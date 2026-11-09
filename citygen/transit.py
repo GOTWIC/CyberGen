@@ -3284,11 +3284,100 @@ def _profile_pass(c: Ctx, ln: Line, gone: set, arr, need: list, runs, over_runs:
     # both envelopes limited to the grade, then the base altitude between them (a clamp
     # between two functions of bounded slope keeps that slope); the lower one wins where
     # they cross (the portal there is then dropped)
-    g = (presets.TRANSIT_MODES[mode].max_grade or 0.05) * 0.95
+    pre = presets.TRANSIT_MODES[mode]
+    g = (pre.max_grade or 0.05) * 0.95
     closed = ln.loop and n > 2 and ln.pts[0] == ln.pts[-1]
     lo = _graded(ln.pts, need, g, max, -1.0, closed)
     hi = _graded(ln.pts, cap, g, min, 1.0, closed)
+    if pre.curve_m:
+        # #124: long ramps and vertical curves (a sky tube's)
+        return [q(z) for z in _curved(ln.pts, need, cap, lo, hi, ln.z0, pre, closed)]
     return [q(max(a, min(b, ln.z0))) for a, b in zip(lo, hi)]
+
+
+def _curved(pts, need: list, cap: list, lo: list, hi: list, z0: float, pre,
+            closed: bool) -> list[float]:
+    """#124: a profile of long ramps and vertical curves. Every need is held level for half a
+    curve and a vertex either side (a crest of `curve_m`), every cap likewise; the needs are
+    lifted and the caps lowered at the design grade (`design_grade`), steeper (up to the limit
+    grade, 0.95 of `max_grade`, as `_profile_pass`) only where the two meet; a sag shorter
+    than `fill_m` between two crests is filled at the lower crest's height (a closing by a
+    level stretch that long); then a moving average over `curve_m` (M7's `elevated.smooth`)
+    rounds every grade change into a parabolic vertical curve of that length. Held level
+    over a crest that long, the average stays over every need and under every cap; where the
+    caps leave no room it is clamped between lo and hi, the needs and caps lifted and lowered
+    at the limit grade, as without curves."""
+    cum = _cum(pts)
+    gap = max((b - a for a, b in zip(cum, cum[1:])), default=0.0)
+    r = pre.curve_m / 2.0 + gap
+    need_w = _window(cum, need, r, max, closed)
+    cap_w = _window(cum, cap, r, min, closed)
+    g = 0.95 * pre.max_grade
+    gd = min(pre.design_grade or g, g)
+    lo_w = _graded(pts, need_w, g, max, -1.0, closed)
+    hi_w = _graded(pts, cap_w, g, min, 1.0, closed)
+    lo_d = _graded(pts, need_w, gd, max, -1.0, closed)
+    hi_d = _graded(pts, cap_w, gd, min, 1.0, closed)
+    # (a clamp between functions of grade at most g keeps that grade)
+    raw = [max(a, min(b, max(c, min(d, z0))))
+           for a, b, c, d in zip(lo_w, hi_w, lo_d, hi_d)]
+    if pre.fill_m:
+        h = pre.fill_m / 2.0
+        shut = _window(cum, _window(cum, raw, h, max, closed), h, min, closed)
+        raw = [max(a, min(b, x)) for a, b, x in zip(lo_w, hi_w, shut)]
+    z = _box(cum, raw, pre.curve_m, closed)
+    return [max(a, min(b, x)) for a, b, x in zip(lo, hi, z)]
+
+
+def _window(cum: list, vals: list, r: float, pick, closed: bool) -> list:
+    """pick (max or min) of vals within r along the track of each point; around a closed
+    track (first point = last) past its seam."""
+    n = len(vals)
+    if closed and n > 2:
+        m, T = n - 1, cum[-1]
+        pos = [s - T for s in cum[:m]] + cum[:m] + [s + T for s in cum[:m]]
+        val = vals[:m] * 3
+    else:
+        pos, val = cum, vals
+    out = []
+    for s in cum:
+        a = bisect.bisect_left(pos, s - r - 1e-9)
+        b = bisect.bisect_right(pos, s + r + 1e-9)
+        out.append(pick(val[a:b]))
+    return out
+
+
+def _box(cum: list, vals: list, L: float, closed: bool) -> list[float]:
+    """The moving average of a profile (linear between its points) over L along the track:
+    past the ends of an open track its end values, around a closed one past its seam."""
+    n = len(vals)
+    T = cum[-1]
+    P = [0.0]
+    for k in range(n - 1):
+        P.append(P[-1] + (cum[k + 1] - cum[k]) * (vals[k] + vals[k + 1]) / 2.0)
+
+    def integral(x: float) -> float:
+        base = 0.0
+        if closed:
+            k = math.floor(x / T)
+            x -= k * T
+            base = k * P[-1]
+        elif x <= 0.0:
+            return x * vals[0]
+        elif x >= T:
+            return P[-1] + (x - T) * vals[-1]
+        i = min(max(bisect.bisect_right(cum, x) - 1, 0), n - 2)
+        t, Ls = x - cum[i], cum[i + 1] - cum[i]
+        part = vals[i] * t + ((vals[i + 1] - vals[i]) * t * t / (2.0 * Ls) if Ls > 0 else 0.0)
+        return base + P[i] + part
+
+    if n < 2 or T <= 0.0:
+        return list(vals)
+    h = L / 2.0
+    out = [(integral(s + h) - integral(s - h)) / L for s in cum]
+    if closed and n > 2:
+        out[-1] = out[0]
+    return out
 
 
 # ---------------------------------------------------------------------------

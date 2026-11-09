@@ -23,7 +23,7 @@ from citygen.validate import validate_spec
 from conftest import SMALL
 
 TRANSIT_CHECKS = {"transit_routes", "transit_stops", "transit_curves", "transit_self_crossing",
-                  "transit_grades", "transit_altitude", "transit_clearance", "transit_supports",
+                  "transit_grades", "transit_profile_smooth", "transit_altitude", "transit_clearance", "transit_supports",
                   "station_access", "transit_skybridges", "transit_hubs"}
 
 # The small city with one line of each kind: underground, along the avenues, through towers,
@@ -148,6 +148,35 @@ def test_check_grades_fails(lines):
         t["path"][5][2] += 8.0
     assert not _rerun(_mutate(lines.model, fn))["transit_grades"].passed
 
+
+
+def test_check_profile_smooth_fails(lines):
+    """#124: a sky tube that climbs in a step (a grade break) or dips between two crests closer
+    than the fill length fails `transit_profile_smooth`; an elevated line is not measured."""
+    assert _rerun(lines.model)["transit_profile_smooth"].passed
+
+    def step(d):
+        t = _line(d, "sky_tube")
+        cum = TR._cum([(p[0], p[1]) for p in t["path"]])
+        k = next(i for i, s in enumerate(cum) if s > cum[-1] / 2)
+        for p in t["path"][k:]:
+            p[2] += 6.0
+    assert not _rerun(_mutate(lines.model, step))["transit_profile_smooth"].passed
+
+    def dip(d):
+        t = _line(d, "sky_tube")
+        cum = TR._cum([(p[0], p[1]) for p in t["path"]])
+        mid = cum[-1] / 2
+        for p, s in zip(t["path"], cum):
+            if abs(s - mid) < 60.0:
+                p[2] -= 0.05 * (60.0 - abs(s - mid))
+    c = _rerun(_mutate(lines.model, dip))["transit_profile_smooth"]
+    assert not c.passed and any("sag" in f for f in c.failures)
+
+    def rail(d):
+        t = _line(d, "elevated_rail")
+        t["path"][5][2] += 3.0
+    assert _rerun(_mutate(lines.model, rail))["transit_profile_smooth"].passed
 
 def test_check_altitude_fails(lines):
     def fn(d):
@@ -310,6 +339,82 @@ def test_graded_closed():
     assert all(abs(a - b) <= 0.04 * math.dist(p, r) + 1e-9
                for a, b, p, r in zip(loop, loop[1:], pts, pts[1:]) if p != r)
 
+
+
+def _sky(need, cap, pts=None, closed=False):
+    """A sky tube profile over needs and caps on a straight track of 10 m steps (#124), with
+    today's envelopes at the limit grade, as `_profile_pass` gives them to `_curved`."""
+    pts = pts or [(10.0 * k, 0.0) for k in range(len(need))]
+    pre = TR.presets.TRANSIT_MODES["sky_tube"]
+    g = 0.95 * pre.max_grade
+    lo = TR._graded(pts, need, g, max, -1.0, closed)
+    hi = TR._graded(pts, cap, g, min, 1.0, closed)
+    return pts, pre, TR._curved(pts, need, cap, lo, hi, 92.5, pre, closed)
+
+
+def _grades(pts, z):
+    return [(b - a) / math.dist(p, r) for a, b, p, r in zip(z, z[1:], pts, pts[1:])]
+
+
+def test_sky_tube_profile_curves_and_fills_sags():
+    """#124: two crests 300 m apart (shorter than the fill length) are joined level at their
+    height, the climbs run at the design grade, and every grade change is a vertical curve
+    (the grade changes by at most two limit grades over a curve's length), over every need."""
+    need = [92.5] * 401
+    for k in list(range(150, 160)) + list(range(190, 200)):
+        need[k] = 114.0
+    pts, pre, z = _sky(need, [TR.INF] * 401)
+    assert all(a >= b - 1e-9 for a, b in zip(z, need))
+    assert min(z[160:190]) == pytest.approx(114.0)                 # the sag filled
+    gr = _grades(pts, z)
+    assert max(abs(x) for x in gr) <= pre.design_grade + 1e-9
+    bend = 2 * 0.95 * pre.max_grade * 10.0 / pre.curve_m
+    assert max(abs(b - a) for a, b in zip(gr, gr[1:])) <= bend + 1e-9
+    assert z[0] == pytest.approx(92.5) and z[-1] == pytest.approx(92.5)
+    # crests farther apart than the fill length: the line comes down between them
+    need = [92.5] * 301
+    for k in list(range(40, 50)) + list(range(250, 260)):
+        need[k] = 114.0
+    _, _, z = _sky(need, [TR.INF] * 301)
+    assert min(z[50:250]) < 100.0
+
+
+def test_sky_tube_profile_keeps_under_caps():
+    """#124: a cap (a tower the tube passes through) holds the curved profile under it; where
+    a need and a cap leave no room for the design grade the profile climbs steeper, up to the
+    limit grade, and still meets both."""
+    need = [92.5] * 201
+    cap = [TR.INF] * 201
+    for k in range(120, 126):
+        need[k] = 110.0
+    for k in range(60, 66):
+        cap[k] = 95.0
+    pts, pre, z = _sky(need, cap)
+    assert all(a >= b - 1e-9 for a, b in zip(z, need))
+    assert all(a <= b + 1e-9 for a, b in zip(z, cap))
+    assert max(abs(x) for x in _grades(pts, z)) > pre.design_grade
+    assert max(abs(x) for x in _grades(pts, z)) <= 0.95 * pre.max_grade + 1e-9
+
+
+def test_sky_tube_profile_round_a_loop():
+    """#124: around a loop the curves and the sag fill reach past its seam."""
+    n = 200
+    pts = [(500.0 * math.cos(2 * math.pi * k / n), 500.0 * math.sin(2 * math.pi * k / n))
+           for k in range(n)] + []
+    pts.append(pts[0])
+    need = [92.5] * (n + 1)
+    for k in list(range(0, 4)) + list(range(n - 14, n - 10)):
+        need[k] = 112.0
+    need[-1] = need[0]
+    _, pre, z = _sky(need, [TR.INF] * (n + 1), pts, closed=True)
+    assert z[0] == z[-1]
+    assert all(a >= b - 1e-9 for a, b in zip(z, need))
+    assert min(z[n - 10:]) == pytest.approx(112.0)       # the sag across the seam filled
+    gr = _grades(pts, z)
+    ring = gr + gr[:1]
+    bend = 2 * 0.95 * pre.max_grade * max(math.dist(a, b) for a, b in zip(pts, pts[1:])) \
+        / pre.curve_m
+    assert max(abs(b - a) for a, b in zip(ring, ring[1:])) <= bend + 1e-6
 
 def _grid(seed: int, n: int = 40):
     """A raster context n by n with random costs and walls (no city)."""

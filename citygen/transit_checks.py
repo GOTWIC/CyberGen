@@ -143,6 +143,58 @@ def check_grades(m: CityModel) -> Check:
     return c
 
 
+SMOOTH_STEP_M = 10.0      # #124: a curved profile measured every 10 m or so
+SMOOTH_TOL = 0.003        # ... its grades to 1 cm in that (the model's heights on the 1 cm grid)
+SAG_TOL_M = 0.05
+
+
+def check_profile_smooth(m: CityModel) -> Check:
+    """#124: lines whose mode has vertical curves (`curve_m`, sky tubes) climb and descend in
+    long ramps and curves: measured every SMOOTH_STEP_M along the track (around a loop, past
+    its seam), the grade changes no faster than a curve allows (two limit grades over its
+    length) and no sag is narrower than the fill length less a curve (a closing of the
+    measured profile by a level stretch that long lifts it nowhere)."""
+    c = _check("transit_profile_smooth",
+               "Sky tubes climb and descend in long ramps and vertical curves (300 m): every "
+               "10 m the grade changes by no more than a curve allows, and no sag between two "
+               "crests is narrower than 200 m (the 500 m fill length less a curve)")
+    for t in m.transit_lines:
+        pre = presets.TRANSIT_MODES[t.mode]
+        if not pre.curve_m or len(t.path) < 3:
+            continue
+        pts, zs = _track(t)
+        cum = _cum(pts)
+        closed = bool(t.loop) and pts[0] == pts[-1]
+        k = max(int(cum[-1] // SMOOTH_STEP_M), 2)
+        step = cum[-1] / k
+        rec = {"cum": cum, "zs": zs}
+        v = [_z_along(rec, step * i) for i in range(k + 1)]
+        g = [(b - a) / step for a, b in zip(v, v[1:])]
+        bend = 2.0 * 0.95 * (pre.max_grade or 0.05) * step / pre.curve_m + SMOOTH_TOL
+        pairs = list(zip(range(k - 1), g, g[1:])) + ([(k - 1, g[-1], g[0])] if closed else [])
+        worst = max(pairs, key=lambda x: (abs(x[2] - x[1]), -x[0]))
+        if abs(worst[2] - worst[1]) > bend:
+            _limit(c, f"{t.name} ({t.mode}): grade {worst[1]:.3f} to {worst[2]:.3f} at "
+                      f"{step * (worst[0] + 1):.0f} m along it, sharper than a "
+                      f"{pre.curve_m:g} m curve")
+        if pre.fill_m > pre.curve_m:
+            r = int((pre.fill_m - pre.curve_m) / 2.0 / step)
+            n = k if closed else k + 1
+
+            def win(vals, pick):
+                if closed:
+                    return [pick(vals[(i + d) % n] for d in range(-r, r + 1)) for i in range(n)]
+                return [pick(vals[max(0, i - r):i + r + 1]) for i in range(n)]
+            u = v[:n]
+            shut = win(win(u, max), min)
+            i = max(range(n), key=lambda j: (shut[j] - u[j], -j))
+            if shut[i] - u[i] > SAG_TOL_M:
+                _limit(c, f"{t.name} ({t.mode}): a sag {shut[i] - u[i]:.2f} m deep at "
+                          f"{step * i:.0f} m along it narrower than "
+                          f"{pre.fill_m - pre.curve_m:g} m")
+    return c
+
+
 def _water(m: CityModel) -> list:
     out = []
     for e in m.seas:
@@ -684,7 +736,8 @@ def run(spec: CitySpec, m: CityModel) -> list:
         return []
     with G.canonical():
         return [check_routes(spec, m), check_stops(spec, m), check_curves(m),
-                check_self_crossing(m), check_grades(m), check_altitude(spec, m),
+                check_self_crossing(m), check_grades(m), check_profile_smooth(m),
+                check_altitude(spec, m),
                 check_clearance(m),
                 check_supports(m), check_station_access(m), check_skybridges(m),
                 check_hubs(spec, m)]
