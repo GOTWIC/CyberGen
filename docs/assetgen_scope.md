@@ -1076,6 +1076,9 @@ stage 3.
 
 ### 14.18 M22 and AG17: Road surfaces by construction
 
+Done: M22 (PR #142, `docs/citygen_milestones.md`) and AG17 (`docs/assetgen_milestones.md`,
+AG17).
+
 From run-through 2's road recheck (Swagnik, 2026-11-05): after #82, #89, #95, #103 and #104,
 roads still fail to meet their junctions in places. Each fix aligned one more case, because
 each piece finds its own edge and the pieces agree only within tolerances:

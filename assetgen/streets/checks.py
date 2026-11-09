@@ -2,14 +2,17 @@
 mesh validity, the blockout objects the pieces replace, budgets, disk.
 
 - `street_coverage`: every entity of the street collections has a piece with a mesh, or a
-  declared reason it needs none (a segment or a sidewalk wholly inside its junctions, a
-  junction wholly inside an overlapping one that draws it (#82), a creek's natural banks);
+  declared reason it needs none (a segment or a sidewalk with no faces of the pavement map:
+  wholly inside its junctions, M22's clusters; a creek's natural banks);
   every transit line has guideway, tube or tunnel pieces; every megasite's elements
   are covered; stations are the building line's (their structures are covered here).
 - `street_meshes`: no degenerate or duplicate triangles, winding that agrees with the
   normals, indices in range, finite UVs, unit normals, in every piece and LOD.
 - `street_replaces`: every blockout object a piece replaces has all its members covered, so
   the exporter can drop it without losing anything.
+- `street_watertight` (AG17, `watertight.py`): every interior edge of M22's pavement map
+  drawn by both its faces on the same vertices at the same heights, or bridged by a curb,
+  exactly on the packs' millimeters.
 - `street_budgets`: triangles per tile and per city within budget.
 """
 
@@ -19,10 +22,10 @@ from collections import Counter, defaultdict
 
 from .build import CITY_TRIANGLE_BUDGET, COVERED, TILE_TRIANGLE_BUDGET
 
-DECLARED = ("inside its junctions", "inside an overlapping junction", "natural banks")
+DECLARED = ("inside its junctions", "natural banks")
 
 
-def report(model, cx, manifest: dict, pieces) -> dict:
+def report(model, cx, manifest: dict, pieces, out_dir=None) -> dict:
     recs = manifest["pieces"]
     checks = []
     cov = {}
@@ -135,6 +138,12 @@ def report(model, cx, manifest: dict, pieces) -> dict:
     if model.decks:
         from .decks import check as deck_check
         checks.append(deck_check(model, cx, recs))
+    wt = None
+    if out_dir is not None and getattr(cx, "pave", None) is not None and cx.pave.on:
+        # AG17: the pieces drawn from M22's map meet exactly (`watertight.py`)
+        from .watertight import check as watertight
+        wt = watertight(model, cx.pave, out_dir, manifest)
+        checks.append({"id": wt["id"], "ok": wt["ok"], "detail": wt["detail"]})
     # budgets
     tri_tile = {t: v.get("triangles", 0) for t, v in manifest["tiles"].items()}
     total = sum(tri_tile.values())
@@ -171,8 +180,8 @@ def report(model, cx, manifest: dict, pieces) -> dict:
             instances[p["kind"]] += len(p["xforms"])
     disk = sum(v.get("bytes", 0) for v in manifest["tiles"].values()) + \
         manifest["parts"]["bytes"]
-    return {"city": model.name, "ok": all(c["ok"] for c in checks), "checks": checks,
-            "coverage": cov,
+    out = {"city": model.name, "ok": all(c["ok"] for c in checks), "checks": checks,
+           "coverage": cov,
             "stats": {"pieces": len(recs), "tiles": len(manifest["tiles"]),
                       "triangles": total, "max_tile_triangles": worst[1],
                       "disk_bytes": disk, "by_kind": dict(sorted(kinds.items())),
@@ -184,6 +193,9 @@ def report(model, cx, manifest: dict, pieces) -> dict:
                       "instances": dict(sorted(instances.items())),
                       "walkways_on_decks": sum(len((r.get("notes") or {}).get("walkways") or {})
                                                for r in recs.values())}}
+    if wt is not None:
+        out["watertight"] = {"stats": wt["stats"], "worst": wt.get("worst", [])}
+    return out
 
 
 def _covered_by_parent(model, eid: str) -> set:

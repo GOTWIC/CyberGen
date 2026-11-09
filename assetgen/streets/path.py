@@ -230,28 +230,3 @@ def seg_cross(p, q, a, b):
     if -1e-9 <= u <= 1.0 + 1e-9 and -1e-9 <= v <= 1.0 + 1e-9:
         return u, v
     return None
-
-
-def first_exit(path_pts, ring):
-    """Where a polyline starting inside a ring first crosses it: (s along the polyline, edge
-    index i of ring[i] -> ring[i+1], v along that edge), or None."""
-    cum = 0.0
-    n = len(ring)
-    for k in range(len(path_pts) - 1):
-        p, q = path_pts[k], path_pts[k + 1]
-        L = dist(p, q)
-        best = None
-        for i in range(n):
-            a, b = ring[i], ring[(i + 1) % n]
-            c = seg_cross(p, q, a, b)
-            if c is None:
-                continue
-            u, v = c
-            if u * L < 0.01 and k == 0:
-                continue
-            if best is None or u < best[0]:
-                best = (u, i, v)
-        if best is not None:
-            return cum + best[0] * L, best[1], best[2]
-        cum += L
-    return None

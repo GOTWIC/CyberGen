@@ -27,7 +27,7 @@ as it lands, as in [`citygen_milestones.md`](citygen_milestones.md).
 | AG15 | Cyberpunk facades and night, from the first run-through: seven new facade systems, window patterns and skins past the grid, two or three finishes a building, the neighbor rule (towers within 150 m never alike by day or night); every building lit its own way by use and hour, crown and edge light, logos; spot lamps, light pools and sign washes in Unreal | Done | [`docs/progress/AG15`](progress/AG15) |
 | Sky tube fixes | Fixes between milestones (issues #94, #97): sky tubes on plain pylons drawn as before M19 (masts an option), ribs at citygen's rings along the whole line, an LED band in the line's color on each lit one (neon, brighter by night) | Done | [`docs/progress/sky_tubes`](progress/sky_tubes) |
 | AG16 | Performance (scope 14.17, issue #96): a benchmark in a standalone game process, frame time, VRAM, RAM and import targets for Delta on the Windows PC, structural fixes from what it shows, budgets in the build; upscaling measured, DLSS later | Planned | |
-| AG17 | Road surfaces by construction (scope 14.18), with stage 1's M22: AG7's road, junction, sidewalk, median and corner pieces meshed from M22's pavement map, their boundaries the map's stored vertices never split, interiors by constrained triangulation, barriers along stored edges, decals on the face that holds them; a `street_watertight` check (every interior map edge in exactly two pieces at the same positions); AG14's step and strip checks reading 0 | Planned | |
+| AG17 | Road surfaces by construction (scope 14.18), with stage 1's M22: AG7's road, junction, sidewalk, median and corner pieces meshed from M22's pavement map, their boundaries the map's stored vertices never split, interiors by constrained triangulation, barriers along stored edges, decals on the face that holds them; a `street_watertight` check (every interior map edge in exactly two pieces at the same positions); AG14's step and strip checks reading 0 | Done | [`docs/progress/AG17`](progress/AG17) |
 
 ## AG0: contract and spike
 
@@ -2280,6 +2280,170 @@ A fix between milestones, from run-through 2's open items. Tests:
   Windows PC builds a Nexus City model other than its golden, the same on main) and the props
   golden (#92). The streets, ground and water goldens do not move (this fix changes none of
   those stages and no flat city's model).
+
+## AG17: road surfaces by construction
+
+**Built.** From run-through 2's road recheck (scope 14.18), after stage 1's M22 (PR #142):
+AG7 drew each road, junction and sidewalk from its own idea of where its edges were, and the
+pieces agreed only within tolerances (three exit finders, two cuts, AG14's 3 cm and 1 m
+matching, inverse-distance junction heights), so they still overlapped, left gaps and
+stepped where they met (#105). M22 keeps one exact map of every road surface in the model;
+AG17 draws AG7's street pieces from it, so two pieces meet on the same vertices at the same
+heights by construction. Tests: `tests/assetgen/test_ag_junctions.py`,
+`test_ag_triangulate.py` (and the street, barrier, deck, fit and props tests updated);
+outputs `docs/progress/AG17/`.
+
+- **Faces** (`assetgen/streets/pave.py`): a road piece draws its carriageway faces, bends,
+  walking surface and median, and a side's sidewalk bands where no sidewalk piece draws
+  them; a sidewalk piece its side's curb band, furniture zone and clear path; a junction
+  piece its carriageway, corner pads and bulb (a cluster's whole surface; the junctions M22
+  keeps as M18 left them, `attrs.unbuildable`, as they are). Piece ids, kinds, keys and
+  `replaces` are as before; a road or sidewalk with no faces (a cluster's inner road) has no
+  mesh and is declared covered.
+- **Meshing** (`triangulate.triangulate_face`): a face's stored vertices in order, never
+  split or dropped (holes that touch each other or the outer ring at a vertex are joined
+  there first), clipped ear by ear with the shortest new diagonal first (`_clip_best`: a
+  long ribbon comes out as a strip; the plain ear clipper's fan left slivers along a 700 m
+  highway that cut across its vertical curves, more than the Delaunay pass could flip);
+  its interior samples inserted as Steiner points strictly inside, by an exact point walk
+  and edge splits; Lawson flips across every edge that is not boundary. Integer
+  orientation and in-circle tests: the same triangles on every machine.
+- **UV0**: a road or sidewalk face's vertex on one of the map's rows takes that row's
+  (station, offset) (`roads.row_uvs`, through citygen's `pavement.Road`, as M22 lays the
+  rows), so the paving runs along the road with no squeeze outside a turn; a bend's and a
+  junction's faces in plan.
+- **Heights** (`pave.Index`, built once on the street stage's context; every piece's inputs
+  carry each vertex as [x, y, top, z, z over ground] in millimeters): a vertex's height over
+  sea level is the map's z plus the finished ground there; the face's lift adds 50 mm for
+  carriageways, junctions, bulbs, bends and walking surfaces (`ROAD_DZ_MM`), 200 mm for curb
+  bands, sidewalks and corner pads, 70 mm at a curb ramp, and 200 mm for an avenue's,
+  street's or service road's median of a meter or more (an island), level with the road
+  (its cut-through, concrete) under a crosswalk and from it on to a road end within 40 m. Curb ramps (`Index.ramps`) drop
+  the curb band's vertices beside a crosswalk's end or a garage, loading or gate entrance,
+  at least the one nearest each (a band edge is sampled every 4 m or less and never split,
+  so the ramp's slope runs across the furniture zone to its far edge).
+- **Curbs and walls** (`walls`, `draw_walls`): where two faces meet at different lifts, the
+  higher face's piece draws the wall between them, the same stored polyline at the two
+  heights; the right of way's outer edges go down into the ground at grade (`bottoms`: 20 mm
+  in), to a raised road's 0.45 m fascia, an embankment's fill, a deck street's slab top.
+  Where walls of several faces meet at a vertex the faces only touch at (two pads meeting at
+  one curb vertex, a junction pinched at a point), the second and later take a vertex on
+  that edge (`Mesh.wall_mm`'s split), so no two run up the same edge the same way.
+- **Decks**: a raised road's girder runs between its cuts only, capped on its port lines,
+  its soffit 1 cm past the fascia; a raised junction stands on a slab of its own (its
+  legs' deepest `DECK_D`, down to the ground where it is low), with its edge on its ports
+  from 0.45 m under the seam to its foot (0.1 m under its face where it lies in a cut); no
+  girder runs under a junction.
+- **Marks** on the faces as drawn (`Surface`): lane lines, stop lines, arrows, manholes,
+  drains and patches with rows at the map's own stations (`roads.map_stations`, through
+  citygen's `pavement.Road`), crosswalk stripes and tactile paving in rows every 2 m over
+  the faces that hold them (a crosswalk lies on its road's carriageway and median faces, or
+  a junction's), tree pits on the sidewalk.
+- **Bends**: a bend face (a road's stretch where a band would fold) is one face at the
+  carriageway's height over the whole right of way; its curb lines go in as Steiner points
+  every meter, asphalt where a triangle lies within the carriageway's half width and its
+  lanes' corridors (0.5 m wider), the district's paving outside, concrete on a road with
+  no sidewalk (the inside of a fold no lane crosses: no building or barrier check takes it
+  for the carriageway). A junction's carriageway part apart from its main one (a cluster's
+  gore between two roads) is asphalt only where its triangles lie in its connector lanes'
+  corridors (0.5 m wider), paving elsewhere.
+- **Barriers** (`barriers.py` reworked): a run's spans go from cut to cut, less where its
+  band would leave the road's own faces (M22 cuts them where another road's overlap) or come
+  within 1 m of any crosswalk (spans never meet end to end); every end at a cut lies on the
+  road's port line
+  (`Road.port_frame`; `roads.port_lines`: the outermost vertices of the edges the road shares
+  with the faces at that end, its junction's or the road it goes on as, port edges and seams,
+  within a road's width of the cut) and is `join`, `open` or `stop`. A junction's corner
+  parapets (raised) and guard walls (at grade) run along the boundary of its faces
+  (`_loops`) from one leg's outer port vertex to the next, on their port lines where those
+  are straight (within 2 cm; else square to their own edge), out of the junction's
+  connector lanes (cut and capped where the section, at twice its reach for the sweep's
+  mitres, meets a lane's corridor with round ends, `_off_lanes`; a hit outside a sharp turn
+  cut 1 cm either side of its vertex), split where the edge
+  turns back or passes a vertex twice (`_split_sharp`); the median across runs between the
+  two port middles where no connector lane crosses or runs along it.
+- **Retired**: `path.first_exit`, `Road._edge` and `CUT_TOL_M`, `_with_corners`,
+  `_cut_run`, `_run_z`, `_road_rows`, `_surface` (inverse-distance heights), `_sectors` and
+  its duplicate `_corner`, `_fills`, `_fill`, `_clear_spans`, `_clip_rings`, `_overlaps` and
+  the `_carriageway` seam, `_along_legs`, `_despike`, `_draped`, `roads._median_clip`,
+  `roads._make`'s tidied line, `barriers.Keepout`, `clip_line`, `junction_area`,
+  `near_of_junction`, `leg_ends`, `corner_points`, `_level_with`.
+- **Checks**: `street_watertight` (new, `streets/watertight.py`, on the packs read back on
+  integer millimeters): for every segment of every edge two faces share, each face's piece
+  draws the segment between its two stored vertices at the heights it draws them, and that
+  mesh edge lies in exactly two triangles of all the street surfaces (the two faces', or a
+  face's and its curb's); a missing segment is a gap (measured in plan to the nearest edge
+  its piece draws), one in a single triangle is open, in more drawn twice. AG14's step check
+  (`fit.seams`) compares a road's and its junction's pieces exactly at the map's port
+  vertices, faces of one class (a sidewalk ending on a carriageway is a curb); its strip
+  check reads the packs as before.
+- **Footbridges** (out of M22's map, which has no faces for them): a footbridge's road
+  piece draws its walking surface on its own profile from where its line leaves the
+  junction at each end (`roads.walk_span`, the junction's outline) and its girder under it,
+  the sides rising to the surface (no face draws a fascia there); the bridge piece's
+  railings and stone parapets run along that surface too, each `FOOT_CLEAR_M` (0.15 m) off
+  the faces of the junction at its ends (corner pads too) at its own offset
+  (`barriers.road_runs`, #95's rule; M22's cuts fall about 2 m further in, past the top of
+  the stairs). Found on the materials golden: the first AG17 build left
+  footbridges with an open girder, no surface and their railings 2 m short at each end.
+- **AG8** (`props/gather.py`): props keep off the map's carriageway faces (`_Fit`, at the
+  height of the nearest vertex); a raised junction's corner is its faces (`_RaisedCorners`:
+  a standing thing in its reach at its height on no face of the map is left out, one on a
+  pad stands on it as AG7 triangulates it); a median barrier prop of a road with no faces
+  (a cluster's inner road) is left out.
+- **Exporter**: no change (`docs/unreal_export.md`, "From AG17").
+
+Every sample, the pinned, stack and deck demos and Cragmouth with the final code
+(`assetgen build`, models from M22's main): street pieces, triangles, the watertight
+check's shared segments and its not drawn / open / twice, AG14's steps and strips, every
+clash, and the assetgen checks that fail (all of buildings or water, whose code AG17 leaves
+as it was: Delta's #144, Vesper Bay Pinned's two buildings with one thumbnail, Nexus's water
+gap on main's water stage, Cragmouth's skybridge clearance and landings and a roof vent).
+
+| City | Pieces | Triangles | Segments | Not drawn / open / twice | Steps | Strips | Clashes | Failing |
+|---|---|---|---|---|---|---|---|---|
+| Delta Megacity | 8,827 | 1,586,582 | 196,763 | 0 / 0 / 0 | 0 | 0 | 0 | asset_envelope, asset_unique, asset_grounded |
+| Vesper Bay | 9,019 | 1,457,809 | 210,886 | 0 / 0 / 0 | 0 | 0 | 0 | none |
+| Saltreach Free Port | 5,484 | 815,542 | 118,555 | 0 / 0 / 0 | 0 | 0 | 0 | none |
+| Nexus City | 9,617 | 1,471,296 | 223,841 | 0 / 0 / 0 | 0 | 0 | 0 | water_gaps |
+| Greyhook | 4,450 | 833,821 | 128,893 | 0 / 0 / 0 | 0 | 0 | 0 | none |
+| Vesper Bay Pinned | 9,817 | 1,459,583 | 219,929 | 0 / 0 / 0 | 0 | 0 | 0 | asset_unique |
+| Vesper Bay Stacks | 9,790 | 1,488,107 | 217,981 | 0 / 0 / 0 | 0 | 0 | 0 | none |
+| Vesper Bay Decks | 9,945 | 1,606,122 | 219,812 | 0 / 0 / 0 | 0 | 0 | 0 | none |
+| Cragmouth | 11,119 | 1,803,719 | 228,098 | 0 / 0 / 0 | 0 | 0 | 0 | asset_clearance, asset_landings, asset_grounded |
+
+Delta before (M22's main) and after: 8,827 street pieces both; 1,288,343 triangles to
+1,586,582 (roads 261,668 to 357,973, junctions 217,036 to 362,476, sidewalks 346,999 to
+373,423, crosswalks 20,202 to 50,284); roads inside their junctions with no mesh 8 to 246
+(the clusters' inner roads); corner pads 3,248 (269 left out) to 3,594 (none). The
+watertight check on M22's own packs: 361,103 sides of shared segments not drawn, 29,306
+open (the old pieces found their own edges, off the map's vertices); after: 0 and 0.
+Goldens: `golden_streets.json`, `golden_props.json` and `golden_ground.json` rewritten (the
+street tiles drawn from the map, props keeping off its faces, the ground stage's code hash
+holding `streets/path.py`, from which `first_exit` went), and `golden_hashes.json`'s
+`ag6.testport_materials` (the small city's street contribution: entries, hashes, triangles
+and walkway lines drawn from the map, no entry for the clusters' inner roads and sidewalks,
+which have no mesh); `golden_water.json` unchanged. The materials golden moved with AG17,
+not with the suite's order: run alone, main passes its own and AG17's code its new one.
+
+Open:
+- AG14's grounded rule (#105's last leftover): `fit.build.grounded` takes a thing's
+  smallest foot gap where fewer than three of its five feet touch, so one foot is enough.
+  The third smallest, as its description says, finds roof equipment AG4 seats on fewer
+  than three feet (Vesper Bay 4 AC units, Delta an AC unit and a second roof vent); a fix
+  of AG4's seating first, then the rule.
+- A junction's corner barrier ends square to its own edge where its leg's port line is not
+  straight within 2 cm (a curved port), not on the port.
+- Curb ramps lower the curb band's stored vertices, which are never split, so a ramp slopes
+  across the furniture zone to its far edge; a short flared ramp needs ramp vertices in
+  M22's map.
+- Junctions M22 keeps as M18 left them (`attrs.unbuildable`) and Cragmouth's steep hillside
+  junctions are drawn as their faces are, steep where the map is: Delta's `jn.e170s444`
+  (drawn grade 0.9) has a corner pad folded up between the road at grade and its ramp 10 m
+  up (`docs/progress/AG17/`); a surface there is M22's to fit.
+- Street triangles rose by a quarter (bends' curb lines as Steiner points every meter, the
+  map's interior samples, curbs as walls), within the budgets; AG16's to weigh.
+- The Unreal check after AG17 (an import over M22's, shots of `jn.e170s444`).
 
 ## Order
 

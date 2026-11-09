@@ -1,10 +1,13 @@
-"""Issues #82 and #89, AG7's junctions and AG14's leftovers: AG14's `asset_clash` finds a
-sidewalk, a junction's corner or a median over a junction's carriageway (`fit.strips`)."""
+"""Junctions and their seams. Issues #82 and #89 and AG14's leftovers: AG14's `asset_clash`
+finds a sidewalk, a junction's corner or a median over a junction's carriageway
+(`fit.strips`). AG17: the street pieces draw M22's pavement map (`streets/pave.py`): two
+faces meet on their shared vertices at one height, or a curb's wall between them; a raised
+junction stands on its own slab; a cul-de-sac's bulb is drawn whole; AG8 reads a raised
+junction's faces from the map."""
 
 from types import SimpleNamespace
 
 import numpy as np
-import pytest
 
 from assetgen.fit.strips import strip_clash
 
@@ -63,157 +66,166 @@ def test_the_check_finds_a_sidewalk_across_a_junction():
     assert r["worst"]["strip_on_junction"][0]["strip"] == "jn.b"
 
 
-# -- AG7: overlapping junctions and clipped sidewalks ----------------------------------------
+# -- AG17: a tiny pavement map ---------------------------------------------------------------
 
 STYLE = {"archetype": None, "era": "mixed_modern", "grime": 0.0, "wealth": 0.5, "wear": 1.0}
 
 
-def _leg(sid, line, zs, at_start=True, width=20.0, side=0.0, cls="avenue"):
-    return {"id": sid, "at_start": at_start, "line": [list(p) for p in line],
-            "z_profile": [{"s": s, "z": z} for s, z in zs], "width": width, "side": side,
-            "cls": cls}
+def _map(z: float = 8.0):
+    """A junction `jn.a` of two faces at height z over flat ground: its carriageway
+    (0, 0)-(10, 10) and a corner pad (10, 0)-(20, 5) beside it, sharing the curb edge from
+    (10, 0) to (10, 5)."""
+    from assetgen.streets import pave as PV
+    from assetgen.streets.ctx import Ground
+
+    pts = {"a": (0.0, 0.0), "b": (10.0, 0.0), "c": (10.0, 5.0), "d": (10.0, 10.0),
+           "e": (0.0, 10.0), "f": (20.0, 0.0), "g": (20.0, 5.0)}
+    V = [SimpleNamespace(id=k, p=p, z=z) for k, p in sorted(pts.items())]
+    E = [SimpleNamespace(id=f"e{u}{v}", kind=k, v=[u, v]) for u, v, k in (
+        ("a", "b", "outer"), ("b", "c", "curb"), ("c", "d", "outer"), ("d", "e", "outer"),
+        ("e", "a", "outer"), ("b", "f", "outer"), ("f", "g", "outer"), ("g", "c", "outer"))]
+    faces = [SimpleNamespace(id="jn.a.pv.jn", owner_id="jn.a", kind="junction", band="jn",
+                             layer="g1", rings=[["eab", "ebc", "ecd", "ede", "eea"]],
+                             samples=[]),
+             SimpleNamespace(id="jn.a.pv.pad_a", owner_id="jn.a", kind="corner",
+                             band="pad_a", layer="g1", rings=[["ebf", "efg", "egc", "-ebc"]],
+                             samples=[])]
+    m = SimpleNamespace(pavement_net=SimpleNamespace(vertices=V, edges=E), pavement=faces,
+                        road_segments=[], junctions=[SimpleNamespace(id="jn.a", level=0)],
+                        crosswalks=[], buildings=[], parking=[])
+    PI = PV.Index(m, Ground(SimpleNamespace(seas=[], rivers=[], channels=[], waterways=[])))
+    PI.ramps(m)
+    return m, PI
 
 
-def _junction(jid, ring, node, legs):
-    return {"junction": {"id": jid, "polygon": {"exterior": [list(p) for p in ring],
-                                                "holes": []},
-                         "level": 0, "shape": "multi", "corner_radius_m": 6.0},
-            "node": list(node), "node_ground": 0.0, "legs": legs, "style": STYLE,
-            "origin": [0.0, 0.0]}
+def _cross2(u, v) -> float:
+    return u[0] * v[1] - u[1] * v[0]
 
 
-def _asphalt(out) -> np.ndarray:
-    return np.array([p for k, sl in out.mesh.slots.items() if k.startswith("asphalt")
-                     for p in sl.pos], dtype=np.float64) / 1000.0
+def _edges(mesh) -> dict:
+    """Every mesh edge (its ends' positions, in a fixed order): how many triangles use it."""
+    out: dict = {}
+    for sl in mesh.slots.values():
+        for t in range(0, len(sl.idx), 3):
+            a, b, c = (sl.pos[i] for i in sl.idx[t:t + 3])
+            for u, v in ((a, b), (b, c), (c, a)):
+                k = (min(u, v), max(u, v))
+                out[k] = out.get(k, 0) + 1
+    return out
 
 
-def test_an_overlapping_junction_leaves_the_overlap_to_its_owner():
-    """#82: two junctions whose outlines overlap (M17's shared pavement of two roads between
-    their nodes): the larger draws the overlap, the other only the rest, and along the
-    owner's outline the other's surface takes the owner's heights (no step between them)."""
+def test_two_faces_meet_on_their_shared_vertices():
+    """A carriageway and a corner pad beside it: each drawn on its stored vertices, the pad
+    `pave.CURB_MM` higher, a curb's wall between them on the same two vertices at the two
+    heights: every mesh edge on the shared edge in exactly two triangles."""
+    from assetgen.streets import pave as PV
+    from assetgen.streets.kit import Mesh, check
+    _, PI = _map()
+    mesh = Mesh((0.0, 0.0))
+    specs: list = []
+    for fid in PI.faces_of("jn.a"):
+        fi = PI.face_input(fid)
+        PV.draw(mesh, fi, "asphalt.street" if fi["cls"] == "top" else "paving.tile")
+        PV.walls(mesh, fi, "concrete", PV.ground_bottom, curb_slot="curb.granite", out=specs)
+    PV.draw_walls(mesh, specs)
+    assert not any(check(mesh.slots).values())
+    E = _edges(mesh)
+    lo, hi = 8000 + PV.ROAD_DZ_MM, 8000 + PV.ROAD_DZ_MM + PV.CURB_MM
+    for z in (lo, hi):
+        k = ((10000, 0, z), (10000, 5000, z))
+        assert E.get(k) == 2, (z, E.get(k))
+    # the curb: its two vertical edges and its foot and top on those vertices
+    curb = mesh.slots["curb.granite"]
+    assert {p[2] for p in curb.pos} == {lo, hi}
+    assert {(p[0], p[1]) for p in curb.pos} == {(10000, 0), (10000, 5000)}
+
+
+def test_a_raised_junction_stands_on_its_slab():
+    """A raised junction's faces stand on a slab of their own (`deck_d` deep, its underside
+    under every face, its edges walled), and nothing else under it: no girder runs under a
+    junction (AG17), its roads' end on its ports."""
     from assetgen.streets import walks as W
-    from assetgen.streets.roads import ROAD_DZ
-    ramp = [(0.0, 0.0), (0.0, 50.0)]
-    a = _junction("jn.a", [(-10, -10), (10, -10), (10, 50), (-10, 50)], (0.0, 0.0, 5.0),
-                  [_leg("rs.s", [(0.0, 0.0), (0.0, -60.0)], [(0, 5.0), (60, 5.0)]),
-                   _leg("rs.r", ramp, [(0, 5.0), (50, 0.0)])])
-    b = _junction("jn.b", [(-10, 20), (10, 20), (10, 70), (-10, 70)], (0.0, 50.0, 0.0),
-                  [_leg("rs.r", ramp, [(0, 5.0), (50, 0.0)], at_start=False),
-                   _leg("rs.n", [(0.0, 50.0), (0.0, 100.0)], [(0, 0.0), (50, 0.0)])])
-    sa = W._surface(a)
-    b["overlaps"] = [{"id": "jn.a", "ring": a["junction"]["polygon"]["exterior"],
-                      "owner": True,
-                      "drawn": [[x, y, sa["zfun"](x, y)] for x, y in sa["cring"]]}]
-    a["overlaps"] = [{"id": "jn.b", "ring": b["junction"]["polygon"]["exterior"]}]
-    pa = _asphalt(W.make_junction(a))
-    pb = _asphalt(W.make_junction(b))
-    assert pa[:, 1].min() < -9.9 and pa[:, 1].max() > 49.9          # the owner whole
-    assert pb[:, 1].min() > 49.9 and pb[:, 1].max() > 69.9          # the rest only
-    seam = pb[np.abs(pb[:, 1] - 50.0) < 0.01]
-    assert len(seam) >= 2
-    assert np.allclose(seam[:, 2], ROAD_DZ, atol=0.002)             # the owner's height there
-
-
-def test_a_sidewalk_is_not_drawn_over_a_junction():
-    """#82: a sidewalk M2 laid along a whole road (its cuts at two overlapping junctions
-    overlap) is drawn only where its slab is off the junctions it reaches into."""
-    from assetgen.streets import walks as W
-    seg = {"id": "rs.a", "centerline": [[0.0, -20.0], [0.0, 40.0]], "width_m": 20.0,
-           "road_class": "avenue", "z_profile": [{"s": 0.0, "z": 0.0}, {"s": 60.0, "z": 0.0}],
-           "cross_section": {"sidewalk_m": [3.0, 3.0], "median_m": 0.0, "curb_m": 0.15},
-           "attrs": {}}
-    road = {"seg": seg, "cls": "avenue", "ends": [], "crossings": [], "lanes": [],
-            "start": "a", "end": "b", "origin": [0.0, 0.0]}
-    walk = {"id": "rs.a.swl", "line": [[-8.5, -20.0], [-8.5, 40.0]], "width_m": 3.0,
-            "side": "left", "curb_m": 0.15}
-    inp = {"walk": walk, "road": road, "style": STYLE, "drops": [], "trees": [],
-           "origin": [0.0, 0.0]}
-    whole = W.make_sidewalk(dict(inp))
-    y = np.array([p[1] for sl in whole.mesh.slots.values() for p in sl.pos]) / 1000.0
-    assert ((y > 12.0) & (y < 28.0)).any()
-    inp["clip"] = [{"id": "jn.x", "ring": [[-20.0, 10.0], [20.0, 10.0], [20.0, 30.0],
-                                          [-20.0, 30.0]]}]
-    cut = W.make_sidewalk(inp)
-    y = np.array([p[1] for sl in cut.mesh.slots.values() for p in sl.pos]) / 1000.0
-    assert not ((y > 10.06) & (y < 29.94)).any()
-    assert y.min() < -19.9 and y.max() > 39.9
-
-
-
-def test_a_sidewalk_draws_the_rest_of_its_width_beside_a_junction():
-    """#82: where a junction reaches over only part of a sidewalk's width, the stretch's
-    slab goes and the rest of its width is drawn flat (`walks._fills`), not left open."""
-    from assetgen.streets import walks as W
-    seg = {"id": "rs.a", "centerline": [[0.0, -20.0], [0.0, 40.0]], "width_m": 20.0,
-           "road_class": "avenue", "z_profile": [{"s": 0.0, "z": 0.0}, {"s": 60.0, "z": 0.0}],
-           "cross_section": {"sidewalk_m": [3.0, 3.0], "median_m": 0.0, "curb_m": 0.15},
-           "attrs": {}}
-    road = {"seg": seg, "cls": "avenue", "ends": [], "crossings": [], "lanes": [],
-            "start": "a", "end": "b", "origin": [0.0, 0.0]}
-    walk = {"id": "rs.a.swl", "line": [[-8.5, -20.0], [-8.5, 40.0]], "width_m": 3.0,
-            "side": "left", "curb_m": 0.15}
-    inp = {"walk": walk, "road": road, "style": STYLE, "drops": [], "trees": [],
-           "origin": [0.0, 0.0],
-           "clip": [{"id": "jn.x", "ring": [[-20.0, 10.0], [-9.0, 10.0], [-9.0, 30.0],
-                                            [-20.0, 30.0]]}]}
-    out = W.make_sidewalk(inp)
-
-    def top_at(x, y):
-        """The highest up-facing triangle over (x, y), or None."""
-        best = None
-        for sl in out.mesh.slots.values():
-            Q = np.array(sl.pos, dtype=np.float64) / 1000.0
-            for t in np.array(sl.idx).reshape(-1, 3):
-                a, b, c = Q[t]
-                d = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
-                if d <= 1e-9:
-                    continue
-                u = ((b[0] - x) * (c[1] - y) - (b[1] - y) * (c[0] - x)) / d
-                v = ((c[0] - x) * (a[1] - y) - (c[1] - y) * (a[0] - x)) / d
-                if u >= 0 and v >= 0 and u + v <= 1:
-                    z = u * a[2] + v * b[2] + (1 - u - v) * c[2]
-                    best = z if best is None else max(best, z)
-        return best
-    slab = top_at(-9.5, 0.0)                                        # the slab off it
-    assert slab is not None and top_at(-8.0, 20.0) == pytest.approx(slab, abs=0.005)
-    assert top_at(-9.5, 20.0) is None                               # not over the junction
-    from assetgen.streets.kit import check
-    assert not any(check(out.mesh.slots).values())
+    _, PI = _map(8.0)
+    inp = {"faces": [PI.face_input(f) for f in PI.faces_of("jn.a")],
+           "junction": {"id": "jn.a", "level": 0, "shape": "multi"}, "style": STYLE,
+           "origin": [0.0, 0.0], "top": "avenue", "deck_d": 1.2}
+    out = W.make_junction(inp)
+    deck = out.mesh.slots["concrete.deck"]
+    P = np.array(deck.pos)
+    assert P[:, 2].min() == 8000 - 1200
+    T = P[np.array(deck.idx).reshape(-1, 3)]
+    n = np.cross(T[:, 1] - T[:, 0], T[:, 2] - T[:, 0])
+    under = T[(n[:, 2] < 0)]
+    assert len(under) and (under[:, :, 2] == 6800).all()
+    # the underside covers both faces' plan (10 x 10 m and 10 x 5 m)
+    area = sum(abs(_cross2(t[1] - t[0], t[2] - t[0])) / 2.0 for t in under)
+    assert abs(area - 150.0e6) < 1.0
+    assert out.notes["corner_pads"] == [1, 0]
+    low = [p for sl in out.mesh.slots.values() for p in sl.pos if p[2] < 6800]
+    assert not low
 
 
 def test_a_prop_in_a_raised_corner_with_no_pad_is_left_out():
-    """#89: AG8 leaves out a standing thing in a raised junction's corner (AG7's notes) at
-    the junction's height that stands on neither its carriageway nor a pad AG7 drew; one on
-    the ground under it, or on a pad, stays."""
+    """#89, AG17: AG8 leaves out a standing thing in a raised junction's reach at its height
+    that stands on none of the map's faces; one on the ground under it, on a pad or on the
+    carriageway stays; on a pad it stands on the pad as AG7 draws it."""
     from assetgen.props.gather import _RaisedCorners
-    note = {"area": [[[0.0, 0.0], [20.0, 0.0], [20.0, 20.0], [0.0, 20.0]]],
-            "carriageway": [[[0.0, 0.0], [10.0, 0.0], [10.0, 10.0], [0.0, 10.0]]],
-            "z": [8.0, 8.5],
-            "pads": [[[10.0, 0.0, 8.2], [20.0, 0.0, 8.2], [20.0, 5.0, 8.2], [10.0, 5.0, 8.2]]]}
-    rc = _RaisedCorners([note])
-    assert rc.unpaved(15.0, 15.0, 8.1)          # in the corner, no pad under it
-    assert not rc.unpaved(15.0, 2.5, 8.1)       # on a pad
+    m, PI = _map(8.0)
+    rc = _RaisedCorners(m, PI)
+    assert rc.unpaved(12.0, 7.0, 8.1)           # in its reach, on no face
+    assert not rc.unpaved(15.0, 2.5, 8.1)       # on the pad
     assert not rc.unpaved(5.0, 5.0, 8.1)        # on the carriageway (#95's to keep off)
-    assert not rc.unpaved(15.0, 15.0, 0.0)      # on the ground under the junction
-    assert not rc.unpaved(30.0, 30.0, 8.1)      # not in its corners
+    assert not rc.unpaved(12.0, 7.0, 0.0)       # on the ground under the junction
+    assert not rc.unpaved(30.0, 30.0, 8.1)      # out of its reach
+    assert abs(rc.pad_top(15.0, 2.5, 8.1) - 8.2) < 1e-9
 
 
-def test_a_cul_de_sac_has_a_sidewalk_round_its_bulb():
-    """#82: a turning bulb gets a band of its leg's sidewalk width round it, less the leg's
-    right of way (the leg's own sidewalks run up to it; they used to run on into it)."""
+def test_a_footbridge_draws_its_walking_surface():
+    """M22 keeps footbridges out of its map (no faces): AG7 draws a footbridge's walking
+    surface on its profile from where it leaves its junctions (`walk_span`, as before AG17)
+    and its girder under that stretch, closed up to the surface; nothing below the deck."""
+    from assetgen.streets import roads as RD
+    from assetgen.streets.kit import check
+    seg = {"id": "rs.fb", "centerline": [[0.0, 0.0], [30.0, 0.0]], "width_m": 4.0,
+           "road_class": "footbridge", "bridge": True, "attrs": {},
+           "z_profile": [{"s": 0.0, "z": 0.0}, {"s": 4.0, "z": 3.8}, {"s": 26.0, "z": 3.8},
+                         {"s": 30.0, "z": 0.0}],
+           "cross_section": {"sidewalk_m": [0.0, 0.0], "median_m": 0.0, "curb_m": 0.15}}
+    inp = {"seg": seg, "cls": "footbridge", "ends": [], "crossings": [], "lanes": [],
+           "style": STYLE, "origin": [15.0, 0.0], "cuts": [7.0, 7.0], "faces": [],
+           "walk": [5.0, 25.0], "barriers": []}
+    out = RD.make(inp)
+    assert not any(check(out.mesh.slots).values())
+    walk = out.mesh.slots[RD.asphalt_slot("footbridge", STYLE)]
+    P = np.array(walk.pos)
+    assert P[:, 0].min() == 5000 - 15000 and P[:, 0].max() == 25000 - 15000
+    assert (P[:, 2] == 3800 + RD.PV.ROAD_DZ_MM).all()
+    assert P[:, 1].min() == -2000 and P[:, 1].max() == 2000
+    deck = np.array(out.mesh.slots["concrete.deck"].pos)
+    assert deck[:, 0].min() == P[:, 0].min() and deck[:, 0].max() == P[:, 0].max()
+    assert deck[:, 2].max() == P[:, 2].max()            # (its sides up to the surface)
+
+
+def test_a_bulb_is_drawn_whole():
+    """A cul-de-sac's bulb (its own face of the map, starting at its road's port: no wedge)
+    is drawn whole at the carriageway's height."""
     import math
 
+    from assetgen.streets import pave as PV
     from assetgen.streets import walks as W
-    ring = [(12.0 * math.cos(2 * math.pi * k / 24), 12.0 * math.sin(2 * math.pi * k / 24))
-            for k in range(24)]
-    inp = _junction("jn.c", ring, (0.0, 0.0, 0.0),
-                    [_leg("rs.c", [(0.0, 0.0), (-80.0, 0.0)], [(0, 0.0), (80, 0.0)],
-                          width=16.0, side=3.0, cls="street")])
-    inp["junction"]["shape"] = "cul_de_sac"
+    from assetgen.triangulate import area2
+    n = 24
+    ring = [(int(round(12000 * math.cos(2 * math.pi * k / n))),
+             int(round(12000 * math.sin(2 * math.pi * k / n)))) for k in range(n)]
+    fi = {"id": "jn.c.pv.jn", "kind": "bulb", "band": "jn", "layer": "g0", "cls": "top",
+          "rings": [[[x, y, PV.ROAD_DZ_MM, 0, 0] for x, y in ring]],
+          "segs": [[["outer"]] * n], "samples": []}
+    inp = {"faces": [fi], "junction": {"id": "jn.c", "level": 0, "shape": "cul_de_sac"},
+           "style": STYLE, "origin": [0.0, 0.0], "top": "street", "deck_d": 1.2}
     out = W.make_junction(inp)
-    pave = [k for k in out.mesh.slots if k.startswith("paving")]
-    assert pave and out.notes["corner_pads"][0] == 1
-    P = np.array([p for k in pave for p in out.mesh.slots[k].pos], dtype=np.float64) / 1000.0
-    r = np.hypot(P[:, 0], P[:, 1])
-    assert r.min() > 11.0 and r.max() < 15.3                  # round the bulb, 3 m wide
-    assert not ((P[:, 0] < -12.5) & (np.abs(P[:, 1]) < 7.9)).any()   # not on the leg
+    sl = out.mesh.slots["asphalt.street"]
+    T = np.array(sl.pos)[np.array(sl.idx).reshape(-1, 3)]
+    up = T[np.cross(T[:, 1] - T[:, 0], T[:, 2] - T[:, 0])[:, 2] > 0]
+    area2_ = sum(int(_cross2(t[1] - t[0], t[2] - t[0])) for t in up)
+    assert area2_ == area2(ring)
+    assert {p[2] for t in up for p in t} == {PV.ROAD_DZ_MM}

@@ -1,12 +1,15 @@
 """Issue #95, barriers and props at junctions: AG7's barrier runs end at their junctions with
-a ramped or capped end, a junction carries its own corner barriers clear of its legs'
-carriageways and its lanes, AG14's `asset_clash` finds a barrier or a prop on a carriageway,
-a junction or a crosswalk or through another barrier, AG8 picks a prop variant that keeps
-off the carriageway, and M6's quay railings and median barriers keep off the junctions."""
+a ramped or capped end, or (AG17) on the road's port line where the junction carries them
+on, a junction's own barriers follow its edge, AG14's `asset_clash` finds a barrier or a
+prop on a carriageway, a junction or a crosswalk or through another barrier, AG8 picks a
+prop variant that keeps off the carriageway, and M6's quay railings and median barriers keep
+off the junctions."""
 
+import math
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 import shapely
 
 from assetgen.fit.barriers import barrier_clash
@@ -74,19 +77,37 @@ def test_a_parapet_is_capped_and_an_open_end_is_not():
     assert xs == {0, 6, 12, 18, 24, 30, 36, 42, 48, 54, 60}
 
 
-def test_clip_line_keeps_off_a_leg_and_a_lane():
-    """A junction's own barrier is clipped where it would stand on a leg's carriageway (past
-    its cut) or in one of the junction's lanes."""
-    leg = {"key": "rs.a@s", "exit": (10.0, 0, 0.0), "path": Path([(0.0, 0.0), (60.0, 0.0)]),
-           "h": 5.0}
-    keep = BR.Keepout([leg], [], None, {"lanes": [{"line": [[-5.0, -20.0], [-5.0, 20.0]],
-                                                   "h": 1.75}]})
-    assert keep.blocked(20.0, 3.0) and not keep.blocked(5.0, 3.0)
-    assert keep.blocked(-5.0, 10.0) and not keep.blocked(-9.0, 10.0)
-    parts = BR.clip_line([(-20.0, 8.0), (30.0, 8.0)], [0.0], keep)
-    # (the line at 8 m: clear of the leg's carriageway, 5 m and CLEAR_M; cut by the lane)
+def test_a_junction_chain_splits_where_its_edge_turns_back():
+    """AG17: a junction's barrier along its edge is split (each part capped, 1 cm short of
+    the turn) where the edge turns back or passes a vertex twice, so no section folds
+    through itself."""
+    from assetgen.streets.kit import check
+    pts = [[0.0, 0.0, 0.0], [10.0, 0.0, 0.0], [9.0, 1.0, 0.0], [9.0, 6.0, 0.0]]
+    parts = BR._split_sharp(pts, (None, None))
     assert len(parts) == 2
-    assert parts[0][-1][0] < -5.0 - 1.75 + 0.3 and parts[1][0][0] > -5.0 + 1.75 - 0.3
+    assert abs(parts[0][0][-1][0] - 9.99) < 1e-9 and parts[0][1] == (None, None)
+    m = Mesh((0.0, 0.0))
+    BR.draw_chain(m, "concrete.barrier", pts, BR.parapet_profile(0.0, "r"))
+    assert not any(check(m.slots).values())
+    # a port line at an end: the section lies along it, no cap there
+    f = BR.chain_frames([[0.0, 0.0, 1.0], [10.0, 0.0, 1.0]], 0.0,
+                        ([0.0, 0.0, 0.0, 1.0, 1.25], None))
+    assert f[0][3:6] == (0.0, 1.0, 1.25) and f[0][2] == 1.0
+
+
+def test_a_lane_hit_outside_a_sharp_turn_cuts_both_sides():
+    """AG17: a connector lane's corridor met only outside a sharp turn of a junction's
+    barrier (it projects onto the turn's vertex) cuts the chain 1 cm either side of the
+    vertex, so the two parts' caps never share an edge."""
+    pts = [[0, 0, 0], [10000, 0, 0], [5000, -3000, 0]]      # (mm; a sharp right turn)
+    corr = shapely.Point(10.3, 0.0).buffer(0.15)            # (outside the turn, meters)
+    parts = BR._off_lanes(pts, corr, 0.35)
+    assert len(parts) == 2
+    (a, _, _), (b, _, _) = parts
+    assert a[-1] != b[0]
+    assert abs(a[-1][0] - 9990) <= 1 and a[-1][1] == 0
+    assert math.hypot(b[0][0] - 10000, b[0][1]) == pytest.approx(10, abs=1)
+    assert b[0][1] < 0                                      # (on the leg after the turn)
 
 
 def _fake_packs(pieces: dict):
@@ -147,42 +168,67 @@ def test_the_check_finds_a_barrier_across_another_road():
 
 
 def test_small_city_runs_end_at_their_junctions():
-    """On the small test city every road's barrier runs lie on the road with a known end at
-    each side; a jersey that stops (not carried on by its junction) keeps `CLEAR_M` off the
-    junctions at its ends. (Whether any barrier crosses anything is AG14's check, which the
-    small city passes: `test_ag_fit.py`.)"""
+    """On the small test city every road's barrier runs lie between its cuts (where its
+    faces of M22's map end, AG17) with a known end at each side, and an end at a cut has
+    the road's port line to lie on. (Whether any barrier crosses anything is AG14's check,
+    which the small city passes: `test_ag_fit.py`.)"""
     from assetgen import brief as B
     from assetgen.streets import roads as RD
     from assetgen.streets.ctx import Ctx
 
     model, _, _ = B.load_model(small_build() / "base")
     cx = Ctx(model)
-    spans = stops = 0
+    spans = ported = 0
     for s in model.road_segments:
         inp = RD.gather(cx, s).inputs
         if "barriers" not in inp:
             continue
         rd = RD.Road(inp)
-        polys = [shapely.Polygon(e["junction"]["ring"]) for e in inp["ends"]
-                 if e.get("junction")]
         for r in inp["barriers"]:
-            run = next(x for x in BR.runs_of(inp["seg"], inp["cls"]) if x.name == r["name"])
             for a, b, ea, eb in r["spans"]:
                 spans += 1
-                assert 0.0 <= a < b <= rd.L + 1e-6
-                assert ea in ("join", "stop", "open", "corner")
-                assert eb in ("join", "stop", "open", "corner")
-                if not run.jersey:
-                    continue
-                for sv, e in ((a, ea), (b, eb)):
-                    if e != "stop":
+                assert rd.s0 - 1e-3 <= a < b <= rd.s1 + 1e-3
+                assert ea in ("join", "stop", "open") and eb in ("join", "stop", "open")
+                for sv, at in ((a, "start"), (b, "end")):
+                    if abs(sv - (rd.s0 if at == "start" else rd.s1)) > 1e-3:
                         continue
-                    stops += 1
-                    x, y, nx, ny, _ = rd.path.frame(sv)
-                    for t in (run.t0, run.t1):
-                        q = shapely.Point(x + nx * t, y + ny * t)
-                        assert all(p.distance(q) > BR.CLEAR_M - 0.05 for p in polys)
-    assert spans and stops
+                    fr = rd.port_frame(at, 0.0)
+                    if fr is None:
+                        continue
+                    ported += 1
+                    R, L = rd.ports[at][0], rd.ports[at][1]
+                    assert abs(fr[0] - (R[0] + L[0]) / 2.0) < 1e-9
+    assert spans and ported
+
+
+def test_small_city_footbridge_railings_run_along_the_walk():
+    """M22's map leaves footbridges out: a footbridge's railings (the bridge piece's) run
+    along its walking surface (`roads.walk_span`, from the junction's outline at each end),
+    within it and starting at most a meter in (`FOOT_CLEAR_M` off the junction at the
+    railing's own offset), not from M22's cuts about 2 m further in, past the top of its
+    stairs."""
+    from assetgen import brief as B
+    from assetgen.streets import structures as ST
+    from assetgen.streets.ctx import Ctx
+    from assetgen.streets.roads import gather
+
+    model, _, _ = B.load_model(small_build() / "base")
+    cx = Ctx(model)
+    n = 0
+    for b in sorted(model.bridges, key=lambda b: b.id):
+        inp = ST.gather_bridge(cx, b).inputs
+        if not inp.get("rails"):
+            continue
+        ids = list(b.segment_ids) or ST._carriers(cx, b)
+        walk = gather(cx, cx.seg[ids[0]]).inputs.get("walk")
+        assert walk, b.id
+        for r in inp["rails"]:
+            assert r["spans"], (b.id, r["name"])
+            a, e = r["spans"][0][0], r["spans"][-1][1]
+            assert walk[0] - 1e-3 <= a < e <= walk[1] + 1e-3, (b.id, r, walk)
+            assert a - walk[0] < 1.0 and walk[1] - e < 1.0, (b.id, r, walk)
+            n += 1
+    assert n
 
 
 def test_a_prop_variant_keeps_off_the_carriageway():
@@ -191,8 +237,12 @@ def test_a_prop_variant_keeps_off_the_carriageway():
     from assetgen import brief as B
     from assetgen.props.gather import _Fit
 
+    from assetgen.streets import pave as PV
+    from assetgen.streets.ctx import Ground
+
     model, _, _ = B.load_model(small_build() / "base")
-    fit = _Fit(model)
+    PI = PV.Index(model, Ground(model))
+    fit = _Fit(model, PI)
     s = next(s for s in model.road_segments if s.road_class == "street" and not s.bridge and
              max((z.z for z in s.z_profile), default=0.0) < 0.1 and len(s.centerline) >= 2)
     x, y = Path(s.centerline).point(Path(s.centerline).L / 2.0)

@@ -13,7 +13,6 @@ from assetgen.buildings import fronts as FR
 from assetgen.buildings import genome as GN
 from assetgen.buildings import shell as SH
 from assetgen.streets import kit as K
-from assetgen.streets import walks as W
 from assetgen.streets import water as WA
 
 from test_ag_shell import brief_of, mass
@@ -52,17 +51,6 @@ def test_a_moved_door_takes_the_place_of_ground_windows():
         assert SH.build(br, gm)["checks"]["access"]["missing"] == 1
     finally:
         FR.Band.rehome = keep
-
-
-def test_a_corner_keeps_no_vertex_inside_an_earlier_one():
-    """Nexus City's `jn.e383n933`: the overlay put the point where a corner leaves an earlier
-    corner's edge 4.4 mm inside it."""
-    earlier = [(424.83, 923.65), (423.96, 923.84), (423.84, 921.66)]
-    ring = [(423.96, 923.84), (424.81, 923.65), (424.83, 923.65), (425.99, 925.99),
-            (424.1, 926.3)]
-    assert W._onto(ring, [earlier]) == [(423.96, 923.84), (424.83, 923.65), (425.99, 925.99),
-                                        (424.1, 926.3)]
-    assert W._onto(ring, []) == ring
 
 
 def test_quay_uvs_stay_in_meters_round_a_sharp_corner():

@@ -98,12 +98,15 @@ FULL_FALLBACK = ("street.deck.slab", "street.deck.stair", "street.deck.elevator"
 
 
 def code_hash() -> str:
-    """sha256 of the code that makes the packs (this package, the mesh writer and the
-    triangulator), so a changed generator remakes its tiles even where no version was
-    bumped."""
+    """sha256 of the code that makes the packs (this package, the mesh writer, the
+    triangulator and citygen's pavement map code, whose rows and stations the road and
+    sidewalk pieces read), so a changed generator remakes its tiles even where no version
+    was bumped."""
     here = Path(__file__).resolve().parent
     files = sorted(here.glob("*.py")) + [here.parent / "gltf.py", here.parent / "triangulate.py",
-                                         here.parent / "canon.py"]
+                                         here.parent / "canon.py",
+                                         # (AG17: the map's rows and stations, read as M22 lays them)
+                                         here.parent.parent / "citygen" / "pavement.py"]
     h = []
     for f in files:
         h.append([f.name, C.sha256_bytes(f.read_bytes().replace(b"\r\n", b"\n"))])
@@ -342,7 +345,7 @@ def build(model, model_sha: str, out_dir: Path, spec=None, workers: int | None =
     con_written = _write_text(out_dir / "unreal_contribution.streets.json", con_text)
     t_write = time.perf_counter()
     from .checks import report
-    rep = report(model, cx, manifest, pieces)
+    rep = report(model, cx, manifest, pieces, out_dir)
     rep["files"] = {"tiles_made": len(todo), "tiles_kept": len(keep),
                     "tiles_written": len(written), "tiles_same_bytes": unchanged_files,
                     "tiles_removed": len(stale), "parts_written": parts_written,

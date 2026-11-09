@@ -202,7 +202,10 @@ def test_placements_pick_their_variant_from_their_id():
         h = ST.pick(n, "ag8.prop", pid)
         if k == h:
             continue
-        fit = fit or _Fit(model)
+        if fit is None:
+            from assetgen.streets import pave as PV
+            from assetgen.streets.ctx import Ground
+            fit = _Fit(model, PV.Index(model, Ground(model)))
         style = part.split(".")[2]
         p = props[pid]
         x, y, z = p.position

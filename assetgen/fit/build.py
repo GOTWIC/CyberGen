@@ -18,9 +18,9 @@ BUILD/assets/fit_report.json, .txt     the two checks, their counts and the wors
   street, ground, water bed, building shell and front and skybridge pack, the dunnage
   frames' tops, and the blockout's land (0 on a flat city, M13's ground on a terrain city;
   none over the water, where a footing takes M16's bed), never the thing itself. With it,
-  the junction seams (`seams`): every vertex of a road's carriageway on the outline of a
-  junction at one of its ends, near where its centerline first leaves it, within `GAP_M` of
-  the junction piece's surface there. What fails: anything assetgen seats itself (roof
+  the junction seams (`seams`, AG17): at every vertex of a port of M22's pavement map
+  between a road's face and a junction's face, the road's piece and the junction's draw the
+  same height within `GAP_M`. What fails: anything assetgen seats itself (roof
   items, dunnage, street pieces), the quay railings and shrubs (#89, `FAILED`)
   and any step over `GAP_M`; other props and plants stand at the model's heights (M20's
   `prop_support`) and are listed, not failed.
@@ -475,88 +475,65 @@ def grounded(pk: Packs, model, floor: Floor) -> dict:
 
 
 def seams(pk: Packs, model=None) -> dict:
-    """A road meets its junctions: every vertex of a road piece's carriageway on the
-    outline of a junction at one of its ends (its cut edge, within 3 cm) that lies on that
-    junction piece's carriageway is within `GAP_M` of the junction's surface there (no step
-    where a leg meets its junction), near where its centerline crosses the outline (within
-    its half width and 1 m: not a road's side running along a junction's outline further
-    out, M17's shared pavement)."""
-    ring_of, own, cut = {}, {}, {}
-    if model is not None:
-        from citygen import geom as G
-        # (M22: every node of a cluster is its junction's)
-        jat = {n: j for j in model.junctions for n in j.attrs.get("nodes") or [j.node_id]}
-        for j in model.junctions:
-            ring_of[j.id] = G.from_model_poly(j.polygon).exterior
-        for s in model.road_segments:
-            own[s.id] = {jat[n].id for n in (s.start, s.end) if n in jat}
-            cl = shapely.LineString([(p[0], p[1]) for p in s.centerline])
-            for n in (s.start, s.end):
-                j = jat.get(n)
-                if j is None:
-                    continue
-                x = cl.intersection(ring_of[j.id])
-                pts = [p for p in shapely.get_parts(x) if p.geom_type == "Point"] \
-                    if not x.is_empty else []
-                if not pts:
-                    cut[(s.id, j.id)] = None
-                    continue
-                # (the road's first crossing out of the junction from its node: its cut)
-                at = [cl.project(p) for p in pts]
-                k = at.index(min(at)) if n == s.start else at.index(max(at))
-                cut[(s.id, j.id)] = (pts[k], s.width_m / 2.0 + 1.0)
-    jt, jo = [], []
-    for pid in pk.street_ids():
-        if pk.street_kind(pid) != "street.junction":
-            continue
-        T, mats = pk.street_tris(pid)
-        keep = np.array([m.startswith("asphalt") for m in mats],
-                        dtype=bool)
-        if len(T) and keep.any():
-            jt.append(T[keep])
-            jo.append(np.full(int(keep.sum()), pk.owner(pid)))
+    """A road meets its junctions (AG17: on M22's pavement map): at every vertex of a port
+    between a road's face and a junction's face of one class (a carriageway and the
+    junction's carriageway, a sidewalk band and a corner pad), the heights the two pieces draw there
+    (their triangles' vertices at that position, on the millimeter) differ by at
+    most `GAP_M`; a port vertex one of them does not draw is a step of the other's height
+    over its ground (a gap). Without a map, nothing to compare."""
     out = {"legs": 0, "steps": 0, "max_m": 0.0, "worst": []}
-    if not jt:
+    if model is None or getattr(model, "pavement_net", None) is None or not model.pavement:
         return out
-    S = Surfaces(np.concatenate(jt), np.concatenate(jo), min_nz=0.5)
+    from ..streets import pave as PV
+    from ..streets.ctx import Ground
+    from ..streets.watertight import owner_piece
+    PI = PV.Index(model, Ground(model))
+    piece = owner_piece(model, PI)
+    jids = {j.id for j in model.junctions}
+    sids = {s.id for s in model.road_segments}
+    drawn: dict = {}
+
+    def heights(pid: str) -> dict:
+        got = drawn.get(pid)
+        if got is None:
+            T, _ = pk.street_tris(pid)
+            got = drawn[pid] = defaultdict(set)
+            if len(T):
+                # (every triangle's vertices: a hillside junction's faces can be steeper
+                # than any "up-facing" cut; the pair of heights nearest each other counts)
+                P = np.rint(T.reshape(-1, 3) * 1000.0).astype(np.int64)
+                for x, y, z in P.tolist():
+                    got[(x, y)].add(z)
+        return got
     rows = []
-    for pid in pk.street_ids():
-        if pk.street_kind(pid) != "street.road":
+    legs = set()
+    for eid in sorted(PI.E):
+        kind, vs = PI.E[eid]
+        if kind != "port":
             continue
-        T, mats = pk.street_tris(pid)
-        keep = np.array([m.startswith("asphalt") for m in mats],
-                        dtype=bool)
-        if not len(T) or not keep.any():
-            continue
-        P = np.unique(np.round(T[keep].reshape(-1, 3), 3), axis=0)
-        p_, t_ = S.candidates(P[:, :2])
-        if not len(p_):
-            continue
-        ins, z = S.heights(P[:, :2], p_, t_, eps=1e-4)
-        dz = np.abs(P[p_, 2] - z)
-        sel = ins & (dz < 1.0)
-        if model is not None:
-            mine = own.get(pid, set())
-            jn = [pk.names[int(o)] for o in S.owner[t_].tolist()]
-            on = np.array([j in mine for j in jn], dtype=bool)
-            sel &= on
-            for k in np.nonzero(sel)[0].tolist():
-                pt = shapely.Point(P[p_[k], :2])
-                c = cut.get((pid, jn[k]))
-                if shapely.distance(ring_of[jn[k]], pt) > 0.03 or c is None or \
-                        shapely.distance(c[0], pt) > c[1]:
-                    sel[k] = False
-        if not sel.any():
-            continue
-        out["legs"] += len({int(S.owner[t]) for t in t_[sel].tolist()})
-        worst = float(dz[sel].max())
-        if worst > GAP_M:
-            out["steps"] += 1
-            i = int(np.argmax(np.where(sel, dz, -1.0)))
-            rows.append((worst, pid, pk.names[int(S.owner[t_[i]])],
-                         [C.m2(v) for v in P[p_[i]]]))
-        out["max_m"] = max(out["max_m"], C.m(worst))
-    rows.sort(key=lambda r: (-r[0], r[1]))
+        fs = PI.edge_faces.get(eid, ())
+        rf = [f for f in fs if PI.F[f].owner_id in sids]
+        jf = [f for f in fs if PI.F[f].owner_id in jids]
+        if not rf or not jf or PI.cls[rf[0]] != PI.cls[jf[0]]:
+            continue        # (a sidewalk ending on a carriageway: a curb, by design)
+        a, b = piece[rf[0]], piece[jf[0]]
+        legs.add((PI.F[rf[0]].owner_id, PI.F[jf[0]].owner_id))
+        ha, hb = heights(a), heights(b)
+        for v in vs:
+            x, y = PI.V[v][0], PI.V[v][1]
+            za, zb = ha.get((x, y), set()), hb.get((x, y), set())
+            if za and zb:
+                d = min(abs(p - q) for p in za for q in zb) / 1000.0
+            else:
+                d = max(PI.top(rf[0], v), PI.top(jf[0], v)) - (PI.V[v][2] - PI.V[v][3])
+                d = d / 1000.0
+            out["max_m"] = max(out["max_m"], C.m(d))
+            if d > GAP_M:
+                rows.append((d, a, b, [C.m2(x / 1000.0), C.m2(y / 1000.0)]))
+    out["legs"] = len(legs)
+    steps = {(r[1], r[2]) for r in rows}
+    out["steps"] = len(steps)
+    rows.sort(key=lambda r: (-r[0], r[1], r[2]))
     out["worst"] = [{"road": r[1], "junction": r[2], "step_m": C.m(r[0]), "at": r[3]}
                     for r in rows[:LIST_MAX]]
     return out

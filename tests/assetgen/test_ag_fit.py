@@ -96,20 +96,34 @@ def test_m19_supports_are_drawn():
     assert not any(K.check(bm.slots).values())
 
 
+def _band_face(x0: float, x1: float, half: float, zf, step: float = 5.0) -> dict:
+    """A straight road's carriageway as a face of the pavement map (`pave.Index.face_input`):
+    vertices every `step` along both edges at heights zf(x) over flat ground."""
+    def mm(v):
+        return int(round(v * 1000.0))
+    xs = [x0 + k * step for k in range(int(round((x1 - x0) / step)) + 1)]
+    ring = [(x, -half) for x in xs] + [(x, half) for x in reversed(xs)]
+    verts = [[mm(x), mm(y), mm(zf(x)) + 50, mm(zf(x)), mm(zf(x))] for x, y in ring]
+    return {"id": "rs.e0n0.pv.cw", "kind": "carriageway", "band": "cw", "layer": "g1",
+            "cls": "top", "rings": [verts], "segs": [[["outer"]] * len(ring)], "samples": []}
+
+
 def test_a_low_deck_stands_on_its_embankment():
+    from assetgen.streets.path import Profile
     from assetgen.streets.roads import _spans
     from assetgen.streets.roads import make as make_road
     assert _spans(0.0, 100.0, [(20.0, 40.0), (35.0, 60.0)]) == [(0.0, 20.0), (60.0, 100.0)]
-    seg = {"id": "rs.e0n0", "centerline": [[0.0, 0.0], [100.0, 0.0]],
-           "z_profile": [{"s": 0.0, "z": 0.0}, {"s": 50.0, "z": 3.0}, {"s": 100.0, "z": 9.0}],
+    zp = [{"s": 0.0, "z": 0.0}, {"s": 50.0, "z": 3.0}, {"s": 100.0, "z": 9.0}]
+    seg = {"id": "rs.e0n0", "centerline": [[0.0, 0.0], [100.0, 0.0]], "z_profile": zp,
            "width_m": 8.0, "road_class": "street", "attrs": {"role": "ramp"},
            "cross_section": {"sidewalk_m": [0.0, 0.0], "median_m": 0.0, "shared": False}}
     inp = {"seg": seg, "cls": "street", "ends": [], "crossings": [], "lanes": [],
            "style": STYLE, "start": "a", "end": "b", "origin": [50.0, 0.0],
-           "embankments": [[0.0, 70.0]]}
+           "embankments": [[0.0, 70.0]], "faces": [_band_face(0.0, 100.0, 4.0, Profile.of(zp))]}
     mesh = make_road(inp).mesh
     deck = [p for p in mesh.slots["concrete.deck"].pos]
-    # the girder only past the fill (x over 70 m), the fill's faces and its end across
+    # the girder and its fascia only past the fill (x over 70 m), the fill's faces (its
+    # walls down to the ground) and its end across
     assert min(p[0] for p in deck) >= 70000 - 50000 - 1
     sl = mesh.slots["concrete"]
     P = np.array(sl.pos)
@@ -117,6 +131,7 @@ def test_a_low_deck_stands_on_its_embankment():
     n = np.cross(T[:, 1] - T[:, 0], T[:, 2] - T[:, 0])
     end = (np.abs(T[:, :, 0] - 20000).max(axis=1) < 2) & (n[:, 0] > 0)
     assert end.any()                # (the fill's face across, toward the girder)
+    assert P[:, 2].min() <= -100    # (its sides into the ground)
     assert not any(K.check(mesh.slots).values())
 
 
