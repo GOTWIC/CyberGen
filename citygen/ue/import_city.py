@@ -200,6 +200,42 @@ def log(msg):
     unreal.log(f"citygen: {msg} ({time.time() - T0:.1f} s)")
 
 
+# (#84, AG16) stage 2's packs imported, finished and saved this many at a time, and the
+# meshes let go of between them: an import kept every one of Delta Megacity's 58,501 meshes
+# loaded to the end, 39 GB committed in the editor on the 32 GB PC
+PACK_CHUNK = int(os.environ.get("CITYGEN_UE_PACK_CHUNK", "150"))
+
+
+class Meshes:
+    """Stage 2's meshes by their manifest path, held as asset paths: a mesh is loaded when
+    an actor asks for it (at once while it is still in memory; from disk once the garbage
+    collector has let go of it), so the meshes imported and saved need not all stay
+    loaded (#84)."""
+
+    def __init__(self):
+        self.paths = {}
+
+    def __setitem__(self, key, sm):
+        self.paths[key] = sm.get_path_name()
+
+    def __getitem__(self, key):
+        sm = unreal.load_asset(self.paths[key])
+        if sm is None:
+            raise RuntimeError(f"{self.paths[key]}: no static mesh")
+        return sm
+
+    def __contains__(self, key):
+        return key in self.paths
+
+    def __len__(self):
+        return len(self.paths)
+
+
+def let_go():
+    """The objects nothing holds any more unloaded (the meshes saved and no longer used)."""
+    unreal.SystemLibrary.collect_garbage()
+
+
 # progress lines `citygen unreal` draws as a bar (citygen.progress.MARKER and its Relay ops)
 PROGRESS = "CYBERGEN_PROGRESS"
 # the importer's phases by the stage they show under
@@ -2156,7 +2192,7 @@ class Importer:
         the next packs import), each mesh built once with its own settings (the pack step),
         then finished and saved in one batch; else one pack at a time, each mesh saved once
         built."""
-        self.meshes_s2 = {}
+        self.meshes_s2 = Meshes()
         if not self.s2:
             return
         st = self.stats["stage2"]
@@ -2177,16 +2213,42 @@ class Importer:
             st["meshes"]["kept"] += len(entries)
             for a, sm in got.items():
                 self.meshes_s2[f"{pk['folder']}/{a}"] = sm
-        t = time.time()
-        if self.fast:
-            self.import_packs(todo)        # (its count: packs imported; then meshes finished)
-        sub["meshes2.import"] = round(time.time() - t, 2)
-        t = time.time()
-        done = []
+            del got
+            checked = st.setdefault("packs_checked", 0) + 1
+            st["packs_checked"] = checked
+            if PACK_CHUNK > 0 and checked % PACK_CHUNK == 0:
+                let_go()              # (#84: the meshes loaded to read their hashes)
+        sub["meshes2.import"] = 0.0
+        sub["meshes2.finish"] = 0.0
+        sub["meshes2.save"] = 0.0
         seen = total - sum(len(x[2]) for x in todo)       # (the packs kept)
         built, nanite_built = 0, 0
         REPORT.update(seen, total, force=True)
-        for k, (pk, folder, entries, fresh) in enumerate(todo):
+        chunk = PACK_CHUNK if self.fast and PACK_CHUNK > 0 else max(len(todo), 1)
+        for c0 in range(0, len(todo), chunk):
+            seen, built, nanite_built = self.meshes2_chunk(
+                todo[c0:c0 + chunk], c0, len(todo), total, seen, built, nanite_built)
+        t = time.time()
+        # (the subsystem is not made in a commandlet; its LOD functions keep no state, so its
+        # class default object serves)
+        sms = unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem) or \
+            unreal.get_default_object(unreal.StaticMeshEditorSubsystem)
+        self.lod_chains(sms)
+        sub["meshes2.lod_chains"] = round(time.time() - t, 2)
+
+    def meshes2_chunk(self, todo, c0, n_todo, total, seen, built, nanite_built):
+        """One chunk of `meshes2`'s packs (all of them on the one-at-a-time path): imported
+        (fast: queued at once), each mesh finished, saved in one batch, then let go of
+        (#84); the counts carried on."""
+        st = self.stats["stage2"]
+        sub = self.stats["subtimings"]
+        t = time.time()
+        if self.fast:
+            self.import_packs(todo)        # (its count: packs imported; then meshes finished)
+        sub["meshes2.import"] = round(sub["meshes2.import"] + time.time() - t, 2)
+        t = time.time()
+        done = []
+        for k, (pk, folder, entries, fresh) in enumerate(todo, c0):
             glb = os.path.join(self.build, pk["glb"])
             if not self.fast:
                 self.import_glb(glb, folder, self.pipeline(
@@ -2206,20 +2268,24 @@ class Importer:
             built += len(entries)
             nanite_built += sum(1 for m in pk["meshes"] if m["nanite"])
             seen += len(entries)
-            REPORT.update(seen, total, detail=f"pack {k + 1} of {len(todo)}, {built} built, "
-                          f"{nanite_built} with Nanite", force=k + 1 == len(todo))
+            REPORT.update(seen, total, detail=f"pack {k + 1} of {n_todo}, {built} built, "
+                          f"{nanite_built} with Nanite", force=k + 1 == n_todo)
             if k % 25 == 0:
-                log(f"stage 2 pack {k + 1}/{len(todo)} {pk['folder']}")
-        sub["meshes2.finish"] = round(time.time() - t, 2)
+                log(f"stage 2 pack {k + 1}/{n_todo} {pk['folder']}")
+        sub["meshes2.finish"] = round(sub["meshes2.finish"] + time.time() - t, 2)
         if self.fast and done:
             t = time.time()
             EAL.save_loaded_assets(done, False)
-            sub["meshes2.save"] = round(time.time() - t, 2)
-        t = time.time()
-        # (the subsystem is not made in a commandlet; its LOD functions keep no state, so its
-        # class default object serves)
-        sms = unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem) or \
-            unreal.get_default_object(unreal.StaticMeshEditorSubsystem)
+            sub["meshes2.save"] = round(sub["meshes2.save"] + time.time() - t, 2)
+        del done
+        if self.fast and PACK_CHUNK > 0:
+            let_go()                  # (#84: this chunk's meshes, saved)
+        return seen, built, nanite_built
+
+    def lod_chains(self, sms):
+        """The non-Nanite LOD chains (AG8's holo-ads, AG7's sky tube glass): each a copy of
+        its first LOD's mesh with the others set as its LODs."""
+        st = self.stats["stage2"]
         for c in self.s2["lod_chains"]:
             path = f"{self.root}/{c['mesh']}"
             h = f"{STAGE2_MESH_VERSION}.{c['hash']}"
@@ -2240,7 +2306,6 @@ class Importer:
             self.meshes_s2[c["mesh"]] = sm
             st["meshes"]["imported"] += 1
             st["lod_chains"] += 1
-        sub["meshes2.lod_chains"] = round(time.time() - t, 2)
 
     # -- the level --
 
@@ -2378,6 +2443,10 @@ class Importer:
             WPL.load_actors(guids)          # (the library's references, then let go of them)
             WPL.unload_actors(guids)
             self.offloaded += guids
+            # (#84: and every few offloads the meshes only those actors used, AG16)
+            self.offloads = getattr(self, "offloads", 0) + 1
+            if PACK_CHUNK > 0 and self.offloads % 4 == 0:
+                let_go()
         self.live = []
         self.add_sub("actors.offload", time.perf_counter() - t)
 
