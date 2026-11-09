@@ -742,6 +742,8 @@ RING_VIA_GRID_M = 90.0
 RING_RADII = (1.15, 1.06)   # times the mode's radius, the wider first
 RING_R = 1.05           # an open line's curves as fitted at least this times the radius (a
 #                         polyline measures a few percent tighter)
+RADIUS_TOL = 0.98       # `transit_curves`: the radius measured on 30 m chords of a polyline
+#                         arc at least this times the mode's
 RING_ARC_W = 1.0        # a meter of curve costs this much more than a straight one (the same
 #                         for every convex ring: it keeps rings from looping round a stop)
 _TWO_PI = 2.0 * M.PI
@@ -1592,7 +1594,9 @@ class Line:
     cut: bool = False                            # M19: a sky tube that takes out the towers
     #                                              it can neither pass nor go round
     no_hosts: frozenset = frozenset()            # M19: towers other lines take out (never
-    #                                              its hosts, `_reroute_hosts`)
+    #                                              its hosts, `_reroute_hosts`), or that
+    #                                              left it too tight (#143, `_rehost`)
+    chosen: dict = field(default_factory=dict)   # #143: stop index -> the tower `_hosts` chose
     supports: str = "pylon"                      # sky tubes (#94): "pylon" or "mast"
     lit_every: int = 1                           # sky tubes (#97): every how many rings lit
 
@@ -1916,6 +1920,7 @@ def _hosts(c: Ctx, ln: Line) -> None:
             continue
         _, b, ctr, clean = best
         hosts.add(b.id)
+        ln.chosen[k] = b.id
         s.tower_id, s.p = b.id, ctr
         ln.heads[k] = clean
         if again and k == 0:
@@ -4597,20 +4602,87 @@ def _blocked(c: Ctx, ln: Line) -> tuple:
             len(_corridor(c, ln, ln.pts, check_only=True)))
 
 
-def _routed(c: Ctx, ln: Line, tl) -> Line:
+def _fresh(c: Ctx, ln: Line, tl, **kw) -> Line:
+    """A line as `_build` makes it, its stops resolved anew, before its route."""
+    out = Line(ln.id, ln.name, ln.mode, ln.color, ln.loop, ln.alt, ln.z0, ln.through, **kw)
+    out.stops = [st for st in (resolve_stop(c, name, tl.mode) for name in tl.route)
+                 if st is not None]
+    return out
+
+
+def _fails(c: Ctx, ln: Line) -> tuple:
+    """#143: what the transit checks find of a routed line's track, lower better (as
+    `_line_score`): (a leg without a route, the stops it misses, where it meets itself), a
+    curve under the mode's radius as `transit_curves` measures it, the buildings in its
+    corridor it cannot pass."""
+    r_min = presets.TRANSIT_MODES[ln.mode].min_curve_radius_m or 0.0
+    pts = ln.pts[:-1] if ln.loop and len(ln.pts) > 2 and ln.pts[0] == ln.pts[-1] else ln.pts
+    rr = radii(resample(pts, 10.0, ln.loop), ln.loop) if r_min > 0 and len(pts) >= 2 else []
+    return ((1 if "route" in ln.conflicts else 0,
+             sum(1 for s in ln.stops if not _served(ln.pts, s)),
+             meets(ln.pts, ln.loop, ln.mode)),
+            1 if rr and min(rr) < RADIUS_TOL * r_min else 0,
+            len(_corridor(c, ln, ln.pts, check_only=True)))
+
+
+def _route_cut(c: Ctx, ln: Line, tl) -> Line:
     """A line's route (`route_line`); a sky tube that can neither pass a tower (not at a
     station) nor go round it is routed again taking the towers it may out of its way (M19)."""
     route_line(c, ln)
     if tl.mode == "sky_tube" and any(_blocked(c, ln)):
-        alt_ln = Line(ln.id, ln.name, ln.mode, ln.color, ln.loop, ln.alt, ln.z0,
-                      ln.through, cut=True, no_hosts=ln.no_hosts)
-        alt_ln.stops = [st for st in (resolve_stop(c, name, tl.mode)
-                                      for name in tl.route) if st is not None]
+        alt_ln = _fresh(c, ln, tl, cut=True, no_hosts=ln.no_hosts)
         route_line(c, alt_ln)
         if _blocked(c, alt_ln) < _blocked(c, ln):
             ln = alt_ln
             ln.notes.append(f"{ln.name}: takes out the towers it can neither pass "
                             f"nor go round")
+    return ln
+
+
+REHOST_ROUNDS = 2   # #143: rounds of barring a sky tube's station towers, each from the best
+
+
+def _rehost(c: Ctx, ln: Line, tl) -> Line:
+    """#143: a sky tube through towers whose track still turns tighter than its radius
+    (`transit_curves`) after every route: routed again with each tower `_hosts` chose for a
+    station barred in turn (`Line.no_hosts`; the stop takes its next tower, else a pylon). A
+    station tower is chosen alone, before the route: one whose clean headings leave the
+    curves to the next stop no room (Vesper Bay Stacks: its Crown Line left a Corporate Core
+    tower on a 25 m hook to reach a Stacks tower passed only east to west) takes the line
+    with it. The best is kept (`_fails`, then more stations in towers, then the order
+    tried, by stop), and from it again while it is still too tight, REHOST_ROUNDS times at
+    most; the line as it was when none is better."""
+    r_min = presets.TRANSIT_MODES[ln.mode].min_curve_radius_m or 0.0
+    key = _fails(c, ln)
+    said: list = []
+    for _ in range(REHOST_ROUNDS):
+        best = None
+        for k, bid in sorted(ln.chosen.items()):
+            alt = _route_cut(c, _fresh(c, ln, tl, no_hosts=ln.no_hosts | {bid}), tl)
+            ak = (_fails(c, alt), -len(alt.hosts))
+            if best is None or ak < best[0]:
+                best = (ak, alt, k, bid)
+            if ak[0] == ((0, 0, 0), 0, 0):
+                break
+        if best is None or best[0][0] >= key:
+            break
+        (key, _), alt, k, bid = best
+        said.append(f"{ln.name}: routed again without {bid} as the station tower at "
+                    f"{ln.stops[k].name} (through it the track turned tighter than "
+                    f"{r_min:g} m)")
+        alt.notes += said
+        ln = alt
+        if not key[1]:
+            break
+    return ln
+
+
+def _routed(c: Ctx, ln: Line, tl) -> Line:
+    """A line's route (`_route_cut`); a sky tube through towers still too tight is routed
+    again without one of the towers chosen for its stations (#143, `_rehost`)."""
+    ln = _route_cut(c, ln, tl)
+    if tl.mode == "sky_tube" and ln.through and ln.chosen and _fails(c, ln)[1]:
+        ln = _rehost(c, ln, tl)
     return ln
 
 

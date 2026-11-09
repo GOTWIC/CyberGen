@@ -602,11 +602,7 @@ def road_runs(cx, s, inputs: dict, runs: list[Run] | None = None,
         return []
     cuts = inputs.get("cuts") or list(cx.cuts.get(s.id, (0.0, 0.0)))
     s0, s1 = cuts[0], P.L - cuts[1]
-    if inputs.get("walk"):
-        # (a footbridge, out of M22's map: its railings run along its walking surface from
-        # the junction's outline at each end, `roads.walk_span`; M22's cuts fall further in,
-        # past the top of its stairs)
-        s0, s1 = inputs["walk"]
+    foot = s.road_class == "footbridge"
     if s1 - s0 < MIN_SPAN_M:
         return []
     by = set() if by is None else by
@@ -629,9 +625,11 @@ def road_runs(cx, s, inputs: dict, runs: list[Run] | None = None,
             cid, g = xs[k]
             xws.append(g)
             by.add(cid)
-    if inputs.get("walk"):
+    if foot:
         # (each footbridge railing keeps `FOOT_CLEAR_M` off the junctions at its ends at its
-        # own offset, as #95 kept it: their faces of the map, corner pads too, else outline)
+        # own offset, as #95 kept it: their faces of the map, corner pads too, else outline;
+        # #147: its faces run from its stairs' feet, in a slot of the junction where they
+        # start inside it, so its railings begin where it leaves the junction)
         for nid in (s.start, s.end):
             j = cx.junction_at.get(nid)
             if j is not None:
