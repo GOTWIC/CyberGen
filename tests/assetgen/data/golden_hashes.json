@@ -30,8 +30,8 @@
     "shanty_stack_ubx": "ce18b5f4c3e4d3e55e21fb71976ed1c58caf5bf0bf219ac4a303cdec8d3b4a78"
   },
   "ag1": {
-    "testport_manifest": "828dc201511a81a93e99dd49f944a2b7ae604aceee777c726ea4ef107fa1fb1f",
-    "testport_files": "e265178556043fffcdfa6218f6a8e03056a21c0aaac2bd7e5766f9245946337b",
+    "testport_manifest": "9af64dd46f4c00045dbb693fc9cb3971729a71b6f458a729837f6f77000c4322",
+    "testport_files": "b4c49b6a7ffc71779ef568d109cd60c06f309e331c86ee023ac5a363e966eb18",
     "buildings": {
       "vesper_bay": {
         "d01.lm.e852s10.bld": "778f810eea91543236962aaaeceef4c68444f2c739c0bba2eebbe3371c0d1b36",
@@ -56,6 +56,6 @@
       "atlases.road.base": "fb094feb3c47fbb0200b2458252b590b8f7160b2bb7732db4a6d96b04e3f4c34",
       "atlases.trim_heritage.base": "64fa683152efc6b1ea7373aeeb366116518f007213ac3411029361fbf48eeec8"
     },
-    "testport_materials": "bbddaef84803a7c806b97e1333be885f423d8eb0165e0a0ea8553f956e330969"
+    "testport_materials": "1bce2043ae7a8b4f930857b620d705c455df7e306d89c3f60fb325109549ee4b"
   }
 }

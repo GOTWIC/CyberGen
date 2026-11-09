@@ -92,6 +92,17 @@ Now every cell and every clipped piece takes the vertices the clipped pieces put
 lattice line does a mesh change. On main's Nexus City model the fix alone makes
 `water_gaps` pass: two of its 111 water tiles change, with two more triangles in all.
 
+## A plate ring crossing itself
+
+The water moved the small test city's `water_required` layout (`test_build.py`), and a tower
+there failed with a GEOS topology error in M21's sloped crown (`forms.crown_in`). Its base
+plate, a circle of radius 21.80 m turned 45 degrees, is four quarter arcs; each gives the
+point it shares with the next, and two of them rounded to (-105.03, 103.48) and
+(-105.02, 103.47), the second a step behind the first, so the ring crossed itself.
+`massing.Plate.ring` now drops a point within 1.5 cm of the one before it, only where the
+ring would cross itself (`_unstep`), so every valid ring stays as it was. No built city has
+an invalid mass footprint, and the recorded models keep their bytes with it.
+
 ## Results
 
 Every city built on the final code, one at a time (citygen with the blockout, then `assetgen

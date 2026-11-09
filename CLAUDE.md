@@ -1472,6 +1472,11 @@ The water coverage fixes (issue #140 and #144's Nexus `water_gaps`) are in place
   vertex without crossing it (a bank's dry strip ending on it), the whole cell beside it
   takes that vertex too; it met the clipped cell across a T-junction, a crack of 0.15 m in
   Nexus City's bed by `sep.e126n468.bank.w5n461`.
+- **Plate rings** (`massing.Plate.ring`, `_unstep`): two arcs meeting tangent each give their
+  shared end, which may round to grid points a step apart, the second behind the first; a
+  ring that would cross itself drops such steps (a valid ring stays as it was). The small
+  city's `water_required` layout, moved by the water, had a circle plate turned 45 degrees
+  cross itself and a sloped crown's overlay fail.
 Outputs: `docs/progress/fix_nexus_water/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
