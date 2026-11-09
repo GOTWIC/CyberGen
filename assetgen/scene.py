@@ -23,11 +23,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-# The budgets (AG16, Delta Megacity on the Windows PC, decision 13.4's target; see
-# docs/assetgen_milestones.md, AG16): a city and a tile within these keep the benchmark's
-# frame times. Set from what the benchmark showed fits.
-CITY = {"actors": 60000, "components": 90000, "meshes": 52000, "instances": 3500000}
-TILE = {"actors": 2000, "components": 3000, "meshes": 2500, "instances": 120000}
+# The budgets (AG16), from Delta Megacity on the Windows PC (decision 13.4's target), which
+# runs at a 95th percentile of 9 to 13 ms everywhere with 13,642 actors, 72,447 components,
+# 42,633 distinct Nanite meshes and 2.3 million instances, its busiest tile 295 actors,
+# 1,639 components, 1,411 meshes and 59,436 instances (`docs/progress/AG16`): about half
+# again over those. The city's meshes are held to what Nanite's root pages leave at the
+# smallest streaming pool (57,344 pages at 256 MB, over `citygen.unreal.ROOT_MARGIN`).
+CITY = {"actors": 25000, "components": 110000, "meshes": 52000, "instances": 3500000}
+TILE = {"actors": 600, "components": 2500, "meshes": 2100, "instances": 90000}
 ROOT_PAGES_PER_MESH = 1.0
 ROOT_PAGE_MB = 32768 / 1048576.0       # NANITE_ROOT_PAGE_GPU_SIZE, 32 KB
 
