@@ -102,18 +102,18 @@ def test_group_actors():
     # their tile's group; a column stays an actor of its own
     assert [r["holder"] for r in insts] == ["bld.a", "bld.a", "prop.bench.t", "prop.bench.t"]
     assert by["bld.a.front"]["holder"] == "bld.a"
-    assert by["sign.x"]["holder"] == by["sign.y"]["holder"] == "group.signs.t+00+00"
-    assert by["rs.e1n1"]["holder"] == "group.streets.t+00+01"
+    assert by["sign.x"]["holder"] == by["sign.y"]["holder"] == "group.signs.t+00+00.c00"
+    assert by["rs.e1n1"]["holder"] == "group.streets.t+00+01.c00"
     assert "holder" not in by["col.1"] and "holder" not in by["bld.a"]
     assert by["bld.a"]["members"] == 3 and by["bld.a"]["hash"] != "ha"
     gk = [g["key"] for g in groups]
-    assert gk == ["group.signs.t+00+00", "group.streets.t+00+01", "prop.bench.t"]
+    assert gk == ["group.signs.t+00+00.c00", "group.streets.t+00+01.c00", "prop.bench.t"]
     g = {x["key"]: x for x in groups}
     # an entry's group at its pivot; a tile's at the tile's middle
     assert g["prop.bench.t"]["pivot"] == [5.0, 6.0, 0.0] and g["prop.bench.t"]["members"] == 2
     assert g["prop.bench.t"]["type"] == "prop.bench"
-    assert g["group.signs.t+00+00"]["pivot"] == [128.0, 128.0, 0.0]
-    assert g["group.signs.t+00+00"]["category"] == "signs"
+    assert g["group.signs.t+00+00.c00"]["pivot"] == [32.0, 32.0, 0.0]
+    assert g["group.signs.t+00+00.c00"]["category"] == "signs"
     # a member changing changes its holder's hash, and only that
     a2, i2 = _parts()
     i2[3]["hash"] = "p4b"
@@ -121,8 +121,8 @@ def test_group_actors():
     g2 = {x["key"]: x for x in U.group_actors(a2, i2, MAN)}
     assert [x for x in a2 if x["key"] == "bld.a"][0]["hash"] == by["bld.a"]["hash"]
     assert g2["prop.bench.t"]["hash"] != g["prop.bench.t"]["hash"]
-    assert g2["group.signs.t+00+00"]["hash"] != g["group.signs.t+00+00"]["hash"]
-    assert g2["group.streets.t+00+01"]["hash"] == g["group.streets.t+00+01"]["hash"]
+    assert g2["group.signs.t+00+00.c00"]["hash"] != g["group.signs.t+00+00.c00"]["hash"]
+    assert g2["group.streets.t+00+01.c00"]["hash"] == g["group.streets.t+00+01.c00"]["hash"]
 
 
 def test_grouped_manifest_changes():
@@ -138,10 +138,10 @@ def test_grouped_manifest_changes():
            "stage2": {"replaced": [], "actors": actors, "instances": insts, "groups": groups}}
     kinds = U.actor_kinds(new)
     assert kinds["bld.a"] == "mesh" and kinds["prop.bench.t"] == "group"
-    assert kinds["col.1"] == "mesh" and kinds["group.signs.t+00+00"] == "group"
+    assert kinds["col.1"] == "mesh" and kinds["group.signs.t+00+00.c00"] == "group"
     assert not {"bld.a.part.win", "bld.a.front", "sign.x", "rs.e1n1"} & set(kinds)
     ch = U.manifest_changes(old, new)
-    assert ch["created"] == ["group.signs.t+00+00", "group.streets.t+00+01", "prop.bench.t"]
+    assert ch["created"] == ["group.signs.t+00+00.c00", "group.streets.t+00+01.c00", "prop.bench.t"]
     assert ch["updated"] == ["bld.a"]
     assert ch["deleted"] == sorted([r["key"] for r in insts] +
                                    ["bld.a.front", "rs.e1n1", "sign.x", "sign.y"])

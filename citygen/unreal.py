@@ -897,21 +897,34 @@ def tile_group(category: str) -> str | None:
     return None
 
 
-def _tile_mid(man: dict | None, tile: str, first: list[float]) -> list[float]:
+# A tile group is split into cells this wide (a 256 m tile into 4 x 4): the engine takes a
+# streamed-out actor's components away in one go (`ULevel::IncrementalUnregisterComponents`
+# steps by actor), so a group stays small enough not to make one long frame of it, and
+# compact enough to cull
+GROUP_CELL_M = 64.0
+
+
+def _group_cell(man: dict | None, tile: str, at: list[float]) -> tuple[str, list[float]]:
+    """The cell of a tile group a piece at `at` goes into: its name (`c<i><j>`, i east, j
+    north, from the tile's south-west corner) and its middle (z 0)."""
     b = next((t["bounds"] for t in (man or {}).get("tiles", []) if t["name"] == tile), None)
-    if b is None:
-        return [float(first[0]), float(first[1]), 0.0]
-    return [round((b[0] + b[2]) / 2.0, 3), round((b[1] + b[3]) / 2.0, 3), 0.0]
+    x0, y0 = (b[0], b[1]) if b else (0.0, 0.0)
+    n = max(1, int(round(((b[2] - b[0]) if b else 256.0) / GROUP_CELL_M)))
+    i = min(n - 1, max(0, int((at[0] - x0) // GROUP_CELL_M)))
+    j = min(n - 1, max(0, int((at[1] - y0) // GROUP_CELL_M)))
+    return f"c{i}{j}", [round(x0 + (i + 0.5) * GROUP_CELL_M, 3),
+                        round(y0 + (j + 0.5) * GROUP_CELL_M, 3), 0.0]
 
 
 def group_actors(actors: list[dict], insts: list[dict], man: dict | None = None) -> list[dict]:
     """Every record that becomes a component of another actor gets that actor's key as its
     `holder`: an instanced part its entry's; a street front (`<building>.front`) its
-    building's; a single-mesh actor of a `tile_group` kind the tile group's
-    (`group.<kind>.<tile>`, `.l<level>` on a deck). A holder's hash is taken again over its
-    members' hashes (it changes when any of them does). Returns the group actors: one for
-    each entry with parts and no mesh actor of its own (at the entry's pivot) and one per
-    tile group (at the tile's middle), by key."""
+    building's; a single-mesh actor of a `tile_group` kind the tile group's, by the
+    `GROUP_CELL_M` cell of the tile its pivot is in (`group.<kind>.<tile>.c<i><j>`,
+    `.l<level>` on a deck). A holder's hash is taken again over its members' hashes (it
+    changes when any of them does). Returns the group actors: one for each entry with parts
+    and no mesh actor of its own (at the entry's pivot) and one per tile group cell (at its
+    middle), by key."""
     own = {a["key"]: a for a in actors}
     members: dict[str, list[dict]] = {}
     groups: dict[str, dict] = {}
@@ -923,10 +936,12 @@ def group_actors(actors: list[dict], insts: list[dict], man: dict | None = None)
             g = tile_group(a["category"])
             if g is None:
                 continue
-            hk = f"group.{g}.{a['tile']}" + (f".l{a['level']}" if a.get("level") else "")
+            cell, mid = _group_cell(man, a["tile"], a["pivot"])
+            hk = f"group.{g}.{a['tile']}.{cell}" + (f".l{a['level']}" if a.get("level")
+                                                    else "")
             a["holder"] = hk
             if hk not in groups:
-                groups[hk] = {"key": hk, "pivot": _tile_mid(man, a["tile"], a["pivot"]),
+                groups[hk] = {"key": hk, "pivot": mid,
                               "yaw_deg": 0.0, "category": g, "type": f"group.{g}",
                               "tile": a["tile"], "district": "", "ids": []}
                 if a.get("level"):
