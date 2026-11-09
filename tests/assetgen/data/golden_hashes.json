@@ -13,11 +13,11 @@
     }
   },
   "samples": {
-    "archipelago_free_port": "926db39d79ce9ea76cd99c94ada4579da188bc20b7e43e4ab09ffc98d44d89bc",
-    "delta_megacity": "6d14f3ed4cf852485be1ada23fa99e8c714be34ec822cffdcd50bc99575d175a",
+    "archipelago_free_port": "0d43fe3830f6232d2b0ecbe912371a3d458bfb9badcdcc153231bf9af3623393",
+    "delta_megacity": "faf881b44486362071a0c4d12ba608d2a3e3ea67a10b1c6e0454ccdd882a2c7e",
     "nexus_city": "8bde6b3f41a137d18e555aa23ad9e54a035a105dd8a952f76ab5e732b2597c23",
-    "peninsula_city": "354556d17804e1a9fc09e08a11297fdcc255843b1e290c09a9729740e8124f64",
-    "vesper_bay": "774f65c9be28f1b825f01bd3d1a3a0f3f200ab9d7b02d5e4026333acbd6548ec"
+    "peninsula_city": "e37202678772bc9c188f474536b8cbeb304f5afe98ea121f27379d819e8b4411",
+    "vesper_bay": "c87ed67b22cea6889b3381bb9da6331e94c249bbe1ef035a1f14e9c1750d9796"
   },
   "spike": {
     "shopfront_row": "f23a2f816caf8edb6e5ebd46b70d96a7fc9e205c5c979b9eda1c88f6abe5276e",

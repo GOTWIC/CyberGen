@@ -120,6 +120,23 @@ def test_structures_and_walkways(lines):
         assert all(n in walks for n in w.neighbors)
 
 
+
+def one_elevator_an_end(m) -> list:
+    """#109: the stations with two elevator walkways at one point."""
+    seen: dict = {}
+    for w in m.walkways:
+        sid = (w.attrs or {}).get("station")
+        if w.kind == "elevator" and sid:
+            key = (sid, round(w.line[0][0], 2), round(w.line[0][1], 2))
+            seen[key] = seen.get(key, 0) + 1
+    return sorted(k for k, n in seen.items() if n > 1)
+
+
+def test_one_elevator_a_platform_end(lines):
+    """#109: an elevated platform end has one elevator (not its own at its first end and
+    another where the sidewalk right under that end is)."""
+    assert not one_elevator_an_end(lines.model)
+
 def test_report_has_transit_stats(lines):
     st = lines.stats["transit"]
     assert set(st["by_mode"]) == {"metro", "elevated_rail", "sky_tube"}
@@ -833,6 +850,41 @@ def test_sky_tube_style_in_the_spec():
     d["transit"]["lines"][2]["lit_rings_every"] = 0
     assert not validate_spec(d).ok
 
+
+
+def test_bent_room_takes_out_a_low_building_beside_the_line():
+    """#108: a sky tube 1.2 km over a street whose lanes take every spot under it, low
+    removable buildings 9 to 30 m off it on both sides: the dry run leaves it without a
+    support; `_support_room` then takes out, a span apart, the buildings that alone keep a
+    cantilever bent's column off its spot beside the line (`_bent_room`), so the supports
+    leave no stretch longer than the longest span. Nothing else goes."""
+    from types import SimpleNamespace as NS
+    ln = TR.Line("tl01", "Test Tube", "sky_tube", "#fff", False, (60.0, 120.0), 100.0, False)
+    ln.pts = [(10.0 * k, 0.0) for k in range(121)]
+    ln.zs = [100.0] * len(ln.pts)
+    blds = [TR.Bld(f"b{k}{'ns'[side < 0]}",
+                   shapely.box(15.0 + 30.0 * k - 12.0, min(9.0 * side, 30.0 * side),
+                               15.0 + 30.0 * k + 12.0, max(9.0 * side, 30.0 * side)),
+                   40.0, True)
+            for k in range(40) for side in (1, -1)]
+    lane = shapely.LineString([(-50.0, 0.0), (1250.0, 0.0)])
+    lanes = (shapely.STRtree([lane]), [lane], [16.0])
+    sw = (None, [], None)
+    c = NS(m=NS(tunnels=[], seas=[], rivers=[], channels=[], waterways=[], site_elements=[],
+                bounds=(-100.0, -100.0, 1300.0, 100.0)),
+           blds=blds, btree=shapely.STRtree([b.poly for b in blds]), slabs=[], decks=[],
+           dtree=None)
+
+    def spans(gone):
+        keep = TR.Keep(c, gone, lanes, sw, [TR.track_rec(ln)], [])
+        return TR._Dry(c).supports_of(ln, keep)[1]
+
+    assert any(k == "gap" for _, _, k in spans(set()))
+    gone: set = set()
+    TR._support_room(c, [ln], gone, lanes, sw, [])
+    assert gone and sorted(gone) == sorted(ln.removed)
+    assert len(gone) <= 2 * len([x for x in range(0, 1200, 420)])
+    assert not any(k == "gap" for _, _, k in spans(gone))
 
 def test_check_supports_fails_off_the_line(lines):
     def fn(d):

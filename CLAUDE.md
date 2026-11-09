@@ -1433,6 +1433,20 @@ ramps and vertical curves, not in steps and humps.
   (the fill length less a curve).
 Outputs: `docs/progress/fix_sky_tube_profile/`.
 
+The support and elevator fixes (issues #108 and #109) are in place, in `citygen/transit.py`:
+- **Bents beside the line** (#108, `_bent_room`, from `_support_room`): where the dry run
+  still leaves a gap once the low buildings under the track are out (a line over dense
+  streets, every spot under it a lane, a sidewalk's clear path or a building that is not
+  low), at each spot a span apart along it the nearest spot beside the line for a cantilever
+  bent's column (within `CANT_REACH_M`, as `_frame` searches) that only low removable
+  buildings keep it off (their tops 2 m under its arm), the rest of the spot and the arm
+  clear, has those buildings taken out. A city whose dry run leaves no gap is unchanged.
+  #108's layout (Vesper Bay Decks' second) no longer reproduces the gap on main.
+- **One elevator an end** (#109, `Builder._elevated`): the platform's own elevator at its
+  first end is added only where that end has none yet (the sidewalk right under it had one
+  added already).
+Outputs: `docs/progress/fix_pylons_elevators/`.
+
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
 - **Validation:** as in "Validation" above; nothing beyond it.
