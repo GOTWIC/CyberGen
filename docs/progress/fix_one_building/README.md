@@ -35,6 +35,11 @@ Delta's pair 6 to 60 bits apart, Pinned's 0 to 91 (8 needed). Before and after:
 
 <img src="thumbs_pinned_sheds_before.png" width="600"> <img src="thumbs_pinned_sheds_after.png" width="600">
 
+Pinned's pair after, rendered: `d06.lot.e568s1497.bld` in its red cladding, and
+`d06.lot.w64s1275.bld` in its dark grey (each had the same dark red roof before).
+
+<img src="pinned_shed_red_after.jpg" width="600"> <img src="pinned_shed_grey_after.jpg" width="600">
+
 ## `asset_clearance`: a barrel in a skybridge's corridor (Cragmouth, `d02.lot.w1085n239.bld`)
 
 The shanty stack's roof water barrel was placed with `roofs._place` directly, not through
