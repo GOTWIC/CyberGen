@@ -1,0 +1,9 @@
+fit checks: Delta Megacity: FAIL
+FAIL asset_grounded: 53839 things (34 kinds), 3 not resting on a surface (3 failing, the rest props and plants at the model's heights, reported)
+    roads on their junctions: 4430 legs, 0 roads with a step over 0.02 m (largest 0.0 m; failing over 0.02 m)
+    roof.ac_unit: 1 of 11642
+    roof.roof_vent: 2 of 6068
+    d03.lot.e502s115.bld (roof.roof_vent) at [512.87, -150.43, 120.0] gap 119.9
+    d02.lot.e1036n718.bld (roof.roof_vent) at [1042.45, 713.24, 38.5] gap 38.5
+    d04.lot.w1594n1214.bld (roof.ac_unit) at [-1593.25, 1226.05, 9.0] gap 0.038
+PASS asset_clash: 0 (road_into_building 0, building_over_road 0, bridge_twice 0, transit_through_building 0, transit_through_platform 0, barrier_on_road 0, barrier_in_junction 0, barrier_on_crosswalk 0, barrier_through_barrier 0, prop_on_road 0, prop_in_barrier 0, strip_on_junction 0, strip_on_road 0)
