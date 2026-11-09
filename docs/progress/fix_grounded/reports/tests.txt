@@ -1,0 +1,70 @@
+tests/assetgen/test_ag_roofs.py::test_ag4_parts_are_closed_named_and_roof_equipment_untinted PASSED [  2%]
+tests/assetgen/test_ag_roofs.py::test_shed_roof_forms_stay_inside_the_envelope PASSED [  4%]
+tests/assetgen/test_ag_roofs.py::test_pitched_roofs_and_mansards PASSED  [  7%]
+tests/assetgen/test_ag_roofs.py::test_every_roof_item_has_an_asset PASSED [  9%]
+tests/assetgen/test_ag_roofs.py::test_roof_equipment_keeps_out_of_a_corridor_over_it PASSED [ 11%]
+tests/assetgen/test_ag_roofs.py::test_every_skybridge_kind_is_closed PASSED [ 14%]
+tests/assetgen/test_ag_roofs.py::test_landing_doors_where_a_skybridge_meets_a_floor_line PASSED [ 16%]
+tests/assetgen/test_ag_roofs.py::test_portals_are_cut_open PASSED        [ 19%]
+tests/assetgen/test_ag_roofs.py::test_roof_items_stand_on_all_their_feet PASSED [ 21%]
+tests/assetgen/test_ag_fit.py::test_surfaces_find_the_highest_floor_under_a_point PASSED [ 23%]
+tests/assetgen/test_ag_fit.py::test_a_thing_rests_on_three_of_its_five_feet PASSED [ 26%]
+tests/assetgen/test_ag_fit.py::test_packs_read_back_in_world_space PASSED [ 28%]
+tests/assetgen/test_ag_fit.py::test_m19_supports_are_drawn PASSED        [ 30%]
+tests/assetgen/test_ag_fit.py::test_a_low_deck_stands_on_its_embankment PASSED [ 33%]
+tests/assetgen/test_ag_fit.py::test_curved_walls_are_smooth_and_glazed PASSED [ 35%]
+tests/assetgen/test_ag_fit.py::test_small_city_passes_the_fit_checks PASSED [ 38%]
+tests/assetgen/test_ag_build.py::test_every_building_has_a_shell_and_a_proxy PASSED [ 40%]
+tests/assetgen/test_ag_build.py::test_checks_are_the_fourteen PASSED     [ 42%]
+tests/assetgen/test_ag_build.py::test_build_writes_buildings_and_streets PASSED [ 45%]
+tests/assetgen/test_ag_build.py::test_second_build_writes_no_file PASSED [ 47%]
+tests/assetgen/test_ag_build.py::test_bytes_do_not_depend_on_workers PASSED [ 50%]
+tests/assetgen/test_ag_build.py::test_same_bytes_with_another_hash_seed PASSED [ 52%]
+tests/assetgen/test_ag_build.py::test_regenerated_district_rebuilds_only_changed_tiles PASSED [ 54%]
+tests/assetgen/test_ag_build.py::test_unreal_contribution_covers_every_building PASSED [ 57%]
+tests/assetgen/test_ag_build.py::test_parts_packs_and_their_instances PASSED [ 59%]
+tests/assetgen/test_ag_build.py::test_manifest_keeps_other_sections PASSED [ 61%]
+tests/assetgen/test_ag_build.py::test_small_city_golden PASSED           [ 64%]
+tests/assetgen/test_ag_build.py::test_vesper_bay_buildings_golden PASSED [ 66%]
+tests/assetgen/test_ag_build.py::test_golden_file_has_ag1 PASSED         [ 69%]
+tests/assetgen/test_ag_materials.py::test_noise_tiles_and_is_exact PASSED [ 71%]
+tests/assetgen/test_ag_materials.py::test_every_surface_generator PASSED [ 73%]
+tests/assetgen/test_ag_materials.py::test_normal_map_convention PASSED   [ 76%]
+tests/assetgen/test_ag_materials.py::test_library_index_cache_and_budget PASSED [ 78%]
+tests/assetgen/test_ag_materials.py::test_library_goldens PASSED         [ 80%]
+tests/assetgen/test_ag_materials.py::test_materials_golden PASSED        [ 83%]
+tests/assetgen/test_ag_materials.py::test_interior_projection PASSED     [ 85%]
+tests/assetgen/test_ag_materials.py::test_glyphs_every_script PASSED     [ 88%]
+tests/assetgen/test_ag_materials.py::test_catalog_covers_every_slot PASSED [ 90%]
+tests/assetgen/test_ag_materials.py::test_materials_stage_on_the_small_city PASSED [ 92%]
+tests/assetgen/test_ag_materials.py::test_params_per_building PASSED     [ 95%]
+tests/assetgen/test_ag_materials.py::test_texel_density_check_fails_when_the_library_is_too_coarse PASSED [ 97%]
+tests/assetgen/test_ag_materials.py::test_whole_city_views_take_every_water_and_ground_tile PASSED [100%]
+run 20261109-125811-96975 (/Users/swag/Projects/CyberGen/.claude/worktrees/strange-brahmagupta-1a7c31/.pytest_runs/20261109-125811-96975): 42 passed in all
+============================= slowest 25 durations =============================
+372.03s call     tests/assetgen/test_ag_fit.py::test_small_city_passes_the_fit_checks
+253.33s call     tests/assetgen/test_ag_build.py::test_regenerated_district_rebuilds_only_changed_tiles
+243.95s call     tests/assetgen/test_ag_build.py::test_bytes_do_not_depend_on_workers
+174.91s call     tests/assetgen/test_ag_build.py::test_vesper_bay_buildings_golden
+142.09s call     tests/assetgen/test_ag_fit.py::test_curved_walls_are_smooth_and_glazed
+141.82s call     tests/assetgen/test_ag_build.py::test_same_bytes_with_another_hash_seed
+100.88s call     tests/assetgen/test_ag_build.py::test_second_build_writes_no_file
+11.45s call     tests/assetgen/test_ag_materials.py::test_texel_density_check_fails_when_the_library_is_too_coarse
+4.17s call     tests/assetgen/test_ag_build.py::test_every_building_has_a_shell_and_a_proxy
+3.93s call     tests/assetgen/test_ag_materials.py::test_materials_stage_on_the_small_city
+1.28s call     tests/assetgen/test_ag_materials.py::test_library_index_cache_and_budget
+1.26s call     tests/assetgen/test_ag_build.py::test_parts_packs_and_their_instances
+1.00s call     tests/assetgen/test_ag_build.py::test_unreal_contribution_covers_every_building
+0.91s call     tests/assetgen/test_ag_materials.py::test_params_per_building
+0.68s call     tests/assetgen/test_ag_build.py::test_small_city_golden
+0.47s call     tests/assetgen/test_ag_roofs.py::test_portals_are_cut_open
+0.26s call     tests/assetgen/test_ag_roofs.py::test_shed_roof_forms_stay_inside_the_envelope
+0.15s call     tests/assetgen/test_ag_roofs.py::test_pitched_roofs_and_mansards
+0.12s call     tests/assetgen/test_ag_roofs.py::test_roof_equipment_keeps_out_of_a_corridor_over_it
+0.12s call     tests/assetgen/test_ag_roofs.py::test_landing_doors_where_a_skybridge_meets_a_floor_line
+0.12s call     tests/assetgen/test_ag_roofs.py::test_every_roof_item_has_an_asset
+0.11s call     tests/assetgen/test_ag_build.py::test_build_writes_buildings_and_streets
+0.11s call     tests/assetgen/test_ag_roofs.py::test_roof_items_stand_on_all_their_feet
+0.10s call     tests/assetgen/test_ag_fit.py::test_a_low_deck_stands_on_its_embankment
+0.07s call     tests/assetgen/test_ag_roofs.py::test_ag4_parts_are_closed_named_and_roof_equipment_untinted
+======================= 42 passed in 1456.55s (0:24:16) ========================

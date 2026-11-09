@@ -2150,7 +2150,8 @@ A fix between milestones, from run-through 2 and AG14's open items, on #95's bar
   square on its cut short of its bulb's curve (a carriageway wedge, also on main); AG7's mitre bulge at a sharp alley hairpin
   (Decks' `rs.e1681s1093`; the mitre is in `streets/path.py`, in AG12's and AG13's code
   hashes too); sidewalk slivers under 10 cm (Delta 9.7 m2); Stacks' signal; AG14's grounded
-  rule takes a thing as resting when one of its five feet is. M17's long junctions and the
+  rule takes a thing as resting when one of its five feet is (fixed: "AG14's grounded rule"
+  below). M17's long junctions and the
   deck girders under junctions are the road recheck's.
 
 ## Fix: a median under a paved lane (issue #114)
@@ -2475,6 +2476,28 @@ Vesper Bay), `golden_props.json`, `golden_ground.json`, `golden_water.json` (Ves
 the small city's water is unchanged) and `golden_hashes.json`'s small city briefs, AG1 files
 and AG6 materials and the five samples' briefs; the Vesper Bay buildings, the spike and the
 triangulation are unchanged.
+
+## Fix: AG14's grounded rule, roof parts on all their feet (issue #105)
+
+The last item of #105. `asset_grounded` took a thing as resting when one of its five feet
+was within 2 cm of a surface (the smallest gap where fewer than three rested); it takes the
+third smallest now (`fit.build.rest_gaps`), and a dunnage frame's own top no longer holds it
+up (each frame its own owner). AG4 seats every roof part on all its feet: `roofs.Stand` reads
+the faces facing up of what the shell has drawn and the frames placed so far as AG14 reads
+the packs; a roof item is laid out and tested, frame and item (`_lay`, `_stands`), else moved
+toward its roof's middle 0.25 m at a time up to 6 m (`_inward`); on a form it sits at its
+feet's lowest drawn roof where that rises under `LEG_MIN`, else at the form's top on a frame
+whose legs reach the drawn roof under each foot (`_seat`, `_legs`); huts, vents and
+skylights take only spots where they stand. #89's quay railings and shrubs fail where no
+foot rests (their seat), and are reported on fewer than three, as the other props and
+plants. `GEN_VERSION` fix105.1.
+
+On main's AG4, 56 of Delta's roof parts did not stand on all their feet (35 AC units, 15
+frames, 4 tanks, 2 vents, #144's two among them); now none on Delta, Cragmouth (its #144
+vent too) or Vesper Bay. Cragmouth reports 2,406 props and plants on fewer than three feet
+(2,060 shrubs straddling retaining walls and cliff edges), not failing. Goldens:
+`golden_hashes.json`'s small city AG1 files and AG6 materials and the Vesper Bay buildings.
+Renders and reports: `docs/progress/fix_grounded/`.
 
 ## Order
 
