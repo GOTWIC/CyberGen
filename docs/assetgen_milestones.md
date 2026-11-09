@@ -2499,6 +2499,29 @@ vent too) or Vesper Bay. Cragmouth reports 2,406 props and plants on fewer than 
 `golden_hashes.json`'s small city AG1 files and AG6 materials and the Vesper Bay buildings.
 Renders and reports: `docs/progress/fix_grounded/`.
 
+## Fix: one-building failures on M22's layouts (issue #144)
+
+The checks that failed on one or two buildings in Delta, Cragmouth and Vesper Bay Pinned
+(#156 fixed the roof vents and AC unit):
+- **`asset_envelope`** (Delta `d02.lot.e465n764.bld`): `rings.tidy` closed a spike by a chord
+  from end to end; at a 4 cm slit beside a wall the chord stood up to 4 cm outside the
+  footprint. Of the chord and the shorter leg's end moved onto the longer leg's line, the
+  way whose new edges keep nearest the outline wins (`_deviation`).
+- **`asset_unique`** (Delta's two open sheds 6 bits apart, Pinned's 0): the thumbnail drew
+  no pillars or roof equipment (`thumb.DRAWN` has them now), and an open shed showed only
+  its roof's color; it is roofed in its cladding (`hangar`, the wall tint: `roofs.open_shed`)
+  and its columns painted in it (`pillar` style `painted`). Delta's pair 60 bits apart,
+  Pinned's 91.
+- **`asset_clearance`** (Cragmouth `d02.lot.w1085n239.bld`): the shanty's roof barrel, and
+  the megablock's antenna farm, placed without `types.put`'s corridor test, keep off the
+  corridors over the roof.
+- **`asset_landings`** (Cragmouth `d05.sb.e1557s268`): a skybridge end farther than 1.5 m
+  from every wall meets none (`connections.wall_of`; the brief files it under its nearest
+  wall): on a roof of the building at its deck it lands there (`roof`, `on_roof` in the
+  check, apart), else `no_edge`. Cragmouth's three podium decks.
+`GEN_VERSION` fix144.1. Every check passes on the three cities. Notes:
+`docs/progress/fix_one_building/`.
+
 ## Order
 
 ```

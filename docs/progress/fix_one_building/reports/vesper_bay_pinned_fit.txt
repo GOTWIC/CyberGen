@@ -1,0 +1,6 @@
+fit checks: Vesper Bay Pinned: all pass
+PASS asset_grounded: 58671 things (32 kinds), 1 not resting on a surface (0 failing, the rest props and plants at the model's heights, reported)
+    roads on their junctions: 5123 legs, 0 roads with a step over 0.02 m (largest 0.0 m; failing over 0.02 m)
+    prop.bollard: 1 of 954
+    d05.prop.bollard.w493n1032 (prop.bollard) at [-492.8, 1031.88, 3.68] gap 0.39
+PASS asset_clash: 0 (road_into_building 0, building_over_road 0, bridge_twice 0, transit_through_building 0, transit_through_platform 0, barrier_on_road 0, barrier_in_junction 0, barrier_on_crosswalk 0, barrier_through_barrier 0, prop_on_road 0, prop_in_barrier 0, strip_on_junction 0, strip_on_road 0)
