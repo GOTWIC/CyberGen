@@ -84,11 +84,11 @@ FLY_MODE = f"{CORE}/GM_CityGenFly"
 # stage 2 (assetgen, layer 2): the masters' version (Core/M_Cg<Master>, rebuilt in place when
 # it changes), the meshes' and the actors' (stored hashes "<version>.<content hash>", as
 # MESH_VERSION and ACTOR_VERSION)
-STAGE2_VERSION = "9"                 # AG6: textured masters; AG8: leaves, textured holo;
-                                     # AG5: the heroes' masks (HeroMask on UV1);
-                                     # AG12: water (Single Layer Water) and bed (caustics);
-                                     # AG15: the glass's night by schedule and Hour;
-                                     # #93: the water's pins by UE 5.8's names
+# (its versions: AG6 textured masters; AG8 leaves, textured holo; AG5 the heroes' masks
+# (HeroMask on UV1); AG12 water (Single Layer Water) and bed (caustics); AG15 the glass's
+# night by schedule and Hour; #93 the water's pins by UE 5.8's names; 10, AG16: Custom
+# Primitive Data read through per-instance custom data, the instanced HLODs' colors)
+STAGE2_VERSION = "10"
 TEXTURE_VERSION = "1"
 # a prune of more assets than this deletes their package files itself, on an empty level: the
 # editor's delete makes a reachability pass over every loaded object per package (8435 meshes
@@ -846,7 +846,7 @@ def tint_color(m, x, y):
         v = expr(m, unreal.MaterialExpressionVectorParameter, x - 400, y + 80 + 90 * k,
                  parameter_name=f"Tint{i}", default_value=unreal.LinearColor(1, 1, 1, 1),
                  use_custom_primitive_data=True, primitive_data_index=i)
-        link(v, "", cus, f"C{i}")
+        link(per_instance(m, v, i, x - 400, y + 80 + 90 * k, vector=True), "", cus, f"C{i}")
     return cus
 
 
@@ -944,13 +944,29 @@ def light_pool_material():
 
 
 def sparam(m, name, x, y, default=0.0, cpd=None):
-    """A scalar parameter, read from the actor's Custom Primitive Data at `cpd` if given."""
+    """A scalar parameter, read from the actor's Custom Primitive Data at `cpd` if given
+    (through `per_instance`)."""
     if cpd is None:
         return expr(m, unreal.MaterialExpressionScalarParameter, x, y, parameter_name=name,
                     default_value=float(default))
-    return expr(m, unreal.MaterialExpressionScalarParameter, x, y, parameter_name=name,
-                default_value=float(default), use_custom_primitive_data=True,
-                primitive_data_index=cpd)
+    return per_instance(m, expr(m, unreal.MaterialExpressionScalarParameter, x, y,
+                                parameter_name=name, default_value=float(default),
+                                use_custom_primitive_data=True, primitive_data_index=cpd),
+                        cpd, x, y)
+
+
+def per_instance(m, param, index, x, y, vector=False):
+    """AG16: a Custom Primitive Data parameter read through a per-instance custom data node
+    at the same index, the parameter its default: an actor (or a component) reads its own
+    Custom Primitive Data as before, and an instance of an instanced HLOD the custom data the
+    HLOD builder gave it from its source's Custom Primitive Data (`FISMComponentBatcher`).
+    Read from the parameter alone, the far city's HLODs lost every tint, schedule and seed
+    (dark and untinted past the loading range)."""
+    cls = (unreal.MaterialExpressionPerInstanceCustomData3Vector if vector
+           else unreal.MaterialExpressionPerInstanceCustomData)
+    pic = expr(m, cls, x + 120, y + 30, data_index=index)
+    link(param, "", pic, "DefaultValue")
+    return pic
 
 
 def tparam(m, name, kind, x, y, uv, defaults):

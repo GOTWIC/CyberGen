@@ -875,7 +875,7 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
 # own actor (else of a group actor at the entry's pivot), a building's street front (AG3) a
 # component of the building's actor, and the many small single-mesh pieces of a tile (signs,
 # street pieces, water pieces, ground cover) components of one actor per tile and kind
-# (`TILE_GROUPS`): a level of Delta Megacity's 73,772 actors holds about 17,000. Each
+# (`tile_group`): Delta Megacity's level of 73,772 actors holds 13,642 (4,650 groups). Each
 # component keeps its own mesh, transform, Custom Primitive Data, materials, collision and
 # its record's key and ids as tags. CITYGEN_UE_GROUP=0 keeps an actor per record (the
 # manifest then has no `groups`).
