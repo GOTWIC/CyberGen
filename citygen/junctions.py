@@ -256,6 +256,43 @@ def lock_cuts(net, legs: dict) -> int:
 
 
 LOCK_GAP_M = 1.0        # M22: a junction's port this far short of a locked stretch
+
+
+def stair_foot(seg: dict, at_start: bool) -> float:
+    """#147: how far from one end a footbridge stays at that end's height (its profile's
+    knots within 1 mm of it), where its stairs begin."""
+    zp = [(p["s"], p["z"]) for p in seg["z_profile"]]
+    if not zp:
+        return 0.0
+    L = zp[-1][0]
+    ks = zp if at_start else [(L - s, z) for s, z in reversed(zp)]
+    z0 = ks[0][1]
+    foot = 0.0
+    for s, z in ks:
+        if abs(z - z0) > 0.001:
+            break
+        foot = s
+    return foot
+
+
+def foot_cuts(legs: dict) -> int:
+    """#147: a footbridge's cut at a junction no farther out than its stairs' foot, so its
+    port, where its face of the pavement map meets the junction's, is at the junction's
+    level, and its stairs rise past it (in a slot of the junction's region where they
+    start inside it, `pavement.unit_regions`; M2 starts most stairs at the node). Returns
+    how many it shortened."""
+    n = 0
+    for nid in sorted(legs):
+        for x in legs[nid]:
+            if x.cls != "footbridge":
+                continue
+            c = min(x.cut, stair_foot(x.seg, x.at_start))
+            if c < x.cut - 0.0005:
+                x.cut = x.cut_row = c
+                n += 1
+    return n
+
+
 FOLD_REACH = 3.0        # M22: a fold this many half widths past a cut is the junction's
 
 
@@ -2489,6 +2526,7 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
     fold_cuts(net, legs)
     lock_cuts(net, legs)
     fold_cuts(net, legs)        # (a lock's cut can land in a fold)
+    foot_cuts(legs)
     # (M10 with M22: a regeneration's junctions whose roads are all held as they were)
     fr0 = getattr(getattr(net, "builder", None), "frame", None)
     hu, old_of, plain = held_units(net, legs, fr0) if fr0 is not None else ({}, {}, set())

@@ -246,3 +246,182 @@ def test_sample_passes_the_map_checks():
     assert {f.id: f for f in again.pavement} == {f.id: f for f in m.pavement}
     assert again.pavement_net == m.pavement_net
     assert [j.polygon for j in again.junctions] == [j.polygon for j in m.junctions]
+
+
+def _footbridge_net(flat: bool = True):
+    """A street east to west through the origin and a footbridge south from it whose stairs
+    start at the node (M2 lands most so, 1 cm out; with flat False from the node itself),
+    3.8 m up from 5 m to 25 m, down by 30 m."""
+    nodes = {"o": (0.0, 0.0, 0.0), "w": (-100.0, 0.0, 0.0), "e": (100.0, 0.0, 0.0),
+             "s": (0.0, -30.0, 0.0)}
+    segs = [_seg("rw", "o", "w", [(0.0, 0.0), (-100.0, 0.0)], cuts=(12.0, 0.0)),
+            _seg("re", "o", "e", [(0.0, 0.0), (100.0, 0.0)], cuts=(12.0, 0.0)),
+            _seg("fb", "o", "s", [(0.0, 0.0), (0.0, -30.0)], cls="footbridge",
+                 cuts=(12.0, 0.0))]
+    fb = segs[-1]
+    fb["width_m"] = 4.0
+    fb["cross_section"] = ST.cross_section("footbridge", None)
+    fb["bridge"] = True
+    fb["z_profile"] = [{"s": 0.0, "z": 0.0}, {"s": 0.01, "z": 0.0}, {"s": 5.0, "z": 3.8},
+                       {"s": 25.0, "z": 3.8}, {"s": 30.0, "z": 0.0}]
+    if not flat:
+        del fb["z_profile"][1]
+    return nodes, segs, [_junction("jo", "o", 3)]
+
+
+def test_a_footbridge_is_a_face_of_the_map():
+    """#147: a footbridge's faces are the map's, from port to port: its port on its
+    junction at its stairs' foot (its cut no farther out), at the junction's level and shared
+    with it; where its stairs start inside the junction they stand in a slot of its region,
+    their sides walls (outer edges of both), the junction's own vertices there at its level,
+    and the map passes its checks; so too where its stairs rise from the node itself (a
+    zero cut, which a junction does not record)."""
+    for flat in (True, False):
+        _footbridge_at_its_junction(*_footbridge_net(flat), flat)
+
+
+def _footbridge_at_its_junction(nodes, segs, jn, flat):
+    from citygen import junctions as JN
+
+    assert JN.stair_foot(segs[-1], True) == (0.01 if flat else 0.0)
+    assert JN.stair_foot(segs[-1], False) == 0.0
+    m = _map(nodes, segs, jn)
+    cs = _checks(m)
+    for cid in M22:
+        assert cs[cid].passed, (cid, cs[cid].failures[:5])
+    N = PVC.Net(m)
+    fb = [f for f in m.pavement if f.owner_id == "fb"]
+    assert fb and all(f.kind == "walk" for f in fb)
+    # (its faces reach from its stairs' foot, the node, to its far end)
+    g = shapely_union([N.poly(f.id) for f in fb])
+    assert g.bounds[3] > -0.5 and g.bounds[1] < -29.5
+    # (the junction's faces stay at the street's level; none overlaps the stairs)
+    jf = [f for f in m.pavement if f.owner_id == "jo"]
+    assert jf and max(N.z(v) for f in jf for r in N.rings[f.id] for v in r) < 0.01
+    for f in jf:
+        assert N.poly(f.id).intersection(g).area < 1e-3
+    # (one port edge between the footbridge and its junction, at the junction's level; the
+    # stairs' sides beside the junction are outer edges, walls)
+    edges = {e.id: e for e in m.pavement_net.edges}
+    fb_refs = {r.lstrip("-") for f in fb for ring in f.rings for r in ring}
+    j_refs = {r.lstrip("-") for f in jf for ring in f.rings for r in ring}
+    ports = [edges[e] for e in fb_refs & j_refs]
+    assert ports and all(e.kind == "port" for e in ports)
+    assert all(abs(N.z(v)) < 0.01 for e in ports for v in e.v)
+    beside = [edges[e] for e in fb_refs if edges[e].kind == "outer" and
+              any(N.xy(v)[1] > -5.0 for v in edges[e].v)]
+    assert beside and any(max(N.z(v) for v in e.v) > 1.0 for e in beside)
+
+
+def test_a_footbridge_meets_its_junction_along_its_whole_port_line():
+    """#147: a footbridge's faces and another owner's are one level only on its port line;
+    a junction's vertex put into that line between its port points (Delta Megacity's
+    `jn.e540n598`, whose two promenades meet 1 cm off the footbridge's end) is on it, so the
+    two faces share the edge there rather than each keeping a vertex of its own (both outer
+    edges, no seam); beside the stairs they stay apart."""
+    J = PV.Face("j.pv.jn", "j", "junction", "jn", "g0", (6, 9),
+                [[(-5000, -3000), (5000, -3000), (5000, 0), (2000, 0), (0, 0), (-2000, 0),
+                  (-5000, 0)]], unit="j")
+    F = PV.Face("fb.pv.wk", "fb", "walk", "wk", "g0", (7, 0),
+                [[(-2000, 0), (0, 0), (2000, 0), (2000, 30000), (-2000, 30000)]], road="fb")
+    A = PV.Assembly.__new__(PV.Assembly)
+    A.faces = [J, F]
+    A.adj = {"j": {"fb"}, "fb": {"j"}}
+    A.foot = {"fb"}
+    A.ports = {(-2000, 0), (2000, 0)}
+    A.foot_ports = [((-2000, 0), (2000, 0))]
+    A.zf = lambda f, x, y: 0.0
+    assert A._on_foot_port((0, 0)) and not A._on_foot_port((2000, 1000))
+    assert A._levels((0, 0), [0, 1]) == [[0, 1]]
+    assert A._levels((2000, 0), [0, 1]) == [[0, 1]]
+    assert len(A._levels((5000, 0), [0, 1])) == 2      # (beside the stairs: two levels)
+
+
+def shapely_union(gs):
+    from shapely import union_all
+
+    return union_all(gs)
+
+
+def _unfold_case(depth: float):
+    """A junction face 40 m by 20 m between a port at 0 m (west) and one at 2 m (east),
+    with a slot 2 m wide cut `depth` m into it from its north edge, and a corner pad filling
+    the slot: (the assembly, its heights by the curb rule, the anchored vertices)."""
+    def mmp(p):
+        return (int(p[0] * 1000), int(p[1] * 1000))
+    ring = [(0, 0), (40, 0), (40, 20), (21, 20), (21, 20 - depth), (19, 20 - depth),
+            (19, 20), (0, 20)]
+    pad = [(19, 20), (19, 20 - depth), (21, 20 - depth), (21, 20)]
+    names = {p: f"v{p[0]}_{p[1]}" for p in ring}
+    A = PV.Assembly.__new__(PV.Assembly)
+    A.faces = [PV.Face("u.pv.jn", "u", "junction", "jn", "g0", (6, 9), [[mmp(p) for p in ring]],
+                       unit="u"),
+               PV.Face("u.pv.pad_a", "u", "corner", "pad_a", "g0", (1, 9),
+                       [[mmp(p) for p in pad]], unit="u")]
+    A.vrings = [[[names[p] for p in ring]], [[names[p] for p in pad]]]
+    A.vpos = {names[p]: mmp(p) for p in ring}
+    A.stats = {}
+    z = {names[(0, 0)]: 0.0, names[(0, 20)]: 0.0, names[(40, 0)]: 2.0, names[(40, 20)]: 2.0}
+    fixed = set(z)
+    # (the curb rule: by length along the ring from the east port round the slot)
+    path = [(40, 20), (21, 20), (21, 20 - depth), (19, 20 - depth), (19, 20), (0, 20)]
+    cum = [0.0]
+    for a, b in zip(path, path[1:]):
+        cum.append(cum[-1] + math.dist(a, b))
+    for p, c in zip(path, cum):
+        z.setdefault(names[p], 2.0 - 2.0 * c / cum[-1])
+    A.bracket = {names[p]: (0.0, 2.0) for p in path[1:-1]}
+    return A, z, fixed, names
+
+
+def test_a_junction_the_curb_rule_folds_is_unfolded():
+    """#147: the curb rule runs a junction's heights along its ring, so across the mouth of
+    a deep slot (a gore island's neck) two vertices 2 m apart get heights from points the
+    slot's whole round apart, and the pad across it folds; `Assembly._unfold` gives its free
+    vertices heights from its ports by plan distance, no steeper than between them. A slot
+    the rule does not fold keeps its heights."""
+    A, z, fixed, names = _unfold_case(15.0)
+    mouth = abs(z[names[(21, 20)]] - z[names[(19, 20)]]) / 2.0
+    assert mouth > 0.3                                 # (the fold: 45% across 2 m)
+    before = A._drawn([0, 1], z)
+    assert A._unfold(z, fixed) == 1
+    assert A._drawn([0, 1], z) < before
+    assert abs(z[names[(21, 20)]] - z[names[(19, 20)]]) / 2.0 <= 0.05 + PV.FOLD_TOL
+    for v in fixed:
+        assert z[v] in (0.0, 2.0)                      # (the ports keep theirs)
+    A, z, fixed, names = _unfold_case(0.1)
+    keep = dict(z)
+    assert A._unfold(z, fixed) == 0 and z == keep
+
+
+def test_a_strip_creased_against_its_long_edge_is_unfolded():
+    """#147: a corner pad 20 m long and under a meter wide whose far side is one edge with
+    no vertex between its ends (Delta Megacity's `jn.e170s444`, pad_c, along its ramp): a
+    free vertex 0.6 m across from that edge's middle, its height from the curb rule 0.8 m
+    under the edge's there, is a fold no other vertex is near enough to show; `_folds`
+    measures it against points along the edge, and `_unfold` gives it the edge's height."""
+    def mmp(p):
+        return (int(p[0] * 1000), int(p[1] * 1000))
+    ring = [(0, 0), (20, 0), (20, 1), (10, 0.6), (0, 1)]
+    names = {p: f"v{p[0]}_{p[1]}" for p in ring}
+    A = PV.Assembly.__new__(PV.Assembly)
+    A.faces = [PV.Face("u.pv.pad_a", "u", "corner", "pad_a", "g0", (1, 9),
+                       [[mmp(p) for p in ring]], unit="u")]
+    A.vrings = [[[names[p] for p in ring]]]
+    A.vpos = {names[p]: mmp(p) for p in ring}
+    A.stats = {}
+    z = {names[(0, 0)]: 0.0, names[(20, 0)]: 2.0, names[(20, 1)]: 2.0, names[(0, 1)]: 0.0}
+    fixed = set(z)
+    mid = names[(10, 0.6)]
+    z[mid] = 0.2                                       # (the curb rule's, from far round)
+    A.bracket = {mid: (0.0, 2.0)}
+    assert A._folds([0], z, 0.1 + PV.FOLD_TOL, {mid}) == {mid}
+    assert A._unfold(z, fixed) == 1
+    assert abs(z[mid] - 1.0) < 0.1                     # (the edge's height across from it)
+    assert A._folds([0], z, 0.1 + PV.FOLD_TOL, {mid}) == set()
+    # (never past the heights the curb rule ran it between, as `junction_levels` holds a
+    # curb between its two legs' heights: Greyhook's cul-de-sac `jn.w192n935`)
+    A.bracket = {mid: (0.0, 0.5)}
+    z[mid] = 0.2
+    A._unfold(z, fixed)
+    assert z[mid] <= 0.5
