@@ -1,25 +1,25 @@
 {
  "device": "mac",
  "label": "Mac",
- "updated": "2026-11-06T19:30:36Z",
- "sessions": 31,
- "worktree_sessions": 29,
+ "updated": "2026-11-09T08:05:48Z",
+ "sessions": 32,
+ "worktree_sessions": 30,
  "subagents": 1,
  "totals": {
-  "total": 6670717162,
-  "input": 38376,
-  "output": 15913113,
+  "total": 6819001285,
+  "input": 39270,
+  "output": 16074852,
   "cache_write_5m": 155522,
-  "cache_write_1h": 57704728,
-  "cache_read": 6596905423
+  "cache_write_1h": 58740665,
+  "cache_read": 6743990976
  },
  "models": {
   "claude-opus-5-5": {
-   "input": 38244,
-   "output": 15865461,
+   "input": 39138,
+   "output": 16027200,
    "cache_write_5m": 155522,
-   "cache_write_1h": 57534681,
-   "cache_read": 6586707035
+   "cache_write_1h": 58570618,
+   "cache_read": 6733792588
   },
   "claude-sonnet-5-5": {
    "input": 132,
@@ -86,27 +86,32 @@
    "sessions": 4
   },
   "2026-11-06": {
-   "total": 132295459,
-   "output": 163567,
+   "total": 236639058,
+   "output": 237982,
    "sessions": 3
+  },
+  "2026-11-09": {
+   "total": 43940524,
+   "output": 87324,
+   "sessions": 2
   }
  },
  "stats": {
   "totals": {
-   "total": 15787949665,
-   "input": 88590,
-   "output": 44550678,
+   "total": 16720169369,
+   "input": 93818,
+   "output": 46446916,
    "cache_write_5m": 321890,
-   "cache_write_1h": 163771647,
-   "cache_read": 15579216860
+   "cache_write_1h": 170720051,
+   "cache_read": 16502586694
   },
   "models": {
    "claude-opus-5-5": {
-    "input": 88284,
-    "output": 44429513,
+    "input": 93512,
+    "output": 46325751,
     "cache_write_5m": 321890,
-    "cache_write_1h": 163319764,
-    "cache_read": 15555427336
+    "cache_write_1h": 170268168,
+    "cache_read": 16478797170
    },
    "claude-sonnet-5-5": {
     "input": 306,
@@ -168,14 +173,19 @@
     "sessions": 1
    },
    "2026-11-05": {
-    "total": 785072584,
-    "output": 1906855,
+    "total": 1264312627,
+    "output": 3095487,
     "sessions": 4
    },
    "2026-11-06": {
-    "total": 248409267,
-    "output": 436064,
+    "total": 615875570,
+    "output": 936730,
     "sessions": 3
+   },
+   "2026-11-09": {
+    "total": 85513358,
+    "output": 206940,
+    "sessions": 2
    }
   },
   "complete": true,
