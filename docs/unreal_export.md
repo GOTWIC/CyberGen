@@ -807,6 +807,54 @@ import over an earlier one updates the street actors and meshes in place.
   `--check --shots` and `night_*` views logs the lamps near each view and shoots it again
   at the scales in `CITYGEN_UE_LAMP_SCALES` (comma separated), skipping the walk's checks.
 
+### From AG16: performance
+
+**The benchmark** (`citygen unreal BUILD UPROJECT --bench`, or `--bench-only` on a city
+imported before; `citygen/bench.py`, the driver `UCityGenBench` in the play plugin):
+
+- **Route** (`bench.route`, from the build alone, so before and after a change it is the
+  same route): a 150 m sidewalk walk at 5 m/s in each of the three districts with the most
+  stage 2 actors (from the walkway point nearest the actor nearest the district's middle,
+  sidewalks first, never up an elevator or stairs), a 1.2 km drive at 25 m/s along the lanes
+  4 m over the road from the lane nearest the city's middle (on into the lane that turns
+  least), a flight at 150 m and 50 m/s across the diagonal of the stage 2 buildings' middle
+  90% (4 km at most, looking 15 degrees down), and a teleport back to the first walk's
+  start, held 6 s once streamed in. Each path starts with a teleport onto it and a wait
+  until the World Partition cells within 150 m are activated (a load), then 1.5 s.
+- **Passes**: by day and by night (the play actor's `SetNight`), at the native 1440p and at
+  a 67% screen percentage with TSR (`r.ScreenPercentage` 100 or 67, `r.AntiAliasingMethod`
+  4, the default screen percentage mode manual), in that order; before them two warm-up
+  passes (the flight by day, then by night: the first use of most of the city's materials
+  and lights, recorded and left out). `--bench-passes` picks passes by name.
+- **The game**: `UnrealEditor PROJECT MAP -game -windowed -ResX -ResY -CityGenBench=<job>
+  -csvGpuStats ...` (a standalone game process on the uncooked project, not play-in-editor),
+  switched to windowed fullscreen at 2560 x 1440 (`r.SetRes 2560x1440wf`: a 1440p window
+  with its borders would not fit a 1440p screen), `r.VSync 0`, `t.MaxFPS 0`. The pawn the
+  level's game mode gives is moved by the route (its collision and movement off), the view
+  turning smoothly toward the path 1.2 s ahead.
+- **What it records**, every frame (`frames.csv`): the frame time, the game, render and RHI
+  threads' times and the GPU's (`GGameThreadTime`, `GRenderThreadTime`, `GRHIThreadTime`,
+  `RHIGetGPUFrameCycles`), draw calls and primitives (`GNumDrawCallsRHI`), whether the cells
+  within 100 m of the player are activated (every 5th frame) and World Partition's
+  streaming performance, VRAM in use (`RHIGetMemoryStats`, every 15th frame) and RAM
+  (the process's physical use); beside it the engine's CSV profile (`csvGpuStats`: the
+  GPU's passes; `NaniteStreaming/RootAllocationMB`, the Nanite root pages in use), its
+  segments marked by events (`cg:<pass>:<segment>`), and `bench_events.json` (passes,
+  segments, loads, the viewport, the adapter, the scalability levels, the Nanite pools).
+- **Results** (`bench.summarize`, `combine`): per pass the moving frames of the walks, the
+  drive and the flight, the teleport's, and all moving frames together: frame time p50,
+  p95, p99 and max, the threads' p95, the thread that sets the frame at its p95, draw
+  calls, hitches over 50 and 100 ms, the share of frames not streamed around the player,
+  VRAM and RAM at most, root pages at most, the GPU's costliest passes, and the loads'
+  seconds; over `--bench-runs` runs (3 by default) the median of each figure and the
+  spread of p50 and p95 (min to max). Written as `bench.json`, `bench.md` (the table and the
+  targets met or missed) and a frame-time graph per pass along the route
+  (`frame_times_<pass>.png`) in `docs/progress/AG16/bench/<city>/<label>` (`--bench-label`,
+  default `bench`); the raw files of each run in `BUILD/unreal/bench/<label>/run<k>`.
+- **Hygiene**: before each run it waits while another Unreal editor, Blender, a citygen
+  build or sweep, assetgen or pytest runs (`bench.busy`, Windows), so the numbers are the
+  city's alone; the play plugin is built first if its source changed.
+
 ## assetgen's street contribution (AG7)
 
 `assetgen streets BUILD` writes `BUILD/assets/unreal_contribution.streets.json` beside its

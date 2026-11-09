@@ -1264,11 +1264,15 @@ def test_check_shots_stay_under_nanites_root_pages():
     ns = _ue_script("check_city.py", "view_load", "mesh_of", "SHOT_MESHES")
     vl = ns["view_load"]
     assert 30000 <= ns["SHOT_MESHES"] <= 45000
-    rows = [("p0", "actor", 900.0, 0.0, None), ("h0", "hlod", 0.0, 0.0, None)] + \
-        [(f"m{k}", "actor", float(k), 0.0, f"mesh{k // 2}") for k in range(10)]
+    rows = [("p0", "actor", 900.0, 0.0, ()), ("h0", "hlod", 0.0, 0.0, ())] + \
+        [(f"m{k}", "actor", float(k), 0.0, (f"mesh{k // 2}",)) for k in range(10)]
     assert set(vl(rows, (0.0, 0.0), cap=5)) == {"p0"} | {f"m{k}" for k in range(10)}
     assert vl(rows, (6.2, 0.0), cap=2) == ["m6", "m7", "m5", "m4", "p0"]
     assert vl(rows, (100.0, 0.0), cap=1) == ["m9", "m8", "p0"]
+    # (AG16) an actor's own mesh and its parts' count together: one that does not fit whole
+    # is left out, a farther one that fits still loads
+    grouped = [("g0", "actor", 0.0, 0.0, ("a", "b", "c")), ("g1", "actor", 1.0, 0.0, ("d",))]
+    assert vl(grouped, (0.0, 0.0), cap=2) == ["g1"]
     src = (Path(U.__file__).parent / "ue" / "check_city.py").read_text()
     shots = src[src.index("def shots("):src.index("# --- the tick loop")]
     assert shots.count("load_actors(") == 1 and "unload_actors" not in shots
@@ -1278,9 +1282,13 @@ def test_check_shots_stay_under_nanites_root_pages():
                                  {"key": "a.holo", "mesh": "Assets/Signs/t/a_holo"}],
                       "instances": [{"key": "a.bld.part.x", "mesh": "Assets/BuildingsParts/t/x"}],
                       "lod_chains": [{"mesh": "Assets/Signs/t/a_holo"}]}}
-    assert ns["mesh_of"](man) == {"city.sea.t+00+00": "Meshes/t+00+00/city_sea_t+00+00",
-                                  "a.bld": "Assets/Buildings/t/a_bld", "a.holo": None,
-                                  "a.bld.part.x": "Assets/BuildingsParts/t/x"}
+    assert ns["mesh_of"](man) == {"city.sea.t+00+00": ["Meshes/t+00+00/city_sea_t+00+00"],
+                                  "a.bld": ["Assets/Buildings/t/a_bld"], "a.holo": [],
+                                  "a.bld.part.x": ["Assets/BuildingsParts/t/x"]}
+    # with groups, a part's mesh is its holder's
+    man["stage2"]["instances"][0]["holder"] = "a.bld"
+    assert ns["mesh_of"](man)["a.bld"] == ["Assets/Buildings/t/a_bld",
+                                           "Assets/BuildingsParts/t/x"]
 
 
 def test_import_resets_a_stale_fallback():

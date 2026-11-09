@@ -118,6 +118,11 @@ bool UCityGenBench::ReadJob()
 			O->TryGetNumberField(TEXT("screen_percentage"), Sp);
 			P.ScreenPercentage = float(Sp);
 			O->TryGetBoolField(TEXT("warm"), P.bWarm);
+			const TArray<TSharedPtr<FJsonValue>>* Only = nullptr;
+			if (O->TryGetArrayField(TEXT("segments"), Only))
+			{
+				for (const TSharedPtr<FJsonValue>& S : *Only) { P.Only.Add(int32(S->AsNumber())); }
+			}
 			Passes.Add(P);
 		}
 	}
@@ -213,6 +218,16 @@ void UCityGenBench::StartPass()
 	Event(FString::Printf(TEXT("\"op\": \"pass\", \"name\": \"%s\", \"night\": %s, \"screen_percentage\": %.1f, \"warm\": %s"),
 		*Esc(P.Name), P.bNight ? TEXT("true") : TEXT("false"), P.ScreenPercentage,
 		P.bWarm ? TEXT("true") : TEXT("false")));
+	while (SegIndex < Segments.Num() && !P.Only.IsEmpty() && !P.Only.Contains(SegIndex))
+	{
+		++SegIndex;
+	}
+	if (SegIndex >= Segments.Num())
+	{
+		SegIndex = Segments.Num() - 1;
+		NextSegment();
+		return;
+	}
 	StartSegment();
 }
 
@@ -239,7 +254,13 @@ void UCityGenBench::StartSegment()
 void UCityGenBench::NextSegment()
 {
 	Event(TEXT("\"op\": \"end\""));
-	if (++SegIndex < Segments.Num())
+	const TArray<int32>& Only = Passes[PassIndex].Only;
+	++SegIndex;
+	while (SegIndex < Segments.Num() && !Only.IsEmpty() && !Only.Contains(SegIndex))
+	{
+		++SegIndex;
+	}
+	if (SegIndex < Segments.Num())
 	{
 		StartSegment();
 		return;

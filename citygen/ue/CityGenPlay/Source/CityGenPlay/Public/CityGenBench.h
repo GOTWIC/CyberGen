@@ -35,6 +35,7 @@ struct FCityGenBenchPass
 	bool bNight = false;
 	float ScreenPercentage = 100.f;
 	bool bWarm = false;           // a warm-up pass: recorded, left out of the results
+	TArray<int32> Only;           // the segments it runs (all when empty)
 };
 
 UCLASS()

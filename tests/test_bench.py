@@ -76,8 +76,11 @@ def test_route_walks_drive_flight_teleport(tmp_path):
 def test_job_has_a_warm_pass_first(tmp_path):
     _build(tmp_path)
     jb = B.job(B.route(tmp_path), tmp_path / "run1")
-    assert jb["passes"][0]["warm"] and len(jb["passes"]) == 1 + len(B.PASSES)
-    assert [p["screen_percentage"] for p in jb["passes"][1:]] == [100.0, 67.0, 100.0, 67.0]
+    # by day and by night, the flight alone
+    assert [p["name"] for p in jb["passes"][:2]] == ["warm_day", "warm_night"]
+    assert all(p["warm"] and p["segments"] == [4] for p in jb["passes"][:2])
+    assert len(jb["passes"]) == 2 + len(B.PASSES)
+    assert [p["screen_percentage"] for p in jb["passes"][2:]] == [100.0, 67.0, 100.0, 67.0]
     assert "r.VSync 0" in jb["commands"]
 
 

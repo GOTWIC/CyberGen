@@ -807,6 +807,7 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                     a["materials"] = {slot: "MI_" + asset_name(f"{part}.{m}")
                                       for slot, m in sorted(e["materials"].items())}
                 a["type"] = p["kind"]
+                a["entry_type"] = base["type"]
                 a["hash"] = content_hash([a, mh])
                 insts.append(a)
                 made = True
@@ -819,6 +820,8 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                     replaced.add(r)
                 else:
                     missing += 1
+    shared = share_meshes(packs, actors + insts)
+    groups = group_parts(actors, insts) if GROUP_PARTS else None
     out_packs = []
     for k in sorted(packs):
         pk = packs[k]
@@ -840,23 +843,117 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                "tint": u["tint"], "fog": u["fog"]}
         rec["hash"] = content_hash(rec)
         uw.append(rec)
-    return {"files": files, "masters": masters, "materials": mats, "packs": out_packs,
-            "underwater": uw,
-            "textures": dict(sorted(textures.items())),
-            "lod_chains": sorted(chains, key=lambda x: x["mesh"]),
-            "actors": sorted(actors, key=lambda a: a["key"]),
-            "instances": sorted(insts, key=lambda a: a["key"]),
-            "replaced": sorted(replaced),
-            "counts": {"entries": len(owner), "actors": len(actors),
-                       "instance_actors": len(insts),
-                       "instances": sum(a["count"] if "count" in a else len(a["xforms"])
-                                        for a in insts),
-                       "replaced": len(replaced), "replaces_missing": missing,
-                       "packs": len(out_packs),
-                       "meshes": sum(len(p["meshes"]) for p in out_packs) + len(chains),
-                       "materials": len(mats), "textures": len(textures),
-                       "heroes": sum(1 for a in actors if a.get("hero")),
-                       "underwater_volumes": len(uw)}}
+    out = {"files": files, "masters": masters, "materials": mats, "packs": out_packs,
+           "underwater": uw,
+           "textures": dict(sorted(textures.items())),
+           "lod_chains": sorted(chains, key=lambda x: x["mesh"]),
+           "actors": sorted(actors, key=lambda a: a["key"]),
+           "instances": sorted(insts, key=lambda a: a["key"]),
+           "replaced": sorted(replaced),
+           "counts": {"entries": len(owner), "actors": len(actors),
+                      "instance_actors": len(insts) if groups is None else 0,
+                      "instance_components": len(insts),
+                      "instances": sum(a["count"] if "count" in a else len(a["xforms"])
+                                       for a in insts),
+                      "replaced": len(replaced), "replaces_missing": missing,
+                      "packs": len(out_packs),
+                      "meshes": sum(len(p["meshes"]) for p in out_packs) + len(chains),
+                      "materials": len(mats), "textures": len(textures),
+                      "heroes": sum(1 for a in actors if a.get("hero")),
+                      "underwater_volumes": len(uw), "shared_meshes": shared}}
+    if groups is not None:
+        out["groups"] = groups
+        out["counts"]["group_actors"] = len(groups)
+    return out
+
+
+# AG16: an entry's instanced parts as components of one actor (its own mesh actor where it
+# has one, else a group actor keyed by the entry), not an actor per entry and part kind:
+# Delta Megacity's 33,310 instancer actors become 1,902 group actors. CITYGEN_UE_GROUP=0
+# keeps an actor per part kind (the manifest then has no `groups`).
+GROUP_PARTS = os.environ.get("CITYGEN_UE_GROUP", "1") != "0"
+
+
+def group_parts(actors: list[dict], insts: list[dict]) -> list[dict]:
+    """Each instanced part record (`insts`) given the key of the actor that holds it as a
+    component (`holder`: its entry's), the holder's hash taken again over its parts' hashes
+    (so it changes when any of them does), and a group actor for each entry with parts and
+    no mesh actor of its own (at the entry's pivot, its category, tile, district and level).
+    The group actors, by key."""
+    by: dict[str, list[dict]] = {}
+    for r in insts:
+        by.setdefault(r["entry"], []).append(r)
+    own = {a["key"]: a for a in actors}
+    groups = []
+    for entry in sorted(by):
+        rs = sorted(by[entry], key=lambda r: r["key"])
+        ph = content_hash([r["hash"] for r in rs])
+        for r in rs:
+            r["holder"] = entry
+        if entry in own:
+            a = own[entry]
+            a["parts"] = len(rs)
+            a["hash"] = content_hash([a["hash"], ph])
+            continue
+        r0 = rs[0]
+        g = {"key": entry, "pivot": r0["pivot"], "yaw_deg": r0["yaw_deg"],
+             "category": r0["category"], "type": r0.get("entry_type", r0["type"]),
+             "tile": r0["tile"], "district": r0["district"], "ids": [entry], "parts": len(rs)}
+        if r0.get("level"):
+            g["level"] = r0["level"]
+        g["hash"] = content_hash([g, ph])
+        groups.append(g)
+    return groups
+
+
+# AG16: the packs whose node names are their content (AG2's parts named by the hash of their
+# type and parameters, `assetgen.buildings.parts.node_name`; AG8's signs by the digest of
+# their inputs, `assetgen.props.gather`), so a node of one name is one mesh in every tile
+SHARED_USES = ("part",)
+SHARED_PARTS = ("signs",)
+
+
+def _shared(pk: dict) -> bool:
+    return pk["use"] in SHARED_USES or (pk["use"] == "mesh" and pk["part"] in SHARED_PARTS)
+
+
+def _mesh_key(pk: dict, m: dict) -> tuple:
+    return (pk["part"], pk["use"], m["asset"], json.dumps(m["collision"], sort_keys=True),
+            m["nanite"], m.get("shape_preservation"), bool(m.get("fallback_full")))
+
+
+def share_meshes(packs: dict, placed: list[dict]) -> int:
+    """AG16: a mesh that several tiles' packs hold under one name (`SHARED_USES`,
+    `SHARED_PARTS`: the same content) imported once, from the first of those packs by
+    folder, and every actor or instancer of it pointed there (its hash taken again); the
+    other packs leave it out (the pack step leaves out what a pack's plan does not name).
+    Delta Megacity: 9,244 of 58,882 meshes, so as many fewer distinct Nanite meshes and
+    root pages. The number of meshes left out."""
+    canon: dict[tuple, tuple[str, dict]] = {}
+    for k in sorted(packs, key=lambda k: packs[k]["folder"]):
+        pk = packs[k]
+        if _shared(pk):
+            for a in sorted(pk["meshes"]):
+                m = pk["meshes"][a]
+                canon.setdefault(_mesh_key(pk, m), (pk["folder"], m))
+    remap: dict[str, tuple[str, str]] = {}
+    for pk in packs.values():
+        if not _shared(pk):
+            continue
+        for a in list(pk["meshes"]):
+            m = pk["meshes"][a]
+            folder, cm = canon[_mesh_key(pk, m)]
+            if folder != pk["folder"]:
+                remap[f"{pk['folder']}/{a}"] = (f"{folder}/{a}", cm["hash"])
+                del pk["meshes"][a]
+    for k in [k for k, pk in packs.items() if _shared(pk) and not pk["meshes"]]:
+        del packs[k]
+    for a in placed:
+        if a["mesh"] in remap:
+            a["mesh"], h = remap[a["mesh"]]
+            a.pop("hash")
+            a["hash"] = content_hash([a, h])
+    return len(remap)
 
 
 def build_manifest(build_dir: str | Path, name: str | None = None,
@@ -979,7 +1076,9 @@ def actor_hashes(man: dict) -> dict[str, str]:
         # stage 2's actors over the blockout's: the keys it replaces dropped, its own added
         for k in s2["replaced"]:
             out.pop(k, None)
-        out.update({a["key"]: a["hash"] for a in s2["actors"] + s2["instances"]})
+        # (AG16: with `groups` an entry's parts are components of its actor or group actor)
+        out.update({a["key"]: a["hash"] for a in s2["actors"] +
+                    (s2["groups"] if "groups" in s2 else s2["instances"])})
         out.update({u["key"]: u["hash"] for u in s2.get("underwater", [])})
     out["player_start"] = content_hash(man["player_start"])
     out.update({k: content_hash([k, "v1"]) for k in LIGHTING})
@@ -999,7 +1098,10 @@ def actor_kinds(man: dict) -> dict[str, str]:
         for k in s2["replaced"]:
             out.pop(k, None)
         out.update({a["key"]: "mesh" for a in s2["actors"]})
-        out.update({i["key"]: "instances" for i in s2["instances"]})
+        if "groups" in s2:
+            out.update({g["key"]: "group" for g in s2["groups"]})
+        else:
+            out.update({i["key"]: "instances" for i in s2["instances"]})
         out.update({u["key"]: "underwater" for u in s2.get("underwater", [])})
     if man.get("play"):
         out[PLAY_KEY] = "play"

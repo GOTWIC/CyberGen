@@ -1541,7 +1541,10 @@ class Importer:
             if self.s2 else set()
         if self.s2:
             self.stats["stage2"] = {
-                "actors": len(self.s2["actors"]), "instance_actors": len(self.s2["instances"]),
+                "actors": len(self.s2["actors"]),
+                # (AG16: with groups the parts are components, `part_components` counts them)
+                "instance_actors": 0 if "groups" in self.s2 else len(self.s2["instances"]),
+                "group_actors": len(self.s2.get("groups") or []),
                 "replaced": len(self.s2["replaced"]),
                 "meshes": {"imported": 0, "kept": 0, "deleted": 0}, "packs_imported": 0,
                 "materials": {"created": 0, "updated": 0, "kept": 0, "deleted": 0},
@@ -2302,7 +2305,9 @@ class Importer:
         n += sum(1 for i in self.man["instances"] if i["key"] not in self.skip)
         n += len(self.man.get("swim", []))
         if self.s2:
-            n += len(self.s2["actors"]) + len(self.s2["instances"])
+            # (AG16: with groups an entry's parts are components, its group actor one actor)
+            n += len(self.s2["actors"]) + len(self.s2["groups"] if "groups" in self.s2
+                                              else self.s2["instances"])
             n += len(self.s2.get("underwater", []))       # (AG12)
         n += int(self.plays())           # (the play features' actor)
         return n + 1 + 3                 # (the sun, the sky light, the atmosphere)
@@ -2436,12 +2441,19 @@ class Importer:
 
     def actors2(self, have):
         """Stage 2's actors: a static mesh actor per entry at its pivot (yaw -yaw), its
-        Custom Primitive Data, no collision where its entry has none; an instanced actor per
-        entry and part kind (HISM, the transforms relative to the pivot)."""
+        Custom Primitive Data, no collision where its entry has none; an entry's instanced
+        parts (the transforms relative to the pivot) as components of its own actor or, with
+        no mesh of its own, of a group actor at its pivot (AG16, the manifest's `groups`;
+        before, and without `groups`, an instanced actor per entry and part kind)."""
         if not self.s2:
             return
         sma = unreal.StaticMeshActor.static_class()
         stage = unreal.Name("cg.stage=2")
+        grouped = "groups" in self.s2
+        parts_of = {}
+        if grouped:
+            for r in self.s2["instances"]:
+                parts_of.setdefault(r["holder"], []).append(r)
         for r in self.s2["actors"]:
             sm = self.meshes_s2[r["mesh"]]
             loc = ue_loc(*r["pivot"])
@@ -2476,9 +2488,36 @@ class Importer:
                 a.tags = self.tags(r["key"], h, r["ids"], r["type"], r["category"],
                                    r["tile"], r["district"], r.get("level", 0)) + [stage] + \
                     doors + links + more
+                if grouped:
+                    self.part_components(a, parts_of.get(r["key"], []))
 
             self.place(have, r["key"], r["hash"], sma, make, update,
                        f"CityGen/{r['category']}", STAGE2_ACTOR_VERSION)
+        if grouped:
+            gcls = blueprint(f"{CORE}/BP_CityGenGroup", unreal.Actor, [])
+            for g in self.s2["groups"]:
+                loc = ue_loc(*g["pivot"])
+                rot = unreal.Rotator(roll=0.0, pitch=0.0, yaw=-g["yaw_deg"])
+
+                def make(loc=loc):
+                    return self.eas.spawn_actor_from_class(gcls, loc)
+
+                def update(a, h, g=g, loc=loc, rot=rot):
+                    a.root_component.set_mobility(unreal.ComponentMobility.STATIC)
+                    a.set_actor_location_and_rotation(loc, rot, False, False)
+                    rs = parts_of.get(g["key"], [])
+                    if rs and all(x.get("no_hlod") for x in rs):
+                        try:
+                            a.set_editor_property("enable_auto_lod_generation", False)
+                        except Exception as ex:      # (a property this engine lacks)
+                            log(f"{g['key']}: enable_auto_lod_generation: {ex}")
+                    a.tags = self.tags(g["key"], h, g["ids"], g["type"], g["category"],
+                                       g["tile"], g["district"], g.get("level", 0)) + [stage]
+                    self.part_components(a, rs)
+
+                self.place(have, g["key"], g["hash"], gcls, make, update,
+                           f"CityGen/{g['category']}", STAGE2_ACTOR_VERSION)
+            return
         cls = blueprint(f"{CORE}/BP_CityGenInstances", unreal.Actor, INSTANCE_VARS, hism=True)
         for r in self.s2["instances"]:
             sm = self.meshes_s2[r["mesh"]]
@@ -2491,40 +2530,13 @@ class Importer:
             def update(a, h, r=r, sm=sm, loc=loc, rot=rot):
                 comp = a.get_components_by_class(
                     unreal.HierarchicalInstancedStaticMeshComponent)[0]
-                comp.set_static_mesh(sm)
                 a.root_component.set_mobility(unreal.ComponentMobility.STATIC)
-                comp.set_mobility(unreal.ComponentMobility.STATIC)
-                comp.clear_instances()
-                # [x, y, z, yaw] or, with a scale (AG8's props and plants), [..., sx, sy, sz];
-                # AG13's grass in a file of the tile's (`xforms_file`, by its node)
-                xfs = r["xforms"] if "xforms" in r else self.xforms_file(r)
-                comp.add_instances([unreal.Transform(
-                    unreal.Vector(xf[0] * 100.0, -xf[1] * 100.0, xf[2] * 100.0),
-                    unreal.Rotator(roll=0.0, pitch=0.0, yaw=-xf[3]),
-                    unreal.Vector(*(xf[4:7] if len(xf) >= 7 else (1, 1, 1))))
-                    for xf in xfs], False, False)
-                if r.get("cull_m"):
-                    # (AG13: the grass fades out between these distances, decision 13.9 a)
-                    comp.set_cull_distances(int(r["cull_m"][0] * 100.0),
-                                            int(r["cull_m"][1] * 100.0))
-                if r.get("no_shadow"):
-                    comp.set_cast_shadow(False)
+                self.set_parts(comp, r, sm)
                 if r.get("no_hlod"):
-                    for obj, prop in ((comp, "enable_auto_lod_generation"),
-                                      (a, "enable_auto_lod_generation")):
-                        try:
-                            obj.set_editor_property(prop, False)
-                        except Exception as ex:      # (a property this engine lacks)
-                            log(f"{r['key']}: {prop}: {ex}")
-                comp.set_default_custom_primitive_data_float_array(
-                    0, [float(v) for v in r["cpd"]])
-                for slot, asset in sorted((r.get("materials") or {}).items()):
-                    mi = self.mi2.get(asset)
-                    i = comp.get_material_index(unreal.Name(slot))
-                    if mi is not None and i >= 0:
-                        comp.set_material(i, mi)
-                if r.get("no_collision"):
-                    comp.set_collision_profile_name("NoCollision")
+                    try:
+                        a.set_editor_property("enable_auto_lod_generation", False)
+                    except Exception as ex:      # (a property this engine lacks)
+                        log(f"{r['key']}: enable_auto_lod_generation: {ex}")
                 a.set_actor_location_and_rotation(loc, rot, False, False)
                 a.set_editor_property("Ids", [unreal.Name(i) for i in r.get("ids") or
                                               [r["entry"]]])
@@ -2534,6 +2546,78 @@ class Importer:
 
             self.place(have, r["key"], r["hash"], cls, make, update,
                        f"CityGen/{r['category']}", STAGE2_ACTOR_VERSION)
+
+    def set_parts(self, comp, r, sm):
+        """An instanced component as a part record asks: its mesh, static, the transforms
+        (relative to its actor), cull distances, shadow, HLOD, Custom Primitive Data, slot
+        materials and collision."""
+        comp.set_static_mesh(sm)
+        comp.set_mobility(unreal.ComponentMobility.STATIC)
+        comp.clear_instances()
+        # [x, y, z, yaw] or, with a scale (AG8's props and plants), [..., sx, sy, sz];
+        # AG13's grass in a file of the tile's (`xforms_file`, by its node)
+        xfs = r["xforms"] if "xforms" in r else self.xforms_file(r)
+        comp.add_instances([unreal.Transform(
+            unreal.Vector(xf[0] * 100.0, -xf[1] * 100.0, xf[2] * 100.0),
+            unreal.Rotator(roll=0.0, pitch=0.0, yaw=-xf[3]),
+            unreal.Vector(*(xf[4:7] if len(xf) >= 7 else (1, 1, 1))))
+            for xf in xfs], False, False)
+        if r.get("cull_m"):
+            # (AG13: the grass fades out between these distances, decision 13.9 a)
+            comp.set_cull_distances(int(r["cull_m"][0] * 100.0), int(r["cull_m"][1] * 100.0))
+        if r.get("no_shadow"):
+            comp.set_cast_shadow(False)
+        if r.get("no_hlod"):
+            try:
+                comp.set_editor_property("enable_auto_lod_generation", False)
+            except Exception as ex:      # (a property this engine lacks)
+                log(f"{r['key']}: enable_auto_lod_generation: {ex}")
+        comp.set_default_custom_primitive_data_float_array(0, [float(v) for v in r["cpd"]])
+        for slot, asset in sorted((r.get("materials") or {}).items()):
+            mi = self.mi2.get(asset)
+            i = comp.get_material_index(unreal.Name(slot))
+            if mi is not None and i >= 0:
+                comp.set_material(i, mi)
+        if r.get("no_collision"):
+            comp.set_collision_profile_name("NoCollision")
+
+    def part_components(self, a, recs):
+        """AG16: an actor's instanced parts as its own components, one per part record (an
+        instanced static mesh component for a Nanite mesh, which Nanite culls per instance;
+        a hierarchical one, with its cluster tree, for the rest), each tagged `cg.part`,
+        `cg.key=<record key>`, `cg.kind=<part kind>` and `cg.id=` per citygen id; the ones
+        it had before go first. Added as the editor adds a component to a placed actor (the
+        subobject data subsystem), so they are saved with it."""
+        sds = unreal.get_engine_subsystem(unreal.SubobjectDataSubsystem)
+        lib = unreal.SubobjectDataBlueprintFunctionLibrary
+        handles = sds.k2_gather_subobject_data_for_instance(a)
+        if not handles:
+            raise RuntimeError(f"{a.get_actor_label()}: no subobject data")
+        old = []
+        for hd in handles[1:]:
+            obj = lib.get_object(lib.get_data(hd))
+            if isinstance(obj, unreal.InstancedStaticMeshComponent) and \
+                    "cg.part" in [str(t) for t in obj.component_tags]:
+                old.append(hd)
+        if old:
+            sds.delete_subobjects(handles[0], old, None)
+        for r in sorted(recs, key=lambda r: r["key"]):
+            sm = self.meshes_s2[r["mesh"]]
+            nanite = bool(sm.get_editor_property("nanite_settings").get_editor_property("enabled"))
+            cls = unreal.InstancedStaticMeshComponent if nanite else \
+                unreal.HierarchicalInstancedStaticMeshComponent
+            hd, why = sds.add_new_subobject(unreal.AddNewSubobjectParams(
+                parent_handle=handles[0], new_class=cls))
+            comp = lib.get_object(lib.get_data(hd))
+            if comp is None:
+                raise RuntimeError(f"{r['key']}: no component added ({why})")
+            self.set_parts(comp, r, sm)
+            comp.set_editor_property("component_tags", [
+                unreal.Name("cg.part"), unreal.Name(f"cg.key={r['key']}"),
+                unreal.Name(f"cg.kind={r['kind']}")] +
+                [unreal.Name(f"cg.id={i}") for i in (r.get("ids") or [r["entry"]])])
+            self.stats["stage2"]["part_components"] = \
+                self.stats["stage2"].get("part_components", 0) + 1
 
     def xforms_file(self, r):
         """AG13: an instance actor's transforms from its tile's file (read once a file)."""

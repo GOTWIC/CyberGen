@@ -250,15 +250,23 @@ def route(build: str | Path, man: dict | None = None) -> dict:
 
 
 def job(route_: dict, out_dir: Path, passes=PASSES, warm: bool = True,
-        csv_name: str = "profile.csv") -> dict:
-    """The game process's job: the route, the passes (a warm-up pass first: the route's
-    first segments by day, recorded and left out), the console commands."""
+        csv_name: str = "profile.csv", resolution=RESOLUTION) -> dict:
+    """The game process's job: the route, the passes (warm-up passes first: the flight
+    across the city by day and by night, which meets most of the city's materials and
+    lights, so the first measured pass does not pay for their first use alone; recorded and
+    left out), the console commands."""
     ps = [{"name": n, "night": night, "screen_percentage": sp} for n, night, sp in passes]
+    fly = [i for i, s in enumerate(route_["segments"]) if s["group"] == "fly"]
     if warm:
-        ps.insert(0, {"name": "warm", "night": False, "screen_percentage": 100.0,
-                      "warm": True})
+        nights = sorted({night for _, night, _ in passes})
+        ps[:0] = [{"name": f"warm_{'night' if n else 'day'}", "night": n,
+                   "screen_percentage": 100.0, "warm": True, "segments": fly}
+                  for n in nights]
     return {"out_dir": str(out_dir).replace("\\", "/"), "csv_name": csv_name,
-            "commands": list(COMMANDS), "settle_s": 1.5, "load_timeout_s": 120.0,
+            # (windowed fullscreen at the resolution: a window of that size with its
+            # borders would not fit a screen of that size)
+            "commands": list(COMMANDS) + [f"r.SetRes {resolution[0]}x{resolution[1]}wf"],
+            "settle_s": 1.5, "load_timeout_s": 120.0,
             "load_radius_m": LOAD_RADIUS_M, "stream_radius_m": STREAM_RADIUS_M,
             "start_wait_s": 10.0, "stream_every": 5, "memory_every": 15,
             "passes": ps, "segments": route_["segments"]}
@@ -332,6 +340,13 @@ def bench(build_dir: str | Path, uproject: str | Path, engine: str | None = None
     rt = route(build, man)
     raw = build / "unreal" / "bench" / label
     raw.mkdir(parents=True, exist_ok=True)
+    # the play plugin drives the route: built as the import builds it (skipped when its
+    # binaries are of this source)
+    from .unreal_play import build_plugin
+    pl = build_plugin(root, up, raw / "plugin_build_log.txt")
+    if not pl.get("ok"):
+        raise RuntimeError(f"the play plugin (the benchmark's driver) did not build: "
+                           f"{pl.get('error')}")
     (raw / "route.json").write_text(json.dumps(rt, indent=1) + "\n", encoding="utf-8",
                                     newline="\n")
     results = []
@@ -348,7 +363,7 @@ def bench(build_dir: str | Path, uproject: str | Path, engine: str | None = None
         if rd.exists():
             shutil.rmtree(rd)
         rd.mkdir(parents=True)
-        jb = job(rt, rd, passes)
+        jb = job(rt, rd, passes, resolution=resolution)
         jp = rd / "job.json"
         jp.write_text(json.dumps(jb, indent=1) + "\n", encoding="utf-8", newline="\n")
         say(f"bench: run {k + 1} of {runs} ({len(jb['passes'])} passes, "
@@ -656,11 +671,10 @@ def graphs(rd: Path, dest: Path, res: dict) -> None:
     import matplotlib.pyplot as plt
     frames = read_frames(rd / "frames.csv")
     info = json.loads((rd / "bench_events.json").read_text(encoding="utf-8"))
-    names = {e["pass"]: e["name"] for e in info["events"] if e.get("op") == "pass"}
+    names = {e["pass"]: e["name"] for e in info["events"]
+             if e.get("op") == "pass" and not e.get("warm")}
     segs = res["segments"]
     for pi, name in names.items():
-        if name == "warm":
-            continue
         fs = [f for f in frames if int(f["pass"]) == pi and int(f["phase"]) in (2, 3)]
         if not fs:
             continue
