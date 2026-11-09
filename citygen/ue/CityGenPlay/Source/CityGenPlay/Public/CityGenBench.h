@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "Async/Future.h"
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "CityGenBench.generated.h"
@@ -95,6 +96,7 @@ private:
 	bool bFailed = false;
 	FString Error;
 
+	TSharedFuture<FString> CsvDone;   // the CSV profile's file, once written
 	TArray<FString> Rows;         // the frames, as CSV lines
 	TArray<FString> Events;       // JSON objects: segment starts, loads, teleports
 

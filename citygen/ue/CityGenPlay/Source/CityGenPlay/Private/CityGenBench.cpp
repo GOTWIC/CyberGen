@@ -361,7 +361,8 @@ void UCityGenBench::Finish()
 	{
 		if (FCsvProfiler::IsCapturing())
 		{
-			Csv->EndCapture();
+			// (the file is written on the profiler's own thread: its future is set once written)
+			CsvDone = Csv->EndCapture();
 		}
 	}
 #endif
@@ -510,7 +511,8 @@ void UCityGenBench::Tick(float DeltaTime)
 	case EStage::Done:
 	{
 #if CSV_PROFILER
-		if (FCsvProfiler::IsCapturing() && Now - StageStart < CsvWaitS)
+		if ((FCsvProfiler::IsCapturing() || (CsvDone.IsValid() && !CsvDone.IsReady())) &&
+			Now - StageStart < CsvWaitS)
 		{
 			return;          // (the CSV is written on its own thread once the capture ends)
 		}
