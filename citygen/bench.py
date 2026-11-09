@@ -621,7 +621,11 @@ def verdict(res: dict) -> dict:
             if p95 > FLOOR_MS:
                 out["p95_40fps"].append(f"{tag} {p95:.1f} ms")
             if e["big_hitches"]["max"] > 0:
-                out["big_hitches"].append(f"{tag} {e['big_hitches']['median']:g}")
+                # (frames over 100 ms a run: the median and the most of any run, and the
+                # longest frame of the runs' medians)
+                out["big_hitches"].append(
+                    f"{tag} {e['big_hitches']['median']:g} a run (at most "
+                    f"{e['big_hitches']['max']:g})")
             if (e.get("vram_mb_max") or 0) > VRAM_MB:
                 out["vram"].append(f"{tag} {e['vram_mb_max']:.0f} MB")
     return out

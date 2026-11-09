@@ -2096,18 +2096,18 @@
    "night_tsr67/fly 29.1 ms"
   ],
   "big_hitches": [
-   "day_native/walk 29",
-   "day_native/drive 11",
-   "day_native/fly 16",
-   "day_tsr67/walk 26",
-   "day_tsr67/drive 13",
-   "day_tsr67/fly 16",
-   "night_native/walk 27",
-   "night_native/drive 16",
-   "night_native/fly 18",
-   "night_tsr67/walk 30",
-   "night_tsr67/drive 13",
-   "night_tsr67/fly 13"
+   "day_native/walk 29 a run (at most 30)",
+   "day_native/drive 11 a run (at most 11)",
+   "day_native/fly 16 a run (at most 17)",
+   "day_tsr67/walk 26 a run (at most 30)",
+   "day_tsr67/drive 13 a run (at most 14)",
+   "day_tsr67/fly 16 a run (at most 16)",
+   "night_native/walk 27 a run (at most 28)",
+   "night_native/drive 16 a run (at most 18)",
+   "night_native/fly 18 a run (at most 23)",
+   "night_tsr67/walk 30 a run (at most 30)",
+   "night_tsr67/drive 13 a run (at most 14)",
+   "night_tsr67/fly 13 a run (at most 15)"
   ],
   "vram": []
  }
