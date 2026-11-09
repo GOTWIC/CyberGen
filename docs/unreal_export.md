@@ -859,7 +859,52 @@ imported before; `citygen/bench.py`, the driver `UCityGenBench` in the play plug
   a change); the raw files of each run in `BUILD/unreal/bench/<label>/run<k>`.
 - **Hygiene**: before each run it waits while another Unreal editor, Blender, a citygen
   build or sweep, assetgen or pytest runs (`bench.busy`, Windows), so the numbers are the
-  city's alone; the play plugin is built first if its source changed.
+  city's alone; the play plugin is built first if its source changed. The game is kept
+  DPI-aware (`bAllowHighDPIInGameMode`, `bAllowHighDpiWhenUnattended`: on a 1440p screen
+  at 125% scaling a DPI-unaware game gets a 2048 x 1152 window), and a run that rendered at
+  another size says so (`resolution_mismatch`).
+
+**What the benchmark found on Delta Megacity** (`docs/progress/AG16/`): bound by the game
+thread, not the GPU. Every frame spent its async loading time, physics waited on bodies
+made and dropped as cells streamed, and the render thread waited on the visibility of the
+primitives loaded: with a 1,500 m loading range most of the city's 73,772 actors were
+loaded at once (43,000 to 67,000), each its own package to load in an uncooked game (what
+play-in-editor and `-game` run). So the fixes cut what the level holds and streams:
+
+- **Meshes shared across tiles** (`unreal.share_meshes`): an AG2 part or AG8 sign node of
+  one name in several tiles' packs is the same content (named by its parameters' hash or its
+  inputs' digest), imported once from the first pack by folder; the other packs leave it out
+  (the pack step skips what a pack's plan does not name) and their actors point at it.
+  Delta: 9,244 of 58,882 meshes, 53,911 distinct Nanite meshes to 44,667.
+- **Records as components** (`unreal.group_actors`, the manifest's `groups` and each
+  record's `holder`; `CITYGEN_UE_GROUP=0` keeps an actor per record): an entry's instanced
+  parts are components of its own actor (else of a group actor at the entry's pivot, class
+  `BP_CityGenGroup`), a building's street front (AG3) a component of the building's actor
+  (its doors tagged on the building), and a tile's signs, street pieces, water pieces and
+  ground cover (`tile_group`) components of one group actor per kind and 64 m cell of the
+  tile (`group.<kind>.<tile>.c<i><j>`: the engine takes a streamed-out actor's components
+  away in one step, so a group stays small). Each component keeps its mesh, transform,
+  Custom Primitive Data, materials and collision, and carries its record's tags
+  (`cg.member`, `cg.key=`, `cg.type=`, `cg.category=`, `cg.kind=` for a part, `cg.id=` per
+  citygen id, `cg.door=`); stage 4 finds a sign, a street piece or a part by its component's
+  `cg.key`. A holder's hash covers its members', so an import over another updates it when
+  any changes. Instanced parts of a Nanite mesh are instanced static mesh components (Nanite
+  culls them per instance), the rest hierarchical ones.
+- **No collision on props no one touches** (`unreal.NO_COLLISION`): awnings, facade AC
+  units, wall lights and litter (Delta: 39,500 of its 71,000 prop instance bodies).
+- **Underwater volumes switched by distance** (the play actor, `UpdateUnderwater`): the
+  engine weighs every enabled post-process volume against the view each frame by its
+  brush's distance, a physics query per volume, and AG12's 660 underwater volumes of Delta
+  took 1.3 to 1.5 ms of the game thread every frame. Every 0.25 s the play actor enables
+  only the volumes (`cg.type=underwater`) within their blend radius and 1 m of the view;
+  the engine skips a disabled one at once. Without the play plugin they all stay enabled,
+  as before.
+- **The Nanite pool from the city** (`nanite_pool_mb`, above).
+- **The import's memory** (#84): stage 2's packs imported, finished and saved 150 at a time
+  (`CITYGEN_UE_PACK_CHUNK`, 0 for all at once), and the meshes let go of between chunks
+  (and every fourth actor offload): the importer holds asset paths (`Meshes`) and loads a
+  mesh when an actor asks for it. Delta's first import had held every one of its 58,501
+  meshes to the end, 39 GB committed in the editor.
 
 ## assetgen's street contribution (AG7)
 

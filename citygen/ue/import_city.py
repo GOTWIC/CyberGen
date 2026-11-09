@@ -1521,14 +1521,17 @@ def delete_files(paths):
     del loaded
     unreal.SystemLibrary.collect_garbage()
     content = unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_content_dir())
+    gone = 0
     for n in names:
         base = os.path.join(content, n[len("/Game/"):])
         for ext in (".uasset", ".uexp", ".ubulk"):
             if os.path.exists(base + ext):
                 os.remove(base + ext)
+        # (counted by their files: right after the scan the registry can still list them,
+        # AG16's 9,244 shared meshes read "deleted 0")
+        gone += int(not os.path.exists(base + ".uasset"))
     folders = sorted({n.rsplit("/", 1)[0] for n in names})
     unreal.AssetRegistryHelpers.get_asset_registry().scan_paths_synchronous(folders, True)
-    gone = sum(1 for n in names if not EAL.does_asset_exist(n))
     log(f"deleted {gone} of {len(names)} assets by their files")
     return gone
 
