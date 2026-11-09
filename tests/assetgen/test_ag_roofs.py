@@ -6,6 +6,7 @@ over it; the clearance check; every skybridge kind closed; landing doors where a
 meets a floor line; portals cut open, a sky station's platforms."""
 
 import copy
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -15,6 +16,7 @@ from assetgen.buildings import envelope as EN
 from assetgen.buildings import genome as GN
 from assetgen.buildings import parts as PT
 from assetgen.buildings import roofparts as RP
+from assetgen.buildings import roofs as RF
 from assetgen.buildings import shell as SH
 from assetgen.buildings import systems as SY
 
@@ -186,6 +188,10 @@ def _bridged():
         dict(end, id="sb.off_floor", z_m=6 * 3.4 + 1.5,
              at={"mass": 0, "edge": 3, "s": 10.0, "d": 0.0}),
         dict(end, id="sb.no_edge", z_m=6 * 3.4, at=None),
+        # (#144: an open deck landing on the roof, far from every wall the brief filed it
+        # under: no door, counted apart)
+        dict(end, id="sb.roof", kind="open_deck", z_m=10 * 3.4, end=[3.0, 2.0],
+             at={"mass": 0, "edge": 1, "s": 5.0, "d": 9.0}),
         # a cable bridge's narrow deck, landing in a corner pier: still a door
         dict(end, id="sb.cable", kind="cable", width_m=1.2, z_m=3 * 3.4,
              at={"mass": 0, "edge": 0, "s": 1.0, "d": 0.0})]
@@ -200,11 +206,13 @@ def test_landing_doors_where_a_skybridge_meets_a_floor_line():
     assert ld["sb.on_floor"]["door"] and ld["sb.cable"]["door"]
     assert not ld["sb.off_floor"]["door"] and ld["sb.off_floor"]["why"] == "off_floor"
     assert ld["sb.no_edge"]["why"] == "no_edge"
+    assert not ld["sb.roof"]["door"] and ld["sb.roof"]["why"] == "roof"
     assert any(x["family"] == "landing" for x in res["parts"]) or \
         res["stats"].get("parts_merged", 0) > 0
     rec = {"b": {"landings": res["landings"]}}
     c = AC.landings(rec)
-    assert c["ok"] and c["doors"] == 2 and c["off_floor"] == 1 and c["no_edge"] == 1
+    assert c["ok"] and c["doors"] == 2 and c["off_floor"] == 1 and c["no_edge"] == 1 and \
+        c["on_roof"] == 1
 
 
 def _portal(station: bool):
@@ -239,3 +247,50 @@ def test_portals_are_cut_open():
     gm = GN.make(solid)
     res = SH.build(solid, gm)
     assert EN.clearances(br, res["arrays"], EN.part_points(res["parts"]))["portal_hits"] > 0
+
+
+def _standing(res) -> list:
+    """#105: the roof parts of a shell that do not stand on all their feet (the frames on
+    the shell, the items on the shell and the frames' tops)."""
+    st = RF.Stand(SimpleNamespace(buf=res["buf"]))
+    put = [(x["family"], x["params"], at) for x in res["parts"] if x["family"] in RP.ROOF
+           for at in x["at"]]
+    off = [(f, a) for f, p, a in put if f == "dunnage" and not st.rests(f, p, *a)]
+    for f, p, a in put:
+        if f == "dunnage":
+            st.add_frame(p["w"], p["d"], p["leg"], *a)
+    return off + [(f, a) for f, p, a in put if f != "dunnage" and not st.rests(f, p, *a)]
+
+
+def test_roof_items_stand_on_all_their_feet():
+    """#105: AC units on a gable's slopes (they stood at the slope's middle, two feet over
+    it), a tank and an antenna there, AC units at a mansard's edge (two feet over its
+    slope) and vents: every roof part stands on all its feet, moved in or on a frame."""
+    br = _tower("corrugated", 1, btype="building.warehouse", w=40.0, d=24.0, fh=9.0)
+    top = br["masses"][0]["z"][1]
+    br["roof_items"] = [{"kind": k, "position": [x, y, top], "size": list(s), "yaw_deg": 0.0,
+                         "mass": 0}
+                        for k, (x, y), s in (("ac_unit", (-12.0, 4.0), (1.6, 1.2, 1.2)),
+                                             ("ac_unit", (0.0, -5.0), (1.6, 1.2, 1.2)),
+                                             ("ac_unit", (12.0, 8.5), (1.6, 1.2, 1.2)),
+                                             ("water_tank", (6.0, -8.0), (3.0, 3.0, 3.5)),
+                                             ("antenna", (-6.0, 10.0), (0.6, 0.6, 6.0)))]
+    gm, res = _with(br, **{"roof_form": "gable", "crown": "flat", "body.system": "corrugated"})
+    _ok(br, res)
+    assert _kinds(res) == {"gable"}
+    assert not _standing(res), _standing(res)
+    assert not res["stats"].get("roof_items_off") and not res["stats"].get("roof_parts_off")
+    ell = [[-10.0, -8.0], [10.0, -8.0], [10.0, 2.0], [0.0, 2.0], [0.0, 8.0], [-10.0, 8.0]]
+    br = brief_of([mass(ell, 0.0, 9.6, 3)], btype="building.villa")
+    br["roof_items"] = [{"kind": "ac_unit", "position": [x, y, 9.6], "size": [1.6, 1.2, 1.2],
+                         "yaw_deg": 0.0, "mass": 0}
+                        for x, y in ((-9.0, -7.0), (8.8, 1.0), (-1.0, 7.2))]
+    gm, res = _with(br, crown="pitched")
+    _ok(br, res)
+    assert _kinds(res) == {"mansard"}
+    assert not _standing(res), _standing(res)
+    assert not res["stats"].get("roof_items_off") and not res["stats"].get("roof_parts_off")
+    # a flat roof's vents and skylights, and the hut
+    br, _ = _roofed()
+    gm, res = _with(br)
+    assert res["stats"].get("roof_vents") and not _standing(res), _standing(res)

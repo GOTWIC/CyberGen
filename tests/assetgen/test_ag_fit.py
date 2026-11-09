@@ -11,7 +11,7 @@ import numpy as np
 
 from assetgen import gltf as GT
 from assetgen.fit import glb as GL
-from assetgen.fit.build import feet
+from assetgen.fit.build import GAP_M, feet, rest_gaps
 from assetgen.fit.index import Surfaces
 from assetgen.streets import kit as K
 from assetgen.streets.materials import gltf_materials
@@ -33,6 +33,19 @@ def test_surfaces_find_the_highest_floor_under_a_point():
     # a point's own owner does not hold it up
     z = S.under(P[:1], 0.3, exclude=np.array([1]))
     assert abs(z[0]) < 1e-9
+
+
+def test_a_thing_rests_on_three_of_its_five_feet():
+    """#105: one foot on a surface does not hold the other four up."""
+    nan = float("nan")
+    g = np.array([[0.0, nan, nan, nan, nan],          # one foot on the roof, four over air
+                  [0.0, 0.01, 0.5, 0.5, 2.0],         # two feet on it
+                  [0.0, 0.0, 0.0, 2.3, 1.8],          # three: rests
+                  [0.01, -0.3, 0.0, 0.5, nan],        # a foot set into a slope counts
+                  [nan, nan, nan, nan, nan]])
+    r = rest_gaps(g)
+    assert not r[0] <= GAP_M and not r[1] <= GAP_M and not r[4] <= GAP_M
+    assert r[2] <= GAP_M and r[3] <= GAP_M and r[1] == 0.5 and np.isinf(r[0])
 
 
 def test_packs_read_back_in_world_space(tmp_path):

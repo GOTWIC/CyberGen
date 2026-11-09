@@ -16,13 +16,13 @@ BUILD/assets/fit_report.json, .txt     the two checks, their counts and the wors
   whole height, a column's footing `FOOTING_M` into the ground or the bed); it rests when
   three of the five are within `GAP_M` over one. Surfaces are the faces facing up of every
   street, ground, water bed, building shell and front and skybridge pack, the dunnage
-  frames' tops, and the blockout's land (0 on a flat city, M13's ground on a terrain city;
+  frames' tops (never a frame's own), and the blockout's land (0 on a flat city, M13's ground on a terrain city;
   none over the water, where a footing takes M16's bed), never the thing itself. With it,
   the junction seams (`seams`, AG17): at every vertex of a port of M22's pavement map
   between a road's face and a junction's face, the road's piece and the junction's draw the
   same height within `GAP_M`. What fails: anything assetgen seats itself (roof
-  items, dunnage, street pieces), the quay railings and shrubs (#89, `FAILED`)
-  and any step over `GAP_M`; other props and plants stand at the model's heights (M20's
+  items, dunnage, street pieces), the quay railings and shrubs with no foot on a surface
+  (#89's seat, `FAILED`; on fewer than three, reported, #105) and any step over `GAP_M`; other props and plants stand at the model's heights (M20's
   `prop_support`) and are listed, not failed.
 - **`asset_clash`**:
   - *road into building*: a vertex of a road or junction piece's carriageway, deck or
@@ -366,10 +366,13 @@ def _things(pk: Packs, model) -> list[dict]:
                 # 5 cm more, so the roof's top at the frame's own top counts)
                 reach = (max(REACH_M, float(np.ptp(mesh[0][:, 2])) + 0.05)
                          if p["family"] == "dunnage" else REACH_M)
-                for xf in p["xforms"]:
+                for j, xf in enumerate(p["xforms"]):
                     W = _xform(F, px + xf[0], py + xf[1], pz + xf[2], xf[3])
+                    # (#105: a frame's own top never holds it up)
+                    me = pk.owner(f"{bid}:dunnage:{p['node']}:{j}") \
+                        if p["family"] == "dunnage" else None
                     out.append({"id": bid, "what": f"roof.{p['family']}", "feet": W,
-                                "self": None, "reach": reach})
+                                "self": me, "reach": reach})
     # street pieces that stand on their feet
     for pid in pk.street_ids():
         k = pk.street_kind(pid)
@@ -406,13 +409,20 @@ def _dunnage(pk: Packs) -> dict[str, list]:
             top = np.array([[lo[0], lo[1], hi[2]], [hi[0], lo[1], hi[2]],
                             [hi[0], hi[1], hi[2]], [lo[0], hi[1], hi[2]]])
             quad = np.array([[0, 1, 2], [0, 2, 3]])
-            for xf in p["xforms"]:
+            for j, xf in enumerate(p["xforms"]):
                 W = _xform(top, px + xf[0], py + xf[1], pz + xf[2], xf[3])
                 T = W[quad]
                 c = T.mean(axis=(0, 1))
-                out[tile_of(c[0], c[1])].append((T.astype(np.float32),
-                                                 np.full(len(T), pk.owner(f"{bid}:dunnage"))))
+                own = pk.owner(f"{bid}:dunnage:{p['node']}:{j}")
+                out[tile_of(c[0], c[1])].append((T.astype(np.float32), np.full(len(T), own)))
     return out
+
+
+def rest_gaps(g: np.ndarray) -> np.ndarray:
+    """Each thing's gap from its five feet's (n, 5; nan: no surface under a foot): a thing
+    rests where three of its feet do, so its gap is the third smallest (#105: the smallest
+    let one foot on a surface hold the rest up)."""
+    return np.sort(np.where(np.isnan(g), np.inf, g), axis=1)[:, 2]
 
 
 def grounded(pk: Packs, model, floor: Floor) -> dict:
@@ -423,6 +433,7 @@ def grounded(pk: Packs, model, floor: Floor) -> dict:
         c = th["feet"][0]
         by_tile[tile_of(c[0], c[1])].append(i)
     gaps = np.full(len(things), np.nan)
+    ones = np.full(len(things), np.nan)          # (the smallest: one foot resting)
     for t in sorted(by_tile):
         ix, iy = _tile_xy(t)
         extra = [x for k in _ring(ix, iy) for x in dun.get(k, ())]
@@ -440,13 +451,11 @@ def grounded(pk: Packs, model, floor: Floor) -> dict:
         fl = np.where(P[:, 2] + R >= fl, fl, np.nan)     # (nan over the water too)
         zs = np.fmax(S.under(P, R, ex), fl)
         g = (P[:, 2] - zs).reshape(-1, 5)
-        ok = g <= GAP_M
+        third = rest_gaps(g)
+        one = np.sort(np.where(np.isnan(g), np.inf, g), axis=1)[:, 0]
         for j, i in enumerate(ids):
-            row = g[j]
-            if ok[j].sum() >= 3:
-                gaps[i] = float(np.nanmax(np.where(ok[j], row, -np.inf)))
-            else:
-                gaps[i] = float(np.nanmin(row)) if not np.all(np.isnan(row)) else np.inf
+            gaps[i] = float(third[j])
+            ones[i] = float(one[j])
     steps = seams(pk, model)
     floating = [i for i in range(len(things)) if not gaps[i] <= GAP_M]
     by_what: dict[str, list] = defaultdict(lambda: [0, 0])
@@ -459,8 +468,11 @@ def grounded(pk: Packs, model, floor: Floor) -> dict:
     # props and plants #89 seats (quay railings, shrubs) and any step; other
     # props and plants stand at the model's heights (M20's `prop_support`) and are
     # reported, as `asset_access` reports)
+    # (#105: the quay railings and shrubs fail where #89's seat is off, no foot on its
+    # surface; resting on fewer than three feet, one on a hillside's retaining wall or a
+    # cliff's edge, they are reported with the other props and plants)
     failing = [i for i in floating if not things[i]["what"].startswith(REPORTED) or
-               things[i]["what"] in FAILED]
+               (things[i]["what"] in FAILED and not ones[i] <= GAP_M)]
     return {"id": "asset_grounded",
             "ok": not failing and steps["max_m"] <= STEP_FAIL_M,
             "things": len(things), "floating": len(floating), "failing": len(failing),

@@ -3284,11 +3284,100 @@ def _profile_pass(c: Ctx, ln: Line, gone: set, arr, need: list, runs, over_runs:
     # both envelopes limited to the grade, then the base altitude between them (a clamp
     # between two functions of bounded slope keeps that slope); the lower one wins where
     # they cross (the portal there is then dropped)
-    g = (presets.TRANSIT_MODES[mode].max_grade or 0.05) * 0.95
+    pre = presets.TRANSIT_MODES[mode]
+    g = (pre.max_grade or 0.05) * 0.95
     closed = ln.loop and n > 2 and ln.pts[0] == ln.pts[-1]
     lo = _graded(ln.pts, need, g, max, -1.0, closed)
     hi = _graded(ln.pts, cap, g, min, 1.0, closed)
+    if pre.curve_m:
+        # #124: long ramps and vertical curves (a sky tube's)
+        return [q(z) for z in _curved(ln.pts, need, cap, lo, hi, ln.z0, pre, closed)]
     return [q(max(a, min(b, ln.z0))) for a, b in zip(lo, hi)]
+
+
+def _curved(pts, need: list, cap: list, lo: list, hi: list, z0: float, pre,
+            closed: bool) -> list[float]:
+    """#124: a profile of long ramps and vertical curves. Every need is held level for half a
+    curve and a vertex either side (a crest of `curve_m`), every cap likewise; the needs are
+    lifted and the caps lowered at the design grade (`design_grade`), steeper (up to the limit
+    grade, 0.95 of `max_grade`, as `_profile_pass`) only where the two meet; a sag shorter
+    than `fill_m` between two crests is filled at the lower crest's height (a closing by a
+    level stretch that long); then a moving average over `curve_m` (M7's `elevated.smooth`)
+    rounds every grade change into a parabolic vertical curve of that length. Held level
+    over a crest that long, the average stays over every need and under every cap; where the
+    caps leave no room it is clamped between lo and hi, the needs and caps lifted and lowered
+    at the limit grade, as without curves."""
+    cum = _cum(pts)
+    gap = max((b - a for a, b in zip(cum, cum[1:])), default=0.0)
+    r = pre.curve_m / 2.0 + gap
+    need_w = _window(cum, need, r, max, closed)
+    cap_w = _window(cum, cap, r, min, closed)
+    g = 0.95 * pre.max_grade
+    gd = min(pre.design_grade or g, g)
+    lo_w = _graded(pts, need_w, g, max, -1.0, closed)
+    hi_w = _graded(pts, cap_w, g, min, 1.0, closed)
+    lo_d = _graded(pts, need_w, gd, max, -1.0, closed)
+    hi_d = _graded(pts, cap_w, gd, min, 1.0, closed)
+    # (a clamp between functions of grade at most g keeps that grade)
+    raw = [max(a, min(b, max(c, min(d, z0))))
+           for a, b, c, d in zip(lo_w, hi_w, lo_d, hi_d)]
+    if pre.fill_m:
+        h = pre.fill_m / 2.0
+        shut = _window(cum, _window(cum, raw, h, max, closed), h, min, closed)
+        raw = [max(a, min(b, x)) for a, b, x in zip(lo_w, hi_w, shut)]
+    z = _box(cum, raw, pre.curve_m, closed)
+    return [max(a, min(b, x)) for a, b, x in zip(lo, hi, z)]
+
+
+def _window(cum: list, vals: list, r: float, pick, closed: bool) -> list:
+    """pick (max or min) of vals within r along the track of each point; around a closed
+    track (first point = last) past its seam."""
+    n = len(vals)
+    if closed and n > 2:
+        m, T = n - 1, cum[-1]
+        pos = [s - T for s in cum[:m]] + cum[:m] + [s + T for s in cum[:m]]
+        val = vals[:m] * 3
+    else:
+        pos, val = cum, vals
+    out = []
+    for s in cum:
+        a = bisect.bisect_left(pos, s - r - 1e-9)
+        b = bisect.bisect_right(pos, s + r + 1e-9)
+        out.append(pick(val[a:b]))
+    return out
+
+
+def _box(cum: list, vals: list, L: float, closed: bool) -> list[float]:
+    """The moving average of a profile (linear between its points) over L along the track:
+    past the ends of an open track its end values, around a closed one past its seam."""
+    n = len(vals)
+    T = cum[-1]
+    P = [0.0]
+    for k in range(n - 1):
+        P.append(P[-1] + (cum[k + 1] - cum[k]) * (vals[k] + vals[k + 1]) / 2.0)
+
+    def integral(x: float) -> float:
+        base = 0.0
+        if closed:
+            k = math.floor(x / T)
+            x -= k * T
+            base = k * P[-1]
+        elif x <= 0.0:
+            return x * vals[0]
+        elif x >= T:
+            return P[-1] + (x - T) * vals[-1]
+        i = min(max(bisect.bisect_right(cum, x) - 1, 0), n - 2)
+        t, Ls = x - cum[i], cum[i + 1] - cum[i]
+        part = vals[i] * t + ((vals[i + 1] - vals[i]) * t * t / (2.0 * Ls) if Ls > 0 else 0.0)
+        return base + P[i] + part
+
+    if n < 2 or T <= 0.0:
+        return list(vals)
+    h = L / 2.0
+    out = [(integral(s + h) - integral(s - h)) / L for s in cum]
+    if closed and n > 2:
+        out[-1] = out[0]
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -3572,6 +3661,69 @@ def _support_room(c: Ctx, lines: list, gone: set, lanes, sw, ground: list) -> No
                         gone.add(o.id)
                         ln.removed.append(o.id)
                 x += span
+        if any(kind == "gap" for _, _, kind in spans):
+            _bent_room(c, ln, gone, lanes, sw, ground, lines, span)
+
+
+def _bent_room(c: Ctx, ln: Line, gone: set, lanes, sw, ground: list, lines: list,
+               span: float) -> None:
+    """#108: a gap the dry run still leaves once the low buildings under the track are out
+    (a line over dense streets, every spot under it a lane, a sidewalk's clear path or a
+    building that is not low): at each spot a span apart along it, the nearest spot beside
+    the line for a cantilever bent's column (within CANT_REACH_M, as `_frame` searches it)
+    that only low removable buildings keep it off (their tops 2 m under its arm), the rest
+    of the spot and the arm clear; those buildings are taken out, as `_support_room` takes
+    out the ones under the track."""
+    keep = Keep(c, gone, lanes, sw, [track_rec(o) for o in lines if o.mode != "metro"],
+                ground)
+    dry = _Dry(c)
+    notes = list(ln.notes)
+    _, spans = dry.supports_of(ln, keep)
+    ln.notes = notes
+    T_ = _Track(ln)
+    size = COLUMN_M[ln.mode]
+    reach = WIDTH_M[ln.mode] / 2.0 + 0.3
+    ds = np.arange(size / 2.0 + 0.5, CANT_REACH_M + 0.01, LEG_STEP_M).tolist()
+    for a, b, kind in spans:
+        if kind != "gap":
+            continue
+        b = b + T_.L if T_.closed and b < a else b
+        x = a + span / 2.0
+        while x < b:
+            s = x % T_.L if T_.closed else x
+            px, py = T_.xy(s)
+            nx, ny = T_.normal(s)
+            top = T_.z(s) - below(ln.mode)
+            best = None
+            for d in ds:
+                for side in (1.0, -1.0):
+                    leg = (G.q(px + nx * side * d), G.q(py + ny * side * d))
+                    hit = sorted(c.btree.query(Point(leg), predicate="dwithin",
+                                               distance=size).tolist())
+                    blds = [c.blds[i] for i in hit if keep.ok_bld[i]]
+                    if not blds or not all(o.removable and o.id not in ln.portals and
+                                           o.top <= top - CAP_M - 2.0 for o in blds):
+                        continue
+                    idx = [i for i in hit if keep.ok_bld[i]]
+                    keep.ok_bld[idx] = False      # (as if they were out)
+                    P = np.array([leg], dtype=np.float64)
+                    far = (G.q(px - nx * side * reach), G.q(py - ny * side * reach))
+                    ok = bool(keep.free(P, size, [top - CAP_M], ln, [s])[0]) and \
+                        not bool(keep.wet(P, size)[0]) and keep.sidewalk_ok(leg, size) and \
+                        keep.beam_ok([leg, far], top, ln, s)
+                    keep.ok_bld[idx] = True
+                    if ok:
+                        best = (idx, blds)
+                        break
+                if best is not None:
+                    break
+            if best is not None:
+                idx, blds = best
+                keep.ok_bld[idx] = False
+                for o in blds:
+                    gone.add(o.id)
+                    ln.removed.append(o.id)
+            x += span
 
 
 class Keep:
@@ -4036,6 +4188,7 @@ class Builder:
         self.struct(f"{sid}.pf", "deck", z - 1.0, z, footprint=foot,
                     attrs={"station": sid, "role": "platform", "mode": mode})
         ends = [seg[0], seg[-1]] if not pylon else [self._core_end(ln, seg)]
+        lift_at = set()       # (#109: the platform ends with an elevator)
         for e, tag in zip(ends, ("a", "b")):
             f, d = self.foot(e)
             # (access fix, #87: a sidewalk reached only round the buildings: an elevator
@@ -4051,6 +4204,7 @@ class Builder:
                     # elevator, below, is there)
                     acc.append(self.walk("elevator", [(e[0], e[1], 0.0), (e[0], e[1], z)],
                                          2.5, {"station": sid}))
+                    lift_at.add(tuple(e[:2]))
                 if f != tuple(e):
                     acc.append(self.walk("path", [(e[0], e[1], 0.0), (f[0], f[1], 0.0)], 3.0,
                                          {"station": sid}))
@@ -4064,7 +4218,9 @@ class Builder:
                 cnp = G.qpoly(Point(f).buffer(3.0, cap_style="square"))
                 self.struct(f"{sid}.cn{tag}", "canopy", 2.8, 3.2, footprint=cnp,
                             attrs={"station": sid, "role": "stair_canopy"})
-        if not pylon:
+        if not pylon and tuple(seg[0][:2]) not in lift_at:
+            # the platform's own elevator at its first end (#109: one elevator an end: not
+            # where the sidewalk right under that end has one already)
             e = seg[0]
             acc.append(self.walk("elevator", [(e[0], e[1], 0.0), (e[0], e[1], z)], 2.5,
                                  {"station": sid}))

@@ -1413,6 +1413,40 @@ district regeneration only (a fresh build is unchanged):
   the map); the street now bends onto the old node, as the old city's did.
 Outputs: `docs/progress/fix_core_regen/`.
 
+The sky tube profile fix (issue #124) is in place, in `citygen/transit.py` (`_curved`,
+`_window`, `_box`), `presets.py` and `transit_checks.py`: sky tubes climb and descend in long
+ramps and vertical curves, not in steps and humps.
+- **Per mode** (`ModePreset.design_grade`, `curve_m`, `fill_m`): sky tubes 3.5%, 300 m and
+  500 m, `max_grade` (8%) kept as the limit. The other modes have none, so their profiles are
+  as before.
+- **Profile** (`_profile_pass`, then `_curved`): every need and cap is held level for half a
+  curve and a vertex either side, then lifted and lowered at the design grade. Only where the
+  two meet does it climb steeper, up to the limit grade (0.95 of `max_grade`). A closing by a
+  level stretch of `fill_m` fills a sag between crests closer than that at the lower crest's
+  height, and leaves a wider one a floor at least that long. A moving average over `curve_m`
+  (M7's way) makes every grade change a parabolic vertical curve. Held level that long, the
+  average stays over every need and under every cap; it is last clamped between the needs
+  and caps lifted and lowered at the limit grade, as before.
+- **Check** `transit_profile_smooth` (one more on every city with transit lines: 107 on a
+  flat sample, 112 with decks): measured every 10 m, a sky tube's grade changes no faster
+  than a 300 m curve allows (two limit grades over it), and no sag is narrower than 200 m
+  (the fill length less a curve).
+Outputs: `docs/progress/fix_sky_tube_profile/`.
+
+The support and elevator fixes (issues #108 and #109) are in place, in `citygen/transit.py`:
+- **Bents beside the line** (#108, `_bent_room`, from `_support_room`): where the dry run
+  still leaves a gap once the low buildings under the track are out (a line over dense
+  streets, every spot under it a lane, a sidewalk's clear path or a building that is not
+  low), at each spot a span apart along it the nearest spot beside the line for a cantilever
+  bent's column (within `CANT_REACH_M`, as `_frame` searches) that only low removable
+  buildings keep it off (their tops 2 m under its arm), the rest of the spot and the arm
+  clear, has those buildings taken out. A city whose dry run leaves no gap is unchanged.
+  #108's layout (Vesper Bay Decks' second) no longer reproduces the gap on main.
+- **One elevator an end** (#109, `Builder._elevated`): the platform's own elevator at its
+  first end is added only where that end has none yet (the sidewalk right under it had one
+  added already).
+Outputs: `docs/progress/fix_pylons_elevators/`.
+
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
 - **Validation:** as in "Validation" above; nothing beyond it.
@@ -1979,8 +2013,19 @@ AG14 (fit and finish, from the first run-through) is in place (tests
   `_Tops`) and ground plants with their foot's middle 5 cm into the ground (`_seat`).
   `asset_clash` also fails on a sidewalk, junction corner or median over a carriageway at
   its height (`fit/strips.py`).
+- **Grounded rule** (#105): a thing rests on three of its five feet (`fit.build.rest_gaps`,
+  the third smallest gap; a frame's own top never holds it up); #89's railings and shrubs
+  fail with no foot on their surface, reported on fewer than three. AG4 seats every roof
+  part on all its feet on the roof the shell drew (`roofs.Stand`: items laid out and tested
+  with their frames, `_lay`, moved in 0.25 m at a time up to 6 m, `_inward`; huts, vents and
+  skylights only where they stand). `GEN_VERSION` fix105.1.
+- **One-building fixes** (#144): `rings.tidy` closes a spike the way that keeps nearest the
+  outline; open sheds roofed and columned in their cladding, thumbnails drawing pillars and
+  roof equipment; type clutter off the corridors; a skybridge end over 1.5 m from every wall
+  lands on a roof (`connections.wall_of`, `on_roof`) or none. `GEN_VERSION` fix144.1.
 Results: `docs/progress/AG14/`; the sky tube fixes: `docs/progress/sky_tubes/`; the junctions
-fix: `docs/progress/fix_junctions/`.
+fix: `docs/progress/fix_junctions/`; the grounded rule: `docs/progress/fix_grounded/`; the
+one-building fixes: `docs/progress/fix_one_building/`.
 
 AG15 (cyberpunk facades and night, from the first run-through) is in place (tests
 `tests/assetgen/test_ag_night.py`):

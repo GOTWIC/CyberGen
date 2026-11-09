@@ -647,7 +647,7 @@ class ShellBuilder:
             # (AG4: the bridge's corridor and a margin: its deck structure 1 m under the
             # landing, 0.5 m beside it, so no sill, shutter or shade enters it)
             h = int(max(s["levels"], 1) * s["level_height_m"] * 1000) + 1600
-            add(s["at"], s["z_m"] + (h - 2400) / 2000.0, int(s["width_m"] * 1000) + 1000, h)
+            add(CN.wall_of(s), s["z_m"] + (h - 2400) / 2000.0, int(s["width_m"] * 1000) + 1000, h)
         return out
 
     # -- build ---------------------------------------------------------------------------

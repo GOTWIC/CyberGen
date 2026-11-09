@@ -1,0 +1,29 @@
+fit checks: Cragmouth: all pass
+PASS asset_grounded: 62569 things (31 kinds), 2406 not resting on a surface (0 failing, the rest props and plants at the model's heights, reported)
+    roads on their junctions: 5400 legs, 0 roads with a step over 0.02 m (largest 0.0 m; failing over 0.02 m)
+    plant.conifer: 16 of 582
+    plant.park_tree: 242 of 6721
+    plant.shrub: 2060 of 9183
+    plant.street_tree: 1 of 1374
+    prop.bench: 3 of 266
+    prop.dumpster: 64 of 317
+    prop.railing: 5 of 1535
+    prop.street_light: 8 of 3670
+    prop.trash: 4 of 2038
+    prop.trash_can: 3 of 502
+    d05.plant.shrub.e1072n780 (plant.shrub) at [1072.04, 780.03, 60.28] gap None
+    d05.prop.dumpster.e1248n992 (prop.dumpster) at [1248.24, 992.22, 83.14] gap None
+    d04.prop.trash.w1103n686 (prop.trash) at [-1102.58, 685.63, 10.45] gap 4.084
+    d04.prop.street_light.w1103n683 (prop.street_light) at [-1102.6, 683.29, 10.11] gap 3.93
+    d03.plant.shrub.w677n312 (plant.shrub) at [-676.92, 311.63, 24.73] gap 3.069
+    d03.plant.shrub.w680n507 (plant.shrub) at [-680.49, 507.46, 29.29] gap 3.063
+    d03.plant.shrub.w651n672 (plant.shrub) at [-651.38, 671.85, 18.51] gap 3.013
+    d05.plant.shrub.e1166n578 (plant.shrub) at [1166.18, 577.8, 70.46] gap 2.937
+    d03.plant.shrub.w671n539 (plant.shrub) at [-671.25, 538.65, 21.61] gap 2.866
+    d05.plant.shrub.e1177n540 (plant.shrub) at [1177.29, 540.38, 68.96] gap 2.84
+    d05.plant.shrub.e751n549 (plant.shrub) at [750.93, 548.92, 21.11] gap 2.78
+    d03.plant.shrub.w655n647 (plant.shrub) at [-654.7, 647.26, 19.4] gap 2.774
+    d03.plant.shrub.w656n239 (plant.shrub) at [-655.49, 238.54, 20.28] gap 2.691
+    d03.plant.shrub.w657n243 (plant.shrub) at [-656.97, 243.33, 21.37] gap 2.674
+    d03.plant.park_tree.w658n240 (plant.park_tree) at [-658.1, 239.88, 16.35] gap 2.657
+PASS asset_clash: 0 (road_into_building 0, building_over_road 0, bridge_twice 0, transit_through_building 0, transit_through_platform 0, barrier_on_road 0, barrier_in_junction 0, barrier_on_crosswalk 0, barrier_through_barrier 0, prop_on_road 0, prop_in_barrier 0, strip_on_junction 0, strip_on_road 0)

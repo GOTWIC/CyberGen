@@ -114,6 +114,46 @@ def test_types_build_inside_their_envelope():
     assert feats >= 8
 
 
+def test_shanty_clutter_keeps_out_of_a_corridor():
+    """#144: a shanty's roof barrels (and a megablock's antenna farm) keep off a skybridge's
+    corridor over the roof, as the type's other parts do (Cragmouth's d02.lot.w1085n239.bld:
+    a barrel in its skybridge's)."""
+    for k in range(12):
+        br = brief_of([mass(rect(-6.0, -5.0, 6.0, 5.0), 0.0, 14.0, 4)],
+                      btype="building.shanty_stack", bid=f"d01.lot.e{k}n0.bld")
+        # (over the roof's middle, clear of its parapet, as the bridge's end over a
+        # stack in the city)
+        br["clearances"] = [{"kind": "skybridge", "id": "sb.x", "half_m": 2.0,
+                             "line": [(-2.5, -0.5, 13.7, 16.4), (2.5, 0.5, 13.7, 16.4)]}]
+        sh = SH.build(br, GN.make(br))
+        clr = EN.clearances(br, sh["arrays"], EN.part_points(sh["parts"]))
+        assert clr["ok"], (k, clr)
+
+
+def test_open_sheds_show_their_walls_color():
+    """#144: an open shed (no walls) is roofed and its columns painted in its cladding, its
+    wall gene's color: two of one size and roof color that differ in their walls' have
+    thumbnails apart (Vesper Bay Pinned's twin sheds drew alike, 0 bits)."""
+    from assetgen import asset_checks as AC2
+    from assetgen import build as BD
+    from assetgen.buildings import thumb as TH
+    hs = []
+    for k, wall in enumerate(("#b5452f", "#3f4448")):
+        br = brief_of([mass(rect(-40.0, -25.0, 40.0, 25.0), 0.0, 11.0, 1)],
+                      btype="building.shed", bid=f"d01.lot.e{k}n9.bld")
+        br["building"]["attrs"] = {"open_sides": True}
+        gm = GN.make(br)
+        gm["colors"].update({"wall": wall, "roof": "#7a3e2c"})
+        sh = SH.build(br, gm)
+        assert "hangar" in sh["arrays"] and "roof_metal" not in sh["arrays"]
+        assert any(x["family"] == "pillar" and x["params"]["style"] == "painted"
+                   for x in sh["parts"]) or sh["stats"].get("parts_merged", 0) > 0
+        tints = BD._tints(gm)
+        hs.append(TH.hash_of(br, sh["arrays"], sh["parts"], tints)[0])
+    H = TH.distances(hs)
+    assert int(np.bitwise_count(H[0] ^ H[1]).sum()) >= AC2.THUMB_MIN
+
+
 def _tower_hero(kind="megatower"):
     masses = [mass(rect(-20.0, -20.0, 20.0, 20.0), 0.0, 24.0, 6),
               mass(rect(-12.0, -12.0, 12.0, 12.0), 24.0, 150.0, 34, role="tower")]
