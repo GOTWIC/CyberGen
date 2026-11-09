@@ -21,8 +21,8 @@ BUILD/assets/fit_report.json, .txt     the two checks, their counts and the wors
   the junction seams (`seams`, AG17): at every vertex of a port of M22's pavement map
   between a road's face and a junction's face, the road's piece and the junction's draw the
   same height within `GAP_M`. What fails: anything assetgen seats itself (roof
-  items, dunnage, street pieces), the quay railings and shrubs (#89, `FAILED`)
-  and any step over `GAP_M`; other props and plants stand at the model's heights (M20's
+  items, dunnage, street pieces), the quay railings and shrubs with no foot on a surface
+  (#89's seat, `FAILED`; on fewer than three, reported, #105) and any step over `GAP_M`; other props and plants stand at the model's heights (M20's
   `prop_support`) and are listed, not failed.
 - **`asset_clash`**:
   - *road into building*: a vertex of a road or junction piece's carriageway, deck or
@@ -433,6 +433,7 @@ def grounded(pk: Packs, model, floor: Floor) -> dict:
         c = th["feet"][0]
         by_tile[tile_of(c[0], c[1])].append(i)
     gaps = np.full(len(things), np.nan)
+    ones = np.full(len(things), np.nan)          # (the smallest: one foot resting)
     for t in sorted(by_tile):
         ix, iy = _tile_xy(t)
         extra = [x for k in _ring(ix, iy) for x in dun.get(k, ())]
@@ -451,8 +452,10 @@ def grounded(pk: Packs, model, floor: Floor) -> dict:
         zs = np.fmax(S.under(P, R, ex), fl)
         g = (P[:, 2] - zs).reshape(-1, 5)
         third = rest_gaps(g)
+        one = np.sort(np.where(np.isnan(g), np.inf, g), axis=1)[:, 0]
         for j, i in enumerate(ids):
             gaps[i] = float(third[j])
+            ones[i] = float(one[j])
     steps = seams(pk, model)
     floating = [i for i in range(len(things)) if not gaps[i] <= GAP_M]
     by_what: dict[str, list] = defaultdict(lambda: [0, 0])
@@ -465,8 +468,11 @@ def grounded(pk: Packs, model, floor: Floor) -> dict:
     # props and plants #89 seats (quay railings, shrubs) and any step; other
     # props and plants stand at the model's heights (M20's `prop_support`) and are
     # reported, as `asset_access` reports)
+    # (#105: the quay railings and shrubs fail where #89's seat is off, no foot on its
+    # surface; resting on fewer than three feet, one on a hillside's retaining wall or a
+    # cliff's edge, they are reported with the other props and plants)
     failing = [i for i in floating if not things[i]["what"].startswith(REPORTED) or
-               things[i]["what"] in FAILED]
+               (things[i]["what"] in FAILED and not ones[i] <= GAP_M)]
     return {"id": "asset_grounded",
             "ok": not failing and steps["max_m"] <= STEP_FAIL_M,
             "things": len(things), "floating": len(floating), "failing": len(failing),
