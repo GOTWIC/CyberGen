@@ -2510,9 +2510,54 @@ class Importer:
         self.offloaded = []
         self.add_sub("actors.reload", time.perf_counter() - t)
 
+    def wanted_classes(self):
+        """The class of the actor each key gets, by class name (the blockout's and stage 2's;
+        the player start, the lighting and the play actor keep theirs)."""
+        out = {}
+        for t in self.man["tiles"]:
+            for o in t["objects"]:
+                if o["key"] not in self.skip:
+                    out[o["key"]] = "StaticMeshActor"
+        for i in self.man["instances"]:
+            if i["key"] not in self.skip:
+                out[i["key"]] = "BP_CityGenInstances_C"
+        for s in self.man.get("swim", []):
+            out[s["key"]] = "PhysicsVolume"
+        if self.s2:
+            for u in self.s2.get("underwater", []):
+                out[u["key"]] = "PostProcessVolume"
+            for r in self.s2["actors"]:
+                if not r.get("holder"):
+                    out[r["key"]] = "StaticMeshActor"
+            if "groups" in self.s2:
+                for g in self.s2["groups"]:
+                    out[g["key"]] = "BP_CityGenGroup_C"
+            else:
+                for r in self.s2["instances"]:
+                    out[r["key"]] = "BP_CityGenInstances_C"
+        return out
+
+    def clear_moved(self, have):
+        """The actors whose key now gets another class (AG8's exact props over M15's
+        instanced prototypes, a group over a prototype, the reverse on the way back) destroyed
+        before anything is made, and the level saved at once: destroyed later, beside new
+        actors under the same labels, offloads and collections, their packages stayed on disk
+        and came back with the next load (the small city's stage 2 import test: 30 cables and
+        scaffolds twice)."""
+        want = self.wanted_classes()
+        moved = sorted(k for k, a in have.items()
+                       if k in want and a.get_class().get_name() != want[k])
+        for k in moved:
+            self.destroy(have.pop(k), k)
+        if moved:
+            self.save()
+            log(f"{len(moved)} actors of another class destroyed first")
+        self.stats["actors"]["moved"] = len(moved)
+
     def actors(self):
         have = self.existing()
         log(f"{len(have)} actors of {self.city} in the level")
+        self.clear_moved(have)
         self.placed = 0
         self.to_place = self.actor_count()
         REPORT.update(0, self.to_place, force=True)

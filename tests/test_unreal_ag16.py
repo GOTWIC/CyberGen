@@ -125,6 +125,27 @@ def test_group_actors():
     assert g2["group.streets.t+00+01.c00"]["hash"] == g["group.streets.t+00+01.c00"]["hash"]
 
 
+def test_a_street_piece_with_parts_keeps_its_actor():
+    """A street piece with instanced parts of its own (an AG7 bridge's) is no member of its
+    tile's group: its parts are components of its own actor, placed relative to its pivot."""
+    actors, insts = _parts()
+    br = {"key": "br.e1n1", "mesh": "b", "hash": "hb", "pivot": [40.0, 300.0, 0.0],
+          "yaw_deg": 15.0, "category": "road_bridge", "type": "street.bridge",
+          "tile": "t+00+01"}
+    part = {"key": "br.e1n1.part.rail", "entry": "br.e1n1", "kind": "part.rail", "hash": "pr",
+            "pivot": [40.0, 300.0, 0.0], "yaw_deg": 15.0, "category": "road_bridge",
+            "tile": "t+00+01", "district": "", "type": "part.rail",
+            "entry_type": "street.bridge"}
+    actors.append(br)
+    insts.append(part)
+    groups = U.group_actors(actors, insts, MAN)
+    assert "holder" not in br and br["members"] == 1
+    assert part["holder"] == "br.e1n1"
+    assert "br.e1n1" not in {g["key"] for g in groups}
+    tops = {a["key"] for a in actors if not a.get("holder")} | {g["key"] for g in groups}
+    assert all(r["holder"] in tops for r in actors + insts if r.get("holder"))
+
+
 def test_grouped_manifest_changes():
     """An import with groups over one without: every part instancer, front, sign and street
     piece actor goes, a group actor comes for each entry with no mesh actor and each tile

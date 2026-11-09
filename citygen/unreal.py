@@ -924,17 +924,21 @@ def group_actors(actors: list[dict], insts: list[dict], man: dict | None = None)
     `holder`: an instanced part its entry's; a street front (`<building>.front`) its
     building's; a single-mesh actor of a `tile_group` kind the tile group's, by the
     `GROUP_CELL_M` cell of the tile its pivot is in (`group.<kind>.<tile>.c<i><j>`,
-    `.l<level>` on a deck). A holder's hash is taken again over its members' hashes (it
+    `.l<level>` on a deck), unless it has instanced parts of its own (an AG7 bridge's), which
+    stay on its own actor. A holder's hash is taken again over its members' hashes (it
     changes when any of them does). Returns the group actors: one for each entry with parts
     and no mesh actor of its own (at the entry's pivot) and one per tile group cell (at its
     middle), by key."""
     own = {a["key"]: a for a in actors}
+    parts_of = {r["entry"] for r in insts}
     members: dict[str, list[dict]] = {}
     groups: dict[str, dict] = {}
     for a in actors:
         k = a["key"]
         if a.get("type") == "building.front" and k.endswith(".front") and k[:-6] in own:
             a["holder"] = k[:-6]
+        elif k in parts_of:
+            continue            # (its parts are its components: it keeps its own actor)
         else:
             g = tile_group(a["category"])
             if g is None:
