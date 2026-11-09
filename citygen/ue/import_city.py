@@ -100,8 +100,6 @@ PRUNE_FILES = 50
 EMPTY_LEVEL = "/Engine/Maps/Entry"
 STAGE2_MESH_VERSION = "2"
 STAGE2_ACTOR_VERSION = "2"
-# AG16's group actors (BP_CityGenGroup): 2, their components added again on the static root
-GROUP_ACTOR_VERSION = "2"
 TINT_CPD = (0, 8, 11, 14, 17, 20)    # citygen.unreal.TINT_CPD: the tints a master reads
 LIT_CPD = 6                          # the lit-window ratio (AG1's cpd_layout)
 # AG6's Custom Primitive Data (assetgen/materials/params.py): wear, dirt height, seed (AG0),
@@ -2626,7 +2624,7 @@ class Importer:
                     self.member_components(a, rs)
 
                 self.place(have, g["key"], g["hash"], gcls, make, update,
-                           f"CityGen/{g['category']}", GROUP_ACTOR_VERSION)
+                           f"CityGen/{g['category']}", STAGE2_ACTOR_VERSION)
             return
         cls = blueprint(f"{CORE}/BP_CityGenInstances", unreal.Actor, INSTANCE_VARS, hism=True)
         for r in self.s2["instances"]:

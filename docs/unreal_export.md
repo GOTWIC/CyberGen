@@ -889,7 +889,18 @@ play-in-editor and `-game` run). So the fixes cut what the level holds and strea
   citygen id, `cg.door=`); stage 4 finds a sign, a street piece or a part by its component's
   `cg.key`. A holder's hash covers its members', so an import over another updates it when
   any changes. Instanced parts of a Nanite mesh are instanced static mesh components (Nanite
-  culls them per instance), the rest hierarchical ones.
+  culls them per instance), the rest hierarchical ones. `BP_CityGenGroup`'s root is static
+  in the Blueprint itself (`blueprint(..., static_root=True)`, `CORE_VERSION` 3): set on the
+  placed actor alone it is still movable while the level loads and its static members fail
+  to attach, each failure a log line (160,000 in a game of Delta, 72 ms of `AddToWorld` in
+  its slow frames; the Blueprint's recompile saves its placed actors again).
+- **The instanced HLODs keep each building's look** (`per_instance`, `STAGE2_VERSION` 10):
+  the HLOD builder moves each source's Custom Primitive Data into its instance's custom
+  data (`FISMComponentBatcher`), and the masters read only Custom Primitive Data, so past
+  the loading range every tint, night schedule and seed was lost (a dark, untinted far
+  city, plain beyond 768 m, as it was beyond 1,500 m). Each read is now a per-instance
+  custom data node whose default is the Custom Primitive Data parameter: an actor reads its
+  own as before, an HLOD instance the data it carries.
 - **No collision on props no one touches** (`unreal.NO_COLLISION`): awnings, facade AC
   units, wall lights and litter (Delta: 39,500 of its 71,000 prop instance bodies).
 - **Underwater volumes switched by distance** (the play actor, `UpdateUnderwater`): the
