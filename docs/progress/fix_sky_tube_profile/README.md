@@ -46,6 +46,13 @@ to 93.5 m and 101 m between crests, with 28 grade breaks of more than 1% over 10
 
 <img src="crown_loop_profile.png" width="900">
 
+The Crown Loop from the east, over the Corporate Core: the blockout's own render
+(`citygen rerender BLOCKOUT --eye 2050 480 175 --target 1420 470 105 --lens 30`). On main the
+tube drops, then climbs in a straight 7.6% pitch; with the fix it comes round in one long level
+curve.
+
+<img src="crown_loop_east.jpg" width="900">
+
 ## Choices
 
 - **M7's way of making curves** (crests held level for half a curve, then a moving average)
