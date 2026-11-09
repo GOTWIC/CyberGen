@@ -16,7 +16,7 @@ BUILD/assets/fit_report.json, .txt     the two checks, their counts and the wors
   whole height, a column's footing `FOOTING_M` into the ground or the bed); it rests when
   three of the five are within `GAP_M` over one. Surfaces are the faces facing up of every
   street, ground, water bed, building shell and front and skybridge pack, the dunnage
-  frames' tops, and the blockout's land (0 on a flat city, M13's ground on a terrain city;
+  frames' tops (never a frame's own), and the blockout's land (0 on a flat city, M13's ground on a terrain city;
   none over the water, where a footing takes M16's bed), never the thing itself. With it,
   the junction seams (`seams`, AG17): at every vertex of a port of M22's pavement map
   between a road's face and a junction's face, the road's piece and the junction's draw the
@@ -366,10 +366,13 @@ def _things(pk: Packs, model) -> list[dict]:
                 # 5 cm more, so the roof's top at the frame's own top counts)
                 reach = (max(REACH_M, float(np.ptp(mesh[0][:, 2])) + 0.05)
                          if p["family"] == "dunnage" else REACH_M)
-                for xf in p["xforms"]:
+                for j, xf in enumerate(p["xforms"]):
                     W = _xform(F, px + xf[0], py + xf[1], pz + xf[2], xf[3])
+                    # (#105: a frame's own top never holds it up)
+                    me = pk.owner(f"{bid}:dunnage:{p['node']}:{j}") \
+                        if p["family"] == "dunnage" else None
                     out.append({"id": bid, "what": f"roof.{p['family']}", "feet": W,
-                                "self": None, "reach": reach})
+                                "self": me, "reach": reach})
     # street pieces that stand on their feet
     for pid in pk.street_ids():
         k = pk.street_kind(pid)
@@ -406,12 +409,12 @@ def _dunnage(pk: Packs) -> dict[str, list]:
             top = np.array([[lo[0], lo[1], hi[2]], [hi[0], lo[1], hi[2]],
                             [hi[0], hi[1], hi[2]], [lo[0], hi[1], hi[2]]])
             quad = np.array([[0, 1, 2], [0, 2, 3]])
-            for xf in p["xforms"]:
+            for j, xf in enumerate(p["xforms"]):
                 W = _xform(top, px + xf[0], py + xf[1], pz + xf[2], xf[3])
                 T = W[quad]
                 c = T.mean(axis=(0, 1))
-                out[tile_of(c[0], c[1])].append((T.astype(np.float32),
-                                                 np.full(len(T), pk.owner(f"{bid}:dunnage"))))
+                own = pk.owner(f"{bid}:dunnage:{p['node']}:{j}")
+                out[tile_of(c[0], c[1])].append((T.astype(np.float32), np.full(len(T), own)))
     return out
 
 
