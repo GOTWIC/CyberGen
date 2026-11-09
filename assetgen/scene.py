@@ -30,7 +30,6 @@ CITY = {"actors": 60000, "components": 90000, "meshes": 52000, "instances": 3500
 TILE = {"actors": 2000, "components": 3000, "meshes": 2500, "instances": 120000}
 ROOT_PAGES_PER_MESH = 1.0
 ROOT_PAGE_MB = 32768 / 1048576.0       # NANITE_ROOT_PAGE_GPU_SIZE, 32 KB
-NANITE_POOL_MAX_MB = 2048              # Nanite's cluster page pool on NVIDIA (4095 on AMD)
 
 
 def _tile_of(man: dict) -> dict[str, str]:
@@ -74,7 +73,7 @@ def count(man: dict) -> dict:
                 e["components"] += 1
                 e["meshes"].add(f"Meshes/{tl['name']}/{o['asset']}")
     for i in man["instances"]:
-        if i["key"] in hashes:
+        if i["key"] in hashes and i["key"] not in replaced:
             e = t(i["tile"])
             e["components"] += 1
             e["instances"] += i["count"]
@@ -98,8 +97,8 @@ def count(man: dict) -> dict:
             "instances": sum(v["instances"] for v in tiles.values()),
             "grouped": grouped}
     city["root_pages"] = int(round(city["meshes"] * ROOT_PAGES_PER_MESH))
-    pool = U.nanite_pool_mb(man) if hasattr(U, "nanite_pool_mb") else 512
-    city["root_pages_max"] = int((NANITE_POOL_MAX_MB - pool) / ROOT_PAGE_MB)
+    pool = U.nanite_pool_mb(man)
+    city["root_pages_max"] = int((U.NANITE_BUFFER_MB - pool) / ROOT_PAGE_MB)
     city["nanite_pool_mb"] = pool
     return {"city": city, "tiles": out_tiles}
 
@@ -131,8 +130,11 @@ def check(build_dir: str | Path) -> dict | None:
             "tiles": len(c["tiles"])}
 
 
-def write(build_dir: str | Path, res: dict) -> Path:
+def write(build_dir: str | Path, res: dict) -> int:
+    """`assets/scene_budget.json`, written only when its bytes change; 1 when written."""
     p = Path(build_dir) / "assets" / "scene_budget.json"
-    p.write_text(json.dumps(res, indent=1, sort_keys=True) + "\n", encoding="utf-8",
-                 newline="\n")
-    return p
+    text = json.dumps(res, indent=1, sort_keys=True) + "\n"
+    if p.is_file() and p.read_text(encoding="utf-8") == text:
+        return 0
+    p.write_text(text, encoding="utf-8", newline="\n")
+    return 1

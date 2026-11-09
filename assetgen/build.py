@@ -822,6 +822,19 @@ def build(build_dir: str | Path, spec_path: str | None = None,
         if progress is None:
             log(f"fit: {g_['things']} things, {g_['floating']} not resting, "
                 f"{g_['seams']['steps']} junction steps, {c_['clashes']} clashes")
+    if streets and props and ground and water:
+        # AG16: the city's scene as the Unreal exporter makes it (actors, components,
+        # distinct Nanite meshes, instances, root pages) within `asset_budget`'s limits per
+        # tile and per city (`assetgen/scene.py`); a build without a blockout has none
+        from . import scene as SC
+        with P.stage("scene budget"):
+            sc = SC.check(bdir)
+        if sc is not None:
+            wrote += SC.write(bdir, sc)
+            b = rep["checks"]["asset_budget"]
+            b["scene"] = sc
+            b["ok"] = b["ok"] and sc["ok"]
+            rep["ok"] = rep["ok"] and sc["ok"]
     rep["files_written"] = wrote
     return rep
 
@@ -949,10 +962,22 @@ def report_text(rep: dict) -> str:
              f"{rep['skybridges']['triangles']:,} triangles, "
              f"{rep['skybridges']['bytes'] / 1e6:.1f} MB", ""]
     for name, c in rep["checks"].items():
-        extra = {k: v for k, v in c.items() if k not in ("name", "ok", "first")}
+        extra = {k: v for k, v in c.items() if k not in ("name", "ok", "first", "scene")}
         lines.append(f"{'PASS' if c['ok'] else 'FAIL'} {name}: {extra}")
         if not c["ok"] and c.get("first"):
             lines.append(f"     first: {c['first']}")
+        sc = c.get("scene")
+        if sc:
+            # (AG16: the scene in Unreal, `assetgen/scene.py`, scene_budget.json)
+            cy, mt = sc["city"], sc["max_tile"]
+            lines.append(
+                f"     scene: {cy['actors']:,} actors, {cy['components']:,} components, "
+                f"{cy['meshes']:,} Nanite meshes, {cy['instances']:,} instances, "
+                f"{cy['root_pages']:,} of {cy['root_pages_max']:,} root pages (pool "
+                f"{cy['nanite_pool_mb']} MB); busiest tile "
+                + ", ".join(f"{k} {v['count']:,} ({v['tile']})" for k, v in mt.items())
+                + ("" if sc["ok"] else f"; OVER: city {sc['over_city']}, "
+                   f"{sc['tiles_over']} tiles {sc['first_over']}"))
     lines.append("")
     lines.append("triangles by type:")
     for k, v in t["by_type"].items():
