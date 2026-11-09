@@ -15,13 +15,13 @@ from .checks import Check
 from .model import CityModel
 from .spec import CitySpec
 from .transit import (DECK_CLEAR_M, DECK_M, GROUND_TOP_M, INF, MAIN_SPAN_M, PLATFORM_M,
-                      ROAD_CLEAR_M, SELF_GAP_M, SERVE_M, SIDE_PAD_M, SKY_CLEAR_M, WIDTH_M,
-                      _cum, _graded, _runs, _xing_z, _z_along, above, below, deck_heights, floor_z,
-                      over_deck, pier_reach, radii, raised_roads, resample, road_underside,
-                      self_clear_m, self_meets, sidewalk_index, sidewalks_clear)
+                      RADIUS_TOL, ROAD_CLEAR_M, SELF_GAP_M, SERVE_M, SIDE_PAD_M, SKY_CLEAR_M,
+                      WIDTH_M, _cum, _graded, _runs, _xing_z, _z_along, above, below,
+                      deck_heights, floor_z, over_deck, pier_reach, radii, raised_roads,
+                      resample, road_underside, self_clear_m, self_meets, sidewalk_index,
+                      sidewalks_clear)
 
 LIMIT = 12
-RADIUS_TOL = 0.98    # radius measured on 30 m chords of a polyline arc
 GRADE_TOL = 0.002
 EXIT_M = 300.0
 
