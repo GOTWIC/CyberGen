@@ -10,5 +10,7 @@ public class CityGenPlay : ModuleRules
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine" });
 		PrivateDependencyModuleNames.AddRange(new string[] { "InputCore", "Slate", "SlateCore" });
+		// AG16's benchmark (CityGenBench): its job as JSON, the RHI's and render thread's timings
+		PrivateDependencyModuleNames.AddRange(new string[] { "Json", "RHI", "RenderCore" });
 	}
 }
