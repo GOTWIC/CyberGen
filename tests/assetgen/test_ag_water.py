@@ -128,19 +128,21 @@ def test_same_bytes_any_workers_and_hash_seed(tmp_path):
     assert WB.outputs_digest(tmp_path / "seed") == want
 
 
-def test_regenerated_district_rewrites_only_water_near_it():
+def test_regenerated_district_rewrites_only_water_near_it(tmp_path):
     """Old Quarter regenerated: every water piece that changed is one of its banks, or a
     body piece whose tile lies within reach of a bank that changed (M16's banks keep to their
-    district, a bed reads only banks within reach)."""
+    district, a bed reads only banks within reach). Both built into folders of their own,
+    without AG7's street stage, as the golden is: an earlier test may have built the streets
+    into the base, and their bridge piers would add foam to the base's pieces alone."""
     base, _ = _small()
     regen = small_regen()
-    if (regen / "assets" / "water").exists():
-        shutil.rmtree(regen / "assets" / "water")
-    shutil.copytree(base / "assets" / "water", regen / "assets" / "water")
-    rep = _water(regen)
+    out_a, out_b = tmp_path / "base", tmp_path / "regen"
+    _water(base, out_a)
+    shutil.copytree(out_a / "water", out_b / "water")
+    rep = _water(regen, out_b)
     assert rep["ok"], [c for c in rep["checks"] if not c["ok"]]
-    a = json.loads((base / "assets" / "water" / "manifest.json").read_text())["pieces"]
-    b = json.loads((regen / "assets" / "water" / "manifest.json").read_text())["pieces"]
+    a = json.loads((out_a / "water" / "manifest.json").read_text())["pieces"]
+    b = json.loads((out_b / "water" / "manifest.json").read_text())["pieces"]
     changed = sorted(k for k in a.keys() | b.keys()
                      if a.get(k, {}).get("hash") != b.get(k, {}).get("hash"))
     assert changed
