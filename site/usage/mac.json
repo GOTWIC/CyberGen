@@ -1,32 +1,32 @@
 {
  "device": "mac",
  "label": "Mac",
- "updated": "2026-11-10T12:41:28Z",
+ "updated": "2026-11-10T19:25:11Z",
  "sessions": 35,
  "worktree_sessions": 33,
- "subagents": 18,
+ "subagents": 25,
  "totals": {
-  "total": 7685864236,
-  "input": 44232,
-  "output": 19279232,
-  "cache_write_5m": 7093897,
-  "cache_write_1h": 63582212,
-  "cache_read": 7595864663
+  "total": 7789756039,
+  "input": 44948,
+  "output": 20082723,
+  "cache_write_5m": 14226386,
+  "cache_write_1h": 64319430,
+  "cache_read": 7691082552
  },
  "models": {
   "claude-opus-5-5": {
-   "input": 42536,
-   "output": 17360249,
-   "cache_write_5m": 155522,
+   "input": 42760,
+   "output": 17603020,
+   "cache_write_5m": 4845048,
    "cache_write_1h": 62429135,
-   "cache_read": 7390130165
+   "cache_read": 7426868816
   },
   "claude-fable-5-2": {
-   "input": 1564,
-   "output": 1871331,
-   "cache_write_5m": 6938375,
-   "cache_write_1h": 983030,
-   "cache_read": 195536110
+   "input": 2056,
+   "output": 2432051,
+   "cache_write_5m": 9381338,
+   "cache_write_1h": 1720248,
+   "cache_read": 254015348
   },
   "claude-sonnet-5-5": {
    "input": 132,
@@ -103,34 +103,34 @@
    "sessions": 4
   },
   "2026-11-10": {
-   "total": 214326258,
-   "output": 1887967,
+   "total": 318218061,
+   "output": 2691458,
    "sessions": 2
   }
  },
  "stats": {
   "totals": {
-   "total": 18604120825,
-   "input": 104668,
-   "output": 54528516,
-   "cache_write_5m": 18352918,
-   "cache_write_1h": 181714007,
-   "cache_read": 18349420716
+   "total": 18845026023,
+   "input": 106346,
+   "output": 56614904,
+   "cache_write_5m": 37237471,
+   "cache_write_1h": 184897848,
+   "cache_read": 18566169454
   },
   "models": {
    "claude-opus-5-5": {
-    "input": 100600,
-    "output": 49649790,
-    "cache_write_5m": 321890,
+    "input": 101198,
+    "output": 50378255,
+    "cache_write_5m": 13623034,
     "cache_write_1h": 178576534,
-    "cache_read": 17873423383
+    "cache_read": 17970467396
    },
    "claude-fable-5-2": {
-    "input": 3762,
-    "output": 4757561,
-    "cache_write_5m": 18031028,
-    "cache_write_1h": 2685590,
-    "cache_read": 452207809
+    "input": 4842,
+    "output": 6115484,
+    "cache_write_5m": 23614437,
+    "cache_write_1h": 5869431,
+    "cache_read": 571912534
    },
    "claude-sonnet-5-5": {
     "input": 306,
@@ -207,8 +207,8 @@
     "sessions": 4
    },
    "2026-11-10": {
-    "total": 492530059,
-    "output": 4787115,
+    "total": 733435257,
+    "output": 6873503,
     "sessions": 2
    }
   },

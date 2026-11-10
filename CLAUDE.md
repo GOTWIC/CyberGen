@@ -2219,7 +2219,9 @@ AG18 (hero vehicles, scope 14.19) is in progress, and is not a generator: vehicl
 one by one as Blender scripts in `vehicles/` (kit `carkit.py`, a script per car in `cars/`,
 brand book `BRANDS.md`: seven made-up makers whose language is geometry and texture, never
 color; design brief `BRIEF.md`; guide `README.md`), one multi-view sheet a car in
-`docs/progress/AG18/<car>/`, the roster in `docs/progress/AG18/README.md`.
+`docs/progress/AG18/<car>/`, the roster in `docs/progress/AG18/README.md`. Phase 1 is built
+(21 vehicles, 2026-11-10; line-up `vehicles/lineup.py`, `docs/progress/AG18/lineup.jpg`) and
+waits for Swagnik's review.
 - Every Blender run for a vehicle goes through `vehicles/blender.sh`, which queues runs
   across sessions on one lock.
 - The owner's concept images are in `reference/car_concepts/` (gitignored, inspiration

@@ -32,6 +32,70 @@ vehicles/blender.sh vehicles/cars/NAME.py --out DIR --sheet      # DIR/sheet.jpg
 `BLENDER=/path/to/blender` picks another Blender. `--sheet` and `--preview` put their tiles
 together with `post.py`, run by the repo's `.venv` Python (`CYBERGEN_PYTHON` overrides).
 
+## The line-up
+
+`lineup.py` puts every car of `cars/` into one scene at one scale and renders it:
+
+```
+vehicles/blender.sh vehicles/lineup.py            # docs/progress/AG18/lineup.jpg, 3840 px wide
+vehicles/blender.sh vehicles/lineup.py --test     # 1920 px, 24 samples, into the cache
+```
+
+- **Cars.** Found by listing `cars/*.py`, so a new car joins with nothing to edit. Each is
+  built once by its own script with `--blend` into `~/.cache/cybergen/vehicles/lineup/<car>/`
+  (never in the repo) and built again only when its script or `carkit.py` is newer; its `CAR`
+  collection is then appended under an empty of its name. A car that fails to build or
+  append is left out with a message (`BUILD FAILED`, `SKIPPED`, `LEFT OUT` in the log, the
+  build's own output in `<car>/build.log`).
+- **Layout.** A column per brand in `BRANDS.md`'s order (a car's brand is the one whose
+  table lists its model, else the first word of its file name), its cars one behind
+  another, lowest in front, each row a little to the right of the one before. Rows are
+  spaced by the height of the cars in front, so none hides the one behind, and every car is
+  turned to show the camera the same three-quarter view of its nose and left flank. The
+  brand's name lies on the floor in front of its column. The frame's shape follows the
+  layout, between 2.7:1 and 16:9.
+- **Studio.** Its own floor and cove, as wide as the camera's distance asks (the camera
+  stands about 100 m off with a 105 mm lens), a pool of soft light over the cars; each car
+  keeps its own lights, and the image gets the sheets' bloom.
+- **Time.** About 1.5 minutes for 19 cars (4.5 million triangles): 25 s to build the cars
+  the first time, 3 s to append them, a minute to render 3840 x 1422 at 128 samples. A
+  `--test` takes 12 s once the cars are cached.
+- **Arguments.** `--out FILE`, `--cache DIR`, `--width N`, `--samples N`, `--only a,b` (some
+  cars), `--rebuild` (every car again), `--blend` (the scene as `lineup.blend` in the cache).
+
+The spacing, the camera's height and the turn are the constants at the top of `lineup.py`.
+
+## Game packs
+
+`game.py` turns any car into a game-ready pack for an engine: a few named parts (body,
+glass, a node per wheel and brake about its axle), an atlas per material slot with baked
+textures (base color, normal, occlusion-roughness-metallic-coat, a paint mask, emissive),
+four LODs, convex collision hulls, the lights as data and a proof image. The paint's hue is
+not baked: an engine material recolors the car through its mask with any color. The
+format is the contract in `GAME.md`.
+
+```
+vehicles/blender.sh vehicles/game.py --car vanta_r                  # ~/.cache/cybergen/vehicles/game/vanta_r/
+vehicles/blender.sh vehicles/game.py --car vanta_r --docs           # also docs/progress/AG18/vanta_r/game.jpg
+vehicles/blender.sh vehicles/game.py --car vanta_r --test           # 1024 / 512 textures, about a minute
+```
+
+- **No hints from the car.** The script runs unchanged; wheels, glass, paint channels and
+  what to bake down are found by rules on the built objects (`GAME.md` lists them). Fix the
+  tool, not the car.
+- **Baked down.** Lettering, ribbons and other flat relief go onto the surface under them;
+  dense arrays (honeycombs) become cards; dense tires become lathes with the tread and
+  sidewall marks baked on; over budget, taller relief such as bolt rows, then a collapse of
+  the densest small parts. Faces nothing can see are removed.
+- **Proof.** `game.jpg`: the pack alone in the kit's studio next to the procedural original
+  from the hero view, a recolored copy, the textures and the four LODs. `--views a,b`
+  compares more of the car's views (`proof/original_<view>.jpg` and `baked_<view>.jpg`);
+  look at them at full size.
+- **Checks.** Budgets, UV overlap, texel density, files, wheel pivots, LOD bounds, hull
+  count (`game_report.json`); the run fails when one fails.
+- **Time.** About 4 to 6 minutes a car at full size (most of it the bakes and the proof);
+  packs are 18 to 31 MB and never go in git.
+
 ## Workflow
 
 1. **Stations and lines.** Draw the body as character lines (top centerline, hood crease,

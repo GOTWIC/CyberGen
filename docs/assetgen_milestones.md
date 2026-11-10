@@ -2675,7 +2675,7 @@ the Unreal tests updated); results `docs/progress/AG16/`.
 
 ## AG18: hero vehicles (in progress)
 
-**Phase 1 running.** Scope 14.19 (Swagnik, 2026-11-10): vehicles designed one by one, not
+**Phase 1 built, waiting for review.** Scope 14.19 (Swagnik, 2026-11-10): vehicles designed one by one, not
 generated. Everything is in `vehicles/` (the kit `carkit.py`, a script per car in `cars/`,
 the brand book `BRANDS.md`, the design brief `BRIEF.md`, `post.py`, the render queue
 `blender.sh`); a car's sheet and notes are in `docs/progress/AG18/<car>/`. The concept
@@ -2702,9 +2702,32 @@ building it and looking at its sheet. Rebuilt `.blend` and `.glb` files are not 
   `vehicles/README.md`.
 - **Brands and roster:** `vehicles/BRANDS.md`: Halcyon, Kestrel Aerodyne, Orrin, Brakk
   Industrial, Aurel, Vex, Tanager, three models each, 21 vehicles with the Vanta-R.
+- **The kit** (PR #169, fixes #173): `carkit.py` (palette per car, `Geo`, `build_body` for any
+  number of pieces with creases, caps, recesses, glass insets and cutters, the surface
+  projector, wheels, the studio, cameras fitted to the silhouette and held inside the cove),
+  `--preview` (four views, 8 s), `--sheet` (hero, front, side, back and an optional fifth
+  tile composed into one 3840 x 2160 image, about 2 minutes), `blender.sh` (one Blender run
+  at a time across sessions, on a lock in `~/.cache/cybergen`).
+- **The roster, built 2026-11-10** (PRs #170 to #192): the twenty other vehicles, each by a
+  design session of its own working from `vehicles/BRIEF.md`, three sessions at a time, the
+  first model of a brand setting its cues and the later two repeating them. 72,000 to
+  501,000 triangles a vehicle, 5.1 million in all. Wheeled and hovering (Kestrel's three and
+  Aurel's Zenith have no wheels), exposed wheels (Brakk, Vex), hubless ring wheels (Vex
+  Halo), bodies with gaps through them (Vex, Orrin Aria), opened doors modelled (Orrin
+  Pebble, Tanager Cab and Porter).
+- **The line-up** (PR #191, `vehicles/lineup.py`): every car built once to a cached .blend
+  outside the repo, appended into one scene by brand, `docs/progress/AG18/lineup.jpg`, about
+  1.5 minutes.
+- **What the designers found** (each car's README, "Kit wishes"; folded into scope 14.19's
+  improvements as item 14): glass that mirrors the top light when it leans or faces the sky
+  (several cars carry a low-IOR coated glass and unlink lights from glass), brand helpers
+  copied into three scripts each, no cabin light, emissive strengths and coat strength not
+  in the palette, no nearest-point projection, wheel builder without tread styles or a ring
+  wheel, panel edges that move under subdivision. Show colors cluster (three blues, three
+  purples, two olives) because cars were designed in parallel; color is not part of a brand.
 - **Improvements and the plan for them:** scope 14.19.
 
-The cars built so far are listed in [`docs/progress/AG18/README.md`](progress/AG18/README.md).
+The roster with sizes and sheets: [`docs/progress/AG18/README.md`](progress/AG18/README.md).
 
 ## Order
 

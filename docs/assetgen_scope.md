@@ -1286,9 +1286,10 @@ target is a current AAA open-world game's hero vehicles.
   and smooth bodies, enclosed and exposed wheels, bodies with gaps through them. Owner's
   concept images are inspiration only, kept out of git (`reference/car_concepts/`), never
   copied.
-- **Phase 1, designs** (now): every car of the roster to the standard of the first
-  (Halcyon Vanta-R): one 4K multi-view sheet each in `docs/progress/AG18/<car>/`, reviewed
-  with Swagnik. Not game-ready, and not meant to be yet.
+- **Phase 1, designs** (built 2026-11-10, waiting for Swagnik's review): every car of the
+  roster to the standard of the first (Halcyon Vanta-R): one 4K multi-view sheet each in
+  `docs/progress/AG18/<car>/`, and a line-up of all 21 (`docs/progress/AG18/lineup.jpg`).
+  Not game-ready, and not meant to be yet.
 - **Phase 2, improvements** (planned, the list and its order below).
 - **Phase 3, game-ready**: UVs, baked texture sets, LODs, collision, pivots.
 - **Phase 4, into the city**: AG8's `parked_vehicle` families draw the hero models by
@@ -1339,13 +1340,22 @@ target is a current AAA open-world game's hero vehicles.
     footprint (pickups, vans and limousines are longer than today's 4.6 m slot); AG8's
     families by district style and wealth; the exporter's part; stage 4's fleet.
 13. *Kit checks.* Wanted in the kit: tire to body and ground clearances, symmetry, no open
-    edge inside a panel, a triangle budget, a turntable.
+    edge inside a panel, nothing poking through the hull, a triangle budget, a turntable.
+14. *What the twenty design sessions asked of the kit* (step A): a coated glass and a light
+    hook, so leaning and sky-facing glass does not mirror the top light; a cabin light;
+    light strengths, coat strength, a matte finish and a dry weave in the palette; a module
+    per brand for the helpers now copied into three scripts each (`vehicles/brands/`); a
+    nearest-point projector, strips and flutes along a curve, bolt rows, a tube along a
+    path, a ring and a lathe about any axis; wheels with tread styles, a car's own rim and
+    a ring wheel; body pieces with holes, one-sided cutters, a blend between pieces, panel
+    edges given where they should end up; opening parts (a door, hatch or canopy as a group
+    with a pose per view); more than one small tile on a sheet; a table of show colors.
 
 **Plan** (each step a session or two, in this order, after Swagnik's review of phase 1):
 
 | Step | Work | Covers |
 |---|---|---|
-| A | Kit: clay and zebra renders, the checks, a line-up render of the roster | 3, 13 |
+| A | Kit: clay and zebra renders, the checks, the designers' wishes (the line-up render is done) | 3, 13, 14 |
 | B | What shows at street distance: lamps, cut lines, glass, on the kept cars | 1, 2, 6 (glass) |
 | C | Wheels, running gear, hover gear, undersides | 4, 5, 7 |
 | D | Cabins | 6 (cabin) |
