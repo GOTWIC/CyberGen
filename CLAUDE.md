@@ -2215,6 +2215,19 @@ AG16 (performance) is in place (scope 14.17, issue #96; `docs/unreal_export.md`,
   gain or worse.
 Results: `docs/progress/AG16/`.
 
+AG18 (hero vehicles, scope 14.19) is in progress, and is not a generator: vehicles designed
+one by one as Blender scripts in `vehicles/` (kit `carkit.py`, a script per car in `cars/`,
+brand book `BRANDS.md`: seven made-up makers whose language is geometry and texture, never
+color; design brief `BRIEF.md`; guide `README.md`), one multi-view sheet a car in
+`docs/progress/AG18/<car>/`, the roster in `docs/progress/AG18/README.md`.
+- Every Blender run for a vehicle goes through `vehicles/blender.sh`, which queues runs
+  across sessions on one lock.
+- The owner's concept images are in `reference/car_concepts/` (gitignored, inspiration
+  only, never copied); `.blend` and `.glb` files of vehicles are not committed.
+- No tests and no goldens: a car is checked by building it and looking at its sheet.
+- Phases after the designs (improvements, game-ready meshes, AG8's parked vehicles and
+  stage 4's fleet drawing on them) are listed in the scope with their plan.
+
 Progress output: `assetgen build`, `preview`, `materials preview|board`, `library`, `streets`,
 `water`, `props` and `ground` print a line per stage, a bar (n of N, time left) where the count is known and
 the time per stage on stderr (`assetgen/progress.py`, stage 1's `Progress` interface; one

@@ -708,6 +708,7 @@ docker image; Windows joins in AG9.
 | AG15 | Cyberpunk facades and night (14.16) | AG14, AG6; M20, M21 | AG12, AG13 |
 | AG16 | Performance (14.17) | AG15; the first run-through's fixes; AG17 | |
 | AG17 | Road surfaces by construction (14.18) | M22; AG14 | |
+| AG18 | Hero vehicles (14.19; hand-designed, not a generator) | nothing; AG8 and stage 4 use it later | everything |
 
 ### 14.1 AG0: Contract and spike
 
@@ -1237,6 +1238,92 @@ M22's larger parts are the map and the level separation. AG17 rewrites the junct
 makers and reuses most of the road maker. Roads come first so AG16 measures the final street
 pieces: Delta has 10,489 today, and clusters and bend faces change that count, which AG16 may
 merge further.
+
+### 14.19 AG18: Hero vehicles
+
+**In progress** (Swagnik, 2026-11-10). Unlike every other milestone this is not a generator:
+it is a library of vehicles designed one at a time, by Claude with Swagnik's art direction,
+each as a Blender script on a shared kit (`vehicles/`). AG8's parked cars are extruded
+profiles; a city at street level needs cars that hold up next to its buildings. The quality
+target is a current AAA open-world game's hero vehicles.
+
+- **Adds:** `vehicles/carkit.py` (bodies as creased subdivision cages over character lines
+  and stations, cut and split into panels with real gaps; wheels; lights; surface details,
+  lettering; a studio; a fast preview and a one-image multi-view sheet), `vehicles/cars/`
+  (one script per vehicle), `vehicles/BRANDS.md` (seven made-up makers, each a design
+  language in geometry and texture, never in color, with three models) and
+  `vehicles/BRIEF.md` (the brief of a design session). The roster mixes wheeled and hover
+  vehicles, two and four seats, coupes, sedans, utility vehicles, pickups and vans, sharp
+  and smooth bodies, enclosed and exposed wheels, bodies with gaps through them. Owner's
+  concept images are inspiration only, kept out of git (`reference/car_concepts/`), never
+  copied.
+- **Phase 1, designs** (now): every car of the roster to the standard of the first
+  (Halcyon Vanta-R): one 4K multi-view sheet each in `docs/progress/AG18/<car>/`, reviewed
+  with Swagnik. Not game-ready, and not meant to be yet.
+- **Phase 2, improvements** (planned, the list and its order below).
+- **Phase 3, game-ready**: UVs, baked texture sets, LODs, collision, pivots.
+- **Phase 4, into the city**: AG8's `parked_vehicle` families draw the hero models by
+  district style and in many colors; stage 4's fleet (lifegen) drives them.
+- **Unreal:** nothing in phases 1 and 2. From phase 3: static meshes with LOD chains (or
+  Nanite where it pays), a paint master whose color is Custom Primitive Data, glass and
+  emissive masters that follow `MPC_CityGen`'s Night, wheels and doors as components with
+  pivots; from phase 4 entries of layer 2 that replace AG8's parked vehicle variants.
+- **Blender:** all of phases 1 and 2.
+- **Determinism:** the scripts repeat on one machine, but nothing here is in the Mac = x86
+  contract until phase 3 bakes the vehicles into packs, which are then fixed inputs like
+  AG6's material library.
+- **Done when:** phase 1: the roster is built and Swagnik has picked what to keep, redo or
+  add. Later phases get their own "done when" as they are scheduled.
+- **Shows:** the sheets, and a line-up of the whole roster.
+
+**Improvements wanted** (from the first cars' close-ups; phase 2 unless marked):
+
+1. *Lights with depth.* Lamps are plain emissive strips. Wanted: a housing pocket, a lens,
+   reflector or projector modules, light guides, tail lamp lenses with inner structure.
+2. *Real cut lines.* Door handles, charge flaps and some shut lines are thin strips lying
+   on the surface. Wanted: grooves cut into the panels (insets in the cage with creases, or
+   groove cutters), even gaps of 3 to 4 mm everywhere.
+3. *Surfacing.* Soft creases wobble where the cage is coarse. Wanted: a zebra-stripe and a
+   clay render mode in the kit, more stations where highlights break, cleaner transitions
+   from sharp to soft along a line.
+4. *Wheels and running gear.* Wanted: spokes with real sections, vented and drilled discs,
+   calipers with detail, uprights, wishbones and dampers visible in the wells or in the
+   open, well liners, tread from a pattern, a flattened contact patch.
+5. *Hover gear.* Wanted: emitters with layered glow and a heat shimmer card, landing skids
+   that read as mechanisms, a hover and a parked pose.
+6. *Glass and cabin.* Wanted: glass with thickness and a black frit border, mirrors with
+   glass, wiper mechanisms; cabins to a level that survives a look through the window:
+   instrument cluster, wheel with spokes, seats with bolsters and seams, door cards, belts,
+   pedals, headliner, lit displays.
+7. *Underside.* A flat plate today. Wanted: floor with tunnels, strakes joined to it,
+   skid plates, exhaust or battery housings.
+8. *Night.* Wanted: headlamps as spot lights with a beam pattern, tail and marker lights,
+   cabin ambient light, hooks for stage 3.
+9. *Variety.* Wanted: three trims a design (base, sport, armored or utility), optional
+   parts (wings, racks, bars, roof gear), wear levels (new, used, beaten), any color.
+10. *Materials to textures* (phase 3). UVs per panel; paint flake, dust, grime, weave and
+    decals baked to texture sets; two to four material slots a car; color as a parameter.
+11. *Game-ready meshes* (phase 3). LOD0 near 150k triangles, then 60k, 20k, 5k and an
+    impostor; meshes such as honeycomb as alpha cards past LOD0; collision hulls; wheels,
+    doors, hood and wing as nodes with pivots.
+12. *Into the generators* (phase 4). Parking bays and lanes checked against each vehicle's
+    footprint (pickups, vans and limousines are longer than today's 4.6 m slot); AG8's
+    families by district style and wealth; the exporter's part; stage 4's fleet.
+13. *Kit checks.* Wanted in the kit: tire to body and ground clearances, symmetry, no open
+    edge inside a panel, a triangle budget, a turntable.
+
+**Plan** (each step a session or two, in this order, after Swagnik's review of phase 1):
+
+| Step | Work | Covers |
+|---|---|---|
+| A | Kit: clay and zebra renders, the checks, a line-up render of the roster | 3, 13 |
+| B | What shows at street distance: lamps, cut lines, glass, on the kept cars | 1, 2, 6 (glass) |
+| C | Wheels, running gear, hover gear, undersides | 4, 5, 7 |
+| D | Cabins | 6 (cabin) |
+| E | Night lights, trims, optional parts, wear | 8, 9 |
+| F | UVs and bakes, colors as parameters | 10 |
+| G | LODs, collision, pivots; export packs | 11 |
+| H | AG8 families, bay and lane sizes with stage 1, the exporter, an Unreal check | 12 |
 
 ## 15. Running it
 
