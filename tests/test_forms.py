@@ -54,6 +54,32 @@ def test_plates_follow_their_arcs_within_2_cm(plate):
     assert all(len(set(p2.ring())) == len(p2.ring()) for _ in (0,))
 
 
+def test_a_plate_ring_never_steps_back_across_itself():
+    """A circle plate turned 45 degrees (the small city's `water_required` layout, #140): its
+    quarter arcs' shared ends round to grid points a step apart, (-105.03, 103.48) then
+    (-105.02, 103.47), and the ring crossed itself (a crown's overlay failed); the step goes,
+    nothing else does, and a valid ring stays as it was."""
+    r = 21.80010206398126
+    plate = MS.Plate(MS.Frame(-120.44, 88.06, math.pi / 4.0), r, r, r)
+    ring = plate.ring()
+    poly = plate.polygon()
+    assert poly.is_valid and len(set(ring)) == len(ring)
+
+    def raw(pl):
+        pts, _ = pl._local()
+        out = []
+        for u, v in pts:
+            p = pl.fr.world(u, v)
+            if not out or p != out[-1]:
+                out.append(p)
+        return out[:-1] if out[0] == out[-1] else out
+    gone = [p for p in raw(plate) if p not in ring]
+    assert gone and len(gone) <= 4 and all(p in raw(plate) for p in ring)
+    assert _sag(poly, plate.arcs()) <= BC.ARC_TOL_M
+    ok = MS.Plate(MS.Frame(10.37, -4.21, 0.3), 30.0, 30.0, 30.0)
+    assert ok.ring() == raw(ok)
+
+
 def test_sector_and_circle_helpers():
     poly, arcs = MS.sector(0.0, -100.0, 80.0, 96.0, 1.2, 0.5)
     assert poly.is_valid and len(arcs) == 2 and _sag(poly, arcs) <= BC.ARC_TOL_M

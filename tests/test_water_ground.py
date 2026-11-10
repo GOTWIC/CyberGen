@@ -153,6 +153,27 @@ def test_cover_check_fails_on_overlaps_and_gaps():
     assert any("building" in f for f in _check(WC.check_cover, over))
 
 
+def test_cover_check_takes_junction_faces_for_pavement():
+    """#140: a junction's faces in M22's map are pavement, so land under them left bare is not
+    open land left bare. A cul-de-sac's ring of sidewalk round its bulb (a corner pad) lies
+    outside M16's right of way, which takes the junction's carriageway; the generator covers
+    it, or leaves it out where a hairline joins it to a curb strip (the small city's
+    `water_required` layout)."""
+    m = city().model
+    with G.canonical():
+        pads = WC._junction_faces(m)
+        tree = shapely.STRtree(pads)
+
+        def on_pads(g):
+            gp = G.from_model_poly(g.polygon)
+            near = [pads[int(k)] for k in tree.query(gp, predicate="intersects")]
+            return near and G.area(G.diff(gp, G.union_local(near))) < 0.5
+
+        g = next(g for g in m.ground_cover if g.area_m2 >= 40 and on_pads(g))
+    bare = m.model_copy(update={"ground_cover": [x for x in m.ground_cover if x.id != g.id]})
+    assert not _check(WC.check_cover, bare), g.id
+
+
 def test_the_stage_is_a_function_of_the_city():
     """Run again on the finished city, the stage gives the same rows (the build's own run
     saw the same city, its props and plants named later only)."""

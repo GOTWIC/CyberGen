@@ -268,6 +268,13 @@ class Renamer:
         old = e["id"]
         if coll in KEEP:
             return old
+        part = (e.get("attrs") or {}).get("part") if coll in ("rivers", "channels") else None
+        if part:
+            # #140: a further piece of a water body on the map: a named body's id and the
+            # piece (`rv.great_river.part2`), an unnamed one's own anchor
+            if e.get("name"):
+                return f"{'rv' if coll == 'rivers' else 'ch'}.{slug(e['name'])}.part{part}"
+            return self.derived(old.split(".")[0], True, e)
         if coll in NAMED and e.get("name"):
             return f"{NAMED[coll]}.{slug(e['name'])}"
         if coll == "channels" and e.get("name"):
