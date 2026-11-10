@@ -65,6 +65,37 @@ vehicles/blender.sh vehicles/lineup.py --test     # 1920 px, 24 samples, into th
 
 The spacing, the camera's height and the turn are the constants at the top of `lineup.py`.
 
+## Game packs
+
+`game.py` turns any car into a game-ready pack for an engine: a few named parts (body,
+glass, a node per wheel and brake about its axle), an atlas per material slot with baked
+textures (base color, normal, occlusion-roughness-metallic-coat, a paint mask, emissive),
+four LODs, convex collision hulls, the lights as data and a proof image. The paint's hue is
+not baked: an engine material recolors the car through its mask with any color. The
+format is the contract in `GAME.md`.
+
+```
+vehicles/blender.sh vehicles/game.py --car vanta_r                  # ~/.cache/cybergen/vehicles/game/vanta_r/
+vehicles/blender.sh vehicles/game.py --car vanta_r --docs           # also docs/progress/AG18/vanta_r/game.jpg
+vehicles/blender.sh vehicles/game.py --car vanta_r --test           # 1024 / 512 textures, about a minute
+```
+
+- **No hints from the car.** The script runs unchanged; wheels, glass, paint channels and
+  what to bake down are found by rules on the built objects (`GAME.md` lists them). Fix the
+  tool, not the car.
+- **Baked down.** Lettering, ribbons and other flat relief go onto the surface under them;
+  dense arrays (honeycombs) become cards; dense tires become lathes with the tread and
+  sidewall marks baked on; over budget, taller relief such as bolt rows, then a collapse of
+  the densest small parts. Faces nothing can see are removed.
+- **Proof.** `game.jpg`: the pack alone in the kit's studio next to the procedural original
+  from the hero view, a recolored copy, the textures and the four LODs. `--views a,b`
+  compares more of the car's views (`proof/original_<view>.jpg` and `baked_<view>.jpg`);
+  look at them at full size.
+- **Checks.** Budgets, UV overlap, texel density, files, wheel pivots, LOD bounds, hull
+  count (`game_report.json`); the run fails when one fails.
+- **Time.** About 4 to 6 minutes a car at full size (most of it the bakes and the proof);
+  packs are 18 to 31 MB and never go in git.
+
 ## Workflow
 
 1. **Stations and lines.** Draw the body as character lines (top centerline, hood crease,

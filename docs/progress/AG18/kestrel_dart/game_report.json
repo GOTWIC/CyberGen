@@ -1,0 +1,223 @@
+{
+ "car": "kestrel_dart",
+ "title": "Kestrel Aerodyne Dart",
+ "ok": true,
+ "triangles": {
+  "original": 72340,
+  "lods": [
+   51336,
+   30796,
+   16534,
+   4465
+  ],
+  "lod0_parts": {
+   "body": 49880,
+   "glass": 1456
+  }
+ },
+ "objects": {
+  "original": 92,
+  "parts": 2
+ },
+ "textures": {
+  "body": 4096
+ },
+ "pack_bytes": 17704683,
+ "seconds": 223.5,
+ "stage_seconds": {
+  "build": 0.1,
+  "render_original": 18.9,
+  "parts": 3.3,
+  "nodes": 0.0,
+  "uv": 1.8,
+  "bake": 115.2,
+  "lods_export": 0.9,
+  "textures": 5.744800090789795,
+  "proof": 77.31813025474548
+ },
+ "baked_down": {
+  "relief": {
+   "pieces": 9,
+   "triangles": 2594,
+   "names": [
+    "decals",
+    "led.marker",
+    "led.visor",
+    "lettering",
+    "nose.lamps",
+    "nose.slot",
+    "pod.stencils",
+    "sensors",
+    "visor.slits"
+   ]
+  }
+ },
+ "texel_px_per_m": {
+  "body": {
+   "exterior": {
+    "area_m2": 33.169,
+    "p5": 370.6,
+    "median": 391.9
+   },
+   "underside": {
+    "area_m2": 0.786,
+    "p5": 137.1,
+    "median": 377.8
+   },
+   "cabin": {
+    "area_m2": 9.476,
+    "p5": 152.7,
+    "median": 156.9
+   }
+  }
+ },
+ "lights": 51,
+ "collision_hulls": 9,
+ "source": {
+  "script": "vehicles/cars/kestrel_dart.py",
+  "script_sha256": "cadcff0182ea368d1f78b8f37cd5d315f990137e67a57c3ebea112040e28ad1f",
+  "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
+  "game_sha256": "67c3771ba2cb69ac1405d92e8369e067fba321081d4a4193f60050a8eab2adc6",
+  "original_triangles": 72340,
+  "original_objects": 92
+ },
+ "test": false,
+ "checks": [
+  {
+   "check": "files",
+   "ok": true,
+   "detail": {
+    "files": 10,
+    "missing": [],
+    "unreadable": []
+   }
+  },
+  {
+   "check": "budgets",
+   "ok": true,
+   "detail": [
+    {
+     "lod": 0,
+     "triangles": 51336,
+     "budget": 150000,
+     "ok": true
+    },
+    {
+     "lod": 1,
+     "triangles": 30796,
+     "budget": 60000,
+     "ok": true
+    },
+    {
+     "lod": 2,
+     "triangles": 16534,
+     "budget": 20000,
+     "ok": true
+    },
+    {
+     "lod": 3,
+     "triangles": 4465,
+     "budget": 5000,
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "uv_overlap",
+   "ok": true,
+   "detail": {
+    "limit": 0.005,
+    "slots": {
+     "body": {
+      "overlap": 0.00017,
+      "coverage": 0.3363,
+      "outside_unit": 0.0
+     }
+    }
+   }
+  },
+  {
+   "check": "texel_density",
+   "ok": true,
+   "detail": {
+    "body": {
+     "p5": 370.6,
+     "median": 391.9,
+     "floor": 300.0,
+     "ok": true
+    }
+   }
+  },
+  {
+   "check": "wheel_pivots",
+   "ok": true,
+   "detail": []
+  },
+  {
+   "check": "lod_bounds",
+   "ok": true,
+   "detail": [
+    {
+     "lod": 1,
+     "deviation_m": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tolerance_m": [
+      0.0699,
+      0.0299,
+      0.02
+     ],
+     "ok": true
+    },
+    {
+     "lod": 2,
+     "deviation_m": [
+      0.0,
+      0.0,
+      0.0001
+     ],
+     "tolerance_m": [
+      0.0699,
+      0.0299,
+      0.02
+     ],
+     "ok": true
+    },
+    {
+     "lod": 3,
+     "deviation_m": [
+      0.0025,
+      0.0006,
+      0.0069
+     ],
+     "tolerance_m": [
+      0.0699,
+      0.0299,
+      0.02
+     ],
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "collision",
+   "ok": true,
+   "detail": {
+    "hulls": 9,
+    "vertices": [
+     334,
+     234,
+     160,
+     210,
+     114,
+     364,
+     120,
+     330,
+     110
+    ]
+   }
+  }
+ ]
+}
