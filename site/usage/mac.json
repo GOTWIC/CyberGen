@@ -1,25 +1,25 @@
 {
  "device": "mac",
  "label": "Mac",
- "updated": "2026-11-10T00:30:45Z",
+ "updated": "2026-11-10T05:41:11Z",
  "sessions": 34,
  "worktree_sessions": 32,
  "subagents": 1,
  "totals": {
-  "total": 7467602676,
-  "input": 42582,
-  "output": 17385087,
+  "total": 7479111547,
+  "input": 42658,
+  "output": 17400926,
   "cache_write_5m": 155522,
-  "cache_write_1h": 61993883,
-  "cache_read": 7388025602
+  "cache_write_1h": 62596047,
+  "cache_read": 7398916394
  },
  "models": {
   "claude-opus-5-5": {
-   "input": 42450,
-   "output": 17337435,
+   "input": 42526,
+   "output": 17353274,
    "cache_write_5m": 155522,
-   "cache_write_1h": 61823836,
-   "cache_read": 7377827214
+   "cache_write_1h": 62426000,
+   "cache_read": 7388718006
   },
   "claude-sonnet-5-5": {
    "input": 132,
@@ -91,27 +91,32 @@
    "sessions": 3
   },
   "2026-11-09": {
-   "total": 692541915,
-   "output": 1397559,
+   "total": 696477217,
+   "output": 1403737,
    "sessions": 4
+  },
+  "2026-11-10": {
+   "total": 7573569,
+   "output": 9661,
+   "sessions": 1
   }
  },
  "stats": {
   "totals": {
-   "total": 18105037824,
-   "input": 100768,
-   "output": 49730594,
+   "total": 18124299403,
+   "input": 100890,
+   "output": 49758782,
    "cache_write_5m": 321890,
-   "cache_write_1h": 178398158,
-   "cache_read": 17876486414
+   "cache_write_1h": 179023022,
+   "cache_read": 17895094819
   },
   "models": {
    "claude-opus-5-5": {
-    "input": 100462,
-    "output": 49609429,
+    "input": 100584,
+    "output": 49637617,
     "cache_write_5m": 321890,
-    "cache_write_1h": 177946275,
-    "cache_read": 17852696890
+    "cache_write_1h": 178571139,
+    "cache_read": 17871305295
    },
    "claude-sonnet-5-5": {
     "input": 306,
@@ -183,9 +188,14 @@
     "sessions": 3
    },
    "2026-11-09": {
-    "total": 1470381813,
-    "output": 3490618,
+    "total": 1476934755,
+    "output": 3501425,
     "sessions": 4
+   },
+   "2026-11-10": {
+    "total": 12708637,
+    "output": 17381,
+    "sessions": 1
    }
   },
   "complete": true,
