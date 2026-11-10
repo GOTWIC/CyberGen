@@ -19,6 +19,7 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "HAL/IConsoleManager.h"
 #include "InputCoreTypes.h"
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Materials/MaterialParameterCollection.h"
@@ -37,6 +38,12 @@ namespace
 	const FName SunKey(TEXT("cg.key=lighting.sun"));
 	const FName UnderwaterTag(TEXT("cg.type=underwater"));
 	const FName SkyKey(TEXT("cg.key=lighting.sky"));
+
+	// AT0: atmosgen's runtime (CityGenAtmos) sets this to 0 while its plan's lights are on;
+	// the lamps' spot lights, light pools and sign washes then go dark (decision 12.2: the
+	// lamps move to atmosgen)
+	TAutoConsoleVariable<int32> CVarPlayLamps(TEXT("CityGen.PlayLamps"), 1,
+		TEXT("The play features' lamps, light pools and sign washes by night (0: off, atmosgen's lights instead)"));
 }
 
 ACityGenPlay::ACityGenPlay()
@@ -559,6 +566,24 @@ void ACityGenPlay::SetNight(bool bOn)
 
 void ACityGenPlay::UpdateLamps()
 {
+	if (CVarPlayLamps.GetValueOnGameThread() == 0)
+	{
+		for (USpotLightComponent* L : Lamps)
+		{
+			L->SetVisibility(false);
+		}
+		for (UDecalComponent* D : Pools)
+		{
+			D->SetVisibility(false);
+		}
+		for (UPointLightComponent* W : Washes)
+		{
+			W->SetVisibility(false);
+		}
+		LampsOn = 0;
+		PoolsOn = 0;
+		return;
+	}
 	// the lamps nearest the view get the lights; the farthest of them fade, so a lamp
 	// coming into the set does not pop
 	const FVector View = ViewLocation();

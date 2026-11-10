@@ -1,0 +1,472 @@
+{
+ "$defs": {
+  "Emitter": {
+   "additionalProperties": false,
+   "description": "AT4: a steam or smoke emitter on its manhole, drain, vent, stall or chimney.",
+   "properties": {
+    "hash": {
+     "title": "Hash",
+     "type": "string"
+    },
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "kind": {
+     "enum": [
+      "steam",
+      "smoke",
+      "exhaust",
+      "cooking"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "owner_id": {
+     "title": "Owner Id",
+     "type": "string"
+    },
+    "pos": {
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 3,
+     "minItems": 3,
+     "title": "Pos",
+     "type": "array"
+    },
+    "rate": {
+     "title": "Rate",
+     "type": "number"
+    },
+    "schedule": {
+     "title": "Schedule",
+     "type": "string"
+    },
+    "tile": {
+     "title": "Tile",
+     "type": "string"
+    }
+   },
+   "required": [
+    "id",
+    "owner_id",
+    "kind",
+    "tile",
+    "pos",
+    "rate",
+    "schedule",
+    "hash"
+   ],
+   "title": "Emitter",
+   "type": "object"
+  },
+  "FogVolume": {
+   "additionalProperties": false,
+   "description": "AT4: a fog or smog volume (mist over water, smog over industry, haze under decks).",
+   "properties": {
+    "albedo": {
+     "description": "Linear RGB, 0 to 1.",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 3,
+     "minItems": 3,
+     "title": "Albedo",
+     "type": "array"
+    },
+    "center": {
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 3,
+     "minItems": 3,
+     "title": "Center",
+     "type": "array"
+    },
+    "density": {
+     "title": "Density",
+     "type": "number"
+    },
+    "extent": {
+     "description": "Half sizes (m) of its box, along its yaw.",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 3,
+     "minItems": 3,
+     "title": "Extent",
+     "type": "array"
+    },
+    "hash": {
+     "title": "Hash",
+     "type": "string"
+    },
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "kind": {
+     "enum": [
+      "mist",
+      "smog",
+      "haze",
+      "tunnel_haze",
+      "steam_bank"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "owner_id": {
+     "title": "Owner Id",
+     "type": "string"
+    },
+    "schedule": {
+     "title": "Schedule",
+     "type": "string"
+    },
+    "tile": {
+     "title": "Tile",
+     "type": "string"
+    },
+    "yaw_deg": {
+     "default": 0.0,
+     "title": "Yaw Deg",
+     "type": "number"
+    }
+   },
+   "required": [
+    "id",
+    "owner_id",
+    "kind",
+    "tile",
+    "center",
+    "extent",
+    "density",
+    "albedo",
+    "schedule",
+    "hash"
+   ],
+   "title": "FogVolume",
+   "type": "object"
+  },
+  "Mask": {
+   "additionalProperties": false,
+   "description": "AT5: a tile's rain shadow, wetness and puddle mask (0.5 m texels).",
+   "properties": {
+    "file": {
+     "title": "File",
+     "type": "string"
+    },
+    "px": {
+     "title": "Px",
+     "type": "integer"
+    },
+    "sha256": {
+     "title": "Sha256",
+     "type": "string"
+    },
+    "tile": {
+     "title": "Tile",
+     "type": "string"
+    }
+   },
+   "required": [
+    "tile",
+    "file",
+    "px",
+    "sha256"
+   ],
+   "title": "Mask",
+   "type": "object"
+  },
+  "Sky": {
+   "additionalProperties": false,
+   "properties": {
+    "cloud_deck_m": {
+     "description": "The cloud deck's height (0: none).",
+     "title": "Cloud Deck M",
+     "type": "number"
+    },
+    "cloud_glow": {
+     "description": "How much of the city's upward light the deck shows.",
+     "title": "Cloud Glow",
+     "type": "number"
+    },
+    "moon": {
+     "description": "The moon's share of the sun's intensity.",
+     "title": "Moon",
+     "type": "number"
+    },
+    "stars": {
+     "title": "Stars",
+     "type": "number"
+    },
+    "upward_lm": {
+     "default": 0.0,
+     "description": "The plan's upward luminous flux (lm), for the deck's glow (AT3).",
+     "title": "Upward Lm",
+     "type": "number"
+    }
+   },
+   "required": [
+    "moon",
+    "stars",
+    "cloud_deck_m",
+    "cloud_glow"
+   ],
+   "title": "Sky",
+   "type": "object"
+  },
+  "Tiers": {
+   "additionalProperties": false,
+   "properties": {
+    "far_m": {
+     "title": "Far M",
+     "type": "number"
+    },
+    "mid_m": {
+     "title": "Mid M",
+     "type": "number"
+    },
+    "mid_max": {
+     "title": "Mid Max",
+     "type": "integer"
+    },
+    "near_m": {
+     "title": "Near M",
+     "type": "number"
+    },
+    "near_max": {
+     "title": "Near Max",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "near_m",
+    "near_max",
+    "mid_m",
+    "mid_max",
+    "far_m"
+   ],
+   "title": "Tiers",
+   "type": "object"
+  },
+  "TileIndex": {
+   "additionalProperties": false,
+   "properties": {
+    "count": {
+     "title": "Count",
+     "type": "integer"
+    },
+    "file": {
+     "description": "`lights/<tile>.json`, relative to the plan.",
+     "title": "File",
+     "type": "string"
+    },
+    "kinds": {
+     "additionalProperties": {
+      "type": "integer"
+     },
+     "title": "Kinds",
+     "type": "object"
+    },
+    "sha256": {
+     "description": "sha256 of the tile file's bytes.",
+     "title": "Sha256",
+     "type": "string"
+    },
+    "tile": {
+     "title": "Tile",
+     "type": "string"
+    }
+   },
+   "required": [
+    "tile",
+    "file",
+    "count",
+    "kinds",
+    "sha256"
+   ],
+   "title": "TileIndex",
+   "type": "object"
+  }
+ },
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": false,
+ "properties": {
+  "$schema": {
+   "anyOf": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "title": "$Schema"
+  },
+  "budgets": {
+   "additionalProperties": true,
+   "title": "Budgets",
+   "type": "object"
+  },
+  "city": {
+   "title": "City",
+   "type": "string"
+  },
+  "code": {
+   "description": "atmosgen's version and code hash.",
+   "title": "Code",
+   "type": "string"
+  },
+  "counts": {
+   "additionalProperties": {
+    "type": "integer"
+   },
+   "title": "Counts",
+   "type": "object"
+  },
+  "districts": {
+   "additionalProperties": {
+    "additionalProperties": true,
+    "type": "object"
+   },
+   "description": "Every district's resolved mood by id.",
+   "title": "Districts",
+   "type": "object"
+  },
+  "emitters": {
+   "items": {
+    "$ref": "#/$defs/Emitter"
+   },
+   "title": "Emitters",
+   "type": "array"
+  },
+  "hour": {
+   "title": "Hour",
+   "type": "number"
+  },
+  "look": {
+   "additionalProperties": true,
+   "title": "Look",
+   "type": "object"
+  },
+  "masks": {
+   "items": {
+    "$ref": "#/$defs/Mask"
+   },
+   "title": "Masks",
+   "type": "array"
+  },
+  "model_sha256": {
+   "title": "Model Sha256",
+   "type": "string"
+  },
+  "night_ev100": {
+   "description": "The exposure the lights are set for; a scene shown at another scales them by 2^(EV_scene - night_ev100).",
+   "title": "Night Ev100",
+   "type": "number"
+  },
+  "preset": {
+   "enum": [
+    "neon_rain",
+    "clear_night",
+    "smog_dusk",
+    "overcast_day"
+   ],
+   "title": "Preset",
+   "type": "string"
+  },
+  "schedules": {
+   "additionalProperties": {
+    "description": "On share by hour, 0 to 23.",
+    "items": {
+     "type": "number"
+    },
+    "maxItems": 24,
+    "minItems": 24,
+    "type": "array"
+   },
+   "title": "Schedules",
+   "type": "object"
+  },
+  "sky": {
+   "$ref": "#/$defs/Sky"
+  },
+  "sources": {
+   "additionalProperties": {
+    "type": "integer"
+   },
+   "description": "Lights by source: derived or assetgen (the asks met).",
+   "title": "Sources",
+   "type": "object"
+  },
+  "spec_sha256": {
+   "title": "Spec Sha256",
+   "type": "string"
+  },
+  "tiers": {
+   "$ref": "#/$defs/Tiers"
+  },
+  "tiles": {
+   "items": {
+    "$ref": "#/$defs/TileIndex"
+   },
+   "title": "Tiles",
+   "type": "array"
+  },
+  "version": {
+   "const": 1,
+   "default": 1,
+   "title": "Version",
+   "type": "integer"
+  },
+  "volumes": {
+   "items": {
+    "$ref": "#/$defs/FogVolume"
+   },
+   "title": "Volumes",
+   "type": "array"
+  },
+  "weather": {
+   "enum": [
+    "clear",
+    "drizzle",
+    "rain",
+    "fog",
+    "smog"
+   ],
+   "title": "Weather",
+   "type": "string"
+  },
+  "weather_state": {
+   "additionalProperties": true,
+   "title": "Weather State",
+   "type": "object"
+  }
+ },
+ "required": [
+  "city",
+  "model_sha256",
+  "spec_sha256",
+  "code",
+  "preset",
+  "hour",
+  "weather",
+  "night_ev100",
+  "look",
+  "weather_state",
+  "sky",
+  "schedules",
+  "districts",
+  "tiers",
+  "budgets",
+  "tiles",
+  "counts",
+  "sources"
+ ],
+ "title": "atmosgen atmos plan",
+ "type": "object"
+}

@@ -1,0 +1,296 @@
+{
+ "$defs": {
+  "Light": {
+   "additionalProperties": false,
+   "description": "One light that casts light (scope 6.1).",
+   "properties": {
+    "aim": {
+     "description": "[yaw, pitch] degrees: yaw counterclockwise from east, pitch from the horizontal (-90 straight down).",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 2,
+     "minItems": 2,
+     "title": "Aim",
+     "type": "array"
+    },
+    "barn_deg": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A rect light's barn door angle.",
+     "title": "Barn Deg"
+    },
+    "cd": {
+     "description": "Intensity (candela): a spot's or point's peak, a rect's luminance times its area.",
+     "title": "Cd",
+     "type": "number"
+    },
+    "cls": {
+     "description": "Its photometric class (`presets.PHOTOMETRY`).",
+     "enum": [
+      "cobra_head",
+      "post_top",
+      "wall_pack",
+      "high_mast",
+      "soffit",
+      "sign_face",
+      "neon_band",
+      "holo_face",
+      "shop_sign",
+      "shop_spill"
+     ],
+     "title": "Cls",
+     "type": "string"
+    },
+    "color": {
+     "description": "Linear RGB, 0 to 1.",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 3,
+     "minItems": 3,
+     "title": "Color",
+     "type": "array"
+    },
+    "cone": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "number"
+       },
+       "maxItems": 2,
+       "minItems": 2,
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A spot's [inner, outer] half angles (deg).",
+     "title": "Cone"
+    },
+    "district_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "District Id"
+    },
+    "flicker": {
+     "default": 0.0,
+     "description": "0 steady; else how deep it flickers.",
+     "maximum": 1.0,
+     "minimum": 0.0,
+     "title": "Flicker",
+     "type": "number"
+    },
+    "hash": {
+     "title": "Hash",
+     "type": "string"
+    },
+    "id": {
+     "description": "`<owner id>.light` (a fixture's k-th light: `.light<k>`).",
+     "title": "Id",
+     "type": "string"
+    },
+    "kind": {
+     "enum": [
+      "street_light",
+      "wall_light",
+      "sign",
+      "shop_sign",
+      "spill",
+      "soffit",
+      "flood",
+      "aviation",
+      "searchlight",
+      "tunnel",
+      "station",
+      "high_mast"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "on": {
+     "default": true,
+     "description": "False: broken (kept in the plan, never lit).",
+     "title": "On",
+     "type": "boolean"
+    },
+    "owner_id": {
+     "description": "What it hangs on: an M6 prop, an M20 sign slot, an M3 building's unit, an M14 deck, ...",
+     "title": "Owner Id",
+     "type": "string"
+    },
+    "pos": {
+     "description": "Where the light is (m, absolute z): outside its fixture's mesh (a lamp's light hangs `drop_m` under its head, a face's `out_m` in front of it).",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 3,
+     "minItems": 3,
+     "title": "Pos",
+     "type": "array"
+    },
+    "reach_m": {
+     "description": "Its attenuation radius (m).",
+     "title": "Reach M",
+     "type": "number"
+    },
+    "schedule": {
+     "description": "A name in the plan's `schedules`.",
+     "title": "Schedule",
+     "type": "string"
+    },
+    "shadow": {
+     "default": false,
+     "description": "May cast shadows in the near tier.",
+     "title": "Shadow",
+     "type": "boolean"
+    },
+    "shape": {
+     "enum": [
+      "spot",
+      "point",
+      "rect"
+     ],
+     "title": "Shape",
+     "type": "string"
+    },
+    "size": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "number"
+       },
+       "maxItems": 2,
+       "minItems": 2,
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A rect light's [width, height] (m).",
+     "title": "Size"
+    },
+    "source": {
+     "default": "derived",
+     "description": "Where its fixture's light came from: assetgen's emitter record (the asks, section 4.1) or derived from citygen.",
+     "enum": [
+      "derived",
+      "assetgen"
+     ],
+     "title": "Source",
+     "type": "string"
+    },
+    "source_m": {
+     "default": 0.0,
+     "description": "A spot or point light's source radius (m).",
+     "title": "Source M",
+     "type": "number"
+    },
+    "temp_k": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Its color temperature, when white.",
+     "title": "Temp K"
+    },
+    "tier": {
+     "default": "mid",
+     "description": "The farthest tier it is live in: `near` lights only near the view (small, many), `mid` out to the mid radius.",
+     "enum": [
+      "near",
+      "mid"
+     ],
+     "title": "Tier",
+     "type": "string"
+    },
+    "tile": {
+     "title": "Tile",
+     "type": "string"
+    }
+   },
+   "required": [
+    "id",
+    "owner_id",
+    "kind",
+    "cls",
+    "shape",
+    "tile",
+    "pos",
+    "aim",
+    "cd",
+    "color",
+    "reach_m",
+    "schedule",
+    "hash"
+   ],
+   "title": "Light",
+   "type": "object"
+  }
+ },
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": false,
+ "properties": {
+  "bounds": {
+   "items": {
+    "type": "number"
+   },
+   "maxItems": 4,
+   "minItems": 4,
+   "title": "Bounds",
+   "type": "array"
+  },
+  "city": {
+   "title": "City",
+   "type": "string"
+  },
+  "lights": {
+   "items": {
+    "$ref": "#/$defs/Light"
+   },
+   "title": "Lights",
+   "type": "array"
+  },
+  "tile": {
+   "title": "Tile",
+   "type": "string"
+  },
+  "version": {
+   "const": 1,
+   "default": 1,
+   "title": "Version",
+   "type": "integer"
+  }
+ },
+ "required": [
+  "city",
+  "tile",
+  "bounds",
+  "lights"
+ ],
+ "title": "atmosgen tile lights",
+ "type": "object"
+}

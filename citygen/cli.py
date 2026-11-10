@@ -335,14 +335,16 @@ def cmd_unreal(args: argparse.Namespace) -> int:
         if args.bench or args.bench_only:
             from . import bench as B
             want = [n.strip() for n in args.bench_passes.split(",") if n.strip()]
-            passes = [p for p in B.PASSES if p[0] in want]
+            allp = B.PASSES + (B.ATMOS_PASSES if args.bench_atmos else ())
+            # (in the order asked: AT0's spike compares passes side by side)
+            passes = [p for n in want for p in allp if p[0] == n]
             if not passes:
-                print(f"error: --bench-passes: none of {', '.join(p[0] for p in B.PASSES)}",
+                print(f"error: --bench-passes: none of {', '.join(p[0] for p in allp)}",
                       file=sys.stderr)
                 return EXIT_USAGE
             br = B.bench(build, args.uproject, engine=args.engine, runs=args.bench_runs,
                          passes=passes, label=args.bench_label, out=args.bench_out,
-                         timeout=args.timeout)
+                         timeout=args.timeout, atmos=args.bench_atmos, rt=args.bench_rt)
             print(B.table(br))
             print(f"wrote {br['out']}")
     except (RuntimeError, FileNotFoundError, subprocess.TimeoutExpired) as e:
@@ -691,6 +693,13 @@ def build_parser() -> argparse.ArgumentParser:
     ue.add_argument("--bench-passes", default="day_native,day_tsr67,night_native,night_tsr67",
                     help="the passes, by name (default all four)")
     ue.add_argument("--bench-out", metavar="DIR", help="the results' folder (default as above)")
+    ue.add_argument("--bench-atmos", metavar="PLAN_DIR",
+                    help="AT0: atmosgen's runtime in the benchmark's game with this atmos plan "
+                         "(BUILD/atmos), its assets made first; adds the spike's passes "
+                         "(night_plan, night_plan_fog, night_plan_all, ...: citygen.bench."
+                         "ATMOS_PASSES) to --bench-passes' choices")
+    ue.add_argument("--bench-rt", action="store_true",
+                    help="AT0: hardware ray tracing on in the benchmark's game (MegaLights)")
     _progress_args(ue)
     ue.set_defaults(func=cmd_unreal)
 

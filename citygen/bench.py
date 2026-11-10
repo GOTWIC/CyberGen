@@ -48,6 +48,42 @@ RESOLUTION = (2560, 1440)    # 1440p (decision 13.4's target: the Windows PC)
 TSR_PERCENT = 67.0
 PASSES = (("day_native", False, 100.0), ("day_tsr67", False, TSR_PERCENT),
           ("night_native", True, 100.0), ("night_tsr67", True, TSR_PERCENT))
+# AT0 (atmosgen's spike, docs/progress/AT0): passes that switch atmosgen's runtime
+# (CityGenAtmos) by console commands at their start, with `--bench-atmos PLAN_DIR`: the plan's
+# lights by tile with a live set by tier (the play features' lamps dark), volumetric fog, rain
+# and wet streets, MegaLights (with `--bench-rt`). A pass without commands of its own switches
+# all of it off, so passes do not leak into each other.
+ATMOS_OFF = ("CityGenAtmos.Lights 0", "CityGenAtmos.Fog 0", "CityGenAtmos.Rain 0",
+             "CityGenAtmos.Wet 0", "CityGenAtmos.MegaLights 0")
+
+
+def _atmos(lights: bool = True, fog: bool = False, rain: bool = False, wet: bool = False,
+           mega: bool = False, live: int = 512, range_m: float = 300.0,
+           shadowed: int = 16) -> tuple[str, ...]:
+    return (f"CityGenAtmos.Tiers {live} {range_m:g} {shadowed}",
+            f"CityGenAtmos.Lights {int(lights)}", f"CityGenAtmos.Fog {int(fog)}",
+            f"CityGenAtmos.Rain {int(rain)}", f"CityGenAtmos.Wet {int(wet)}",
+            f"CityGenAtmos.MegaLights {int(mega)}", "CityGenAtmos.Hour 23")
+
+
+ATMOS_PASSES = (
+    ("night_plan", True, 100.0, _atmos()),
+    ("night_plan_fog", True, 100.0, _atmos(fog=True)),
+    ("night_plan_all", True, 100.0, _atmos(fog=True, rain=True, wet=True)),
+    ("night_plan_all_tsr67", True, TSR_PERCENT, _atmos(fog=True, rain=True, wet=True)),
+    ("night_plan_1024", True, 100.0, _atmos(fog=True, rain=True, wet=True, live=1024,
+                                            range_m=400.0)),
+    ("night_plan_256", True, 100.0, _atmos(fog=True, rain=True, wet=True, live=256,
+                                           range_m=250.0, shadowed=8)),
+    ("night_play_air", True, 100.0, _atmos(lights=False, fog=True, rain=True, wet=True)),
+    ("night_plan_mega", True, 100.0, _atmos(fog=True, rain=True, wet=True, mega=True)),
+    ("night_plan_mega_2048", True, 100.0, _atmos(fog=True, rain=True, wet=True, mega=True,
+                                                 live=2048, range_m=500.0, shadowed=0)),
+)
+# what a game with hardware ray tracing needs at startup (MegaLights traces its shadows; UE
+# 5.8 marks MegaLights experimental), in the game's -ini override of the project's settings
+RT_INI = ("[/Script/Engine.RendererSettings]:r.RayTracing=True,"
+          "[/Script/Engine.RendererSettings]:r.SkinCache.CompileShaders=True")
 HITCH_MS = 50.0
 BIG_HITCH_MS = 100.0
 TARGET_MS = 16.7             # 60 fps at the 95th percentile (Swagnik, 2026-11-05)
@@ -255,13 +291,27 @@ def job(route_: dict, out_dir: Path, passes=PASSES, warm: bool = True,
     across the city by day and by night, which meets most of the city's materials and
     lights, so the first measured pass does not pay for their first use alone; recorded and
     left out), the console commands."""
-    ps = [{"name": n, "night": night, "screen_percentage": sp} for n, night, sp in passes]
+    atmos = any(len(p) > 3 for p in passes)
+    ps = []
+    for p in passes:
+        n, night, sp = p[:3]
+        e = {"name": n, "night": night, "screen_percentage": sp}
+        if atmos:
+            # (AT0: a pass of atmosgen's spike runs its commands; the rest switch it off)
+            e["commands"] = list(p[3]) if len(p) > 3 else list(ATMOS_OFF)
+        ps.append(e)
     fly = [i for i, s in enumerate(route_["segments"]) if s["group"] == "fly"]
     if warm:
-        nights = sorted({night for _, night, _ in passes})
+        nights = sorted({p[1] for p in passes})
         ps[:0] = [{"name": f"warm_{'night' if n else 'day'}", "night": n,
                    "screen_percentage": 100.0, "warm": True, "segments": fly}
                   for n in nights]
+        if atmos:
+            # (the night's warm-up with all of atmosgen's spike on: its materials' and
+            # lights' shaders compiled before a measured pass meets them)
+            for w in ps[:len(nights)]:
+                w["commands"] = (list(_atmos(fog=True, rain=True, wet=True)) if w["night"]
+                                 else list(ATMOS_OFF))
     return {"out_dir": str(out_dir).replace("\\", "/"), "csv_name": csv_name,
             # (windowed fullscreen at the resolution: a window of that size with its
             # borders would not fit a screen of that size)
@@ -298,7 +348,10 @@ def busy() -> list[str]:
         low = (name + " " + cmd).lower()
         if int(pid) == os.getpid():
             continue
+        # (AT0: another benchmark's game too, a packaged one among them: its executable is
+        # the project's own, so only its -CityGenBench= names it)
         if ("unrealeditor" in name.lower() or "blender" in name.lower() or
+                "-citygenbench=" in low or "automationtool" in low or
                 ("python" in name.lower() and re.search(r"citygen (build|sweep)|assetgen|pytest",
                                                          low))):
             hits.append(f"{name} {pid}")
@@ -372,11 +425,18 @@ def others_summary(samples: list[dict]) -> dict | None:
 
 def run_game(root: Path, uproject: Path, level: str, job_path: Path, log: Path,
              resolution=RESOLUTION, timeout: float = 3600.0,
-             samples: list | None = None) -> int:
+             samples: list | None = None, atmos: Path | None = None,
+             rt: bool = False) -> int:
     """The standalone game on `level` with the bench's job; its exit code. With `samples`,
-    the CPU other processes take is appended to it every SAMPLE_S seconds while it plays."""
+    the CPU other processes take is appended to it every SAMPLE_S seconds while it plays.
+    AT0: `atmos`, an atmos plan's folder the game's CityGenAtmos reads
+    (`-CityGenAtmosPlan`); `rt`, hardware ray tracing on for this game alone (MegaLights)."""
     from .unreal import editor_binary
     exe = editor_binary(root, gui=True)
+    ini = ("[/Script/Engine.UserInterfaceSettings]:bAllowHighDPIInGameMode=True,"
+           "[/Script/Engine.UserInterfaceSettings]:bAllowHighDpiWhenUnattended=True")
+    if rt:
+        ini += "," + RT_INI
     cmd = [str(exe), str(uproject), level, "-game", "-windowed",
            f"-ResX={resolution[0]}", f"-ResY={resolution[1]}", "-WinX=0", "-WinY=0",
            f"-CityGenBench={job_path.as_posix()}", "-csvGpuStats", "-NoSound", "-nosplash",
@@ -384,9 +444,9 @@ def run_game(root: Path, uproject: Path, level: str, job_path: Path, log: Path,
            # (a DPI-unaware process on a 1440p screen at 125% gets a 2048 x 1152 window: the
            # engine leaves a game DPI-unaware, BaseEngine.ini's bAllowHighDPIInGameMode, and
            # an unattended one too, bAllowHighDpiWhenUnattended)
-           "-ini:Engine:[/Script/Engine.UserInterfaceSettings]:bAllowHighDPIInGameMode=True,"
-           "[/Script/Engine.UserInterfaceSettings]:bAllowHighDpiWhenUnattended=True",
-           "-NoScreenMessages"]
+           f"-ini:Engine:{ini}", "-NoScreenMessages"]
+    if atmos is not None:
+        cmd.append(f"-CityGenAtmosPlan={Path(atmos).resolve().as_posix()}")
     with open(log, "wb") as f:
         proc = subprocess.Popen(cmd, stdout=f, stderr=subprocess.STDOUT)
         t0 = time.time()
@@ -410,10 +470,12 @@ def run_game(root: Path, uproject: Path, level: str, job_path: Path, log: Path,
 def bench(build_dir: str | Path, uproject: str | Path, engine: str | None = None,
           runs: int = 3, passes=PASSES, label: str = "bench", out: str | Path | None = None,
           resolution=RESOLUTION, wait_idle: bool = True, timeout: float = 3600.0,
-          say=print) -> dict:
+          say=print, atmos: str | Path | None = None, rt: bool = False) -> dict:
     """`citygen unreal --bench`: `runs` game processes over the route, each run's raw frames
     kept in BUILD/unreal/bench/<label>/run<k>, the results (`combine`) written to `out`
-    (default docs/progress/AG16/bench/<city>/<label>)."""
+    (default docs/progress/AG16/bench/<city>/<label>). AT0: `atmos` an atmos plan's folder
+    (atmosgen's runtime in the game, its assets made first; `ATMOS_PASSES`), `rt` hardware
+    ray tracing on in the game."""
     from .unreal import find_engine
     build = Path(build_dir).resolve()
     up = Path(uproject).resolve()
@@ -422,6 +484,7 @@ def bench(build_dir: str | Path, uproject: str | Path, engine: str | None = None
         raise RuntimeError("no Unreal Engine found (pass --engine or set CITYGEN_UE_ROOT)")
     man = json.loads((build / "unreal" / "manifest.json").read_text(encoding="utf-8"))
     level = f"{man['content_root']}/Maps/{man['folder']}"
+    use_rt = rt
     rt = route(build, man)
     raw = build / "unreal" / "bench" / label
     raw.mkdir(parents=True, exist_ok=True)
@@ -432,6 +495,13 @@ def bench(build_dir: str | Path, uproject: str | Path, engine: str | None = None
     if not pl.get("ok"):
         raise RuntimeError(f"the play plugin (the benchmark's driver) did not build: "
                            f"{pl.get('error')}")
+    if atmos is not None:
+        if not (Path(atmos) / "atmos_plan.json").is_file():
+            raise RuntimeError(f"{atmos}: no atmos_plan.json (run atmosgen plan)")
+        from .unreal_atmos import make_assets
+        ma = make_assets(root, up, raw / "atmos_assets_log.txt")
+        if not ma.get("ok"):
+            raise RuntimeError(f"atmosgen's assets: {ma.get('error')}")
     (raw / "route.json").write_text(json.dumps(rt, indent=1) + "\n", encoding="utf-8",
                                     newline="\n")
     results = []
@@ -458,7 +528,7 @@ def bench(build_dir: str | Path, uproject: str | Path, engine: str | None = None
         t = time.time()
         samples: list[dict] = []
         code = run_game(root, up, level, jp, rd / "game_log.txt", resolution, timeout,
-                        samples=samples)
+                        samples=samples, atmos=Path(atmos) if atmos else None, rt=use_rt)
         (rd / "others.json").write_text(json.dumps(samples, indent=0) + "\n",
                                         encoding="utf-8", newline="\n")
         if not (rd / "frames.csv").is_file():

@@ -194,3 +194,27 @@ def test_side_by_side(tmp_path):
     assert im.size == (328, 90 + 28)
     # before on the left, after on the right
     assert im.getpixel((40, 70))[0] > 150 and im.getpixel((200, 70))[2] > 150
+
+
+def test_job_with_atmosgens_passes(tmp_path):
+    """AT0: a pass of atmosgen's spike carries its console commands; with one in the job every
+    other pass switches atmosgen off and the night's warm-up has all of it on."""
+    _build(tmp_path)
+    names = {p[0] for p in B.ATMOS_PASSES}
+    assert len(names) == len(B.ATMOS_PASSES) and not names & {p[0] for p in B.PASSES}
+    want = [p for p in B.PASSES if p[0] == "night_native"] + \
+        [p for p in B.ATMOS_PASSES if p[0] == "night_plan_all"]
+    jb = B.job(B.route(tmp_path), tmp_path / "run1", want)
+    assert [p["name"] for p in jb["passes"]] == ["warm_night", "night_native", "night_plan_all"]
+    warm, native, plan = jb["passes"]
+    assert native["commands"] == list(B.ATMOS_OFF)
+    assert "CityGenAtmos.Lights 1" in plan["commands"] and "CityGenAtmos.Rain 1" in plan["commands"]
+    assert "CityGenAtmos.Wet 1" in warm["commands"] and warm["warm"]
+    # without atmosgen's passes the job is AG16's (no commands per pass)
+    jb = B.job(B.route(tmp_path), tmp_path / "run2")
+    assert all("commands" not in p for p in jb["passes"])
+
+
+def test_atmos_assets_version():
+    from citygen import unreal_atmos as UA
+    assert UA.assets_version().isdigit()

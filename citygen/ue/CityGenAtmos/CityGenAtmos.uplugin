@@ -1,0 +1,18 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1",
+	"FriendlyName": "CityGen Atmos",
+	"Description": "atmosgen's runtime (CyberGen stage 3): renders a city's atmos plan: lights by tile with a live set near the view by tier, time of day and weather driving the material parameters, fog, rain and wet streets.",
+	"Category": "CityGen",
+	"CreatedBy": "CyberGen",
+	"CanContainContent": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "CityGenAtmos",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}

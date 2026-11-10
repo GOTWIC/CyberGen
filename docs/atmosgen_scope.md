@@ -6,7 +6,7 @@ steam, rain and wet streets, time of day and the post-processing look. All of it
 Unreal through the shared exporter (`docs/unreal_export.md`). Like stages 1 and 2 it is
 city-agnostic, offline and deterministic. Its milestones carry the prefix AT (AT0 to AT7,
 section 13). It starts after AG16 (performance), whose benchmark is its baseline. The
-decisions that need Swagnik before AT0 starts are in section 12.
+decisions Swagnik took before AT0 are in section 12.
 
 ```
  citygen build  ──>  city_model.json          assetgen build  ──>  assets/ (manifest,
@@ -114,12 +114,20 @@ first pass to replace, not a part done.
 
 What it needs and the others do not yet record goes into asks, as assetgen's section 4.5
 does: a lamp's photometric class by variant (cobra head, post top, wall pack, high mast)
-and each sign's lit face as a rectangle, not a point.
+and each sign's lit face as a rectangle, not a point. AT0 set them down
+(`atmosgen/emitters.py`): AG8's variant record gains `emitter` (class, lens point, normal
+and size in the variant's frame) and `signs.json`'s slot record gains `face` (middle,
+normal, size, two-sided) and its cell `emit` (color, nits). Until assetgen writes them the
+plan derives both from citygen (M6's prototype lamp head, M20's slot with the prototype's
+frame, the cell's own color or the mean of its bright pixels on the page), and every light
+says which (`Light.source`, the plan's `sources`).
 
 ### 4.2 Outputs and the exporter
 
 - `BUILD/atmos/`: `atmos_plan.json` (canonical JSON, a hash per entry), `lights/<tile>.json`
-  (lights by tier; also `lights/<tile>.glb` with `KHR_lights_punctual` nodes for Blender),
+  (lights by tier; the Blender previews read these directly: glTF's `KHR_lights_punctual`
+  has no area light, and the signs and shopfronts are rect lights, so AT0 drops the planned
+  `lights/<tile>.glb`),
   `masks/<tile>.png` (rain shadow, wetness, puddles, at 0.5 m), `atmos_report.json/.txt`,
   `preview_lux.png`, `unreal_contribution.atmos.json`. An unchanged rebuild writes no file;
   a district regeneration changes only its district's and seam's entries.
@@ -296,20 +304,28 @@ the costly part (a raster per tile, lights culled by range).
 Sound (rain, traffic, crowd ambience); vehicles and crowds and their lights (lifegen);
 story lighting (storygen); seasons and snow; interiors (AG11).
 
-## 12. Decisions that need Swagnik
+## 12. Decisions (Swagnik, 2026-11-10)
 
-1. **The shape:** a generator of light and air (section 2), with a runtime plugin and
-   presets. Recommended.
+All six were answered on 2026-11-10, before AT0.
+
+1. **The shape:** a generator of light and air (section 2), with the `CityGenAtmos` runtime
+   plugin and presets. Decided as recommended.
 2. **The play features' lights:** atmosgen takes over the lamps, light pools, sign washes,
    moon and night exposure from `CityGenPlay` (AT1 to AT3), which keeps input, map, menu
-   and free camera. Recommended; the exporter's doc already plans it.
-3. **Time:** the data for every hour from AT0, art direction on night first. Recommended.
+   and free camera. Decided as recommended. (AT0: the console variable `CityGen.PlayLamps`
+   turns the play features' lamps, pools and washes off while the plan's lights are on.)
+3. **Time:** the data for every hour from AT0, art direction on night first. Decided as
+   recommended (the plan's schedules hold 24 values each).
 4. **Weather:** rain and wet streets as the default look (`neon_rain`), with clear, fog and
-   smog as states. Recommended.
-5. **References:** concept images or reference stills for the look (as stage 1 had a
-   concept map), and the neon palette, if you have a preference.
-6. **The night's frame budget:** how much of AG16's targets atmosgen may spend by night
-   (a proposal: at most 4 ms of the 16.7 ms at p50 walking, on the PC at 1440p).
+   smog as states. Decided as recommended.
+5. **References:** none yet; Swagnik may add some later. The look: near-photorealistic
+   cyberpunk and futurism, clean or gritty by place: a clean corporate core; gritty
+   markets, old towns and poor districts. Driven by each district's archetype, wealth and
+   danger (`spec.mood`: grit, flicker, broken lights and dark alleys pulled up by danger and
+   down by wealth from the archetype's mood in `presets.MOOD`).
+6. **The night's frame budget:** the night pass stays at or under 16.7 ms p95 at native
+   1440p on the PC, by AG16's benchmark (Delta's night was 12.6 ms p95 after AG16, so about
+   4 ms for atmosgen), run by night before and after every AT milestone.
 
 ## 13. Milestones
 

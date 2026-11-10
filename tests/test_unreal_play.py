@@ -210,7 +210,11 @@ def test_plugin_install(tmp_path):
     up.write_text(json.dumps({"FileVersion": 3, "Plugins": [{"Name": "X", "Enabled": True}]}))
     r = P.install_plugin(up)
     dest = Path(r["dir"])
-    assert r["wrote"] == len(P.plugin_files()) > 4 and (dest / "CityGenPlay.uplugin").is_file()
+    assert r["wrote"] == sum(len(P.plugin_files(n)) for n in P.PLUGINS)
+    assert len(P.plugin_files()) > 4 and (dest / "CityGenPlay.uplugin").is_file()
+    # (AT0: atmosgen's runtime beside it, enabled too)
+    assert (dest.parent / "CityGenAtmos" / "Source" / "CityGenAtmos" / "CityGenAtmos.Build.cs").is_file()
+    assert {"Name": "CityGenAtmos", "Enabled": True} in json.loads(up.read_text())["Plugins"]
     assert (dest / "Source" / "CityGenPlay" / "CityGenPlay.Build.cs").is_file()
     plugins = json.loads(up.read_text())["Plugins"]
     assert {"Name": P.PLUGIN, "Enabled": True} in plugins and {"Name": "X", "Enabled": True} in plugins
@@ -220,7 +224,7 @@ def test_plugin_install(tmp_path):
     assert r2["wrote"] == 0 and r2["removed"] == 1 and not stale.exists()
     assert len(P.plugin_hash()) == 16
     P.remove_plugin(up)
-    assert not dest.exists()
+    assert not dest.exists() and not (dest.parent / "CityGenAtmos").exists()
     assert json.loads(up.read_text())["Plugins"] == [{"Name": "X", "Enabled": True}]
 
 

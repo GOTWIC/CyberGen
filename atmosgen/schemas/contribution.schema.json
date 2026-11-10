@@ -1,0 +1,114 @@
+{
+ "$defs": {
+  "ContributionEntry": {
+   "additionalProperties": false,
+   "properties": {
+    "count": {
+     "default": 0,
+     "title": "Count",
+     "type": "integer"
+    },
+    "file": {
+     "title": "File",
+     "type": "string"
+    },
+    "hash": {
+     "title": "Hash",
+     "type": "string"
+    },
+    "key": {
+     "description": "`atmos` (the controller), `atmos.lights.<tile>` (a tile's light spawner); AT3 adds entries that replace `lighting.sun`, `lighting.sky` and `lighting.atmosphere`.",
+     "title": "Key",
+     "type": "string"
+    },
+    "kind": {
+     "enum": [
+      "controller",
+      "tile_lights",
+      "volume",
+      "emitter"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "replaces": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Replaces",
+     "type": "array"
+    },
+    "tile": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Tile"
+    }
+   },
+   "required": [
+    "key",
+    "kind",
+    "file",
+    "hash"
+   ],
+   "title": "ContributionEntry",
+   "type": "object"
+  }
+ },
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": false,
+ "description": "`BUILD/atmos/unreal_contribution.atmos.json`: layer 3 of the manifest (keys by M10's\nids; a later stage's entry replaces an earlier one's for the same key).",
+ "properties": {
+  "city": {
+   "title": "City",
+   "type": "string"
+  },
+  "entries": {
+   "items": {
+    "$ref": "#/$defs/ContributionEntry"
+   },
+   "title": "Entries",
+   "type": "array"
+  },
+  "plan": {
+   "title": "Plan",
+   "type": "string"
+  },
+  "plan_sha256": {
+   "title": "Plan Sha256",
+   "type": "string"
+  },
+  "plugin": {
+   "const": "CityGenAtmos",
+   "default": "CityGenAtmos",
+   "title": "Plugin",
+   "type": "string"
+  },
+  "stage": {
+   "const": 3,
+   "default": 3,
+   "title": "Stage",
+   "type": "integer"
+  },
+  "version": {
+   "const": 1,
+   "default": 1,
+   "title": "Version",
+   "type": "integer"
+  }
+ },
+ "required": [
+  "city",
+  "plan",
+  "plan_sha256",
+  "entries"
+ ],
+ "title": "atmosgen unreal contribution",
+ "type": "object"
+}

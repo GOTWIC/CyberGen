@@ -16,6 +16,13 @@ AG3: the street fronts (`<id>.front`) and the tiles' decal meshes (`decals.<tile
 quads from the decal atlas) come with the shells; AG2's instanced parts (`parts/<tile>.glb`)
 are put on points by geometry nodes, one instancer per pack, their materials reading the
 building's tints from the instance.
+
+AT0 (atmosgen's night preview, `atmosgen preview`): a view's `atmos_lights` (the atmos
+plan's spot, point and rect lights near it) light it in place of the stopgap lamps and
+washes; the job's `engine` "cycles" renders in Cycles on the GPU (its light tree takes the
+thousands of lights), `fog` a haze of that density as a volume box round the view, `wet` the
+streets and ground glossier and darker where they face up. A job without them renders as
+before.
 """
 
 import json
@@ -76,6 +83,8 @@ def start():
     bpy.data.batch_remove([m for m in bpy.data.meshes if m.users == 0])
     sc = bpy.context.scene
     sc.render.engine = "BLENDER_EEVEE"
+    if JOB.get("engine") == "cycles":
+        cycles(sc)
     try:
         sc.eevee.taa_render_samples = JOB.get("samples", 32)
     except AttributeError:
@@ -105,6 +114,156 @@ def start():
     return sc, sun
 
 
+def cycles(sc):
+    """AT0: Cycles on the GPU (OptiX, else CUDA, else the CPU), the light tree on, denoised."""
+    sc.render.engine = "CYCLES"
+    try:
+        prefs = bpy.context.preferences.addons["cycles"].preferences
+        for kind in ("OPTIX", "CUDA", "HIP", "METAL", "ONEAPI"):
+            try:
+                prefs.compute_device_type = kind
+                prefs.get_devices()
+                devs = [d for d in prefs.devices if d.type == kind]
+                if devs:
+                    for d in prefs.devices:
+                        d.use = d.type == kind
+                    sc.cycles.device = "GPU"
+                    log(f"cycles on {kind}: {', '.join(d.name for d in devs)}")
+                    break
+            except (TypeError, ValueError):
+                continue
+    except (KeyError, AttributeError) as e:
+        log(f"cycles on the CPU ({e})")
+    sc.cycles.samples = JOB.get("samples", 64)
+    for attr, val in (("use_denoising", True), ("use_light_tree", True),
+                      ("max_bounces", 4), ("volume_bounces", 1), ("caustics_reflective", False),
+                      ("caustics_refractive", False), ("volume_step_rate", 4.0)):
+        try:
+            setattr(sc.cycles, attr, val)
+        except AttributeError:
+            pass
+
+
+def atmos_lights(items):
+    """AT0: the atmos plan's lights (atmosgen/preview.py): spots and points at the lamp heads,
+    area lights on the sign faces and shopfronts, each along its aim (a Blender light shines
+    down its -Z), in its color and power."""
+    objs = []
+    for k, L in enumerate(items):
+        shape = L["shape"]
+        d = bpy.data.lights.new(f"atm{k}", {"spot": "SPOT", "point": "POINT",
+                                            "rect": "AREA"}[shape])
+        d.energy = float(L["watts"])
+        d.color = tuple(min(1.0, max(0.0, c)) for c in L["color"])
+        if shape == "rect":
+            d.shape = "RECTANGLE"
+            d.size, d.size_y = float(L["size"][0]), float(L["size"][1])
+            try:
+                d.spread = math.radians(160.0)
+            except AttributeError:
+                pass
+        else:
+            d.shadow_soft_size = max(0.05, float(L.get("radius") or 0.1))
+            if shape == "spot":
+                inner, outer = L["cone"]
+                d.spot_size = math.radians(2.0 * outer)
+                d.spot_blend = max(0.0, min(1.0, (outer - inner) / max(outer, 1e-3)))
+        ob = bpy.data.objects.new(f"atm{k}", d)
+        ob.location = tuple(L["pos"])
+        yaw, pitch = math.radians(L["aim"][0]), math.radians(L["aim"][1])
+        aim = Vector((math.cos(pitch) * math.cos(yaw), math.cos(pitch) * math.sin(yaw),
+                      math.sin(pitch)))
+        ob.rotation_euler = aim.to_track_quat("-Z", "Y").to_euler()
+        bpy.context.scene.collection.objects.link(ob)
+        objs.append(ob)
+    return objs
+
+
+def haze(sc, v, density, color):
+    """AT0: the weather's haze, a volume box round the view (1.6 km across, 400 m up)."""
+    import bpy as _b
+    c = Vector(v["target"] if v.get("far") else v["eye"])
+    me = _b.data.meshes.new("atm_haze")
+    s, h = 800.0, 400.0
+    vs = [(c.x + x * s, c.y + y * s, z) for z in (-5.0, h) for x, y in
+          ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+    fs = [(0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)]
+    me.from_pydata(vs, [], fs)
+    ob = _b.data.objects.new("atm_haze", me)
+    m = _b.data.materials.new("atm_haze")
+    m.use_nodes = True
+    nt = m.node_tree
+    for n in list(nt.nodes):
+        nt.nodes.remove(n)
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    vol = nt.nodes.new("ShaderNodeVolumePrincipled")
+    vol.inputs["Density"].default_value = float(density)
+    col = tuple(int(color[1 + 2 * i:3 + 2 * i], 16) / 255.0 for i in range(3)) + (1.0,)
+    vol.inputs["Color"].default_value = col
+    vol.inputs["Anisotropy"].default_value = 0.55
+    nt.links.new(vol.outputs[0], out.inputs["Volume"])
+    me.materials.append(m)
+    sc.collection.objects.link(ob)
+    return ob
+
+
+WET_DONE = set()
+
+
+def wet(objs, amount):
+    """AT0: wet streets: every street and ground material's roughness down and its color
+    darker where its surface faces up (`Geometry` normal's z), by `amount`."""
+    for o in objs:
+        if o.type != "MESH" or o.get("ag6") not in ("streets", "ground"):
+            continue
+        for slot in o.material_slots:
+            m = slot.material
+            if m is None or m.name in WET_DONE or not m.use_nodes:
+                continue
+            WET_DONE.add(m.name)
+            nt = m.node_tree
+            bsdf = next((n for n in nt.nodes if n.type == "BSDF_PRINCIPLED"), None)
+            if bsdf is None:
+                continue
+            geo = nt.nodes.new("ShaderNodeNewGeometry")
+            sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+            nt.links.new(geo.outputs["Normal"], sep.inputs[0])
+            up = nt.nodes.new("ShaderNodeMapRange")
+            up.inputs["From Min"].default_value = 0.6
+            up.inputs["From Max"].default_value = 0.9
+            up.inputs["To Max"].default_value = float(amount)
+            nt.links.new(sep.outputs["Z"], up.inputs["Value"])
+            for name, low in (("Roughness", 0.04), ("Base Color", None)):
+                inp = bsdf.inputs[name]
+                if low is not None:
+                    src = inp.links[0].from_socket if inp.links else None
+                    mix = nt.nodes.new("ShaderNodeMix")
+                    mix.data_type = "FLOAT"
+                    nt.links.new(up.outputs[0], mix.inputs["Factor"])
+                    if src is not None:
+                        nt.links.new(src, mix.inputs["A"])
+                    else:
+                        mix.inputs["A"].default_value = inp.default_value
+                    mix.inputs["B"].default_value = low
+                    nt.links.new(mix.outputs["Result"], inp)
+                else:
+                    src = inp.links[0].from_socket if inp.links else None
+                    mul = nt.nodes.new("ShaderNodeMix")
+                    mul.data_type = "RGBA"
+                    mul.blend_type = "MULTIPLY"
+                    fac = nt.nodes.new("ShaderNodeMath")
+                    fac.operation = "MULTIPLY"
+                    fac.inputs[1].default_value = 0.55
+                    nt.links.new(up.outputs[0], fac.inputs[0])
+                    nt.links.new(fac.outputs[0], mul.inputs["Factor"])
+                    if src is not None:
+                        nt.links.new(src, mul.inputs["A"])
+                    else:
+                        mul.inputs["A"].default_value = inp.default_value
+                    mul.inputs["B"].default_value = (0.25, 0.25, 0.27, 1.0)
+                    nt.links.new(mul.outputs["Result"], inp)
+
+
 def lighting(sc, sun, mode):
     bg = sc.world.node_tree.nodes.get("Background")
     if mode == "day":
@@ -121,7 +280,7 @@ def lighting(sc, sun, mode):
         sun.data.energy = 0.04
         sun.data.color = (0.6, 0.7, 1.0)
         AM.set_night(1.0)
-        sc.view_settings.exposure = 1.0
+        sc.view_settings.exposure = float(JOB.get("exposure", 1.0))
     glare(sc, mode == "night")
 
 
@@ -616,13 +775,23 @@ def main():
             sc.eevee.taa_render_samples = v.get("samples") or JOB.get("samples", 32)
         except AttributeError:
             pass
+        if JOB.get("engine") == "cycles":
+            sc.cycles.samples = v.get("samples") or JOB.get("samples", 64)
         sc.render.resolution_x, sc.render.resolution_y = v["w"], v["h"]
         sc.render.resolution_percentage = 100
         lobjs = []
         for mode in JOB["modes"]:
             lighting(sc, sun, mode)
             if mode == "night" and not lobjs:
-                lobjs = lamps(v.get("lights", []), v.get("washes", []))
+                if v.get("atmos_lights") is not None:
+                    # (AT0: the atmos plan's lights, its haze and wet streets)
+                    lobjs = atmos_lights(v["atmos_lights"])
+                    if JOB.get("fog"):
+                        lobjs.append(haze(sc, v, JOB["fog"], JOB.get("fog_color", "#8a97ad")))
+                    if JOB.get("wet"):
+                        wet(objs, JOB["wet"])
+                else:
+                    lobjs = lamps(v.get("lights", []), v.get("washes", []))
             for o in lobjs:
                 o.hide_render = mode != "night"
             name = v["name"] if mode == "day" else f"{v['name']}_night"

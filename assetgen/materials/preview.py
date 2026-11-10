@@ -288,6 +288,13 @@ def core_views(model, man: dict, width: int) -> list[dict]:
 
 
 def run(args, progress=None) -> dict:
+    job, od, n = make_job(args, progress)
+    return _blender(job, "ag6_preview.py", args.blender, od, progress, n)
+
+
+def make_job(args, progress=None) -> tuple[dict, Path, int]:
+    """The Blender job of `run` (its views, materials, lights), its output folder and how
+    many views; atmosgen's night preview (AT0) takes it and lights it with its plan."""
     from ..brief import load_model
     from ..progress import Progress
     P = progress if progress is not None else Progress(quiet=True)
@@ -376,7 +383,7 @@ def run(args, progress=None) -> dict:
            "proxy_tiles": sorted(man["tiles"]), "samples": args.samples,
            "hour": float(getattr(args, "hour", 21.0) or 21.0),
            "era_slots": sorted(CT.ERA_SLOTS)}
-    return _blender(job, "ag6_preview.py", args.blender, od, progress, len(views))
+    return job, od, len(views)
 
 
 WATER_R = 700.0          # AG12: the water tiles of a view within this of its eye or target
