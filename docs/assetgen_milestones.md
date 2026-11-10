@@ -2559,7 +2559,8 @@ the Unreal tests updated); results `docs/progress/AG16/`.
   - **records as components** (`unreal.group_actors`): an entry's instanced parts on its
     own actor (else a group actor), a building's street front on the building's actor, a
     tile's signs, street pieces, water pieces and ground cover on one group actor per kind
-    and 64 m cell; 73,772 actors to 13,642, the components as they were; the group
+    and 64 m cell (an entry with instanced parts of its own, AG12's riprap banks, keeps
+    its own actor); 73,772 actors to 13,644, the components as they were; the group
     Blueprint's root static in the Blueprint (else its members fail to attach as the level
     loads: 160,000 log lines in a game, far worse than before);
   - **no collision on props no one touches** (awnings, facade AC units, wall lights,
@@ -2582,15 +2583,21 @@ the Unreal tests updated); results `docs/progress/AG16/`.
     meshes loaded again when an actor asks; the first import had held 39 GB committed.
     Offloads take their actors by guid (by label, an actor made again under its key, AG8's
     cables over M15's prototypes, brought the destroyed one back once the collections let
-    go of it), and an actor that holds no records any more loses its member components
-    (back to the blockout, or without groups over groups).
-- **After** (`bench/delta_megacity/after`): the 95th percentile 8.3 to 12.9 ms walking, 9.1 to 12.2 ms driving and 10.6 to 12.8
-  ms flying, by day and night, native and at 67% TSR (each within 0.5 ms over three runs),
-  the median 7 to 11 ms: 60 fps everywhere. No moving frame over 100 ms but one in the 36
-  measurements (106 ms, a garbage collection); VRAM at most 7.5 GB, RAM 8 to 12.8 GB, root
-  pages 43,008, loads 13 to 19 s a pass; the frame now set by the render thread or the
-  GPU. The city looks the same: every view before and after side by side in
-  `docs/progress/AG16/before_after/`.
+    go of it); an actor whose key gets another class is destroyed and the level saved
+    before anything is made (`clear_moved`: destroyed later, some kept their packages and
+    came back with the next import); an actor that holds no records any more loses its
+    member components (back to the blockout, or without groups over groups); and an entry
+    with instanced parts of its own keeps its own actor (Delta's 72 riprap banks had joined
+    their tile's water group, so their 26,257 stones were never placed).
+- **After** (`bench/delta_megacity/after`, the final code imported over the level, three
+  runs): the 95th percentile 8.3 to 12.6 ms walking, 8.9 to 12.0 ms driving and 10.7 to
+  12.8 ms flying, by day and night, native and at 67% TSR (each within 0.5 ms over the
+  runs), the median 7 to 11 ms: 60 fps everywhere. No moving frame over 100 ms in any
+  pass's median run (one run of the night walk at 67% had one; the longest elsewhere
+  94 ms); VRAM at most 7.6 GB, RAM 8.5 to 10.2 GB, root pages 43,008, loads 13 to 19 s a
+  pass; the frame now set by the render thread or the GPU. An earlier set of three runs,
+  before the riprap fix below, gave the same within 0.3 ms. The city looks the same: every
+  view before and after side by side in `docs/progress/AG16/before_after/`.
 - **Left as they are, measured**: garbage collection (the reachability analysis over every
   object of an uncooked game, 70 to 350 ms about every 40 s while the city streams) is what
   remains of the frames over 100 ms. UE 5.8's experimental async physics bodies and

@@ -2160,8 +2160,9 @@ AG16 (performance) is in place (scope 14.17, issue #96; `docs/unreal_export.md`,
   and the Nanite pool from the city (`nanite_pool_mb`, `PROJECT_SETTINGS`) in the project; the
   play actor enables an underwater volume only near the view (`UpdateUnderwater`); stage 2's
   packs imported, saved and let go of 150 at a time (`CITYGEN_UE_PACK_CHUNK`, the `Meshes`
-  map, #84). Delta Megacity: 73,772 actors to 13,642, 53,911 distinct Nanite meshes to
-  44,667, the 95th percentile frame from 27 to 49 ms to about 9 to 13 ms.
+  map, #84; offloads by actor guid, an actor whose class changes destroyed and saved
+  first, `clear_moved`). Delta Megacity: 73,772 actors to 13,644, 53,911 distinct Nanite
+  meshes to 44,667, the 95th percentile frame from 27 to 49 ms to about 8 to 13 ms.
 - **Budgets** (`assetgen/scene.py`, in `asset_budget` at the end of `assetgen build`, with
   `assets/scene_budget.json`): the scene as the exporter's own manifest makes it (actors,
   components, distinct Nanite meshes, instances, root pages against the pool) per city and
