@@ -11,7 +11,7 @@ your machine.
 |---|---|---|---|
 | 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M22 done |
 | 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG8, AG10, AG12 to AG17 done, the rest to come |
-| 3 | [atmosgen](#stage-3-atmosgen) | Lighting, sky, weather and atmospherics | Planned ([draft plan](docs/atmosgen_scope.md)) |
+| 3 | [atmosgen](#stage-3-atmosgen) | Lighting, sky, weather and atmospherics | AT0 done, the rest to come |
 | 4 | [lifegen](#stage-4-lifegen) | Traffic, crowds, trains and aircraft, generated | Planned ([draft plan](docs/lifegen_scope.md)) |
 | 5 | [storygen](#stage-5-storygen) | Story, characters and cutscenes | Planned |
 
@@ -516,13 +516,42 @@ it works out where every light, fog pocket, steam vent and puddle goes from the 
 its assets, checks that every street is lit, previews the night in Blender, and hands the
 plan to Unreal through the same exporter.
 
-Plan (draft): [`docs/atmosgen_scope.md`](docs/atmosgen_scope.md). It starts after AG16.
+The look: near-photorealistic cyberpunk, clean or gritty by place (a spotless corporate
+core, gritty markets, old towns and poor districts), with rain and wet streets by default.
+
+Its first part is in place: the light plan. From a built city it places a light at every
+street and wall lamp's head, on every sign's lit face and in every shopfront, each with
+its photometry, color, hours and its district's mood (cool white and steady in a wealthy
+core, sodium, flickering and some broken in an old town), and draws its light map:
+
+```bash
+.venv/bin/python -m atmosgen plan out/vesper_bay              # BUILD/atmos: the plan, per 256 m tile
+.venv/bin/python -m atmosgen lux out/vesper_bay               # the light map and the lux map round the core
+.venv/bin/python -m atmosgen preview out/vesper_bay           # a Blender night render lit by the plan
+```
+
+| The plan's lights, Delta Megacity | Light on the ground round the Corporate Core |
+|---|---|
+| <img src="docs/progress/AT0/wip/01_plan/preview_plan.png" width="420"> | <img src="docs/progress/AT0/wip/01_plan/preview_lux.png" width="420"> |
+
+In Unreal, atmosgen's runtime plugin (`CityGenAtmos`, built by `citygen unreal` with the
+play features) lights the streets from the plan, with haze, rain and wet streets
+(prototypes for now):
+
+| Old Town by night, the play features' lamps | The same street lit by the plan, in rain |
+|---|---|
+| <img src="docs/progress/AT0/street_old_town_play.jpg" width="420"> | <img src="docs/progress/AT0/street_old_town_plan.jpg" width="420"> |
+| The Corporate Core, the play features' lamps | The same, lit by the plan, in rain |
+| <img src="docs/progress/AT0/street_core_play.jpg" width="420"> | <img src="docs/progress/AT0/street_core_plan.jpg" width="420"> |
+
+Plan: [`docs/atmosgen_scope.md`](docs/atmosgen_scope.md); what each milestone did:
+[`docs/atmosgen_milestones.md`](docs/atmosgen_milestones.md).
 
 ### Milestones
 
 | | Milestone | What it adds | Status |
 |---|---|---|---|
-| AT0 | Groundwork | Look presets and art direction spec, the plan's format, a night test of one district in Unreal | Planned |
+| AT0 | Groundwork | Look presets and art direction spec, the plan's format, lights for every lamp, sign and shopfront, the runtime plugin's start, a night test of Delta Megacity in Unreal (lights, haze, rain, wet streets), a Blender night preview | Done |
 | AT1 | Streets at night | Street and wall lights that light sidewalks and roads, shop light spilling onto the street, deck, tunnel and station lights, a check that every street is lit | Planned |
 | AT2 | Neon and signs as light | Billboards, banners and holo-boards lighting the street and facades they face, neon spill, crown floods, aviation lights, searchlights, port and spaceport lights, flicker | Planned |
 | AT3 | Sky and time | Night, dusk and day skies, a cloud deck lit by the city, the moon, time of day driving every light and window | Planned |
