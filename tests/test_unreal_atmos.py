@@ -121,3 +121,6 @@ def test_a_failed_check_is_not_delivered(build):
     p.write_text(json.dumps(plan))
     assert "AT0" in UA.write_atmos(build)["skipped"]
     assert UA.write_atmos(build.parent / "nowhere") is None
+    # a folder named for the plan that holds none is an error, not a city without one
+    with pytest.raises(FileNotFoundError):
+        UA.write_atmos(build, build.parent / "nowhere")

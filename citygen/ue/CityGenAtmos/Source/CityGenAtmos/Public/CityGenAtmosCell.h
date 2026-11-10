@@ -35,19 +35,19 @@ public:
 	ACityGenAtmosCell();
 
 	/** The cell's name (`<tile>.<quarter>`, citygen's 256 m tile and its 128 m quarter). */
-	UPROPERTY(VisibleAnywhere, Category = "CityGen")
+	UPROPERTY(EditAnywhere, Category = "CityGen")
 	FString Cell;
 
 	/** How many lights it holds. */
-	UPROPERTY(VisibleAnywhere, Category = "CityGen")
+	UPROPERTY(EditAnywhere, Category = "CityGen")
 	int32 Count = 0;
 
 	/** Its lights' packed floats (CityGenAtmosPack::Floats each). */
-	UPROPERTY(VisibleAnywhere, Category = "CityGen")
+	UPROPERTY(EditAnywhere, Category = "CityGen")
 	TArray<float> LightFloats;
 
 	/** Its lights' packed ints (CityGenAtmosPack::Ints each). */
-	UPROPERTY(VisibleAnywhere, Category = "CityGen")
+	UPROPERTY(EditAnywhere, Category = "CityGen")
 	TArray<int32> LightInts;
 
 protected:

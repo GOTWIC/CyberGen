@@ -62,7 +62,7 @@ public:
 	FString City;
 
 	/** The plan's hash (the importer's: an import of another plan updates the actor). */
-	UPROPERTY(VisibleAnywhere, Category = "CityGen")
+	UPROPERTY(EditAnywhere, Category = "CityGen")
 	FString PlanHash;
 
 	/** Every schedule's name and its 24 hourly values (ScheduleHours: 24 per name). */

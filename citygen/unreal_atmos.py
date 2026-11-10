@@ -182,6 +182,8 @@ def write_atmos(build: str | Path, given: str | Path | None = None) -> dict | No
     change); None without a plan, {"skipped": why} for a plan not delivered."""
     pdir = plan_dir(build, given)
     if pdir is None:
+        if given:
+            raise FileNotFoundError(f"{given}: no atmos_plan.json (run atmosgen plan)")
         return None
     data, why = atmos_data(pdir)
     if data is None:
