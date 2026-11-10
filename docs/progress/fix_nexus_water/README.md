@@ -153,3 +153,12 @@ checks as on main, none of them water ones.
 - AG12: 19 bodies (18), 115 tiles (111), 1,597,191 triangles (1,575,257); every water check
   passes;
 - `assetgen streets` passes (9,617 pieces), then `fit`: nothing off its surface, no clash.
+
+## The samples' committed reports
+
+`archipelago_free_port/`, `delta_megacity/`, `nexus_city/`, `peninsula_city/` and
+`vesper_bay/` hold each sample's `report.json`, `report.txt` and gameplay and transit previews,
+built on main after the fixes of 2026-11-09 (#147 to #159). They replace `docs/progress/M22`'s
+as the reports `test_committed_reports_match` reads: M22's predate #153's
+`transit_profile_smooth` and the models those fixes moved. Every sample passes all 107 checks
+and matches its recorded hash.
