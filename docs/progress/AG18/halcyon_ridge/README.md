@@ -1,0 +1,22 @@
+# AG18: Halcyon Ridge
+
+![sheet](sheet.jpg)
+
+- **Brand, model, type:** Halcyon Ridge, a performance crossover, four doors and a hatch, 4 seats (both names made up).
+- **Size:** 4.75 m long (4.89 over the tow eyes), 2.05 m wide over the arch armor (2.09 over the camera pods), 1.59 m high over the roof bar, 2.95 m wheelbase, 0.82 m wheels, 0.24 m ground clearance. Show color: burnt orange.
+- **The Vanta-R's and the Sable's sibling:** the carbon spine from nose to tail, octagonal bolted arches, the light strip under the nose lip that turns down each corner, a ring of light round the whole tail, honeycomb in every opening, the scoop ahead of the rear wheel, louvres and extractors, twin-spoke turbine wheels with a light ring, wide-spaced capitals on the tail beam, the model name low on the door.
+- **Its own ideas:**
+  - The spine as a wishbone that opens round the cabin: wide on the hood, up both windshield pillars, along the roof, down the hatch frame, closed again on the tail. In bare weave, bolted down along its edges.
+  - It ends in the ground: a keel down the middle of the nose into a ribbed alloy skid plate, a second plate with the family's fins under the tail, anodized tow eyes on both.
+  - Flying roof rails lifted off the spine's arms, a light bar between them over the windshield, and the same rails carrying the hatch spoiler clear of the glass.
+  - The arches at their boldest: true half octagons with a flat top, each a ring of five armor plates with joints and two bolts a plate, 7 to 11 cm of air to the tire.
+  - A scoop twice the family's height (0.53 m) with honeycomb and a blade at half height, the door's foot channelled into it with a light line.
+  - Step blades on brackets with a light in their edge, three hexagonal lamps stacked in each intake, all-terrain tires of the car's own (lugged shoulders, chevron middle rows, sidewall lettering) on the kit's twin-spoke rim.
+- **Triangles:** 223,779 in 114 objects.
+- **Build:** `vehicles/blender.sh vehicles/cars/halcyon_ridge.py --out docs/progress/AG18/halcyon_ridge --sheet`
+- **What I would improve:** the rear door is only 0.52 m long at the sill (its cut should climb over the arch); the B pillar is a strip lying on one long side glass, not a real post between two panes; the well behind the armor is empty (no arms, springs or liners to see through the gap); the door skins between the shoulder and the cladding are plain; dash, door cards and load bay are blocked in.
+- **Kit wishes:**
+  - A carbon without the clear coat in the library: the coated weave mirrors the top light on every upward face (hood, rails, spoiler, deck read as silver), so this car makes its own `carbon_dry` by reaching into the material's nodes.
+  - `Geo.honeycomb` on any plane (an origin and two axes), not only x = const: the scoop's mesh needed a helper to turn it.
+  - `arch_trim` and `arch_bolts` with the plate joints, the plate thickness and the bolt size as arguments, and `build_wheel` with a choice of tire tread (road, all-terrain, lugged), since the third car now brings its own tire.
+  - `text_on_body(proj='z')` drops the whole word without a message when one point misses the surface; a log line would have saved a look.
