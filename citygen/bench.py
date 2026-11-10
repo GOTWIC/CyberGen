@@ -436,15 +436,72 @@ def others(prev: dict, cur: dict, dt: float, own: set[int]) -> dict:
     return {"cores": round(sum(per.values()), 2), "top": [[n, round(c, 2)] for n, c in top]}
 
 
+# AT1: on a hybrid CPU (the PC's i7-12700K: 8 performance and 4 efficiency cores) Windows
+# moves a window that loses the foreground onto the efficiency cores (EcoQoS): Delta's
+# night runs then had their game and render threads twice as slow from wherever the desktop
+# was used, at the same GPU time. The game is opted out of that power throttling and run
+# above normal priority (`unthrottle`), and each sample says whether it had the foreground
+# (`in_front`; the summary's `front`, the share of samples).
+PROCESS_POWER_THROTTLING = 4            # PROCESS_INFORMATION_CLASS ProcessPowerThrottling
+POWER_THROTTLING_EXECUTION_SPEED = 0x1
+ABOVE_NORMAL_PRIORITY_CLASS = 0x8000
+
+
+def unthrottle(pid: int) -> dict:
+    """Windows: the process out of execution-speed power throttling (EcoQoS: the
+    efficiency cores when not in front) and at above normal priority; what was set."""
+    if os.name != "nt":
+        return {}
+    import ctypes
+    from ctypes import wintypes
+
+    class _State(ctypes.Structure):
+        _fields_ = [("Version", wintypes.ULONG), ("ControlMask", wintypes.ULONG),
+                    ("StateMask", wintypes.ULONG)]
+
+    k = ctypes.windll.kernel32
+    h = k.OpenProcess(0x0200 | 0x1000, False, pid)   # SET_INFORMATION, QUERY_LIMITED
+    if not h:
+        return {"error": "OpenProcess failed"}
+    try:
+        st = _State(1, POWER_THROTTLING_EXECUTION_SPEED, 0)
+        eco = bool(k.SetProcessInformation(h, PROCESS_POWER_THROTTLING, ctypes.byref(st),
+                                           ctypes.sizeof(st)))
+        pri = bool(k.SetPriorityClass(h, ABOVE_NORMAL_PRIORITY_CLASS))
+    finally:
+        k.CloseHandle(h)
+    return {"no_power_throttling": eco, "above_normal": pri}
+
+
+def in_front(pid: int) -> bool | None:
+    """Windows: whether the foreground window belongs to `pid`."""
+    if os.name != "nt":
+        return None
+    import ctypes
+    from ctypes import wintypes
+    u = ctypes.windll.user32
+    w = u.GetForegroundWindow()
+    if not w:
+        return False
+    owner = wintypes.DWORD()
+    u.GetWindowThreadProcessId(w, ctypes.byref(owner))
+    return owner.value == pid
+
+
 def others_summary(samples: list[dict]) -> dict | None:
-    """A run's `others` samples in short: the mean and most cores, the busiest by name."""
+    """A run's `others` samples in short: the mean and most cores, the busiest by name, the
+    share of samples with the game in front, what `unthrottle` set."""
+    un = next((x["unthrottle"] for x in samples if "unthrottle" in x), None)
+    samples = [x for x in samples if "unthrottle" not in x]
     if not samples:
         return None
     tot: dict[str, float] = {}
     for x in samples:
         for n, c in x["top"]:
             tot[n] = tot.get(n, 0.0) + c / len(samples)
+    fr = [x["in_front"] for x in samples if x.get("in_front") is not None]
     return {"samples": len(samples),
+            "front": round(sum(fr) / len(fr), 2) if fr else None, "unthrottle": un,
             "cores_mean": round(statistics.fmean(x["cores"] for x in samples), 2),
             "cores_max": round(max(x["cores"] for x in samples), 2),
             "top": [[n, round(c, 2)] for n, c in
@@ -473,6 +530,9 @@ def run_game(root: Path, uproject: Path, level: str, job_path: Path, log: Path,
            f"-ini:Engine:{ini}", "-NoScreenMessages"]
     with open(log, "wb") as f:
         proc = subprocess.Popen(cmd, stdout=f, stderr=subprocess.STDOUT)
+        if samples is not None:
+            samples.append({"t": 0.0, "cores": 0.0, "top": [],
+                            "unthrottle": unthrottle(proc.pid)})
         t0 = time.time()
         watch = samples is not None and os.name == "nt"
         prev, tl = (cpu_times(), t0) if watch else ({}, t0)
@@ -486,7 +546,7 @@ def run_game(root: Path, uproject: Path, level: str, job_path: Path, log: Path,
                     proc.wait()
                     raise
                 cur, now = cpu_times(), time.time()
-                samples.append({"t": round(now - t0, 1),
+                samples.append({"t": round(now - t0, 1), "in_front": in_front(proc.pid),
                                 **others(prev, cur, now - tl, {proc.pid, os.getpid()})})
                 prev, tl = cur, now
 

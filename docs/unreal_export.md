@@ -883,7 +883,11 @@ imported before; `citygen/bench.py`, the driver `UCityGenBench` in the play plug
   run's summary; and a run whose game or render thread median is 1.5 times the fastest
   run's while its GPU median stays within 15% (`bench.starved`: a first run after an
   import, or other work on the PC) is named under the table with the cores other processes
-  took meanwhile.
+  took meanwhile. Since AT1 the game is opted out of Windows' power throttling and run
+  above normal priority (`bench.unthrottle`): on the PC's hybrid CPU a game window that lost
+  the foreground to the desktop was moved to the efficiency cores, its game and render
+  threads twice as slow for minutes at the same GPU time (AT1's first after runs); each
+  sample also says whether the game had the foreground (`in_front`, the summary's `front`).
 
 **What the benchmark found on Delta Megacity** (`docs/progress/AG16/`): bound by the game
 thread, not the GPU. Every frame spent its async loading time, physics waited on bodies

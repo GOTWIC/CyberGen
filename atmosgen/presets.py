@@ -86,21 +86,25 @@ NEON = ("#ff2a6d", "#05d9e8", "#b967ff", "#ffb000", "#39ff8a", "#f2f6ff")   # AG
 # large): a cobra head 1200 cd to 62 degrees off its aim, so a carriageway lit from both
 # sides between its poles (M6: every 25 to 35 m on each side, staggered) reads lit from
 # lamp to lamp (#81) at about 10 to 15 lx, where AT0's 6000 cd in a 45 degree cone gave
-# 52 lx under the heads and the junctions dark.
+# 52 lx under the heads and the junctions dark. Each reach is what its light needs (the
+# window takes a light to 0 there): a live light's shading cost grows with the screen its
+# reach covers, and AT1's first reaches (cobra 40, post top 28 with cube-map shadows, spill
+# 16 m) cost 2 ms more of Delta's night than AT0's live set (docs/progress/AT1); a point
+# light never casts shadows (six shadow maps).
 PHOTOMETRY = {
-    "cobra_head": {"shape": "spot", "cd": 1200.0, "reach_m": 40.0, "inner": 62.0,
+    "cobra_head": {"shape": "spot", "cd": 1200.0, "reach_m": 30.0, "inner": 62.0,
                    "outer": 80.0, "tilt": 15.0, "source_m": 0.25, "shadow": True,
                    "drop_m": 0.3},
-    "post_top":   {"shape": "point", "cd": 600.0, "reach_m": 28.0, "source_m": 0.3,
-                   "shadow": True, "drop_m": 0.1},
-    "wall_pack":  {"shape": "spot", "cd": 420.0, "reach_m": 24.0, "inner": 65.0,
+    "post_top":   {"shape": "point", "cd": 600.0, "reach_m": 18.0, "source_m": 0.3,
+                   "shadow": False, "drop_m": 0.1},
+    "wall_pack":  {"shape": "spot", "cd": 420.0, "reach_m": 18.0, "inner": 65.0,
                    "outer": 86.0, "tilt": 20.0, "source_m": 0.15, "shadow": True,
                    "drop_m": 0.2},
     "high_mast":  {"shape": "spot", "cd": 40000.0, "reach_m": 120.0, "inner": 55.0,
                    "outer": 78.0, "tilt": 0.0, "source_m": 0.8, "shadow": True,
                    "drop_m": 0.5},
     # a highway's columns: 12 m over the road, a twin arm in the median or one at the edge
-    "highway":    {"shape": "spot", "cd": 2600.0, "reach_m": 60.0, "inner": 64.0,
+    "highway":    {"shape": "spot", "cd": 2600.0, "reach_m": 45.0, "inner": 64.0,
                    "outer": 80.0, "tilt": 10.0, "source_m": 0.3, "shadow": False,
                    "drop_m": 0.3},
     "soffit":     {"shape": "spot", "cd": 140.0, "reach_m": 18.0, "inner": 60.0,
@@ -122,7 +126,7 @@ PHOTOMETRY = {
                    "out_m": 0.05, "shadow": False},
     "shop_sign":  {"shape": "rect", "nits": 450.0, "reach_m": 10.0, "barn_deg": 80.0,
                    "out_m": 0.1, "shadow": False},
-    "shop_spill": {"shape": "rect", "nits": 110.0, "reach_m": 16.0, "barn_deg": 70.0,
+    "shop_spill": {"shape": "rect", "nits": 110.0, "reach_m": 12.0, "barn_deg": 70.0,
                    "out_m": 0.25, "shadow": False, "height_m": 2.8, "sill_m": 0.3},
 }
 CLASSES = tuple(PHOTOMETRY)

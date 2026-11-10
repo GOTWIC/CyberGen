@@ -2317,6 +2317,11 @@ AT1 (streets at night) is in place:
   by night (`MPC_CityGen`'s `Night`). `-CityGenAtmosPlan` and the subsystem are gone; the play
   features lose AG15's spot lamps and washes (`play.json` 3), keeping the light pools as the
   far tier; `--bench-atmos` is a flag. `docs/unreal_export.md`, "From AT1".
+- **Exposure:** the night looks' `reference_ev100` is matched to the plan's street levels
+  (neon rain 1.5, clear night 1.0; AT0's 3 went with its 52 lx streets), so the runtime's
+  $2^{-3 - EV_{ref}}$ scale shows the streets as AT0's did until AT3 moves the exposure.
+- Results, the benchmark before and after and the check's night views:
+  `docs/progress/AT1/README.md`.
 
 ## Life generator (lifegen)
 
