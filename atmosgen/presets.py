@@ -98,7 +98,7 @@ PHOTOMETRY = {
     "highway":    {"shape": "spot", "cd": 2600.0, "reach_m": 60.0, "inner": 64.0,
                    "outer": 80.0, "tilt": 10.0, "source_m": 0.3, "shadow": False,
                    "drop_m": 0.3},
-    "soffit":     {"shape": "spot", "cd": 320.0, "reach_m": 18.0, "inner": 60.0,
+    "soffit":     {"shape": "spot", "cd": 140.0, "reach_m": 18.0, "inner": 60.0,
                    "outer": 82.0, "tilt": 0.0, "source_m": 0.3, "shadow": False,
                    "drop_m": 0.1},
     # a road tunnel's wall strips and an underpass's ceiling strip (AG7)

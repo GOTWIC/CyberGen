@@ -61,3 +61,59 @@ recommendations: [`docs/progress/AT0/README.md`](progress/AT0/README.md).
 - **Tests:** `tests/atmosgen/test_at_plan.py`; `tests/test_bench.py` (the spike's job,
   `busy`), `tests/test_unreal_play.py` (both plugins installed), `tests/test_no_network.py`
   (atmosgen too).
+
+## AT1: streets at night
+
+Built on the Windows PC (2026-11-10), on main after AT0 (#185). Report, measurements and
+images: [`docs/progress/AT1/README.md`](progress/AT1/README.md).
+
+- **Photometric classes** (`atmosgen/presets.py` `PHOTOMETRY`): each light's profile is
+  Unreal's own, so the plan's check and the runtime agree: a spot's intensity flat to its
+  inner cone and falling as $t^2$ to its outer, a point's alike all round, a lit face's by its
+  cosine and barn doors, each in the engine's reach window
+  $\mathrm{clamp}(1 - (d/R)^4)^2$. Cobra heads 1200 cd to 62 degrees, 80 at most, tilted 15
+  degrees over the road (AT0's 6000 cd in 45 degrees: 52 lx under the heads, the carriageway
+  between them and the junctions dark); post tops 600 cd; wall packs 420 cd, wide; highway
+  columns 2600 cd at 12 m; soffit, tunnel and platform classes.
+- **New lights** (`atmosgen/plan.py`): a mast arm on every traffic signal reaching into its
+  junction (`signals`); highway and ramp columns every 42 m (a twin arm in a median, else
+  staggered at the edges), service roads, posts on footbridges and every 16 m along
+  pedestrian streets and promenades, which M6 gives no lamps (`roads`); wall packs along
+  alleys, closer where the mood's alleys are lighter (`alleys`); AG10's soffit lights under
+  M14's decks at its fixtures (`decks`, AG10's own `_ground_streets` and `_lights`); AG7's
+  tunnel wall strips and underpass ceiling strips (`tunnels`); platform downlights in
+  elevated and underground stations (`stations`; sky stations are inside their towers,
+  AT2).
+- **Junctions** (`corners`): a junction whose lane points under 1 lx or crosswalk points under
+  2 lx pass 5% gets corner poles one at a time, at the junction ends of its legs' sidewalks
+  and its crosswalks' ends (its outline's corners when it has neither), the one leaving
+  fewest of its points dark first, at most 6.
+- **Fill** (`fill`): a light at the darkest point of each walkway or road (outside the
+  junctions) the check still finds dark (3 points under its minimum, or an alley point at
+  0), up to 4 rounds: a wall pack over an alley, a post top at a sidewalk's curb, a pole at a
+  road's edge. Corner poles and fill lights are never broken.
+- **What a light hangs on** (`Light.mount`): the city's own fixture (`prop`, `sign`,
+  `facade`, `soffit`, `tunnel`) or one asked of stage 2 (`pole`, `mast_arm`, `wall`,
+  `canopy`: `emitters.py`'s third ask, assetgen scope 4.6), counted in the report.
+- **The lux check** (`atmosgen/lux.py`, scope 8): every walkway and lane every 2 m by class
+  (sidewalks, promenades, pedestrian streets and footbridges `sidewalk`; crosswalks and the
+  junctions' crossings `crosswalk`; every road's and junction's lanes `carriageway`; alleys;
+  anything on the ground under a deck `under_deck`; park paths reported), on its road's
+  surface where the walk graph keeps a raised road's walks on the ground; occlusion against
+  the building masses and deck slabs (`Occluders`: a 1 m raster of the lowest bottom and
+  highest top over each cell, a footprint taken 0.5 m in so a ray grazing a facade from its
+  own fixture stays clear, marched every meter); at 23:00. A class passes on its city
+  average, at most 5% under its minimum, no alley point dark, and in each district half its
+  average with at most 15% under. The plan's `checks.lux`; `atmosgen plan` exits 1 when it
+  fails and the exporter leaves that plan out. `preview_lux.png` with occlusion.
+- **Exporter** (`citygen/unreal_atmos.py`, `ue/import_city.py`): layer 3 of the manifest
+  (`atmos`: the controller's key and hash, a cell per 128 m cell with its key
+  `atmos.lights.<tile>.<quarter>` and hash; the records in `unreal/atmos.json`); the import
+  places the `CityGenAtmos` controller (always loaded, the plan's settings) and a
+  `CityGenAtmosCell` data actor per cell (spatially loaded, its lights packed, 16 floats and
+  2 ints each); `--atmos DIR`, `--no-atmos`. The runtime: a cell registers its lights with
+  the controller when it streams in and takes them out when it goes, the controller's pooled
+  live set (512 within 300 m, 16 shadowed within 60 m) renders them by night. AT0's
+  `-CityGenAtmosPlan` and subsystem are gone; the play features lose AG15's spot lamps and
+  sign washes (`play.json` 3) and keep the light pools as the far tier; the check reads the
+  controller's status by night; `--bench-atmos` is a flag.
