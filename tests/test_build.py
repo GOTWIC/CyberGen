@@ -73,11 +73,13 @@ def test_sample_city_builds_and_passes(path):
 
 
 def test_committed_reports_match(tmp_path):
-    """docs/progress/M22/<city>/report.json (M22, the pavement map: every road surface one
-    exact map, its four checks) is committed, passes and matches a fresh build."""
+    """docs/progress/fix_nexus_water/<city>/report.json (the samples built again after the
+    fixes of 2026-11-09, #147 to #159: footbridges in the pavement map, sky tube profiles and
+    their check, one elevator a platform end, the water pieces) is committed, passes and
+    matches a fresh build."""
     for path in CITIES:
         slug = path.parent.name
-        folder = ROOT / "docs" / "progress" / "M22" / slug
+        folder = ROOT / "docs" / "progress" / "fix_nexus_water" / slug
         committed = folder / "report.json"
         assert committed.is_file(), committed
         rep = json.loads(committed.read_text())
