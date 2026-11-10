@@ -2522,6 +2522,37 @@ The checks that failed on one or two buildings in Delta, Cragmouth and Vesper Ba
 `GEN_VERSION` fix144.1. Every check passes on the three cities. Notes:
 `docs/progress/fix_one_building/`.
 
+## Fix: water no body has, and a crack in the bed (issue #140, #144's Nexus `water_gaps`)
+
+Stage 1's log has the model's side (`docs/citygen_milestones.md`, "Water coverage fixes"):
+every part of the map's water is now a water body's, so AG12 draws water wherever the
+blockout's sea sheet it takes used to show. AG12's side:
+- **`water_coverage`** (`water/checks.py`, `uncovered`): besides each body's own water, the
+  water a blockout sea sheet showed (the map less its ground: the land less the rivers,
+  channels and waterways) must be a body's or under a bank's band (its line, `width_m` out)
+  wherever AG12 takes the sheet (replaced or dropped); a part of 1 m2 or more left over fails,
+  named by the tile of the sheet over most of it. A sheet fills its whole tile under the
+  ground, so taking it over water no body has leaves a hole to the sky. On main's Nexus City
+  it fails (`t+06+04` 36,703 m2, `t+06-03` 22,617 m2); with the model's fix every city passes.
+- **Bed seams** (`water/grid.py`, `_Sides`): the lattice mesher clips the cells the region's
+  edge crosses and meshes the rest whole. Where the edge only touches a lattice line at a
+  vertex (Nexus City's `sep.e126n468.bank.w5n461`: its dry strip ends on x = -28 at
+  (-28.00, 463.39)), the clipped cell had that vertex and the whole cell beside it did not, a
+  T-junction, here a 0.15 m crack in the bed that the gap check's waterline point lay on.
+  Every cell and clipped piece now takes the clipped pieces' vertices on its sides; a cell
+  with none is meshed as before (on main's Nexus City model two of 111 tiles change, two
+  triangles more, and `water_gaps` passes).
+
+Nexus City with both (`assetgen streets`, `water`, `fit`): 19 water bodies (18), 115 tiles
+(111), 1,597,191 triangles (1,575,257), every water check passing; 9,617 street pieces
+passing; nothing off its surface and no clash. Every other city's `assetgen water` passes.
+Goldens rewritten (every city's model moves with its water): `golden_water.json` (the small
+city and Vesper Bay), `golden_streets.json`, `golden_props.json` and `golden_ground.json`
+(the small city; Vesper Bay's street tiles keep their bytes, its `all` moves) and
+`golden_hashes.json`'s small city briefs, AG1 files and AG6 materials and the five samples'
+briefs; the Vesper Bay buildings, their shells, the spike and the triangulation are
+unchanged. Notes: `docs/progress/fix_nexus_water/`.
+
 ## AG16: performance
 
 **Built.** Scope 14.17, issue #96: a whole city's runtime and import cost in Unreal,

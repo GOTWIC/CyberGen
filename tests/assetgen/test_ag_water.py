@@ -128,19 +128,21 @@ def test_same_bytes_any_workers_and_hash_seed(tmp_path):
     assert WB.outputs_digest(tmp_path / "seed") == want
 
 
-def test_regenerated_district_rewrites_only_water_near_it():
+def test_regenerated_district_rewrites_only_water_near_it(tmp_path):
     """Old Quarter regenerated: every water piece that changed is one of its banks, or a
     body piece whose tile lies within reach of a bank that changed (M16's banks keep to their
-    district, a bed reads only banks within reach)."""
+    district, a bed reads only banks within reach). Both built into folders of their own,
+    without AG7's street stage, as the golden is: an earlier test may have built the streets
+    into the base, and their bridge piers would add foam to the base's pieces alone."""
     base, _ = _small()
     regen = small_regen()
-    if (regen / "assets" / "water").exists():
-        shutil.rmtree(regen / "assets" / "water")
-    shutil.copytree(base / "assets" / "water", regen / "assets" / "water")
-    rep = _water(regen)
+    out_a, out_b = tmp_path / "base", tmp_path / "regen"
+    _water(base, out_a)
+    shutil.copytree(out_a / "water", out_b / "water")
+    rep = _water(regen, out_b)
     assert rep["ok"], [c for c in rep["checks"] if not c["ok"]]
-    a = json.loads((base / "assets" / "water" / "manifest.json").read_text())["pieces"]
-    b = json.loads((regen / "assets" / "water" / "manifest.json").read_text())["pieces"]
+    a = json.loads((out_a / "water" / "manifest.json").read_text())["pieces"]
+    b = json.loads((out_b / "water" / "manifest.json").read_text())["pieces"]
     changed = sorted(k for k in a.keys() | b.keys()
                      if a.get(k, {}).get("hash") != b.get(k, {}).get("hash"))
     assert changed
@@ -260,6 +262,62 @@ def test_mesher_takes_a_hole_touching_its_outline():
     area = ((b[:, 0] - a[:, 0]) * (cc[:, 1] - a[:, 1]) -
             (b[:, 1] - a[:, 1]) * (cc[:, 0] - a[:, 0])).sum() / 2.0
     assert abs(area - poly.area) < 1e-6
+
+
+def _t_junctions(v, t) -> list:
+    """Vertices lying inside another triangle's edge (not at its ends): where the mesh is
+    not one sheet (exact on the integer millimeters)."""
+    out = []
+    for tri in t:
+        for a, b in ((tri[0], tri[1]), (tri[1], tri[2]), (tri[2], tri[0])):
+            pa, pb = v[a], v[b]
+            d = pb - pa
+            rel = v - pa
+            on = (d[0] * rel[:, 1] - d[1] * rel[:, 0] == 0)
+            s = rel @ d
+            inside = on & (s > 0) & (s < d @ d)
+            out += [tuple(v[i]) for i in np.flatnonzero(inside)]
+    return out
+
+
+def test_mesher_leaves_no_t_junction_where_the_edge_touches_a_lattice_line():
+    """#144: the region's edge touches the lattice line x = 4 at a vertex without crossing
+    it (a bank's dry strip ending there, Nexus City's `sep.e126n468.bank.w5n461`): the whole
+    cell on the other side takes that vertex too, so the bed is one sheet there."""
+    poly = box(0.0, 0.0, 12.0, 8.0).difference(
+        shapely.Polygon([(4.0, 6.39), (7.0, 7.5), (7.0, 5.0)]))
+    v, t = GR.mesh(poly, (0.0, 0.0, 12.0, 8.0), 4.0)
+    assert (4000, 6390) in {tuple(p) for p in v}
+    assert not _t_junctions(v, t)
+    p = v.astype(float) / 1000.0
+    a, b, cc = p[t[:, 0]], p[t[:, 1]], p[t[:, 2]]
+    area = ((b[:, 0] - a[:, 0]) * (cc[:, 1] - a[:, 1]) -
+            (b[:, 1] - a[:, 1]) * (cc[:, 0] - a[:, 0])).sum() / 2.0
+    assert abs(area - poly.area) < 1e-6
+    # (a region whose edge crosses the lattice lines only meshes as before: two triangles a
+    # whole cell)
+    v2, t2 = GR.mesh(box(0.0, 0.0, 8.0, 8.0), (0.0, 0.0, 8.0, 8.0), 4.0)
+    assert len(t2) == 8 and not _t_junctions(v2, t2)
+
+
+def test_coverage_finds_water_no_piece_draws():
+    """#140: `water_coverage` fails where AG12 takes the blockout's sea sheet over water no
+    body covers (Nexus City's Kurosawa River piece north-east of the map's edge, which the
+    model had left out): here the small city's river taken out of the model."""
+    from assetgen.water import checks as WC
+    base, _ = _small()
+    model, _, _ = load_model(base)
+    man = json.loads((base / "assets" / "water" / "manifest.json").read_text())
+    took = {k for r in man["pieces"].values() for k in r.get("replaces", [])} | \
+        set(man["drop"])
+    assert WC.uncovered(model, WCtx(model), took) == []
+    river = model.rivers[0]
+    gone = model.model_copy(update={"rivers": [r for r in model.rivers if r.id != river.id]})
+    bare = WC.uncovered(gone, WCtx(gone), took)
+    assert bare and sum(a for _, a in bare) > 1000.0, bare
+    tiles = {t for t, _ in bare}
+    poly = shapely.Polygon(river.polygon.exterior, river.polygon.holes)
+    assert all(poly.intersects(box(*tb)) for t, tb in WCtx(gone).tiles() if t in tiles)
 
 
 def test_small_city_golden(tmp_path):

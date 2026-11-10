@@ -12,7 +12,8 @@ ground cover):
   quay with the quay's height, a road embankment on its road, a width and toe).
 - `ground_cover`: the pieces tile the open land once: no two overlap, none lies under a
   building, a road or the water, and every part of the open land not covered is a curb
-  corner narrower than `cover.SLIVER_M`.
+  corner narrower than `cover.SLIVER_M`, or one past a junction's faces in M22's map,
+  which are pavement, not open land (`_junction_faces`, `_bare`).
 - `regen_locality` (a district regeneration only, `edit.py`): outside the district and its
   seam (`SEAM_M`) the water bodies' data, the banks and the ground cover change only where
   what they are made from (`INPUTS`: a crowd density, a walkway the splice changed) changed
@@ -237,6 +238,8 @@ def check_cover(m) -> Check:
                 _limit(c, f"{hits} pieces under {what}")
         # the open land it leaves
         left = 0
+        pads = _junction_faces(m)
+        ptree = shapely.STRtree(pads) if pads else None
         for did, zone in CV._zones(cx):
             cut = cx._near(cx.rtree, cx.row, zone) + cx._near(cx.wtree, cx.wet, zone) + \
                 cx._near(cx.htree, cx.hard, zone) + \
@@ -245,7 +248,8 @@ def check_cover(m) -> Check:
             rest = G.inter(G.diff(zone, G.union_local(cut)), cx.land)
             for p in G.parts(rest):
                 A = G.area(p)
-                if A >= CV.MIN_PIECE_M2 * 20 and CV.width_of(p) >= CV.SLIVER_M:
+                if A >= CV.MIN_PIECE_M2 * 20 and CV.width_of(p) >= CV.SLIVER_M and \
+                        _bare(p, cx._near(ptree, pads, p)):
                     left += 1
                     if left <= 3:
                         x, y = G.qpoint(p.representative_point())
@@ -254,6 +258,41 @@ def check_cover(m) -> Check:
         if left > 3:
             _limit(c, f"{left} uncovered pieces of open land")
     return c
+
+
+def _bare(p, pads) -> bool:
+    """Whether open land wider than `cover.SLIVER_M` is still that wide past the junctions'
+    faces on it (only a part that fails is cut: cut first, a narrow part could split into a
+    wide one the generator, measuring it whole, rightly left out)."""
+    if not pads:
+        return True
+    q = G.diff(p, G.union_local(pads))
+    return any(G.area(x) >= CV.MIN_PIECE_M2 * 20 and CV.width_of(x) >= CV.SLIVER_M
+               for x in G.parts(q))
+
+
+def _junction_faces(m) -> list:
+    """M22's faces of every junction on the ground (its carriageway, a cul-de-sac's bulb, the
+    corner pads): pavement, not open land. M16's right of way takes a junction's polygon,
+    its carriageway since M22, so a cul-de-sac's ring of sidewalk round its bulb (a corner
+    pad) lies outside it. The ground cover covers such a ring where it measures 3 m wide or
+    more as a piece of the land between the sources, and leaves it where a hairline joins it
+    to a curb strip (the small test city's `water_required` layout on #140: a 4 m ring, 286
+    m2, measured 1.5 m wide with the strip); either way it is not open land left bare."""
+    if not m.pavement:
+        return []
+    from . import pavement_checks as PC
+
+    jids = {j.id for j in m.junctions}
+    N = PC.Net(m)
+    out = []
+    for f in m.pavement:
+        if f.owner_id not in jids or f.layer != "g0" or f.id in N.bad or not N.rings[f.id]:
+            continue
+        p = G.polygonal(G.clean(N.poly(f.id)))
+        if not p.is_empty:
+            out.append(p)
+    return out
 
 
 def run(spec, m) -> list:

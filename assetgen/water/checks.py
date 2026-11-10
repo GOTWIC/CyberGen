@@ -4,7 +4,10 @@ meshes read back) against the model (M16's beds, banks and levels, M13's levels)
 - `water_coverage`: every water body's own water (its polygon less the bodies before it) is
   covered by its surfaces' first LOD and by its beds with its sloped banks' dry strips (plan
   areas within 0.2% and 2 m2); every
-  bank AG12 draws has a mesh, and every quay and waterway canal wall has AG7's piece.
+  bank AG12 draws has a mesh, and every quay and waterway canal wall has AG7's piece; and
+  (#140, `uncovered`) no part of the water a blockout sea sheet showed (the map less its
+  ground) of `BARE_M2` or more lies outside every body and bank band where AG12 takes the
+  sheet: a sheet fills its whole tile, so taking it over water no body has leaves a hole.
 - `water_levels`: every surface vertex (every LOD) at its body's level (M13's along a river,
   a flat city's `surface_m`) within 1 cm; every bed vertex at its depth: AG12's bottom from
   the model's own banks (M16's bed, or a bank's slope carried on under the water where that
@@ -44,6 +47,8 @@ LEVEL_TOL_M = 0.01
 BED_TOL_M = 0.02
 EDGE_OVER_M = 0.12
 SAMPLE = 3                   # every SAMPLE-th bed vertex is checked
+BARE_M2 = 1.0                # #140: water left undrawn this small is the grid's rounding
+BAND_PAD_M = 0.05            # a bank's band a little wider (its strip's round corners)
 
 
 def _meshes(assets: Path, man: dict) -> dict[str, list]:
@@ -142,13 +147,19 @@ def report(model, cx, manifest: dict, pieces, assets: Path) -> dict:
             pid = k.quay_id if k.kind == "quay" else k.water_id
             if s_pieces is not None and s_pieces.get(pid, {}).get("triangles", 0) <= 0:
                 missing.append(f"{k.id} (AG7 {pid})")
-    checks.append({"id": "water_coverage", "ok": not missing and not area_bad,
+    took = {k for r in recs.values() for k in r.get("replaces", [])} | set(manifest["drop"])
+    bare = uncovered(model, cx, took)
+    checks.append({"id": "water_coverage", "ok": not missing and not area_bad and not bare,
                    "detail": f"{len(own_area)} bodies, "
                              f"{sum(1 for p in pieces if p.maker == 'bank')} banks drawn, "
                              f"{ag7} by AG7" + (f"; {len(missing)} without a mesh: "
                                                 f"{', '.join(sorted(missing)[:6])}"
                                                 if missing else "")
-                             + (f"; areas off: {'; '.join(area_bad[:4])}" if area_bad else "")})
+                             + (f"; areas off: {'; '.join(area_bad[:4])}" if area_bad else "")
+                             + (f"; {len(bare)} parts of the water no piece draws where the "
+                                f"blockout's sea is taken: "
+                                f"{', '.join(f'{t} {a:.0f} m2' for t, a in bare[:6])}"
+                                if bare else "")})
     # -- levels and depths
     lev_bad, bed_bad, deeper, n_lev, n_bed, on16 = [], [], 0, 0, 0, 0
     worst_bed = 0.0
@@ -323,6 +334,35 @@ def report(model, cx, manifest: dict, pieces, assets: Path) -> dict:
                       "triangles_by_kind": dict(sorted(tri_kind.items())),
                       "stones": dict(sorted(instances.items())),
                       "water_m2": round(sum(own_area.values()), 1)}}
+
+
+def uncovered(model, cx, took: set) -> list[tuple[str, float]]:
+    """#140: the water a blockout sea sheet showed that no piece draws once AG12 takes the
+    sheet (replaced or dropped): the map less its ground (the land less the rivers, channels
+    and waterways), less every body's water and every bank's band (its line, `width_m` out
+    to the waterline, and a wall's thickness: a sliver of a shore under it), in parts of
+    `BARE_M2` or more, each as (the tile of the sheet over most of it, its area), the
+    largest first. A sea sheet fills its whole tile under the ground, so AG12 taking it
+    over water no body has leaves a hole to the sky."""
+    with G.canonical():
+        canvas = shapely.box(*model.bounds)
+        land = G.union([G.from_model_poly(p) for x in model.land for p in x.polygons])
+        wet = G.union([b.poly for b in cx.bodies])
+        need = G.diff(canvas, G.diff(land, wet))
+        bands = [LineString(k.line).buffer(k.width_m + BAND_PAD_M, cap_style="flat")
+                 for k in model.banks if len(k.line) >= 2]
+        left = G.diff(need, G.union([wet, *bands]))
+        out = []
+        for p in G.parts(left):
+            a = G.area(p)
+            if a < BARE_M2:
+                continue
+            at = [(G.area(G.inter(p, shapely.box(*tb))), t) for t, tb in cx.tiles()
+                  if f"city.sea.{t}" in took]
+            at = [(x, t) for x, t in at if x > 0.0]
+            if at:
+                out.append((max(at, key=lambda v: (v[0], v[1]))[1], round(a, 1)))
+    return sorted(out, key=lambda v: (-v[1], v[0]))
 
 
 def _vertical(w, tri) -> bool:

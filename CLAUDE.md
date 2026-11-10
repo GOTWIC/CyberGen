@@ -31,9 +31,10 @@ separate local session for it (import the cities it touches into a throwaway pro
 check's own, import again, `--check`, shots). Spec and the record of what each milestone
 changed in it: `docs/unreal_export.md`.
 
-**Validation (every stage, every PR; Swagnik's rules, 2026-10-27 and 2026-11-05).** Before
-pushing a PR, make sure the outputs look good and nothing breaks, at the scale of the change: a
-check earns its place by what it can find, not by habit.
+**Validation (every stage, every PR; Swagnik's rules, 2026-10-27, 2026-11-05 and 2026-11-10).**
+Before pushing a PR, make sure the outputs look good and nothing breaks, at the scale of the
+change: a check earns its place by what it can find, not by habit. Test only what changed: no
+PR, milestone or not, runs the full test suite.
 - **Small fixes** (one feature or issue, code local to it, such as #93, #94, #95): the change's
   own tests and the test files of the modules it touched; builds of only the cities that have
   the feature (every check passes) and only the asset stages it touches (`assetgen streets`,
@@ -43,12 +44,13 @@ check earns its place by what it can find, not by habit.
   the change (name it if it is a known one).
 - **Milestones and changes to shared code** (roads, junctions, ids, geometry, the build
   driver, anything every city goes through): build the cities the change touches, every check
-  passes, look at their previews and renders, and the full test suite passes (recorded hashes
+  passes, look at their previews and renders, and the tests of what changed pass: the test
+  files of the modules it touched and the tests that run that code (recorded hashes
   regenerated where a change moves a model on purpose, saying why).
-- **Main:** after a batch of merges the coordinating session runs the full test suite once on
-  main, in the background, and fixes or files what it finds. It does not validate a PR again
-  (it reviews the outputs and the diff, and has the PR merge the latest main first when they
-  overlap).
+- **Main:** a full test suite only now and then, not after every merge or milestone; the
+  coordinating session runs it on main in the background and fixes or files what it finds. It
+  does not validate a PR again (it reviews the outputs and the diff, and has the PR merge the
+  latest main first when they overlap).
 - **Test runs show their progress** (Swagnik, 2026-11-06): write pytest's output straight to
   a log file as it runs, never only through `| tail` or another filter that holds it back
   until the end:
@@ -1446,6 +1448,45 @@ The support and elevator fixes (issues #108 and #109) are in place, in `citygen/
   first end is added only where that end has none yet (the sidewalk right under it had one
   added already).
 Outputs: `docs/progress/fix_pylons_elevators/`.
+
+The water coverage fixes (issue #140 and #144's Nexus `water_gaps`) are in place, in
+`citygen/build.py` and `assetgen/water/`:
+- **Every part of the map's water a body's** (`build.water_pieces`, in `assemble`): the model
+  kept only the largest part of each body's polygon on the map's water and none of the land
+  the hydrology's opening took between the bodies or beside one, so that water was no
+  body's. The blockout's sea sheet (its whole tile, under the ground) showed there, but AG12
+  takes every sea sheet and drew nothing: Nexus City's Kurosawa River leaves the map at its
+  east edge and comes back, and its first stretch in the north-east was a hole to the sky
+  between the land and an islet. Now every part of the water outside the sea and every
+  body's main piece (down to slivers along a shore; crumbs under `WATER_CRUMB_M2`, 0.01 m2,
+  are the grid's) joins the water whose piece it touches (the one holding most of it, ties
+  by id; again while parts join); a part touching none goes to the water holding most of
+  it, else the nearest, ties by id (the road stage's rule, `roads.Net`), as a further piece
+  of the body, a row of its own (`attrs.part` 2, 3, ...; its stretch of the centerline,
+  `build.piece_line`; cut off by the map's edge, `mouth` edge and no `flows_into`), named
+  `rv.<name>.part<k>` or `ch.<name>.part<k>` (`ids.base`; an unnamed channel by its own
+  anchor). The road stage still takes parts under 50 m2 as land, and M17's `water_end` reads
+  the hydrology's bodies.
+- **Coverage** (`water_coverage`, `checks.uncovered`): the water a blockout sea sheet showed
+  (the map less its ground) must be a body's or under a bank's band wherever AG12 takes the
+  sheet; a part of 1 m2 or more left over fails, named by its tile.
+- **Bed seams** (#144, `grid._Sides`): where the region's edge touches a lattice line at a
+  vertex without crossing it (a bank's dry strip ending on it), the whole cell beside it
+  takes that vertex too; it met the clipped cell across a T-junction, a crack of 0.15 m in
+  Nexus City's bed by `sep.e126n468.bank.w5n461`.
+- **Plate rings** (`massing.Plate.ring`, `_unstep`): two arcs meeting tangent each give their
+  shared end, which may round to grid points a step apart, the second behind the first; a
+  ring that would cross itself drops such steps (a valid ring stays as it was). The small
+  city's `water_required` layout, moved by the water, had a circle plate turned 45 degrees
+  cross itself and a sloped crown's overlay fail.
+- **Junction faces in `ground_cover`** (`water_checks._junction_faces`, `_bare`): M16's
+  right of way takes a junction's carriageway only, so a cul-de-sac's ring of sidewalk round
+  its bulb (a corner pad of M22's map) lies outside it. The generator covers it (meadow) where
+  it measures 3 m wide as a piece, and left it out on that layout, where a hairline joins it
+  to a curb strip; the check counted it as open land left bare. A part of open land that
+  fails is now cut by the junctions' faces on the ground first (only then: cut first, a
+  narrow part could split into a wide one). No city's model moves.
+Outputs: `docs/progress/fix_nexus_water/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
