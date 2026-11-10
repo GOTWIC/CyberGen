@@ -149,6 +149,7 @@ void ACityGenAtmos::RegisterCell(ACityGenAtmosCell* Cell)
 		L.bShadow = (Flags & 4u) != 0;
 		L.bNearOnly = (Flags & 8u) != 0;
 		L.bOn = (Flags & 16u) != 0;
+		L.bNoSpecular = (Flags & 32u) != 0;
 		L.Schedule = uint8((Flags >> 8) & 0xffu);
 		L.Kind = uint8((Flags >> 16) & 0xffu);
 		L.Seed = uint32(i[1]);
@@ -315,6 +316,8 @@ void ACityGenAtmos::ApplyLight(ULocalLightComponent* C, const FCityGenAtmosLight
 	C->SetLightColor(L.Color);
 	C->SetAttenuationRadius(L.ReachCm);
 	C->SetVolumetricScatteringIntensity(VolumetricScattering);
+	// (a sign's or shopfront's stand-in leaves glossy surfaces to reflect the face itself)
+	C->SetSpecularScale(L.bNoSpecular ? 0.f : 1.f);
 	if (L.Shape == 2)
 	{
 		URectLightComponent* R = CastChecked<URectLightComponent>(C);

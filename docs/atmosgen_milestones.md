@@ -138,6 +138,14 @@ images: [`docs/progress/AT1/README.md`](progress/AT1/README.md).
   14.6 walking; with AT0's fog, rain and wet street prototypes 16.0 to 16.4 over the route,
   within 16.7, and 16.5 to 16.8 walking, 0.1 over (AT4 and AT5's: Lumen's reflections on the
   wet decal, 2.5 ms).
+- **No highlight from a lit face's stand-in:** sign, shop sign and shopfront spill lights
+  have specular scale 0 (`Light.specular`, `presets.NO_SPECULAR_KINDS`, flag bit 5): glossy
+  surfaces reflect the face itself (the play features' washes put a bright ball in nearly every
+  billboard); the rule for AT2's sign lights. Delta's night views show no point highlight.
+- **The game at the monitor's resolution** (Swagnik): every import sets
+  `bAllowHighDPIInGameMode=True` in the project (`unreal.set_project_ini`); Delta's game
+  window measured 2560 x 1440 on the 125%-scaled 1440p monitor (2048 x 1152 before). Unreal's
+  automatic screen percentage stays.
 - **Benchmark:** a game window that lost the foreground ran on the 12700K's efficiency cores
   (its threads twice as slow at the same GPU time); the game is now unthrottled and above normal
   priority (`bench.unthrottle`), each sample records the foreground (`front`).

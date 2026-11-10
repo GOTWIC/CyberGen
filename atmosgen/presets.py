@@ -133,6 +133,12 @@ CLASSES = tuple(PHOTOMETRY)
 
 # the lit face of each M20 / M6 sign kind (the second emitter ask: a sign's lit face as a
 # rectangle), and whether its light is near-tier only (small, many)
+# AT1: the lights standing in for a lit face (a sign's, a shopfront's) cast no specular
+# highlight: a glossy surface already reflects the face itself (its emissive, through Lumen),
+# and a light's highlight on it is a bright ball (the play features' sign washes put one in
+# every billboard). The same holds for AT2's sign lights.
+NO_SPECULAR_KINDS = ("sign", "shop_sign", "spill")
+
 SIGN_CLASS = {"billboard": "sign_face", "banner": "neon_band", "neon": "neon_band",
               "holo_ad": "holo_face", "shop_sign": "shop_sign"}
 SIGN_NEAR_ONLY = ("shop_sign",)

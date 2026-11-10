@@ -96,6 +96,18 @@ the player, 13 shadowed; the 768 light pools past them) and a 1,654 m teleport, 
 | **The Corporate Core from the air** | **The Corporate Core, a walk** |
 | ![](unreal/night_core_air.jpg) | ![](unreal/night_core_walk.jpg) |
 
+**No bright ball in the billboards.** The play features' sign washes (a point light 1.5 m
+before each of the 32 nearest large signs) put a specular highlight in nearly every glossy
+billboard; they are gone, and the lights AT1 places for a lit face (signs, shop signs,
+shopfront spill) cast no specular at all (the surfaces reflect the face itself, through
+Lumen). The night views above show the billboards clean; the rule holds for AT2's sign lights.
+
+**The game at the monitor's resolution.** Every import now makes the game DPI-aware
+(`bAllowHighDPIInGameMode=True` in the project): launched as a player would launch it, Delta's
+game window measured 2560 x 1440 physical pixels on the PC's 2560 x 1440 monitor at 125%
+(DPI-unaware it got a 2048 x 1152 window stretched by Windows, the neon strips shimmering).
+Unreal's automatic screen percentage stays as it is.
+
 ## The night's frame time
 
 AG16's benchmark by night on Delta (`citygen unreal ... --bench-only --bench-atmos

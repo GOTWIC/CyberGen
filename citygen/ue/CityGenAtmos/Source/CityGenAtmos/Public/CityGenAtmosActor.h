@@ -43,6 +43,7 @@ struct FCityGenAtmosLight
 	bool bShadow = false;
 	bool bNearOnly = false;
 	bool bOn = true;
+	bool bNoSpecular = false;               // a lit face's stand-in: no highlight
 	float Flicker = 0.f;
 	uint32 Seed = 0;
 };

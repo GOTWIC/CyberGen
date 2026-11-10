@@ -229,6 +229,14 @@
      "title": "Source M",
      "type": "number"
     },
+    "specular": {
+     "default": 1.0,
+     "description": "Its specular scale (AT1): 0 for a light standing in for a lit face (a sign's, a shopfront's), which a glossy surface reflects already.",
+     "maximum": 1.0,
+     "minimum": 0.0,
+     "title": "Specular",
+     "type": "number"
+    },
     "temp_k": {
      "anyOf": [
       {

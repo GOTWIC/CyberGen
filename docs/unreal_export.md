@@ -968,6 +968,12 @@ play-in-editor and `-game` run). So the fixes cut what the level holds and strea
   level adds; with the cells and their HLODs coming and going it made 36 to 48 ms frames at
   256 m cells and 1 to 2.8 s frames at 128 m. A city's textures (AG6's library sets and its
   sign pages, a few hundred) fit whole: Delta's VRAM stayed at 7 GB.
+- **The game at the monitor's resolution** (AT1, `unreal.set_project_ini`:
+  `bAllowHighDPIInGameMode=True` in the project's `[/Script/Engine.UserInterfaceSettings]`,
+  written by every import): the game is DPI-aware, so a 2560 x 1440 monitor scaled 125% gives
+  it a 2560 x 1440 window (DPI-unaware it got 2048 x 1152, stretched by Windows, and the neon
+  strips shimmered). Unreal's automatic screen percentage is left as it is; the benchmark keeps
+  its own overrides.
 - **Tried and left out**: UE 5.8's experimental switches for physics bodies made off the
   game thread (`p.Chaos.EnableAsyncInitBody`) and incremental garbage collection
   (`gc.AllowIncrementalReachability`, `gc.AllowIncrementalGather`), no forced collection
@@ -1472,8 +1478,8 @@ import go):
   Unreal's frame (position in cm, pitch and yaw, a rect's width and height, the source
   radius, the intensity in candela, or nits for a rect, the linear color, the reach, a
   spot's cones or a rect's barn door angle, the flicker depth) and 2 ints (flags: shape,
-  may cast shadows, near tier only, on or broken, schedule, kind and mount indices; a seed
-  from its record's hash).
+  may cast shadows, near tier only, on or broken, no specular, schedule, kind and mount
+  indices; a seed from its record's hash).
 - **The importer** (`Importer.atmos_cells`, `atmos_controller`): a `CityGenAtmosCell`
   actor per cell at its middle, spatially loaded (no primitive: World Partition streams it
   by its location, in the main grid's 128 m cell holding it), its `LightFloats` and
@@ -1501,6 +1507,11 @@ import go):
   lights live near the player when the city has a plan (else the light pools); the night
   views log the live set. `CITYGEN_UE_LAMP_DEBUG=1` still skips the walk's checks, straight
   to the play features and their views.
+- **No highlight from a lit face's stand-in**: the lights standing in for a sign's or a
+  shopfront's lit face (kinds `sign`, `shop_sign`, `spill`) have specular scale 0 (the plan's
+  `specular`, flag bit 5 of the packed record): a glossy surface reflects the face itself,
+  through Lumen, and a light's highlight on it is a bright ball (the play features' sign washes
+  put one in nearly every billboard). The same rule holds for AT2's sign lights.
 - **A city without an atmos plan** imports as before (no controller, no cells), its night
   lit by the light pools alone.
 

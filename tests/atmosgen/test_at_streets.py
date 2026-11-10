@@ -164,6 +164,9 @@ def test_plan_lights_junctions_roads_alleys_and_structures(build):
     st = [v for v in L.values() if v["kind"] == "station"]
     assert st and all(v["pos"][2] > 12.0 and v["on"] and not v["flicker"] for v in st)
     assert kinds["station"] == len(st)
+    # a sign's or a shopfront's light casts no specular highlight; the street's do
+    assert all(v["specular"] == 0.0 for v in L.values() if v["kind"] in P.NO_SPECULAR_KINDS)
+    assert sig["specular"] == 1.0
     # every light names what it hangs on; the ones asked of stage 2 are counted
     assert rep["asked"] == sum(1 for v in L.values() if v["mount"] in PM.ASKED)
     assert rep["mounts"]["prop"] == 1                  # (the one street light)

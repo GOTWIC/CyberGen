@@ -85,6 +85,10 @@ class Light(_Model):
     source: Literal["derived", "assetgen"] = Field(
         "derived", description="Where its fixture's light came from: assetgen's emitter "
                                "record (the asks, section 4.1) or derived from citygen.")
+    specular: float = Field(1.0, ge=0.0, le=1.0,
+                            description="Its specular scale (AT1): 0 for a light standing in "
+                                        "for a lit face (a sign's, a shopfront's), which a "
+                                        "glossy surface reflects already.")
     mount: Mount = Field("prop", description="What it hangs on (AT1): the city's own "
                                              "fixture, or one the plan asks of stage 2 "
                                              "(pole, mast_arm, wall, canopy).")

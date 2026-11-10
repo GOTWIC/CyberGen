@@ -20,7 +20,8 @@ namespace CityGenAtmosPack
 	// door angle in inner), flicker depth
 	constexpr int32 Floats = 16;
 	// ints: flags (bits 0-1 shape: 0 spot, 1 point, 2 rect; 2 may cast shadows; 3 near tier
-	// only; 4 on, not broken; 8-15 schedule index; 16-23 kind index; 24-27 mount index),
+	// only; 4 on, not broken; 5 no specular, a lit face's stand-in; 8-15 schedule index;
+	// 16-23 kind index; 24-27 mount index),
 	// seed (a hash of its id)
 	constexpr int32 Ints = 2;
 }

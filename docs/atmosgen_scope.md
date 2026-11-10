@@ -201,7 +201,10 @@ stages have); never required to edit. Fields, all with defaults:
   (sodium, LED). Light pools only where a lamp is beyond the live set.
 - **Shop spill:** a rect light per lit storefront facing out across the sidewalk, color
   from the shop's use, by its hours (M11).
-- **Signs as light:** a billboard, banner or holo-board lights what it faces as a lit
+- **Signs as light** (AT1's rule for every light standing in for a lit face, a sign's or a
+  shopfront's: no specular highlight, the glossy surfaces reflect the face itself; a point
+  light before a billboard put a bright ball in it):
+  a billboard, banner or holo-board lights what it faces as a lit
   face would (a rect light the size of its face, its color from the sign page, falling off
   over the street and the facade opposite), not a point that floods its own wall; neon
   bands and shop signs as small colored lights near; some flicker, some broken, more where

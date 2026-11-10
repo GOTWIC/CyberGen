@@ -1380,6 +1380,18 @@ def set_nanite_pool(uproject: str | Path, man: dict) -> bool:
 # dumps on Delta Megacity); a city's textures (AG6's library sets and its sign pages, a few
 # hundred) fit whole: Delta's VRAM stayed at 7 GB.
 PROJECT_SETTINGS = [("r.TextureStreaming", "0")]
+# AT1 (Swagnik: "make sure that the game runs on the monitor's resolution"): a game is
+# DPI-aware, so on a screen scaled 125% a 2560 x 1440 monitor gives the game 2560 x 1440, not
+# a 2048 x 1152 window Windows stretches (the neon strips shimmered); the benchmark's own
+# `-ini` override did this for its runs alone. Unreal's automatic screen percentage stays.
+UI_SECTION = "[/Script/Engine.UserInterfaceSettings]"
+UI_SETTINGS = [("bAllowHighDPIInGameMode", "True")]
+
+
+def set_project_ini(uproject: str | Path) -> bool:
+    """The game's settings every import makes the project's defaults (`UI_SETTINGS` in its
+    DefaultEngine.ini). True when the file changed."""
+    return set_engine_ini(uproject, UI_SECTION, UI_SETTINGS)
 
 
 def set_engine_ini(uproject: str | Path, section: str, want: list[tuple[str, str]]) -> bool:
@@ -1732,6 +1744,7 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
         res["nanite_meshes"] = nanite_meshes(man)
         res["nanite_pool_mb"] = nanite_pool_mb(man)
         res["nanite_pool_changed"] = set_nanite_pool(up, man)
+        res["project_ini_changed"] = set_project_ini(up)
         Path(job["result"]).write_text(json.dumps(res, indent=1) + "\n",
                                        encoding="utf-8", newline="\n")
     return res

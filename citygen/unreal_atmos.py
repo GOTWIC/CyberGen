@@ -110,7 +110,9 @@ def pack(L: dict, schedules: list[str], kinds: list[str], mounts: list[str]):
          _r(inten, 2), _r(col[0], 4), _r(col[1], 4), _r(col[2], 4),
          _r(float(L["reach_m"]) * 100.0, 1), _r(inner), _r(outer), _r(L.get("flicker", 0.0))]
     flags = (shape | (4 if L.get("shadow") else 0) | (8 if L.get("tier") == "near" else 0)
-             | (16 if L.get("on", True) else 0) | (schedules.index(L["schedule"]) << 8)
+             | (16 if L.get("on", True) else 0)
+             | (32 if float(L.get("specular", 1.0)) < 0.5 else 0)
+             | (schedules.index(L["schedule"]) << 8)
              | (kinds.index(L["kind"]) << 16) | (mounts.index(L.get("mount", "prop")) << 24))
     seed = int(L["hash"][:8], 16)
     if seed >= 2 ** 31:

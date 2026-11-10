@@ -299,7 +299,8 @@ class Plan:
                "on": kept or kind == "corner" or ".fill" in owner or
                not (u(lid, "broken") < md["broken"]),
                "source": "derived",
-               "mount": mount}
+               "mount": mount,
+               "specular": 0.0 if kind in P.NO_SPECULAR_KINDS else 1.0}
         if temp_k is not None:
             rec["temp_k"] = int(temp_k)
         if ph["shape"] == "rect":

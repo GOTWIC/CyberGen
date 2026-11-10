@@ -91,6 +91,10 @@ def test_pack_frames_and_flags():
          "kind": "spill", "mount": "facade"}
     f, i = UA.pack(R, ["always", "dusk_dawn"], kinds, mounts)
     assert f[8] == 100.0 and f[13] == 70.0 and f[5:7] == [200.0, 50.0] and i[0] & 3 == 2
+    assert not flags & 32 and not i[0] & 32
+    # a lit face's stand-in casts no specular highlight (bit 5)
+    _, i = UA.pack({**R, "specular": 0.0}, ["always", "dusk_dawn"], kinds, mounts)
+    assert i[0] & 32
 
 
 def test_hashes_follow_the_lights(build, tmp_path):
