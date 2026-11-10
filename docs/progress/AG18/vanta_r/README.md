@@ -6,7 +6,7 @@ not a generator: one design, built by a Blender script, with nothing of it wired
 generators yet.
 
 ![hero](car_hero.jpg)
-![sheet](car_sheet.jpg)
+![sheet](sheet.jpg)
 ![night](car_low_night.jpg)
 
 ## The car
@@ -35,26 +35,30 @@ About 240,000 triangles in 93 objects (the two honeycomb meshes are about 60,000
 
 | File | What |
 |---|---|
-| `vehicles/cars/vanta_r.py` | builds the car, the studio and the renders in Blender 5.2 |
-| `vehicles/post.py` | bloom on a render, and the turnaround sheet (PIL, numpy) |
+| `vehicles/cars/vanta_r.py` | the car's own design, built on the kit in Blender 5.2 |
+| `vehicles/carkit.py` | the shared kit: materials, body builder, wheels, studio, cameras, renders (`vehicles/README.md`) |
+| `vehicles/blender.sh` | the wrapper every build runs through, one Blender job at a time |
+| `vehicles/post.py` | bloom on a render, and putting a sheet's tiles together (PIL, numpy) |
 | `car.blend` | the built scene: car, studio, cameras, procedural materials (`--blend`, not in git) |
 | `car.glb` | the car alone, modifiers applied, flat PBR values per material (`--glb`, not in git) |
 | `car_hero.jpg`, `car_rear.jpg`, `car_side.jpg`, `car_front.jpg`, `car_back.jpg`, `car_top.jpg` | studio views, 3840 x 2160 |
 | `car_wheel.jpg`, `car_nose.jpg`, `car_tail.jpg` | close-ups |
 | `car_low_night.jpg`, `car_rear_night.jpg` | night views on a wet floor |
-| `car_sheet.jpg` | hero with front, side and back |
+| `sheet.jpg` | hero with front, side and back, each rendered at its tile's size (`--sheet`) |
 
 ## Run
 
 ```
-"/Applications/Blender 5.2.app/Contents/MacOS/Blender" -b -P vehicles/cars/vanta_r.py -- \
-    --out OUT --views hero,rear,side --res 3840 2160 --samples 160 [--night] [--blend] [--glb]
+vehicles/blender.sh vehicles/cars/vanta_r.py --out OUT --preview
+vehicles/blender.sh vehicles/cars/vanta_r.py --out OUT --sheet [--night]
+vehicles/blender.sh vehicles/cars/vanta_r.py --out OUT --views hero,rear,side \
+    --res 3840 2160 --samples 160 [--night] [--blend] [--glb]
 .venv/bin/python vehicles/post.py bloom OUT/car_low_night.jpg OUT/car_low_night.jpg 1.0 0.8
-.venv/bin/python vehicles/post.py sheet OUT OUT/car_sheet.jpg
 ```
 
 Views: `hero`, `rear`, `rear_l`, `side`, `front`, `back`, `top`, `low`, `wheel`, `nose`,
-`tail`, `cabin`. The build takes under a second; a 4K view takes about two minutes on the M4.
+`tail`, `cabin`. The build takes under a second, the preview about ten seconds, the sheet
+and a 4K view about two minutes each on the M4.
 
 ## Where it stands against a shipped game car
 
