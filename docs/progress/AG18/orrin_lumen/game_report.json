@@ -1,0 +1,379 @@
+{
+ "car": "orrin_lumen",
+ "title": "Orrin Lumen",
+ "ok": true,
+ "triangles": {
+  "original": 293582,
+  "lods": [
+   149620,
+   59994,
+   18261,
+   4563
+  ],
+  "lod0_parts": {
+   "body": 100160,
+   "glass": 9398,
+   "wheel_fl": 10019,
+   "wheel_fr": 10019,
+   "wheel_rl": 10012,
+   "wheel_rr": 10012
+  }
+ },
+ "objects": {
+  "original": 47,
+  "parts": 6
+ },
+ "textures": {
+  "body": 4096,
+  "wheels": 2048
+ },
+ "pack_bytes": 22139639,
+ "seconds": 614.2,
+ "stage_seconds": {
+  "build": 1.2,
+  "render_original": 90.4,
+  "parts": 15.3,
+  "nodes": 0.0,
+  "uv": 2.5,
+  "bake": 370.3,
+  "lods_export": 2.2,
+  "textures": 11.926034927368164,
+  "proof": 120.1503369808197
+ },
+ "baked_down": {
+  "collapse": {
+   "pieces": 29,
+   "triangles": 228617,
+   "names": [
+    "body.door_f",
+    "body.door_r",
+    "body.floor",
+    "body.front",
+    "body.glass",
+    "body.rear",
+    "body.sill",
+    "body.slot",
+    "body.well",
+    "cameras",
+    "deck.front.deck",
+    "deck.rear.deck",
+    "glass.lines",
+    "interior.seats",
+    "led.cabin",
+    "led.front",
+    "led.rear",
+    "rim.fl",
+    "rim.fr",
+    "rim.rl",
+    "rim.rr",
+    "ring.fl",
+    "ring.fr",
+    "ring.rl",
+    "ring.rr",
+    "vanes.fl",
+    "vanes.fr",
+    "vanes.rl",
+    "vanes.rr"
+   ]
+  },
+  "relief": {
+   "pieces": 7,
+   "triangles": 5101,
+   "names": [
+    "camera.lens",
+    "dots",
+    "led.marker",
+    "led.port",
+    "lettering",
+    "lines",
+    "sensors"
+   ]
+  },
+  "lathe": {
+   "pieces": 4,
+   "triangles": 57536,
+   "names": [
+    "tire.fl",
+    "tire.fr",
+    "tire.rl",
+    "tire.rr"
+   ]
+  }
+ },
+ "texel_px_per_m": {
+  "body": {
+   "exterior": {
+    "area_m2": 21.152,
+    "p5": 447.8,
+    "median": 476.4
+   },
+   "cabin": {
+    "area_m2": 15.869,
+    "p5": 190.1,
+    "median": 190.5
+   },
+   "underside": {
+    "area_m2": 1.042,
+    "p5": 154.5,
+    "median": 173.8
+   }
+  },
+  "wheels": {
+   "exterior": {
+    "area_m2": 4.284,
+    "p5": 367.6,
+    "median": 401.0
+   },
+   "underside": {
+    "area_m2": 0.012,
+    "p5": 370.9,
+    "median": 401.0
+   }
+  }
+ },
+ "lights": 13,
+ "collision_hulls": 9,
+ "source": {
+  "script": "vehicles/cars/orrin_lumen.py",
+  "script_sha256": "9118021838ae343b769492cd70766cb65f23cff220c9ae74d32d59a259d4c4bd",
+  "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
+  "game_sha256": "28c5e18befb8616a4862f4d0185b0a82daa07e8142d43c78bd26d832dba4430e",
+  "original_triangles": 293582,
+  "original_objects": 47
+ },
+ "test": false,
+ "checks": [
+  {
+   "check": "files",
+   "ok": true,
+   "detail": {
+    "files": 15,
+    "missing": [],
+    "unreadable": []
+   }
+  },
+  {
+   "check": "budgets",
+   "ok": true,
+   "detail": [
+    {
+     "lod": 0,
+     "triangles": 149620,
+     "budget": 150000,
+     "ok": true
+    },
+    {
+     "lod": 1,
+     "triangles": 59994,
+     "budget": 60000,
+     "ok": true
+    },
+    {
+     "lod": 2,
+     "triangles": 18261,
+     "budget": 20000,
+     "ok": true
+    },
+    {
+     "lod": 3,
+     "triangles": 4563,
+     "budget": 5000,
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "uv_overlap",
+   "ok": true,
+   "detail": {
+    "limit": 0.005,
+    "slots": {
+     "body": {
+      "overlap": 5e-05,
+      "coverage": 0.4489,
+      "outside_unit": 0.0
+     },
+     "wheels": {
+      "overlap": 0.0,
+      "coverage": 0.1649,
+      "outside_unit": 0.0
+     }
+    }
+   }
+  },
+  {
+   "check": "texel_density",
+   "ok": true,
+   "detail": {
+    "body": {
+     "p5": 447.8,
+     "median": 476.4,
+     "floor": 300.0,
+     "ok": true
+    },
+    "wheels": {
+     "p5": 367.6,
+     "median": 401.0,
+     "floor": 300.0,
+     "ok": true
+    }
+   }
+  },
+  {
+   "check": "wheel_pivots",
+   "ok": true,
+   "detail": [
+    {
+     "part": "wheel_fl",
+     "pivot": [
+      1.58,
+      0.8225,
+      0.37
+     ],
+     "center_offset_mm": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "radius": 0.37,
+     "radius_pack": 0.37,
+     "json_pivot": [
+      1.58,
+      0.8225,
+      0.37
+     ],
+     "ok": true
+    },
+    {
+     "part": "wheel_fr",
+     "pivot": [
+      1.58,
+      -0.8225,
+      0.37
+     ],
+     "center_offset_mm": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "radius": 0.37,
+     "radius_pack": 0.37,
+     "json_pivot": [
+      1.58,
+      -0.8225,
+      0.37
+     ],
+     "ok": true
+    },
+    {
+     "part": "wheel_rl",
+     "pivot": [
+      -1.52,
+      0.7575,
+      0.37
+     ],
+     "center_offset_mm": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "radius": 0.37,
+     "radius_pack": 0.37,
+     "json_pivot": [
+      -1.52,
+      0.7575,
+      0.37
+     ],
+     "ok": true
+    },
+    {
+     "part": "wheel_rr",
+     "pivot": [
+      -1.52,
+      -0.7575,
+      0.37
+     ],
+     "center_offset_mm": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "radius": 0.37,
+     "radius_pack": 0.37,
+     "json_pivot": [
+      -1.52,
+      -0.7575,
+      0.37
+     ],
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "lod_bounds",
+   "ok": true,
+   "detail": [
+    {
+     "lod": 1,
+     "deviation_m": [
+      0.0,
+      0.0,
+      0.0002
+     ],
+     "tolerance_m": [
+      0.0755,
+      0.03,
+      0.0206
+     ],
+     "ok": true
+    },
+    {
+     "lod": 2,
+     "deviation_m": [
+      0.0002,
+      0.0,
+      0.0022
+     ],
+     "tolerance_m": [
+      0.0755,
+      0.03,
+      0.0206
+     ],
+     "ok": true
+    },
+    {
+     "lod": 3,
+     "deviation_m": [
+      0.0028,
+      0.0013,
+      0.0036
+     ],
+     "tolerance_m": [
+      0.0755,
+      0.03,
+      0.0206
+     ],
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "collision",
+   "ok": true,
+   "detail": {
+    "hulls": 9,
+    "vertices": [
+     482,
+     170,
+     372,
+     196,
+     336,
+     114,
+     396,
+     108,
+     506
+    ]
+   }
+  }
+ ]
+}

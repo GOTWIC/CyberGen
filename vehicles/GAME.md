@@ -74,7 +74,7 @@ Two baked slots, `body` (4096) and `wheels` (2048), PNG, each with five textures
 | `<slot>_normal.png` | linear | RGB: tangent space normal, **OpenGL convention** (+Y, glTF's and the repo's material library's); flip green for DirectX (Unreal's importer has the switch). Tangents are in the glTF (MikkTSpace) |
 | `<slot>_orm.png` | linear | R: ambient occlusion, G: roughness, B: metallic, A: clear coat weight |
 | `<slot>_mask.png` | linear | R: primary paint weight, G: secondary paint weight, B: accent weight, A: shade on the tinted color (1 clean, lower in creases) |
-| `<slot>_emissive.png` | sRGB | RGB: emission color times its strength over `emissive_strength`. A: specular level (0.5 standard, 0 on voids) |
+| `<slot>_emissive.png` | sRGB | RGB: emission color times its strength over `emissive_strength`, at most 1 (an emitter seen only through glass and stronger than the scale is clipped keeping its hue, `emissive_clipped`). A: specular level (0.5 standard, 0 on voids) |
 
 Glass is a parameter-only slot (`materials.glass.params`: color, roughness, IOR,
 transmission; `opaque_from_lod` 2: LOD2 and LOD3 carry no cabin, draw the glass dark and
@@ -110,12 +110,15 @@ So that LOD0 is near 150,000 triangles without decimating the silhouette:
   lathe of their cross section's outer envelope (64 segments), the tread pockets and
   sidewall lettering baked onto it.
 - **Over the budget, in this order**: relief up to 12.5 mm (bolt rows, badges, lenses),
-  most triangles first; then the densest small parts (never body panels or glass) are
-  collapsed, their originals baked onto them.
+  most triangles first; then the glass is collapsed (to 35% at most: it carries no
+  texture); then every part of 600 triangles or more alike, body panels too, lamps never,
+  at most halved a round, three rounds. Collapsed parts have their originals baked onto them. A right wheel that is
+  its left partner mirrored is collapsed as that mirror, so the pair still shares its UVs.
 - **Never seen**: faces no ray from outside reaches (through glass counts, for the cabin)
   are removed, and coincident faces (one of two facing the same way, both of two facing
   apart). Faces seen only through glass are the cabin class, only from below the
-  underside class.
+  underside class. A face never seen from its front but seen from its back (a design
+  face turned the wrong way, which Blender draws and an engine culls) is turned round.
 
 `baked_down` in `pack.json` lists every piece and what became of it.
 
@@ -123,8 +126,13 @@ So that LOD0 is near 150,000 triangles without decimating the silhouette:
 
 Smart projection per slot, each island scaled to one texel density times its class's
 weight (exterior 1, cabin 0.4, underside 0.35), then a skyline packer at the largest
-common scale, each lying flat or stood up, with 8 px between islands at 4096 (bake margins 8 px; whole texels between islands down to the 512 mip). Measured density
-(px/m, area weighted median and 5th percentile, per class) is in `uv.texel_px_per_m`.
+common scale, each lying flat or stood up, with 8 px between islands at 4096 (bake margins 8 px; whole texels between islands down to the 512 mip). The body's islands
+that carry baked-down relief (lettering, decals, small lamps) get up to twice the density,
+less where that would grow the atlas by more than 20% or take the exterior's 5th
+percentile under 3% over the floor (`uv.detail_boost`). Baked-down detail is carried out
+into the margins round its islands, so a seam across it does not show the surface under
+it. Measured density (px/m, area weighted median and 5th percentile, per class) is in
+`uv.texel_px_per_m`.
 
 ## LODs
 
@@ -154,13 +162,13 @@ corners (the farthest points along 128 directions). `collision.glb`, nodes
 | `parts` | per node: name, kind (`body`, `glass`, `wheel`, `brake`), material, pivot; wheels and brakes also radius, width, side, axle, `steers`, `spins`, `follows`, `uv_shared_with` |
 | `materials` | per slot: textures (file, size, color space, channels) and params |
 | `colors`, `tinted_materials` | show colors per channel; the materials that follow them |
-| `emissive_strength` | the emissive texture's 1.0 in Blender's strength (day values) |
+| `emissive_strength`, `emissive_clipped` | the emissive texture's 1.0 in Blender's strength (day values): the strongest emitter seen from outside; the cabin-only emitters stronger than that, clipped to it (their true strength is in `lights`) |
 | `micro_detail` | detail left to the engine's detail maps |
 | `lights` | every emissive surface grouped into lamps: role (`head`, `tail`, `marker`, `wheel`, `cabin`, `glow`, `lamp`, `emitter`), part, position, size, facing, area, color, strength |
 | `collision` | file and hulls |
 | `views`, `cameras` | the hero view and the cameras of the proof renders |
 | `baked_down` | what was removed or replaced, and how |
-| `uv` | islands, measured texel density, its floor |
+| `uv` | islands, measured texel density, its floor, the density factor of the islands under baked-down detail (`detail_boost`) |
 | `build` | test or full, samples, seconds per stage |
 
 ## Checks (`game_report.json`; the run fails when one fails)
@@ -180,4 +188,5 @@ corners (the farthest points along 128 directions). `collision.glb`, nodes
 
 `proof/` and `game.jpg`: the pack alone (the GLBs and PNGs, through the formula above, in a
 fresh Blender, in the kit's studio) next to the procedural original from the same camera,
-a recolored copy, the textures, and the four LODs.
+a recolored copy, the textures, and the four LODs (from `opaque_from_lod` the glass dark
+and opaque, as an engine draws it).
