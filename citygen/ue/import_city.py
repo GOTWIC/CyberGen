@@ -2792,6 +2792,8 @@ class Importer:
                 old.append(hd)
         if old:
             sds.delete_subobjects(handles[0], old, None)
+        if not recs:
+            return               # (`drop_members`, also on an import of the blockout alone)
         st = self.stats["stage2"]
         for r in sorted(recs, key=lambda r: r["key"]):
             sm = self.meshes_s2[r["mesh"]]
