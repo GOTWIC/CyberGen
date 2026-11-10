@@ -2544,7 +2544,10 @@ the Unreal tests updated); results `docs/progress/AG16/`.
   hitches over 50 and 100 ms, frames not streamed around the player, memory and the loads;
   over three runs the median and the spread; JSON, a table, frame-time graphs and the last
   run's screenshot of each segment start in `docs/progress/AG16/bench/<city>/<label>`.
-  `bench.side_by_side` pairs two benchmarks' shots.
+  `bench.side_by_side` pairs two benchmarks' shots. While a run plays the CPU other
+  processes take is sampled every 30 s (`others.json`), and a run whose game or render
+  thread median is 1.5 times the fastest run's at the same GPU time is named under the
+  table (`bench.starved`).
 - **Before** (`bench/delta_megacity/before`): the median frame 8 to 13 ms walking and
   flying, 18 to 20 ms driving, the 95th percentile 27 to 49 ms everywhere, 53 to 61 frames
   over 100 ms a pass, always the game thread; the GPU's p95 7 to 12 ms. The slow frames
@@ -2603,7 +2606,13 @@ the Unreal tests updated); results `docs/progress/AG16/`.
   remains of the frames over 100 ms. UE 5.8's experimental async physics bodies and
   incremental garbage collection, no forced collection after a cell streams out and actor
   clustering were tried and left out (no gain, or far worse). An import over an earlier
-  level still loads all its actors first (37 GB committed for Delta's).
+  level still loads all its actors first (37 GB committed for Delta's). A first launch
+  after an import is starved of CPU (the derived data cache, pipeline states, the OS file
+  cache); a cooked build carries the derived data. A discarded second set of after runs
+  had a night freeze in its run 3 from outside the game (a 1,845 ms frame with 8 ms of
+  game-thread work while another process wrote 0.9 GB to the disk); the final set has
+  none. A small-city A/B in two fresh projects, grouped and not, draws the same views
+  (AG3's fronts included).
 - **Budgets** (`assetgen/scene.py`, in `asset_budget` at the end of `assetgen build`, with
   `assets/scene_budget.json`): the city's scene as the exporter makes it (its own manifest:
   actors, components, distinct Nanite meshes, instances, root pages against the pool)
@@ -2613,9 +2622,13 @@ the Unreal tests updated); results `docs/progress/AG16/`.
   95th percentile 8.0 to 13.2 ms, the median 6.7 to 11.5 ms walking, driving and flying, by
   day and night, native and at 67% TSR, no frame over 100 ms in the median run, VRAM at most
   7.5 GB; 13,928 actors, 41,969 meshes, 3.1 million instances. Its first run, right after
-  the import, waited on meshes being built into the derived data cache (the median frame 18
-  to 22 ms walking, game thread); the other two agree within 0.2 ms, and the median of three
-  leaves it out.
+  the import, was starved of CPU throughout: the render, game and RHI threads about twice
+  as slow as in runs 2 and 3 at the same GPU time (render p50 18.4 against 8.8 ms walking by
+  day), with half the frames, so every p95 spread reads up to 29 to 45 ms. The game builds
+  the meshes' derived data on the CPU's cores while it plays (3,775 lines of waiting for
+  static meshes against 693); Delta's first run after its final import did the same
+  (render p50 23 to 24 against 9.5 ms). No Defender scan ran meanwhile. Runs 2 and 3 agree
+  within 0.2 ms, and the median of three leaves run 1 out.
 
 **Open:**
 - Garbage collection's 70 to 350 ms frames, a few a pass: an uncooked game's object count; a

@@ -305,9 +305,76 @@ def busy() -> list[str]:
     return hits
 
 
+# While a run plays, the CPU other processes take is sampled every SAMPLE_S seconds
+# (Windows): the game's own helpers (OWN_NAMES) and the driver left out. A run whose game or
+# render thread median is STARVED_CPU times the fastest run's while its GPU median stays
+# within STARVED_GPU of the fastest run's is flagged (`starved`): a first run after an
+# import builds the meshes' derived data on the CPU's cores, and other work on the PC takes
+# them the same way (Vesper Bay's and Delta's first runs: the threads twice as slow at the
+# same GPU time)
+SAMPLE_S = 30.0
+OWN_NAMES = ("Idle", "ShaderCompileWorker", "UnrealTraceServer")
+STARVED_CPU = 1.5
+STARVED_GPU = 1.15
+
+
+def cpu_times() -> dict[int, tuple[str, float]]:
+    """Every process's CPU seconds so far, by pid: (name, seconds); Windows only (else
+    nothing)."""
+    if os.name != "nt":
+        return {}
+    try:
+        out = subprocess.run(
+            ["powershell", "-NoProfile", "-Command",
+             "Get-Process | ForEach-Object { \"$($_.Id)`t$($_.ProcessName)`t$($_.CPU)\" }"],
+            capture_output=True, text=True, timeout=60).stdout
+    except (OSError, subprocess.SubprocessError):
+        return {}
+    res = {}
+    for line in out.splitlines():
+        parts = line.split("\t")
+        if len(parts) == 3 and parts[2].strip():
+            try:
+                res[int(parts[0])] = (parts[1], float(parts[2]))
+            except ValueError:
+                continue
+    return res
+
+
+def others(prev: dict, cur: dict, dt: float, own: set[int]) -> dict:
+    """The cores other processes took between two `cpu_times` samples `dt` seconds apart
+    (a process started since is not counted), with the five busiest by name."""
+    per: dict[str, float] = {}
+    for pid, (name, sec) in cur.items():
+        if pid in own or name in OWN_NAMES or pid not in prev or prev[pid][0] != name:
+            continue
+        d = sec - prev[pid][1]
+        if d > 0:
+            per[name] = per.get(name, 0.0) + d / max(dt, 1e-6)
+    top = sorted(per.items(), key=lambda kv: (-kv[1], kv[0]))[:5]
+    return {"cores": round(sum(per.values()), 2), "top": [[n, round(c, 2)] for n, c in top]}
+
+
+def others_summary(samples: list[dict]) -> dict | None:
+    """A run's `others` samples in short: the mean and most cores, the busiest by name."""
+    if not samples:
+        return None
+    tot: dict[str, float] = {}
+    for x in samples:
+        for n, c in x["top"]:
+            tot[n] = tot.get(n, 0.0) + c / len(samples)
+    return {"samples": len(samples),
+            "cores_mean": round(statistics.fmean(x["cores"] for x in samples), 2),
+            "cores_max": round(max(x["cores"] for x in samples), 2),
+            "top": [[n, round(c, 2)] for n, c in
+                    sorted(tot.items(), key=lambda kv: (-kv[1], kv[0]))[:5]]}
+
+
 def run_game(root: Path, uproject: Path, level: str, job_path: Path, log: Path,
-             resolution=RESOLUTION, timeout: float = 3600.0) -> int:
-    """The standalone game on `level` with the bench's job; its exit code."""
+             resolution=RESOLUTION, timeout: float = 3600.0,
+             samples: list | None = None) -> int:
+    """The standalone game on `level` with the bench's job; its exit code. With `samples`,
+    the CPU other processes take is appended to it every SAMPLE_S seconds while it plays."""
     from .unreal import editor_binary
     exe = editor_binary(root, gui=True)
     cmd = [str(exe), str(uproject), level, "-game", "-windowed",
@@ -322,12 +389,22 @@ def run_game(root: Path, uproject: Path, level: str, job_path: Path, log: Path,
            "-NoScreenMessages"]
     with open(log, "wb") as f:
         proc = subprocess.Popen(cmd, stdout=f, stderr=subprocess.STDOUT)
-        try:
-            return proc.wait(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait()
-            raise
+        t0 = time.time()
+        watch = samples is not None and os.name == "nt"
+        prev, tl = (cpu_times(), t0) if watch else ({}, t0)
+        while True:
+            left = timeout - (time.time() - t0)
+            try:
+                return proc.wait(timeout=max(0.1, min(left, SAMPLE_S) if watch else left))
+            except subprocess.TimeoutExpired:
+                if time.time() - t0 >= timeout:
+                    proc.kill()
+                    proc.wait()
+                    raise
+                cur, now = cpu_times(), time.time()
+                samples.append({"t": round(now - t0, 1),
+                                **others(prev, cur, now - tl, {proc.pid, os.getpid()})})
+                prev, tl = cur, now
 
 
 def bench(build_dir: str | Path, uproject: str | Path, engine: str | None = None,
@@ -379,12 +456,17 @@ def bench(build_dir: str | Path, uproject: str | Path, engine: str | None = None
         say(f"bench: run {k + 1} of {runs} ({len(jb['passes'])} passes, "
             f"{len(rt['segments'])} segments)")
         t = time.time()
-        code = run_game(root, up, level, jp, rd / "game_log.txt", resolution, timeout)
+        samples: list[dict] = []
+        code = run_game(root, up, level, jp, rd / "game_log.txt", resolution, timeout,
+                        samples=samples)
+        (rd / "others.json").write_text(json.dumps(samples, indent=0) + "\n",
+                                        encoding="utf-8", newline="\n")
         if not (rd / "frames.csv").is_file():
             raise RuntimeError(f"run {k + 1}: the game wrote no frames (exit {code}); "
                                f"log {rd / 'game_log.txt'}")
         res = summarize(rd, rt)
         res["exit_code"], res["wall_s"] = code, round(time.time() - t, 1)
+        res["others"] = others_summary(samples)
         if res.get("viewport") != list(resolution):
             # (a run at another resolution is not this benchmark: say so in its results)
             res["resolution_mismatch"] = True
@@ -577,7 +659,35 @@ def combine(results: list[dict], rt: dict, label: str, resolution) -> dict:
                                                  for r in results])
         out["passes"].append(ent)
     out["targets"] = verdict(out)
+    out["starved"] = starved(results)
+    out["others"] = [r.get("others") for r in results]
     return out
+
+
+def starved(results: list[dict]) -> list[dict]:
+    """The runs whose CPU threads were slow at the same GPU time: a pass where the run's game
+    or render thread median (all moving frames) is STARVED_CPU times the fastest run's while
+    its GPU median stays within STARVED_GPU of the fastest run's; per run its passes, the
+    most it was slower by, and the cores other processes took meanwhile (`others`)."""
+    flags: dict[int, list] = {}
+    if len(results) < 2:
+        return []
+    for i, p in enumerate(results[0]["passes"]):
+        rows = [r["passes"][i].get("all") or {} for r in results]
+        if not all(r.get("frames") for r in rows):
+            continue
+        g0 = min(r["game_ms"]["p50"] for r in rows)
+        r0 = min(r["render_ms"]["p50"] for r in rows)
+        u0 = min(r["gpu_ms"]["p50"] for r in rows)
+        for k, r in enumerate(rows):
+            cpu = max(r["game_ms"]["p50"] / max(g0, 0.01), r["render_ms"]["p50"] / max(r0, 0.01))
+            gpu = r["gpu_ms"]["p50"] / max(u0, 0.01)
+            if cpu >= STARVED_CPU and gpu <= STARVED_GPU:
+                flags.setdefault(k + 1, []).append((p["name"], cpu))
+    return [{"run": k, "passes": [n for n, _ in fs], "cpu_x": round(max(c for _, c in fs), 2),
+             "others_cores": (results[k - 1].get("others") or {}).get("cores_mean"),
+             "others_top": (results[k - 1].get("others") or {}).get("top")}
+            for k, fs in sorted(flags.items())]
 
 
 def _spread(v: list[float]) -> dict:
@@ -662,6 +772,22 @@ def table(res: dict) -> str:
                 f"{e.get('nanite_root_pages_max') or ''} |")
     lines += ["", "Loads (s, after each teleport onto a segment's start, all segments): "
               + "; ".join(f"{p['name']} {p['load_s']['median']:g}" for p in res["passes"])]
+    if res.get("starved"):
+        lines += ["", "CPU-starved runs (a thread's median at least "
+                  f"{STARVED_CPU:g} times the fastest run's at the same GPU time; a first run "
+                  "after an import builds the meshes' derived data, or other work on the PC; "
+                  "the median of the runs leaves one out): " + "; ".join(
+                      f"run {x['run']} ({', '.join(x['passes'])}; up to {x['cpu_x']:g}x"
+                      + (f"; other processes {x['others_cores']:g} cores on average"
+                         if x.get("others_cores") is not None else "") + ")"
+                      for x in res["starved"])]
+    oth = [(k + 1, o) for k, o in enumerate(res.get("others") or []) if o]
+    if oth:
+        lines += ["", "Other processes' CPU during the runs (cores, mean and most; the "
+                  "busiest): " + "; ".join(
+                      f"run {k} {o['cores_mean']:g} / {o['cores_max']:g} ("
+                      + ", ".join(f"{n} {c:g}" for n, c in o["top"][:3]) + ")"
+                      for k, o in oth)]
     t = res["targets"]
     lines += ["", "Targets: 60 fps (p95 16.7 ms) missed by: "
               + (", ".join(t["p95_60fps"]) or "none")

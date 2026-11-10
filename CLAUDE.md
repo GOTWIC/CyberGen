@@ -2146,8 +2146,10 @@ AG16 (performance) is in place (scope 14.17, issue #96; `docs/unreal_export.md`,
   `-game` process at 2560 x 1440 (windowed fullscreen, kept DPI-aware), day and night,
   native and 67% TSR, after warm-up flights; per frame the frame, game, render, RHI and GPU
   times, draw calls, streaming, VRAM and RAM, beside the engine's CSV profile; JSON, a table,
-  graphs and shots in `docs/progress/AG16/bench/<city>/<label>`; it waits while other heavy
-  processes run (`bench.busy`). `bench.side_by_side` pairs two benchmarks' shots.
+  graphs and the last run's shots in `docs/progress/AG16/bench/<city>/<label>`; it waits while
+  other heavy processes run (`bench.busy`), samples their CPU through each run and names a
+  CPU-starved run (`bench.starved`: a first run after an import is one). `bench.side_by_side`
+  pairs two benchmarks' shots.
 - **Exporter fixes**: a part or sign node of one name imported once for every tile
   (`unreal.share_meshes`); records as components (`unreal.group_actors`, the manifest's
   `groups` and `holder`: an entry's parts on its actor or a `BP_CityGenGroup`, a street front

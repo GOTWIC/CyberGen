@@ -84,7 +84,7 @@ def test_job_has_a_warm_pass_first(tmp_path):
     assert "r.VSync 0" in jb["commands"]
 
 
-def _run(rd, rt, slow=1.0):
+def _run(rd, rt, slow=1.0, cpu=1.0):
     """A run's files as the game writes them: the warm pass and one measured pass, each
     segment loaded, then moving frames (phase 2) or the teleport's (phase 3)."""
     rd.mkdir(parents=True)
@@ -104,8 +104,9 @@ def _run(rd, rt, slow=1.0):
                 ms = (10.0 if k < 90 else 30.0) * slow
                 if s["group"] == "fly" and k == 50:
                     ms = 120.0
-                rows.append(f"{pi},{si},{phase},0,{ms},{ms - 2},{ms - 3},2,{ms - 1},"
-                            f"500,9000,{0 if k % 10 == 0 else 1},0,{6000 + k},12000,0,0,0")
+                rows.append(f"{pi},{si},{phase},0,{ms * cpu},{(ms - 2) * cpu},"
+                            f"{(ms - 3) * cpu},2,{ms - 1},500,9000,"
+                            f"{0 if k % 10 == 0 else 1},0,{6000 + k},12000,0,0,0")
     (rd / "frames.csv").write_text("\n".join(rows) + "\n", encoding="utf-8")
     (rd / "bench_events.json").write_text(json.dumps(
         {"viewport": [2560, 1440], "adapter": "Test GPU", "rhi": "D3D12",
@@ -153,6 +154,31 @@ def test_summarize_combine_and_table(tmp_path):
     B.write_results(comb, tmp_path / "out", [tmp_path / "run1"])
     assert json.loads((tmp_path / "out" / "bench.json").read_text(encoding="utf-8")) == comb
     assert (tmp_path / "out" / "frame_times_day_tsr67.png").is_file()
+
+
+def test_a_cpu_starved_run_is_flagged(tmp_path):
+    """A run whose threads take twice as long at the same GPU time (a first run after an
+    import, or other work on the PC) is named under the table; the median leaves it out."""
+    _build(tmp_path)
+    rt = B.route(tmp_path)
+    res = []
+    for k, cpu in enumerate((2.0, 1.0, 1.05)):
+        rd = tmp_path / f"run{k + 1}"
+        _run(rd, rt, 1.0, cpu)
+        res.append(B.summarize(rd, rt))
+    res[0]["others"] = {"samples": 4, "cores_mean": 3.5, "cores_max": 6.0,
+                        "top": [["OneDrive", 3.0]]}
+    comb = B.combine(res, rt, "after", B.RESOLUTION)
+    assert [x["run"] for x in comb["starved"]] == [1]
+    assert comb["starved"][0]["passes"] == ["day_tsr67"] and comb["starved"][0]["cpu_x"] >= 1.9
+    assert comb["starved"][0]["others_cores"] == 3.5
+    md = B.table(comb)
+    assert "CPU-starved runs" in md and "run 1 (day_tsr67" in md and "OneDrive 3" in md
+    # the other processes between two samples: a new process and the game's own left out
+    prev = {1: ("OneDrive", 10.0), 2: ("UnrealEditor", 50.0), 3: ("ShaderCompileWorker", 5.0)}
+    cur = {1: ("OneDrive", 25.0), 2: ("UnrealEditor", 80.0), 3: ("ShaderCompileWorker", 9.0),
+           4: ("MsMpEng", 30.0)}
+    assert B.others(prev, cur, 30.0, {2}) == {"cores": 0.5, "top": [["OneDrive", 0.5]]}
 
 
 def test_side_by_side(tmp_path):
