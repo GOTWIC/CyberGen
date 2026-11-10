@@ -31,9 +31,10 @@ separate local session for it (import the cities it touches into a throwaway pro
 check's own, import again, `--check`, shots). Spec and the record of what each milestone
 changed in it: `docs/unreal_export.md`.
 
-**Validation (every stage, every PR; Swagnik's rules, 2026-10-27 and 2026-11-05).** Before
-pushing a PR, make sure the outputs look good and nothing breaks, at the scale of the change: a
-check earns its place by what it can find, not by habit.
+**Validation (every stage, every PR; Swagnik's rules, 2026-10-27, 2026-11-05 and 2026-11-10).**
+Before pushing a PR, make sure the outputs look good and nothing breaks, at the scale of the
+change: a check earns its place by what it can find, not by habit. Test only what changed: no
+PR, milestone or not, runs the full test suite.
 - **Small fixes** (one feature or issue, code local to it, such as #93, #94, #95): the change's
   own tests and the test files of the modules it touched; builds of only the cities that have
   the feature (every check passes) and only the asset stages it touches (`assetgen streets`,
@@ -43,12 +44,13 @@ check earns its place by what it can find, not by habit.
   the change (name it if it is a known one).
 - **Milestones and changes to shared code** (roads, junctions, ids, geometry, the build
   driver, anything every city goes through): build the cities the change touches, every check
-  passes, look at their previews and renders, and the full test suite passes (recorded hashes
+  passes, look at their previews and renders, and the tests of what changed pass: the test
+  files of the modules it touched and the tests that run that code (recorded hashes
   regenerated where a change moves a model on purpose, saying why).
-- **Main:** after a batch of merges the coordinating session runs the full test suite once on
-  main, in the background, and fixes or files what it finds. It does not validate a PR again
-  (it reviews the outputs and the diff, and has the PR merge the latest main first when they
-  overlap).
+- **Main:** a full test suite only now and then, not after every merge or milestone; the
+  coordinating session runs it on main in the background and fixes or files what it finds. It
+  does not validate a PR again (it reviews the outputs and the diff, and has the PR merge the
+  latest main first when they overlap).
 - **Test runs show their progress** (Swagnik, 2026-11-06): write pytest's output straight to
   a log file as it runs, never only through `| tail` or another filter that holds it back
   until the end:
