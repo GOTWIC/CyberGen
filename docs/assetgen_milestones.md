@@ -28,6 +28,7 @@ as it lands, as in [`citygen_milestones.md`](citygen_milestones.md).
 | Sky tube fixes | Fixes between milestones (issues #94, #97): sky tubes on plain pylons drawn as before M19 (masts an option), ribs at citygen's rings along the whole line, an LED band in the line's color on each lit one (neon, brighter by night) | Done | [`docs/progress/sky_tubes`](progress/sky_tubes) |
 | AG16 | Performance (scope 14.17, issue #96): a benchmark in a standalone game process, frame time, VRAM, RAM and import targets for Delta on the Windows PC, structural fixes from what it shows, budgets in the build; upscaling measured, DLSS later | Planned | |
 | AG17 | Road surfaces by construction (scope 14.18), with stage 1's M22: AG7's road, junction, sidewalk, median and corner pieces meshed from M22's pavement map, their boundaries the map's stored vertices never split, interiors by constrained triangulation, barriers along stored edges, decals on the face that holds them; a `street_watertight` check (every interior map edge in exactly two pieces at the same positions); AG14's step and strip checks reading 0 | Done | [`docs/progress/AG17`](progress/AG17) |
+| AG18 | Hero vehicles (scope 14.19): hand-designed cars, trucks and hover vehicles as Blender scripts on a shared kit, seven made-up brands, one multi-view sheet a car; not a generator, not game-ready yet | In progress | [`docs/progress/AG18`](progress/AG18) |
 
 ## AG0: contract and spike
 
@@ -2671,6 +2672,39 @@ the Unreal tests updated); results `docs/progress/AG16/`.
   TSR at 67%.
 - Mac = x86: no generator output changed (only `assets/scene_budget.json` is new), so the
   deferred determinism check has nothing of AG16's to compare.
+
+## AG18: hero vehicles (in progress)
+
+**Phase 1 running.** Scope 14.19 (Swagnik, 2026-11-10): vehicles designed one by one, not
+generated. Everything is in `vehicles/` (the kit `carkit.py`, a script per car in `cars/`,
+the brand book `BRANDS.md`, the design brief `BRIEF.md`, `post.py`, the render queue
+`blender.sh`); a car's sheet and notes are in `docs/progress/AG18/<car>/`. The concept
+references are outside git (`reference/car_concepts/`). No tests: a car is checked by
+building it and looking at its sheet. Rebuilt `.blend` and `.glb` files are not committed.
+
+- **The first car, Halcyon Vanta-R** (`vehicles/cars/vanta_r.py`, PR #167): a mid-engined
+  wedge, 4.69 x 2.06 x 1.19 m, about 240,000 triangles in 93 objects.
+  - Body: nine character lines over twelve stations as a quad cage with edge and vertex
+    creases, Catmull-Clark level 3, caps with a light band, frame and flat back at nose and
+    tail, recesses and glass insets made in the cage, wheel wells cut with octagonal prisms
+    (exact boolean), then split by panel, each panel pulled in 1.2 mm at its open edges,
+    given a 14 mm rim and bevelled with weighted normals.
+  - Details on the station points: light strips, honeycomb meshes, slats, struts, splitter,
+    canards, skirts, diffuser, exhausts, wing, mirrors, arch trims with bolts; details
+    projected onto the built body through a BVH (ribbons, lettering in DIN, sensors, pins,
+    wiper).
+  - Wheels: lathed tires with tread pockets, grooves and sidewall lettering, twin-spoke
+    rims, light ring, disc and caliper. Cabin blocked in. A power unit under the rear glass.
+  - Materials are procedural (paint flake, dust by height, grime by ambient occlusion,
+    carbon weave); the `.glb` carries flat values.
+- **The method that worked:** a faceted, triangulated loft looked like papercraft; the
+  creased subdivision cage gave taut surfaces with crisp lines. Lessons are in
+  `vehicles/README.md`.
+- **Brands and roster:** `vehicles/BRANDS.md`: Halcyon, Kestrel Aerodyne, Orrin, Brakk
+  Industrial, Aurel, Vex, Tanager, three models each, 21 vehicles with the Vanta-R.
+- **Improvements and the plan for them:** scope 14.19.
+
+The cars built so far are listed in [`docs/progress/AG18/README.md`](progress/AG18/README.md).
 
 ## Order
 
