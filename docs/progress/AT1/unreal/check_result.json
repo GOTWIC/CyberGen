@@ -1,0 +1,315 @@
+{
+ "ok": true,
+ "lines": [
+  "streaming: 2377 of 14145 actors loaded at the start, 5064 after a teleport to (-1408, 1408) (5049 new)",
+  "collision: 505 of 507 traces down hit (building 258, streets 136, cover 72, bridge 27, structure_tube 4, quay 3), 36 of 36 roofs, 36 of 36 facades",
+  "walk: 345 m along a 347 m sidewalk path in 59 s, 100% of frames on the ground, reached its end, frames 0.009 s (median), 0.011 s (95%), 1.74 s at most",
+  "console: ghost flying without collision, fly flying, walk walking",
+  "play features: map, menu, night (127 atmos lights live of 1719 in 89 cells, 13 shadowed, 768 light pools), free camera and back, teleport 1654 m onto the ground",
+  "fly: BP_CityGenFlyPawn_C at 50 m/s flew 419 m in 8.4 s, 2814 actors loaded where it ended, frames 0.009 s (median), 0.017 s (95%), 0.33 s at most"
+ ],
+ "checks": {
+  "streaming": {
+   "ok": true,
+   "actors": 14145,
+   "loaded_at_start": 2377,
+   "stage2_at_start": 1808,
+   "loaded_far": 5064,
+   "only_far": 5049,
+   "far_spot_m": [
+    -1408.0,
+    1408.0
+   ],
+   "far_tile_loaded": true
+  },
+  "collision": {
+   "ok": true,
+   "down": {
+    "traces": 507,
+    "hits": 505,
+    "by_category": {
+     "cover": 72,
+     "building": 258,
+     "bridge": 27,
+     "structure_tube": 4,
+     "streets": 136,
+     "structure_pylon": 1,
+     "quay": 3,
+     "water": 3,
+     "prop_trash_can": 1
+    },
+    "late": 0
+   },
+   "roofs": {
+    "tried": 36,
+    "hit": 36
+   },
+   "facades": {
+    "tried": 36,
+    "hit": 36
+   },
+   "spots": [
+    [
+     -104.91,
+     -119.02
+    ],
+    [
+     -1408.0,
+     1408.0
+    ],
+    [
+     -1408.0,
+     896.0
+    ]
+   ]
+  },
+  "walk": {
+   "ok": true,
+   "path_m": 346.7,
+   "points": 19,
+   "reached": true,
+   "travelled_m": 345.1,
+   "on_ground": 1.0,
+   "max_drop_m": 0.13,
+   "seconds": 59.3,
+   "stopped_by": {},
+   "stops": [],
+   "skipped_low_walkways": 0,
+   "frame_time": {
+    "frames": 6348,
+    "median_s": 0.009,
+    "p95_s": 0.011,
+    "max_s": 1.739
+   }
+  },
+  "cheats": {
+   "ok": true,
+   "ghost": {
+    "mode": "flying",
+    "collision": false
+   },
+   "fly": {
+    "mode": "flying",
+    "collision": true
+   },
+   "walk": {
+    "mode": "walking",
+    "collision": true
+   }
+  },
+  "play_features": {
+   "ok": true,
+   "pawn": "BP_FirstPersonCharacter_C",
+   "walk_points": 77723,
+   "lamp_points": 4394,
+   "atmos_night": {
+    "plan": true,
+    "city": "Delta Megacity",
+    "plan_hash": "24a96bd4af50d0f6",
+    "lights": 1719,
+    "cells": 89,
+    "registrations": 564,
+    "on": true,
+    "live": 127,
+    "spot": 116,
+    "point": 11,
+    "rect": 0,
+    "live_kinds": {
+     "street_light": 87,
+     "signal": 4,
+     "corner": 15,
+     "road": 19,
+     "alley": 2
+    },
+    "shadowed": 13,
+    "candidates": 127,
+    "max_live": 512,
+    "mid_m": 300,
+    "max_shadowed": 16,
+    "update_ms": 0.152,
+    "update_ms_max": 3.514,
+    "scale": 0.04419,
+    "hour": 23.0,
+    "fog": false,
+    "rain": false,
+    "wet": false,
+    "megalights": false,
+    "ray_tracing": 0,
+    "components": 127,
+    "showing": true
+   },
+   "light_pools": 768,
+   "teleport_to": [
+    1050.0,
+    1050.0
+   ],
+   "teleported_m": 1654.2,
+   "landed": true,
+   "states": {
+    "start": {
+     "ready": true,
+     "night": false,
+     "map": false,
+     "menu": false,
+     "free_cam": false,
+     "waiting": false,
+     "pawn": "BP_FirstPersonCharacter_C",
+     "x": -279.47,
+     "y": -373.75,
+     "z": 1.03,
+     "light_pools": 0,
+     "lamp_points": 4394,
+     "walk_points": 77723,
+     "map_texture": true,
+     "overlay": true
+    },
+    "map": true,
+    "menu": true,
+    "night": {
+     "ready": true,
+     "night": true,
+     "map": false,
+     "menu": false,
+     "free_cam": false,
+     "waiting": false,
+     "pawn": "BP_FirstPersonCharacter_C",
+     "x": -279.47,
+     "y": -373.75,
+     "z": 1.03,
+     "light_pools": 768,
+     "lamp_points": 4394,
+     "walk_points": 77723,
+     "map_texture": true,
+     "overlay": true
+    },
+    "atmos_night": {
+     "plan": true,
+     "city": "Delta Megacity",
+     "plan_hash": "24a96bd4af50d0f6",
+     "lights": 1719,
+     "cells": 89,
+     "registrations": 564,
+     "on": true,
+     "live": 127,
+     "spot": 116,
+     "point": 11,
+     "rect": 0,
+     "live_kinds": {
+      "street_light": 87,
+      "signal": 4,
+      "corner": 15,
+      "road": 19,
+      "alley": 2
+     },
+     "shadowed": 13,
+     "candidates": 127,
+     "max_live": 512,
+     "mid_m": 300,
+     "max_shadowed": 16,
+     "update_ms": 0.152,
+     "update_ms_max": 3.514,
+     "scale": 0.04419,
+     "hour": 23.0,
+     "fog": false,
+     "rain": false,
+     "wet": false,
+     "megalights": false,
+     "ray_tracing": 0,
+     "components": 127,
+     "showing": true
+    },
+    "free_cam": {
+     "ready": true,
+     "night": true,
+     "map": false,
+     "menu": false,
+     "free_cam": true,
+     "waiting": false,
+     "pawn": "CityGenFreeCam",
+     "x": -279.56,
+     "y": -373.85,
+     "z": 1.73,
+     "light_pools": 768,
+     "lamp_points": 4394,
+     "walk_points": 77723,
+     "map_texture": true,
+     "overlay": true
+    },
+    "back": {
+     "ready": true,
+     "night": true,
+     "map": false,
+     "menu": false,
+     "free_cam": false,
+     "waiting": true,
+     "pawn": "BP_FirstPersonCharacter_C",
+     "x": -279.47,
+     "y": -373.75,
+     "z": 1.03,
+     "light_pools": 768,
+     "lamp_points": 4394,
+     "walk_points": 77723,
+     "map_texture": true,
+     "overlay": true
+    },
+    "teleport": {
+     "ready": true,
+     "night": false,
+     "map": false,
+     "menu": false,
+     "free_cam": false,
+     "waiting": false,
+     "pawn": "BP_FirstPersonCharacter_C",
+     "x": 1065.35,
+     "y": 1050.11,
+     "z": 1.18,
+     "light_pools": 0,
+     "lamp_points": 4394,
+     "walk_points": 77723,
+     "map_texture": true,
+     "overlay": true
+    }
+   }
+  },
+  "fly": {
+   "ok": true,
+   "pawn": "BP_CityGenFlyPawn_C",
+   "speed_m_s": 50.0,
+   "flew_m": 419.5,
+   "seconds": 8.4,
+   "through": null,
+   "loaded_at_end": 2814,
+   "end_tile_loaded": true,
+   "frame_time": {
+    "frames": 742,
+    "median_s": 0.009,
+    "p95_s": 0.017,
+    "max_s": 0.333
+   }
+  }
+ },
+ "city": "Delta Megacity",
+ "pawn": "BP_FirstPersonCharacter_C",
+ "play_shots": [
+  "C:/Users/swagn/CityGen/builds/at1/check_shots/unreal_play_minimap.png",
+  "C:/Users/swagn/CityGen/builds/at1/check_shots/unreal_play_map.png",
+  "C:/Users/swagn/CityGen/builds/at1/check_shots/unreal_play_menu.png",
+  "C:/Users/swagn/CityGen/builds/at1/check_shots/unreal_play_night.png",
+  "C:/Users/swagn/CityGen/builds/at1/check_shots/unreal_play_free_cam_night.png",
+  "C:/Users/swagn/CityGen/builds/at1/check_shots/unreal_night_core_junction.png",
+  "C:/Users/swagn/CityGen/builds/at1/check_shots/unreal_night_oldtown_junction.png",
+  "C:/Users/swagn/CityGen/builds/at1/check_shots/unreal_night_oldtown_alley.png",
+  "C:/Users/swagn/CityGen/builds/at1/check_shots/unreal_night_highway.png",
+  "C:/Users/swagn/CityGen/builds/at1/check_shots/unreal_night_core_air.png",
+  "C:/Users/swagn/CityGen/builds/at1/check_shots/unreal_night_core_walk.png"
+ ],
+ "fly_pawn": "BP_CityGenFlyPawn_C",
+ "fly_shots": [
+  "C:/Users/swagn/CityGen/builds/at1/check_shots/unreal_fly_over.png",
+  "C:/Users/swagn/CityGen/builds/at1/check_shots/unreal_fly_low.png"
+ ],
+ "total_s": 477.0,
+ "exit_code": 0,
+ "wall_s": 524.3,
+ "log": "C:\\Users\\swagn\\CityGen\\builds\\ag16\\delta_megacity\\unreal\\check_log.txt"
+}

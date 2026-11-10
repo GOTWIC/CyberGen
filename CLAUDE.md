@@ -2320,8 +2320,14 @@ AT1 (streets at night) is in place:
 - **Exposure:** the night looks' `reference_ev100` is matched to the plan's street levels
   (neon rain 1.5, clear night 1.0; AT0's 3 went with its 52 lx streets), so the runtime's
   $2^{-3 - EV_{ref}}$ scale shows the streets as AT0's did until AT3 moves the exposure.
-- Results, the benchmark before and after and the check's night views:
-  `docs/progress/AT1/README.md`.
+- **Reaches** are what each light needs (cobra 30 m, highway 45, post top 18 and never
+  shadowed, wall pack 18, shop spill 12): a live light's shading cost is the screen its reach
+  covers (AT1's first reaches cost Delta's night 2 ms).
+- **Benchmark:** the game is opted out of Windows' power throttling and run above normal
+  priority (`bench.unthrottle`; a window that lost the foreground ran on the 12700K's
+  efficiency cores, its threads twice as slow), each sample records the foreground (`front`).
+- Results (Delta's night 16.4 ms p95 over the route with everything on, 14.4 with AT1's lights
+  alone), the check's night views: `docs/progress/AT1/README.md`.
 
 ## Life generator (lifegen)
 

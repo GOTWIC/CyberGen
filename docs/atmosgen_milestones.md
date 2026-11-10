@@ -117,3 +117,30 @@ images: [`docs/progress/AT1/README.md`](progress/AT1/README.md).
   `-CityGenAtmosPlan` and subsystem are gone; the play features lose AG15's spot lamps and
   sign washes (`play.json` 3) and keep the light pools as the far tier; the check reads the
   controller's status by night; `--bench-atmos` is a flag.
+- **Exposure:** the night looks' `reference_ev100` matched to their streets (neon rain 3 to
+  1.5, clear night 2.5 to 1.0: a road at $E$ lux shows $0.08 E / \pi$ cd/m2, middle gray at
+  $\log_2(8 L)$; AT0's 3 went with its 52 lx), so the runtime's scale shows AT1's physical
+  streets as bright as AT0's showed its own, until AT3.
+- **Reaches sized for the frame:** the first after run had Delta's deferred light pass at
+  5.2 ms walking (AT0 3.0): the live set near a walker full of large-reach spots and posts with
+  cube-map shadows. Reaches are what each light needs (cobra 30 m, highway 45, post top 18 and
+  never shadowed, wall pack 18, shop spill 12); the live set's screen-coverage proxy is back at
+  AT0's and the pass at 3.7 ms; the check, on the same window, places more corner and fill
+  lights.
+- **The plans** (Delta and the samples, `docs/progress/AT1/README.md`): every city passes;
+  Delta 53,559 lights (902 signal mast arms, 662 corner poles, 884 fill lights, 1,036 alley
+  packs), carriageways 16.2 lx average with 0.5% under 1 lx, sidewalks 26.6 lx with 1.0% under
+  2 lx, junction lanes 1% under 1 lx (AT0's 54%); 5,722 lights on fixtures asked of stage 2.
+- **Unreal** (Delta in CityAG16): the import makes the controller and 500 cells in under 3 min;
+  the check passes by night (127 lights live of 1,719 registered in 89 cells round the player,
+  13 shadowed). **The night, native 1440p, p95** (three runs each, before AT0's plan through
+  the command line, after AT1's in the level): lights 14.0 to 14.4 ms over the route, 14.4 to
+  14.6 walking; with AT0's fog, rain and wet street prototypes 16.0 to 16.4 over the route,
+  within 16.7, and 16.5 to 16.8 walking, 0.1 over (AT4 and AT5's: Lumen's reflections on the
+  wet decal, 2.5 ms).
+- **Benchmark:** a game window that lost the foreground ran on the 12700K's efficiency cores
+  (its threads twice as slow at the same GPU time); the game is now unthrottled and above normal
+  priority (`bench.unthrottle`), each sample records the foreground (`front`).
+- **Tests:** `tests/atmosgen/test_at_streets.py` (photometry, the new lights, occlusion, the
+  check, corner poles), `tests/test_unreal_atmos.py` (packing, cells, hashes, a failed plan
+  left out); `tests/test_unreal_play.py` without the washes.

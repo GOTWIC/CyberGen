@@ -546,11 +546,11 @@ the level's streamed cells, and atmosgen's runtime plugin (`CityGenAtmos`, built
 play features) lights the nearest of them by night. Haze, rain and wet streets are prototypes
 for now (AT0):
 
-| Old Town by night, the play features' lamps | The same street lit by the plan, in rain |
+| A Corporate Core junction by night | An Old Town street in rain |
 |---|---|
-| <img src="docs/progress/AT0/street_old_town_play.jpg" width="420"> | <img src="docs/progress/AT0/street_old_town_plan.jpg" width="420"> |
-| The Corporate Core, the play features' lamps | The same, lit by the plan, in rain |
-| <img src="docs/progress/AT0/street_core_play.jpg" width="420"> | <img src="docs/progress/AT0/street_core_plan.jpg" width="420"> |
+| <img src="docs/progress/AT1/unreal/night_core_junction.jpg" width="420"> | <img src="docs/progress/AT1/bench/after/shots/night_plan_all_walk_d04.jpg" width="420"> |
+| An Old Town alley | A highway through the port |
+| <img src="docs/progress/AT1/unreal/night_oldtown_alley.jpg" width="420"> | <img src="docs/progress/AT1/unreal/night_highway.jpg" width="420"> |
 
 Its Blender preview renders the same night in Cycles, lit by the plan's lights:
 
