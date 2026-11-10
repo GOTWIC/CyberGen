@@ -1,4 +1,4 @@
-# atmosgen: light, sky, air and weather (scope, draft v1)
+# atmosgen: light, sky, air and weather (scope, v2: decided 2026-11-10, AT0 done)
 
 Stage 3 (atmosgen) of CyberGen's five stages. It takes a built city with its assets and
 makes the city's light and air: every light source that casts light, the sky, fog, smog,
@@ -149,7 +149,10 @@ says which (`Light.source`, the plan's `sources`).
   Niagara systems are graphs. Rain, splashes, drips and steam are therefore C++ components
   and materials (instanced streak and splash cards, ripple and wetness inputs on the
   masters, local fog volumes for steam), unless AT0 finds a way to build Niagara systems
-  from code that holds up.
+  from code that holds up. AT0 found none: UE 5.8 exposes no API to author a Niagara
+  emitter from code (only an engine template could be duplicated and fed user parameters),
+  so effects are C++ components and code-made materials (AT0's rain cards and wet decal,
+  `docs/progress/AT0/`).
 
 ### 4.3 The line with assetgen
 
@@ -288,7 +291,12 @@ its inputs.
   AT milestone. AG16's proposed targets for Delta at 1440p are 16.7 ms p50 and 25 ms p95
   walking; atmosgen's lights, shadows, fog and volumetrics live within what is left.
 - **Many lights:** a night city wants thousands of lights near the view. MegaLights (if it
-  is production-ready in 5.8) or the tiers of 6.1, measured in AT0.
+  is production-ready in 5.8) or the tiers of 6.1, measured in AT0: MegaLights is still
+  experimental in 5.8 and needs hardware ray tracing, which costs Delta 2.6 to 2.8 ms by
+  itself; MegaLights then saves 1.2 ms over the tiers and is flat in the light count, but
+  the tiers without ray tracing are faster (15.8 against 17.4 ms p95 with everything on)
+  and only they keep the 16.7 ms budget. The tiers it is: 512 live within 300 m, 16
+  shadowed within 60 m (`docs/progress/AT0/README.md`).
 - **Blender:** night previews with Cycles' light tree (many lights) from the plan's glTF
   lights, over AG15's night materials, at 4K for review and 8K for the README.
 

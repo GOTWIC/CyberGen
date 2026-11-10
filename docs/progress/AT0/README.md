@@ -115,3 +115,105 @@ From the air the plan's lights reach 300 m round the camera; past that the play 
 light pools keep the far streets reading lit (`CityGen.PlayLamps 2`, added after the smoke
 run showed the far city dark without them). The far tier proper (light cards and the
 HLODs' emissive, scope 6.6) is AT7's; the pools are a stopgap that costs nothing measurable.
+
+## MegaLights against the tiers
+
+UE 5.8 still calls MegaLights experimental (its project setting and console variable say
+so) and it needs hardware ray tracing (or software ray tracing on mesh distance fields,
+which the importer leaves off). `--bench-rt` starts the game with `r.RayTracing` on for that
+process alone; the passes switch MegaLights by the controller's post-process volume
+(`bench/megalights`, two runs; the first was starved of CPU by the ray tracing shaders'
+first compile, 4.4 times slower threads, so the warm second run's figures stand here):
+
+| Pass (hardware ray tracing on) | p95 all | walk | drive | fly | GPU p95 | VRAM MB |
+|---|---|---|---|---|---|---|
+| `night_native` | 15.3 | 15.3 | 14.2 | 15.7 | 13.0 | 9,242 |
+| `night_plan_all` (deferred lights, 512 live, 16 shadowed) | 18.6 | 18.9 | 16.1 | 16.3 | 16.6 | 9,337 |
+| `night_plan_mega` (MegaLights, 512 live, all shadowed) | 17.4 | 17.5 | 16.1 | 16.8 | 15.9 | 9,637 |
+| `night_plan_mega_2048` (MegaLights, 2,048 live within 500 m) | 17.2 | 17.4 | 15.4 | 16.4 | 15.7 | 9,639 |
+
+- **Ray tracing itself costs 2.6 to 2.8 ms** a frame on Delta (the play features' night 12.7
+  to 15.3 ms; the plan's 15.8 to 18.6) and 1.6 GB of VRAM, before MegaLights does anything:
+  the scene's acceleration structures for 44,667 meshes and their instances.
+- **MegaLights then saves 1.2 ms** over the deferred tiers (its stochastic lighting
+  replaces the 2.5 ms deferred lights pass) and **does not grow with the lights**: 2,048
+  live, every one shadowed, cost what 512 did. It shadows every light, where the tiers
+  shadow 16.
+- **On this PC the tiers win:** 15.8 ms (deferred, no ray tracing) against 17.4 ms
+  (MegaLights with ray tracing), and only the tiers stay within decision 12.6's 16.7 ms.
+  MegaLights pays off when the scene has ray tracing for other reasons (Lumen's hardware
+  ray tracing) or when far more than a thousand lights must be live near the view; it is
+  worth measuring again in a later engine where it is no longer experimental.
+
+## Effects from code
+
+Unreal's Niagara systems are graphs, and UE 5.8 exposes no API to author one from code:
+its editor library builds nothing, and the most a script can do is duplicate an engine
+template (`/Niagara/DefaultAssets/Templates/...`) and feed its user parameters. So AT0
+built its prototypes the way the repo builds every asset: C++ components in the runtime
+plugin and materials made by the importer's Python (`atmos_assets.py`):
+
+- **rain**: an instanced static mesh of 4,000 streak cards round the view, falling by world
+  position offset with a phase per instance, lit translucent (they take the neon's colors);
+  cheap (below the profiler's top passes), though too faint to read in the shots: AT5 tunes
+  it and keeps it out of what is covered;
+- **wet streets**: a deferred decal round the view; works and reads well at street level,
+  but paints over markings, and its cost is the reflections it causes (above);
+- **volumetric fog**: the engine's exponential height fog, spawned and set from the plan's
+  weather (0.9 ms);
+- **steam, splashes, drips** (AT4, AT5): the same route, instanced cards or local fog volumes
+  driven by C++.
+
+Decision for AT4 and AT5: effects are C++ components and code-made materials, not Niagara.
+
+## Blender night preview
+
+`atmosgen preview BUILD` takes AG15's night preview (its scene, AG6's night materials, the
+`core` views) and lights it with the plan's lights near each view (spot, point and area
+lights, a candela as 4 pi / 683 W, a nit as pi A / 683 W, times one gain), in Cycles on the
+GPU (OptiX, the light tree), with the weather's haze as a volume round the view and the
+streets wet (glossier and darker where they face up). `wip/03_blender/` holds the first,
+small render of the Corporate Core's street (1,923 lights); `core_night.jpg` and
+`core_street_night.jpg` here are the 8K renders.
+
+## Recommendations for AT1 to AT7
+
+- **AT1 (streets at night).**
+  - Keep the plan's tile files as data, not light components: per 128 m World Partition
+    cell a data actor holding its lights' records (registering with the controller as its
+    cell streams in), and the controller's pooled live set rendering them, as measured:
+    512 within 300 m, 16 shadowed within 60 m, about 1.1 to 1.4 ms. Placing a light
+    component per light would put tens of thousands of lights in the scene, registering
+    and unregistering in bulk as cells stream, which AG16 found is what hurts.
+  - Light the junctions (signal mast arms, corner lights over the crosswalks): the lux map
+    finds 54% of their lanes under 1 lx. Bring the cobra heads down (the streets average
+    52 lx against a 7 lx target); the lux check with occlusion decides.
+  - Keep the play features' pools as the far tier until AT7, and retire the play features'
+    spot lamps and washes for good (the controller already turns them off).
+  - Photometry in physical units with the runtime's exposure scale works (2^(-3 - 3), the
+    play features' -3 EV100 night against the plan's 3); AT3 must move the exposure and
+    every emissive's strength (`unreal.EMISSIVE`, `SIGN_GLOW`, `HOLO_GLOW`, `NightGain`)
+    together to a physical night, or keep -3 and the scale.
+- **AT2 (neon and signs as light).** Sign faces as rect lights read right (colors from the
+  sign pages, rect lights the size of the face, most of the live set); a band flush on its
+  wall floods it: a standoff and a barn door off the wall, less of a band's luminance as
+  light. Ask assetgen for the sign face and emitted color (scope 4.1) so the light sits on
+  the drawn face.
+- **AT3 (sky and time).** The controller already drives `Hour` and every light's schedule;
+  AT3 adds the sky, the moon and the exposure by hour, and replaces the play features'
+  night switch.
+- **AT4 (air).** Volumetric fog costs 0.9 ms with every live light scattering: give small
+  lights (shop signs, spill) no volumetric scattering and measure; mist, smog and haze as
+  local fog volumes from the plan.
+- **AT5 (weather).** Wetness in the road, paving and facade masters (`MPC_CityGenAtmos`'s
+  `Wetness` and `Rain`, a collection of their own already in the project: adding them to
+  the masters is one recompile), puddles from the grade lines, the rain shadow as a mask;
+  budget the reflections (1.6 ms): limit Lumen's reflection tracing on wet surfaces
+  (`r.Lumen.Reflections.MaxRoughnessToTrace`, screen traces) or run reflections at a lower
+  resolution.
+- **AT6 (looks).** The post per district, the grade; at 15.8 ms walking with everything on
+  there is 0.5 to 0.9 ms left at native 1440p, so the looks must pay their way (AG16's TSR
+  at 67% gave 2.6 ms back by night).
+- **AT7 (far city).** Light cards and the HLODs' emissive in place of the pools.
+- **Every AT milestone:** the night pass by `--bench --bench-atmos` before and after, native
+  1440p, three runs; walking is the binding part of the route.
