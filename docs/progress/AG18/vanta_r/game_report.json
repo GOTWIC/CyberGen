@@ -1,0 +1,354 @@
+{
+ "car": "vanta_r",
+ "title": "Halcyon Vanta-R",
+ "ok": true,
+ "triangles": {
+  "original": 240286,
+  "lods": [
+   116731,
+   59987,
+   19240,
+   4801
+  ],
+  "lod0_parts": {
+   "body": 68355,
+   "glass": 2976,
+   "wheel_fl": 11528,
+   "wheel_fr": 11528,
+   "wheel_rl": 10764,
+   "wheel_rr": 10764,
+   "brake_fl": 204,
+   "brake_fr": 204,
+   "brake_rl": 204,
+   "brake_rr": 204
+  }
+ },
+ "objects": {
+  "original": 93,
+  "parts": 10
+ },
+ "textures": {
+  "body": 4096,
+  "wheels": 2048
+ },
+ "pack_bytes": 21482925,
+ "seconds": 270.9,
+ "stage_seconds": {
+  "build": 0.5,
+  "render_original": 21.0,
+  "parts": 4.2,
+  "nodes": 0.0,
+  "uv": 2.4,
+  "bake": 157.6,
+  "lods_export": 1.7,
+  "textures": 6.992828845977783,
+  "proof": 76.41945910453796
+ },
+ "baked_down": {
+  "card_src": {
+   "pieces": 2,
+   "triangles": 44400,
+   "names": [
+    "mouth.mesh",
+    "tail.mesh"
+   ]
+  },
+  "relief": {
+   "pieces": 7,
+   "triangles": 6568,
+   "names": [
+    "decals",
+    "led.marker",
+    "led.name",
+    "lettering",
+    "lines",
+    "plate.glyphs",
+    "sensors"
+   ]
+  },
+  "lathe": {
+   "pieces": 4,
+   "triangles": 57536,
+   "names": [
+    "tire.fl",
+    "tire.fr",
+    "tire.rl",
+    "tire.rr"
+   ]
+  }
+ },
+ "texel_px_per_m": {
+  "body": {
+   "exterior": {
+    "area_m2": 35.491,
+    "p5": 430.1,
+    "median": 448.1
+   },
+   "underside": {
+    "area_m2": 0.199,
+    "p5": 156.5,
+    "median": 454.7
+   },
+   "cabin": {
+    "area_m2": 11.389,
+    "p5": 179.0,
+    "median": 179.1
+   }
+  },
+  "wheels": {
+   "exterior": {
+    "area_m2": 5.092,
+    "p5": 364.3,
+    "median": 399.6
+   },
+   "underside": {
+    "area_m2": 0.024,
+    "p5": 139.8,
+    "median": 399.6
+   }
+  }
+ },
+ "lights": 49,
+ "collision_hulls": 7,
+ "source": {
+  "script": "vehicles/cars/vanta_r.py",
+  "script_sha256": "5af82e8775bac6f88aa1e842b7e6aa0f88a1e721750ca746a4c3b1cc1b9aa9ae",
+  "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
+  "game_sha256": "67c3771ba2cb69ac1405d92e8369e067fba321081d4a4193f60050a8eab2adc6",
+  "original_triangles": 240286,
+  "original_objects": 93
+ },
+ "test": false,
+ "checks": [
+  {
+   "check": "files",
+   "ok": true,
+   "detail": {
+    "files": 15,
+    "missing": [],
+    "unreadable": []
+   }
+  },
+  {
+   "check": "budgets",
+   "ok": true,
+   "detail": [
+    {
+     "lod": 0,
+     "triangles": 116731,
+     "budget": 150000,
+     "ok": true
+    },
+    {
+     "lod": 1,
+     "triangles": 59987,
+     "budget": 60000,
+     "ok": true
+    },
+    {
+     "lod": 2,
+     "triangles": 19240,
+     "budget": 20000,
+     "ok": true
+    },
+    {
+     "lod": 3,
+     "triangles": 4801,
+     "budget": 5000,
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "uv_overlap",
+   "ok": true,
+   "detail": {
+    "limit": 0.005,
+    "slots": {
+     "body": {
+      "overlap": 1e-05,
+      "coverage": 0.4797,
+      "outside_unit": 0.0
+     },
+     "wheels": {
+      "overlap": 0.0,
+      "coverage": 0.1948,
+      "outside_unit": 0.0
+     }
+    }
+   }
+  },
+  {
+   "check": "texel_density",
+   "ok": true,
+   "detail": {
+    "body": {
+     "p5": 430.1,
+     "median": 448.1,
+     "floor": 300.0,
+     "ok": true
+    },
+    "wheels": {
+     "p5": 364.3,
+     "median": 399.6,
+     "floor": 300.0,
+     "ok": true
+    }
+   }
+  },
+  {
+   "check": "wheel_pivots",
+   "ok": true,
+   "detail": [
+    {
+     "part": "wheel_fl",
+     "pivot": [
+      1.4,
+      0.8205,
+      0.35
+     ],
+     "center_offset_mm": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "radius": 0.35,
+     "radius_pack": 0.35,
+     "json_pivot": [
+      1.4,
+      0.8205,
+      0.35
+     ],
+     "ok": true
+    },
+    {
+     "part": "wheel_fr",
+     "pivot": [
+      1.4,
+      -0.8205,
+      0.35
+     ],
+     "center_offset_mm": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "radius": 0.35,
+     "radius_pack": 0.35,
+     "json_pivot": [
+      1.4,
+      -0.8205,
+      0.35
+     ],
+     "ok": true
+    },
+    {
+     "part": "wheel_rl",
+     "pivot": [
+      -1.32,
+      0.8055,
+      0.37
+     ],
+     "center_offset_mm": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "radius": 0.37,
+     "radius_pack": 0.37,
+     "json_pivot": [
+      -1.32,
+      0.8055,
+      0.37
+     ],
+     "ok": true
+    },
+    {
+     "part": "wheel_rr",
+     "pivot": [
+      -1.32,
+      -0.8055,
+      0.37
+     ],
+     "center_offset_mm": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "radius": 0.37,
+     "radius_pack": 0.37,
+     "json_pivot": [
+      -1.32,
+      -0.8055,
+      0.37
+     ],
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "lod_bounds",
+   "ok": true,
+   "detail": [
+    {
+     "lod": 1,
+     "deviation_m": [
+      0.0,
+      0.0,
+      0.0001
+     ],
+     "tolerance_m": [
+      0.0703,
+      0.0309,
+      0.02
+     ],
+     "ok": true
+    },
+    {
+     "lod": 2,
+     "deviation_m": [
+      0.0008,
+      0.0003,
+      0.0038
+     ],
+     "tolerance_m": [
+      0.0703,
+      0.0309,
+      0.02
+     ],
+     "ok": true
+    },
+    {
+     "lod": 3,
+     "deviation_m": [
+      0.0042,
+      0.0082,
+      0.0083
+     ],
+     "tolerance_m": [
+      0.0703,
+      0.0309,
+      0.02
+     ],
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "collision",
+   "ok": true,
+   "detail": {
+    "hulls": 7,
+    "vertices": [
+     294,
+     252,
+     132,
+     176,
+     126,
+     224,
+     352
+    ]
+   }
+  }
+ ]
+}

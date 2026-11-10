@@ -1,0 +1,2795 @@
+"""game.py: one car of the roster into a game-ready pack (UVs, baked textures, LODs, collision).
+
+    vehicles/blender.sh vehicles/game.py --car vanta_r [--out DIR] [--docs]
+    vehicles/blender.sh vehicles/game.py --car vanta_r --test          # 1024 / 512, quick
+
+The pack's format is the contract in vehicles/GAME.md. One run, one job under blender.sh's
+lock:
+
+1. builds the car in this Blender by running its own script (cars/<car>.py, unchanged) and
+   renders the procedural original from its hero view;
+2. turns its objects into parts (body, glass, a node per wheel, a brake node per wheel
+   that has a caliper), each a single mesh in the car's frame, wheels about their axles;
+3. bakes down what is wasteful in a game (lettering, ribbons and other flat relief always;
+   dense arrays such as honeycombs onto cards; over the budget, taller relief such as bolt
+   rows, dense tires rebuilt as lathes, then a collapse of the densest small parts) and
+   removes faces nothing can see (inside the hull, coincident, the backs of merged solids);
+4. unwraps an atlas per material slot (exterior favored over underside and cabin) and bakes
+   the procedural materials in Cycles: the kept surfaces directly, the baked-down detail
+   from the original objects onto the surface under it;
+5. makes the LOD chain, the collision hulls and the light data, exports the glTF files,
+   then (in the repo's venv Python, this same file) packs the textures, and in a fresh
+   Blender loads the pack alone to render the proof, then checks the pack.
+
+Blender side: stdlib and bpy only. Venv side (PIL, numpy): `python game.py post|check PACK`.
+"""
+import argparse
+import hashlib
+import json
+import os
+import runpy
+import shutil
+import subprocess
+import sys
+import time
+from math import atan2, cos, pi, sin, sqrt
+
+try:
+    import bpy
+    import bmesh
+    from mathutils import Matrix, Vector as V3
+    from mathutils.bvhtree import BVHTree
+except ImportError:                                     # the venv side
+    bpy = None
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+CACHE = os.path.join(os.path.expanduser("~"), ".cache", "cybergen", "vehicles", "game")
+FORMAT = "cybergen.vehicle_pack"
+VERSION = 1
+T0 = time.time()
+
+# budgets and rules (GAME.md says why)
+LOD_TRIS = (150000, 60000, 20000, 5000)
+FLAT_RELIEF_M = 0.0032          # relief this low is always baked onto the surface under it
+TALL_RELIEF_M = 0.0125          # relief up to this tall is baked down when over the budget
+CARD_DENSITY = 15000.0          # triangles per m2 of a dense array's outline: a card
+CARD_MIN_TRIS = 1500
+CARD_MIN_PARTS = 8
+CARD_THICK_M = 0.045
+TIRE_LATHE_TRIS = 6000          # a tire denser than this is rebuilt as a lathe (over budget)
+TIRE_SEGMENTS = 64
+WEIGHT = {0: 1.0, 1: 0.35, 2: 0.4}  # texel density by face class: exterior, underside, cabin
+CLASS_NAMES = {0: "exterior", 1: "underside", 2: "cabin"}
+CAGE_M, REACH_M = 0.015, 0.035  # baking the detail: cage out, ray reach under the surface
+TEXEL_FLOOR = {"body": 300.0, "wheels": 300.0}  # px/m on exterior faces at 4096 / 2048
+CORE_WHEEL = ("tire", "rim", "hub", "ring", "disc", "drum", "caliper")
+
+
+def log(msg):
+    print("G %6.1f  %s" % (time.time() - T0, msg))
+    sys.stdout.flush()
+
+
+def sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        h.update(f.read())
+    return h.hexdigest()
+
+
+def venv_python():
+    cands = [os.environ.get("CYBERGEN_PYTHON")]
+    d = HERE
+    for _ in range(8):
+        d = os.path.dirname(d)
+        cands.append(os.path.join(d, ".venv", "bin", "python"))
+        cands.append(os.path.join(d, ".venv", "Scripts", "python.exe"))
+    cands.append("/Users/swag/Projects/CyberGen/.venv/bin/python")
+    return next((c for c in cands if c and os.path.exists(c)), None)
+
+
+# =========================================================================================
+# Blender side
+# =========================================================================================
+def blender_args():
+    argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+    ap = argparse.ArgumentParser(prog="blender.sh vehicles/game.py")
+    ap.add_argument("--car", help="a car of vehicles/cars/ (file name without .py)")
+    ap.add_argument("--out", default=None, help="the pack's folder (default %s/<car>)" % CACHE)
+    ap.add_argument("--body-size", type=int, default=4096)
+    ap.add_argument("--wheel-size", type=int, default=2048)
+    ap.add_argument("--lods", type=int, nargs=4, default=list(LOD_TRIS))
+    ap.add_argument("--samples", type=float, default=1.0, help="bake and render samples scale")
+    ap.add_argument("--test", action="store_true", help="1024 / 512 textures, few samples")
+    ap.add_argument("--docs", action="store_true",
+                    help="also write docs/progress/AG18/<car>/game.jpg and game_report.json")
+    ap.add_argument("--views", default="", help="more views to compare, e.g. nose,tail,wheel")
+    ap.add_argument("--keep-work", action="store_true", help="keep the raw bakes (work/)")
+    ap.add_argument("--proof", default=None, help=argparse.SUPPRESS)   # internal: PACK
+    a = ap.parse_args(argv)
+    if a.proof is None and not a.car:
+        ap.error("--car NAME is needed")
+    if a.test:
+        a.body_size, a.wheel_size = min(a.body_size, 1024), min(a.wheel_size, 512)
+        a.samples = min(a.samples, 0.25)
+    if a.car:
+        a.out = os.path.abspath(a.out or os.path.join(CACHE, a.car))
+    return a
+
+
+# ---------------------------------------------------------------------------------------
+# the car as designed
+# ---------------------------------------------------------------------------------------
+def build_car(car, out):
+    """Runs the car's own script here (it empties the scene, builds, and with no render
+    argument only counts) and returns the kit module it used."""
+    script = os.path.join(HERE, "cars", car + ".py")
+    if not os.path.exists(script):
+        raise SystemExit("no car %s (%s)" % (car, script))
+    saved = sys.argv
+    sys.argv = [saved[0], "--", "--out", os.path.join(out, "build")]
+    try:
+        runpy.run_path(script, run_name="__main__")
+    finally:
+        sys.argv = saved
+    return sys.modules["carkit"]
+
+
+def cam_record(cam):
+    d = cam.data
+    return dict(matrix=[list(r) for r in cam.matrix_world], lens=d.lens, sensor=d.sensor_width,
+                dof=bool(d.dof.use_dof), focus=d.dof.focus_distance, fstop=d.dof.aperture_fstop)
+
+
+def render_views(K, names, res, samples, folder, prefix):
+    """The car's own views (the kit's fit), each to folder/<prefix>_<view>.jpg; returns the
+    cameras, so the baked pack is seen from exactly the same place."""
+    cams = {}
+    for name in names:
+        if name not in K.VIEWS:
+            log("no view %s on this car" % name)
+            continue
+        path = os.path.join(folder, "%s_%s.jpg" % (prefix, name))
+        K.render_view(name, path, res, samples)
+        cams[name] = cam_record(K.SCN.camera)
+    return cams
+
+
+# ---------------------------------------------------------------------------------------
+# materials: what each one is, and its channels as emission for the bakes
+# ---------------------------------------------------------------------------------------
+def bsdf_of(m):
+    if m is None or m.node_tree is None:
+        return None
+    return next((n for n in m.node_tree.nodes if n.type == 'BSDF_PRINCIPLED'), None)
+
+
+def out_of(m):
+    nodes = [n for n in m.node_tree.nodes if n.type == 'OUTPUT_MATERIAL']
+    return next((n for n in nodes if n.is_active_output), nodes[0] if nodes else None)
+
+
+def src(sock):
+    return sock.links[0].from_socket if sock.is_linked else None
+
+
+def val(b, name, default):
+    if b is None or name not in b.inputs:
+        return default
+    v = b.inputs[name].default_value
+    try:
+        return tuple(v)
+    except TypeError:
+        return v
+
+
+def paint_nodes(m):
+    """The kit's paint(): Base Color <- grime (multiply) <- dm (paint mixed with dust by
+    the dust weight), grime's second color the crease factor. None if m is not one."""
+    b = bsdf_of(m)
+    if b is None:
+        return None
+    g = src(b.inputs["Base Color"])
+    if g is None or g.node.type != 'MIX_RGB' or g.node.blend_type != 'MULTIPLY':
+        return None
+    dm = src(g.node.inputs["Color1"])
+    if dm is None or dm.node.type != 'MIX_RGB' or not dm.node.inputs["Fac"].is_linked:
+        return None
+    return dict(grime=g.node, dm=dm.node, dust_w=src(dm.node.inputs["Fac"]),
+                crease=src(g.node.inputs["Color2"]),
+                color=tuple(dm.node.inputs["Color1"].default_value)[:3],
+                dust=tuple(dm.node.inputs["Color2"].default_value)[:3])
+
+
+class MatInfo:
+    def __init__(self, m):
+        self.m = m
+        self.name = m.name
+        b = bsdf_of(m)
+        self.b = b
+        self.glass = b is not None and not b.inputs["Transmission Weight"].is_linked and \
+            b.inputs["Transmission Weight"].default_value >= 0.5
+        es = val(b, "Emission Strength", 0.0)
+        ec = val(b, "Emission Color", (0, 0, 0, 1))
+        self.strength = es if b is not None and not b.inputs["Emission Strength"].is_linked else 0.0
+        self.emit_color = ec[:3]
+        self.emissive = self.strength > 0 and max(self.emit_color) > 0
+        self.paint = paint_nodes(m)
+        self.color = self.paint["color"] if self.paint else (
+            val(b, "Base Color", (0.5, 0.5, 0.5, 1))[:3] if b is not None and
+            not b.inputs["Base Color"].is_linked else None)
+        self.channel = None             # 0 primary, 1 secondary, 2 accent (tintable)
+
+
+def analyze_materials(K):
+    """Every material of the car, and which tint channel each one follows: the kit's paint
+    (R), paint2 (G), caliper (B), and any other material in exactly one of those colors."""
+    infos = {m.name: MatInfo(m) for m in bpy.data.materials if m.node_tree is not None}
+    ref = {}
+    for ch, name in ((0, "paint"), (1, "paint2"), (2, "caliper")):
+        if name in infos and infos[name].color is not None:
+            ref[ch] = infos[name].color
+    for mi in infos.values():
+        if mi.glass or mi.emissive or mi.color is None:
+            continue
+        for ch, c in ref.items():
+            if max(abs(a - b) for a, b in zip(mi.color, c)) < 2e-3:
+                mi.channel = ch
+                break
+    return infos
+
+
+MICRO_SCALE = 150.0     # a procedural texture finer than this (cells a meter) is below a texel
+
+
+def strip_flake(infos):
+    """Detail finer than a texel cannot be baked without aliasing: the paint's flake (a
+    bump at 0.4 mm) is dropped and every texture finer than MICRO_SCALE (the carbon
+    weave) gives its mean, 0.5. Both are left to the engine's detail maps; returns
+    {material: [what]} for pack.json."""
+    micro = {}
+    for mi in infos.values():
+        nt = mi.m.node_tree
+        if mi.paint and mi.b.inputs["Normal"].is_linked:
+            for l in list(mi.b.inputs["Normal"].links):
+                nt.links.remove(l)
+            micro.setdefault(mi.name, []).append("flake")
+        for n in list(nt.nodes):
+            if not n.type.startswith("TEX_") or "Scale" not in n.inputs or \
+                    n.inputs["Scale"].is_linked or n.inputs["Scale"].default_value < MICRO_SCALE:
+                continue
+            links = [l for o in n.outputs for l in o.links]
+            if not links:
+                continue
+            c = nt.nodes.new('ShaderNodeValue')
+            c.outputs[0].default_value = 0.5
+            for l in links:
+                to = l.to_socket
+                nt.links.remove(l)
+                nt.links.new(c.outputs[0], to)
+            micro.setdefault(mi.name, []).append("%s %.0f" % (n.type.lower()[4:],
+                                                              n.inputs["Scale"].default_value))
+    return micro
+
+
+class Channels:
+    """Emission rewiring of one material for the bakes. Each pass shows one thing as
+    emission: BASE (what is not paint, and the dust and grime on the paint), TINT (the
+    weights of the three tint channels), RMC (roughness, metallic, coat), SSE (the shade on
+    the tinted color, specular level, coverage), EMIT (emission over the car's strongest)."""
+
+    def __init__(self, mi, infos, emax, cover, low):
+        self.mi = mi
+        m = mi.m
+        nt = m.node_tree
+        self.nt = nt
+        self.out = out_of(m)
+        self.surface = src(self.out.inputs["Surface"])
+        b = mi.b
+        N = nt.nodes
+        if low:                         # the joined parts keep each piece's object space
+            for tc in [n for n in N if n.type == 'TEX_COORD']:
+                for l in list(tc.outputs["Object"].links):
+                    at = N.new('ShaderNodeAttribute')
+                    at.attribute_type = 'GEOMETRY'
+                    at.attribute_name = "cg_obj"
+                    nt.links.new(at.outputs["Vector"], l.to_socket)
+        self.E = N.new('ShaderNodeEmission')
+        self.E.inputs["Strength"].default_value = 1.0
+        self.src = {}
+
+        def inp(name, default):
+            if b is None or name not in b.inputs:
+                return default
+            s = b.inputs[name]
+            if s.is_linked:
+                return src(s)
+            v = s.default_value
+            try:
+                return tuple(v)
+            except TypeError:
+                return float(v)
+
+        def comb(r, g, bl):
+            c = N.new('ShaderNodeCombineColor')
+            for sock, v in zip(c.inputs, (r, g, bl)):
+                if isinstance(v, (int, float)):
+                    sock.default_value = float(v)
+                else:
+                    nt.links.new(v, sock)
+            return c.outputs[0]
+
+        def one_minus(s):
+            n = N.new('ShaderNodeMath')
+            n.operation = 'SUBTRACT'
+            n.inputs[0].default_value = 1.0
+            nt.links.new(s, n.inputs[1])
+            return n.outputs[0]
+
+        p = mi.paint
+        if p is not None:
+            mul = N.new('ShaderNodeMixRGB')
+            mul.blend_type = 'MULTIPLY'
+            mul.inputs["Fac"].default_value = 1.0
+            mul.inputs["Color1"].default_value = (*p["dust"], 1.0)
+            if p["crease"] is not None:
+                nt.links.new(p["crease"], mul.inputs["Color2"])
+            self.src["BASE"] = mul.outputs[0]
+        else:
+            self.src["BASE"] = inp("Base Color", (0.5, 0.5, 0.5, 1.0))
+        w = [0.0, 0.0, 0.0]
+        if mi.channel is not None:
+            w[mi.channel] = one_minus(p["dust_w"]) if p is not None else 1.0
+        self.src["TINT"] = comb(*w)
+        self.src["RMC"] = comb(_f(inp("Roughness", 0.5)), _f(inp("Metallic", 0.0)),
+                               _f(inp("Coat Weight", 0.0)))
+        shade = 1.0
+        if p is not None and mi.channel is not None and p["crease"] is not None:
+            shade = p["crease"]
+        self.src["SSE"] = comb(shade, _f(inp("Specular IOR Level", 0.5)), 1.0 if cover else 0.0)
+        if mi.emissive and emax > 0:
+            vm = N.new('ShaderNodeVectorMath')
+            vm.operation = 'SCALE'
+            vm.inputs[0].default_value = mi.emit_color
+            vm.inputs["Scale"].default_value = mi.strength / emax
+            self.src["EMIT"] = vm.outputs[0]
+        else:
+            self.src["EMIT"] = (0.0, 0.0, 0.0, 1.0)
+        self.img = N.new('ShaderNodeTexImage')
+        nt.nodes.active = self.img
+
+    def show(self, what):
+        """what: a pass name, or None for the material as it is (NORMAL and AO bakes)."""
+        L = self.nt.links
+        for l in list(self.out.inputs["Surface"].links):
+            L.remove(l)
+        if what is None:
+            if self.surface is not None:
+                L.new(self.surface, self.out.inputs["Surface"])
+            return
+        s = self.src[what]
+        ci = self.E.inputs["Color"]
+        for l in list(ci.links):
+            L.remove(l)
+        if isinstance(s, (tuple, float)):
+            s = s if isinstance(s, tuple) else (s, s, s, 1.0)
+            ci.default_value = tuple(s[:3]) + (1.0,)
+        else:
+            L.new(s, ci)
+        L.new(self.E.outputs[0], self.out.inputs["Surface"])
+
+
+def _f(v):
+    """A Principled input's value: a socket stays a socket, a value becomes a float."""
+    if isinstance(v, (int, float)):
+        return float(v)
+    if isinstance(v, tuple):
+        return float(v[0])
+    return v
+
+
+def slot_copy(m, slot, infos, emax):
+    """A slot's own copy of a material (its own image node, object space read from the
+    cg_obj attribute), with its emission channels."""
+    cp = m.copy()
+    cp.name = slot + "::" + m.name
+    mi = MatInfo(cp)
+    orig = infos.get(m.name)
+    if orig is not None:
+        mi.channel = orig.channel
+    return cp, Channels(mi, infos, emax, False, True)
+
+
+# ---------------------------------------------------------------------------------------
+# pieces: every object split by material, evaluated, in the car's frame
+# ---------------------------------------------------------------------------------------
+class Piece:
+    def __init__(self, name, ob, mat, me):
+        self.name = name
+        self.ob = ob                    # the original object (a bake source when replaced)
+        self.mat = mat                  # material name
+        self.me = me                    # bpy mesh in world space, attributes cg_obj, cg_n
+        self.tris = sum(len(p.vertices) - 2 for p in me.polygons)
+        self.part = "body"
+        self.op = "keep"                # keep, relief, card, lathe, collapse
+        self.relief = None              # height over the surface under it, m
+        self.panel = any(md.type == 'SOLIDIFY' for md in ob.modifiers)
+        self.idx = -1
+
+
+def piece_meshes(ob, dg):
+    """The object's evaluated mesh split by material: [(material name, mesh)] in world
+    space; cg_obj holds each vertex in the object's own space (what its materials read),
+    cg_n each corner's normal in world space (the designs' custom normals)."""
+    ev = ob.evaluated_get(dg)
+    me = bpy.data.meshes.new_from_object(ev, preserve_all_data_layers=True, depsgraph=dg)
+    if len(me.polygons) == 0:
+        bpy.data.meshes.remove(me)
+        return []
+    M = ob.matrix_world.copy()
+    nM = M.to_3x3().inverted_safe().transposed()
+    co = [v.co.copy() for v in me.vertices]
+    a = me.attributes.new("cg_obj", 'FLOAT_VECTOR', 'POINT')
+    a.data.foreach_set("vector", [c for p in co for c in p])
+    ns = [V3(n.vector) for n in me.corner_normals]
+    me.transform(M)
+    a = me.attributes.new("cg_n", 'FLOAT_VECTOR', 'CORNER')
+    a.data.foreach_set("vector", [c for n in ns for c in (nM @ n).normalized()])
+    for nm in [x.name for x in me.attributes if x.name not in
+               ("cg_obj", "cg_n", "position", "sharp_face", "material_index") and
+               not x.name.startswith(".")]:
+        try:
+            me.attributes.remove(me.attributes[nm])
+        except Exception:
+            pass
+    while me.uv_layers:
+        me.uv_layers.remove(me.uv_layers[0])
+    mats = [m.name if m else "void" for m in me.materials] or ["void"]
+    idxs = sorted({p.material_index for p in me.polygons})
+    out = []
+    for i in idxs:
+        if len(idxs) == 1:
+            sub = me
+        else:
+            bm = bmesh.new()
+            bm.from_mesh(me)
+            bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.material_index != i],
+                             context='FACES')
+            sub = bpy.data.meshes.new(me.name + "." + str(i))
+            bm.to_mesh(sub)
+            bm.free()
+        sub.materials.clear()
+        for p in sub.polygons:
+            p.material_index = 0
+        out.append((mats[min(i, len(mats) - 1)], sub))
+    if len(idxs) > 1:
+        bpy.data.meshes.remove(me)
+    return out
+
+
+def void_material():
+    m = bpy.data.materials.get("void")
+    if m is None:
+        m = bpy.data.materials.new("void")
+        m.use_nodes = True
+        b = bsdf_of(m)
+        b.inputs["Base Color"].default_value = (0.004, 0.004, 0.005, 1)
+        b.inputs["Roughness"].default_value = 0.8
+        b.inputs["Specular IOR Level"].default_value = 0.0
+    return m
+
+
+def axis_of(ob):
+    return (ob.matrix_world.to_3x3() @ V3((0, 1, 0))).normalized()
+
+
+def wheel_groups(objs, dg):
+    """tire.<tag> objects that stand on the ground on a sideways axle, each with the
+    objects named <kind>.<tag> sharing its origin: [(tag, pivot, [objects])]. A tire on a
+    turned axle or off the ground (a spare) stays with the body."""
+    out = []
+    for t in objs:
+        if not t.name.startswith("tire.") or t.type != 'MESH':
+            continue
+        tag = t.name[5:]
+        piv = t.matrix_world.translation.copy()
+        if abs(axis_of(t).y) < 0.98:
+            continue
+        zs = [(t.matrix_world @ V3(c)).z for c in t.bound_box]
+        if min(zs) > 0.03:
+            continue
+        mem = [o for o in objs if o.type == 'MESH' and "." in o.name and
+               o.name.split(".", 1)[1] == tag and
+               (o.matrix_world.translation - piv).length < 1e-3]
+        out.append((tag, piv, mem))
+    return out
+
+
+def gather(K, infos):
+    dg = bpy.context.evaluated_depsgraph_get()
+    objs = [o for o in K.CAR.objects if o.type in ('MESH', 'CURVE', 'FONT', 'SURFACE')
+            and not o.hide_render]
+    wheels = wheel_groups(objs, dg)
+    member = {}
+    for tag, piv, mem in wheels:
+        for o in mem:
+            member[o.name] = (tag, o.name.split(".", 1)[0])
+    pieces = []
+    for ob in objs:
+        for mat, me in piece_meshes(ob, dg):
+            me.materials.append(bpy.data.materials.get(mat) or void_material())
+            p = Piece("%s#%s" % (ob.name, mat), ob, mat, me)
+            mi = infos.get(mat)
+            if ob.name in member:
+                tag, kind = member[ob.name]
+                p.part = ("brake:" if kind == "caliper" else "wheel:") + tag
+            elif mi is not None and mi.glass:
+                p.part = "glass"
+            pieces.append(p)
+    for i, p in enumerate(pieces):
+        p.idx = i
+    return pieces, wheels
+
+
+# ---------------------------------------------------------------------------------------
+# small geometry helpers (stdlib and mathutils)
+# ---------------------------------------------------------------------------------------
+def mesh_tris(me):
+    return sum(len(p.vertices) - 2 for p in me.polygons)
+
+
+def loose_parts(bm):
+    """Lists of faces connected by edges."""
+    seen = set()
+    parts = []
+    for f in bm.faces:
+        if f.index in seen:
+            continue
+        stack, part = [f], []
+        seen.add(f.index)
+        while stack:
+            g = stack.pop()
+            part.append(g)
+            for e in g.edges:
+                for h in e.link_faces:
+                    if h.index not in seen:
+                        seen.add(h.index)
+                        stack.append(h)
+        parts.append(part)
+    return parts
+
+
+def jacobi3(A):
+    """Eigenvalues and eigenvectors (columns) of a symmetric 3 x 3 matrix (lists)."""
+    a = [row[:] for row in A]
+    v = [[1.0 if i == j else 0.0 for j in range(3)] for i in range(3)]
+    for _ in range(60):
+        p, q, big = 0, 1, 0.0
+        for i in range(3):
+            for j in range(i + 1, 3):
+                if abs(a[i][j]) > big:
+                    p, q, big = i, j, abs(a[i][j])
+        if big < 1e-14:
+            break
+        th = 0.5 * atan2(2 * a[p][q], a[q][q] - a[p][p])
+        c, s = cos(th), sin(th)
+        for k in range(3):
+            akp, akq = a[k][p], a[k][q]
+            a[k][p], a[k][q] = c * akp - s * akq, s * akp + c * akq
+        for k in range(3):
+            apk, aqk = a[p][k], a[q][k]
+            a[p][k], a[q][k] = c * apk - s * aqk, s * apk + c * aqk
+        for k in range(3):
+            vkp, vkq = v[k][p], v[k][q]
+            v[k][p], v[k][q] = c * vkp - s * vkq, s * vkp + c * vkq
+    return [a[i][i] for i in range(3)], [V3((v[0][i], v[1][i], v[2][i])) for i in range(3)]
+
+
+def hull2d(pts):
+    pts = sorted(set(pts))
+    if len(pts) < 3:
+        return pts
+
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+    lo, hi = [], []
+    for p in pts:
+        while len(lo) >= 2 and cross(lo[-2], lo[-1], p) <= 0:
+            lo.pop()
+        lo.append(p)
+    for p in reversed(pts):
+        while len(hi) >= 2 and cross(hi[-2], hi[-1], p) <= 0:
+            hi.pop()
+        hi.append(p)
+    return lo[:-1] + hi[:-1]
+
+
+def poly_area2d(poly):
+    return abs(sum(a[0] * b[1] - b[0] * a[1] for a, b in zip(poly, poly[1:] + poly[:1]))) / 2
+
+
+def rdp(pts, tol):
+    """Douglas-Peucker on an open polyline of 2D points."""
+    if len(pts) < 3:
+        return pts
+    a, b = pts[0], pts[-1]
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    L = sqrt(dx * dx + dy * dy) or 1e-12
+    k, dm = 0, -1.0
+    for i in range(1, len(pts) - 1):
+        d = abs(dy * (pts[i][0] - a[0]) - dx * (pts[i][1] - a[1])) / L
+        if d > dm:
+            k, dm = i, d
+    if dm <= tol:
+        return [a, b]
+    return rdp(pts[:k + 1], tol)[:-1] + rdp(pts[k:], tol)
+
+
+def fib_dirs(n):
+    """n directions over the sphere, mirror symmetric in y (so twin wheels match)."""
+    half = []
+    g = pi * (3 - sqrt(5))
+    m = n // 2
+    for i in range(m):
+        z = 1 - 2 * (i + 0.5) / m
+        r = sqrt(max(0.0, 1 - z * z))
+        a = g * i
+        x, y = r * cos(a), abs(r * sin(a))
+        half.append(V3((x, y, z)))
+    return half + [V3((d.x, -d.y, d.z)) for d in half]
+
+
+def new_obj(name, me, coll):
+    ob = bpy.data.objects.new(name, me)
+    coll.objects.link(ob)
+    return ob
+
+
+def join_meshes(name, meshes, coll):
+    """One object from several meshes (all in one space), attributes kept."""
+    obs = [new_obj(name + ".%d" % i, me, coll) for i, me in enumerate(meshes)]
+    if len(obs) > 1:
+        with bpy.context.temp_override(active_object=obs[0], object=obs[0],
+                                       selected_objects=obs, selected_editable_objects=obs):
+            bpy.ops.object.join()
+    ob = obs[0]
+    ob.name = name
+    ob.data.name = name
+    return ob
+
+
+# ---------------------------------------------------------------------------------------
+# baking down: relief, cards, lathes, collapse
+# ---------------------------------------------------------------------------------------
+def world_bvh(pieces):
+    vs, ps, owner = [], [], []
+    for p in pieces:
+        o = len(vs)
+        vs += [v.co.copy() for v in p.me.vertices]
+        for poly in p.me.polygons:
+            ps.append([o + i for i in poly.vertices])
+            owner.append(p.idx)
+    return BVHTree.FromPolygons(vs, ps), owner
+
+
+def find_relief(pieces):
+    """Each piece's height over the surfaces of other pieces it lies on, when every one of
+    its vertices is within TALL_RELIEF_M of another piece's surface."""
+    tree, owner = world_bvh([p for p in pieces if p.part != "glass"])
+    for p in pieces:
+        if p.part == "glass" or p.panel or p.op != "keep":
+            continue
+        kind = p.ob.name.split(".", 1)[0]
+        if p.part != "body" and kind in CORE_WHEEL:
+            continue
+        # its vertices and the middles of its faces and edges: a long bar whose vertices
+        # all sit in its end plates is no relief
+        pts = [v.co for v in p.me.vertices] + [f.center for f in p.me.polygons]
+        vs = p.me.vertices
+        pts += [(vs[e.vertices[0]].co + vs[e.vertices[1]].co) / 2 for e in p.me.edges]
+        step = max(1, len(pts) // 4000)
+        h = 0.0
+        for co in pts[::step]:
+            best = None
+            for loc, nrm, i, d in tree.find_nearest_range(co, TALL_RELIEF_M):
+                if owner[i] != p.idx and (best is None or d < best):
+                    best = d
+            if best is None:
+                h = None
+                break
+            h = max(h, best)
+        p.relief = h
+
+
+def clusters_of(me):
+    """Loose parts of a mesh grouped by nearness: [(faces' vertex lists, n parts, tris)]."""
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bm.faces.ensure_lookup_table()
+    parts = loose_parts(bm)
+    boxes = []
+    for part in parts:
+        cs = [v.co for f in part for v in f.verts]
+        boxes.append(([min(c[i] for c in cs) for i in range(3)],
+                      [max(c[i] for c in cs) for i in range(3)]))
+    n = len(parts)
+    parent = list(range(n))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+    gap = 0.02
+    order = sorted(range(n), key=lambda i: boxes[i][0][0])
+    for a_i, i in enumerate(order):
+        lo, hi = boxes[i]
+        for j in order[a_i + 1:]:
+            lo2, hi2 = boxes[j]
+            if lo2[0] > hi[0] + gap:
+                break
+            if all(lo2[k] <= hi[k] + gap and lo[k] <= hi2[k] + gap for k in range(3)):
+                parent[find(i)] = find(j)
+    groups = {}
+    for i in range(n):
+        groups.setdefault(find(i), []).append(i)
+    out = []
+    for idxs in groups.values():
+        pts = [v.co.copy() for i in idxs for f in parts[i] for v in f.verts]
+        tris = sum(len(f.verts) - 2 for i in idxs for f in parts[i])
+        out.append((pts, len(idxs), tris))
+    bm.free()
+    return out
+
+
+def plane_of(pts):
+    c = sum(pts, V3()) / len(pts)
+    C = [[0.0] * 3 for _ in range(3)]
+    step = max(1, len(pts) // 4000)
+    for p in pts[::step]:
+        d = p - c
+        for i in range(3):
+            for j in range(3):
+                C[i][j] += d[i] * d[j]
+    w, vecs = jacobi3(C)
+    k = min(range(3), key=lambda i: w[i])
+    return c, vecs[k].normalized()
+
+
+def find_cards(pieces, tree_all, owner):
+    """Dense arrays of small parts lying in a slab (honeycombs, mesh grilles): a flat card
+    in the slab's back face replaces each, its look baked from the original."""
+    pts_all = [v.co for q in pieces if q.part == "body" for v in list(q.me.vertices)[::50]]
+    mid = V3([(min(x[k] for x in pts_all) + max(x[k] for x in pts_all)) / 2 for k in range(3)])
+    cards = []
+    for p in pieces:
+        if p.part != "body" or p.panel or p.op != "keep" or p.tris < CARD_MIN_TRIS:
+            continue
+        mine = []
+        others = None
+        for pts, nparts, tris in clusters_of(p.me):
+            if nparts < CARD_MIN_PARTS or tris < CARD_MIN_TRIS:
+                continue
+            c, n = plane_of(pts)
+            ds = [(q - c).dot(n) for q in pts]
+            thick = max(ds) - min(ds)
+            u = n.orthogonal().normalized()
+            v = n.cross(u).normalized()
+            hull = hull2d([(round((q - c).dot(u), 5), round((q - c).dot(v), 5)) for q in pts])
+            area = poly_area2d(hull)
+            if area <= 0 or thick > CARD_THICK_M or tris / area < CARD_DENSITY:
+                continue
+            # outward: the side a ray from the slab's middle leaves the car on, cast at the
+            # car without the array itself; a tie goes to the side away from the car's
+            # middle
+            if others is None:
+                others = world_bvh([q for q in pieces if q.part == "body" and q is not p])[0]
+            free = []
+            for sgn in (1, -1):
+                hit = others.ray_cast(c, n * sgn)
+                free.append(1e9 if hit[0] is None else hit[3])
+            if abs(free[0] - free[1]) < 1e-6:
+                free = [(c - mid).dot(n), -(c - mid).dot(n)]
+            if free[1] > free[0]:
+                n, v = -n, -v
+                ds = [-d for d in ds]
+                hull = [(a, -b) for a, b in hull]
+            # the card lies in the array's back face, so what stands inside the array's
+            # depth (a plate, an exhaust in a hole) stays in front of it
+            off = min(ds) + 0.001      # 1 mm inside: the back may lie flush on a wall
+            ring = [c + n * off + u * a + v * b for a, b in hull]
+            mine.append(dict(piece=p, ring=ring, normal=n, tris=tris, area=area,
+                             thick=thick))
+        if mine and sum(c["tris"] for c in mine) >= 0.9 * p.tris:
+            cards += mine
+    return cards
+
+
+def card_mesh(card):
+    me = bpy.data.meshes.new("card")
+    ring = card["ring"]
+    me.from_pydata([tuple(p) for p in ring], [], [list(range(len(ring)))])
+    me.update()
+    if me.polygons[0].normal.dot(card["normal"]) < 0:
+        me.polygons[0].flip()
+        me.update()
+    a = me.attributes.new("cg_obj", 'FLOAT_VECTOR', 'POINT')
+    a.data.foreach_set("vector", [c for p in ring for c in p])
+    n = card["normal"]
+    a = me.attributes.new("cg_n", 'FLOAT_VECTOR', 'CORNER')
+    a.data.foreach_set("vector", [c for _ in me.loops for c in n])
+    me.materials.append(void_material())
+    return me
+
+
+def lathe_mesh(p):
+    """A tire rebuilt as a lathe of its outer envelope: the cross section's outline in
+    (axial y, radius) around its middle, the deepest pockets and the letters left to the
+    bake. Built in the tire's own space, then put where the tire is."""
+    co = [V3(v.vector) for v in p.me.attributes["cg_obj"].data]
+    yr = [(c.y, sqrt(c.x * c.x + c.z * c.z)) for c in co]
+    y0, y1 = min(a for a, _ in yr), max(a for a, _ in yr)
+    r0, r1 = min(b for _, b in yr), max(b for _, b in yr)
+    yc, rc, hy, hr = (y0 + y1) / 2, (r0 + r1) / 2, (y1 - y0) / 2 or 1e-3, (r1 - r0) / 2 or 1e-3
+    K_ = 256
+    best = [None] * K_
+    for y, r in yr:
+        a, b = (y - yc) / hy, (r - rc) / hr
+        k = int(((atan2(b, a) + pi) / (2 * pi)) * K_) % K_
+        d = a * a + b * b
+        if best[k] is None or d > best[k][0]:
+            best[k] = (d, y, r)
+    known = [k for k in range(K_) if best[k] is not None]
+    prof = []
+    for k in range(K_):
+        if best[k] is not None:
+            prof.append((best[k][1], best[k][2]))
+            continue
+        lo = max((j for j in known if j < k), default=known[-1] - K_)
+        hi = min((j for j in known if j > k), default=known[0] + K_)
+        t = (k - lo) / (hi - lo)
+        A, B = best[lo % K_], best[hi % K_]
+        prof.append((A[1] + (B[1] - A[1]) * t, A[2] + (B[2] - A[2]) * t))
+    # start at the innermost point, simplify the closed outline
+    s = min(range(K_), key=lambda i: prof[i][1])
+    ring = prof[s:] + prof[:s]
+    far = max(range(K_), key=lambda i: (ring[i][0] - ring[0][0]) ** 2 +
+              (ring[i][1] - ring[0][1]) ** 2)
+    ring = rdp(ring[:far + 1], 0.0006)[:-1] + rdp(ring[far:] + [ring[0]], 0.0006)[:-1]
+    N = TIRE_SEGMENTS
+    m = len(ring)
+    verts, faces = [], []
+    for k in range(N):
+        a = 2 * pi * k / N
+        for (y, r) in ring:
+            verts.append((r * cos(a), y, r * sin(a)))
+    for k in range(N):
+        k2 = (k + 1) % N
+        for j in range(m):
+            j2 = (j + 1) % m
+            faces.append((k * m + j, k * m + j2, k2 * m + j2, k2 * m + j))
+    me = bpy.data.meshes.new("lathe")
+    me.from_pydata(verts, [], faces)
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(me)
+    bm.free()
+    a = me.attributes.new("cg_obj", 'FLOAT_VECTOR', 'POINT')
+    a.data.foreach_set("vector", [c for v in me.vertices for c in v.co])
+    me.transform(p.ob.matrix_world)
+    me.shade_smooth()
+    me.set_sharp_from_angle(angle=0.6)
+    a = me.attributes.new("cg_n", 'FLOAT_VECTOR', 'CORNER')
+    a.data.foreach_set("vector", [c for n in me.corner_normals for c in n.vector])
+    me.materials.append(p.me.materials[0])
+    return me, len(ring)
+
+
+def collapse_mesh(p, ratio):
+    """The piece's mesh collapsed to ratio of its triangles (Blender's decimate), its
+    attributes carried along by the collapse."""
+    me = p.me.copy()
+    ob = new_obj("tmp_collapse", me, bpy.context.scene.collection)
+    md = ob.modifiers.new("dec", 'DECIMATE')
+    md.decimate_type = 'COLLAPSE'
+    md.ratio = ratio
+    dg = bpy.context.evaluated_depsgraph_get()
+    out = bpy.data.meshes.new_from_object(ob.evaluated_get(dg), preserve_all_data_layers=True,
+                                          depsgraph=dg)
+    bpy.data.objects.remove(ob)
+    bpy.data.meshes.remove(me)
+    out.shade_smooth()
+    out.set_sharp_from_angle(angle=0.6)
+    if "cg_n" in out.attributes:
+        out.attributes.remove(out.attributes["cg_n"])
+    a = out.attributes.new("cg_n", 'FLOAT_VECTOR', 'CORNER')
+    a.data.foreach_set("vector", [c for n in out.corner_normals for c in n.vector])
+    return out
+
+
+# ---------------------------------------------------------------------------------------
+# parts: meshes joined, hidden faces removed
+# ---------------------------------------------------------------------------------------
+def find_twins(objs, wheels):
+    """Right wheels (and brakes) that are their left partner mirrored, vertex for vertex:
+    {right key: left key}. A twin is made from its partner after the UVs, so the pair
+    shares its texels."""
+    twins = {}
+    for tag, piv, mem in wheels:
+        if piv.y <= 0:
+            continue
+        for tag2, piv2, mem2 in wheels:
+            if tag2 == tag or abs(piv2.x - piv.x) > 1e-3 or abs(piv2.y + piv.y) > 1e-3 or \
+                    abs(piv2.z - piv.z) > 1e-3:
+                continue
+            for kind in ("wheel", "brake"):
+                a, b = objs.get(kind + ":" + tag), objs.get(kind + ":" + tag2)
+                if a is None or b is None:
+                    continue
+                va, vb = a.data.vertices, b.data.vertices
+                if len(va) != len(vb) or len(a.data.polygons) != len(b.data.polygons):
+                    continue
+                # the same points mirrored (in any order: a mirrored bevel numbers its
+                # vertices its own way), allowing a few to round the other way
+                ka = sorted((round(v.co.x, 3), round(-v.co.y, 3), round(v.co.z, 3)) for v in va)
+                kb = sorted((round(v.co.x, 3), round(v.co.y, 3), round(v.co.z, 3)) for v in vb)
+                same = sum(1 for p, q in zip(ka, kb) if p == q)
+                if same >= 0.98 * len(ka):
+                    twins[kind + ":" + tag2] = kind + ":" + tag
+    return twins
+
+
+def tag_mesh(me, piece_idx):
+    a = me.attributes.get("cg_piece") or me.attributes.new("cg_piece", 'INT', 'FACE')
+    a.data.foreach_set("value", [piece_idx] * len(me.polygons))
+
+
+def part_meshes(pieces, cards):
+    """The low meshes of every part (world space): kept pieces as they are, replacements
+    in place of what they replace. Returns {part: [(mesh, piece)]}."""
+    out = {}
+    for p in pieces:
+        if p.op in ("relief", "card_src"):
+            continue
+        if p.op == "lathe":
+            me = p.lathe
+        elif p.op == "collapse":
+            me = p.low
+        else:
+            me = p.me.copy()
+        if p.op in ("lathe", "collapse"):
+            me = me.copy()
+        tag_mesh(me, p.idx)
+        out.setdefault(p.part, []).append((me, p))
+    for k, c in enumerate(cards):
+        me = card_mesh(c)
+        tag_mesh(me, -2 - k)
+        out.setdefault("body", []).append((me, c["piece"]))
+    return out
+
+
+def dedupe_faces(bm):
+    """Coincident faces: one of two facing the same way is kept, two facing apart (the
+    backs of solids merged face to face) both go."""
+    seen = {}
+    gone = set()
+    for f in bm.faces:
+        key = tuple(sorted((round(v.co.x, 4), round(v.co.y, 4), round(v.co.z, 4))
+                           for v in f.verts))
+        g = seen.get(key)
+        if g is None:
+            seen[key] = f
+            continue
+        if f.normal.dot(g.normal) > 0:
+            gone.add(f)
+        else:
+            gone.add(f)
+            gone.add(g)
+    return list(gone)
+
+
+DIRS = None
+
+
+def visibility(bm, glass_tree):
+    """Face classes by rays: 0 seen from outside (exterior), 1 seen only from below
+    (underside), 2 seen only through glass (cabin), -1 never seen (removed)."""
+    global DIRS
+    if DIRS is None:
+        DIRS = fib_dirs(96)
+    bm.faces.ensure_lookup_table()
+    tree = BVHTree.FromBMesh(bm)
+    cls = []
+    eps = 2e-4
+    for f in bm.faces:
+        n = f.normal
+        if n.length < 0.5:
+            cls.append(0)
+            continue
+        c = f.calc_center_median()
+        samples = [c]
+        if f.calc_area() > 2e-4:
+            samples += [c.lerp(v.co, 0.85) for v in f.verts]
+        dirs = [n] + [d for d in DIRS if d.dot(n) > 0.12]
+        best = -1
+        for p in samples:
+            o = p + n * eps
+            for d in dirs:
+                if tree.ray_cast(o, d)[0] is not None:
+                    continue
+                through = glass_tree is not None and glass_tree.ray_cast(o, d)[0] is not None
+                k = 2 if through else (0 if d.z > -0.3 else 1)
+                if best == -1 or (k == 0) or (k == 1 and best == 2):
+                    best = k
+                if best == 0:
+                    break
+            if best == 0:
+                break
+        cls.append(best)
+    return cls
+
+
+def cull(ob, glass_tree):
+    """Removes coincident and never seen faces of a part, stores each face's class (FACE
+    int cg_class). Returns (faces removed as coincident, as hidden)."""
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    bm.normal_update()
+    dup = dedupe_faces(bm) + [f for f in bm.faces if f.calc_area() < 1e-9]
+    bmesh.ops.delete(bm, geom=list(set(dup)), context='FACES')
+    bm.faces.ensure_lookup_table()
+    cls = visibility(bm, glass_tree)
+    lay = bm.faces.layers.int.get("cg_class") or bm.faces.layers.int.new("cg_class")
+    hidden = []
+    for f, k in zip(bm.faces, cls):
+        if k < 0:
+            hidden.append(f)
+        else:
+            f[lay] = k
+    bmesh.ops.delete(bm, geom=hidden, context='FACES')
+    bm.to_mesh(ob.data)
+    bm.free()
+    return len(dup), len(hidden)
+
+
+def set_normals(me):
+    if "cg_n" not in me.attributes:
+        return
+    a = me.attributes["cg_n"].data
+    ns = [tuple(V3(x.vector).normalized()) for x in a]
+    me.normals_split_custom_set(ns)
+
+
+# ---------------------------------------------------------------------------------------
+# UVs
+# ---------------------------------------------------------------------------------------
+def edit(ob):
+    bpy.ops.object.mode_set(mode='OBJECT') if bpy.context.object and \
+        bpy.context.object.mode != 'OBJECT' else None
+    for o in bpy.context.view_layer.objects:
+        o.select_set(False)
+    bpy.context.view_layer.objects.active = ob
+    ob.select_set(True)
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.reveal()
+    bpy.ops.mesh.select_all(action='SELECT')
+
+
+def unwrap(ob, size, pad_px=None):
+    """Smart projection, even texel density, islands scaled by face class (exterior over
+    underside and cabin), packed into the unit square with pad_px between islands."""
+    me = ob.data
+    pad_px = pad_px or max(4, size // 512)          # 8 px between islands at 4096
+    if not me.uv_layers:
+        me.uv_layers.new(name="UVMap")
+    bpy.context.scene.tool_settings.use_uv_select_sync = True
+    edit(ob)
+    bpy.ops.uv.smart_project(angle_limit=1.15, island_margin=0.0, area_weight=0.0,
+                             correct_aspect=True, scale_to_bounds=False)
+    bpy.ops.object.mode_set(mode='OBJECT')
+    log("  smart projection %s: %s" % (ob.name, _uvbox(me)))
+    from bpy_extras import mesh_utils
+    islands = mesh_utils.mesh_linked_uv_islands(me)
+    uv = me.uv_layers.active.data
+    cls = me.attributes.get("cg_class")
+    fc = [x.value for x in cls.data] if cls else [0] * len(me.polygons)
+    U = [0.0] * (2 * len(uv))
+    uv.foreach_get("uv", U)
+    bad = sum(1 for u in U if u != u or abs(u) > 1e6)
+    if bad:
+        U = [0.0 if (u != u or abs(u) > 1e6) else u for u in U]
+        log("  %d UV coordinates of degenerate faces were not numbers: set to 0" % bad)
+    # every island to one texel density (a UV unit a meter), times its class's weight; an
+    # island with no UV area (degenerate faces) is left as it is
+    polys = me.polygons
+    for isl in islands:
+        w = max(WEIGHT.get(fc[i], 1.0) for i in isl)
+        loops = [l for i in isl for l in polys[i].loop_indices]
+        A3 = sum(polys[i].area for i in isl)
+        Auv = 0.0
+        for i in isl:
+            ls = list(polys[i].loop_indices)
+            Auv += abs(sum(U[2 * a] * U[2 * b + 1] - U[2 * b] * U[2 * a + 1]
+                           for a, b in zip(ls, ls[1:] + ls[:1]))) / 2
+        if Auv < 1e-12 or A3 < 1e-10:
+            continue
+        s = sqrt(A3 / Auv) * w
+        cx = sum(U[2 * l] for l in loops) / len(loops)
+        cy = sum(U[2 * l + 1] for l in loops) / len(loops)
+        for l in loops:
+            U[2 * l] = cx + (U[2 * l] - cx) * s
+            U[2 * l + 1] = cy + (U[2 * l + 1] - cy) * s
+    U, fill = pack_uv(U, [[l for i in isl for l in polys[i].loop_indices] for isl in islands],
+                      pad_px / size)
+    uv.foreach_set("uv", U)
+    me.update()
+    log("  packed %s: %d islands, %.0f%% of the square, uv box %s" % (
+        ob.name, len(islands), fill * 100, _uvbox(me)))
+    return len(islands)
+
+
+def pack_uv(U, islands, pad):
+    """Islands (lists of loop indices into U, flat u, v pairs) packed into the unit square
+    at one common scale, the largest that fits: each turned to its smallest bounding
+    rectangle (lying flat), then laid in shelves tallest first, pad between them.
+    Returns (U, share of the square the islands' rectangles take)."""
+    rects = []
+    for loops in islands:
+        pts = list({(U[2 * l], U[2 * l + 1]) for l in loops})
+        hull = hull2d(pts) if len(pts) > 2 else pts
+        best = None
+        for i in range(max(1, len(hull))):
+            a, b = hull[i], hull[(i + 1) % len(hull)]
+            ang = atan2(b[1] - a[1], b[0] - a[0]) if hull else 0.0
+            c, s = cos(-ang), sin(-ang)
+            xs = [p[0] * c - p[1] * s for p in hull]
+            ys = [p[0] * s + p[1] * c for p in hull]
+            w, h = max(xs) - min(xs), max(ys) - min(ys)
+            if best is None or w * h < best[0] - 1e-15:
+                best = (w * h, -ang, min(xs), min(ys), w, h)
+        _, ang, x0, y0, w, h = best
+        if h > w:                                   # lie flat: shelves of low rows
+            ang += pi / 2
+            c, s = cos(ang), sin(ang)
+            xs = [p[0] * c - p[1] * s for p in hull]
+            ys = [p[0] * s + p[1] * c for p in hull]
+            x0, y0, w, h = min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys)
+        rects.append([loops, ang, x0, y0, max(w, 1e-6), max(h, 1e-6)])
+    order = sorted(range(len(rects)), key=lambda i: (-rects[i][5], -rects[i][4]))
+
+    def skyline(S):
+        """Bottom-left on a skyline: each rectangle where its top ends lowest."""
+        sky = [[0.0, 1.0, 0.0]]                     # segments: x, width, height
+        pos = {}
+        for i in order:
+            best = None
+            for rot in (False, True):           # lying flat, or stood up where that fits lower
+                w, h = rects[i][4] * S + pad, rects[i][5] * S + pad
+                if rot:
+                    w, h = h, w
+                if w > 1 or h > 1:
+                    continue
+                for k in range(len(sky)):
+                    x = sky[k][0]
+                    if x + w > 1 + 1e-12:
+                        break
+                    y, j, reach = 0.0, k, x + w
+                    while j < len(sky) and sky[j][0] < reach - 1e-12:
+                        y = max(y, sky[j][2])
+                        j += 1
+                    if y + h <= 1 and (best is None or y + h < best[1] + best[4] - 1e-12):
+                        best = (x, y, w, rot, h)
+            if best is None:
+                return None
+            x, y, w, rot, h = best
+            pos[i] = (x, y, rot)
+            new = []
+            for seg in sky:
+                sx, sw, sy = seg
+                if sx + sw <= x + 1e-12 or sx >= x + w - 1e-12:
+                    new.append(seg)
+                    continue
+                if sx < x:
+                    new.append([sx, x - sx, sy])
+                if sx + sw > x + w:
+                    new.append([x + w, sx + sw - x - w, sy])
+            new.append([x, w, y + h])
+            new.sort(key=lambda s: s[0])
+            merged = [new[0]]
+            for seg in new[1:]:
+                if abs(seg[2] - merged[-1][2]) < 1e-12:
+                    merged[-1][1] += seg[1]
+                else:
+                    merged.append(seg)
+            sky = merged
+        return pos
+    A_ = sum((r[4] + 0) * (r[5] + 0) for r in rects)
+    lo, hi = sqrt(0.3 / A_), sqrt(1.0 / A_)
+    while skyline(lo) is None and lo > 1e-9:
+        lo *= 0.7
+    for _ in range(12):
+        mid = (lo + hi) / 2
+        if skyline(mid) is not None:
+            lo = mid
+        else:
+            hi = mid
+    S = lo
+    pos = skyline(S)
+    used = 0.0
+    out = list(U)
+    for i, (loops, ang, x0, y0, w, h) in enumerate(rects):
+        px, py, rot = pos[i]
+        c, s = cos(ang), sin(ang)
+        for l in loops:
+            u, v = U[2 * l], U[2 * l + 1]
+            a, b = (u * c - v * s - x0) * S, (u * s + v * c - y0) * S
+            if rot:                                 # a quarter turn: (a, b) -> (b, w - a)
+                a, b = b, w * S - a
+            out[2 * l] = px + pad / 2 + a
+            out[2 * l + 1] = py + pad / 2 + b
+        used += (w * S) * (h * S)
+    return out, used
+
+
+def _uvbox(me):
+    U = [0.0] * (2 * len(me.loops))
+    me.uv_layers.active.data.foreach_get("uv", U)
+    xs, ys = U[0::2], U[1::2]
+    z = 0
+    for p in me.polygons:
+        ls = list(p.loop_indices)
+        a = abs(sum(U[2 * i] * U[2 * j + 1] - U[2 * j] * U[2 * i + 1]
+                    for i, j in zip(ls, ls[1:] + ls[:1])))
+        z += a < 1e-14
+    return [round(min(xs), 3), round(min(ys), 3), round(max(xs), 3), round(max(ys), 3),
+            "zero-area %d of %d" % (z, len(me.polygons))]
+
+
+def texel_stats(ob, size):
+    """px/m per face class, area weighted: median and 5th percentile."""
+    me = ob.data
+    n = len(me.polygons)
+    U = [0.0] * (2 * len(me.loops))
+    me.uv_layers.active.data.foreach_get("uv", U)
+    ls0, lt, ar = [0] * n, [0] * n, [0.0] * n
+    me.polygons.foreach_get("loop_start", ls0)
+    me.polygons.foreach_get("loop_total", lt)
+    me.polygons.foreach_get("area", ar)
+    cls = me.attributes.get("cg_class")
+    fc = [0] * n
+    if cls is not None:
+        cls.data.foreach_get("value", fc)
+    rows = {}
+    for i in range(n):
+        A = ar[i]
+        if A < 1e-8:
+            continue
+        ls = range(ls0[i], ls0[i] + lt[i])
+        ls2 = list(ls[1:]) + [ls[0]]
+        ua = abs(sum(U[2 * a] * U[2 * b + 1] - U[2 * b] * U[2 * a + 1]
+                     for a, b in zip(ls, ls2))) / 2
+        rows.setdefault(fc[i], []).append((sqrt(ua * size * size / A), A))
+    out = {}
+    for k, r in rows.items():
+        r.sort()
+        tot = sum(a for _, a in r)
+        acc, p5, med = 0.0, None, None
+        for d, a in r:
+            acc += a
+            if p5 is None and acc >= 0.05 * tot:
+                p5 = d
+            if med is None and acc >= 0.5 * tot:
+                med = d
+        out[CLASS_NAMES.get(k, str(k))] = dict(area_m2=round(tot, 3), p5=round(p5, 1),
+                                                median=round(med, 1))
+    return out
+
+
+def mirror_copy(src_ob, name, coll):
+    """The left wheel's final mesh mirrored to the right (y negated): the same UVs, so a
+    pair shares its texels."""
+    me = src_ob.data.copy()
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    for v in bm.verts:
+        v.co.y = -v.co.y
+    bmesh.ops.reverse_faces(bm, faces=bm.faces[:])
+    lay = bm.loops.layers.float_vector.get("cg_n")
+    if lay is not None:
+        for f in bm.faces:
+            for l in f.loops:
+                n = l[lay]
+                l[lay] = V3((n.x, -n.y, n.z))
+    bm.to_mesh(me)
+    bm.free()
+    ob = new_obj(name, me, coll)
+    t = src_ob.location.copy()
+    ob.location = (t.x, -t.y, t.z)
+    return ob
+
+
+# ---------------------------------------------------------------------------------------
+# bakes
+# ---------------------------------------------------------------------------------------
+PASSES = ("BASE", "TINT", "RMC", "SSE", "EMIT", "NORMAL", "AO")
+SRGB = ("BASE", "EMIT")
+
+
+def make_image(name, size, srgb):
+    img = bpy.data.images.new(name, size, size, alpha=True, float_buffer=False)
+    img.colorspace_settings.name = "sRGB" if srgb else "Non-Color"
+    img.generated_color = (0, 0, 0, 0)
+    return img
+
+
+def layer_coll(name):
+    def walk(lc):
+        if lc.collection.name == name:
+            return lc
+        for c in lc.children:
+            r = walk(c)
+            if r:
+                return r
+    return walk(bpy.context.view_layer.layer_collection)
+
+
+def select(objs, active):
+    bpy.context.view_layer.update()
+    for o in bpy.data.objects:
+        try:
+            o.select_set(False)
+        except RuntimeError:
+            pass                                        # not in the view layer
+    for o in objs:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = active
+
+
+def ray_vis(objs, on):
+    for o in objs:
+        for k in ("visible_camera", "visible_diffuse", "visible_glossy", "visible_transmission",
+                  "visible_volume_scatter", "visible_shadow"):
+            setattr(o, k, on)
+
+
+def bake_slot(slot, targets, receiver, sources, chans_low, chans_src, size, work, samples,
+              K, low_coll, hide):
+    """Pass A: each target's own surface, its materials as they are, against the low parts.
+    Pass B: the baked-down detail, from the original objects (sources) onto the receiver
+    (the faces under it), against the original car. hide: objects out of both (glass, the
+    other copies of the targets). Every pass a PNG in work/: <slot>_<A|B>_<pass>.png."""
+    scn = bpy.context.scene
+    car_lc, st_lc = layer_coll(K.CAR.name), layer_coll(K.STUDIO.name)
+    st_lc.exclude = True
+    for g in hide:
+        g.hide_render = True
+    scn.render.bake.normal_space = 'TANGENT'
+    scn.render.bake.normal_r, scn.render.bake.normal_g, scn.render.bake.normal_b = \
+        'POS_X', 'POS_Y', 'POS_Z'
+    scn.world.light_settings.distance = 0.3
+    files = {}
+    for side in ("A", "B"):
+        if side == "B" and (receiver is None or not sources):
+            break
+        car_lc.exclude = side == "A"
+        if receiver is not None:
+            receiver.hide_render = side == "A"
+        tgt = targets if side == "A" else [receiver]
+        ray_vis(low_coll.objects, side == "A")
+        sel = tgt + (sources if side == "B" else [])
+        select(sel, tgt[0])
+        for ps in PASSES:
+            img = make_image("%s_%s_%s" % (slot, side, ps), size, ps in SRGB)
+            for c in chans_low:
+                c.img.image = img
+                c.nt.nodes.active = c.img
+            what = None if ps in ("NORMAL", "AO") else ps
+            for c in chans_low + (chans_src if side == "B" else []):
+                c.show(what)
+            n = {"NORMAL": 4, "AO": 64}.get(ps, 16)
+            scn.cycles.samples = max(1, int(n * samples))
+            t = time.time()
+            kw = dict(type='EMIT' if what else ps, margin=0 if side == "B" else
+                      max(2, size // 512), margin_type='EXTEND', use_clear=False,
+                      target='IMAGE_TEXTURES', use_selected_to_active=side == "B")
+            if side == "B":
+                kw.update(cage_extrusion=CAGE_M, max_ray_distance=CAGE_M + REACH_M)
+            if ps == PASSES[0]:
+                # the first bake after the scene changes writes nothing (Blender 5.2): it
+                # only primes the bake, the second is the real one
+                bpy.ops.object.bake(**kw)
+            bpy.ops.object.bake(**kw)
+            path = os.path.join(work, "%s_%s_%s.png" % (slot, side, ps))
+            img.filepath_raw = path
+            img.file_format = 'PNG'
+            img.save()
+            files[(side, ps)] = path
+            log("  baked %s %s %s at %d, %d samples, %.1f s" % (slot, side, ps, size,
+                                                                scn.cycles.samples,
+                                                                time.time() - t))
+            bpy.data.images.remove(img)
+        for c in chans_low + chans_src:
+            c.show(None)
+    ray_vis(low_coll.objects, True)
+    car_lc.exclude = False
+    st_lc.exclude = False
+    for g in hide:
+        g.hide_render = False
+    return files
+
+
+# ---------------------------------------------------------------------------------------
+# collision, lights
+# ---------------------------------------------------------------------------------------
+def support_hull(pts, n_dirs=128):
+    """A convex hull of at most n_dirs corners: the farthest points along many directions
+    (game engines want few corners a hull)."""
+    if len(pts) < 4:
+        return None
+    ds = fib_dirs(n_dirs)
+    keep = {}
+    for d in ds:
+        i = max(range(len(pts)), key=lambda k: pts[k].dot(d))
+        keep[i] = pts[i]
+    bm = bmesh.new()
+    for p in keep.values():
+        bm.verts.new(p)
+    try:
+        r = bmesh.ops.convex_hull(bm, input=bm.verts[:])
+    except Exception:
+        bm.free()
+        return None
+    gone = {g for g in r["geom_interior"] + r["geom_unused"] if isinstance(g, bmesh.types.BMVert)}
+    bmesh.ops.delete(bm, geom=list(gone), context='VERTS')
+    bmesh.ops.triangulate(bm, faces=bm.faces[:])
+    me = bpy.data.meshes.new("hull")
+    bm.to_mesh(me)
+    bm.free()
+    return me
+
+
+def collision(obs):
+    """Convex hulls along the car: slabs along x, each split at its beltline (the highest
+    height where it is still most of its widest) when what stands above is narrower."""
+    pts = []
+    for ob in obs:
+        M = ob.matrix_world
+        pts += [M @ v.co for v in ob.data.vertices]
+    if not pts:
+        return []
+    x0, x1 = min(p.x for p in pts), max(p.x for p in pts)
+    L = x1 - x0
+    ns = max(3, min(6, int(round(L / 0.95))))
+    hulls = []
+    for k in range(ns):
+        a, b = x0 + L * k / ns, x0 + L * (k + 1) / ns
+        pad = 0.02
+        sl = [p for p in pts if a - pad <= p.x <= b + pad]
+        if len(sl) < 8:
+            continue
+        z0, z1 = min(p.z for p in sl), max(p.z for p in sl)
+        nb = 24
+        wid = [0.0] * nb
+        for p in sl:
+            i = min(nb - 1, int((p.z - z0) / max(z1 - z0, 1e-6) * nb))
+            wid[i] = max(wid[i], abs(p.y))
+        wmax = max(wid)
+        top = max(i for i in range(nb) if wid[i] >= 0.85 * wmax)
+        zb = z0 + (z1 - z0) * (top + 1) / nb
+        upper = [p for p in sl if p.z >= zb - 0.03]
+        above = [p for p in sl if p.z > zb + 0.05]
+        split = (z1 - zb) > 0.12 and len(above) > 8 and \
+            max(abs(p.y) for p in above) < 0.9 * wmax
+        groups = [[p for p in sl if p.z <= zb + 0.03], upper] if split else [sl]
+        for g in groups:
+            me = support_hull(g)
+            if me is not None:
+                hulls.append(me)
+    return hulls[:12]
+
+
+ROLE = {"led_front": "head", "led_rear": "tail", "led_accent": "marker", "led_wheel": "wheel",
+        "screen": "cabin", "lamp": "lamp", "ember": "glow"}
+
+
+def lights_of(pieces, infos):
+    """Every emissive surface as data: grouped into lamps (parts closer than 3 cm), each
+    with its middle, size, facing, area, color and strength."""
+    out = []
+    for p in pieces:
+        mi = infos.get(p.mat)
+        if mi is None or not mi.emissive:
+            continue
+        bm = bmesh.new()
+        bm.from_mesh(p.me)
+        bm.normal_update()
+        parts = loose_parts(bm)
+        groups = []
+        for part in parts:
+            cs = [v.co.copy() for f in part for v in f.verts]
+            lo = V3([min(c[i] for c in cs) for i in range(3)])
+            hi = V3([max(c[i] for c in cs) for i in range(3)])
+            area = sum(f.calc_area() for f in part)
+            nrm = sum((f.normal * f.calc_area() for f in part), V3())
+            cen = sum((f.calc_center_median() * f.calc_area() for f in part), V3())
+            for g in groups:
+                if all(lo[i] <= g["hi"][i] + 0.03 and g["lo"][i] <= hi[i] + 0.03
+                       for i in range(3)):
+                    g["lo"] = V3([min(g["lo"][i], lo[i]) for i in range(3)])
+                    g["hi"] = V3([max(g["hi"][i], hi[i]) for i in range(3)])
+                    g["area"] += area
+                    g["n"] += nrm
+                    g["c"] += cen
+                    break
+            else:
+                groups.append(dict(lo=lo, hi=hi, area=area, n=nrm, c=cen))
+        bm.free()
+        for g in groups:
+            if g["area"] <= 0:
+                continue
+            c = g["c"] / g["area"]
+            role = ROLE.get(p.mat, "emitter")
+            if p.part.startswith("wheel:"):
+                role = "wheel"
+            out.append(dict(
+                name=p.ob.name, part=p.part.split(":")[0], material=p.mat, role=role,
+                position=[round(x, 4) for x in c], size=[round(g["hi"][i] - g["lo"][i], 4)
+                                                         for i in range(3)],
+                facing=[round(x, 3) for x in (g["n"].normalized() if g["n"].length > 1e-9
+                                              else V3((0, 0, 0)))],
+                area_m2=round(g["area"], 5), color=[round(x, 4) for x in mi.emit_color],
+                strength=round(mi.strength, 3)))
+    out.sort(key=lambda d: (d["role"], -d["position"][0], -d["position"][1], d["position"][2]))
+    return out
+
+
+# ---------------------------------------------------------------------------------------
+# export
+# ---------------------------------------------------------------------------------------
+def final_material(name):
+    m = bpy.data.materials.get("pack_" + name) or bpy.data.materials.new("pack_" + name)
+    return m
+
+
+def single_slot(ob, matname):
+    me = ob.data
+    for p in me.polygons:
+        p.material_index = 0
+    me.materials.clear()
+    me.materials.append(final_material(matname))
+
+
+def strip_attrs(me):
+    for nm in [a.name for a in me.attributes if a.name.startswith("cg_")]:
+        me.attributes.remove(me.attributes[nm])
+
+
+def export_glb(path, objs, names):
+    """objs under one empty "car" at the origin, each named as given, written as GLB with
+    normals, tangents and one UV set; no images (the pack's PNGs are the textures)."""
+    root = bpy.data.objects.new("car", None)
+    bpy.context.scene.collection.objects.link(root)
+    saved = []
+    for ob, nm in zip(objs, names):
+        saved.append((ob, ob.name, ob.data.name))
+        other = bpy.data.objects.get(nm)
+        if other is not None and other not in objs:
+            other.name = "orig_" + nm                   # a design object of that name
+    for ob, nm in zip(objs, names):
+        ob.name = "tmpx_" + nm
+    for ob, nm in zip(objs, names):
+        ob.name = nm
+        ob.data.name = nm
+        ob.parent = root
+    select(objs + [root], root)
+    kw = dict(filepath=path, export_format='GLB', use_selection=True, export_apply=False,
+              export_tangents=True, export_normals=True, export_texcoords=True,
+              export_image_format='NONE', export_materials='EXPORT', export_yup=True,
+              export_animations=False, export_extras=False)
+    try:
+        kw["export_vertex_color"] = 'NONE'
+        bpy.ops.export_scene.gltf(**kw)
+    except TypeError:
+        kw.pop("export_vertex_color")
+        bpy.ops.export_scene.gltf(**kw)
+    for ob, nm, dn in saved:
+        ob.parent = None
+        ob.name = "tmpy_" + nm
+    for ob, nm, dn in saved:
+        ob.name = nm
+        ob.data.name = dn
+    bpy.data.objects.remove(root)
+
+
+def decimate_copy(ob, ratio, name, coll, drop_class=None, symmetric=False):
+    me = ob.data.copy()
+    if drop_class is not None and "cg_class" in me.attributes:
+        bm = bmesh.new()
+        bm.from_mesh(me)
+        lay = bm.faces.layers.int.get("cg_class")
+        bmesh.ops.delete(bm, geom=[f for f in bm.faces if f[lay] in drop_class], context='FACES')
+        bm.to_mesh(me)
+        bm.free()
+    tmp = new_obj(name + "_tmp", me, coll)
+    tmp.location = ob.location
+    if ratio < 0.999:
+        md = tmp.modifiers.new("dec", 'DECIMATE')
+        md.decimate_type = 'COLLAPSE'
+        md.ratio = max(0.003, ratio)
+        md.use_collapse_triangulate = True
+        if symmetric:
+            md.use_symmetry = True
+            md.symmetry_axis = 'Y'
+    dg = bpy.context.evaluated_depsgraph_get()
+    out = bpy.data.meshes.new_from_object(tmp.evaluated_get(dg), preserve_all_data_layers=True,
+                                          depsgraph=dg)
+    bpy.data.objects.remove(tmp)
+    bpy.data.meshes.remove(me)
+    out.shade_smooth()
+    out.set_sharp_from_angle(angle=0.7)
+    res = new_obj(name, out, coll)
+    res.location = ob.location
+    return res
+
+
+# ---------------------------------------------------------------------------------------
+# the run
+# ---------------------------------------------------------------------------------------
+def main_build(A):
+    out = A.out
+    work = os.path.join(out, "work")
+    proof = os.path.join(out, "proof")
+    if os.path.isdir(out):
+        for f in os.listdir(out):
+            fp = os.path.join(out, f)
+            if f in ("build",):
+                continue
+            shutil.rmtree(fp) if os.path.isdir(fp) else os.remove(fp)
+    for d in (out, work, proof):
+        os.makedirs(d, exist_ok=True)
+    times = {}
+    t = time.time()
+    K = build_car(A.car, out)
+    times["build"] = time.time() - t
+    script = os.path.join(HERE, "cars", A.car + ".py")
+    title = ""
+    with open(script) as f:
+        src_txt = f.read()
+    if src_txt.startswith('"""'):
+        title = src_txt[3:].split("\n", 1)[0].split(":")[0].strip()
+    log("built %s (%s)" % (A.car, title))
+
+    # 1. the original, from the car's own views
+    t = time.time()
+    res = (1920, 1080) if not A.test else (960, 540)
+    sm = max(8, int(96 * A.samples))
+    views = ["hero"] + [v for v in A.views.split(",") if v and v != "hero"]
+    cams = render_views(K, views, res, sm, proof, "original")
+    hero_view = {k: (list(v) if isinstance(v, tuple) else v) for k, v in K.VIEWS["hero"].items()}
+    times["render_original"] = time.time() - t
+    orig_tris = K.tri_count()
+    n_objects = len([o for o in K.CAR.objects])
+
+    # 2. materials and pieces
+    t = time.time()
+    infos = analyze_materials(K)
+    micro = strip_flake(infos)
+    pieces, wheels = gather(K, infos)
+    log("%d pieces from %d objects, %d triangles; %d wheels" % (
+        len(pieces), n_objects, sum(p.tris for p in pieces), len(wheels)))
+    emax = max([mi.strength for mi in infos.values() if mi.emissive] or [0.0])
+
+    # 3. bake down: flat relief and cards always
+    find_relief(pieces)
+    tree_all, owner = world_bvh([p for p in pieces if p.part == "body"])
+    cards = find_cards(pieces, tree_all, owner)
+    for c in cards:
+        c["piece"].op = "card_src"
+        log("  card: %s, %d triangles over %.3f m2 (%.0f mm deep)" % (
+            c["piece"].name, c["tris"], c["area"], c["thick"] * 1000))
+    for p in pieces:
+        if p.op == "keep" and p.relief is not None and p.relief <= FLAT_RELIEF_M:
+            p.op = "relief"
+            log("  relief: %s, %d triangles, %.1f mm" % (p.name, p.tris, p.relief * 1000))
+    for p in pieces:        # tires with tread pockets and lettering cut into them
+        if p.op == "keep" and p.ob.name.startswith("tire.") and p.tris > TIRE_LATHE_TRIS:
+            p.lathe, nprof = lathe_mesh(p)
+            p.op = "lathe"
+            log("  tire %s rebuilt as a lathe (%d -> %d triangles, %d profile points)" % (
+                p.name, p.tris, mesh_tris(p.lathe), nprof))
+    budget = A.lods[0]
+    low_coll = bpy.data.collections.new("LOW")
+    bpy.context.scene.collection.children.link(low_coll)
+    steps = ["tall", "collapse", "collapse", "collapse"]
+    while True:
+        parts = part_meshes(pieces, cards)
+        objs = {part: join_meshes("tmp_" + part, [m for m, _ in lst], low_coll)
+                for part, lst in parts.items()}
+        twins = find_twins(objs, wheels)
+        glass_tree = None
+        if "glass" in objs:
+            bmg = bmesh.new()
+            bmg.from_mesh(objs["glass"].data)
+            glass_tree = BVHTree.FromBMesh(bmg)
+            bmg.free()
+        culled = {}
+        for part, ob in objs.items():
+            if part != "glass" and part not in twins:
+                culled[part] = cull(ob, glass_tree if part == "body" else None)
+        total = sum(mesh_tris(objs[twins.get(k, k)].data) for k in objs)
+        log("low: %d triangles (%s); removed (coincident, hidden) %s; twins %s" % (
+            total, ", ".join("%s %d" % (k, mesh_tris(o.data)) for k, o in sorted(objs.items())),
+            culled, twins))
+        if total <= budget or not steps:
+            break
+        step = steps.pop(0)
+        per_piece = {}
+        for part, ob in objs.items():
+            a = ob.data.attributes.get("cg_piece")
+            if a is None or part in twins:
+                continue
+            k = 2 if part in twins.values() else 1
+            for poly, x in zip(ob.data.polygons, a.data):
+                per_piece[x.value] = per_piece.get(x.value, 0) + k * (len(poly.vertices) - 2)
+        for ob in list(objs.values()):
+            me = ob.data
+            bpy.data.objects.remove(ob)
+            bpy.data.meshes.remove(me)
+        excess = total - budget * 0.97
+        if step == "tall":
+            cand = [p for p in pieces if p.op == "keep" and p.relief is not None and
+                    p.relief <= TALL_RELIEF_M and not (infos.get(p.mat) and
+                                                       infos[p.mat].emissive)]
+            cand.sort(key=lambda p: -per_piece.get(p.idx, 0))
+            for p in cand:
+                if excess <= 0:
+                    break
+                p.op = "relief"
+                excess -= per_piece.get(p.idx, 0)
+                log("  over budget: relief %s (%.1f mm) baked down" % (p.name, p.relief * 1000))
+        else:
+            cand = [p for p in pieces if p.op in ("keep", "collapse") and not p.panel and
+                    p.part != "glass" and per_piece.get(p.idx, 0) >= 600]
+            pool = sum(per_piece.get(p.idx, 0) for p in cand)
+            if pool <= 0:
+                steps = []
+                continue
+            r = max(0.2, 1 - excess / pool)
+            for p in cand:
+                cur = mesh_tris(p.low) / p.tris if p.op == "collapse" else 1.0
+                p.low = collapse_mesh(p, r * cur)
+                p.op = "collapse"
+            log("  over budget: %d small parts collapsed to %.0f%%" % (len(cand), r * 100))
+    times["parts"] = time.time() - t
+
+    # 4. the parts as nodes: body, glass, wheels and brakes about their axles
+    t = time.time()
+    body = objs.get("body")
+    glass = objs.get("glass")
+    if body is not None:
+        body.name = "LOW_body"
+    if glass is not None:
+        glass.name = "LOW_glass"
+        glass.data.attributes.new("cg_class", 'INT', 'FACE')
+    wheel_info = {tag: dict(pivot=piv) for tag, piv, mem in wheels}
+    nodes = {}
+    for key, ob in objs.items():
+        if ":" not in key:
+            continue
+        kind, tag = key.split(":")
+        piv = wheel_info[tag]["pivot"]
+        ob.data.transform(Matrix.Translation(-piv))
+        ob.location = piv
+        ob.name = "LOW_%s_%s" % (kind, tag)
+        nodes[key] = ob
+    times["nodes"] = time.time() - t
+
+    # 5. normals, UVs
+    t = time.time()
+    for ob in [body, glass] + list(nodes.values()):
+        if ob is not None:
+            set_normals(ob.data)
+    uvinfo = {}
+    if body is not None:
+        uvinfo["body"] = unwrap(body, A.body_size)
+    if glass is not None:
+        unwrap(glass, 1024)
+    prim = [nodes[k] for k in sorted(nodes) if k not in twins]
+    wheel_bake = None
+    if prim:
+        # the primaries joined (in place) for one unwrap, then their UVs handed back
+        ms = []
+        for ob in prim:
+            me = ob.data.copy()
+            me.transform(Matrix.Translation(ob.location))
+            ms.append(me)
+        wheel_bake = join_meshes("LOW_wheels_bake", ms, low_coll)
+        uvinfo["wheels"] = unwrap(wheel_bake, A.wheel_size)
+        uv = wheel_bake.data.uv_layers.active.data
+        U = [0.0] * (2 * len(uv))
+        uv.foreach_get("uv", U)
+        o = 0
+        for ob in prim:
+            me = ob.data
+            if not me.uv_layers:
+                me.uv_layers.new(name="UVMap")
+            n = len(me.loops)
+            me.uv_layers.active.data.foreach_set("uv", U[2 * o:2 * (o + n)])
+            o += n
+        for key, src_key in twins.items():
+            old = nodes[key]
+            me = old.data
+            new = mirror_copy(nodes[src_key], "tmp_twin", low_coll)
+            bpy.data.objects.remove(old)
+            bpy.data.meshes.remove(me)
+            nodes[key] = new
+            new.name = "LOW_%s_%s" % tuple(key.split(":"))
+            set_normals(new.data)
+    times["uv"] = time.time() - t
+    texel = {}
+    if body is not None:
+        texel["body"] = texel_stats(body, A.body_size)
+    if wheel_bake is not None:
+        texel["wheels"] = texel_stats(wheel_bake, A.wheel_size)
+    log("texel density px/m: %s" % json.dumps(texel))
+
+    # 6. bakes
+    t = time.time()
+    sources = {"body": [], "wheels": []}
+    replaced = {"body": set(), "wheels": set()}
+    relief = {"body": [], "wheels": []}
+    for p in pieces:
+        if p.op == "keep" or p.part == "glass":
+            continue
+        slot = "body" if p.part == "body" else "wheels"
+        if p.ob not in sources[slot]:
+            sources[slot].append(p.ob)
+        if p.op in ("lathe", "collapse"):
+            replaced[slot].add(p.idx)
+        if p.op == "relief" and p.ob not in relief[slot]:
+            relief[slot].append(p.ob)
+    for k in range(len(cards)):
+        replaced["body"].add(-2 - k)
+    slot_mats = {}
+    chans = {"body": [], "wheels": []}
+    for slot, ob in (("body", body), ("wheels", wheel_bake)):
+        if ob is None:
+            continue
+        for i, m in enumerate(ob.data.materials):
+            if m is None:
+                continue
+            if (slot, m.name) not in slot_mats:
+                cp, ch = slot_copy(m, slot, infos, emax)
+                slot_mats[(slot, m.name)] = cp
+                chans[slot].append(ch)
+            ob.data.materials[i] = slot_mats[(slot, m.name)]
+    src_chans = {}
+    for slot in ("body", "wheels"):
+        for ob in sources[slot]:
+            for m in ob.data.materials:
+                if m is not None and m.name not in src_chans:
+                    src_chans[m.name] = Channels(infos.get(m.name) or MatInfo(m), infos, emax,
+                                                 True, False)
+    files = {}
+    glass_hide = [p.ob for p in pieces if p.part == "glass"] + ([glass] if glass else [])
+    node_obs = list(nodes.values())
+    for slot, target, size in (("body", body, A.body_size), ("wheels", wheel_bake,
+                                                              A.wheel_size)):
+        if target is None:
+            continue
+        rec = receiver_of(target, replaced[slot], sources[slot], relief[slot], low_coll)
+        srcs = sources[slot]
+        sc = [src_chans[m.name] for o in srcs for m in o.data.materials if m is not None]
+        sc = list({id(c): c for c in sc}.values())
+        log("baking %s: %d faces, %d of them under baked-down detail, %d source objects" % (
+            slot, len(target.data.polygons), len(rec.data.polygons) if rec else 0, len(srcs)))
+        hide = glass_hide + ([wheel_bake] if slot == "body" and wheel_bake else node_obs
+                             if slot == "wheels" else [])
+        files[slot] = bake_slot(slot, [target], rec, srcs, chans[slot], sc, size, work,
+                                A.samples, K, low_coll, hide)
+        if rec is not None:
+            me = rec.data
+            bpy.data.objects.remove(rec)
+            bpy.data.meshes.remove(me)
+    times["bake"] = time.time() - t
+
+    # 7. LODs, collision, export
+    t = time.time()
+    parts_final = []
+    if body is not None:
+        single_slot(body, "body")
+        parts_final.append(("body", body))
+    if glass is not None:
+        single_slot(glass, "glass")
+        parts_final.append(("glass", glass))
+    for key in sorted(nodes, key=lambda k: (k.split(":")[0] != "wheel", k)):
+        single_slot(nodes[key], "wheels")
+        kind, tag = key.split(":")
+        parts_final.append(("%s_%s" % (kind, tag), nodes[key]))
+    lod0 = sum(mesh_tris(o.data) for _, o in parts_final)
+    lods = [dict(lod=0, objs=[o for _, o in parts_final])]
+    prev = lod0
+    for k, budget_k in enumerate(A.lods[1:], 1):
+        target = min(budget_k, int(0.6 * prev))     # a car under budget still steps down
+        objs_k = []
+        drop = (2,) if k >= 2 else None
+        base = sum(mesh_tris(o.data) for _, o in parts_final)
+        ratio = target / base
+        for i in range(3):
+            for o in objs_k:
+                me = o.data
+                bpy.data.objects.remove(o)
+                bpy.data.meshes.remove(me)
+            objs_k = []
+            for nm, o in parts_final:
+                objs_k.append(decimate_copy(o, ratio, "LOD%d_%s" % (k, nm), low_coll,
+                                            drop if nm == "body" else None,
+                                            symmetric=(nm in ("body", "glass"))))
+            got = sum(mesh_tris(o.data) for o in objs_k)
+            if got <= target * 1.03:
+                break
+            ratio *= target / got * 0.98
+        prev = got
+        lods.append(dict(lod=k, objs=objs_k))
+    hulls = collision([o for nm, o in parts_final if nm in ("body", "glass")])
+    hull_obs = []
+    for i, me in enumerate(hulls):
+        hull_obs.append(new_obj("UCX_body_%02d" % i, me, low_coll))
+    names = [nm for nm, _ in parts_final]
+    lod_rows = []
+    for L in lods:
+        for o in L["objs"]:
+            strip_attrs(o.data)
+        path = os.path.join(out, "lod%d.glb" % L["lod"])
+        export_glb(path, L["objs"], names)
+        tri = {nm: mesh_tris(o.data) for nm, o in zip(names, L["objs"])}
+        lod_rows.append(dict(lod=L["lod"], file="lod%d.glb" % L["lod"],
+                             triangles=sum(tri.values()), budget=A.lods[L["lod"]],
+                             parts=tri))
+    export_glb(os.path.join(out, "collision.glb"), hull_obs, [o.name for o in hull_obs])
+    times["lods_export"] = time.time() - t
+
+    # 8. pack.json
+    lo = [min((o.matrix_world @ v.co)[i] for o in lods[0]["objs"] for v in o.data.vertices)
+          for i in range(3)]
+    hi = [max((o.matrix_world @ v.co)[i] for o in lods[0]["objs"] for v in o.data.vertices)
+          for i in range(3)]
+    body_lo = min(v.co.z for v in body.data.vertices) if body is not None else 0.0
+    parts_json = []
+    axles = sorted({round(wheel_info[t]["pivot"].x, 3) for t in wheel_info}, reverse=True)
+    for nm, o in parts_final:
+        row = dict(name=nm, material="glass" if nm == "glass" else
+                   ("wheels" if nm.startswith(("wheel_", "brake_")) else "body"),
+                   pivot=[round(x, 5) for x in o.location])
+        if nm in ("body", "glass"):
+            row["kind"] = nm
+        else:
+            kind, tag = nm.split("_", 1)
+            row["kind"] = kind
+            piv = wheel_info[tag]["pivot"]
+            tire = next(p for p in pieces if p.ob.name == "tire." + tag)
+            co = [V3(v.vector) for v in tire.me.attributes["cg_obj"].data]
+            row["radius"] = round(max(sqrt(c.x * c.x + c.z * c.z) for c in co), 4)
+            row["width"] = round(max(c.y for c in co) - min(c.y for c in co), 4)
+            row["side"] = "left" if piv.y > 0 else "right"
+            row["axle"] = axles.index(round(piv.x, 3))
+            row["steers"] = row["axle"] == 0 and len(axles) > 1
+            row["spins"] = kind == "wheel"
+            if kind == "brake":
+                row["follows"] = "wheel_" + tag
+            tw = twins.get(kind + ":" + tag)
+            row["uv_shared_with"] = tw.replace(":", "_") if tw else None
+        parts_json.append(row)
+    wl = [r for r in parts_json if r["kind"] == "wheel"]
+    colors = {}
+    for ch, name, key in ((0, "paint", "primary"), (1, "paint2", "secondary"),
+                          (2, "caliper", "accent")):
+        mi = infos.get(name)
+        if mi is None or mi.color is None:
+            continue
+        b = mi.b
+        colors[key] = dict(color=[round(x, 4) for x in mi.color], channel="RGB"[ch],
+                           metallic=round(val(b, "Metallic", 0.0), 3),
+                           roughness=round(val(b, "Roughness", 0.5), 3),
+                           coat=round(val(b, "Coat Weight", 0.0), 3))
+    tinted = sorted({mi.name for mi in infos.values() if mi.channel is not None})
+    baked_down = []
+    for p in pieces:
+        if p.op != "keep":
+            baked_down.append(dict(piece=p.name, op=p.op, triangles=p.tris,
+                                   relief_mm=round(p.relief * 1000, 1) if p.relief else None,
+                                   into="card" if p.op == "card_src" else
+                                   ("surface under it" if p.op == "relief" else p.op)))
+    gls = infos.get("glass")
+    glass_params = dict(color=list(gls.color) if gls and gls.color else [0.3, 0.33, 0.36],
+                        roughness=round(val(gls.b, "Roughness", 0.0), 3) if gls else 0.0,
+                        ior=round(val(gls.b, "IOR", 1.5), 3) if gls else 1.5,
+                        transmission=1.0, opaque_from_lod=2)
+    pack = dict(
+        format=FORMAT, version=VERSION, car=A.car, title=title,
+        frame=dict(x="forward", y="left", z="up", units="m",
+                   origin="on the ground under the middle of the car",
+                   gltf="the glTF files use glTF's own axes (+Y up); importers convert"),
+        source=dict(script="vehicles/cars/%s.py" % A.car, script_sha256=sha256(script),
+                    carkit_sha256=sha256(os.path.join(HERE, "carkit.py")),
+                    game_sha256=sha256(os.path.abspath(__file__)),
+                    original_triangles=orig_tris, original_objects=n_objects),
+        kind="wheeled" if wl else "hover",
+        dimensions=dict(length=round(hi[0] - lo[0], 4), width=round(hi[1] - lo[1], 4),
+                        height=round(hi[2] - lo[2], 4), min=[round(x, 4) for x in lo],
+                        max=[round(x, 4) for x in hi]),
+        wheelbase=round(axles[0] - axles[-1], 4) if len(axles) > 1 else None,
+        track={str(i): round(max(r["pivot"][1] for r in wl if r["axle"] == i) -
+                             min(r["pivot"][1] for r in wl if r["axle"] == i), 4)
+               for i in range(len(axles))} if wl else None,
+        ride_height=round(body_lo, 4),
+        lods=lod_rows,
+        parts=parts_json,
+        materials=dict(
+            body=slot_json("body", A.body_size, emax) if body is not None else None,
+            wheels=slot_json("wheels", A.wheel_size, emax) if wheel_bake is not None else None,
+            glass=dict(textures={}, params=glass_params)),
+        colors=colors, tinted_materials=tinted,
+        emissive_strength=round(emax, 4),
+        micro_detail=dict(materials=micro, note="finer than a texel, not baked (the bake "
+                          "holds their mean): the paint's flake (2600 cells a meter, bump "
+                          "0.06) and textures such as the carbon weave, for the engine's "
+                          "detail maps"),
+        lights=lights_of(pieces, infos),
+        collision=dict(file="collision.glb", hulls=[
+            dict(name=o.name, vertices=len(o.data.vertices), triangles=mesh_tris(o.data))
+            for o in hull_obs]),
+        views=dict(hero=hero_view), cameras=cams,
+        baked_down=baked_down,
+        uv=dict(islands=uvinfo, texel_px_per_m=texel,
+                texel_floor_px_per_m={k: round(v * (A.body_size if k == "body"
+                                                    else A.wheel_size) /
+                                               (4096 if k == "body" else 2048), 1)
+                                      for k, v in TEXEL_FLOOR.items()}),
+        build=dict(test=A.test, samples=A.samples, seconds={k: round(v, 1)
+                                                           for k, v in times.items()}),
+    )
+    with open(os.path.join(out, "pack.json"), "w") as f:
+        json.dump(pack, f, indent=1)
+    log("wrote pack.json; LODs %s" % [r["triangles"] for r in lod_rows])
+    return pack
+
+
+def receiver_of(target, replaced, sources, relief, coll):
+    """The faces of the target the baked-down detail lands on: the replacements (cards,
+    lathes, collapsed parts) and, for relief, the faces right under it: every point of a
+    relief source (vertices, face and edge middles) marks the face of the target nearest
+    it. A face merely near some detail is left alone. None if there are none."""
+    if not sources:
+        return None
+    me = target.data.copy()
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bm.faces.ensure_lookup_table()
+    lay = bm.faces.layers.int.get("cg_piece")
+    keep = set()
+    if lay is not None:
+        keep = {f for f in bm.faces if f[lay] in replaced}
+    if relief:
+        M = target.matrix_world
+        Mi = M.inverted()
+        tree = BVHTree.FromBMesh(bm)
+        dg = bpy.context.evaluated_depsgraph_get()
+        for ob in relief:
+            ev = ob.evaluated_get(dg)
+            m = ev.to_mesh()
+            W = Mi @ ob.matrix_world
+            pts = [W @ v.co for v in m.vertices] + [W @ f.center for f in m.polygons]
+            vv = m.vertices
+            pts += [W @ ((vv[e.vertices[0]].co + vv[e.vertices[1]].co) / 2) for e in m.edges]
+            ev.to_mesh_clear()
+            for q in pts:
+                hit = tree.find_nearest(q, TALL_RELIEF_M + 0.004)
+                if hit[2] is not None:
+                    keep.add(bm.faces[hit[2]])
+    if relief:      # and the faces round them: a strip crosses faces between its points
+        ring = set()
+        for f in keep:
+            for v in f.verts:
+                ring.update(v.link_faces)
+        keep |= ring
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if f not in keep], context='FACES')
+    if not bm.faces:
+        bm.free()
+        bpy.data.meshes.remove(me)
+        return None
+    bm.to_mesh(me)
+    bm.free()
+    ob = new_obj(target.name + "_receiver", me, coll)
+    ob.matrix_world = target.matrix_world
+    set_normals(me)
+    return ob
+
+
+TEX = (("base_color", "sRGB", "RGB: the color of everything that is not tinted, and on the "
+        "tinted surfaces the dust and grime that lie on the paint. A: unused (1)"),
+       ("normal", "linear", "RGB: tangent space normal, OpenGL convention (+Y up, glTF's); "
+        "flip green for DirectX"),
+       ("orm", "linear", "R: ambient occlusion, G: roughness, B: metallic, A: clear coat weight"),
+       ("mask", "linear", "R: primary paint weight, G: secondary paint weight, B: accent "
+        "weight, A: shade on the tinted color (crease grime, 1 = clean)"),
+       ("emissive", "sRGB", "RGB: emission color times its strength over emissive_strength. "
+        "A: specular level (0.5 standard, 0 for voids)"))
+
+
+def slot_json(slot, size, emax):
+    return dict(textures={k: dict(file="%s_%s.png" % (slot, k), size=size, color_space=cs,
+                                  channels=ch) for k, cs, ch in TEX},
+                params=dict(coat_roughness=0.06, emissive_strength=round(emax, 4)))
+
+
+# ---------------------------------------------------------------------------------------
+# proof: the pack alone in an empty scene
+# ---------------------------------------------------------------------------------------
+def proof_main(pack_dir):
+    with open(os.path.join(pack_dir, "pack.json")) as f:
+        pack = json.load(f)
+    out = os.path.join(pack_dir, "proof")
+    saved = sys.argv
+    sys.argv = [saved[0], "--", "--out", out]
+    sys.path.insert(0, HERE)
+    import carkit as K
+    sys.argv = saved
+    K.pbr("floor", (0.11, 0.11, 0.12), 0.0, 0.30)
+    K.build_studio()
+    K.setup_render()
+    test = pack["build"]["test"]
+    res = (1920, 1080) if not test else (960, 540)
+    sm = max(8, int(96 * pack["build"]["samples"]))
+
+    def material(slot, paint):
+        spec = pack["materials"].get(slot)
+        m = bpy.data.materials.new("proof_" + slot)
+        try:
+            m.use_nodes = True
+        except Exception:
+            pass
+        nt = m.node_tree
+        b = next(n for n in nt.nodes if n.type == 'BSDF_PRINCIPLED')
+        N, L = nt.nodes, nt.links
+        if slot == "glass":
+            gp = spec["params"]
+            b.inputs["Base Color"].default_value = (*gp["color"], 1)
+            b.inputs["Roughness"].default_value = gp["roughness"]
+            b.inputs["IOR"].default_value = gp["ior"]
+            b.inputs["Transmission Weight"].default_value = gp["transmission"]
+            return m
+
+        def tex(key, srgb):
+            n = N.new('ShaderNodeTexImage')
+            n.image = bpy.data.images.load(os.path.join(pack_dir, spec["textures"][key]["file"]))
+            n.image.colorspace_settings.name = "sRGB" if srgb else "Non-Color"
+            n.image.alpha_mode = 'CHANNEL_PACKED'       # alpha is data, as in an engine
+            n.interpolation = 'Linear'
+            return n
+        bc, nm, orm, mk, em = (tex("base_color", True), tex("normal", False), tex("orm", False),
+                               tex("mask", False), tex("emissive", True))
+        # albedo = base (1 - w) + (R P1 + G P2 + B P3) shade, w = R + G + B
+        sep = N.new('ShaderNodeSeparateColor')
+        L.new(mk.outputs["Color"], sep.inputs[0])
+
+        def mul(a, bcol):
+            n = N.new('ShaderNodeMixRGB')
+            n.blend_type = 'MULTIPLY'
+            n.inputs["Fac"].default_value = 1.0
+            n.inputs["Color2"].default_value = (*bcol, 1)
+            L.new(a, n.inputs["Color1"])
+            return n.outputs[0]
+
+        def add(a, c):
+            n = N.new('ShaderNodeMixRGB')
+            n.blend_type = 'ADD'
+            n.inputs["Fac"].default_value = 1.0
+            L.new(a, n.inputs["Color1"])
+            L.new(c, n.inputs["Color2"])
+            return n.outputs[0]
+        tint = None
+        for ch, key in ((0, "primary"), (1, "secondary"), (2, "accent")):
+            col = paint.get(key)
+            if col is None:
+                continue
+            g = N.new('ShaderNodeCombineColor')
+            for s in g.inputs:
+                L.new(sep.outputs[ch], s)
+            t_ = mul(g.outputs[0], col)
+            tint = t_ if tint is None else add(tint, t_)
+        wsum = N.new('ShaderNodeMath')
+        wsum.operation = 'ADD'
+        L.new(sep.outputs[0], wsum.inputs[0])
+        L.new(sep.outputs[1], wsum.inputs[1])
+        w2 = N.new('ShaderNodeMath')
+        w2.operation = 'ADD'
+        L.new(wsum.outputs[0], w2.inputs[0])
+        L.new(sep.outputs[2], w2.inputs[1])
+        inv = N.new('ShaderNodeMath')
+        inv.operation = 'SUBTRACT'
+        inv.use_clamp = True
+        inv.inputs[0].default_value = 1.0
+        L.new(w2.outputs[0], inv.inputs[1])
+        under = N.new('ShaderNodeMixRGB')
+        under.blend_type = 'MULTIPLY'
+        under.inputs["Fac"].default_value = 1.0
+        L.new(bc.outputs["Color"], under.inputs["Color1"])
+        g = N.new('ShaderNodeCombineColor')
+        for s in g.inputs:
+            L.new(inv.outputs[0], s)
+        L.new(g.outputs[0], under.inputs["Color2"])
+        alb = under.outputs[0]
+        if tint is not None:
+            sh = N.new('ShaderNodeMixRGB')
+            sh.blend_type = 'MULTIPLY'
+            sh.inputs["Fac"].default_value = 1.0
+            L.new(tint, sh.inputs["Color1"])
+            g2 = N.new('ShaderNodeCombineColor')
+            for s in g2.inputs:
+                L.new(mk.outputs["Alpha"], s)
+            L.new(g2.outputs[0], sh.inputs["Color2"])
+            alb = add(alb, sh.outputs[0])
+        L.new(alb, b.inputs["Base Color"])
+        so = N.new('ShaderNodeSeparateColor')
+        L.new(orm.outputs["Color"], so.inputs[0])
+        L.new(so.outputs[1], b.inputs["Roughness"])
+        L.new(so.outputs[2], b.inputs["Metallic"])
+        L.new(orm.outputs["Alpha"], b.inputs["Coat Weight"])
+        b.inputs["Coat Roughness"].default_value = spec["params"]["coat_roughness"]
+        nmap = N.new('ShaderNodeNormalMap')
+        nmap.space = 'TANGENT'
+        L.new(nm.outputs["Color"], nmap.inputs["Color"])
+        L.new(nmap.outputs["Normal"], b.inputs["Normal"])
+        L.new(em.outputs["Color"], b.inputs["Emission Color"])
+        b.inputs["Emission Strength"].default_value = spec["params"]["emissive_strength"]
+        L.new(em.outputs["Alpha"], b.inputs["Specular IOR Level"])
+        return m
+
+    def load(lod):
+        before = set(bpy.data.objects)
+        bpy.ops.import_scene.gltf(filepath=os.path.join(pack_dir, "lod%d.glb" % lod))
+        new = [o for o in bpy.data.objects if o not in before]
+        for o in new:
+            for c in list(o.users_collection):
+                c.objects.unlink(o)
+            K.CAR.objects.link(o)
+        return new
+
+    def assign(objs, mats):
+        for o in objs:
+            if o.type != 'MESH':
+                continue
+            for i, m in enumerate(o.data.materials):
+                nm = m.name if m else ""
+                key = "glass" if "glass" in nm else ("wheels" if "wheels" in nm else "body")
+                o.data.materials[i] = mats[key]
+
+    def cam_from(rec):
+        cd = bpy.data.cameras.new("pc")
+        cd.lens = rec["lens"]
+        cd.sensor_width = rec["sensor"]
+        cd.clip_start, cd.clip_end = 0.1, 200
+        if rec["dof"]:
+            cd.dof.use_dof = True
+            cd.dof.focus_distance = rec["focus"]
+            cd.dof.aperture_fstop = rec["fstop"]
+        ob = bpy.data.objects.new("pcam", cd)
+        K.STUDIO.objects.link(ob)
+        ob.matrix_world = Matrix(rec["matrix"])
+        return ob
+
+    def shot(cam, path, r):
+        K.SCN.camera = cam
+        K.SCN.render.resolution_x, K.SCN.render.resolution_y = r
+        K.SCN.cycles.samples = sm
+        K.SCN.render.filepath = path
+        bpy.ops.render.render(write_still=True)
+        log("proof %s" % os.path.basename(path))
+
+    paint = {k: v["color"] for k, v in pack["colors"].items()}
+    mats = {s: material(s, paint) for s in ("body", "wheels", "glass")
+            if pack["materials"].get(s)}
+    lod_objs = {}
+    for L_ in pack["lods"]:
+        lod_objs[L_["lod"]] = load(L_["lod"])
+        assign(lod_objs[L_["lod"]], mats)
+    cams = {k: cam_from(v) for k, v in pack["cameras"].items()}
+
+    def show(lod):
+        for k, objs in lod_objs.items():
+            for o in objs:
+                o.hide_render = k != lod
+    show(0)
+    for name, cam in cams.items():
+        shot(cam, os.path.join(out, "baked_%s.jpg" % name), res)
+    # recolored: the primary and secondary paints swapped for others
+    alt = {"primary": (0.02, 0.30, 0.36), "secondary": (0.60, 0.42, 0.06),
+           "accent": (0.10, 0.55, 0.12)}
+    mats2 = {s: material(s, {k: alt[k] for k in paint}) for s in mats}
+    assign(lod_objs[0], mats2)
+    shot(cams["hero"], os.path.join(out, "recolor_hero.jpg"), res)
+    assign(lod_objs[0], mats)
+    small = (res[0] // 2, res[1] // 2)
+    for k in sorted(lod_objs):
+        show(k)
+        shot(cams["hero"], os.path.join(out, "lod%d_hero.jpg" % k), small)
+    with open(os.path.join(out, "alt_colors.json"), "w") as f:
+        json.dump(alt, f)
+
+
+def main_blender():
+    A = blender_args()
+    if A.proof:
+        proof_main(os.path.abspath(A.proof))
+        return
+    t0 = time.time()
+    pack = main_build(A)
+    py = venv_python()
+    if py is None:
+        raise SystemExit("no Python with PIL and numpy (set CYBERGEN_PYTHON)")
+    t = time.time()
+    subprocess.run([py, os.path.abspath(__file__), "post", A.out], check=True)
+    if not A.keep_work:
+        shutil.rmtree(os.path.join(A.out, "work"), ignore_errors=True)
+    pack_secs = time.time() - t
+    t = time.time()
+    rc = subprocess.run([bpy.app.binary_path, "-b", "--python-exit-code", "1", "-P",
+                         os.path.abspath(__file__), "--", "--proof", A.out]).returncode
+    if rc:
+        raise SystemExit("proof render failed")
+    proof_secs = time.time() - t
+    cmd = [py, os.path.abspath(__file__), "check", A.out,
+           "--seconds", "%.1f" % (time.time() - t0 + 0.0),
+           "--stage-seconds", json.dumps(dict(pack["build"]["seconds"], textures=pack_secs,
+                                              proof=proof_secs))]
+    if A.docs:
+        cmd += ["--docs", os.path.join(ROOT, "docs", "progress", "AG18", A.car)]
+    rc = subprocess.run(cmd).returncode
+    log("done in %.0f s; pack in %s" % (time.time() - t0, A.out))
+    if rc:
+        raise SystemExit("CHECKS FAILED (see %s)" % os.path.join(A.out, "game_report.json"))
+
+
+# =========================================================================================
+# venv side: textures, checks, the proof image
+# =========================================================================================
+def venv_main():
+    ap = argparse.ArgumentParser(prog="python vehicles/game.py")
+    ap.add_argument("what", choices=["post", "check"])
+    ap.add_argument("pack")
+    ap.add_argument("--docs", default=None)
+    ap.add_argument("--seconds", type=float, default=None)
+    ap.add_argument("--stage-seconds", default=None)
+    a = ap.parse_args()
+    if a.what == "post":
+        post(a.pack)
+    else:
+        sys.exit(check(a.pack, a.docs, a.seconds, a.stage_seconds))
+
+
+def _load(path, n=None):
+    import numpy as np
+    from PIL import Image
+    im = Image.open(path).convert("RGBA")
+    return np.asarray(im).astype(np.float32) / 255.0
+
+
+def post(pack_dir):
+    """The raw bakes (work/) into each slot's five textures: the detail (pass B) laid over
+    the surfaces (pass A) where it was hit, channels packed."""
+    import numpy as np
+    from PIL import Image
+    with open(os.path.join(pack_dir, "pack.json")) as f:
+        pack = json.load(f)
+    work = os.path.join(pack_dir, "work")
+    for slot in ("body", "wheels"):
+        spec = pack["materials"].get(slot)
+        if not spec:
+            continue
+        A = {p: _load(os.path.join(work, "%s_A_%s.png" % (slot, p))) for p in PASSES}
+        hasB = os.path.exists(os.path.join(work, "%s_B_BASE.png" % slot))
+        B = {p: _load(os.path.join(work, "%s_B_%s.png" % (slot, p))) for p in PASSES} \
+            if hasB else None
+        if B is not None:
+            cov = (B["SSE"][..., 2] > 0.5).astype(np.float32)[..., None]
+        else:
+            cov = np.zeros(A["BASE"].shape[:2] + (1,), np.float32)
+
+        def lay(p, extra=None):
+            a = A[p][..., :3]
+            if B is None:
+                return a
+            b = B[p][..., :3] if extra is None else extra
+            return a * (1 - cov) + b * cov
+        # the detail's own occlusion darkens its color a little (cavity), the rest as is
+        lin = lambda c: np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+        enc = lambda c: np.where(c <= 0.0031308, c * 12.92, 1.055 * np.power(np.clip(c, 0, 1),
+                                                                             1 / 2.4) - 0.055)
+        if B is not None:
+            cav = 0.25 + 0.75 * B["AO"][..., :1]
+            bb = enc(lin(B["BASE"][..., :3]) * cav)
+        else:
+            bb = None
+        base = lay("BASE", bb)
+        nrm = lay("NORMAL")
+        v = nrm * 2 - 1
+        v[..., 2] = np.maximum(v[..., 2], 0.05)
+        v /= np.linalg.norm(v, axis=2, keepdims=True)
+        nrm = (v + 1) / 2
+        ao = lay("AO")[..., :1]
+        rmc = lay("RMC")
+        tint = lay("TINT")
+        sse = lay("SSE")
+        emit = lay("EMIT")
+        one = np.ones(base.shape[:2] + (1,), np.float32)
+
+        def save(arr, key):
+            arr = np.clip(arr * 255 + 0.5, 0, 255).astype(np.uint8)
+            mode = "RGBA" if arr.shape[2] == 4 else "RGB"
+            Image.fromarray(arr, mode).save(os.path.join(pack_dir, spec["textures"][key]["file"]),
+                                            optimize=False, compress_level=6)
+        save(np.concatenate([base, one], 2), "base_color")
+        save(nrm, "normal")
+        save(np.concatenate([ao, rmc[..., 0:1], rmc[..., 1:2], rmc[..., 2:3]], 2), "orm")
+        save(np.concatenate([tint, sse[..., 0:1]], 2), "mask")
+        save(np.concatenate([emit, sse[..., 1:2]], 2), "emissive")
+        print("textures for %s: %d px, detail over %.1f%% of the texels" % (
+            slot, base.shape[0], 100 * float(cov.mean())))
+
+
+# ---- glTF reading (numpy) ------------------------------------------------------------
+def read_glb(path):
+    import struct
+    import numpy as np
+    with open(path, "rb") as f:
+        data = f.read()
+    magic, ver, length = struct.unpack("<III", data[:12])
+    if magic != 0x46546C67:
+        raise ValueError("not a GLB: " + path)
+    off = 12
+    js, binc = None, b""
+    while off < length:
+        cl, ct = struct.unpack("<II", data[off:off + 8])
+        chunk = data[off + 8:off + 8 + cl]
+        if ct == 0x4E4F534A:
+            js = json.loads(chunk.decode("utf-8"))
+        elif ct == 0x004E4942:
+            binc = chunk
+        off += 8 + cl
+    comp = {5126: np.float32, 5125: np.uint32, 5123: np.uint16, 5121: np.uint8}
+    ncomp = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4}
+
+    def acc(i):
+        a = js["accessors"][i]
+        bv = js["bufferViews"][a["bufferView"]]
+        dt = np.dtype(comp[a["componentType"]])
+        n = ncomp[a["type"]]
+        start = bv.get("byteOffset", 0) + a.get("byteOffset", 0)
+        stride = bv.get("byteStride", 0)
+        if stride and stride != dt.itemsize * n:
+            raw = np.frombuffer(binc, np.uint8, count=stride * a["count"], offset=start)
+            arr = np.ndarray((a["count"], n), dt, raw.data, 0, (stride, dt.itemsize))
+            return np.array(arr)
+        return np.frombuffer(binc, dt, count=a["count"] * n, offset=start).reshape(-1, n)
+
+    nodes = {}
+    for nd in js.get("nodes", []):
+        if "mesh" not in nd:
+            continue
+        t = np.array(nd.get("translation", [0, 0, 0]), np.float64)
+        prims = []
+        for pr in js["meshes"][nd["mesh"]]["primitives"]:
+            pos = acc(pr["attributes"]["POSITION"]).astype(np.float64)
+            uv = acc(pr["attributes"]["TEXCOORD_0"]).astype(np.float64) \
+                if "TEXCOORD_0" in pr["attributes"] else None
+            idx = acc(pr["indices"]).reshape(-1) if "indices" in pr else np.arange(len(pos))
+            mat = js["materials"][pr["material"]]["name"] if "material" in pr else ""
+            prims.append(dict(pos=pos, uv=uv, idx=idx.reshape(-1, 3), material=mat))
+        nodes[nd["name"]] = dict(t=t, rot=nd.get("rotation"), prims=prims)
+    return nodes
+
+
+def to_car(p):
+    """glTF (+Y up) to the car's frame (x forward, y left, z up)."""
+    import numpy as np
+    p = np.asarray(p)
+    return np.stack([p[..., 0], -p[..., 2], p[..., 1]], axis=-1)
+
+
+def uv_overlap(tris_uv, res=2048):
+    """Share of the covered texels (pixel centers at res x res) that two or more triangles
+    cover."""
+    import numpy as np
+    cnt = np.zeros((res, res), np.uint16)
+    T = tris_uv * res - 0.5                        # pixel centers at integers
+    x0 = np.floor(T[:, :, 0].min(1)).astype(int) + 1
+    x1 = np.floor(T[:, :, 0].max(1)).astype(int)
+    y0 = np.floor(T[:, :, 1].min(1)).astype(int) + 1
+    y1 = np.floor(T[:, :, 1].max(1)).astype(int)
+    w = x1 - x0 + 1
+    h = y1 - y0 + 1
+    ok = (w > 0) & (h > 0)
+    a, b, c = T[:, 0], T[:, 1], T[:, 2]
+    area = (b[:, 0] - a[:, 0]) * (c[:, 1] - a[:, 1]) - (b[:, 1] - a[:, 1]) * (c[:, 0] - a[:, 0])
+    ok &= np.abs(area) > 1e-12
+    sz = np.maximum(w, h)
+    for lo, hi in ((1, 4), (5, 8), (9, 16), (17, 32), (33, 64), (65, 128), (129, 4096)):
+        sel = np.where(ok & (sz >= lo) & (sz <= hi))[0]
+        for chunk in np.array_split(sel, max(1, len(sel) * hi * hi // 4000000 + 1)):
+            if len(chunk) == 0:
+                continue
+            gy, gx = np.mgrid[0:hi, 0:hi]
+            X = x0[chunk, None, None] + gx[None]
+            Y = y0[chunk, None, None] + gy[None]
+            inb = (gx[None] < w[chunk, None, None]) & (gy[None] < h[chunk, None, None])
+            s = np.sign(area[chunk])[:, None, None]
+
+            def edge(p, q):
+                return s * ((q[chunk, 0, None, None] - p[chunk, 0, None, None]) *
+                            (Y - p[chunk, 1, None, None]) -
+                            (q[chunk, 1, None, None] - p[chunk, 1, None, None]) *
+                            (X - p[chunk, 0, None, None]))
+            m = inb & (edge(a, b) > 0) & (edge(b, c) > 0) & (edge(c, a) > 0)
+            m &= (X >= 0) & (X < res) & (Y >= 0) & (Y < res)
+            np.add.at(cnt, (Y[m], X[m]), 1)
+    cov = int((cnt > 0).sum())
+    over = int((cnt > 1).sum())
+    out_of_unit = float(((tris_uv < -1e-4) | (tris_uv > 1 + 1e-4)).any(axis=2).mean())
+    return over / max(cov, 1), cov / (res * res), out_of_unit
+
+
+def check(pack_dir, docs, seconds, stage_seconds):
+    import numpy as np
+    from PIL import Image
+    with open(os.path.join(pack_dir, "pack.json")) as f:
+        pack = json.load(f)
+    checks = []
+
+    def ok(name, cond, detail):
+        checks.append(dict(check=name, ok=bool(cond), detail=detail))
+
+    # files present and readable
+    files = [r["file"] for r in pack["lods"]] + [pack["collision"]["file"]]
+    for slot, spec in pack["materials"].items():
+        if spec:
+            files += [t["file"] for t in spec["textures"].values()]
+    missing, bad = [], []
+    glbs = {}
+    for fn in files:
+        p = os.path.join(pack_dir, fn)
+        if not os.path.exists(p):
+            missing.append(fn)
+            continue
+        try:
+            if fn.endswith(".glb"):
+                glbs[fn] = read_glb(p)
+            else:
+                with Image.open(p) as im:
+                    im.load()
+                    want = next(t["size"] for s in pack["materials"].values() if s
+                                for t in s["textures"].values() if t["file"] == fn)
+                    if im.size != (want, want):
+                        bad.append("%s is %s, not %d" % (fn, im.size, want))
+        except Exception as e:
+            bad.append("%s: %s" % (fn, e))
+    ok("files", not missing and not bad, dict(files=len(files), missing=missing, unreadable=bad))
+
+    # budgets per LOD
+    rows = []
+    for r in pack["lods"]:
+        g = glbs.get(r["file"])
+        if g is None:
+            continue
+        n = sum(len(pr["idx"]) for nd in g.values() for pr in nd["prims"])
+        tol = 1.0 if r["lod"] == 0 else 1.1
+        rows.append(dict(lod=r["lod"], triangles=n, budget=r["budget"],
+                         ok=n <= r["budget"] * tol))
+    ok("budgets", all(x["ok"] for x in rows), rows)
+
+    # UV overlap per slot (LOD0; a node sharing another's UVs counted once)
+    g0 = glbs.get(pack["lods"][0]["file"], {})
+    shared = {p["name"] for p in pack["parts"] if p.get("uv_shared_with")}
+    uvres = {}
+    for slot in ("body", "wheels"):
+        tris = []
+        for name, nd in g0.items():
+            if name in shared:
+                continue
+            for pr in nd["prims"]:
+                if slot in pr["material"] and pr["uv"] is not None:
+                    tris.append(pr["uv"][pr["idx"]])
+        if not tris:
+            continue
+        T = np.concatenate(tris)
+        T = T.copy()
+        T[..., 1] = 1 - T[..., 1]
+        ov, cover, outside = uv_overlap(T)
+        uvres[slot] = dict(overlap=round(ov, 5), coverage=round(cover, 4),
+                           outside_unit=round(outside, 5))
+    ok("uv_overlap", all(v["overlap"] <= 0.005 and v["outside_unit"] <= 0.001
+                         for v in uvres.values()),
+       dict(limit=0.005, slots=uvres))
+
+    # texel density on the exterior (measured in Blender on the face classes)
+    tex = pack["uv"]["texel_px_per_m"]
+    floors = pack["uv"]["texel_floor_px_per_m"]
+    td = {}
+    for slot, st in tex.items():
+        ext = st.get("exterior")
+        if ext:
+            td[slot] = dict(p5=ext["p5"], median=ext["median"], floor=floors[slot],
+                            ok=ext["p5"] >= floors[slot])
+    ok("texel_density", all(v["ok"] for v in td.values()), td)
+
+    # wheel pivots on their axles
+    wrows = []
+    for part in pack["parts"]:
+        if part["kind"] != "wheel":
+            continue
+        nd = g0.get(part["name"])
+        if nd is None:
+            wrows.append(dict(part=part["name"], ok=False, why="missing"))
+            continue
+        P = to_car(np.concatenate([pr["pos"] for pr in nd["prims"]]))
+        piv = to_car(nd["t"])
+        r = np.sqrt(P[:, 0] ** 2 + P[:, 2] ** 2)
+        tread = P[r > 0.94 * r.max()]
+        cx = (tread[:, 0].max() + tread[:, 0].min()) / 2
+        cz = (tread[:, 2].max() + tread[:, 2].min()) / 2
+        cy = (tread[:, 1].max() + tread[:, 1].min()) / 2
+        d = dict(part=part["name"], pivot=[round(float(x), 4) for x in piv],
+                 center_offset_mm=[round(float(cx) * 1000, 2), round(float(cy) * 1000, 2),
+                                   round(float(cz) * 1000, 2)],
+                 radius=round(float(r.max()), 4), radius_pack=part["radius"],
+                 json_pivot=part["pivot"])
+        d["ok"] = bool(abs(cx) < 0.003 and abs(cz) < 0.003 and abs(cy) < 0.006 and
+                       abs(r.max() - part["radius"]) < 0.004 and
+                       np.abs(np.array(part["pivot"]) - piv).max() < 1e-3 and
+                       piv[2] >= r.max() - 0.012)
+        wrows.append(d)
+    ok("wheel_pivots", all(x["ok"] for x in wrows), wrows)
+
+    # LOD bounds match LOD0's
+    def bounds(g):
+        P = np.concatenate([to_car(pr["pos"] + nd["t"]) for nd in g.values()
+                            for pr in nd["prims"]])
+        return P.min(0), P.max(0)
+    lo0, hi0 = bounds(g0)
+    brow = []
+    for r in pack["lods"][1:]:
+        g = glbs.get(r["file"])
+        if g is None:
+            continue
+        lo, hi = bounds(g)
+        tol = np.maximum(0.02, 0.015 * (hi0 - lo0))
+        dev = np.maximum(np.abs(lo - lo0), np.abs(hi - hi0))
+        brow.append(dict(lod=r["lod"], deviation_m=[round(float(x), 4) for x in dev],
+                         tolerance_m=[round(float(x), 4) for x in tol],
+                         ok=bool((dev <= tol).all())))
+    ok("lod_bounds", all(x["ok"] for x in brow), brow)
+
+    # collision: a handful of hulls
+    gc = glbs.get(pack["collision"]["file"], {})
+    nh = len(gc)
+    ok("collision", 4 <= nh <= 12, dict(hulls=nh, vertices=[
+        int(sum(len(pr["pos"]) for pr in nd["prims"])) for nd in gc.values()]))
+
+    size = sum(os.path.getsize(os.path.join(pack_dir, f)) for f in os.listdir(pack_dir)
+               if os.path.isfile(os.path.join(pack_dir, f)))
+    tex_sizes = {s: v["textures"]["base_color"]["size"] for s, v in pack["materials"].items()
+                 if v and v.get("textures")}
+    groups = {}
+    for b in pack["baked_down"]:
+        groups.setdefault(b["op"], []).append(b)
+    report = dict(
+        car=pack["car"], title=pack["title"], ok=all(c["ok"] for c in checks),
+        triangles=dict(original=pack["source"]["original_triangles"],
+                       lods=[r["triangles"] for r in pack["lods"]],
+                       lod0_parts=pack["lods"][0]["parts"]),
+        objects=dict(original=pack["source"]["original_objects"], parts=len(pack["parts"])),
+        textures=tex_sizes, pack_bytes=size, seconds=seconds,
+        stage_seconds=json.loads(stage_seconds) if stage_seconds else None,
+        baked_down={k: dict(pieces=len(v), triangles=sum(x["triangles"] for x in v),
+                            names=sorted({x["piece"].split("#")[0] for x in v}))
+                    for k, v in groups.items()},
+        texel_px_per_m=pack["uv"]["texel_px_per_m"],
+        lights=len(pack["lights"]), collision_hulls=nh,
+        source=pack["source"], test=pack["build"]["test"],
+        checks=checks)
+    with open(os.path.join(pack_dir, "game_report.json"), "w") as f:
+        json.dump(report, f, indent=1)
+    compose_proof(pack_dir, pack, report)
+    if docs:
+        os.makedirs(docs, exist_ok=True)
+        shutil.copy(os.path.join(pack_dir, "game.jpg"), os.path.join(docs, "game.jpg"))
+        small = dict(report)
+        with open(os.path.join(docs, "game_report.json"), "w") as f:
+            json.dump(small, f, indent=1)
+    for c in checks:
+        print("%s %-14s %s" % ("ok  " if c["ok"] else "FAIL", c["check"],
+                               json.dumps(c["detail"])[:300]))
+    print("pack %.1f MB, LODs %s" % (size / 1e6, report["triangles"]["lods"]))
+    return 0 if report["ok"] else 1
+
+
+def compose_proof(pack_dir, pack, report):
+    """game.jpg: the original and the baked pack from the hero view, the recolored copy and
+    the textures, the four LODs."""
+    from PIL import Image, ImageDraw, ImageFont
+    proof = os.path.join(pack_dir, "proof")
+    W = 3840
+    font = None
+    for p in ("/System/Library/Fonts/Supplemental/DIN Alternate Bold.ttf",
+              "C:/Windows/Fonts/bahnschrift.ttf"):
+        if os.path.exists(p):
+            font = ImageFont.truetype(p, 34)
+            small_font = ImageFont.truetype(p, 26)
+            break
+    if font is None:
+        font = small_font = ImageFont.load_default()
+
+    def tile(path, size, label):
+        im = Image.open(path).convert("RGB") if os.path.exists(path) else \
+            Image.new("RGB", size, (40, 0, 0))
+        im = im.resize(size, Image.LANCZOS)
+        d = ImageDraw.Draw(im)
+        f = font if size[0] >= 1200 else small_font
+        tw = d.textlength(label, font=f)
+        d.rectangle((0, 0, tw + 28, (44 if f is font else 36)), fill=(14, 14, 16))
+        d.text((14, 5), label, font=f, fill=(230, 232, 236))
+        return im
+    lods = pack["lods"]
+    half = (W // 2, W * 9 // 32)
+    orig = pack["source"]["original_triangles"]
+    row1 = [tile(os.path.join(proof, "original_hero.jpg"), half,
+                 "original: procedural materials, %s triangles, %d objects" % (
+                     format(orig, ","), pack["source"]["original_objects"])),
+            tile(os.path.join(proof, "baked_hero.jpg"), half,
+                 "game pack LOD0: baked textures only, %s triangles, %d parts" % (
+                     format(lods[0]["triangles"], ","), len(pack["parts"])))]
+    tq = (W // 8, W // 8)
+    texs = []
+    for slot in ("body", "wheels"):
+        spec = pack["materials"].get(slot)
+        if not spec:
+            continue
+        for key in ("base_color", "mask", "normal", "orm"):
+            texs.append(tile(os.path.join(pack_dir, spec["textures"][key]["file"]), tq,
+                             "%s %s" % (slot, key.replace("_", " "))))
+    row2 = [tile(os.path.join(proof, "recolor_hero.jpg"), half,
+                 "the same pack recolored through its paint mask")]
+    tw_ = Image.new("RGB", (W // 2, half[1]), (14, 14, 16))
+    for i, t in enumerate(texs[:8]):
+        tw_.paste(t, ((i % 4) * (W // 8), (i // 4) * (W // 8)))
+    row2.append(tw_)
+    q = (W // 4, W * 9 // 64)
+    row3 = [tile(os.path.join(proof, "lod%d_hero.jpg" % r["lod"]), q,
+                 "LOD%d  %s triangles" % (r["lod"], format(r["triangles"], ",")))
+            for r in lods]
+    gap = 4
+    H = half[1] * 2 + q[1] + 2 * gap + 70
+    out = Image.new("RGB", (W, H), (14, 14, 16))
+    y = 0
+    for row in (row1, row2, row3):
+        x = 0
+        for im in row:
+            out.paste(im, (x, y))
+            x += im.width
+        y += row[0].height + gap
+    d = ImageDraw.Draw(out)
+    fails = [c["check"] for c in report["checks"] if not c["ok"]]
+    d.text((16, H - 56), "%s (%s): checks %s; textures %s; pack %.0f MB" % (
+        pack["title"], pack["car"], "all pass" if not fails else "FAILED: " + ", ".join(fails),
+        ", ".join("%s %d" % kv for kv in report["textures"].items()),
+        report["pack_bytes"] / 1e6), font=font, fill=(200, 204, 210))
+    out.save(os.path.join(pack_dir, "game.jpg"), quality=90)
+
+
+if __name__ == "__main__":
+    if bpy is not None:
+        main_blender()
+    else:
+        venv_main()
