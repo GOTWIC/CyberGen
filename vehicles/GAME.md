@@ -76,8 +76,9 @@ Two baked slots, `body` (4096) and `wheels` (2048), PNG, each with five textures
 | `<slot>_mask.png` | linear | R: primary paint weight, G: secondary paint weight, B: accent weight, A: shade on the tinted color (1 clean, lower in creases) |
 | `<slot>_emissive.png` | sRGB | RGB: emission color times its strength over `emissive_strength`, at most 1 (an emitter seen only through glass and stronger than the scale is clipped keeping its hue, `emissive_clipped`). A: specular level (0.5 standard, 0 on voids) |
 
-Glass is a parameter-only slot (`materials.glass.params`: color, roughness, IOR,
-transmission; `opaque_from_lod` 2: LOD2 and LOD3 carry no cabin, draw the glass dark and
+Glass is a parameter-only slot (`materials.glass.params`: the material most of the glass
+wears (`material`, a car's own such as a dome's lower IOR, else the kit's `glass`), its
+color, roughness, IOR, transmission; `opaque_from_lod` 2: LOD2 and LOD3 carry no cabin, draw the glass dark and
 opaque there).
 
 ### Color as a parameter
@@ -110,15 +111,16 @@ So that LOD0 is near 150,000 triangles without decimating the silhouette:
   lathe of their cross section's outer envelope (64 segments), the tread pockets and
   sidewall lettering baked onto it.
 - **Over the budget, in this order**: relief up to 12.5 mm (bolt rows, badges, lenses),
-  most triangles first; then the glass is collapsed (to 35% at most: it carries no
-  texture); then every part of 600 triangles or more alike, body panels too, lamps never,
-  at most halved a round, three rounds. Collapsed parts have their originals baked onto them. A right wheel that is
-  its left partner mirrored is collapsed as that mirror, so the pair still shares its UVs.
+  most triangles first; then every part of 600 triangles or more alike, body panels too
+  (glass, lamps and wheels never), at most halved a round, three rounds. Collapsed parts
+  have their originals baked onto them.
 - **Never seen**: faces no ray from outside reaches (through glass counts, for the cabin)
   are removed, and coincident faces (one of two facing the same way, both of two facing
   apart). Faces seen only through glass are the cabin class, only from below the
   underside class. A face never seen from its front but seen from its back (a design
-  face turned the wrong way, which Blender draws and an engine culls) is turned round.
+  face turned the wrong way, which Blender draws and an engine culls) is turned round, and
+  so is a face seen better from its back than its front (exterior over cabin over
+  underside).
 
 `baked_down` in `pack.json` lists every piece and what became of it.
 
@@ -126,7 +128,10 @@ So that LOD0 is near 150,000 triangles without decimating the silhouette:
 
 Smart projection per slot, each island scaled to one texel density times its class's
 weight (exterior 1, cabin 0.4, underside 0.35), then a skyline packer at the largest
-common scale, each lying flat or stood up, with 8 px between islands at 4096 (bake margins 8 px; whole texels between islands down to the 512 mip). The body's islands
+common scale, each lying flat or stood up, with 8 px between islands at 4096 (bake margins 8 px; whole texels between islands down to the 512 mip). On the body, an island thinner
+than 2 texels (2 area / perimeter: a letter's strokes, a hairline lamp) is scaled up to
+that, 8 times at most, while that grows the atlas by 10% at most (else 1.5, then 1
+texel), so it covers texel centers and bakes. The body's islands
 that carry baked-down relief (lettering, decals, small lamps) get up to twice the density,
 less where that would grow the atlas by more than 20% or take the exterior's 5th
 percentile under 3% over the floor (`uv.detail_boost`). Baked-down detail is carried out
@@ -139,7 +144,9 @@ it. Measured density (px/m, area weighted median and 5th percentile, per class) 
 LOD0 the parts as above. LOD1 to LOD3 are collapses of LOD0 (body and glass symmetric in
 y) to their budgets (60,000, 20,000, 5,000), each at most 60% of the LOD before it (a car
 under budget still steps down), sharing LOD0's UVs and textures; LOD2 and LOD3 drop the
-cabin's faces.
+cabin's faces. A LOD whose box falls short of LOD0's by more than `lod_bounds` allows (a
+glass crown collapsed away) has the parts that reach that side collapsed again at twice
+their ratio, the others a little more to hold the budget.
 
 ## Collision
 

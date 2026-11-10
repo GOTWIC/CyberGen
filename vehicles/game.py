@@ -59,7 +59,6 @@ CARD_MIN_PARTS = 8
 CARD_THICK_M = 0.045
 TIRE_LATHE_TRIS = 6000          # a tire denser than this is rebuilt as a lathe (over budget)
 TIRE_SEGMENTS = 64
-GLASS_MIN = 0.35                # over the budget the glass is collapsed to this share at most
 WEIGHT = {0: 1.0, 1: 0.35, 2: 0.4}  # texel density by face class: exterior, underside, cabin
 CLASS_NAMES = {0: "exterior", 1: "underside", 2: "cabin"}
 CAGE_M, REACH_M = 0.015, 0.035  # baking the detail: cage out, ray reach under the surface
@@ -68,6 +67,8 @@ CORE_WHEEL = ("tire", "rim", "hub", "ring", "disc", "drum", "caliper")
 DETAIL_BOOST = 2.0              # texel density under baked lettering and decals, at most
 DETAIL_MARGIN = 1.03            # ... while the exterior's 5th percentile stays this over the floor
 DETAIL_COST = 0.2               # ... and the atlas grows by this share at most (the rest shrinks)
+THIN_PX = 2.0                   # texels across every island at least (2 area / perimeter)
+THIN_COST = 0.1                 # ... while that grows the atlas by this share at most
 
 
 def log(msg):
@@ -893,26 +894,6 @@ def lathe_mesh(p):
     return me, len(ring)
 
 
-def mirror_y(me):
-    """A world space mesh mirrored in the car's middle plane (y negated), faces turned to
-    face out again, its cg_n mirrored."""
-    out = me.copy()
-    bm = bmesh.new()
-    bm.from_mesh(out)
-    for v in bm.verts:
-        v.co.y = -v.co.y
-    bmesh.ops.reverse_faces(bm, faces=bm.faces[:])
-    lay = bm.loops.layers.float_vector.get("cg_n")
-    if lay is not None:
-        for f in bm.faces:
-            for l in f.loops:
-                n = l[lay]
-                l[lay] = V3((n.x, -n.y, n.z))
-    bm.to_mesh(out)
-    bm.free()
-    return out
-
-
 def collapse_mesh(p, ratio):
     """The piece's mesh collapsed to ratio of its triangles (Blender's decimate), its
     attributes carried along by the collapse."""
@@ -1017,6 +998,7 @@ def dedupe_faces(bm):
 
 
 DIRS = None
+RANK = {-1: 0, 1: 1, 2: 2, 0: 3}    # face classes, worst to best seen
 
 
 def visibility(bm, glass_tree):
@@ -1024,7 +1006,9 @@ def visibility(bm, glass_tree):
     (underside), 2 seen only through glass (cabin), -1 never seen (removed). A face never
     seen from its front but seen from its back is a face the design turned the wrong way
     (Blender draws both sides; an engine culls back faces): its class from the back, and
-    its index in the second list, to be turned round."""
+    its index in the second list, to be turned round. So is a face seen better from its
+    back than from its front (exterior over cabin over underside: a deck under the glass
+    turned down, seen through the glass from above and through a gap from below)."""
     global DIRS
     if DIRS is None:
         DIRS = fib_dirs(96)
@@ -1058,9 +1042,10 @@ def visibility(bm, glass_tree):
         if f.calc_area() > 2e-4:
             samples += [c.lerp(v.co, 0.85) for v in f.verts]
         best = seen(samples, n)
-        if best == -1:
-            best = seen(samples, -n)
-            if best != -1:
+        if best != 0:
+            back = seen(samples, -n)
+            if RANK[back] > RANK[best]:
+                best = back
                 flip.append(f.index)
         cls.append(best)
     return cls, flip
@@ -1140,7 +1125,7 @@ def detail_faces(target, relief):
     return out
 
 
-def unwrap(ob, size, pad_px=None, boost=None, floor=None):
+def unwrap(ob, size, pad_px=None, boost=None, floor=None, thin=True):
     """Smart projection, even texel density, islands scaled by face class (exterior over
     underside and cabin), packed into the unit square with pad_px between islands."""
     me = ob.data
@@ -1191,8 +1176,21 @@ def unwrap(ob, size, pad_px=None, boost=None, floor=None):
     U0 = U
     U, fill = pack_uv(U0, loops_of, pad_px / size)
     f = 1.0
-    if boosted and floor:
-        # the islands under baked lettering and decals get more texels: DETAIL_BOOST times
+    if floor and thin:
+        # 1. thin islands (a letter's strokes, a hairline lamp, a trim strip) thickened to
+        # THIN_PX texels at least (2 area / perimeter), else they cover no texel center and
+        # bake to nothing; up to 4 times, while it grows the atlas by THIN_COST at most
+        A_k, t_k = island_thickness(me, islands, U)
+        tot = sum(A_k) or 1.0
+        g = [1.0] * len(islands)
+        for T in (THIN_PX, THIN_PX * 0.75, THIN_PX * 0.5, 0.0):
+            if T == 0.0:
+                g = [1.0] * len(islands)
+                break
+            g = [min(4.0, T / (t * size)) if 0 < t * size < T else 1.0 for t in t_k]
+            if sum(A * (x * x - 1) for A, x in zip(A_k, g)) <= THIN_COST * tot:
+                break
+        # 2. the islands under baked lettering and decals get more texels: DETAIL_BOOST times
         # the density, less where that would grow the atlas by more than DETAIL_COST or take
         # the exterior's 5th percentile under DETAIL_MARGIN over the floor (packed again,
         # measured, the boost halved until it holds)
@@ -1202,31 +1200,67 @@ def unwrap(ob, size, pad_px=None, boost=None, floor=None):
         if p5 and A_mark > 0:
             grow = min(DETAIL_COST, (p5 / (floor * DETAIL_MARGIN)) ** 2 - 1)
             f = sqrt(max(1.0, min(DETAIL_BOOST ** 2, 1 + grow * A_all / A_mark)))
-        while f > 1.05:
+        mark = set(boosted)
+        nthin = sum(1 for x in g if x > 1.0)
+        for _ in range(5):
+            sc = [max(gk, f if k in mark else 1.0) for k, gk in enumerate(g)]
+            if max(sc) <= 1.0:
+                break
             Ub = list(U0)
-            for k in boosted:
+            for k, x in enumerate(sc):
+                if x <= 1.0:
+                    continue
                 ls = loops_of[k]
                 cx = sum(Ub[2 * l] for l in ls) / len(ls)
                 cy = sum(Ub[2 * l + 1] for l in ls) / len(ls)
                 for l in ls:
-                    Ub[2 * l] = cx + (Ub[2 * l] - cx) * f
-                    Ub[2 * l + 1] = cy + (Ub[2 * l + 1] - cy) * f
+                    Ub[2 * l] = cx + (Ub[2 * l] - cx) * x
+                    Ub[2 * l + 1] = cy + (Ub[2 * l + 1] - cy) * x
             U2, fill2 = pack_uv(Ub, loops_of, pad_px / size)
             p5b = texel_p5(me, U2, size)
             if p5b is not None and p5b >= floor * 1.01:
                 U, fill = U2, fill2
                 break
-            f = 1 + (f - 1) / 2
+            if f > 1.05:
+                f = 1 + (f - 1) / 2
+            else:
+                f, g, nthin = 1.0, [1.0] * len(islands), 0
         else:
-            f = 1.0
-        log("  %d islands under baked detail (%.3f m2) at %.2f times the density" % (
-            len(boosted), A_mark, f))
+            f, nthin = 1.0, 0
+        log("  %d islands under baked detail (%.3f m2) at %.2f times the density; %d thin "
+            "islands thickened" % (len(boosted), A_mark, f, nthin))
     uv.foreach_set("uv", U)
     me.update()
     log("  packed %s: %d islands, %.0f%% of the square, uv box %s" % (
         ob.name, len(islands), fill * 100, _uvbox(me)))
     ob["cg_detail_boost"] = f
     return len(islands)
+
+
+def island_thickness(me, islands, U):
+    """Per island its UV area and its thickness, 2 area / perimeter (UV units)."""
+    polys = me.polygons
+    lv = [l.vertex_index for l in me.loops]
+    A_k, t_k = [], []
+    for isl in islands:
+        A = 0.0
+        edges = {}
+        for i in isl:
+            ls = list(polys[i].loop_indices)
+            A += abs(sum(U[2 * a] * U[2 * b + 1] - U[2 * b] * U[2 * a + 1]
+                         for a, b in zip(ls, ls[1:] + ls[:1]))) / 2
+            for a, b in zip(ls, ls[1:] + ls[:1]):
+                key = (min(lv[a], lv[b]), max(lv[a], lv[b]))
+                e = edges.get(key)
+                if e is None:
+                    edges[key] = [1, sqrt((U[2 * a] - U[2 * b]) ** 2 +
+                                          (U[2 * a + 1] - U[2 * b + 1]) ** 2)]
+                else:
+                    e[0] += 1
+        per = sum(L for n, L in edges.values() if n == 1)
+        A_k.append(A)
+        t_k.append(2 * A / per if per > 0 else 0.0)
+    return A_k, t_k
 
 
 def texel_p5(me, U, size):
@@ -1728,6 +1762,65 @@ def export_glb(path, objs, names):
     bpy.data.objects.remove(root)
 
 
+def world_box(obs):
+    """The box of the faces of objects placed by location alone (matrix_world is stale on
+    new ones; a vertex no face uses is not exported)."""
+    pts = []
+    for o in obs:
+        vs = o.data.vertices
+        used = {i for poly in o.data.polygons for i in poly.vertices}
+        t = o.location
+        pts += [(vs[i].co.x + t.x, vs[i].co.y + t.y, vs[i].co.z + t.z) for i in used]
+    lo = [min(q[i] for q in pts) for i in range(3)]
+    hi = [max(q[i] for q in pts) for i in range(3)]
+    return lo, hi
+
+
+def hold_bounds(parts_final, objs_k, ratio, target, k, coll, drop):
+    """A LOD whose box falls short of LOD0's by more than the check allows (lod_bounds: 2 cm
+    or 1.5% of the size; a glass dome's crown collapsed away): the parts that reach LOD0's
+    box on that side are collapsed again at twice their ratio, the others a little more to
+    keep the budget, up to three times. Returns (objects, triangles)."""
+    lo0, hi0 = world_box([o for _, o in parts_final])
+    tol = [max(0.02, 0.015 * (hi0[i] - lo0[i])) for i in range(3)]
+    rat = {nm: ratio for nm, _ in parts_final}
+    for _ in range(3):
+        lo, hi = world_box(objs_k)
+        short = [(i, -1) for i in range(3) if lo[i] - lo0[i] > tol[i]] + \
+                [(i, 1) for i in range(3) if hi0[i] - hi[i] > tol[i]]
+        if not short:
+            break
+        bump = set()
+        for nm, o in parts_final:
+            plo, phi = world_box([o])
+            for i, sd in short:
+                if (sd < 0 and plo[i] - lo0[i] < 0.002) or (sd > 0 and hi0[i] - phi[i] < 0.002):
+                    bump.add(nm)
+        if not bump:
+            break
+        for nm in bump:
+            rat[nm] = min(1.0, rat[nm] * 2)
+        tri0 = {nm: mesh_tris(o.data) for nm, o in parts_final}
+        fixed = sum(tri0[nm] * rat[nm] for nm in bump)
+        rest = sum(tri0[nm] for nm in tri0 if nm not in bump)
+        if rest > 0:
+            r2 = max(0.003, (target - fixed) / rest)
+            for nm in tri0:
+                if nm not in bump:
+                    rat[nm] = min(rat[nm], r2)
+        log("  LOD%d short of LOD0's box %s: %s collapsed again at %s" % (
+            k, short, sorted(bump), {nm: round(rat[nm], 4) for nm in sorted(bump)}))
+        for o in objs_k:
+            me = o.data
+            bpy.data.objects.remove(o)
+            bpy.data.meshes.remove(me)
+        objs_k = [decimate_copy(o, rat[nm], "LOD%d_%s" % (k, nm), coll,
+                                drop if nm == "body" else None,
+                                symmetric=(nm in ("body", "glass")))
+                  for nm, o in parts_final]
+    return objs_k, sum(mesh_tris(o.data) for o in objs_k)
+
+
 def decimate_copy(ob, ratio, name, coll, drop_class=None, symmetric=False):
     me = ob.data.copy()
     if drop_class is not None and "cg_class" in me.attributes:
@@ -1826,11 +1919,11 @@ def main_build(A):
     budget = A.lods[0]
     low_coll = bpy.data.collections.new("LOW")
     bpy.context.scene.collection.children.link(low_coll)
-    # over the budget, in this order: taller relief; the glass (it carries no texture: a
-    # dense canopy is the cheapest saving); then every part of 600 triangles or more alike,
-    # panels too, at most halved a round (a round that crushed the small dense parts alone
-    # turned turbine wheels and light strips into polygons), three rounds
-    steps = ["tall", "glass", "collapse", "collapse", "collapse"]
+    # over the budget, in this order: taller relief; then every part of 600 triangles or
+    # more alike, panels too, at most halved a round (a round that crushed the small dense
+    # parts alone turned turbine wheels and light strips into polygons), three rounds; the
+    # glass never (a collapsed canopy shows its facets in every reflection)
+    steps = ["tall", "collapse", "collapse", "collapse"]
     while True:
         parts = part_meshes(pieces, cards)
         objs = {part: join_meshes("tmp_" + part, [m for m, _ in lst], low_coll)
@@ -1878,35 +1971,23 @@ def main_build(A):
                 excess -= per_piece.get(p.idx, 0)
                 log("  over budget: relief %s (%.1f mm) baked down" % (p.name, p.relief * 1000))
         else:
-            # lamps never: a thin light strip collapsed breaks into dashes
+            # lamps never (a thin light strip collapsed breaks into dashes), wheels never
+            # (seen close and turning; a collapsed wheel unwraps folded, its UVs overlapping)
             cand = [p for p in pieces if p.op in ("keep", "collapse") and
                     per_piece.get(p.idx, 0) >= 600 and
-                    (p.part == "glass") == (step == "glass") and
+                    p.part != "glass" and
+                    p.part.split(":")[0] not in ("wheel", "brake") and
                     not (infos.get(p.mat) and infos[p.mat].emissive)]
             pool = sum(per_piece.get(p.idx, 0) for p in cand)
             if pool <= 0:
                 continue
-            r = max(GLASS_MIN if step == "glass" else 0.5, 1 - excess / pool)
+            r = max(0.5, 1 - excess / pool)
             for p in cand:
                 cur = mesh_tris(p.low) / p.tris if p.op == "collapse" else 1.0
                 p.low = collapse_mesh(p, r * cur)
                 p.op = "collapse"
-            # a right wheel that was its left partner mirrored stays so: its pieces become
-            # the mirror of the partner's collapsed pieces (counted twice in the partner)
-            nm = 0
-            for q in pieces:
-                if q.part not in twins or q.op not in ("keep", "collapse"):
-                    continue
-                kind = q.ob.name.split(".", 1)[0]
-                src_p = next((x for x in pieces if x.part == twins[q.part] and x.mat == q.mat
-                              and x.ob.name.split(".", 1)[0] == kind and
-                              x.op == "collapse"), None)
-                if src_p is not None:
-                    q.low = mirror_y(src_p.low)
-                    q.op = "collapse"
-                    nm += 1
-            log("  over budget (%s): %d pieces collapsed to %.0f%%, %d mirrored to their "
-                "twins" % (step, len(cand), r * 100, nm))
+            log("  over budget (%s): %d pieces collapsed to %.0f%%" % (step, len(cand),
+                                                                     r * 100))
     times["parts"] = time.time() - t
 
     # 4. the parts as nodes: body, glass, wheels and brakes about their axles
@@ -2081,6 +2162,7 @@ def main_build(A):
             if got <= target * 1.03:
                 break
             ratio *= target / got * 0.98
+        objs_k, got = hold_bounds(parts_final, objs_k, ratio, target, k, low_coll, drop)
         prev = got
         lods.append(dict(lod=k, objs=objs_k))
     hulls = collision([o for nm, o in parts_final if nm in ("body", "glass")])
@@ -2152,8 +2234,15 @@ def main_build(A):
                                    relief_mm=round(p.relief * 1000, 1) if p.relief else None,
                                    into="card" if p.op == "card_src" else
                                    ("surface under it" if p.op == "relief" else p.op)))
-    gls = infos.get("glass")
-    glass_params = dict(color=list(gls.color) if gls and gls.color else [0.3, 0.33, 0.36],
+    # the glass's own material: the one most of the glass area wears (a car may tune its
+    # own, a dome's lower IOR), else the kit's
+    garea = {}
+    for p in pieces:
+        if p.part == "glass" and p.mat in infos:
+            garea[p.mat] = garea.get(p.mat, 0.0) + sum(f.area for f in p.me.polygons)
+    gls = infos.get(max(garea, key=lambda m: (garea[m], m)) if garea else "glass") or \
+        infos.get("glass")
+    glass_params = dict(material=gls.name if gls else None,color=list(gls.color) if gls and gls.color else [0.3, 0.33, 0.36],
                         roughness=round(val(gls.b, "Roughness", 0.0), 3) if gls else 0.0,
                         ior=round(val(gls.b, "IOR", 1.5), 3) if gls else 1.5,
                         transmission=1.0, opaque_from_lod=2)
