@@ -23,6 +23,7 @@ vehicles/blender.sh vehicles/cars/NAME.py --out DIR --sheet      # DIR/sheet.jpg
 | `--out DIR` | where files go (made absolute; default `~/.cache/cybergen/vehicles/NAME`) |
 | `--preview` | four small views (hero, rear three-quarter, side, top) in one 1920 x 1080 image, 24 samples. The image to look at while designing |
 | `--sheet` | the one deliverable: hero on top (3840 x 1536), front, side and back below, each rendered at its tile's size, with a light bloom; 3840 x 2160, 160 samples |
+| `--extra VIEW` | a fifth small tile on the sheet (`top`, `under`, a view of the car's own), laid into a corner of the hero; a car sets its own with `K.shoot(extra=...)` |
 | `--night` | the night studio (wet floor, teal and magenta rims), for any mode |
 | `--views a,b` `--res W H` | full frames `car_<view>.jpg` of single views (close-ups), 1600 x 900 unless `--res` |
 | `--samples N` | overrides a mode's samples |
@@ -103,7 +104,7 @@ for side, s in ((1, "l"), (-1, "r")):
     K.build_wheel("r" + s, -1.30, 0.36, 0.30, 0.27, 0.95, side, spokes=5, style="blade")
 
 K.VIEWS["hero"].update(dir=(1.0, 0.9, 0.35))      # a car may choose its hero direction
-K.shoot()
+K.shoot()                                         # K.shoot(extra="top"): a fifth tile
 ```
 
 ## The kit
@@ -114,21 +115,22 @@ allowed (`Geo.add(verts, faces)`, or bmesh and bpy directly, linked into `K.CAR`
 
 | Name | What |
 |---|---|
-| `materials(**palette)` | the library in `K.MAT`. Palette keys: `paint`, `paint_finish` (`metallic`, `pearl`, `gloss`, `satin`, `matte`, `chrome`, or `(metallic, roughness, coat)`), `paint2`, `paint2_finish`, `dust`, `dust_amount`, `cladding`, `glass`, `led_front`, `led_rear`, `led_accent`, `led_wheel`, `caliper`, `seat`, `interior`, `screen`, `rim`, `rim_bright`, `decal`, `ember`. Names: `paint`, `paint2` (flake, dust, crease grime), `carbon` (weave), `gloss_black`, `cladding`, `underbody`, `void`, `well`, `grille`, `glass`, `rubber`, `rim`, `rim_bright`, `disc`, `caliper`, `interior`, `seat`, `screen`, `decal`, `led_*`, `lamp`, `ember` |
-| `pbr(name, color, metallic, rough, **inputs)`, `emit(name, color, strength)`, `paint(name, color, finish)`, `carbon(name, dark, light)`, `void(name)` | a car's own materials |
-| `Geo()` | collects closed solids: `box(center, size, rot)`, `hexa(8 points)`, `prism(polygon, vector)`, `lathe(profile, n, a0, a1, xf)` about y, `sweep(path, section, up, closed)`, `louvers(a, b, c, d, n, w, th, tilt, out)`, `honeycomb(polygon, x, R, wall, depth, sgn, keep)`, `add(verts, faces)`; then `obj(name, mat, bevel, segs, angle, mirror, sharp, flip_y, loc)` |
+| `materials(**palette)` | the library in `K.MAT`. Palette keys: `paint`, `paint_finish` (`metallic`, `pearl`, `gloss`, `satin`, `matte`, `chrome`, or `(metallic, roughness, coat)`), `paint2`, `paint2_finish`, `dust`, `dust_amount`, `dust_z` (`(0.12, 0.55)`: the paint is all dust at the first height and below, clean from the second up; raise both for a truck or a hover car), `cladding`, `glass`, `led_front`, `led_rear`, `led_accent`, `led_wheel`, `caliper`, `seat`, `interior`, `screen`, `rim`, `rim_bright`, `decal`, `ember`. Names: `paint`, `paint2` (flake, dust, crease grime), `carbon` (weave), `gloss_black`, `cladding`, `underbody`, `void`, `well`, `grille`, `glass`, `rubber`, `rim`, `rim_bright`, `disc`, `caliper`, `interior`, `seat`, `screen`, `decal`, `led_*`, `lamp`, `ember` |
+| `pbr(name, color, metallic, rough, **inputs)`, `emit(name, color, strength)`, `paint(name, color, finish, dust, dust_amount, flake, dust_z)`, `carbon(name, dark, light)`, `void(name)` | a car's own materials |
+| `Geo()` | collects closed solids: `box(center, size, rot)`, `hexa(8 points)`, `prism(polygon, vector)`, `lathe(profile, n, a0, a1, xf)` about y, `sweep(path, section, up, closed)`, `tube(a, b, r, n)` a straight round bar between two points, `louvers(a, b, c, d, n, w, th, tilt, out)`, `honeycomb(polygon, x, R, wall, depth, sgn, keep)`, `add(verts, faces)`; then `obj(name, mat, bevel, segs, angle, mirror, sharp, flip_y, loc, rot)` (`rot`: an Euler, three angles or a matrix, about the object's origin at `loc`) |
 | `finish(ob, bevel, segs, angle, mirror, wn, sharp)` | mirror, bevel and shading on any mesh object |
 | `fill(stations)`, `table(names, lines, S)` | `None` points interpolated; `PT[station][line]` |
-| `build_body(stations, panel_of, pmat, line_crease, station_crease, name, front, rear, recesses, glass, cutters, subdiv, mirror, wrap, gap, thick, glass_thick, project)` | one body piece (below); returns `.parts[panel]` objects and `.caps["front"/"rear"]` inner rings |
+| `build_body(stations, panel_of, pmat, line_crease, station_crease, name, front, rear, recesses, glass, cutters, subdiv, mirror, wrap, gap, thick, glass_thick, project, bevel, bevel_segs)` | one body piece (below); returns `.parts[panel]` objects and `.caps["front"/"rear"]` inner rings |
 | `well_cutter(g, cx, cz, r, y0, angles)` | a wheel well solid for `cutters` |
 | `arch_trim(g, cx, cz, r, y_in, y_out, angles)`, `arch_bolts(g, cx, cz, r, y, angles)` | faceted arch trim and its bolts |
-| `on_body(u, v, proj)` | surface point and normal of the body as built, seen along `'y'` (left side, u = x, v = z), `'Y'` (right), `'x'` (front, u = y, v = z), `'X'` (back), `'z'` (top, u = x, v = y); over all body pieces |
-| `ribbon(g, pts, proj, w)`, `text_on_body(g, txt, size, x0, z0, side)`, `text_flat(g, txt, size, origin, right, up)`, `stud(g, loc, n, profile, seg)` | strips, lettering and studs on the surface |
+| `on_body(u, v, proj, objs)` | surface point and normal of the body as built, seen along `'y'` (left side, u = x, v = z), `'Y'` (right), `'x'` (front, u = y, v = z), `'X'` (back), `'z'` (top, u = x, v = y); over all body pieces, or over `objs` (an object or a list: pods, a wing, one panel), with nothing to set or reset |
+| `ribbon(g, pts, proj, w, objs=)`, `text_on_body(g, txt, size, x0, z0, side, proj=, turn=, objs=)`, `text_flat(g, txt, size, origin, right, up)`, `stud(g, loc, n, profile, seg)` | strips, lettering and studs on the surface. `text_on_body` writes on the flank; with `proj='z'` on a roof, hood or deck, its middle at x = `x0`, y = `z0`, read from the left side (`side=1`) or the right (`-1`), turned by `turn` degrees (90: read from behind) |
+| `body_bvh(objs, default)` | the projector's tree, returned; `body_bvh()` alone makes the body pieces the default target again |
 | `band_point(p, center, w, out)`, `shr(quad, k, lift, out)`, `my(p)` | a point inside a cap's lip; a quad shrunk and lifted; a point mirrored |
-| `build_wheel(tag, cx, R, w, Rr, out_y, side, cz, spokes, style, ring, caliper, rim, bright, tire)` | a wheel: tire radius, width, rim radius, outer face y; `style` `twin`, `blade` or `disc`; `ring` and `caliper` are material names or `None`; `cz` lifts the axle |
-| `VIEWS` | the views by name (`hero`, `rear`, `rear_l`, `side`, `front`, `back`, `top`, `low`): `dir`, `lens`, `target`, then `dist` or a fit (`fit` prefixes, `margin`), `focus`, `fstop`. Change or add entries before `shoot()` |
-| `shoot(sheet=(4 views), preview=(4 views))` | the end of every script: stats, studio, renders, exports |
-| `build_studio()`, `add_camera(name, view)`, `setup_render()`, `render_view(name, path, res, samples)`, `render_sheet()`, `render_preview()`, `stats()`, `tri_count()`, `export_glb(path)`, `log(msg)` | what `shoot()` is made of |
+| `build_wheel(tag, cx, R, w, Rr, out_y, side, cz, spokes, style, ring, caliper, rim, bright, tire, loc, rot)` | a wheel: tire radius, width, rim radius, outer face y; `style` `twin`, `blade` or `disc`; `ring` and `caliper` are material names or `None`; `cz` lifts the axle. `tire=None` leaves the tire out, `rim=None` the rim and its hub (`bright=None` the hub alone), for a car that brings its own; `loc` and `rot` put the wheel anywhere, turned: a spare |
+| `VIEWS` | the views by name (`hero`, `rear`, `rear_l`, `side`, `front`, `back`, `top`, `under`, `low`): `dir`, `lens`, then `dist` or a fit (`fit` prefixes, `margin`), `focus`, `fstop`, and optionally `target` and `no_floor` (below). Change or add entries before `shoot()` |
+| `shoot(sheet=(4 views), preview=(4 views), extra=None)` | the end of every script: stats, studio, renders, exports. `extra`: the sheet's fifth tile, a view name or `dict(view=, size=(840, 400), corner="tl", margin=)` |
+| `build_studio()`, `add_camera(name, view)`, `view_target(view)`, `car_points(prefixes)`, `in_studio(p)`, `setup_render()`, `render_view(name, path, res, samples)`, `render_sheet()`, `render_preview()`, `stats()`, `tri_count()`, `export_glb(path)`, `log(msg)` | what `shoot()` is made of |
 
 ### build_body
 
@@ -153,6 +155,8 @@ bevelled edges.
   **`glass`** `(panel, inset[, trim])`: a trim frame with sharp corners.
 - **`cutters`** `(Geo, panel)`: solids cut out (wheel wells, a tunnel through the body).
   None for a hover car or an open-wheel car.
+- **Bevels**: `bevel=None` gives paint panels 4.5 mm and the rest 3 mm; a number is for
+  every panel, a dict `{panel: width}` for some (0 for none); `bevel_segs` (2) its segments.
 - **More pieces**: call it again with another `name` (a cab and a bed, a canopy, pods).
   A piece whose first and last lines are not on y = 0 mirrors into a left and a right
   copy: with `wrap=True` (last line joined to the first) that is a pair of closed tubes,
@@ -161,6 +165,33 @@ bevelled edges.
   sheet. Crease its outline (line creases on the first and last line, station creases on
   the first and last station) or subdivision rounds its corners away. Do not cut an open
   shell with `cutters`: the boolean needs a closed hull.
+
+### Views, the fit and the studio
+
+- **Target.** A view with no `target` aims at the middle of what it fits: for the whole car
+  the middle of its length and of its own height, on the centerline. A hover car or a tall
+  truck is framed like a low coupe with nothing to set. Give a view a `target` to aim it
+  yourself (close-ups, a hero that should sit lower in its frame).
+- **Fit.** A view without `dist` stands where the car's silhouette just fills the frame less
+  its `margin` (0.05 of the frame on each side; the sheet uses 0.025 for the hero and 0.04
+  below). The silhouette is the convex hull of the car's vertices as built (`car_points`),
+  not the objects' boxes, so the margin is what you see. Negative margins are never needed.
+- **Studio limits.** The floor is flat to 16 m from the middle, then the cove rises to a
+  wall 25 m out and 22 m high. No camera leaves it: it stays 0.5 m clear of the cove and
+  under 21 m. A fitted view that would stand farther is held there and takes a shorter lens
+  that still shows the whole car (the log says so: `view side: its camera is held ...`); a
+  `dist` view is pulled in. That happens to side views of long, tall vehicles in the sheet's
+  wide tile (the 5.7 m pickup: 85 mm for 110; a van 7.3 m long and 3.2 m tall: 53 mm) and
+  to top views of vehicles over about 6 m; every sheet and preview view of that van is whole.
+- **Lights.** The two low strip lights at the sides light the flanks and show in the paint,
+  but not to the camera or through glass (they used to show as white windows in side
+  views of upright glass).
+- **`under`** looks up from below with the studio hidden (`no_floor=True`): the under-floor
+  view of a hover car, lit by its own emitters and the grey world.
+- **The fifth tile.** `K.shoot(extra="top")` (or `--extra top`) lays one more small view
+  into a corner of the hero, over it: the hero keeps its size. Top left by default, the
+  empty wall over the nose; `extra=dict(view="under", corner="br", size=(840, 400))` picks
+  another corner or size. Check on the sheet that the corner is free of the car.
 
 ## Lessons learned
 
@@ -180,6 +211,12 @@ bevelled edges.
   under the lights.
 - **Reflections.** Glossy flat surfaces mirror the studio lights at grazing angles. Judge
   a material from several views, never from one.
+- **Leaning glass.** Flat glass that leans in more than about 25 degrees from upright
+  mirrors the top light in side views: the window goes white. Keep side glass more upright
+  than that, give it a little crown, or break it with a fold.
+- **Projecting on other pieces.** `on_body`, `ribbon` and `text_on_body` take `objs` (pods,
+  a wing, a single panel). Never set `K._BVH` yourself.
+- **Dust.** A tall or floating vehicle wants its dust line higher: `dust_z` in the palette.
 - **Lettering** uses the DIN font on macOS (`carkit.FONTS`).
 - **Names.** Every maker, model and word on a car is made up. Never name a real maker, a
   real model or any game, in text on the car, in file names or in comments.

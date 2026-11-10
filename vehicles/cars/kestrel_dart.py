@@ -121,11 +121,12 @@ def chine(x):
     return _CH[key]
 
 
-def rib(g, pts, proj, w, h):
-    """A raised rib on the body along a path given in projection (its samples as given)."""
+def rib(g, pts, proj, w, h, objs=None):
+    """A raised rib on the body (or on objs) along a path given in projection (its samples
+    as given)."""
     P, N = [], []
     for q in pts:
-        loc, n = on_body(q[0], q[1], proj)
+        loc, n = on_body(q[0], q[1], proj, objs)
         if loc is not None:
             P.append(loc)
             N.append(n)
@@ -257,7 +258,6 @@ def pod_ribs():
     """Fine ribbing on the housings: on the pods as built, seen from the side."""
     parts = [ob for ob in K.CAR.objects if ob.name.startswith("pod.") and ob.type == 'MESH'
              and ob.name.split(".")[1] in ("f", "r")]
-    K.body_bvh(parts)
     g = Geo()
     for tag, p in PODS.items():
         xc, zc, L, s = p["xc"], p["zc"], p["L"], p["s"]
@@ -266,18 +266,19 @@ def pod_ribs():
         for k in range(7):
             z = zc + (0.038 - k * 0.0215) * s
             rib(g, [(x0 + (x1 - x0) * i / n - 0.03 * k * s * (1 if i == 0 else 0), z)
-                    for i in range(n + 1)], 'y', 0.009, 0.005)
+                    for i in range(n + 1)], 'y', 0.009, 0.005, parts)
         for k in range(3):                              # three short ribs on the top chamfer
             z = zc + (0.075 + k * 0.022) * s
-            rib(g, [(xc + (0.30 - 0.6 * i / 12) * s, z) for i in range(13)], 'y', 0.008, 0.004)
+            rib(g, [(xc + (0.30 - 0.6 * i / 12) * s, z) for i in range(13)], 'y', 0.008, 0.004,
+                parts)
     g.obj("pod.ribs", "cladding", mirror=True)
     g = Geo()                                           # emitter numbers on the pods' noses
     for side in (1, -1):
         for k, p in enumerate(PODS.values()):
             text_on_body(g, "E%d" % (2 * k + (1 if side > 0 else 2)), 0.062 * p["s"],
-                         p["xc"] + p["L"] / 2 - 0.235 * p["s"], p["zc"] + 0.012 * p["s"], side)
+                         p["xc"] + p["L"] / 2 - 0.235 * p["s"], p["zc"] + 0.012 * p["s"], side,
+                         objs=parts)
     g.obj("pod.stencils", "stencil")
-    K._BVH[0] = None
 
 
 # ---------------------------------------------------------------------------------------
@@ -564,8 +565,6 @@ def build_interior():
 # ---------------------------------------------------------------------------------------
 # views and the build
 # ---------------------------------------------------------------------------------------
-for v in K.VIEWS.values():
-    v["target"] = (0, 0, 0.82)
 K.VIEWS["hero"].update(dir=(1.0, 0.80, 0.21), focus=(1.2, 0.6, 0.8), fstop=11.0)
 K.VIEWS["rear"].update(focus=(-1.2, -0.6, 0.9), fstop=11.0)
 K.VIEWS.update(

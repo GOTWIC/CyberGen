@@ -867,17 +867,10 @@ def build_interior():
 # ---------------------------------------------------------------------------------------
 # views of its own, and the build
 # ---------------------------------------------------------------------------------------
-for v in K.VIEWS.values():
-    v["target"] = (0, 0, 0.95)
-# The kit fits a view to the corners of every object's box, which for a tall, long truck
-# stand well outside its silhouette: negative margins bring the camera in. The side view
-# takes a shorter lens, or its camera would stand behind the studio's wall (16 m away).
-K.VIEWS["hero"].update(dir=(1.0, 0.66, 0.17), lens=58, focus=(1.9, 0.9, 0.8), margin=-0.03,
+K.VIEWS["hero"].update(dir=(1.0, 0.66, 0.17), lens=58, focus=(1.9, 0.9, 0.8),
                         target=(0, 0, 0.81))
 K.VIEWS["rear"].update(dir=(-1.0, -0.74, 0.42), focus=(-1.9, -0.8, 0.9))
-K.VIEWS["front"].update(margin=-0.03)
-K.VIEWS["back"].update(dir=(-1.0, 0.0, 0.16), margin=-0.03)
-K.VIEWS["side"].update(lens=55, margin=0.01)
+K.VIEWS["back"].update(dir=(-1.0, 0.0, 0.16))
 K.VIEWS.update(
     wheel=dict(dir=(0.55, 1.0, 0.12), lens=85, target=(FA_X, 0.9, 0.5), fit=("tire.fl",),
                margin=0.0),
@@ -886,26 +879,11 @@ K.VIEWS.update(
 )
 
 
-_studio = K.build_studio
-
-
-def build_studio():
-    """The kit's studio; its two low strip lights are not seen by the camera or through
-    glass (the side view looks through both side windows straight into the far one)."""
-    _studio()
-    for ob in K.STUDIO.objects:
-        if ob.name in ("strip", "strip2"):
-            ob.visible_camera = False
-            ob.visible_transmission = False
-
-
-K.build_studio = build_studio
-
-
 def main():
     K.materials(paint=(0.78, 0.33, 0.006), paint_finish=(0.0, 0.40, 0.5),
                 paint2=(0.035, 0.038, 0.042), paint2_finish=(0.35, 0.52, 0.0),
-                dust=(0.24, 0.19, 0.13), dust_amount=0.6, glass=(0.33, 0.37, 0.39),
+                dust=(0.24, 0.19, 0.13), dust_amount=0.6, dust_z=(0.42, 0.95),   # a truck:
+                glass=(0.33, 0.37, 0.39),                           # the dust climbs higher
                 led_front=(1.0, 0.86, 0.62), led_accent=(1.0, 0.42, 0.03),
                 caliper=(0.50, 0.02, 0.015), seat=(0.13, 0.065, 0.03),
                 decal=(0.012, 0.012, 0.013), screen=(1.0, 0.55, 0.12))
@@ -913,12 +891,6 @@ def main():
     K.pbr("liner", (0.03, 0.03, 0.032), 0.0, 0.85)          # the bed's sprayed lining
     K.pbr("mark", (0.78, 0.33, 0.006), 0.0, 0.5)             # markings on the dark parts
     K.pbr("tiremark", (0.085, 0.085, 0.085), 0.0, 0.6)
-    for name in ("paint", "paint2"):                        # a truck: the dust climbs higher
-        for n in K.MAT[name].node_tree.nodes:
-            if (n.type == 'MAP_RANGE' and abs(n.inputs["From Min"].default_value - 0.12) < 1e-6
-                    and abs(n.inputs["From Max"].default_value - 0.55) < 1e-6):
-                n.inputs["From Min"].default_value = 0.42
-                n.inputs["From Max"].default_value = 0.95
     build_hull()
     K.log("hull and bed")
     build_fenders()
