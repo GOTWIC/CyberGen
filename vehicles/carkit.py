@@ -47,6 +47,7 @@ def _args():
     ap.add_argument("--night", action="store_true")
     ap.add_argument("--glb", action="store_true")
     ap.add_argument("--blend", action="store_true")
+    ap.add_argument("--extra", default="", help="a fifth small tile on the sheet: a view name")
     a = ap.parse_args(argv)
     a.out = os.path.abspath(a.out)      # Blender's file writer breaks on a relative path
     return a
@@ -77,6 +78,7 @@ PALETTE = dict(
     paint=(0.15, 0.16, 0.185), paint_finish="metallic",        # the body color
     paint2=(0.45, 0.05, 0.03), paint2_finish="gloss",          # a second color: spine, panels
     dust=(0.20, 0.18, 0.15), dust_amount=0.7,                  # road dust low on the paint
+    dust_z=(0.12, 0.55),                                       # all of it below, none above
     cladding=(0.028, 0.029, 0.032),
     glass=(0.30, 0.33, 0.36),
     led_front=(0.72, 0.93, 1.0), led_rear=(1.0, 0.03, 0.015), led_accent=(1.0, 0.30, 0.03),
@@ -127,8 +129,11 @@ def void(name="void"):
     return pbr(name, (0.004, 0.004, 0.005), 0.0, 0.8, **{"Specular IOR Level": 0.0})
 
 
-def paint(name, color, finish="metallic", dust=(0.20, 0.18, 0.15), dust_amount=0.7, flake=0.06):
-    """Car paint: fine flake under the coat, road dust low down, grime in the creases."""
+def paint(name, color, finish="metallic", dust=(0.20, 0.18, 0.15), dust_amount=0.7, flake=0.06,
+          dust_z=(0.12, 0.55)):
+    """Car paint: fine flake under the coat, road dust low down (all of it at dust_z[0] and
+    below, none from dust_z[1] up: raise both for a truck or a hover car), grime in the
+    creases."""
     metallic, rough, coat = FINISH[finish] if isinstance(finish, str) else finish
     m, b = pbr(name, color, metallic, rough, **{"Coat Weight": coat, "Coat Roughness": 0.06})
     nt = m.node_tree
@@ -145,8 +150,8 @@ def paint(name, color, finish="metallic", dust=(0.20, 0.18, 0.15), dust_amount=0
     sep = nt.nodes.new('ShaderNodeSeparateXYZ')
     nt.links.new(tc.outputs["Object"], sep.inputs[0])
     ramp = nt.nodes.new('ShaderNodeMapRange')
-    ramp.inputs["From Min"].default_value = 0.12
-    ramp.inputs["From Max"].default_value = 0.55
+    ramp.inputs["From Min"].default_value = dust_z[0]
+    ramp.inputs["From Max"].default_value = dust_z[1]
     ramp.inputs["To Min"].default_value = 1.0
     ramp.inputs["To Max"].default_value = 0.0
     nt.links.new(sep.outputs["Z"], ramp.inputs["Value"])
@@ -242,8 +247,10 @@ def materials(**palette):
     if unknown:
         raise KeyError("materials(): unknown palette keys %s" % sorted(unknown))
     p.update(palette)
-    paint("paint", p["paint"], p["paint_finish"], p["dust"], p["dust_amount"])
-    paint("paint2", p["paint2"], p["paint2_finish"], p["dust"], p["dust_amount"])
+    paint("paint", p["paint"], p["paint_finish"], p["dust"], p["dust_amount"],
+          dust_z=p["dust_z"])
+    paint("paint2", p["paint2"], p["paint2_finish"], p["dust"], p["dust_amount"],
+          dust_z=p["dust_z"])
     pbr("gloss_black", (0.010, 0.010, 0.012), 0.0, 0.10, **{"Coat Weight": 1.0})
     pbr("cladding", p["cladding"], 0.3, 0.48)
     carbon()
@@ -373,6 +380,17 @@ class Geo:
             faces += [tuple(range(m)), tuple((n - 1) * m + j for j in range(m))]
         self.add(pts, faces, xf)
 
+    def tube(self, a, b, r, n=12, xf=None):
+        """A straight round bar of radius r from a to b, n sides, its ends closed."""
+        a, b = V3(a), V3(b)
+        t = (b - a).normalized()
+        u = t.cross(V3((0, 0, 1)) if abs(t.z) < 0.9 else V3((1, 0, 0))).normalized()
+        w = t.cross(u)
+        ring = [u * (r * cos(2 * pi * k / n)) + w * (r * sin(2 * pi * k / n)) for k in range(n)]
+        faces = [tuple(range(n)), tuple(range(n, 2 * n))]
+        faces += [(k, (k + 1) % n, n + (k + 1) % n, n + k) for k in range(n)]
+        self.add([a + o for o in ring] + [b + o for o in ring], faces, xf)
+
     def louvers(self, a, b, c, d, n, w, th, tilt, out, lift=0.0, margin=0.06):
         """n slats, each from the a-b edge to the d-c edge, spread from a to b."""
         a, b, c, d = V3(a), V3(b), V3(c), V3(d)
@@ -423,14 +441,18 @@ class Geo:
         return me
 
     def obj(self, name, mat, bevel=0.0, segs=2, angle=30.0, mirror=False, wn=True,
-            sharp=None, flip_y=False, loc=None, coll=None):
-        """The object: material MAT[mat], then finish()'s mirror, bevel and shading."""
+            sharp=None, flip_y=False, loc=None, coll=None, rot=None):
+        """The object: material MAT[mat], then finish()'s mirror, bevel and shading. loc
+        moves it and rot (an Euler, three angles or a matrix) turns it about its origin; a
+        mirror is then about the turned object's own y = 0."""
         me = self.mesh(name, flip_y)
         me.materials.append(MAT[mat])
         ob = bpy.data.objects.new(name, me)
         (coll or CAR).objects.link(ob)
         if loc is not None:
             ob.location = loc
+        if rot is not None:
+            ob.rotation_euler = rot.to_euler() if isinstance(rot, Matrix) else rot
         finish(ob, bevel, segs, angle, mirror, wn, sharp)
         return ob
 
@@ -560,7 +582,7 @@ def shrink(bm, d):
 def build_body(stations, panel_of, pmat, line_crease=0.0, station_crease=0.0, name="body",
                front=None, rear=None, recesses=(), glass=(), cutters=(), subdiv=3,
                mirror=True, wrap=False, gap=0.0012, thick=0.014, glass_thick=0.006,
-               project=True):
+               project=True, bevel=None, bevel_segs=2):
     """One body piece: a quad cage of len(stations) x lines points, creased, subdivided,
     cut, split into panels with gaps, each panel given a rim and bevelled edges.
 
@@ -587,6 +609,9 @@ def build_body(stations, panel_of, pmat, line_crease=0.0, station_crease=0.0, na
     mirror, wrap    mirror=False builds the cage as given; wrap=True joins the last line
                     to the first (a tube about the x axis).
     project         whether on_body(), ribbon() and text_on_body() see this piece.
+    bevel           width of the panels' edge bevel: None is 0.0045 on paint and 0.003 on
+                    the rest, a number is for every panel, a dict {panel: width} for some
+                    (0 for none); bevel_segs its segments.
     """
     S = fill(stations)
     res = Body(name)
@@ -783,7 +808,12 @@ def build_body(stations, panel_of, pmat, line_crease=0.0, station_crease=0.0, na
         md.use_rim_only = True
         if mat.startswith("void"):
             continue
-        finish(ob, bevel=0.0045 if mat.startswith("paint") else 0.003, segs=2, angle=14.0)
+        bw = 0.0045 if mat.startswith("paint") else 0.003
+        if isinstance(bevel, dict):
+            bw = bevel.get(pn, bw)
+        elif bevel is not None:
+            bw = bevel
+        finish(ob, bevel=bw, segs=bevel_segs, angle=14.0)
     bpy.data.meshes.remove(out)
     for mt in pm.values():
         bpy.data.materials.remove(mt)
@@ -830,8 +860,10 @@ def arch_bolts(g, cx, cz, r, y, angles, inset=0.005, width=0.04, at=(0.25, 0.75)
 # ---------------------------------------------------------------------------------------
 # details lying on the body as built
 # ---------------------------------------------------------------------------------------
-def body_bvh(objs=None):
-    """The projector's target: every body piece as built (or the objects given)."""
+def body_bvh(objs=None, default=True):
+    """The projector's target, returned: every body piece as built, or the objects given.
+    With default it also becomes what on_body() sees when given no objects (body_bvh()
+    alone puts the body pieces back); on_body(..., objs=...) needs none of this."""
     bpy.context.view_layer.update()
     dg = bpy.context.evaluated_depsgraph_get()
     vs, ps = [], []
@@ -843,7 +875,25 @@ def body_bvh(objs=None):
         vs += [mw @ v.co for v in me.vertices]
         ps += [tuple(o + i for i in p.vertices) for p in me.polygons]
         ev.to_mesh_clear()
-    _BVH[0] = BVHTree.FromPolygons(vs, ps)
+    tree = BVHTree.FromPolygons(vs, ps)
+    if default:
+        _BVH[0] = tree
+    return tree
+
+
+_TREES = {}         # on_body(objs=...): trees by the objects' names
+
+
+def _tree(objs):
+    if objs is None:
+        if _BVH[0] is None:
+            body_bvh()
+        return _BVH[0]
+    objs = [objs] if isinstance(objs, bpy.types.Object) else list(objs)
+    key = tuple(ob.name for ob in objs)
+    if key not in _TREES:
+        _TREES[key] = body_bvh(objs, default=False)
+    return _TREES[key]
 
 
 # projection -> (the ray's axis, the axes of u and v), where it starts, its direction
@@ -852,17 +902,17 @@ _RAYS = {'y': ((1, 0, 2), 30.0, (0, -1, 0)), 'Y': ((1, 0, 2), -30.0, (0, 1, 0)),
          'z': ((2, 0, 1), 30.0, (0, 0, -1))}
 
 
-def on_body(u, v, proj):
+def on_body(u, v, proj, objs=None):
     """The body's surface point and normal under (u, v), or (None, None): proj 'y' (x, z)
     seen from the left, 'Y' from the right, 'x' (y, z) from the front, 'X' from the back,
-    'z' (x, y) from above."""
-    if _BVH[0] is None:
-        body_bvh()
+    'z' (x, y) from above. objs: an object or a list of objects to project on instead of
+    the body pieces (as they are at the first call with that list)."""
+    tree = _tree(objs)
     (axis, a, b), far, d = _RAYS[proj]
     o = V3()
     o[axis], o[a], o[b] = far, u, v
     d = V3(d)
-    loc, n, _, _ = _BVH[0].ray_cast(o, d)
+    loc, n, _, _ = tree.ray_cast(o, d)
     if loc is None:
         return None, None
     if n.dot(d) > 0:
@@ -870,8 +920,9 @@ def on_body(u, v, proj):
     return loc, n
 
 
-def ribbon(g, pts, proj, w, lift=0.0008, closed=False, step=0.012):
-    """A flat strip of width w lying on the body along a path given in projection."""
+def ribbon(g, pts, proj, w, lift=0.0008, closed=False, step=0.012, objs=None):
+    """A flat strip of width w lying on the body (or on objs) along a path given in
+    projection."""
     pts = [V3((p[0], p[1], 0)) for p in pts]
     if closed:
         pts = pts + [pts[0]]
@@ -882,7 +933,7 @@ def ribbon(g, pts, proj, w, lift=0.0008, closed=False, step=0.012):
     sam.append(pts[-1])
     P, N = [], []
     for q in sam:
-        loc, n = on_body(q.x, q.y, proj)
+        loc, n = on_body(q.x, q.y, proj, objs)
         if loc is not None:
             P.append(loc)
             N.append(n)
@@ -933,13 +984,27 @@ def text_mesh(txt, size, spacing=1.0):
     return vs, fs
 
 
-def text_on_body(g, txt, size, x0, z0, side, lift=0.0012, spacing=1.0):
+def text_on_body(g, txt, size, x0, z0, side, lift=0.0012, spacing=1.0, proj=None, turn=0.0,
+                 objs=None):
     """Text on the body's flank, reading left to right for someone looking at that side
-    (side 1 left, -1 right), its middle at (x0, z0)."""
+    (side 1 left, -1 right), its middle at (x0, z0).
+
+    proj='z' lays it on a roof, hood or deck instead, seen from above: its middle at
+    x = x0, y = z0, reading left to right for someone standing at the car's left (side 1)
+    or right (side -1); turn (degrees, counterclockwise seen from above) turns it from
+    there (side 1, turn 90: read from behind the car). objs as on_body()'s. Nothing is
+    added when any of its points misses the surface."""
     vs, fs = text_mesh(txt, size, spacing)
     out = []
+    if proj == 'z':
+        c, s = cos(rad(turn)), sin(rad(turn))
+        rx, ry = -side * c, -side * s               # along the text
+        ux, uy = side * s, -side * c                # up its letters
     for p in vs:
-        loc, n = on_body(x0 - side * p.x, z0 + p.y, 'y' if side > 0 else 'Y')
+        if proj == 'z':
+            loc, n = on_body(x0 + rx * p.x + ux * p.y, z0 + ry * p.x + uy * p.y, 'z', objs)
+        else:
+            loc, n = on_body(x0 - side * p.x, z0 + p.y, 'y' if side > 0 else 'Y', objs)
         if loc is None:
             return
         out.append(loc + n * lift)
@@ -958,21 +1023,63 @@ def text_flat(g, txt, size, origin, right, up, spacing=1.0):
 # ---------------------------------------------------------------------------------------
 def build_wheel(tag, cx, R, w, Rr, out_y, side, cz=None, spokes=7, style="twin",
                 ring="led_wheel", caliper="caliper", rim="rim", bright="rim_bright",
-                tire="rubber"):
+                tire="rubber", loc=None, rot=None):
     """A wheel on its axle, as objects tire.<tag>, rim.<tag>, hub.<tag>, ring.<tag>,
     disc.<tag>, caliper.<tag>, drum.<tag>, all at the wheel's middle (they can turn).
 
     cx axle x, R tire radius, w tire width, Rr rim radius, out_y the tire's outer face,
     side 1 left or -1 right, cz axle height (R: standing on the ground). spokes and style
     ("twin" pairs of blades, "blade" single swept blades, "disc" a closed dish). ring,
-    caliper: material names, None for no light ring, no brake. Nothing here needs a wheel
+    caliper: material names, None for no light ring, no brake. tire=None leaves the tire
+    out and rim=None the rim and its hub (bright=None the hub alone), for a car that brings
+    its own under the same names. loc puts the wheel's middle somewhere else and rot (an
+    Euler, three angles or a matrix) turns it there: a spare. Nothing here needs a wheel
     well: an exposed wheel is the same call.
     """
     hw = w / 2
     flip = side < 0
-    loc = (cx, side * (out_y - hw), R if cz is None else cz)
+    loc = (cx, side * (out_y - hw), R if cz is None else cz) if loc is None else tuple(loc)
     N = 144
-    # tire
+    if tire:
+        _tire(tag, R, w, Rr, N, tire, flip, loc, rot)
+    if rim:
+        _rim(tag, w, Rr, spokes, style, rim, flip, loc, rot)
+    if rim and bright:
+        g = Geo()
+        g.lathe([(hw - 0.062, 0.004), (hw - 0.062, 0.036), (hw - 0.046, 0.030),
+                 (hw - 0.046, 0.004)], 6)
+        for k in range(5):
+            a = 2 * pi * (k + 0.5) / 5
+            g.lathe([(hw - 0.064, 0.002), (hw - 0.064, 0.0095), (hw - 0.052, 0.0095),
+                     (hw - 0.052, 0.002)], 6,
+                    xf=Matrix.Translation((0.052 * cos(a), 0, 0.052 * sin(a))))
+        g.lathe([(hw - 0.0065, Rr - 0.006), (hw - 0.0065, Rr + 0.0015),
+                 (hw - 0.003, Rr + 0.0015), (hw - 0.003, Rr - 0.006)], 72)
+        g.obj("hub." + tag, bright, bevel=0.0015, flip_y=flip, loc=loc, rot=rot)
+    if ring:
+        g = Geo()
+        for k in range(6):
+            g.lathe([(hw - 0.016, Rr - 0.019), (hw - 0.016, Rr - 0.008), (hw - 0.0085, Rr - 0.008),
+                     (hw - 0.0085, Rr - 0.019)], 10, a0=rad(k * 60 + 5), a1=rad(k * 60 + 55))
+        g.obj("ring." + tag, ring, flip_y=flip, loc=loc, rot=rot)
+    if caliper:
+        g = Geo()
+        g.lathe([(hw - 0.165, 0.09), (hw - 0.165, Rr - 0.04), (hw - 0.135, Rr - 0.04),
+                 (hw - 0.135, 0.09)], 64)
+        g.obj("disc." + tag, "disc", flip_y=flip, loc=loc, sharp=40, rot=rot)
+        g = Geo()
+        g.lathe([(hw - 0.185, Rr - 0.115), (hw - 0.185, Rr - 0.026), (hw - 0.112, Rr - 0.026),
+                 (hw - 0.112, Rr - 0.115)], 5, a0=rad(138), a1=rad(202))
+        g.obj("caliper." + tag, caliper, bevel=0.004, flip_y=flip, loc=loc, rot=rot)
+    g = Geo()
+    g.lathe([(-hw + 0.045, 0.004), (-hw + 0.045, Rr - 0.02), (-hw + 0.03, Rr - 0.02),
+             (-hw + 0.03, 0.004)], 48)
+    g.obj("drum." + tag, "well", flip_y=flip, loc=loc, rot=rot)
+
+
+def _tire(tag, R, w, Rr, N, tire, flip, loc, rot):
+    """The tire: grooves, tread blocks, sidewall lettering."""
+    hw = w / 2
     g = Geo()
     grooves = [-w * 0.24, 0.0, w * 0.24]
 
@@ -990,7 +1097,7 @@ def build_wheel(tag, cx, R, w, Rr, out_y, side, cz=None, spokes=7, style="twin",
         prof += [(c - 0.012, R), (c - 0.007, R - 0.009), (c + 0.007, R - 0.009), (c + 0.012, R)]
     prof += wall(1)
     g.lathe(prof, N)
-    tob = g.obj("tire." + tag, tire, flip_y=flip, loc=loc)
+    tob = g.obj("tire." + tag, tire, flip_y=flip, loc=loc, rot=rot)
     bm = bmesh.new()
     bm.from_mesh(tob.data)
     edges = [-hw] + grooves + [hw]
@@ -1020,7 +1127,10 @@ def build_wheel(tag, cx, R, w, Rr, out_y, side, cz=None, spokes=7, style="twin",
     tob.data.shade_smooth()
     tob.data.set_sharp_from_angle(angle=rad(32))
 
-    # rim: barrel, blades, hub
+
+def _rim(tag, w, Rr, spokes, style, rim, flip, loc, rot):
+    """The rim: barrel, blades, hub."""
+    hw = w / 2
     g = Geo()
     g.lathe([(-hw + 0.03, Rr), (hw - 0.006, Rr), (hw - 0.006, Rr - 0.006),
              (hw - 0.016, Rr - 0.006), (hw - 0.016, Rr - 0.02), (-hw + 0.03, Rr - 0.02)], 72)
@@ -1048,37 +1158,7 @@ def build_wheel(tag, cx, R, w, Rr, out_y, side, cz=None, spokes=7, style="twin",
                 g.hexa(bk + fr)
     g.lathe([(hw - 0.135, 0.004), (hw - 0.135, 0.082), (hw - 0.072, 0.082),
              (hw - 0.062, 0.068), (hw - 0.062, 0.004)], 14)
-    g.obj("rim." + tag, rim, bevel=0.005, flip_y=flip, loc=loc)
-    g = Geo()
-    g.lathe([(hw - 0.062, 0.004), (hw - 0.062, 0.036), (hw - 0.046, 0.030),
-             (hw - 0.046, 0.004)], 6)
-    for k in range(5):
-        a = 2 * pi * (k + 0.5) / 5
-        g.lathe([(hw - 0.064, 0.002), (hw - 0.064, 0.0095), (hw - 0.052, 0.0095),
-                 (hw - 0.052, 0.002)], 6,
-                xf=Matrix.Translation((0.052 * cos(a), 0, 0.052 * sin(a))))
-    g.lathe([(hw - 0.0065, Rr - 0.006), (hw - 0.0065, Rr + 0.0015), (hw - 0.003, Rr + 0.0015),
-             (hw - 0.003, Rr - 0.006)], 72)
-    g.obj("hub." + tag, bright, bevel=0.0015, flip_y=flip, loc=loc)
-    if ring:
-        g = Geo()
-        for k in range(6):
-            g.lathe([(hw - 0.016, Rr - 0.019), (hw - 0.016, Rr - 0.008), (hw - 0.0085, Rr - 0.008),
-                     (hw - 0.0085, Rr - 0.019)], 10, a0=rad(k * 60 + 5), a1=rad(k * 60 + 55))
-        g.obj("ring." + tag, ring, flip_y=flip, loc=loc)
-    if caliper:
-        g = Geo()
-        g.lathe([(hw - 0.165, 0.09), (hw - 0.165, Rr - 0.04), (hw - 0.135, Rr - 0.04),
-                 (hw - 0.135, 0.09)], 64)
-        g.obj("disc." + tag, "disc", flip_y=flip, loc=loc, sharp=40)
-        g = Geo()
-        g.lathe([(hw - 0.185, Rr - 0.115), (hw - 0.185, Rr - 0.026), (hw - 0.112, Rr - 0.026),
-                 (hw - 0.112, Rr - 0.115)], 5, a0=rad(138), a1=rad(202))
-        g.obj("caliper." + tag, caliper, bevel=0.004, flip_y=flip, loc=loc)
-    g = Geo()
-    g.lathe([(-hw + 0.045, 0.004), (-hw + 0.045, Rr - 0.02), (-hw + 0.03, Rr - 0.02),
-             (-hw + 0.03, 0.004)], 48)
-    g.obj("drum." + tag, "well", flip_y=flip, loc=loc)
+    g.obj("rim." + tag, rim, bevel=0.005, flip_y=flip, loc=loc, rot=rot)
 
 
 # ---------------------------------------------------------------------------------------
@@ -1089,14 +1169,19 @@ def aim(ob, target):
     ob.rotation_euler = d.to_track_quat('-Z', 'Y').to_euler()
 
 
+STUDIO_R, COVE_R = 16.0, 9.0        # the floor is flat to STUDIO_R, the cove's radius beyond
+
+
 def build_studio():
-    """A round cove with soft boxes by day; by night a wet floor and two colored rims."""
+    """A round cove with soft boxes by day; by night a wet floor and two colored rims.
+    The floor is flat to 16 m from the middle, the cove rises to a wall 25 m out, 22 m
+    high: room for every view of a vehicle 7 m long (add_camera keeps cameras inside)."""
     g = Geo()
-    prof = [(0.0, 0.01), (0.0, 16.0)]
+    prof = [(0.0, 0.01), (0.0, STUDIO_R)]
     for k in range(1, 13):
         a = (pi / 2) * k / 12
-        prof.append((9.0 * (1 - cos(a)), 16.0 + 9.0 * sin(a)))
-    prof.append((22.0, 25.0))
+        prof.append((COVE_R * (1 - cos(a)), STUDIO_R + COVE_R * sin(a)))
+    prof.append((22.0, STUDIO_R + COVE_R))
     g.lathe(prof, 96, xf=Matrix.Rotation(pi / 2, 4, 'X'), closed=False)
     ob = g.obj("cyc", "floor", coll=STUDIO)
     ob.data.shade_smooth()
@@ -1164,39 +1249,127 @@ def build_studio():
         area("key", (5.0, 5.5, 3.2), (0.5, 0, 0.5), 4.0, 2.5, 620, (1.0, 0.97, 0.93))
         area("rim", (-6.0, -5.0, 5.0), (0, 0, 0.6), 5.0, 1.2, 800, (0.85, 0.92, 1.0))
         area("fill", (5.5, -4.5, 1.6), (0.5, 0, 0.5), 3.0, 2.0, 200)
-        area("strip", (0.0, 6.5, 1.3), (0, 0, 0.6), 9.0, 0.45, 300)
-        area("strip2", (0.0, -6.5, 1.3), (0, 0, 0.6), 9.0, 0.45, 300)
+        # the two low strips light the flanks and show in the paint, but not to the camera
+        # or through glass: a side view looks through both side windows at the far one
+        for name, y in (("strip", 6.5), ("strip2", -6.5)):
+            o = area(name, (0.0, y, 1.3), (0, 0, 0.6), 9.0, 0.45, 300)
+            o.visible_camera = False
+            o.visible_transmission = False
+
+
+_PTS = {}
+
+
+def _hull(bm):
+    """The corners of the convex hull of a bmesh's vertices (none when it has no hull)."""
+    try:
+        r = bmesh.ops.convex_hull(bm, input=bm.verts[:])
+        return [v.co.copy() for v in r["geom"] if isinstance(v, bmesh.types.BMVert)]
+    except Exception:
+        return []
 
 
 def car_points(prefixes=None):
+    """World points that bound the car as built (or its objects whose names start with one
+    of the prefixes): the corners of the convex hull of every vertex, modifiers applied.
+    What a view is fitted to, so the fit follows the real silhouette, not the objects'
+    boxes."""
+    key = (tuple(prefixes) if prefixes else None, len(CAR.objects))
+    if key in _PTS:
+        return _PTS[key]
+    bpy.context.view_layer.update()
+    dg = bpy.context.evaluated_depsgraph_get()
     pts = []
     for ob in CAR.objects:
         if prefixes and not any(ob.name.startswith(p) for p in prefixes):
             continue
-        for c in ob.bound_box:
-            pts.append(ob.matrix_world @ V3(c))
+        own = []
+        if ob.type == 'MESH':
+            ev = ob.evaluated_get(dg)
+            bm = bmesh.new()
+            bm.from_mesh(ev.to_mesh())
+            ev.to_mesh_clear()
+            own = _hull(bm)
+            if len(own) < 4:                    # flat or tiny: its own vertices, thinned
+                vs = bm.verts[:]
+                own = [v.co.copy() for v in vs[::max(1, len(vs) // 2000)]]
+            bm.free()
+        if not own:
+            own = [V3(c) for c in ob.bound_box]
+        mw = ob.matrix_world
+        pts += [mw @ p for p in own]
+    if len(pts) > 8:
+        bm = bmesh.new()
+        for p in pts:
+            bm.verts.new(p)
+        all_ = _hull(bm)
+        bm.free()
+        pts = all_ if len(all_) >= 4 else pts
+    _PTS[key] = pts
     return pts
 
 
-# A view: dir (from the target toward the camera), lens, target, and either dist or a fit
-# of the whole car (fit=(name prefixes) for some objects) with a margin; focus and fstop
-# give depth of field. A car changes or adds views in this table before shoot().
+# A view: dir (from the target toward the camera), lens, and either dist or a fit of the
+# whole car (fit=(name prefixes) for some objects) with a margin; focus and fstop give
+# depth of field. target is optional: without one a view aims at the middle of what it
+# fits (the whole car: the middle of its length and of its own height, on the centerline),
+# so a hover car or a truck is framed like a low coupe. no_floor hides the studio for the
+# view (a camera under the floor). A car changes or adds views in this table before shoot().
 VIEWS = {
-    "hero": dict(dir=(1.0, 0.78, 0.26), lens=70, target=(0, 0, 0.5), focus=(1.6, 0.8, 0.5)),
-    "rear": dict(dir=(-1.0, -0.82, 0.30), lens=70, target=(0, 0, 0.5), focus=(-1.6, -0.8, 0.6)),
-    "rear_l": dict(dir=(-1.0, 0.62, 0.22), lens=70, target=(0, 0, 0.5)),
-    "side": dict(dir=(0.0, 1.0, 0.05), lens=110, target=(0, 0, 0.55)),
-    "front": dict(dir=(1.0, 0.0, 0.07), lens=110, target=(0, 0, 0.55)),
-    "back": dict(dir=(-1.0, 0.0, 0.09), lens=110, target=(0, 0, 0.55)),
-    "top": dict(dir=(0.0, 0.0, 1.0), lens=110, target=(0, 0, 0.5)),
-    "low": dict(dir=(1.0, 0.5, 0.045), lens=40, target=(0, 0, 0.5), focus=(1.8, 0.7, 0.4),
-                fstop=2.8),
+    "hero": dict(dir=(1.0, 0.78, 0.26), lens=70, focus=(1.6, 0.8, 0.5)),
+    "rear": dict(dir=(-1.0, -0.82, 0.30), lens=70, focus=(-1.6, -0.8, 0.6)),
+    "rear_l": dict(dir=(-1.0, 0.62, 0.22), lens=70),
+    "side": dict(dir=(0.0, 1.0, 0.05), lens=110),
+    "front": dict(dir=(1.0, 0.0, 0.07), lens=110),
+    "back": dict(dir=(-1.0, 0.0, 0.09), lens=110),
+    "top": dict(dir=(0.0, 0.0, 1.0), lens=110),
+    "under": dict(dir=(0.0, 0.0, -1.0), lens=110, no_floor=True),
+    "low": dict(dir=(1.0, 0.5, 0.045), lens=40, focus=(1.8, 0.7, 0.4), fstop=2.8),
 }
 FOCUS = {}
+# Where a camera may stand (in_studio): inside the cove, CAM_PAD clear of its rising wall,
+# CAM_LOW over the flat floor, under CAM_TOP (the wall's top is at 22 m).
+CAM_PAD, CAM_LOW, CAM_TOP = 0.5, 0.15, 21.0
+
+
+def view_target(v):
+    """What a view aims at: its target, else the middle of the box of what it fits (on the
+    centerline when that is the whole car)."""
+    if v.get("target") is not None:
+        return V3(v["target"])
+    pts = car_points(v.get("fit"))
+    mid = V3([(min(p[i] for p in pts) + max(p[i] for p in pts)) / 2 for i in range(3)])
+    if not v.get("fit"):
+        mid.y = 0.0
+    return mid
+
+
+def in_studio(p, no_floor=False):
+    """Whether a camera at p stands inside the cove, CAM_PAD clear of its floor and wall
+    (no_floor: a view that hides the studio and may go under the floor)."""
+    r = hypot(p[0], p[1]) + CAM_PAD
+    if abs(p[2]) > CAM_TOP or r >= STUDIO_R + COVE_R:
+        return False
+    if no_floor:
+        return True
+    floor = 0.0 if r <= STUDIO_R else COVE_R - (COVE_R ** 2 - (r - STUDIO_R) ** 2) ** 0.5
+    return p[2] >= floor + (CAM_PAD if r > STUDIO_R else CAM_LOW)
+
+
+def _reach(tgt, d, v):
+    """How far from tgt along d a camera can go and still stand inside the studio."""
+    nf = bool(v.get("no_floor"))
+    t = 0.5
+    while t < 80.0 and in_studio(tgt + d * (t + 0.25), nf):
+        t += 0.25
+    return t
 
 
 def add_camera(name, v):
-    """A camera for the view at the scene's current resolution (set that first)."""
+    """A camera for the view at the scene's current resolution (set that first). A fitted
+    view stands where the car's silhouette (car_points) just fills the frame less its
+    margin; no camera leaves the studio: one that would is held at its edge, and a fitted
+    view then takes the shorter lens that still shows the whole car."""
     cd = bpy.data.cameras.new(name)
     cd.lens = v["lens"]
     cd.sensor_width = 36
@@ -1204,33 +1377,37 @@ def add_camera(name, v):
     ob = bpy.data.objects.new("cam." + name, cd)
     STUDIO.objects.link(ob)
     d = V3(v["dir"]).normalized()
-    ob.rotation_euler = d.to_track_quat('Z', 'Y').to_euler()
-    tgt = V3(v["target"])
+    quat = d.to_track_quat('Z', 'Y')
+    ob.rotation_euler = quat.to_euler()
+    tgt = view_target(v)
     if v.get("focus"):
         cd.dof.use_dof = True
         cd.dof.aperture_fstop = v.get("fstop", 4.0)
         FOCUS[ob.name] = V3(v["focus"])
+    far = _reach(tgt, d, v)
     if v.get("dist"):
-        ob.location = tgt + d * v["dist"]
+        if v["dist"] > far:
+            log("view %s: its camera is held inside the studio, %.1f m away, not %.1f"
+                % (name, far, v["dist"]))
+        ob.location = tgt + d * min(v["dist"], far)
         return ob
-    pts = car_points(v.get("fit"))
-    lo, hi = 1.0, 60.0
-    m = v.get('margin', 0.05)
-    for _ in range(24):
-        mid = (lo + hi) / 2
-        ob.location = tgt + d * mid
-        bpy.context.view_layer.update()
-        ok = True
-        for p in pts:
-            c = world_to_camera_view(SCN, ob, p)
-            if c.z <= 0 or not (m < c.x < 1 - m and m < c.y < 1 - m):
-                ok = False
-                break
-        if ok:
-            hi = mid
-        else:
-            lo = mid
-    ob.location = tgt + d * hi
+    # the frame's half width and height at distance 1 are 18 / lens along its longer side
+    # (sensor fit AUTO) and that times the aspect along the other
+    rm = quat.to_matrix()
+    right, up = rm.col[0], rm.col[1]
+    rx, ry = SCN.render.resolution_x, SCN.render.resolution_y
+    ax, ay = (1.0, rx / ry) if rx >= ry else (ry / rx, 1.0)
+    k = max(0.05, 1 - 2 * v.get('margin', 0.05))
+    rel = [(max(abs(q.dot(right)) * ax, abs(q.dot(up)) * ay), q.dot(d))
+           for q in (p - tgt for p in car_points(v.get("fit")))]
+    half = 18.0 / v["lens"] * k
+    t = max(max(e / half + c for e, c in rel), max(c for _, c in rel) + 0.2)
+    if t > far:
+        t = max(far, max(c for _, c in rel) + 0.2)
+        cd.lens = 18.0 * k / max(e / (t - c) for e, c in rel)
+        log("view %s: its camera is held inside the studio, %.1f m away, with a %.0f mm lens "
+            "(not %.0f)" % (name, t, cd.lens, v["lens"]))
+    ob.location = tgt + d * t
     return ob
 
 
@@ -1269,7 +1446,12 @@ def render_view(name, path, res, samples, margin=None):
     if cam.name in FOCUS:
         cam.data.dof.focus_distance = (FOCUS[cam.name] - cam.location).length
     SCN.render.filepath = path
+    cyc = STUDIO.objects.get("cyc") if v.get("no_floor") else None
+    if cyc is not None:
+        cyc.hide_render = True
     bpy.ops.render.render(write_still=True)
+    if cyc is not None:
+        cyc.hide_render = False
     log("rendered %s %d x %d, %d samples" % (name, res[0], res[1], samples))
 
 
@@ -1285,8 +1467,9 @@ def tri_count():
 
 
 def car_size():
+    """The car's box, (lo, hi), from its objects' bounding boxes."""
     bpy.context.view_layer.update()
-    pts = car_points()
+    pts = [ob.matrix_world @ V3(c) for ob in CAR.objects for c in ob.bound_box]
     lo = [min(p[i] for p in pts) for i in range(3)]
     hi = [max(p[i] for p in pts) for i in range(3)]
     return lo, hi
@@ -1315,12 +1498,15 @@ def _python():
     return next((c for c in cands if c and os.path.exists(c)), None)
 
 
-def compose(dst, rows, bloom=None):
-    """post.py puts the tiles (rows of files) together into dst."""
+def compose(dst, rows, bloom=None, inset=None):
+    """post.py puts the tiles (rows of files) together into dst; inset=(file, corner) lays
+    a small tile into a corner ("tl", "tr", "bl", "br") of the first tile."""
     py = _python()
     cmd = [py or "python", os.path.join(HERE, "post.py"), "compose", dst]
     if bloom:
         cmd += ["--bloom", str(bloom[0]), str(bloom[1])]
+    if inset:
+        cmd += ["--inset", inset[0], inset[1]]
     for row in rows:
         cmd += ["--row"] + row
     if py is None:
@@ -1335,8 +1521,16 @@ def compose(dst, rows, bloom=None):
 SHEET_W, SHEET_TOP, SHEET_ROW, SHEET_GAP = 3840, 1536, 620, 4
 
 
-def render_sheet(views=("hero", "front", "side", "back"), samples=160):
-    """sheet.jpg: the first view on top, three below, each rendered at its tile's size."""
+SHEET_EXTRA = dict(size=(840, 400), corner="tl", margin=0.06)
+
+
+def render_sheet(views=("hero", "front", "side", "back"), samples=160, extra=None):
+    """sheet.jpg: the first view on top, three below, each rendered at its tile's size.
+    extra: a fifth view of the car's choice ("top", "under", one of its own), a view name
+    or dict(view=, size=(w, h), corner="tl"|"tr"|"bl"|"br", margin=), laid as a small tile
+    into a corner of the first, over it (SHEET_EXTRA's defaults: top left, the empty wall
+    over the nose of a hero seen from the front left; pick the corner your hero leaves
+    free)."""
     lo, hi = car_size()
     L, W = hi[0] - lo[0], hi[1] - lo[1]
     room = SHEET_W - 2 * SHEET_GAP
@@ -1348,8 +1542,13 @@ def render_sheet(views=("hero", "front", "side", "back"), samples=160):
     for name, size in zip(views, sizes):
         files.append(os.path.join(tmp, "%s.jpg" % name))
         render_view(name, files[-1], size, samples, 0.025 if not files[1:] else 0.04)
+    inset = None
+    if extra:
+        e = dict(SHEET_EXTRA, **(extra if isinstance(extra, dict) else {"view": extra}))
+        inset = (os.path.join(tmp, "x_%s.jpg" % e["view"]), e["corner"])
+        render_view(e["view"], inset[0], tuple(e["size"]), samples, e["margin"])
     bloom = (0.9, 0.8) if ARGS.night else (0.45, 0.86)
-    if compose(os.path.join(ARGS.out, "sheet.jpg"), [files[:1], files[1:]], bloom):
+    if compose(os.path.join(ARGS.out, "sheet.jpg"), [files[:1], files[1:]], bloom, inset):
         shutil.rmtree(tmp, ignore_errors=True)
 
 
@@ -1384,10 +1583,12 @@ def export_glb(path):
                               export_apply=True)
 
 
-def shoot(sheet=("hero", "front", "side", "back"), preview=("hero", "rear", "side", "top")):
+def shoot(sheet=("hero", "front", "side", "back"), preview=("hero", "rear", "side", "top"),
+          extra=None):
     """The end of every car script: stats, studio, then what the arguments ask for:
     --preview (preview.jpg), --sheet (sheet.jpg), --views (car_<view>.jpg at --res),
-    --blend (car.blend), --glb (car.glb). With none of them it only builds and counts."""
+    --blend (car.blend), --glb (car.glb). With none of them it only builds and counts.
+    extra: the sheet's optional fifth tile, as render_sheet()'s."""
     stats()
     build_studio()
     setup_render()
@@ -1396,7 +1597,7 @@ def shoot(sheet=("hero", "front", "side", "back"), preview=("hero", "rear", "sid
     if ARGS.preview:
         render_preview(preview, ARGS.samples or 24)
     if ARGS.sheet:
-        render_sheet(sheet, ARGS.samples or 160)
+        render_sheet(sheet, ARGS.samples or 160, ARGS.extra or extra)
     for name in views:
         render_view(name, os.path.join(ARGS.out, "car_%s%s.jpg" % (
             name, "_night" if ARGS.night else "")), ARGS.res, ARGS.samples or 64)
