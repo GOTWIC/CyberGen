@@ -90,14 +90,18 @@ Then open the project: the editor opens on the city, and Play (Alt+P) puts you i
   usual.
 - **Switching without importing again:** the level's World Settings, GameMode Override:
   `GM_CityGenFly` flies, None walks. Shift+F1 frees the mouse while playing, Esc stops.
-- **Streaming.** The city loads in 256 m cells within 1500 m of you (`--view-range`), far
-  enough ahead for flying. Beyond that you see the far view, World Partition's HLODs (the
-  city's own meshes and materials, instanced in 512 m cells, out to the whole city), which
-  each import builds after the city: about 2 minutes for a blockout city and 10 with stage
-  2's buildings on a Mac the first time, under a minute when nothing changed (only the cells
-  whose actors changed are built again).
+- **Streaming.** The city loads in 128 m cells within 768 m of you (`--view-range`; 256 m cells to 1,500
+  m before AG16, which loaded most of a sample city at once and streamed it all the time).
+  Beyond that you see the far view, World Partition's HLODs (the city's own meshes and
+  materials, instanced in 256 m cells, out to the whole city, each building with its own
+  Custom Primitive Data, so it looks as the city does up close), which each import builds
+  after the city: about 2 minutes for a blockout city and 10 with stage 2's buildings on a
+  Mac the first time, under a minute when nothing changed (only the cells whose actors
+  changed are built again).
   `--no-hlod` skips them, and the city then ends at the view range. A sample city is about
-  3.5 km across: `--view-range 3000` loads most of it around you, for more memory.
+  3.5 km across: `--view-range 3000` loads most of it around you, for more memory and
+  streaming (AG16's benchmark: the 95th percentile frame went from 27 to 49 ms to 9 to 13 ms
+  on Delta Megacity with the shorter range and AG16's other fixes).
 - **`--check`** plays the level twice in the editor, without saving it: walking with the
   project's character whatever `--play` set (streaming, collision, a walk along a sidewalk),
   then flying with the fly pawn (its speed, no collision, the city loaded where it ends).
@@ -123,10 +127,14 @@ Then open the project: the editor opens on the city, and Play (Alt+P) puts you i
   GPU buffer of at most 2,048 MB with Nanite's streaming pool (512 MB by default), so there
   are 49,152 of them. Delta Megacity with AG15's parts places 53,790 Nanite meshes, and its
   first Play on the Windows PC quit on "Cannot allocate more root pages 49152/49152".
-  Every import of a city with more than 42,000 Nanite meshes (`unreal.NANITE_MANY`, counted
-  as the check counts them, `unreal.nanite_meshes`) sets
-  `r.Nanite.Streaming.StreamingPoolSize=256` in the project's `[SystemSettings]`
-  (`set_nanite_pool`): 57,344 root pages, and Delta plays. The check's editor views still
+  Since AG16 every import sets the pool from the city (`unreal.nanite_pool_mb`,
+  `set_nanite_pool`, in the project's `[SystemSettings]`): what its distinct Nanite meshes'
+  root pages (`unreal.nanite_meshes`, counted as the check counts them, times
+  `ROOT_MARGIN` 1.1: a mesh keeps its root page while it stays loaded, and over a route
+  nearly every one does, 52,224 in use of Delta's 53,911 in AG16's benchmark) leave of the
+  2,048 MB, in 64 MB steps, from 256 MB (57,344 root pages: a city with more meshes is over
+  `asset_budget`) to 1,024 MB. Delta with AG16's shared meshes (44,667) gets the engine's
+  512 MB; before, 256 MB (`NANITE_MANY` 42,000 then set 256 MB). The check's editor views still
   load up to 42,000 meshes that keep their root pages into the walk, so on such a city
   `CITYGEN_UE_PLAY_SHOTS_ONLY=1` leaves them out (only the play window's shots and the
   `pday_*` and `night_*` views, rendered from the free camera in the play world, by day and
@@ -152,7 +160,7 @@ Then open the project: the editor opens on the city, and Play (Alt+P) puts you i
 |---|---|---|
 | `--play fly` or `walk` | `fly` | what Play puts you in |
 | `--fly-speed M_PER_S` | 50 | the fly pawn's top speed |
-| `--view-range M` | 1500 | how far around you the city streams in |
+| `--view-range M` | 768 | how far around you the city streams in (AG16; 1500 before) |
 | `--no-hlod` | off | skip building the far view (HLODs) after the import |
 | `--no-startup` | off | leave the project's startup and default map as they are |
 | `--new-project` | off | make the project from the First Person template if it is missing |
@@ -193,8 +201,8 @@ version's Interchange misbehaves with concurrent imports; it needs a little less
 - **The first Play** of a large city takes minutes, not seconds: Unreal shows nothing until
   every cell within `--view-range` of the player has loaded (Delta Megacity's middle: about
   46,000 meshes), and Windows marks the editor "Not Responding" meanwhile. It is loading, not
-  frozen; later Plays in the same editor session are much faster. `--view-range 800` loads a
-  smaller ring (the far view shows the rest).
+  frozen; later Plays in the same editor session are much faster. The 768 m default (AG16)
+  loads a quarter of what 1,500 m did.
 - **On Windows**, add the project folder and the engine folder to Windows Security's
   exclusions (Virus & threat protection, Manage settings, Exclusions): Defender otherwise
   scans each of the level's files (one per actor, over 100,000 for a big city) as Unreal
@@ -807,6 +815,165 @@ import over an earlier one updates the street actors and meshes in place.
   `--check --shots` and `night_*` views logs the lamps near each view and shoots it again
   at the scales in `CITYGEN_UE_LAMP_SCALES` (comma separated), skipping the walk's checks.
 
+### From AG16: performance
+
+**The benchmark** (`citygen unreal BUILD UPROJECT --bench`, or `--bench-only` on a city
+imported before; `citygen/bench.py`, the driver `UCityGenBench` in the play plugin):
+
+- **Route** (`bench.route`, from the build alone, so before and after a change it is the
+  same route): a 150 m sidewalk walk at 5 m/s in each of the three districts with the most
+  stage 2 actors (from the walkway point nearest the actor nearest the district's middle,
+  sidewalks first, never up an elevator or stairs), a 1.2 km drive at 25 m/s along the lanes
+  4 m over the road from the lane nearest the city's middle (on into the lane that turns
+  least), a flight at 150 m and 50 m/s across the diagonal of the stage 2 buildings' middle
+  90% (4 km at most, looking 15 degrees down), and a teleport back to the first walk's
+  start, held 6 s once streamed in. Each path starts with a teleport onto it and a wait
+  until the World Partition cells within 150 m are activated (a load), then 1.5 s.
+- **Passes**: by day and by night (the play actor's `SetNight`), at the native 1440p and at
+  a 67% screen percentage with TSR (`r.ScreenPercentage` 100 or 67, `r.AntiAliasingMethod`
+  4, the default screen percentage mode manual), in that order; before them two warm-up
+  passes (the flight by day, then by night: the first use of most of the city's materials
+  and lights, recorded and left out). `--bench-passes` picks passes by name.
+- **The game**: `UnrealEditor PROJECT MAP -game -windowed -ResX -ResY -CityGenBench=<job>
+  -csvGpuStats ...` (a standalone game process on the uncooked project, not play-in-editor),
+  switched to windowed fullscreen at 2560 x 1440 (`r.SetRes 2560x1440wf`: a 1440p window
+  with its borders would not fit a 1440p screen), `r.VSync 0`, `t.MaxFPS 0`. The pawn the
+  level's game mode gives is moved by the route (its collision and movement off), the view
+  turning smoothly toward the path 1.2 s ahead.
+- **What it records**, every frame (`frames.csv`): the frame time, the game, render and RHI
+  threads' times and the GPU's (`GGameThreadTime`, `GRenderThreadTime`, `GRHIThreadTime`,
+  `RHIGetGPUFrameCycles`), draw calls and primitives (`GNumDrawCallsRHI`), whether the cells
+  within 100 m of the player are activated (every 5th frame) and World Partition's
+  streaming performance, VRAM in use (`RHIGetMemoryStats`, every 15th frame) and RAM
+  (the process's physical use); beside it the engine's CSV profile (`csvGpuStats`: the
+  GPU's passes; `NaniteStreaming/RootAllocationMB`, the Nanite root pages in use), its
+  segments marked by events (`cg:<pass>:<segment>`), and `bench_events.json` (passes,
+  segments, loads, the viewport, the adapter, the scalability levels, the Nanite pools).
+- **Results** (`bench.summarize`, `combine`): per pass the moving frames of the walks, the
+  drive and the flight, the teleport's, and all moving frames together: frame time p50,
+  p95, p99 and max, the threads' p95, the thread that sets the frame at its p95, draw
+  calls, hitches over 50 and 100 ms, the share of frames not streamed around the player,
+  VRAM and RAM at most, root pages at most, the GPU's costliest passes, and the loads'
+  seconds; over `--bench-runs` runs (3 by default) the median of each figure and the
+  spread of p50 and p95 (min to max). Written as `bench.json`, `bench.md` (the table and the
+  targets met or missed) and the last run's frame-time graph per pass along the route
+  (`frame_times_<pass>.png`) in `docs/progress/AG16/bench/<city>/<label>` (`--bench-label`,
+  default `bench`), with the last run's screenshot of each segment's start in each pass
+  once loaded (`shots/<pass>_<segment>.jpg`, 1600 px wide: the same views before and after
+  a change); the raw files of each run in `BUILD/unreal/bench/<label>/run<k>`. The first
+  run right after an import is starved of CPU throughout: its render, game and RHI threads
+  about twice as slow at the same GPU time, with half the frames, as the uncooked game
+  builds the meshes' derived data on the CPU's cores while it plays (Vesper Bay's and
+  Delta's: about five times the waits for static meshes of the later runs). What warms up
+  between runs is the derived data cache, the pipeline state cache and the OS file cache;
+  a player's first launch after an import sees it too, a cooked build carries the derived
+  data. The median of three leaves such a run out, and the table names it (below). With
+  each shot the game log gets the play actor's lamps nearest the view (lamp,
+  distance, light, candela, shadows: `ACityGenPlay::GetLampReport`), for a night view's
+  light.
+- **Hygiene**: before each run it waits while another Unreal editor, Blender, a citygen
+  build or sweep, assetgen or pytest runs (`bench.busy`, Windows), so the numbers are the
+  city's alone; the play plugin is built first if its source changed. The game is kept
+  DPI-aware (`bAllowHighDPIInGameMode`, `bAllowHighDpiWhenUnattended`: on a 1440p screen
+  at 125% scaling a DPI-unaware game gets a 2048 x 1152 window), and a run that rendered at
+  another size says so (`resolution_mismatch`). While a run plays, the CPU every other
+  process takes is sampled every 30 s (`SAMPLE_S`; the game's own shader compilers and the
+  driver left out) into `others.json` beside the run, its mean, most and busiest in the
+  run's summary; and a run whose game or render thread median is 1.5 times the fastest
+  run's while its GPU median stays within 15% (`bench.starved`: a first run after an
+  import, or other work on the PC) is named under the table with the cores other processes
+  took meanwhile.
+
+**What the benchmark found on Delta Megacity** (`docs/progress/AG16/`): bound by the game
+thread, not the GPU. Every frame spent its async loading time, physics waited on bodies
+made and dropped as cells streamed, and the render thread waited on the visibility of the
+primitives loaded: with a 1,500 m loading range most of the city's 73,772 actors were
+loaded at once (43,000 to 67,000), each its own package to load in an uncooked game (what
+play-in-editor and `-game` run). So the fixes cut what the level holds and streams:
+
+- **Meshes shared across tiles** (`unreal.share_meshes`): an AG2 part or AG8 sign node of
+  one name in several tiles' packs is the same content (named by its parameters' hash or its
+  inputs' digest), imported once from the first pack by folder; the other packs leave it out
+  (the pack step skips what a pack's plan does not name) and their actors point at it.
+  Delta: 9,244 of 58,882 meshes, 53,911 distinct Nanite meshes to 44,667.
+- **Records as components** (`unreal.group_actors`, the manifest's `groups` and each
+  record's `holder`; `CITYGEN_UE_GROUP=0` keeps an actor per record): an entry's instanced
+  parts are components of its own actor (else of a group actor at the entry's pivot, class
+  `BP_CityGenGroup`), a building's street front (AG3) a component of the building's actor
+  (its doors tagged on the building), and a tile's signs, street pieces, water pieces and
+  ground cover (`tile_group`) components of one group actor per kind and 64 m cell of the
+  tile (`group.<kind>.<tile>.c<i><j>`: the engine takes a streamed-out actor's components
+  away in one step, so a group stays small). Each component keeps its mesh, transform,
+  Custom Primitive Data, materials and collision, and carries its record's tags
+  (`cg.member`, `cg.key=`, `cg.type=`, `cg.category=`, `cg.kind=` for a part, `cg.id=` per
+  citygen id, `cg.door=`); stage 4 finds a sign, a street piece or a part by its component's
+  `cg.key`. A holder's hash covers its members', so an import over another updates it when
+  any changes. Instanced parts of a Nanite mesh are instanced static mesh components (Nanite
+  culls them per instance), the rest hierarchical ones. `BP_CityGenGroup`'s root is static
+  in the Blueprint itself (`blueprint(..., static_root=True)`, `CORE_VERSION` 3): set on the
+  placed actor alone it is still movable while the level loads and its static members fail
+  to attach, each failure a log line (160,000 in a game of Delta, 72 ms of `AddToWorld` in
+  its slow frames; the Blueprint's recompile saves its placed actors again).
+- **The instanced HLODs keep each building's look** (`per_instance`, `STAGE2_VERSION` 10):
+  the HLOD builder moves each source's Custom Primitive Data into its instance's custom
+  data (`FISMComponentBatcher`), and the masters read only Custom Primitive Data, so past
+  the loading range every tint, night schedule and seed was lost (a dark, untinted far
+  city, plain beyond 768 m, as it was beyond 1,500 m). Each read is now a per-instance
+  custom data node whose default is the Custom Primitive Data parameter: an actor reads its
+  own as before, an HLOD instance the data it carries.
+- **No collision on props no one touches** (`unreal.NO_COLLISION`): awnings, facade AC
+  units, wall lights and litter (Delta: 39,500 of its 71,000 prop instance bodies).
+- **Underwater volumes switched by distance** (the play actor, `UpdateUnderwater`): the
+  engine weighs every enabled post-process volume against the view each frame by its
+  brush's distance, a physics query per volume, and AG12's 660 underwater volumes of Delta
+  took 1.3 to 1.5 ms of the game thread every frame. Every 0.25 s the play actor enables
+  only the volumes (`cg.type=underwater`) within their blend radius and 1 m of the view;
+  the engine skips a disabled one at once. Without the play plugin they all stay enabled,
+  as before.
+- **The Nanite pool from the city** (`nanite_pool_mb`, above).
+- **The import's memory** (#84): stage 2's packs imported, finished and saved 150 at a time
+  (`CITYGEN_UE_PACK_CHUNK`, 0 for all at once), and the meshes let go of between chunks
+  (and every fourth actor offload): the importer holds asset paths (`Meshes`) and loads a
+  mesh when an actor asks for it. Delta's first import had held every one of its 58,501
+  meshes to the end, 39 GB committed in the editor. An offload takes the actors it saves
+  and unloads by their own guids (`actor_guids`), no longer by label: an actor whose class
+  changes (AG8's cables and scaffolding over M15's instanced prototypes) is destroyed and
+  made again under its key's label, and with the collections between offloads the
+  destroyed one, taken by its label, came back from disk (the small city's stage 2 import
+  test: 30 actors twice). Such class changes are now made first: right after the level
+  loads, every actor whose key gets another class is destroyed and the level saved
+  (`Importer.clear_moved`); destroyed later, among new actors under the same labels,
+  offloads and collections, some kept their packages on disk all the same and came back
+  with the next import. An actor that holds no records any more (an import back to the
+  blockout, or one without groups over one with them) has its member components taken off
+  (`Importer.drop_members`), and the import digest lists each actor's members. An import
+  over an earlier level still loads all its actors first (to compare hashes and delete the
+  old ones): Delta's import of the fixes over the "before" level peaked near 37 GB
+  committed.
+- **Streaming** (`import_city.MAIN_CELL_M`, `VIEW_M`): World Partition's main cells 128 m
+  (256 m before), loaded 768 m around the player (1,500 m before). Each main cell has its
+  HLOD actor, and when the cell goes its HLOD actor's components take their render state in
+  one frame: a dense 256 m cell's 1,400 made 50 to 64 ms frames. Past the range the
+  instanced HLODs draw the same meshes and materials, each building's Custom Primitive Data
+  with it (above), so the city looks the same (the benchmark's shots, before and after side
+  by side).
+- **Texture streaming off** (`unreal.PROJECT_SETTINGS`, `r.TextureStreaming=0` in the
+  project's `[SystemSettings]`, written with the Nanite pool by every import): the render
+  asset streaming manager keeps a manager per streamed level and processes every component a
+  level adds; with the cells and their HLODs coming and going it made 36 to 48 ms frames at
+  256 m cells and 1 to 2.8 s frames at 128 m. A city's textures (AG6's library sets and its
+  sign pages, a few hundred) fit whole: Delta's VRAM stayed at 7 GB.
+- **Tried and left out**: UE 5.8's experimental switches for physics bodies made off the
+  game thread (`p.Chaos.EnableAsyncInitBody`) and incremental garbage collection
+  (`gc.AllowIncrementalReachability`, `gc.AllowIncrementalGather`), no forced collection
+  after a level streams out (`s.ForceGCAfterLevelStreamedOut=0`) and actor clustering for
+  garbage collection: none helped, and the garbage collection ones made it far worse
+  (collections of 0.7 to 2.9 s).
+- **What is left** (`stat dumphitches` on a day pass): garbage collection, the engine's
+  reachability analysis over every object of an uncooked game, 70 to 350 ms about every 40
+  s while the city streams (a cooked game marks far fewer objects); at most one moving
+  frame over 100 ms in a pass.
+
 ## assetgen's street contribution (AG7)
 
 `assetgen streets BUILD` writes `BUILD/assets/unreal_contribution.streets.json` beside its
@@ -1292,3 +1459,4 @@ spec of the library and masters: `assetgen/materials/catalog.py`):
 | AG17 | No code change: the street packs' content changes under the same keys ("From AG17" above). AG7's road, junction and sidewalk pieces are drawn from M22's pavement map (stored vertices and heights, curbs as walls between faces, a raised junction on its own slab with no girder under it, barriers ending on the roads' port lines), so pieces meet exactly; a road or sidewalk with no faces (a cluster's inner road) has no mesh, declared as before. No new kind, part, slot or master | Not run here (the coordinating session's call; the check's walk should cross junctions with no step) |
 | Night lights (a fix on its own, 2026-11-09) | The lamps 0.08 of what they were (`StreetLampCandela` 120, `WallLampCandela` 32), `WashCandela` 120, `PoolStrength` 0.08 (`LIGHT_POOL_VERSION` 4); what glows set for the night's fixed exposure (-3 EV100): `EMISSIVE` and `EMISSIVE2` (neon 8 to 1, emissive 4 to 2, holo 3 to 0.6), assetgen's `SignStrength` times `SIGN_GLOW` 0.125 and a holo-ad's `Emissive` times `HOLO_GLOW` 0.2 in the manifest (`unreal._glow`; stage 2's bytes unchanged). An import over an earlier one makes the light pool's master and the glowing materials' instances again and builds the plugin again | Delta Megacity imported over its AG17 import (CityM22Check); the lamps' strength chosen from night views of a Midtown and an Old Town avenue and the core from the air at several strengths (`CITYGEN_UE_LAMP_SCALES`); the city walked in the editor. The tests were not run (numbers only) |
 | #147 (a fix on its own) | No code change. Footbridges are faces of the pavement map, so the blockout draws each again (on M22 they had no faces and the blockout left them out): one object per footbridge, `<segment>.deck` (category `bridge`, collection `Waterfront`: its walk face, the slab under it, piers in the water), so an import over an earlier one creates their actors; AG7's footbridge road pieces now replace those keys (`replaces`), drawn from the map's faces under the same keys. A junction a footbridge meets has a slot where its stairs start, and the few junctions the unfold mends (`pavement.Assembly._unfold`) change shape in height: their plan entries and their actors' hashes move, updated in place. No new kind, part, slot or master | Not run here (the coordinating session's call) |
+| AG16 | Performance ("From AG16" above): the benchmark (`--bench`, `--bench-only`, `citygen/bench.py`, `UCityGenBench` in the play plugin, a world subsystem started by `-CityGenBench=<job>`; the last run's shots and graphs, other processes' CPU sampled through each run, CPU-starved runs named, `bench.starved`; the play actor's lamps logged with each shot); meshes shared across tiles (`share_meshes`, the manifest's `counts.shared_meshes`); records as components (`group_actors`, the manifest's `groups` and each record's `holder`; `BP_CityGenGroup`, its root static in the Blueprint, `CORE_VERSION` 3; `actor_hashes`, `actor_kinds` and `manifest_changes` count group actors and holders, not the records they hold; the check's shots count an actor's own and its parts' meshes); `NO_COLLISION` props; the masters read Custom Primitive Data through per-instance custom data (`STAGE2_VERSION` 10); main cells 128 m (`MAIN_CELL_M`), `VIEW_M` 768; the project's `r.TextureStreaming=0` and the Nanite pool from the city (`nanite_pool_mb`, `PROJECT_SETTINGS`); the play actor's underwater volumes enabled by distance; packs imported in chunks of 150 and let go of (`PACK_CHUNK`, `Meshes`, #84); offloads take their actors by guid (`actor_guids`), an actor whose class changes is destroyed and the level saved before anything is made (`clear_moved`), an actor that holds no records loses its members (`drop_members`), an entry with parts of its own keeps its actor; pruned meshes counted by their files | Delta Megacity on the Windows PC (`docs/progress/AG16/`): the before import (73,772 actors, 30 min, 39 GB committed), the fixes imported over it (13,644 actors with the final code), the benchmark before and after three runs each, hitch dumps; Vesper Bay imported and benchmarked with one command |

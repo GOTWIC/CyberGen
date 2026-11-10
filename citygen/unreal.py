@@ -87,7 +87,10 @@ UE_DIR = Path(__file__).parent / "ue"
 # mode and pawn (the First Person template's character with --new-project)
 PLAY_MODES = ("fly", "walk")
 FLY_SPEED_M_S = 50.0          # the fly pawn's top speed (a 4 km city in about 80 s)
-VIEW_M = 1500.0               # how far the level streams in around the player
+# how far the level streams in around the player (AG16: 1,500 m before, most of Delta
+# Megacity loaded at once; past it the instanced HLODs draw the same meshes, materials and
+# Custom Primitive Data, so the city looks the same)
+VIEW_M = 768.0
 
 
 # --- names and hashes ---------------------------------------------------------------------
@@ -775,9 +778,11 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
             for p in e.get("parts") or []:
                 glb = p.get("glb") or e["glb"]
                 # a building's parts have none (AG2: its simple collision covers its masses;
-                # a body per instance, 1.3 M in Vesper Bay, is more than play can stream)
+                # a body per instance, 1.3 M in Vesper Bay, is more than play can stream),
+                # nor the props no one walks into (AG16: `NO_COLLISION`)
                 pcol = p.get("collision") or ({"none": True} if base["category"] in
-                                              ("building", "landmark") else {"complex": True})
+                                              ("building", "landmark") + NO_COLLISION
+                                              else {"complex": True})
                 mp, mh = mesh(pack(part, glb, "part"), p["node"], file_sha(glb), pcol,
                               p.get("nanite", True), p.get("shape_preservation"))
                 a = {"key": f"{k}.{p['kind']}", "entry": k, "kind": p["kind"], "mesh": mp,
@@ -807,6 +812,7 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                     a["materials"] = {slot: "MI_" + asset_name(f"{part}.{m}")
                                       for slot, m in sorted(e["materials"].items())}
                 a["type"] = p["kind"]
+                a["entry_type"] = base["type"]
                 a["hash"] = content_hash([a, mh])
                 insts.append(a)
                 made = True
@@ -819,6 +825,8 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                     replaced.add(r)
                 else:
                     missing += 1
+    shared = share_meshes(packs, actors + insts)
+    groups = group_actors(actors, insts, man) if GROUP else None
     out_packs = []
     for k in sorted(packs):
         pk = packs[k]
@@ -840,23 +848,190 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                "tint": u["tint"], "fog": u["fog"]}
         rec["hash"] = content_hash(rec)
         uw.append(rec)
-    return {"files": files, "masters": masters, "materials": mats, "packs": out_packs,
-            "underwater": uw,
-            "textures": dict(sorted(textures.items())),
-            "lod_chains": sorted(chains, key=lambda x: x["mesh"]),
-            "actors": sorted(actors, key=lambda a: a["key"]),
-            "instances": sorted(insts, key=lambda a: a["key"]),
-            "replaced": sorted(replaced),
-            "counts": {"entries": len(owner), "actors": len(actors),
-                       "instance_actors": len(insts),
-                       "instances": sum(a["count"] if "count" in a else len(a["xforms"])
-                                        for a in insts),
-                       "replaced": len(replaced), "replaces_missing": missing,
-                       "packs": len(out_packs),
-                       "meshes": sum(len(p["meshes"]) for p in out_packs) + len(chains),
-                       "materials": len(mats), "textures": len(textures),
-                       "heroes": sum(1 for a in actors if a.get("hero")),
-                       "underwater_volumes": len(uw)}}
+    out = {"files": files, "masters": masters, "materials": mats, "packs": out_packs,
+           "underwater": uw,
+           "textures": dict(sorted(textures.items())),
+           "lod_chains": sorted(chains, key=lambda x: x["mesh"]),
+           "actors": sorted(actors, key=lambda a: a["key"]),
+           "instances": sorted(insts, key=lambda a: a["key"]),
+           "replaced": sorted(replaced),
+           "counts": {"entries": len(owner), "actors": len(actors),
+                      "instance_actors": len(insts) if groups is None else 0,
+                      "instance_components": len(insts),
+                      "instances": sum(a["count"] if "count" in a else len(a["xforms"])
+                                       for a in insts),
+                      "replaced": len(replaced), "replaces_missing": missing,
+                      "packs": len(out_packs),
+                      "meshes": sum(len(p["meshes"]) for p in out_packs) + len(chains),
+                      "materials": len(mats), "textures": len(textures),
+                      "heroes": sum(1 for a in actors if a.get("hero")),
+                      "underwater_volumes": len(uw), "shared_meshes": shared}}
+    if groups is not None:
+        out["groups"] = groups
+        out["counts"]["group_actors"] = len(groups)
+        out["counts"]["actors"] = sum(1 for a in actors if not a.get("holder"))
+        out["counts"]["grouped_actors"] = sum(1 for a in actors if a.get("holder"))
+    return out
+
+
+# AG16: fewer actors, the same components. An entry's instanced parts are components of its
+# own actor (else of a group actor at the entry's pivot), a building's street front (AG3) a
+# component of the building's actor, and the many small single-mesh pieces of a tile (signs,
+# street pieces, water pieces, ground cover) components of one actor per tile and kind
+# (`tile_group`): Delta Megacity's level of 73,772 actors holds 13,642 (4,650 groups). Each
+# component keeps its own mesh, transform, Custom Primitive Data, materials, collision and
+# its record's key and ids as tags. CITYGEN_UE_GROUP=0 keeps an actor per record (the
+# manifest then has no `groups`).
+GROUP = os.environ.get("CITYGEN_UE_GROUP", "1") != "0"
+
+
+def tile_group(category: str) -> str | None:
+    """The kind of tile group a stage 2 actor of `category` goes into, or None (its own
+    actor): AG8's signs, AG7's street pieces, AG12's water pieces and AG13's ground cover."""
+    if category == "prop_sign" or category.startswith("sign"):
+        return "signs"
+    if category in ("sidewalk", "junction", "crosswalk", "street") or \
+            category.startswith(("road_", "deck_")):
+        return "streets"
+    if category in ("bed", "water", "sea") or category.startswith("bank_"):
+        return "water"
+    if category.startswith("cover_"):
+        return "cover"
+    return None
+
+
+# A tile group is split into cells this wide (a 256 m tile into 4 x 4): the engine takes a
+# streamed-out actor's components away in one go (`ULevel::IncrementalUnregisterComponents`
+# steps by actor), so a group stays small enough not to make one long frame of it, and
+# compact enough to cull
+GROUP_CELL_M = 64.0
+
+
+def _group_cell(man: dict | None, tile: str, at: list[float]) -> tuple[str, list[float]]:
+    """The cell of a tile group a piece at `at` goes into: its name (`c<i><j>`, i east, j
+    north, from the tile's south-west corner) and its middle (z 0)."""
+    b = next((t["bounds"] for t in (man or {}).get("tiles", []) if t["name"] == tile), None)
+    x0, y0 = (b[0], b[1]) if b else (0.0, 0.0)
+    n = max(1, int(round(((b[2] - b[0]) if b else 256.0) / GROUP_CELL_M)))
+    i = min(n - 1, max(0, int((at[0] - x0) // GROUP_CELL_M)))
+    j = min(n - 1, max(0, int((at[1] - y0) // GROUP_CELL_M)))
+    return f"c{i}{j}", [round(x0 + (i + 0.5) * GROUP_CELL_M, 3),
+                        round(y0 + (j + 0.5) * GROUP_CELL_M, 3), 0.0]
+
+
+def group_actors(actors: list[dict], insts: list[dict], man: dict | None = None) -> list[dict]:
+    """Every record that becomes a component of another actor gets that actor's key as its
+    `holder`: an instanced part its entry's; a street front (`<building>.front`) its
+    building's; a single-mesh actor of a `tile_group` kind the tile group's, by the
+    `GROUP_CELL_M` cell of the tile its pivot is in (`group.<kind>.<tile>.c<i><j>`,
+    `.l<level>` on a deck), unless it has instanced parts of its own (an AG7 bridge's), which
+    stay on its own actor. A holder's hash is taken again over its members' hashes (it
+    changes when any of them does). Returns the group actors: one for each entry with parts
+    and no mesh actor of its own (at the entry's pivot) and one per tile group cell (at its
+    middle), by key."""
+    own = {a["key"]: a for a in actors}
+    parts_of = {r["entry"] for r in insts}
+    members: dict[str, list[dict]] = {}
+    groups: dict[str, dict] = {}
+    for a in actors:
+        k = a["key"]
+        if a.get("type") == "building.front" and k.endswith(".front") and k[:-6] in own:
+            a["holder"] = k[:-6]
+        elif k in parts_of:
+            continue            # (its parts are its components: it keeps its own actor)
+        else:
+            g = tile_group(a["category"])
+            if g is None:
+                continue
+            cell, mid = _group_cell(man, a["tile"], a["pivot"])
+            hk = f"group.{g}.{a['tile']}.{cell}" + (f".l{a['level']}" if a.get("level")
+                                                    else "")
+            a["holder"] = hk
+            if hk not in groups:
+                groups[hk] = {"key": hk, "pivot": mid,
+                              "yaw_deg": 0.0, "category": g, "type": f"group.{g}",
+                              "tile": a["tile"], "district": "", "ids": []}
+                if a.get("level"):
+                    groups[hk]["level"] = a["level"]
+        members.setdefault(a["holder"], []).append(a)
+    for r in insts:
+        r["holder"] = r["entry"]
+        members.setdefault(r["entry"], []).append(r)
+        if r["entry"] not in own and r["entry"] not in groups:
+            groups[r["entry"]] = {
+                "key": r["entry"], "pivot": r["pivot"], "yaw_deg": r["yaw_deg"],
+                "category": r["category"], "type": r.get("entry_type", r["type"]),
+                "tile": r["tile"], "district": r["district"], "ids": [r["entry"]]}
+            if r.get("level"):
+                groups[r["entry"]]["level"] = r["level"]
+    for hk in sorted(members):
+        ms = sorted(members[hk], key=lambda m: m["key"])
+        mh = content_hash([m["hash"] for m in ms])
+        if hk in own:
+            h = own[hk]
+            h["members"] = len(ms)
+            h["hash"] = content_hash([h["hash"], mh])
+        else:
+            g = groups[hk]
+            g["members"] = len(ms)
+            g["hash"] = content_hash([g, mh])
+    return [groups[k] for k in sorted(groups)]
+
+
+# AG16: instanced props with no collision: overhead or on a wall (awnings, facade AC units,
+# wall lights) or litter. A body per instance (Delta Megacity: 39,500 of its 71,000 prop
+# bodies), made and dropped as their cells stream, which no player stands on or walks into.
+NO_COLLISION = ("prop_awning", "prop_ac_unit", "prop_wall_light", "prop_trash")
+
+
+# AG16: the packs whose node names are their content (AG2's parts named by the hash of their
+# type and parameters, `assetgen.buildings.parts.node_name`; AG8's signs by the digest of
+# their inputs, `assetgen.props.gather`), so a node of one name is one mesh in every tile
+SHARED_USES = ("part",)
+SHARED_PARTS = ("signs",)
+
+
+def _shared(pk: dict) -> bool:
+    return pk["use"] in SHARED_USES or (pk["use"] == "mesh" and pk["part"] in SHARED_PARTS)
+
+
+def _mesh_key(pk: dict, m: dict) -> tuple:
+    return (pk["part"], pk["use"], m["asset"], json.dumps(m["collision"], sort_keys=True),
+            m["nanite"], m.get("shape_preservation"), bool(m.get("fallback_full")))
+
+
+def share_meshes(packs: dict, placed: list[dict]) -> int:
+    """AG16: a mesh that several tiles' packs hold under one name (`SHARED_USES`,
+    `SHARED_PARTS`: the same content) imported once, from the first of those packs by
+    folder, and every actor or instancer of it pointed there (its hash taken again); the
+    other packs leave it out (the pack step leaves out what a pack's plan does not name).
+    Delta Megacity: 9,244 of 58,882 meshes, so as many fewer distinct Nanite meshes and
+    root pages. The number of meshes left out."""
+    canon: dict[tuple, tuple[str, dict]] = {}
+    for k in sorted(packs, key=lambda k: packs[k]["folder"]):
+        pk = packs[k]
+        if _shared(pk):
+            for a in sorted(pk["meshes"]):
+                m = pk["meshes"][a]
+                canon.setdefault(_mesh_key(pk, m), (pk["folder"], m))
+    remap: dict[str, tuple[str, str]] = {}
+    for pk in packs.values():
+        if not _shared(pk):
+            continue
+        for a in list(pk["meshes"]):
+            m = pk["meshes"][a]
+            folder, cm = canon[_mesh_key(pk, m)]
+            if folder != pk["folder"]:
+                remap[f"{pk['folder']}/{a}"] = (f"{folder}/{a}", cm["hash"])
+                del pk["meshes"][a]
+    for k in [k for k, pk in packs.items() if _shared(pk) and not pk["meshes"]]:
+        del packs[k]
+    for a in placed:
+        if a["mesh"] in remap:
+            a["mesh"], h = remap[a["mesh"]]
+            a.pop("hash")
+            a["hash"] = content_hash([a, h])
+    return len(remap)
 
 
 def build_manifest(build_dir: str | Path, name: str | None = None,
@@ -979,7 +1154,10 @@ def actor_hashes(man: dict) -> dict[str, str]:
         # stage 2's actors over the blockout's: the keys it replaces dropped, its own added
         for k in s2["replaced"]:
             out.pop(k, None)
-        out.update({a["key"]: a["hash"] for a in s2["actors"] + s2["instances"]})
+        # (AG16: with `groups`, a record with a `holder` is a component of that actor)
+        out.update({a["key"]: a["hash"] for a in s2["actors"] if not a.get("holder")})
+        out.update({a["key"]: a["hash"] for a in
+                    (s2["groups"] if "groups" in s2 else s2["instances"])})
         out.update({u["key"]: u["hash"] for u in s2.get("underwater", [])})
     out["player_start"] = content_hash(man["player_start"])
     out.update({k: content_hash([k, "v1"]) for k in LIGHTING})
@@ -998,8 +1176,11 @@ def actor_kinds(man: dict) -> dict[str, str]:
     if s2:
         for k in s2["replaced"]:
             out.pop(k, None)
-        out.update({a["key"]: "mesh" for a in s2["actors"]})
-        out.update({i["key"]: "instances" for i in s2["instances"]})
+        out.update({a["key"]: "mesh" for a in s2["actors"] if not a.get("holder")})
+        if "groups" in s2:
+            out.update({g["key"]: "group" for g in s2["groups"]})
+        else:
+            out.update({i["key"]: "instances" for i in s2["instances"]})
         out.update({u["key"]: "underwater" for u in s2.get("underwater", [])})
     if man.get("play"):
         out[PLAY_KEY] = "play"
@@ -1120,14 +1301,21 @@ def set_startup_map(uproject: str | Path, level: str) -> bool:
                           [("EditorStartupMap", ref), ("GameDefaultMap", ref)])
 
 
-# Nanite keeps a root page for every Nanite mesh in memory, in one GPU buffer of at most
-# 2048 MB that the streaming pool (r.Nanite.Streaming.StreamingPoolSize, 512 MB by default)
-# shares: 1536 MB, 49,152 root pages, and the engine quits on a fatal error when they run
-# out. Delta Megacity with AG15's parts (53,790 meshes) ran out in its first Play on the
-# Windows PC (run-through 2), so a city with more Nanite meshes than NANITE_MANY gets a
-# smaller streaming pool, NANITE_POOL_MB: 256 MB leaves 57,344 root pages.
-NANITE_MANY = 42000
-NANITE_POOL_MB = 256
+# Nanite keeps a root page (32 KB) for every Nanite mesh in memory, in one GPU buffer of at
+# most NANITE_BUFFER_MB (2 GB on NVIDIA) that the streaming pool
+# (r.Nanite.Streaming.StreamingPoolSize, 512 MB by default) shares, and the engine quits on a
+# fatal error when they run out (Delta Megacity's 53,790 meshes in its first Play, run-through
+# 2). A mesh loaded keeps its root page while it stays loaded, which over a city's route is
+# nearly every mesh (AG16's benchmark on Delta: 52,224 root pages in use of its 53,911 Nanite
+# meshes). So the pool is sized from the city (AG16): what its meshes' root pages, with
+# ROOT_MARGIN, leave of the buffer, in 64 MB steps, at least NANITE_POOL_MIN_MB (which leaves
+# 57,344 root pages: a city of more Nanite meshes is over `asset_budget`) and at most
+# NANITE_POOL_MAX_MB (a small city streams its geometry in a larger pool).
+NANITE_BUFFER_MB = 2048
+ROOT_PAGE_KB = 32
+ROOT_MARGIN = 1.1
+NANITE_POOL_MIN_MB = 256
+NANITE_POOL_MAX_MB = 1024
 SYSTEM_SECTION = "[SystemSettings]"
 
 
@@ -1145,14 +1333,28 @@ def nanite_meshes(man: dict) -> int:
     return len({v for v in out.values() if v})
 
 
+def nanite_pool_mb(man: dict) -> int:
+    """The Nanite streaming pool for the city of `man` (MB; see NANITE_BUFFER_MB)."""
+    roots = nanite_meshes(man) * ROOT_MARGIN * ROOT_PAGE_KB / 1024.0
+    free = int((NANITE_BUFFER_MB - roots) // 64) * 64
+    return max(NANITE_POOL_MIN_MB, min(NANITE_POOL_MAX_MB, free))
+
+
 def set_nanite_pool(uproject: str | Path, man: dict) -> bool:
-    """A smaller Nanite streaming pool in the project's [SystemSettings] for a city of more
-    than NANITE_MANY Nanite meshes (more root pages; see NANITE_MANY). True when the file
-    changed; a smaller city leaves the project as it is."""
-    if nanite_meshes(man) <= NANITE_MANY:
-        return False
+    """The city's Nanite streaming pool (`nanite_pool_mb`) and `PROJECT_SETTINGS` in the
+    project's [SystemSettings]. True when the file changed."""
     return set_engine_ini(uproject, SYSTEM_SECTION,
-                          [("r.Nanite.Streaming.StreamingPoolSize", str(NANITE_POOL_MB))])
+                          [("r.Nanite.Streaming.StreamingPoolSize", str(nanite_pool_mb(man)))]
+                          + PROJECT_SETTINGS)
+
+
+# AG16: what every import sets in the project beside the pool. Texture streaming off: the
+# render asset streaming manager keeps a manager per streamed level and processes every
+# component a level adds, and with World Partition's cells (and their HLODs) coming and
+# going it made 36 to 48 ms frames at 256 m cells and 1 to 2.8 s ones at 128 m (AG16's hitch
+# dumps on Delta Megacity); a city's textures (AG6's library sets and its sign pages, a few
+# hundred) fit whole: Delta's VRAM stayed at 7 GB.
+PROJECT_SETTINGS = [("r.TextureStreaming", "0")]
 
 
 def set_engine_ini(uproject: str | Path, section: str, want: list[tuple[str, str]]) -> bool:
@@ -1486,6 +1688,7 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
     if res.get("ok"):
         man = json.loads(man_path.read_text(encoding="utf-8"))
         res["nanite_meshes"] = nanite_meshes(man)
+        res["nanite_pool_mb"] = nanite_pool_mb(man)
         res["nanite_pool_changed"] = set_nanite_pool(up, man)
         Path(job["result"]).write_text(json.dumps(res, indent=1) + "\n",
                                        encoding="utf-8", newline="\n")

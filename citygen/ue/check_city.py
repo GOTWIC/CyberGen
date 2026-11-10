@@ -988,36 +988,43 @@ def fly_shots(world, pawn, man, slug):
 # --- shots ------------------------------------------------------------------------------------
 
 def view_load(rows, target, cap=SHOT_MESHES):
-    """The actor descs a view loads, from (guid, kind, x, y, mesh) rows (kind `hlod` for the
-    HLOD actors, never loaded; x and y the middle of its bounds; mesh the actor's mesh, None
-    for one whose meshes are shared or have no Nanite): every other row when their distinct
-    meshes fit in `cap`, else the rows nearest the target (plan x, y) up to `cap` meshes."""
+    """The actor descs a view loads, from (guid, kind, x, y, meshes) rows (kind `hlod` for the
+    HLOD actors, never loaded; x and y the middle of its bounds; meshes the actor's Nanite
+    meshes, its own and its parts' (AG16's groups), empty for one whose meshes are shared or
+    have no Nanite): every other row when their distinct meshes fit in `cap`, else the rows
+    nearest the target (plan x, y) up to `cap` meshes."""
     rows = [r for r in rows if r[1] != "hlod"]
-    if len({r[4] for r in rows if r[4] is not None}) <= cap:
+    if len({m for r in rows for m in r[4]}) <= cap:
         return [r[0] for r in rows]
     tx, ty = target
     out, seen = [], set()
     for r in sorted(rows, key=lambda r: ((r[2] - tx) ** 2 + (r[3] - ty) ** 2, str(r[0]))):
-        if r[4] is not None and r[4] not in seen:
-            if len(seen) >= cap:
+        new = [m for m in r[4] if m not in seen]
+        if new:
+            if len(seen) + len(new) > cap:
                 continue
-            seen.add(r[4])
+            seen.update(new)
         out.append(r[0])
     return out
 
 
 def mesh_of(man):
-    """Each actor key's mesh from the manifest: a blockout object's own, a stage 2 actor's or
-    part instancer's; None for a prop or plant instancer (shared prototypes) and the LOD
-    chains (no Nanite)."""
+    """Each actor key's Nanite meshes from the manifest: a blockout object's own, a stage 2
+    actor's and its parts' (AG16: an entry's parts are components of its actor or group
+    actor, `holder`; before, each part instancer an actor of its own); none for a prop or
+    plant instancer (shared prototypes) and the LOD chains (no Nanite)."""
     s2 = man.get("stage2") or {}
     lod = {c["mesh"] for c in s2.get("lod_chains", [])}
     out = {}
     for t in man.get("tiles", []):
         for o in t.get("objects", []):
-            out[o["key"]] = f"Meshes/{t['name']}/{o['asset']}"
+            out[o["key"]] = [f"Meshes/{t['name']}/{o['asset']}"]
     for r in s2.get("actors", []) + s2.get("instances", []):
-        out[r["key"]] = None if r.get("mesh") in lod else r.get("mesh")
+        key = r.get("holder") or r["key"]
+        if r.get("mesh") and r["mesh"] not in lod:
+            out.setdefault(key, []).append(r["mesh"])
+        else:
+            out.setdefault(key, [])
     return out
 
 
@@ -1031,7 +1038,7 @@ def desc_rows(WPL, meshes):
             x = (bd.min.x + bd.max.x) / 200.0
             y = -(bd.min.y + bd.max.y) / 200.0
         rows.append((d.guid, "hlod" if hlod else "actor", x, y,
-                     meshes.get(str(getattr(d, "label", "")))))
+                     tuple(meshes.get(str(getattr(d, "label", ""))) or ())))
     return rows
 
 

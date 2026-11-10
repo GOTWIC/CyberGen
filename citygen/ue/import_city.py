@@ -59,7 +59,8 @@ import unreal
 
 JOB = json.load(open(os.environ["CITYGEN_UE_JOB"], encoding="utf-8"))
 CORE = "/Game/CityGen/Core"
-CORE_VERSION = "2"  # of the core assets (BP_CityGenInstances, BP_CityGenGraph)
+CORE_VERSION = "3"  # of the core assets (BP_CityGenInstances, BP_CityGenGraph; 3, AG16:
+                    # BP_CityGenGroup's root static in the Blueprint itself)
 NEVER = unreal.PropertyAccessChangeNotifyMode.NEVER
 T0 = time.time()
 EAL = unreal.EditorAssetLibrary
@@ -81,14 +82,16 @@ INSTANCE_VARS = [("Ids", "[name"), ("Kind", "name")]
 PLAY_KEY = "play"                           # citygen.unreal.PLAY_KEY: the play actor's key
 FLY_PAWN = f"{CORE}/BP_CityGenFlyPawn"      # what Play puts you in with `--play fly`
 FLY_MODE = f"{CORE}/GM_CityGenFly"
+VIEW_M = 768.0          # citygen.unreal.VIEW_M: how far the level streams in around the player
+MAIN_CELL_M = 128.0     # World Partition's main cells (AG16; a 256 m tile before)
 # stage 2 (assetgen, layer 2): the masters' version (Core/M_Cg<Master>, rebuilt in place when
 # it changes), the meshes' and the actors' (stored hashes "<version>.<content hash>", as
 # MESH_VERSION and ACTOR_VERSION)
-STAGE2_VERSION = "9"                 # AG6: textured masters; AG8: leaves, textured holo;
-                                     # AG5: the heroes' masks (HeroMask on UV1);
-                                     # AG12: water (Single Layer Water) and bed (caustics);
-                                     # AG15: the glass's night by schedule and Hour;
-                                     # #93: the water's pins by UE 5.8's names
+# (its versions: AG6 textured masters; AG8 leaves, textured holo; AG5 the heroes' masks
+# (HeroMask on UV1); AG12 water (Single Layer Water) and bed (caustics); AG15 the glass's
+# night by schedule and Hour; #93 the water's pins by UE 5.8's names; 10, AG16: Custom
+# Primitive Data read through per-instance custom data, the instanced HLODs' colors)
+STAGE2_VERSION = "10"
 TEXTURE_VERSION = "1"
 # a prune of more assets than this deletes their package files itself, on an empty level: the
 # editor's delete makes a reachability pass over every loaded object per package (8435 meshes
@@ -116,6 +119,7 @@ BAD_NAME_CHARS = "\"' ,/.:|&!~\n\r\t@#(){}[]=;^%$`"
 # the stage 2 packs being imported: glb path -> {asset name: the manifest's mesh record}
 PACK_PLAN = {}
 PACK_STEPS = []          # what the pack step did per pack (counts, for the result)
+PACK_BASE = [0]          # (the steps before this chunk's: its progress counts from there)
 TEXTURE_PLAN = {}        # texture file -> [(factory node setter, value)]
 TEXTURE_STEPS = []       # the texture files the texture step found in TEXTURE_PLAN
 
@@ -153,8 +157,8 @@ if hasattr(unreal, "InterchangePythonPipelineBase"):
             step = {"pack": source_datas[0].get_filename(), "nodes": len(nodes),
                     "matched": found, "skipped": 0}
             PACK_STEPS.append(step)
-            REPORT.update(len(PACK_STEPS), len(PACK_PLAN), detail="packs imported, their "
-                          "meshes building")
+            REPORT.update(len(PACK_STEPS) - PACK_BASE[0], len(PACK_PLAN),
+                          detail="packs imported, their meshes building")
             if found != len(plan):
                 # (a name this step cannot match: leave the pack as the generic pipeline
                 # made it; finish2 sets the settings and prune_meshes deletes the extras)
@@ -198,6 +202,52 @@ if hasattr(unreal, "InterchangePythonPipelineBase"):
 
 def log(msg):
     unreal.log(f"citygen: {msg} ({time.time() - T0:.1f} s)")
+
+
+# (#84, AG16) stage 2's packs imported, finished and saved this many at a time, and the
+# meshes let go of between them: an import kept every one of Delta Megacity's 58,501 meshes
+# loaded to the end, 39 GB committed in the editor on the 32 GB PC
+PACK_CHUNK = int(os.environ.get("CITYGEN_UE_PACK_CHUNK", "150"))
+
+
+class Meshes:
+    """Stage 2's meshes by their manifest path, held as asset paths: a mesh is loaded when
+    an actor asks for it (at once while it is still in memory; from disk once the garbage
+    collector has let go of it), so the meshes imported and saved need not all stay
+    loaded (#84)."""
+
+    def __init__(self):
+        self.paths = {}
+
+    def __setitem__(self, key, sm):
+        self.paths[key] = sm.get_path_name()
+
+    def __getitem__(self, key):
+        sm = unreal.load_asset(self.paths[key])
+        if sm is None:
+            raise RuntimeError(f"{self.paths[key]}: no static mesh")
+        return sm
+
+    def __contains__(self, key):
+        return key in self.paths
+
+    def __len__(self):
+        return len(self.paths)
+
+
+def let_go():
+    """The objects nothing holds any more unloaded (the meshes saved and no longer used)."""
+    unreal.SystemLibrary.collect_garbage()
+
+
+def actor_guids(actors):
+    """The World Partition guids of `actors` (each actor's `ActorGuid`, its descriptor's), or
+    None where the engine does not show them."""
+    try:
+        return [a.get_editor_property("actor_guid") for a in actors]
+    except Exception as ex:
+        log(f"actor guids: {ex}")
+        return None
 
 
 # progress lines `citygen unreal` draws as a bar (citygen.progress.MARKER and its Relay ops)
@@ -275,9 +325,13 @@ def pin_type(spec):
     return BEL.get_array_type(t) if arr else t
 
 
-def blueprint(path, parent, variables, hism=False):
+def blueprint(path, parent, variables, hism=False, static_root=False):
     """A Blueprint class with the given member variables (instance editable; added when
-    missing or when the class is of an older CORE_VERSION), compiled."""
+    missing or when the class is of an older CORE_VERSION), compiled. `static_root` (AG16's
+    group actors): its root component's template static, so the static components the
+    importer adds to a placed actor attach to it when the level loads (set on the placed
+    actor alone, the root is still movable while they attach: "is not static, cannot
+    attach", 160,000 times in a Delta Megacity game)."""
     bp = unreal.load_asset(path) if EAL.does_asset_exist(path) else None
     if bp is not None and meta(bp, "cg.core") == CORE_VERSION:
         return BEL.generated_class(bp)
@@ -292,6 +346,13 @@ def blueprint(path, parent, variables, hism=False):
                 new_class=unreal.HierarchicalInstancedStaticMeshComponent,
                 blueprint_context=bp))
             sds.rename_subobject(h, "Instances")
+    if static_root:
+        sds = unreal.get_engine_subsystem(unreal.SubobjectDataSubsystem)
+        lib = unreal.SubobjectDataBlueprintFunctionLibrary
+        for hd in sds.k2_gather_subobject_data_for_blueprint(bp):
+            obj = lib.get_object_for_blueprint(lib.get_data(hd), bp)
+            if isinstance(obj, unreal.SceneComponent):
+                obj.set_editor_property("mobility", unreal.ComponentMobility.STATIC)
     have = {str(n) for n in BEL.list_member_variable_names(bp)} if not fresh else set()
     for name, spec in variables:
         if name not in have:
@@ -810,7 +871,7 @@ def tint_color(m, x, y):
         v = expr(m, unreal.MaterialExpressionVectorParameter, x - 400, y + 80 + 90 * k,
                  parameter_name=f"Tint{i}", default_value=unreal.LinearColor(1, 1, 1, 1),
                  use_custom_primitive_data=True, primitive_data_index=i)
-        link(v, "", cus, f"C{i}")
+        link(per_instance(m, v, i, x - 400, y + 80 + 90 * k, vector=True), "", cus, f"C{i}")
     return cus
 
 
@@ -908,13 +969,29 @@ def light_pool_material():
 
 
 def sparam(m, name, x, y, default=0.0, cpd=None):
-    """A scalar parameter, read from the actor's Custom Primitive Data at `cpd` if given."""
+    """A scalar parameter, read from the actor's Custom Primitive Data at `cpd` if given
+    (through `per_instance`)."""
     if cpd is None:
         return expr(m, unreal.MaterialExpressionScalarParameter, x, y, parameter_name=name,
                     default_value=float(default))
-    return expr(m, unreal.MaterialExpressionScalarParameter, x, y, parameter_name=name,
-                default_value=float(default), use_custom_primitive_data=True,
-                primitive_data_index=cpd)
+    return per_instance(m, expr(m, unreal.MaterialExpressionScalarParameter, x, y,
+                                parameter_name=name, default_value=float(default),
+                                use_custom_primitive_data=True, primitive_data_index=cpd),
+                        cpd, x, y)
+
+
+def per_instance(m, param, index, x, y, vector=False):
+    """AG16: a Custom Primitive Data parameter read through a per-instance custom data node
+    at the same index, the parameter its default: an actor (or a component) reads its own
+    Custom Primitive Data as before, and an instance of an instanced HLOD the custom data the
+    HLOD builder gave it from its source's Custom Primitive Data (`FISMComponentBatcher`).
+    Read from the parameter alone, the far city's HLODs lost every tint, schedule and seed
+    (dark and untinted past the loading range)."""
+    cls = (unreal.MaterialExpressionPerInstanceCustomData3Vector if vector
+           else unreal.MaterialExpressionPerInstanceCustomData)
+    pic = expr(m, cls, x + 120, y + 30, data_index=index)
+    link(param, "", pic, "DefaultValue")
+    return pic
 
 
 def tparam(m, name, kind, x, y, uv, defaults):
@@ -1485,14 +1562,17 @@ def delete_files(paths):
     del loaded
     unreal.SystemLibrary.collect_garbage()
     content = unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_content_dir())
+    gone = 0
     for n in names:
         base = os.path.join(content, n[len("/Game/"):])
         for ext in (".uasset", ".uexp", ".ubulk"):
             if os.path.exists(base + ext):
                 os.remove(base + ext)
+        # (counted by their files: right after the scan the registry can still list them,
+        # AG16's 9,244 shared meshes read "deleted 0")
+        gone += int(not os.path.exists(base + ".uasset"))
     folders = sorted({n.rsplit("/", 1)[0] for n in names})
     unreal.AssetRegistryHelpers.get_asset_registry().scan_paths_synchronous(folders, True)
-    gone = sum(1 for n in names if not EAL.does_asset_exist(n))
     log(f"deleted {gone} of {len(names)} assets by their files")
     return gone
 
@@ -1541,7 +1621,10 @@ class Importer:
             if self.s2 else set()
         if self.s2:
             self.stats["stage2"] = {
-                "actors": len(self.s2["actors"]), "instance_actors": len(self.s2["instances"]),
+                "actors": len(self.s2["actors"]),
+                # (AG16: with groups the parts are components, `part_components` counts them)
+                "instance_actors": 0 if "groups" in self.s2 else len(self.s2["instances"]),
+                "group_actors": len(self.s2.get("groups") or []),
                 "replaced": len(self.s2["replaced"]),
                 "meshes": {"imported": 0, "kept": 0, "deleted": 0}, "packs_imported": 0,
                 "materials": {"created": 0, "updated": 0, "kept": 0, "deleted": 0},
@@ -1682,6 +1765,7 @@ class Importer:
         step), then waited for: Interchange runs half the worker threads' worth at a time,
         and each mesh's build goes to the asset compiling pool as its import ends."""
         tasks = []
+        PACK_BASE[0] = len(PACK_STEPS)
         for pk, folder, entries, fresh in todo:
             glb = os.path.join(self.build, pk["glb"])
             PACK_PLAN[pack_key(glb)] = {m["asset"]: m for m in pk["meshes"]}
@@ -2153,7 +2237,7 @@ class Importer:
         the next packs import), each mesh built once with its own settings (the pack step),
         then finished and saved in one batch; else one pack at a time, each mesh saved once
         built."""
-        self.meshes_s2 = {}
+        self.meshes_s2 = Meshes()
         if not self.s2:
             return
         st = self.stats["stage2"]
@@ -2174,16 +2258,42 @@ class Importer:
             st["meshes"]["kept"] += len(entries)
             for a, sm in got.items():
                 self.meshes_s2[f"{pk['folder']}/{a}"] = sm
-        t = time.time()
-        if self.fast:
-            self.import_packs(todo)        # (its count: packs imported; then meshes finished)
-        sub["meshes2.import"] = round(time.time() - t, 2)
-        t = time.time()
-        done = []
+            del got
+            checked = st.setdefault("packs_checked", 0) + 1
+            st["packs_checked"] = checked
+            if PACK_CHUNK > 0 and checked % PACK_CHUNK == 0:
+                let_go()              # (#84: the meshes loaded to read their hashes)
+        sub["meshes2.import"] = 0.0
+        sub["meshes2.finish"] = 0.0
+        sub["meshes2.save"] = 0.0
         seen = total - sum(len(x[2]) for x in todo)       # (the packs kept)
         built, nanite_built = 0, 0
         REPORT.update(seen, total, force=True)
-        for k, (pk, folder, entries, fresh) in enumerate(todo):
+        chunk = PACK_CHUNK if self.fast and PACK_CHUNK > 0 else max(len(todo), 1)
+        for c0 in range(0, len(todo), chunk):
+            seen, built, nanite_built = self.meshes2_chunk(
+                todo[c0:c0 + chunk], c0, len(todo), total, seen, built, nanite_built)
+        t = time.time()
+        # (the subsystem is not made in a commandlet; its LOD functions keep no state, so its
+        # class default object serves)
+        sms = unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem) or \
+            unreal.get_default_object(unreal.StaticMeshEditorSubsystem)
+        self.lod_chains(sms)
+        sub["meshes2.lod_chains"] = round(time.time() - t, 2)
+
+    def meshes2_chunk(self, todo, c0, n_todo, total, seen, built, nanite_built):
+        """One chunk of `meshes2`'s packs (all of them on the one-at-a-time path): imported
+        (fast: queued at once), each mesh finished, saved in one batch, then let go of
+        (#84); the counts carried on."""
+        st = self.stats["stage2"]
+        sub = self.stats["subtimings"]
+        t = time.time()
+        if self.fast:
+            self.import_packs(todo)        # (its count: packs imported; then meshes finished)
+        sub["meshes2.import"] = round(sub["meshes2.import"] + time.time() - t, 2)
+        t = time.time()
+        done = []
+        for k, (pk, folder, entries, fresh) in enumerate(todo, c0):
             glb = os.path.join(self.build, pk["glb"])
             if not self.fast:
                 self.import_glb(glb, folder, self.pipeline(
@@ -2203,20 +2313,24 @@ class Importer:
             built += len(entries)
             nanite_built += sum(1 for m in pk["meshes"] if m["nanite"])
             seen += len(entries)
-            REPORT.update(seen, total, detail=f"pack {k + 1} of {len(todo)}, {built} built, "
-                          f"{nanite_built} with Nanite", force=k + 1 == len(todo))
+            REPORT.update(seen, total, detail=f"pack {k + 1} of {n_todo}, {built} built, "
+                          f"{nanite_built} with Nanite", force=k + 1 == n_todo)
             if k % 25 == 0:
-                log(f"stage 2 pack {k + 1}/{len(todo)} {pk['folder']}")
-        sub["meshes2.finish"] = round(time.time() - t, 2)
+                log(f"stage 2 pack {k + 1}/{n_todo} {pk['folder']}")
+        sub["meshes2.finish"] = round(sub["meshes2.finish"] + time.time() - t, 2)
         if self.fast and done:
             t = time.time()
             EAL.save_loaded_assets(done, False)
-            sub["meshes2.save"] = round(time.time() - t, 2)
-        t = time.time()
-        # (the subsystem is not made in a commandlet; its LOD functions keep no state, so its
-        # class default object serves)
-        sms = unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem) or \
-            unreal.get_default_object(unreal.StaticMeshEditorSubsystem)
+            sub["meshes2.save"] = round(sub["meshes2.save"] + time.time() - t, 2)
+        del done
+        if self.fast and PACK_CHUNK > 0:
+            let_go()                  # (#84: this chunk's meshes, saved)
+        return seen, built, nanite_built
+
+    def lod_chains(self, sms):
+        """The non-Nanite LOD chains (AG8's holo-ads, AG7's sky tube glass): each a copy of
+        its first LOD's mesh with the others set as its LODs."""
+        st = self.stats["stage2"]
         for c in self.s2["lod_chains"]:
             path = f"{self.root}/{c['mesh']}"
             h = f"{STAGE2_MESH_VERSION}.{c['hash']}"
@@ -2237,7 +2351,6 @@ class Importer:
             self.meshes_s2[c["mesh"]] = sm
             st["meshes"]["imported"] += 1
             st["lod_chains"] += 1
-        sub["meshes2.lod_chains"] = round(time.time() - t, 2)
 
     # -- the level --
 
@@ -2302,7 +2415,9 @@ class Importer:
         n += sum(1 for i in self.man["instances"] if i["key"] not in self.skip)
         n += len(self.man.get("swim", []))
         if self.s2:
-            n += len(self.s2["actors"]) + len(self.s2["instances"])
+            # (AG16: with groups a record with a holder is a component, not an actor)
+            n += sum(1 for a in self.s2["actors"] if not a.get("holder"))
+            n += len(self.s2["groups"] if "groups" in self.s2 else self.s2["instances"])
             n += len(self.s2.get("underwater", []))       # (AG12)
         n += int(self.plays())           # (the play features' actor)
         return n + 1 + 3                 # (the sun, the sky light, the atmosphere)
@@ -2350,7 +2465,7 @@ class Importer:
         update(a, h)
         self.add_sub("actors.update", time.perf_counter() - t0)
         if self.offload_n and created:
-            self.live.append(key)
+            self.live.append((key, a))
             if len(self.live) >= self.offload_n:
                 self.offload()
         return a
@@ -2361,18 +2476,27 @@ class Importer:
         through the editor's placement path labels the new actor uniquely by collecting the
         label of every actor in the world first, so a first import that keeps all its actors
         loaded spends time growing with the square of their number; few loaded, it stays
-        linear."""
+        linear. The actors are taken by their own guids, never by label: an actor whose class
+        changed (AG8's exact props over M15's instanced ones) is destroyed and made again
+        under the same label, its key, and the destroyed one's descriptor taken by label was
+        loaded back from disk once AG16's garbage collection had let go of it."""
         if not self.live:
             return
         t = time.perf_counter()
         self.save()
-        want = set(self.live)
         WPL = unreal.WorldPartitionBlueprintLibrary
-        guids = [d.guid for d in WPL.get_actor_descs() if str(d.label) in want]
+        guids = actor_guids([a for _, a in self.live])
+        if guids is None:              # (an engine whose actors do not show their guid)
+            want = {k for k, _ in self.live}
+            guids = [d.guid for d in WPL.get_actor_descs() if str(d.label) in want]
         if guids:
             WPL.load_actors(guids)          # (the library's references, then let go of them)
             WPL.unload_actors(guids)
             self.offloaded += guids
+            # (#84: and every few offloads the meshes only those actors used, AG16)
+            self.offloads = getattr(self, "offloads", 0) + 1
+            if PACK_CHUNK > 0 and self.offloads % 4 == 0:
+                let_go()
         self.live = []
         self.add_sub("actors.offload", time.perf_counter() - t)
 
@@ -2386,9 +2510,54 @@ class Importer:
         self.offloaded = []
         self.add_sub("actors.reload", time.perf_counter() - t)
 
+    def wanted_classes(self):
+        """The class of the actor each key gets, by class name (the blockout's and stage 2's;
+        the player start, the lighting and the play actor keep theirs)."""
+        out = {}
+        for t in self.man["tiles"]:
+            for o in t["objects"]:
+                if o["key"] not in self.skip:
+                    out[o["key"]] = "StaticMeshActor"
+        for i in self.man["instances"]:
+            if i["key"] not in self.skip:
+                out[i["key"]] = "BP_CityGenInstances_C"
+        for s in self.man.get("swim", []):
+            out[s["key"]] = "PhysicsVolume"
+        if self.s2:
+            for u in self.s2.get("underwater", []):
+                out[u["key"]] = "PostProcessVolume"
+            for r in self.s2["actors"]:
+                if not r.get("holder"):
+                    out[r["key"]] = "StaticMeshActor"
+            if "groups" in self.s2:
+                for g in self.s2["groups"]:
+                    out[g["key"]] = "BP_CityGenGroup_C"
+            else:
+                for r in self.s2["instances"]:
+                    out[r["key"]] = "BP_CityGenInstances_C"
+        return out
+
+    def clear_moved(self, have):
+        """The actors whose key now gets another class (AG8's exact props over M15's
+        instanced prototypes, a group over a prototype, the reverse on the way back) destroyed
+        before anything is made, and the level saved at once: destroyed later, beside new
+        actors under the same labels, offloads and collections, their packages stayed on disk
+        and came back with the next load (the small city's stage 2 import test: 30 cables and
+        scaffolds twice)."""
+        want = self.wanted_classes()
+        moved = sorted(k for k, a in have.items()
+                       if k in want and a.get_class().get_name() != want[k])
+        for k in moved:
+            self.destroy(have.pop(k), k)
+        if moved:
+            self.save()
+            log(f"{len(moved)} actors of another class destroyed first")
+        self.stats["actors"]["moved"] = len(moved)
+
     def actors(self):
         have = self.existing()
         log(f"{len(have)} actors of {self.city} in the level")
+        self.clear_moved(have)
         self.placed = 0
         self.to_place = self.actor_count()
         REPORT.update(0, self.to_place, force=True)
@@ -2409,6 +2578,7 @@ class Importer:
                     if unstage(a, [c]):
                         self.stats["actors"]["unstaged"] = \
                             self.stats["actors"].get("unstaged", 0) + 1
+                        self.drop_members(a)
                     c.set_static_mesh(sm)
                     c.set_mobility(unreal.ComponentMobility.STATIC)
                     a.set_actor_location(origin, False, False)
@@ -2436,13 +2606,25 @@ class Importer:
 
     def actors2(self, have):
         """Stage 2's actors: a static mesh actor per entry at its pivot (yaw -yaw), its
-        Custom Primitive Data, no collision where its entry has none; an instanced actor per
-        entry and part kind (HISM, the transforms relative to the pivot)."""
+        Custom Primitive Data, no collision where its entry has none; an entry's instanced
+        parts (the transforms relative to the pivot) as components of its own actor or, with
+        no mesh of its own, of a group actor at its pivot (AG16, the manifest's `groups`;
+        before, and without `groups`, an instanced actor per entry and part kind)."""
         if not self.s2:
             return
         sma = unreal.StaticMeshActor.static_class()
         stage = unreal.Name("cg.stage=2")
+        grouped = "groups" in self.s2
+        members_of = {}
+        if grouped:
+            for r in self.s2["actors"]:
+                if r.get("holder"):
+                    members_of.setdefault(r["holder"], []).append(r)
+            for r in self.s2["instances"]:
+                members_of.setdefault(r["holder"], []).append(r)
         for r in self.s2["actors"]:
+            if r.get("holder"):
+                continue                 # (a component of its holder, placed with it)
             sm = self.meshes_s2[r["mesh"]]
             loc = ue_loc(*r["pivot"])
             rot = unreal.Rotator(roll=0.0, pitch=0.0, yaw=-r["yaw_deg"])
@@ -2465,8 +2647,11 @@ class Importer:
                         c.set_material(i, mi)
                 if r.get("no_collision"):
                     c.set_collision_profile_name("NoCollision")
-                # (AG3: a street front's doors, `cg.door=<door id>@<walkway id>`, stage 4's)
-                doors = [unreal.Name(f"cg.door={d}") for d in r.get("doors", [])]
+                # (AG3: a street front's doors, `cg.door=<door id>@<walkway id>`, stage 4's;
+                # AG16: a front that is a component of its building's actor gives it its doors)
+                ms = members_of.get(r["key"], [])
+                doors = [unreal.Name(f"cg.door={d}") for d in
+                         list(r.get("doors", [])) + [d for m in ms for d in m.get("doors", [])]]
                 # (AG4: what a skybridge joins, `cg.link=building:<id>` or `walkway:<id>`)
                 links = [unreal.Name(f"cg.link={x}") for x in r.get("links", [])]
                 # (AG5: a landmark's or the wheel's hero, `cg.hero=<kind>`; a building on a
@@ -2476,9 +2661,38 @@ class Importer:
                 a.tags = self.tags(r["key"], h, r["ids"], r["type"], r["category"],
                                    r["tile"], r["district"], r.get("level", 0)) + [stage] + \
                     doors + links + more
+                if grouped:
+                    self.member_components(a, ms)
+                else:
+                    self.drop_members(a)
 
             self.place(have, r["key"], r["hash"], sma, make, update,
                        f"CityGen/{r['category']}", STAGE2_ACTOR_VERSION)
+        if grouped:
+            gcls = blueprint(f"{CORE}/BP_CityGenGroup", unreal.Actor, [], static_root=True)
+            for g in self.s2["groups"]:
+                loc = ue_loc(*g["pivot"])
+                rot = unreal.Rotator(roll=0.0, pitch=0.0, yaw=-g["yaw_deg"])
+
+                def make(loc=loc):
+                    return self.eas.spawn_actor_from_class(gcls, loc)
+
+                def update(a, h, g=g, loc=loc, rot=rot):
+                    a.root_component.set_mobility(unreal.ComponentMobility.STATIC)
+                    a.set_actor_location_and_rotation(loc, rot, False, False)
+                    rs = members_of.get(g["key"], [])
+                    if rs and all(x.get("no_hlod") for x in rs):
+                        try:
+                            a.set_editor_property("enable_auto_lod_generation", False)
+                        except Exception as ex:      # (a property this engine lacks)
+                            log(f"{g['key']}: enable_auto_lod_generation: {ex}")
+                    a.tags = self.tags(g["key"], h, g["ids"], g["type"], g["category"],
+                                       g["tile"], g["district"], g.get("level", 0)) + [stage]
+                    self.member_components(a, rs)
+
+                self.place(have, g["key"], g["hash"], gcls, make, update,
+                           f"CityGen/{g['category']}", STAGE2_ACTOR_VERSION)
+            return
         cls = blueprint(f"{CORE}/BP_CityGenInstances", unreal.Actor, INSTANCE_VARS, hism=True)
         for r in self.s2["instances"]:
             sm = self.meshes_s2[r["mesh"]]
@@ -2491,40 +2705,13 @@ class Importer:
             def update(a, h, r=r, sm=sm, loc=loc, rot=rot):
                 comp = a.get_components_by_class(
                     unreal.HierarchicalInstancedStaticMeshComponent)[0]
-                comp.set_static_mesh(sm)
                 a.root_component.set_mobility(unreal.ComponentMobility.STATIC)
-                comp.set_mobility(unreal.ComponentMobility.STATIC)
-                comp.clear_instances()
-                # [x, y, z, yaw] or, with a scale (AG8's props and plants), [..., sx, sy, sz];
-                # AG13's grass in a file of the tile's (`xforms_file`, by its node)
-                xfs = r["xforms"] if "xforms" in r else self.xforms_file(r)
-                comp.add_instances([unreal.Transform(
-                    unreal.Vector(xf[0] * 100.0, -xf[1] * 100.0, xf[2] * 100.0),
-                    unreal.Rotator(roll=0.0, pitch=0.0, yaw=-xf[3]),
-                    unreal.Vector(*(xf[4:7] if len(xf) >= 7 else (1, 1, 1))))
-                    for xf in xfs], False, False)
-                if r.get("cull_m"):
-                    # (AG13: the grass fades out between these distances, decision 13.9 a)
-                    comp.set_cull_distances(int(r["cull_m"][0] * 100.0),
-                                            int(r["cull_m"][1] * 100.0))
-                if r.get("no_shadow"):
-                    comp.set_cast_shadow(False)
+                self.set_parts(comp, r, sm)
                 if r.get("no_hlod"):
-                    for obj, prop in ((comp, "enable_auto_lod_generation"),
-                                      (a, "enable_auto_lod_generation")):
-                        try:
-                            obj.set_editor_property(prop, False)
-                        except Exception as ex:      # (a property this engine lacks)
-                            log(f"{r['key']}: {prop}: {ex}")
-                comp.set_default_custom_primitive_data_float_array(
-                    0, [float(v) for v in r["cpd"]])
-                for slot, asset in sorted((r.get("materials") or {}).items()):
-                    mi = self.mi2.get(asset)
-                    i = comp.get_material_index(unreal.Name(slot))
-                    if mi is not None and i >= 0:
-                        comp.set_material(i, mi)
-                if r.get("no_collision"):
-                    comp.set_collision_profile_name("NoCollision")
+                    try:
+                        a.set_editor_property("enable_auto_lod_generation", False)
+                    except Exception as ex:      # (a property this engine lacks)
+                        log(f"{r['key']}: enable_auto_lod_generation: {ex}")
                 a.set_actor_location_and_rotation(loc, rot, False, False)
                 a.set_editor_property("Ids", [unreal.Name(i) for i in r.get("ids") or
                                               [r["entry"]]])
@@ -2534,6 +2721,121 @@ class Importer:
 
             self.place(have, r["key"], r["hash"], cls, make, update,
                        f"CityGen/{r['category']}", STAGE2_ACTOR_VERSION)
+
+    def set_parts(self, comp, r, sm):
+        """An instanced component as a part record asks: its mesh, static, the transforms
+        (relative to its actor), cull distances, shadow, HLOD, Custom Primitive Data, slot
+        materials and collision."""
+        comp.set_static_mesh(sm)
+        comp.set_mobility(unreal.ComponentMobility.STATIC)
+        comp.clear_instances()
+        # [x, y, z, yaw] or, with a scale (AG8's props and plants), [..., sx, sy, sz];
+        # AG13's grass in a file of the tile's (`xforms_file`, by its node)
+        xfs = r["xforms"] if "xforms" in r else self.xforms_file(r)
+        comp.add_instances([unreal.Transform(
+            unreal.Vector(xf[0] * 100.0, -xf[1] * 100.0, xf[2] * 100.0),
+            unreal.Rotator(roll=0.0, pitch=0.0, yaw=-xf[3]),
+            unreal.Vector(*(xf[4:7] if len(xf) >= 7 else (1, 1, 1))))
+            for xf in xfs], False, False)
+        if r.get("cull_m"):
+            # (AG13: the grass fades out between these distances, decision 13.9 a)
+            comp.set_cull_distances(int(r["cull_m"][0] * 100.0), int(r["cull_m"][1] * 100.0))
+        if r.get("no_shadow"):
+            comp.set_cast_shadow(False)
+        if r.get("no_hlod"):
+            try:
+                comp.set_editor_property("enable_auto_lod_generation", False)
+            except Exception as ex:      # (a property this engine lacks)
+                log(f"{r['key']}: enable_auto_lod_generation: {ex}")
+        comp.set_default_custom_primitive_data_float_array(0, [float(v) for v in r["cpd"]])
+        for slot, asset in sorted((r.get("materials") or {}).items()):
+            mi = self.mi2.get(asset)
+            i = comp.get_material_index(unreal.Name(slot))
+            if mi is not None and i >= 0:
+                comp.set_material(i, mi)
+        if r.get("no_collision"):
+            comp.set_collision_profile_name("NoCollision")
+
+    def drop_members(self, a):
+        """An actor's member components (`cg.member`) taken off when it holds none any more:
+        an import back to the blockout, or one without groups (`CITYGEN_UE_GROUP=0`) over one
+        with them, would otherwise keep a building's parts and street front on it beside
+        the actors made for them."""
+        for c in a.get_components_by_class(unreal.PrimitiveComponent):
+            if "cg.member" in [str(t) for t in c.component_tags]:
+                self.member_components(a, [])
+                self.stats["actors"]["members_dropped"] = \
+                    self.stats["actors"].get("members_dropped", 0) + 1
+                return
+
+    def member_components(self, a, recs):
+        """AG16: the records an actor holds (the manifest's `holder`) as its own components:
+        an instanced part as an instanced static mesh component (for a Nanite mesh, which
+        Nanite culls per instance; a hierarchical one, with its cluster tree, for the rest),
+        its transforms relative to the actor; a single-mesh record (a street front, a sign, a
+        street, water or ground cover piece) as a static mesh component at its own pivot and
+        yaw. Each keeps its mesh, Custom Primitive Data, slot materials and collision and is
+        tagged `cg.member`, `cg.key=<record key>`, `cg.type=`, `cg.category=`, `cg.kind=` (a
+        part's) and `cg.id=` per citygen id (and a front's `cg.door=`); the ones the actor had
+        go first. Added as the editor adds a component to a placed actor (the subobject data
+        subsystem), so they are saved with it."""
+        sds = unreal.get_engine_subsystem(unreal.SubobjectDataSubsystem)
+        lib = unreal.SubobjectDataBlueprintFunctionLibrary
+        handles = sds.k2_gather_subobject_data_for_instance(a)
+        if not handles:
+            raise RuntimeError(f"{a.get_actor_label()}: no subobject data")
+        old = []
+        for hd in handles[1:]:
+            obj = lib.get_object(lib.get_data(hd))
+            if isinstance(obj, unreal.PrimitiveComponent) and \
+                    "cg.member" in [str(t) for t in obj.component_tags]:
+                old.append(hd)
+        if old:
+            sds.delete_subobjects(handles[0], old, None)
+        if not recs:
+            return               # (`drop_members`, also on an import of the blockout alone)
+        st = self.stats["stage2"]
+        for r in sorted(recs, key=lambda r: r["key"]):
+            sm = self.meshes_s2[r["mesh"]]
+            part = "entry" in r
+            if part:
+                nanite = bool(sm.get_editor_property("nanite_settings")
+                              .get_editor_property("enabled"))
+                cls = unreal.InstancedStaticMeshComponent if nanite else \
+                    unreal.HierarchicalInstancedStaticMeshComponent
+            else:
+                cls = unreal.StaticMeshComponent
+            hd, why = sds.add_new_subobject(unreal.AddNewSubobjectParams(
+                parent_handle=handles[0], new_class=cls))
+            comp = lib.get_object(lib.get_data(hd))
+            if comp is None:
+                raise RuntimeError(f"{r['key']}: no component added ({why})")
+            if part:
+                self.set_parts(comp, r, sm)
+                st["part_components"] = st.get("part_components", 0) + 1
+            else:
+                comp.set_static_mesh(sm)
+                comp.set_mobility(unreal.ComponentMobility.STATIC)
+                comp.set_world_location_and_rotation(
+                    ue_loc(*r["pivot"]), unreal.Rotator(roll=0.0, pitch=0.0,
+                                                        yaw=-r["yaw_deg"]), False, False)
+                comp.set_default_custom_primitive_data_float_array(
+                    0, [float(v) for v in r["cpd"]])
+                for slot, asset in sorted((r.get("materials") or {}).items()):
+                    mi = self.mi2.get(asset)
+                    i = comp.get_material_index(unreal.Name(slot))
+                    if mi is not None and i >= 0:
+                        comp.set_material(i, mi)
+                comp.set_collision_profile_name("NoCollision" if r.get("no_collision")
+                                                else "BlockAll")
+                st["mesh_components"] = st.get("mesh_components", 0) + 1
+            tags = ["cg.member", f"cg.key={r['key']}", f"cg.type={r['type']}",
+                    f"cg.category={r['category']}"]
+            if part:
+                tags.append(f"cg.kind={r['kind']}")
+            tags += [f"cg.id={i}" for i in (r.get("ids") or [r.get("entry", r["key"])])]
+            tags += [f"cg.door={d}" for d in r.get("doors", [])]
+            comp.set_editor_property("component_tags", [unreal.Name(t) for t in tags])
 
     def xforms_file(self, r):
         """AG13: an instance actor's transforms from its tile's file (read once a file)."""
@@ -2816,13 +3118,16 @@ class Importer:
                               "fly_classes_saved": saved}
 
     def streaming(self):
-        """World Partition for flying over the city: the main partition's cells a tile wide
-        (256 m), loaded `view_m` around the player; the far view (the HLODs `citygen unreal`
-        builds after the import) the level's instanced HLOD layer alone, the city's own
-        meshes and materials in cells twice as wide out to the whole city, nothing baked
-        (the merged layer the engine puts over it is cut off), the last HLOD partition left
-        unused at twice that. Set only where they differ."""
-        view = int(round(float(JOB.get("view_m", 1500.0)) * 100.0))
+        """World Partition for flying over the city: the main partition's cells half a tile
+        wide (`MAIN_CELL_M`, 128 m; a tile, 256 m, before AG16), loaded `view_m` around the
+        player; the far view (the HLODs `citygen unreal` builds after the import) the level's
+        instanced HLOD layer alone, the city's own meshes and materials (an HLOD actor per
+        main cell, streamed in cells twice as wide) out to the whole city, nothing baked (the
+        merged layer the engine puts over it is cut off), the last HLOD partition left
+        unused at twice that. Set only where they differ. (AG16: when a main cell goes, its
+        HLOD actor's components take their render state in one frame; a dense 256 m cell's
+        1,400 made a 50 to 64 ms frame on Delta Megacity.)"""
+        view = int(round(float(JOB.get("view_m", VIEW_M)) * 100.0))
         b = self.man["bounds"]
         span = int(math.ceil(math.hypot(b[2] - b[0], b[3] - b[1]) * 100.0))
         wp = self.world_settings().get_editor_property("world_partition")
@@ -2836,7 +3141,7 @@ class Importer:
             return
         # the main partition has the smallest cells, each HLOD one twice its parent's
         parts.sort(key=lambda p: (p.get_editor_property("CellSize"), p.get_name()))
-        cell = int(self.man["tile_size_m"] * 100.0)
+        cell = int(MAIN_CELL_M * 100.0)
         want = [(cell, view), (2 * cell, max(2 * view, span)),
                 (4 * cell, max(4 * view, span))]
         changed = 0
@@ -2912,8 +3217,18 @@ class Importer:
             if isinstance(a, unreal.StaticMeshActor):
                 sm = a.static_mesh_component.static_mesh
                 mesh = sm.get_path_name() if sm else ""
-            rows.append([tags, mesh, [round(loc.x, 2), round(loc.y, 2), round(loc.z, 2),
-                                      round(rot.yaw, 3)]])
+            row = [tags, mesh, [round(loc.x, 2), round(loc.y, 2), round(loc.z, 2),
+                                round(rot.yaw, 3)]]
+            # (AG16: the records it holds as components, by key, so an import back to the
+            # blockout that kept a building's parts on it differs from the first)
+            members = sorted(
+                str(t)[7:] for c in a.get_components_by_class(unreal.PrimitiveComponent)
+                for t in c.component_tags
+                if str(t).startswith("cg.key=") and "cg.member" in
+                [str(x) for x in c.component_tags])
+            if members:
+                row.append(members)
+            rows.append(row)
         rows.sort()
         assets = []
         for folder in ("Meshes", "Props", "Materials", "Data", STAGE2_FOLDER):

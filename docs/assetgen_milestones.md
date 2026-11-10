@@ -2553,6 +2553,125 @@ city and Vesper Bay), `golden_streets.json`, `golden_props.json` and `golden_gro
 briefs; the Vesper Bay buildings, their shells, the spike and the triangulation are
 unchanged. Notes: `docs/progress/fix_nexus_water/`.
 
+## AG16: performance
+
+**Built.** Scope 14.17, issue #96: a whole city's runtime and import cost in Unreal,
+measured on the Windows PC (RTX 4070 Ti, 32 GB, decision 13.4's target), then cut at its
+source, before stage 3 builds on it. Delta Megacity as main built it (65d5ba8, model sha256
+`6a0ffbba53eb...`), the same city measured before and after every change. Tests:
+`tests/test_bench.py`, `tests/test_unreal_ag16.py`, `tests/assetgen/test_ag_scene.py` (and
+the Unreal tests updated); results `docs/progress/AG16/`.
+
+- **The benchmark** (`citygen unreal BUILD UPROJECT --bench` or `--bench-only`;
+  `citygen/bench.py`, the driver `UCityGenBench` in the play plugin): a fixed route from the
+  build alone (sidewalk walks in the three districts with the most stage 2 actors, a drive
+  at street level along the lanes, a flight at 150 m across the city, a teleport back),
+  each path started by a teleport and a wait for its cells (a load), in a standalone game
+  process (`-game`) at 2560 x 1440 (windowed fullscreen, kept DPI-aware), by day and night,
+  native and at a 67% screen percentage with TSR, after warm-up flights by day and night.
+  Every frame's frame, game, render, RHI and GPU times, draw calls, streaming state, VRAM
+  and RAM, and the engine's CSV profile beside them (Nanite root pages, the GPU's passes);
+  per pass and part of the route p50, p95, p99 and max, the thread that sets the frame,
+  hitches over 50 and 100 ms, frames not streamed around the player, memory and the loads;
+  over three runs the median and the spread; JSON, a table, frame-time graphs and the last
+  run's screenshot of each segment start in `docs/progress/AG16/bench/<city>/<label>`.
+  `bench.side_by_side` pairs two benchmarks' shots. While a run plays the CPU other
+  processes take is sampled every 30 s (`others.json`), and a run whose game or render
+  thread median is 1.5 times the fastest run's at the same GPU time is named under the
+  table (`bench.starved`).
+- **Before** (`bench/delta_megacity/before`): the median frame 8 to 13 ms walking and
+  flying, 18 to 20 ms driving, the 95th percentile 27 to 49 ms everywhere, 53 to 61 frames
+  over 100 ms a pass, always the game thread; the GPU's p95 7 to 12 ms. The slow frames
+  waited 13 ms on physics (bodies made and dropped as cells streamed) and spent 4 ms
+  loading: 54,000 to 57,000 of the city's 73,772 actors were loaded at once with the 1,500 m
+  range, each its own package in an uncooked game (what play-in-editor and `-game` run).
+- **Fixes** (all in the exporter, `docs/unreal_export.md`, "From AG16"; no generator output
+  changed):
+  - **meshes shared across tiles** (`unreal.share_meshes`): AG2's parts and AG8's signs are
+    named by their content, so a node of one name in several tiles' packs is imported once;
+    53,911 distinct Nanite meshes to 44,667 (root pages 52,224 to 43,008);
+  - **records as components** (`unreal.group_actors`): an entry's instanced parts on its
+    own actor (else a group actor), a building's street front on the building's actor, a
+    tile's signs, street pieces, water pieces and ground cover on one group actor per kind
+    and 64 m cell (an entry with instanced parts of its own, AG12's riprap banks, keeps
+    its own actor); 73,772 actors to 13,644, the components as they were; the group
+    Blueprint's root static in the Blueprint (else its members fail to attach as the level
+    loads: 160,000 log lines in a game, far worse than before);
+  - **no collision on props no one touches** (awnings, facade AC units, wall lights,
+    litter): 39,500 of 71,000 instance bodies;
+  - **underwater volumes switched by distance** (the play actor): the engine weighed 660 of
+    them against the view every frame by a physics query, 1.3 to 1.5 ms;
+  - **the masters read Custom Primitive Data through per-instance custom data**
+    (`STAGE2_VERSION` 10): the instanced HLODs carry each building's data per instance, so
+    the far city keeps its tints, night schedules and seeds (it was dark and untinted past
+    the loading range);
+  - **streaming**: World Partition's main cells 128 m and loaded 768 m around the player
+    (256 m and 1,500 m): an HLOD actor per main cell, whose components take their render
+    state at once when the cell goes;
+  - **texture streaming off** in the project (`r.TextureStreaming=0`): the render asset
+    streaming manager's per-level work as cells came and went made 36 ms to 2.8 s frames;
+    VRAM stayed at 7 GB;
+  - **the Nanite pool from the city** (`unreal.nanite_pool_mb`): what its meshes' root pages
+    leave of Nanite's 2 GB buffer, 256 to 1,024 MB (Delta 512 MB, 256 before);
+  - **the import's memory** (#84): packs imported, saved and let go of 150 at a time,
+    meshes loaded again when an actor asks; the first import had held 39 GB committed.
+    Offloads take their actors by guid (by label, an actor made again under its key, AG8's
+    cables over M15's prototypes, brought the destroyed one back once the collections let
+    go of it); an actor whose key gets another class is destroyed and the level saved
+    before anything is made (`clear_moved`: destroyed later, some kept their packages and
+    came back with the next import); an actor that holds no records any more loses its
+    member components (back to the blockout, or without groups over groups); and an entry
+    with instanced parts of its own keeps its own actor (Delta's 72 riprap banks had joined
+    their tile's water group, so their 26,257 stones were never placed).
+- **After** (`bench/delta_megacity/after`, the final code imported over the level, three
+  runs): the 95th percentile 8.3 to 12.6 ms walking, 8.9 to 12.0 ms driving and 10.7 to
+  12.8 ms flying, by day and night, native and at 67% TSR (each within 0.5 ms over the
+  runs), the median 7 to 11 ms: 60 fps everywhere. No moving frame over 100 ms in any
+  pass's median run (one run of the night walk at 67% had one; the longest elsewhere
+  94 ms); VRAM at most 7.6 GB, RAM 8.5 to 10.2 GB, root pages 43,008, loads 13 to 19 s a
+  pass; the frame now set by the render thread or the GPU. An earlier set of three runs,
+  before the riprap fix below, gave the same within 0.3 ms. The city looks the same: every
+  view before and after side by side in `docs/progress/AG16/before_after/`.
+- **Left as they are, measured**: garbage collection (the reachability analysis over every
+  object of an uncooked game, 70 to 350 ms about every 40 s while the city streams) is what
+  remains of the frames over 100 ms. UE 5.8's experimental async physics bodies and
+  incremental garbage collection, no forced collection after a cell streams out and actor
+  clustering were tried and left out (no gain, or far worse). An import over an earlier
+  level still loads all its actors first (37 GB committed for Delta's). A first launch
+  after an import is starved of CPU (the derived data cache, pipeline states, the OS file
+  cache); a cooked build carries the derived data. A discarded second set of after runs
+  had a night freeze in its run 3 from outside the game (a 1,845 ms frame with 8 ms of
+  game-thread work while another process wrote 0.9 GB to the disk); the final set has
+  none. A small-city A/B in two fresh projects, grouped and not, draws the same views
+  (AG3's fronts included).
+- **Budgets** (`assetgen/scene.py`, in `asset_budget` at the end of `assetgen build`, with
+  `assets/scene_budget.json`): the city's scene as the exporter makes it (its own manifest:
+  actors, components, distinct Nanite meshes, instances, root pages against the pool)
+  held per city (25,000 actors, 110,000 components, 52,000 meshes, 3.5 million instances)
+  and per 256 m tile (600, 2,500, 2,100, 90,000), about half again over Delta's.
+- **Vesper Bay** (imported and benchmarked with one command, `bench/vesper_bay/after`): the
+  95th percentile 8.0 to 13.2 ms, the median 6.7 to 11.5 ms walking, driving and flying, by
+  day and night, native and at 67% TSR, no frame over 100 ms in the median run, VRAM at most
+  7.5 GB; 13,928 actors, 41,969 meshes, 3.1 million instances. Its first run, right after
+  the import, was starved of CPU throughout: the render, game and RHI threads about twice
+  as slow as in runs 2 and 3 at the same GPU time (render p50 18.4 against 8.8 ms walking by
+  day), with half the frames, so every p95 spread reads up to 29 to 45 ms. The game builds
+  the meshes' derived data on the CPU's cores while it plays (3,775 lines of waiting for
+  static meshes against 693); Delta's first run after its final import did the same
+  (render p50 23 to 24 against 9.5 ms). No Defender scan ran meanwhile. Runs 2 and 3 agree
+  within 0.2 ms, and the median of three leaves run 1 out.
+
+**Open:**
+- Garbage collection's 70 to 350 ms frames, a few a pass: an uncooked game's object count; a
+  cooked build (and time-sliced reachability once it is not experimental) is where to cut it.
+- The night drive view (`docs/progress/AG16/night_drive/`): the crowns lit by the nearest
+  lamps about 5% darker than before (the light pool a review saw go is unchanged, pixel for
+  pixel); not timing, grouping, texture streaming, the Nanite pool or the HLODs.
+- DLSS, FSR and XeSS (`--upscaler`), later as the scope says; the benchmark already measures
+  TSR at 67%.
+- Mac = x86: no generator output changed (only `assets/scene_budget.json` is new), so the
+  deferred determinism check has nothing of AG16's to compare.
+
 ## Order
 
 ```

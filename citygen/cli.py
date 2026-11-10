@@ -306,7 +306,7 @@ def cmd_unreal(args: argparse.Namespace) -> int:
                             play=args.play, fly_speed=args.fly_speed,
                             startup=not args.no_startup, view_m=args.view_range,
                             play_features=not args.no_play) \
-            if not args.check_only else None
+            if not (args.check_only or args.bench_only) else None
         if res is not None:
             print(U.import_summary(res))
             if not res.get("ok"):
@@ -332,6 +332,19 @@ def cmd_unreal(args: argparse.Namespace) -> int:
             if not chk.get("ok"):
                 print(chk.get("error", ""), file=sys.stderr)
                 return EXIT_INVALID
+        if args.bench or args.bench_only:
+            from . import bench as B
+            want = [n.strip() for n in args.bench_passes.split(",") if n.strip()]
+            passes = [p for p in B.PASSES if p[0] in want]
+            if not passes:
+                print(f"error: --bench-passes: none of {', '.join(p[0] for p in B.PASSES)}",
+                      file=sys.stderr)
+                return EXIT_USAGE
+            br = B.bench(build, args.uproject, engine=args.engine, runs=args.bench_runs,
+                         passes=passes, label=args.bench_label, out=args.bench_out,
+                         timeout=args.timeout)
+            print(B.table(br))
+            print(f"wrote {br['out']}")
     except (RuntimeError, FileNotFoundError, subprocess.TimeoutExpired) as e:
         print(f"error: {e}", file=sys.stderr)
         return EXIT_USAGE
@@ -629,9 +642,9 @@ def build_parser() -> argparse.ArgumentParser:
                          "Person character in a --new-project project)")
     ue.add_argument("--fly-speed", type=float, default=50.0, metavar="M_PER_S",
                     help="the fly pawn's top speed in m/s (default 50)")
-    ue.add_argument("--view-range", type=float, default=1500.0, metavar="M",
+    ue.add_argument("--view-range", type=float, default=768.0, metavar="M",
                     help="how far around the player the level streams in, in meters "
-                         "(default 1500)")
+                         "(default 768; past it the instanced HLODs draw the city)")
     ue.add_argument("--no-hlod", action="store_true",
                     help="skip building the level's HLODs after the import (default: built, "
                          "the far view beyond --view-range while flying; minutes for a "
@@ -661,6 +674,23 @@ def build_parser() -> argparse.ArgumentParser:
                     help="width of the rendered views in pixels (default 3840; 7680 for 8K)")
     ue.add_argument("--timeout", type=float, default=7200.0,
                     help="seconds per editor run (default 7200)")
+    ue.add_argument("--bench", action="store_true",
+                    help="AG16: after the import (or alone, with --check-only's sense: "
+                         "--bench-only), run the benchmark: a fixed route (sidewalk walks "
+                         "in three districts, a drive at street level, a flight across the "
+                         "city at 150 m, a teleport) in a standalone game process at 1440p, "
+                         "by day and night, native and at a 67%% screen percentage with TSR; "
+                         "the results as JSON and a table in docs/progress/AG16/bench/<city>")
+    ue.add_argument("--bench-only", action="store_true", help="the benchmark without importing")
+    ue.add_argument("--bench-runs", type=int, default=3,
+                    help="game processes over the route (default 3: the spread is the "
+                         "variance)")
+    ue.add_argument("--bench-label", default="bench",
+                    help="the results' folder under docs/progress/AG16/bench/<city> "
+                         "(default bench)")
+    ue.add_argument("--bench-passes", default="day_native,day_tsr67,night_native,night_tsr67",
+                    help="the passes, by name (default all four)")
+    ue.add_argument("--bench-out", metavar="DIR", help="the results' folder (default as above)")
     _progress_args(ue)
     ue.set_defaults(func=cmd_unreal)
 

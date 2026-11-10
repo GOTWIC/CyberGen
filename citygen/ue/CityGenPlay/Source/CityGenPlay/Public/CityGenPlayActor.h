@@ -187,6 +187,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "CityGen")
 	FString GetStatus() const;
 
+	/** The lit lamps nearest the view, a JSON array: lamp index, distance (m), light index,
+	 *  place (cm), intensity (cd), shadows (the benchmark logs it with each shot). */
+	FString GetLampReport(int32 Count = 12) const;
+
 	bool IsMapOpen() const { return bMapOpen; }
 	bool IsDevMenuOpen() const { return bDevOpen; }
 	bool IsFreeCam() const;
@@ -222,6 +226,7 @@ private:
 	void Hold(APawn* Pawn, bool bHold);
 	void WaitForStreaming(APawn* Pawn, const FVector& Target);
 	void UpdateLamps();
+	void UpdateUnderwater();
 	int32 NearestWalk(const FVector2D& At) const;
 
 	UPROPERTY(Transient)
@@ -256,6 +261,8 @@ private:
 	FVector WaitTarget = FVector::ZeroVector;
 	double WaitStart = 0.0;
 	double LampsAt = -1.0;
+	double UnderwaterAt = -1.0;
+	int32 UnderwaterOn = 0;
 	int32 LampsOn = 0;
 	int32 PoolsOn = 0;
 	FString ToastText;

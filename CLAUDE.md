@@ -649,7 +649,7 @@ makes the city the project's startup and default map (`unreal.set_startup_map`;
 `--no-startup`) and sets what Play puts you in: the fly pawn (`--play fly`, the default;
 `Core/BP_CityGenFlyPawn`, a SpectatorPawn with no collision at `--fly-speed`, spawned by
 `GM_CityGenFly`, the level's game mode override) or the project's own (`--play walk`);
-World Partition's main grid is 256 m cells loaded `--view-range` (1500 m) around the
+World Partition's main grid is 128 m cells (256 m before AG16) loaded `--view-range` (768 m since AG16) around the
 player and the level's instanced HLOD layer reaches the whole city (its merged parent
 layer cut off; partitions set by C++ property name, `CellSize`, `LoadingRange`; every
 master `used_with_instanced_static_meshes`, or the HLODs draw flat gray), and the HLODs are
@@ -1510,9 +1510,9 @@ Outputs: `docs/progress/fix_nexus_water/`.
 
 ## Asset generator (assetgen)
 
-`docs/assetgen_scope.md` is the spec for stage 2 (milestones AG0 to AG17, section 14; planned:
-AG16 performance, a benchmark and structural fixes before stage 3; AG17, road surfaces by
-construction from stage 1's M22 pavement map, section 14.18, is done), its log
+`docs/assetgen_scope.md` is the spec for stage 2 (milestones AG0 to AG17, section 14; AG16,
+performance, section 14.17, and AG17, road surfaces by construction from stage 1's M22
+pavement map, section 14.18, are done), its log
 `docs/assetgen_milestones.md`. Package `assetgen/` beside `citygen/`, which it imports read
 only (`model`, `dmath`, `geom`; AG17's street stage also `pavement` for the cuts and stations); tests in `tests/assetgen/` (`test_ag_*.py`, helpers in
 `agtools.py`, never a second `conftest.py`, which would shadow `tests/conftest.py`).
@@ -2178,6 +2178,42 @@ AG17 (road surfaces by construction, after M22; scope 14.18) is in place, in
 - **AG8:** props keep off the map's carriageway faces (`_Fit`) and stand on a raised junction's
   pads as AG7 draws them (`_RaisedCorners`), both from the map. No exporter change.
 Results: `docs/progress/AG17/`.
+
+AG16 (performance) is in place (scope 14.17, issue #96; `docs/unreal_export.md`, "From AG16"):
+- **Benchmark** (`citygen unreal BUILD UPROJECT --bench` or `--bench-only`, `--bench-runs`,
+  `--bench-label`, `--bench-passes`; `citygen/bench.py`, the driver `UCityGenBench` in the
+  play plugin, started by `-CityGenBench=<job>`): a route from the build alone (three
+  sidewalk walks, a drive along the lanes, a flight at 150 m, a teleport) in a standalone
+  `-game` process at 2560 x 1440 (windowed fullscreen, kept DPI-aware), day and night,
+  native and 67% TSR, after warm-up flights; per frame the frame, game, render, RHI and GPU
+  times, draw calls, streaming, VRAM and RAM, beside the engine's CSV profile; JSON, a table,
+  graphs and the last run's shots in `docs/progress/AG16/bench/<city>/<label>`; it waits while
+  other heavy processes run (`bench.busy`), samples their CPU through each run and names a
+  CPU-starved run (`bench.starved`: a first run after an import is one). `bench.side_by_side`
+  pairs two benchmarks' shots.
+- **Exporter fixes**: a part or sign node of one name imported once for every tile
+  (`unreal.share_meshes`); records as components (`unreal.group_actors`, the manifest's
+  `groups` and `holder`: an entry's parts on its actor or a `BP_CityGenGroup`, a street front
+  on its building, a tile's signs, street, water and cover pieces on a group per kind and 64
+  m cell; `CITYGEN_UE_GROUP=0` keeps an actor each), the group Blueprint's root static
+  (`CORE_VERSION` 3); props no one touches without collision (`NO_COLLISION`); the masters
+  read Custom Primitive Data through per-instance custom data (`per_instance`,
+  `STAGE2_VERSION` 10: the instanced HLODs keep each building's look); World Partition's main
+  cells 128 m (`MAIN_CELL_M`) loaded 768 m around the player (`VIEW_M`); `r.TextureStreaming=0`
+  and the Nanite pool from the city (`nanite_pool_mb`, `PROJECT_SETTINGS`) in the project; the
+  play actor enables an underwater volume only near the view (`UpdateUnderwater`); stage 2's
+  packs imported, saved and let go of 150 at a time (`CITYGEN_UE_PACK_CHUNK`, the `Meshes`
+  map, #84; offloads by actor guid, an actor whose class changes destroyed and saved
+  first, `clear_moved`). Delta Megacity: 73,772 actors to 13,644, 53,911 distinct Nanite
+  meshes to 44,667, the 95th percentile frame from 27 to 49 ms to about 8 to 13 ms.
+- **Budgets** (`assetgen/scene.py`, in `asset_budget` at the end of `assetgen build`, with
+  `assets/scene_budget.json`): the scene as the exporter's own manifest makes it (actors,
+  components, distinct Nanite meshes, instances, root pages against the pool) per city and
+  per 256 m tile (`CITY`, `TILE`).
+- **Left**: garbage collection in an uncooked game, 70 to 350 ms about every 40 s while
+  streaming; UE 5.8's experimental async physics bodies and incremental collection made no
+  gain or worse.
+Results: `docs/progress/AG16/`.
 
 Progress output: `assetgen build`, `preview`, `materials preview|board`, `library`, `streets`,
 `water`, `props` and `ground` print a line per stage, a bar (n of N, time left) where the count is known and
