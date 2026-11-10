@@ -192,3 +192,25 @@ def test_tiles_are_citygens():
     from citygen.blockout import tile_key, tile_name
     for x, y in ((0.0, 0.0), (-0.01, 255.99), (-1750.0, 1749.0), (512.0, -256.0)):
         assert PL.tile_of(x, y) == tile_name(*tile_key(x, y))
+
+
+def test_illuminance():
+    """The lux preview's E = I cos(theta) / d^2 times Unreal's window: under a point light
+    I / h^2; a spot aimed away lights nothing under it; a face nothing behind it."""
+    from atmosgen import lux as LX
+    sched = {"always": [1.0] * 24}
+    base = {"on": True, "schedule": "always", "reach_m": 100.0, "aim": [0.0, -90.0]}
+    pt = {**base, "shape": "point", "pos": [0.5, 0.5, 5.0], "cd": 100.0}
+    E = LX.illuminance([pt], 0.0, 0.0, 3, 1.0, 23.0, sched)
+    win = (1 - (5.0 / 100.0) ** 4) ** 2
+    assert math.isclose(E[0, 0], 100.0 / 25.0 * win, rel_tol=1e-9)
+    assert E[0, 1] < E[0, 0]
+    spot = {**base, "shape": "spot", "pos": [0.5, 0.5, 5.0], "cd": 100.0, "aim": [0.0, 90.0],
+            "cone": [30.0, 40.0]}
+    assert LX.illuminance([spot], 0.0, 0.0, 3, 1.0, 23.0, sched)[0, 0] == 0.0
+    face = {**base, "shape": "rect", "pos": [10.5, 0.5, 3.0], "cd": 100.0, "aim": [0.0, 0.0]}
+    E = LX.illuminance([face], 0.0, 0.0, 21, 1.0, 23.0, sched)
+    assert E[0, 15] > 0.0 and E[0, 5] == 0.0          # in front of it, not behind
+    dark = {**pt, "schedule": "never"}
+    assert LX.illuminance([dark], 0.0, 0.0, 3, 1.0, 23.0,
+                          {"never": [0.0] * 24}).max() == 0.0

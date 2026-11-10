@@ -253,8 +253,10 @@ at the lamp head sat inside the lamp mesh's own shadow and reached nothing on th
   neon color, no shadow.
 
 Setting night sets `MPC_CityGen`'s `Hour` to the actor's `NightHour` (21 by default).
-Stage 3 (atmosgen) takes the lighting over when it comes; the menu's switch is a
-developer's.
+Stage 3 (atmosgen) takes the lighting over (decision 12.2 of its scope); the menu's switch is
+a developer's. Since AT0 the console variable `CityGen.PlayLamps` (1 by default) turns the
+lamps, pools and washes off when 0, which atmosgen's runtime sets while its plan's lights
+are on ("atmosgen's runtime (AT0)" below).
 
 **How it is built.** The play features are game logic (input, a drawn overlay, possession,
 teleporting), which Unreal's Python cannot write into a Blueprint's graph, so they are a
@@ -337,7 +339,7 @@ high resolution shot), and showing the lane and walkway graphs over the city for
 |---|---|
 | 1 citygen | the blockout, props and plants, graphs, player start, a default sun and sky (M15); terrain: the ground per tile, walls, bores, terrain viaducts and columns by id (M13); decks: the slab, deck streets and the buildings on them tagged with their level, the manifest's decks, levels in the graphs (M14); water and ground: swim volumes per water body and tile, water at its surface, beds, banks by kind and the ground cover by kind with a material each (M16) |
 | 2 assetgen | buildings replacing their blockout boxes by id (own pivots, parts as instances, simple collision), textured master materials with per-actor parameters, street meshes replacing the joined pieces, prop and plant variants, signs, LODs for the pieces Nanite does not take, HLOD and Lumen settings (per milestone: `docs/assetgen_scope.md` section 14) |
-| 3 atmosgen | lights (windows, signs, street lights), sky, weather, fog and post volumes, replacing M15's default sun and sky |
+| 3 atmosgen | lights (street and wall lights, shopfronts, signs as lit faces, floods), sky, time, weather, fog and post volumes, replacing M15's default sun and sky; rendered by its runtime plugin `CityGenAtmos` (AT0: the plugin's skeleton, its assets, the plan's contribution format; "atmosgen's runtime (AT0)" below) |
 | 4 lifegen | traffic, crowd and transit systems on the graphs, spawners |
 | 5 storygen | story actors, triggers, sequences |
 
@@ -1391,6 +1393,62 @@ spec of the library and masters: `assetgen/materials/catalog.py`):
   room, the glass and the stains, their sample parameters defaulting to a texture of the
   build of each kind; the instances get their textures, scalars and vectors; each actor its
   era instances as override materials on its component (by slot name).
+
+## atmosgen's runtime (AT0)
+
+Stage 3 (`docs/atmosgen_scope.md`) renders its plan in Unreal through a C++ runtime plugin
+of its own, `CityGenAtmos` (`citygen/ue/CityGenAtmos`), as the play features do theirs:
+
+- **Built with the play features:** `unreal_play.PLUGINS` is both plugins; `citygen unreal`
+  (and `--bench`) copies both into the project (`Plugins/CityGenPlay`,
+  `Plugins/CityGenAtmos`), enables both in the .uproject and builds them in one
+  UnrealBuildTool run, one stamp for both (`plugin_hash` covers both sources). A project
+  without a compiler imports without either, as before.
+- **Its assets from code** (`citygen/unreal_atmos.make_assets`, the editor script
+  `citygen/ue/atmos_assets.py`, a headless run skipped when the project's
+  `Saved/citygen_atmos_assets.txt` names this version): `/Game/CityGen/Core/Atmos/`
+  `MPC_CityGenAtmos` (`Rain`, `Wetness`, `FogDensity`, `WindMS`: a collection of its own, so
+  making it recompiles none of the city's materials), `M_CgRain` (streak cards, translucent
+  and lit by the translucency volume, falling by world position offset with a phase per
+  instance and drifting with the wind) and `M_CgWet` (a DBuffer decal: darker and glossier
+  surfaces, puddles by a value noise on the plan). Niagara is not used: UE 5.8 has no API to
+  author an emitter from code (scope 4.2).
+- **The controller** (`ACityGenAtmos`, an `AInfo` always loaded, not hidden): reads a plan
+  (`BUILD/atmos`: `atmos_plan.json`, `lights/<tile>.json`) into a 64 m spatial index; every
+  0.2 s keeps the `MaxLive` lights nearest the view within `MidRangeM` live (512 within
+  300 m by default, the plan's tiers; near-tier lights, the shop signs, only within
+  `NearRangeM` 60 m), the nearest `MaxShadowed` (16) of those that may cast shadows with
+  shadows, the farthest fifth fading out; pools of spot, point and rect light components
+  reused (rect lights in nits, the rest in candela); each light scaled by its schedule at
+  `Hour` and by $2^{EV_{scene} - EV_{plan}}$ (the scene's -3 EV100 night against the plan's
+  `night_ev100`), flickering ones dropping by a hash of their seed and the 1/12 s step. It
+  sets `CityGen.PlayLamps` 0 while its lights are on (the play features' lamps, pools and
+  washes go dark, decision 12.2). It also holds AT0's prototypes of the air and weather: an
+  exponential height fog with volumetric fog by the plan's weather, the rain cards round the
+  view (4,000, 25 m round it, 24 m tall), the wet decal (600 m square, 1.4 m deep round the
+  street level, following the view in 40 m steps), and MegaLights by a post-process volume
+  of its own.
+- **Console commands:** `CityGenAtmos.Lights`, `.Fog`, `.Rain`, `.Wet`, `.MegaLights [0|1]`,
+  `.Tiers LIVE RANGE_M SHADOWED`, `.Hour H`, `.Gain G`, `.Scattering S`, `.Load DIR`,
+  `.Status` (one JSON line: lights, live by shape, shadowed, candidates, the live set's
+  update time, the scale, the effects, `r.RayTracing`).
+- **AT0 places nothing in the level.** A game started with `-CityGenAtmosPlan=<dir>` gets the
+  controller from a world subsystem (`UCityGenAtmosSubsystem`), dark until a command turns
+  it on (`-CityGenAtmosOn` starts it lit). The plan's contribution
+  (`BUILD/atmos/unreal_contribution.atmos.json`: `atmos`, the controller, and
+  `atmos.lights.<tile>`, a spawner per tile) is layer 3's format; AT1 places them in the
+  level, the tiles' lights streamed with their cells, and replaces the play features'
+  lamps.
+- **The benchmark:** `--bench-atmos PLAN_DIR` runs the game with the plan, makes the assets
+  first and adds AT0's passes to `--bench-passes` (`bench.ATMOS_PASSES`: `night_plan`,
+  `night_plan_fog`, `night_plan_all` with rain and wet streets, `night_plan_256` and
+  `night_plan_1024` for the live set's size, `night_play_air` the effects over the play
+  features' lamps, `night_plan_mega` and `night_plan_mega_2048` with MegaLights); a pass's
+  `commands` run at its start (`UCityGenBench`), every other pass switches atmosgen off, the
+  night's warm-up has all of it on. `--bench-rt` starts the game with hardware ray tracing
+  (`bench.RT_INI`, for MegaLights), the project's settings untouched. `bench.busy` also waits
+  for another benchmark's game (a packaged one too: `-CityGenBench=` on its command line)
+  and its driver.
 
 ## Milestones and checks
 

@@ -218,3 +218,20 @@ def test_job_with_atmosgens_passes(tmp_path):
 def test_atmos_assets_version():
     from citygen import unreal_atmos as UA
     assert UA.assets_version().isdigit()
+
+
+def test_busy_sees_any_benchmark(monkeypatch):
+    """AT0: another benchmark's game (a packaged one: the project's own executable) and its
+    driver count as busy; a shell that only names one in its command line does not."""
+    import subprocess
+    rows = ["101\tCityAG16.exe\tCityAG16.exe /Game/X -CityGenBench=C:/b/job.json -csvGpuStats",
+            "102\tpython.exe\tpython -u bench_packaged.py 3",
+            "103\tbash.exe\tbash -c until ! powershell ... -CityGenBench=* ; do sleep 60; done",
+            "104\tnotepad.exe\tnotepad.exe notes.txt",
+            "105\tUnrealEditor.exe\tUnrealEditor.exe P.uproject"]
+
+    class R:
+        stdout = "\n".join(rows)
+    monkeypatch.setattr(B.os, "name", "nt")
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: R())
+    assert B.busy() == ["CityAG16.exe 101", "python.exe 102", "UnrealEditor.exe 105"]
