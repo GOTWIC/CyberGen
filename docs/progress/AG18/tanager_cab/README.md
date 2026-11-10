@@ -3,7 +3,7 @@
 ![sheet](sheet.jpg)
 
 - **Brand, model, type:** Tanager Cab, driverless city taxi, a one-box people carrier (all names made up). 4 passenger seats in two pairs facing each other, no driver's seat: a sensor bar over the windshield drives it.
-- **Size:** 4.52 m long, 1.85 m wide over the arch trims (1.99 m over the corner cameras, 2.15 m with the step out), 1.78 m to the roof, 1.95 m over the roof sign, wheelbase 3.0 m, wheels 0.66 m, ground clearance 0.225 m, cabin floor 0.30 m off the road.
+- **Size:** 4.55 m long over the bumper pads (4.50 m body), 1.85 m wide over the arch trims (1.99 m over the corner cameras, 2.15 m with the step out), 1.78 m to the roof, 1.95 m over the roof sign, wheelbase 3.0 m, wheels 0.66 m, ground clearance 0.225 m, cabin floor 0.30 m off the road.
 - **Triangles:** 285,996 in 165 objects (body at subdivision 3).
 - **Build:** `vehicles/blender.sh vehicles/cars/tanager_cab.py --out docs/progress/AG18/tanager_cab --sheet` (`CAB_SHUT=1` builds it with both doors closed, `CAB_HULL=1` with `--preview` shows the bare hull; close-ups: `--views door,tail,nose,sign`).
 
