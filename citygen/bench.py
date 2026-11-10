@@ -371,7 +371,9 @@ def bench(build_dir: str | Path, uproject: str | Path, engine: str | None = None
         if rd.exists():
             shutil.rmtree(rd)
         rd.mkdir(parents=True)
-        jb = job(rt, rd, passes, resolution=resolution, shots=k == 0)
+        # (the last run shoots: its caches are warm; a first run after an import builds
+        # the meshes' derived data as it loads them and draws coarse Nanite meanwhile)
+        jb = job(rt, rd, passes, resolution=resolution, shots=k == runs - 1)
         jp = rd / "job.json"
         jp.write_text(json.dumps(jb, indent=1) + "\n", encoding="utf-8", newline="\n")
         say(f"bench: run {k + 1} of {runs} ({len(jb['passes'])} passes, "
@@ -670,24 +672,24 @@ def table(res: dict) -> str:
 
 
 def write_results(res: dict, dest: Path, run_dirs: list[Path]) -> None:
-    """bench.json and bench.md, and a frame-time graph along the route per pass of the first
-    run (frame_times_<pass>.png)."""
+    """bench.json and bench.md, and a frame-time graph along the route per pass of the last
+    run (frame_times_<pass>.png), with its screenshots."""
     dest.mkdir(parents=True, exist_ok=True)
     (dest / "bench.json").write_text(json.dumps(res, indent=1) + "\n", encoding="utf-8",
                                      newline="\n")
     (dest / "bench.md").write_text(table(res), encoding="utf-8", newline="\n")
     try:
-        graphs(run_dirs[0], dest, res)
+        graphs(run_dirs[-1], dest, res)
     except Exception as e:          # noqa: BLE001 (a graph is not worth failing the run)
         (dest / "graph_error.txt").write_text(str(e) + "\n", encoding="utf-8")
-    shots(run_dirs[0], dest)
+    shots(run_dirs[-1], dest)
 
 
 SHOT_W = 1600
 
 
 def shots(rd: Path, dest: Path) -> list[Path]:
-    """The first run's screenshots (each segment's start in each pass) as JPEGs SHOT_W
+    """A run's screenshots (each segment's start in each pass) as JPEGs SHOT_W
     wide in `dest/shots`."""
     from PIL import Image
     out = []

@@ -2542,7 +2542,7 @@ the Unreal tests updated); results `docs/progress/AG16/`.
   and RAM, and the engine's CSV profile beside them (Nanite root pages, the GPU's passes);
   per pass and part of the route p50, p95, p99 and max, the thread that sets the frame,
   hitches over 50 and 100 ms, frames not streamed around the player, memory and the loads;
-  over three runs the median and the spread; JSON, a table, frame-time graphs and the first
+  over three runs the median and the spread; JSON, a table, frame-time graphs and the last
   run's screenshot of each segment start in `docs/progress/AG16/bench/<city>/<label>`.
   `bench.side_by_side` pairs two benchmarks' shots.
 - **Before** (`bench/delta_megacity/before`): the median frame 8 to 13 ms walking and

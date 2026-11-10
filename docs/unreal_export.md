@@ -856,9 +856,9 @@ imported before; `citygen/bench.py`, the driver `UCityGenBench` in the play plug
   VRAM and RAM at most, root pages at most, the GPU's costliest passes, and the loads'
   seconds; over `--bench-runs` runs (3 by default) the median of each figure and the
   spread of p50 and p95 (min to max). Written as `bench.json`, `bench.md` (the table and the
-  targets met or missed) and a frame-time graph per pass along the route
+  targets met or missed) and the last run's frame-time graph per pass along the route
   (`frame_times_<pass>.png`) in `docs/progress/AG16/bench/<city>/<label>` (`--bench-label`,
-  default `bench`), with the first run's screenshot of each segment's start in each pass
+  default `bench`), with the last run's screenshot of each segment's start in each pass
   once loaded (`shots/<pass>_<segment>.jpg`, 1600 px wide: the same views before and after
   a change); the raw files of each run in `BUILD/unreal/bench/<label>/run<k>`. The first
   run right after an import is slower: the uncooked game builds the new meshes' derived
