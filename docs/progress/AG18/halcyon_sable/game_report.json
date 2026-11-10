@@ -1,0 +1,355 @@
+{
+ "car": "halcyon_sable",
+ "title": "Halcyon Sable",
+ "ok": true,
+ "triangles": {
+  "original": 250465,
+  "lods": [
+   135516,
+   59994,
+   18995,
+   4729
+  ],
+  "lod0_parts": {
+   "body": 82960,
+   "glass": 5440,
+   "wheel_fl": 11832,
+   "wheel_fr": 11832,
+   "wheel_rl": 11318,
+   "wheel_rr": 11318,
+   "brake_fl": 204,
+   "brake_fr": 204,
+   "brake_rl": 204,
+   "brake_rr": 204
+  }
+ },
+ "objects": {
+  "original": 97,
+  "parts": 10
+ },
+ "textures": {
+  "body": 4096,
+  "wheels": 2048
+ },
+ "pack_bytes": 22836159,
+ "seconds": 340.4,
+ "stage_seconds": {
+  "build": 0.5,
+  "render_original": 63.5,
+  "parts": 6.8,
+  "nodes": 0.0,
+  "uv": 4.7,
+  "bake": 135.1,
+  "lods_export": 2.4,
+  "textures": 8.173770904541016,
+  "proof": 119.02252626419067
+ },
+ "baked_down": {
+  "card_src": {
+   "pieces": 2,
+   "triangles": 40032,
+   "names": [
+    "mouth.mesh",
+    "tail.mesh"
+   ]
+  },
+  "relief": {
+   "pieces": 6,
+   "triangles": 3209,
+   "names": [
+    "decals",
+    "led.marker",
+    "led.name",
+    "plate.glyphs",
+    "sensors",
+    "spine.bolts"
+   ]
+  },
+  "lathe": {
+   "pieces": 4,
+   "triangles": 57536,
+   "names": [
+    "tire.fl",
+    "tire.fr",
+    "tire.rl",
+    "tire.rr"
+   ]
+  }
+ },
+ "texel_px_per_m": {
+  "body": {
+   "exterior": {
+    "area_m2": 39.458,
+    "p5": 339.8,
+    "median": 348.9
+   },
+   "cabin": {
+    "area_m2": 17.861,
+    "p5": 139.3,
+    "median": 139.7
+   },
+   "underside": {
+    "area_m2": 0.178,
+    "p5": 327.6,
+    "median": 356.4
+   }
+  },
+  "wheels": {
+   "exterior": {
+    "area_m2": 5.42,
+    "p5": 353.2,
+    "median": 385.4
+   },
+   "underside": {
+    "area_m2": 0.021,
+    "p5": 134.9,
+    "median": 379.5
+   }
+  }
+ },
+ "lights": 45,
+ "collision_hulls": 9,
+ "source": {
+  "script": "vehicles/cars/halcyon_sable.py",
+  "script_sha256": "c2587df6b36a5a3ade3a97c50e52ab6011f28c51c261dfd91708e285f0146de4",
+  "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
+  "game_sha256": "1cb5d3c68c885eda9ec8e5f7c3126bfb3590b59d6165a8d2596418155f0b1c1d",
+  "original_triangles": 250465,
+  "original_objects": 97
+ },
+ "test": false,
+ "checks": [
+  {
+   "check": "files",
+   "ok": true,
+   "detail": {
+    "files": 15,
+    "missing": [],
+    "unreadable": []
+   }
+  },
+  {
+   "check": "budgets",
+   "ok": true,
+   "detail": [
+    {
+     "lod": 0,
+     "triangles": 135516,
+     "budget": 150000,
+     "ok": true
+    },
+    {
+     "lod": 1,
+     "triangles": 59994,
+     "budget": 60000,
+     "ok": true
+    },
+    {
+     "lod": 2,
+     "triangles": 18995,
+     "budget": 20000,
+     "ok": true
+    },
+    {
+     "lod": 3,
+     "triangles": 4729,
+     "budget": 5000,
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "uv_overlap",
+   "ok": true,
+   "detail": {
+    "limit": 0.005,
+    "slots": {
+     "body": {
+      "overlap": 0.00098,
+      "coverage": 0.404,
+      "outside_unit": 0.0
+     },
+     "wheels": {
+      "overlap": 0.0,
+      "coverage": 0.1927,
+      "outside_unit": 0.0
+     }
+    }
+   }
+  },
+  {
+   "check": "texel_density",
+   "ok": true,
+   "detail": {
+    "body": {
+     "p5": 339.8,
+     "median": 348.9,
+     "floor": 300.0,
+     "ok": true
+    },
+    "wheels": {
+     "p5": 353.2,
+     "median": 385.4,
+     "floor": 300.0,
+     "ok": true
+    }
+   }
+  },
+  {
+   "check": "wheel_pivots",
+   "ok": true,
+   "detail": [
+    {
+     "part": "wheel_fl",
+     "pivot": [
+      1.58,
+      0.8175,
+      0.37
+     ],
+     "center_offset_mm": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "radius": 0.37,
+     "radius_pack": 0.37,
+     "json_pivot": [
+      1.58,
+      0.8175,
+      0.37
+     ],
+     "ok": true
+    },
+    {
+     "part": "wheel_fr",
+     "pivot": [
+      1.58,
+      -0.8175,
+      0.37
+     ],
+     "center_offset_mm": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "radius": 0.37,
+     "radius_pack": 0.37,
+     "json_pivot": [
+      1.58,
+      -0.8175,
+      0.37
+     ],
+     "ok": true
+    },
+    {
+     "part": "wheel_rl",
+     "pivot": [
+      -1.47,
+      0.8045,
+      0.37
+     ],
+     "center_offset_mm": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "radius": 0.37,
+     "radius_pack": 0.37,
+     "json_pivot": [
+      -1.47,
+      0.8045,
+      0.37
+     ],
+     "ok": true
+    },
+    {
+     "part": "wheel_rr",
+     "pivot": [
+      -1.47,
+      -0.8045,
+      0.37
+     ],
+     "center_offset_mm": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "radius": 0.37,
+     "radius_pack": 0.37,
+     "json_pivot": [
+      -1.47,
+      -0.8045,
+      0.37
+     ],
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "lod_bounds",
+   "ok": true,
+   "detail": [
+    {
+     "lod": 1,
+     "deviation_m": [
+      0.0,
+      0.0,
+      0.0001
+     ],
+     "tolerance_m": [
+      0.0767,
+      0.0309,
+      0.0201
+     ],
+     "ok": true
+    },
+    {
+     "lod": 2,
+     "deviation_m": [
+      0.004,
+      0.0006,
+      0.0022
+     ],
+     "tolerance_m": [
+      0.0767,
+      0.0309,
+      0.0201
+     ],
+     "ok": true
+    },
+    {
+     "lod": 3,
+     "deviation_m": [
+      0.0042,
+      0.0192,
+      0.0123
+     ],
+     "tolerance_m": [
+      0.0767,
+      0.0309,
+      0.0201
+     ],
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "collision",
+   "ok": true,
+   "detail": {
+    "hulls": 9,
+    "vertices": [
+     304,
+     140,
+     286,
+     174,
+     198,
+     150,
+     190,
+     196,
+     364
+    ]
+   }
+  }
+ ]
+}

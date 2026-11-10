@@ -64,6 +64,11 @@ CLASS_NAMES = {0: "exterior", 1: "underside", 2: "cabin"}
 CAGE_M, REACH_M = 0.015, 0.035  # baking the detail: cage out, ray reach under the surface
 TEXEL_FLOOR = {"body": 300.0, "wheels": 300.0}  # px/m on exterior faces at 4096 / 2048
 CORE_WHEEL = ("tire", "rim", "hub", "ring", "disc", "drum", "caliper")
+DETAIL_BOOST = 2.0              # texel density under baked lettering and decals, at most
+DETAIL_MARGIN = 1.03            # ... while the exterior's 5th percentile stays this over the floor
+DETAIL_COST = 0.2               # ... and the atlas grows by this share at most (the rest shrinks)
+THIN_PX = 2.0                   # texels across every island at least (2 area / perimeter)
+THIN_COST = 0.1                 # ... while that grows the atlas by this share at most
 
 
 def log(msg):
@@ -352,7 +357,9 @@ class Channels:
             vm = N.new('ShaderNodeVectorMath')
             vm.operation = 'SCALE'
             vm.inputs[0].default_value = mi.emit_color
-            vm.inputs["Scale"].default_value = mi.strength / emax
+            # an emitter over the scale (cabin only) is clipped keeping its hue
+            vm.inputs["Scale"].default_value = min(mi.strength / emax,
+                                                   1.0 / max(max(mi.emit_color), 1.0))
             self.src["EMIT"] = vm.outputs[0]
         else:
             self.src["EMIT"] = (0.0, 0.0, 0.0, 1.0)
@@ -991,27 +998,26 @@ def dedupe_faces(bm):
 
 
 DIRS = None
+RANK = {-1: 0, 1: 1, 2: 2, 0: 3}    # face classes, worst to best seen
 
 
 def visibility(bm, glass_tree):
     """Face classes by rays: 0 seen from outside (exterior), 1 seen only from below
-    (underside), 2 seen only through glass (cabin), -1 never seen (removed)."""
+    (underside), 2 seen only through glass (cabin), -1 never seen (removed). A face never
+    seen from its front but seen from its back is a face the design turned the wrong way
+    (Blender draws both sides; an engine culls back faces): its class from the back, and
+    its index in the second list, to be turned round. So is a face seen better from its
+    back than from its front (exterior over cabin over underside: a deck under the glass
+    turned down, seen through the glass from above and through a gap from below)."""
     global DIRS
     if DIRS is None:
         DIRS = fib_dirs(96)
     bm.faces.ensure_lookup_table()
     tree = BVHTree.FromBMesh(bm)
-    cls = []
+    cls, flip = [], []
     eps = 2e-4
-    for f in bm.faces:
-        n = f.normal
-        if n.length < 0.5:
-            cls.append(0)
-            continue
-        c = f.calc_center_median()
-        samples = [c]
-        if f.calc_area() > 2e-4:
-            samples += [c.lerp(v.co, 0.85) for v in f.verts]
+
+    def seen(samples, n):
         dirs = [n] + [d for d in DIRS if d.dot(n) > 0.12]
         best = -1
         for p in samples:
@@ -1024,11 +1030,25 @@ def visibility(bm, glass_tree):
                 if best == -1 or (k == 0) or (k == 1 and best == 2):
                     best = k
                 if best == 0:
-                    break
-            if best == 0:
-                break
+                    return 0
+        return best
+    for f in bm.faces:
+        n = f.normal
+        if n.length < 0.5:
+            cls.append(0)
+            continue
+        c = f.calc_center_median()
+        samples = [c]
+        if f.calc_area() > 2e-4:
+            samples += [c.lerp(v.co, 0.85) for v in f.verts]
+        best = seen(samples, n)
+        if best != 0:
+            back = seen(samples, -n)
+            if RANK[back] > RANK[best]:
+                best = back
+                flip.append(f.index)
         cls.append(best)
-    return cls
+    return cls, flip
 
 
 def cull(ob, glass_tree):
@@ -1040,7 +1060,16 @@ def cull(ob, glass_tree):
     dup = dedupe_faces(bm) + [f for f in bm.faces if f.calc_area() < 1e-9]
     bmesh.ops.delete(bm, geom=list(set(dup)), context='FACES')
     bm.faces.ensure_lookup_table()
-    cls = visibility(bm, glass_tree)
+    cls, flip = visibility(bm, glass_tree)
+    if flip:
+        fl = [bm.faces[i] for i in flip]
+        bmesh.ops.reverse_faces(bm, faces=fl)
+        ln = bm.loops.layers.float_vector.get("cg_n")
+        if ln is not None:
+            for f in fl:
+                for l in f.loops:
+                    l[ln] = -l[ln]
+        log("  %s: %d faces seen only from behind turned round" % (ob.name, len(fl)))
     lay = bm.faces.layers.int.get("cg_class") or bm.faces.layers.int.new("cg_class")
     hidden = []
     for f, k in zip(bm.faces, cls):
@@ -1077,7 +1106,26 @@ def edit(ob):
     bpy.ops.mesh.select_all(action='SELECT')
 
 
-def unwrap(ob, size, pad_px=None):
+def detail_faces(target, relief):
+    """The faces of target (world space) right under baked-down relief: each point of a
+    relief piece (vertices, face middles) marks the nearest face within reach."""
+    if not relief:
+        return set()
+    bm = bmesh.new()
+    bm.from_mesh(target.data)
+    tree = BVHTree.FromBMesh(bm)
+    bm.free()
+    out = set()
+    for p in relief:
+        pts = [v.co for v in p.me.vertices] + [f.center for f in p.me.polygons]
+        for q in pts:
+            hit = tree.find_nearest(q, TALL_RELIEF_M + 0.004)
+            if hit[2] is not None:
+                out.add(hit[2])
+    return out
+
+
+def unwrap(ob, size, pad_px=None, boost=None, floor=None, thin=True):
     """Smart projection, even texel density, islands scaled by face class (exterior over
     underside and cabin), packed into the unit square with pad_px between islands."""
     me = ob.data
@@ -1121,13 +1169,124 @@ def unwrap(ob, size, pad_px=None):
         for l in loops:
             U[2 * l] = cx + (U[2 * l] - cx) * s
             U[2 * l + 1] = cy + (U[2 * l + 1] - cy) * s
-    U, fill = pack_uv(U, [[l for i in isl for l in polys[i].loop_indices] for isl in islands],
-                      pad_px / size)
+    # whole islands: a seam cut round the detail across a flat panel would let the LODs'
+    # collapse smear the texture along it
+    boosted = [k for k, isl in enumerate(islands) if boost and any(i in boost for i in isl)]
+    loops_of = [[l for i in isl for l in polys[i].loop_indices] for isl in islands]
+    U0 = U
+    U, fill = pack_uv(U0, loops_of, pad_px / size)
+    f = 1.0
+    if floor and thin:
+        # 1. thin islands (a letter's strokes, a hairline lamp, a trim strip) thickened to
+        # THIN_PX texels at least (2 area / perimeter), else they cover no texel center and
+        # bake to nothing; up to 4 times, while it grows the atlas by THIN_COST at most
+        A_k, t_k = island_thickness(me, islands, U)
+        tot = sum(A_k) or 1.0
+        g = [1.0] * len(islands)
+        for T in (THIN_PX, THIN_PX * 0.75, THIN_PX * 0.5, 0.0):
+            if T == 0.0:
+                g = [1.0] * len(islands)
+                break
+            g = [min(4.0, T / (t * size)) if 0 < t * size < T else 1.0 for t in t_k]
+            if sum(A * (x * x - 1) for A, x in zip(A_k, g)) <= THIN_COST * tot:
+                break
+        # 2. the islands under baked lettering and decals get more texels: DETAIL_BOOST times
+        # the density, less where that would grow the atlas by more than DETAIL_COST or take
+        # the exterior's 5th percentile under DETAIL_MARGIN over the floor (packed again,
+        # measured, the boost halved until it holds)
+        p5 = texel_p5(me, U, size)
+        A_all = sum(polys[i].area * WEIGHT.get(fc[i], 1.0) ** 2 for isl in islands for i in isl)
+        A_mark = sum(polys[i].area for k in boosted for i in islands[k])
+        if p5 and A_mark > 0:
+            grow = min(DETAIL_COST, (p5 / (floor * DETAIL_MARGIN)) ** 2 - 1)
+            f = sqrt(max(1.0, min(DETAIL_BOOST ** 2, 1 + grow * A_all / A_mark)))
+        mark = set(boosted)
+        nthin = sum(1 for x in g if x > 1.0)
+        for _ in range(5):
+            sc = [max(gk, f if k in mark else 1.0) for k, gk in enumerate(g)]
+            if max(sc) <= 1.0:
+                break
+            Ub = list(U0)
+            for k, x in enumerate(sc):
+                if x <= 1.0:
+                    continue
+                ls = loops_of[k]
+                cx = sum(Ub[2 * l] for l in ls) / len(ls)
+                cy = sum(Ub[2 * l + 1] for l in ls) / len(ls)
+                for l in ls:
+                    Ub[2 * l] = cx + (Ub[2 * l] - cx) * x
+                    Ub[2 * l + 1] = cy + (Ub[2 * l + 1] - cy) * x
+            U2, fill2 = pack_uv(Ub, loops_of, pad_px / size)
+            p5b = texel_p5(me, U2, size)
+            if p5b is not None and p5b >= floor * 1.01:
+                U, fill = U2, fill2
+                break
+            if f > 1.05:
+                f = 1 + (f - 1) / 2
+            else:
+                f, g, nthin = 1.0, [1.0] * len(islands), 0
+        else:
+            f, nthin = 1.0, 0
+        log("  %d islands under baked detail (%.3f m2) at %.2f times the density; %d thin "
+            "islands thickened" % (len(boosted), A_mark, f, nthin))
     uv.foreach_set("uv", U)
     me.update()
     log("  packed %s: %d islands, %.0f%% of the square, uv box %s" % (
         ob.name, len(islands), fill * 100, _uvbox(me)))
+    ob["cg_detail_boost"] = f
     return len(islands)
+
+
+def island_thickness(me, islands, U):
+    """Per island its UV area and its thickness, 2 area / perimeter (UV units)."""
+    polys = me.polygons
+    lv = [l.vertex_index for l in me.loops]
+    A_k, t_k = [], []
+    for isl in islands:
+        A = 0.0
+        edges = {}
+        for i in isl:
+            ls = list(polys[i].loop_indices)
+            A += abs(sum(U[2 * a] * U[2 * b + 1] - U[2 * b] * U[2 * a + 1]
+                         for a, b in zip(ls, ls[1:] + ls[:1]))) / 2
+            for a, b in zip(ls, ls[1:] + ls[:1]):
+                key = (min(lv[a], lv[b]), max(lv[a], lv[b]))
+                e = edges.get(key)
+                if e is None:
+                    edges[key] = [1, sqrt((U[2 * a] - U[2 * b]) ** 2 +
+                                          (U[2 * a + 1] - U[2 * b + 1]) ** 2)]
+                else:
+                    e[0] += 1
+        per = sum(L for n, L in edges.values() if n == 1)
+        A_k.append(A)
+        t_k.append(2 * A / per if per > 0 else 0.0)
+    return A_k, t_k
+
+
+def texel_p5(me, U, size):
+    """The exterior's 5th percentile px/m for UVs U (flat u, v pairs of every loop)."""
+    rows = []
+    cls = me.attributes.get("cg_class")
+    for p in me.polygons:
+        if cls is not None and cls.data[p.index].value != 0:
+            continue
+        A = p.area
+        if A < 1e-8:
+            continue
+        ls = list(p.loop_indices)
+        ua = abs(sum(U[2 * a] * U[2 * b + 1] - U[2 * b] * U[2 * a + 1]
+                     for a, b in zip(ls, ls[1:] + ls[:1]))) / 2
+        rows.append((sqrt(ua * size * size / A), A))
+    if not rows:
+        return None
+    rows.sort()
+    tot = sum(a for _, a in rows)
+    acc = 0.0
+    for d, a in rows:
+        acc += a
+        if acc >= 0.05 * tot:
+            return d
+    return rows[-1][0]
 
 
 def pack_uv(U, islands, pad):
@@ -1603,6 +1762,65 @@ def export_glb(path, objs, names):
     bpy.data.objects.remove(root)
 
 
+def world_box(obs):
+    """The box of the faces of objects placed by location alone (matrix_world is stale on
+    new ones; a vertex no face uses is not exported)."""
+    pts = []
+    for o in obs:
+        vs = o.data.vertices
+        used = {i for poly in o.data.polygons for i in poly.vertices}
+        t = o.location
+        pts += [(vs[i].co.x + t.x, vs[i].co.y + t.y, vs[i].co.z + t.z) for i in used]
+    lo = [min(q[i] for q in pts) for i in range(3)]
+    hi = [max(q[i] for q in pts) for i in range(3)]
+    return lo, hi
+
+
+def hold_bounds(parts_final, objs_k, ratio, target, k, coll, drop):
+    """A LOD whose box falls short of LOD0's by more than the check allows (lod_bounds: 2 cm
+    or 1.5% of the size; a glass dome's crown collapsed away): the parts that reach LOD0's
+    box on that side are collapsed again at twice their ratio, the others a little more to
+    keep the budget, up to three times. Returns (objects, triangles)."""
+    lo0, hi0 = world_box([o for _, o in parts_final])
+    tol = [max(0.02, 0.015 * (hi0[i] - lo0[i])) for i in range(3)]
+    rat = {nm: ratio for nm, _ in parts_final}
+    for _ in range(3):
+        lo, hi = world_box(objs_k)
+        short = [(i, -1) for i in range(3) if lo[i] - lo0[i] > tol[i]] + \
+                [(i, 1) for i in range(3) if hi0[i] - hi[i] > tol[i]]
+        if not short:
+            break
+        bump = set()
+        for nm, o in parts_final:
+            plo, phi = world_box([o])
+            for i, sd in short:
+                if (sd < 0 and plo[i] - lo0[i] < 0.002) or (sd > 0 and hi0[i] - phi[i] < 0.002):
+                    bump.add(nm)
+        if not bump:
+            break
+        for nm in bump:
+            rat[nm] = min(1.0, rat[nm] * 2)
+        tri0 = {nm: mesh_tris(o.data) for nm, o in parts_final}
+        fixed = sum(tri0[nm] * rat[nm] for nm in bump)
+        rest = sum(tri0[nm] for nm in tri0 if nm not in bump)
+        if rest > 0:
+            r2 = max(0.003, (target - fixed) / rest)
+            for nm in tri0:
+                if nm not in bump:
+                    rat[nm] = min(rat[nm], r2)
+        log("  LOD%d short of LOD0's box %s: %s collapsed again at %s" % (
+            k, short, sorted(bump), {nm: round(rat[nm], 4) for nm in sorted(bump)}))
+        for o in objs_k:
+            me = o.data
+            bpy.data.objects.remove(o)
+            bpy.data.meshes.remove(me)
+        objs_k = [decimate_copy(o, rat[nm], "LOD%d_%s" % (k, nm), coll,
+                                drop if nm == "body" else None,
+                                symmetric=(nm in ("body", "glass")))
+                  for nm, o in parts_final]
+    return objs_k, sum(mesh_tris(o.data) for o in objs_k)
+
+
 def decimate_copy(ob, ratio, name, coll, drop_class=None, symmetric=False):
     me = ob.data.copy()
     if drop_class is not None and "cg_class" in me.attributes:
@@ -1679,7 +1897,6 @@ def main_build(A):
     pieces, wheels = gather(K, infos)
     log("%d pieces from %d objects, %d triangles; %d wheels" % (
         len(pieces), n_objects, sum(p.tris for p in pieces), len(wheels)))
-    emax = max([mi.strength for mi in infos.values() if mi.emissive] or [0.0])
 
     # 3. bake down: flat relief and cards always
     find_relief(pieces)
@@ -1702,6 +1919,10 @@ def main_build(A):
     budget = A.lods[0]
     low_coll = bpy.data.collections.new("LOW")
     bpy.context.scene.collection.children.link(low_coll)
+    # over the budget, in this order: taller relief; then every part of 600 triangles or
+    # more alike, panels too, at most halved a round (a round that crushed the small dense
+    # parts alone turned turbine wheels and light strips into polygons), three rounds; the
+    # glass never (a collapsed canopy shows its facets in every reflection)
     steps = ["tall", "collapse", "collapse", "collapse"]
     while True:
         parts = part_meshes(pieces, cards)
@@ -1750,18 +1971,23 @@ def main_build(A):
                 excess -= per_piece.get(p.idx, 0)
                 log("  over budget: relief %s (%.1f mm) baked down" % (p.name, p.relief * 1000))
         else:
-            cand = [p for p in pieces if p.op in ("keep", "collapse") and not p.panel and
-                    p.part != "glass" and per_piece.get(p.idx, 0) >= 600]
+            # lamps never (a thin light strip collapsed breaks into dashes), wheels never
+            # (seen close and turning; a collapsed wheel unwraps folded, its UVs overlapping)
+            cand = [p for p in pieces if p.op in ("keep", "collapse") and
+                    per_piece.get(p.idx, 0) >= 600 and
+                    p.part != "glass" and
+                    p.part.split(":")[0] not in ("wheel", "brake") and
+                    not (infos.get(p.mat) and infos[p.mat].emissive)]
             pool = sum(per_piece.get(p.idx, 0) for p in cand)
             if pool <= 0:
-                steps = []
                 continue
-            r = max(0.2, 1 - excess / pool)
+            r = max(0.5, 1 - excess / pool)
             for p in cand:
                 cur = mesh_tris(p.low) / p.tris if p.op == "collapse" else 1.0
                 p.low = collapse_mesh(p, r * cur)
                 p.op = "collapse"
-            log("  over budget: %d small parts collapsed to %.0f%%" % (len(cand), r * 100))
+            log("  over budget (%s): %d pieces collapsed to %.0f%%" % (step, len(cand),
+                                                                     r * 100))
     times["parts"] = time.time() - t
 
     # 4. the parts as nodes: body, glass, wheels and brakes about their axles
@@ -1793,7 +2019,9 @@ def main_build(A):
             set_normals(ob.data)
     uvinfo = {}
     if body is not None:
-        uvinfo["body"] = unwrap(body, A.body_size)
+        marked = detail_faces(body, [p for p in pieces if p.op == "relief" and p.part == "body"])
+        uvinfo["body"] = unwrap(body, A.body_size, boost=marked,
+                                floor=TEXEL_FLOOR["body"] * A.body_size / 4096)
     if glass is not None:
         unwrap(glass, 1024)
     prim = [nodes[k] for k in sorted(nodes) if k not in twins]
@@ -1837,6 +2065,9 @@ def main_build(A):
 
     # 6. bakes
     t = time.time()
+    emax, clipped = emissive_scale(infos, [o for o in [body] + list(nodes.values()) if o])
+    if clipped:
+        log("emissive scale %.2f; cabin-only emitters clipped to it: %s" % (emax, clipped))
     sources = {"body": [], "wheels": []}
     replaced = {"body": set(), "wheels": set()}
     relief = {"body": [], "wheels": []}
@@ -1931,6 +2162,7 @@ def main_build(A):
             if got <= target * 1.03:
                 break
             ratio *= target / got * 0.98
+        objs_k, got = hold_bounds(parts_final, objs_k, ratio, target, k, low_coll, drop)
         prev = got
         lods.append(dict(lod=k, objs=objs_k))
     hulls = collision([o for nm, o in parts_final if nm in ("body", "glass")])
@@ -2002,8 +2234,15 @@ def main_build(A):
                                    relief_mm=round(p.relief * 1000, 1) if p.relief else None,
                                    into="card" if p.op == "card_src" else
                                    ("surface under it" if p.op == "relief" else p.op)))
-    gls = infos.get("glass")
-    glass_params = dict(color=list(gls.color) if gls and gls.color else [0.3, 0.33, 0.36],
+    # the glass's own material: the one most of the glass area wears (a car may tune its
+    # own, a dome's lower IOR), else the kit's
+    garea = {}
+    for p in pieces:
+        if p.part == "glass" and p.mat in infos:
+            garea[p.mat] = garea.get(p.mat, 0.0) + sum(f.area for f in p.me.polygons)
+    gls = infos.get(max(garea, key=lambda m: (garea[m], m)) if garea else "glass") or \
+        infos.get("glass")
+    glass_params = dict(material=gls.name if gls else None,color=list(gls.color) if gls and gls.color else [0.3, 0.33, 0.36],
                         roughness=round(val(gls.b, "Roughness", 0.0), 3) if gls else 0.0,
                         ior=round(val(gls.b, "IOR", 1.5), 3) if gls else 1.5,
                         transmission=1.0, opaque_from_lod=2)
@@ -2032,7 +2271,7 @@ def main_build(A):
             wheels=slot_json("wheels", A.wheel_size, emax) if wheel_bake is not None else None,
             glass=dict(textures={}, params=glass_params)),
         colors=colors, tinted_materials=tinted,
-        emissive_strength=round(emax, 4),
+        emissive_strength=round(emax, 4), emissive_clipped=clipped,
         micro_detail=dict(materials=micro, note="finer than a texel, not baked (the bake "
                           "holds their mean): the paint's flake (2600 cells a meter, bump "
                           "0.06) and textures such as the carbon weave, for the engine's "
@@ -2044,6 +2283,7 @@ def main_build(A):
         views=dict(hero=hero_view), cameras=cams,
         baked_down=baked_down,
         uv=dict(islands=uvinfo, texel_px_per_m=texel,
+                detail_boost=round(body.get("cg_detail_boost", 1.0), 3) if body else None,
                 texel_floor_px_per_m={k: round(v * (A.body_size if k == "body"
                                                     else A.wheel_size) /
                                                (4096 if k == "body" else 2048), 1)
@@ -2055,6 +2295,28 @@ def main_build(A):
         json.dump(pack, f, indent=1)
     log("wrote pack.json; LODs %s" % [r["triangles"] for r in lod_rows])
     return pack
+
+
+def emissive_scale(infos, obs):
+    """The emissive texture's 1.0: the strongest emitter seen from outside. An emitter
+    only ever seen through glass (a cabin's ceiling light) does not count, so it cannot
+    squeeze the 8-bit range of the lamps; it is clipped to the scale. A baked-down emitter
+    (no faces of its own left) counts. Returns (scale, [materials clipped])."""
+    seen = {}
+    for ob in obs:
+        me = ob.data
+        cls = me.attributes.get("cg_class")
+        for poly in me.polygons:
+            m = me.materials[poly.material_index] if me.materials else None
+            if m is None:
+                continue
+            k = cls.data[poly.index].value if cls is not None else 0
+            seen.setdefault(m.name, set()).add(k)
+    em = [mi for mi in infos.values() if mi.emissive]
+    cabin = {mi.name for mi in em if seen.get(mi.name) == {2}}
+    out = [mi.strength for mi in em if mi.name not in cabin]
+    emax = max(out or [mi.strength for mi in em] or [0.0])
+    return emax, sorted(mi.name for mi in em if mi.name in cabin and mi.strength > emax)
 
 
 def receiver_of(target, replaced, sources, relief, coll):
@@ -2154,12 +2416,17 @@ def proof_main(pack_dir):
         nt = m.node_tree
         b = next(n for n in nt.nodes if n.type == 'BSDF_PRINCIPLED')
         N, L = nt.nodes, nt.links
-        if slot == "glass":
-            gp = spec["params"]
-            b.inputs["Base Color"].default_value = (*gp["color"], 1)
-            b.inputs["Roughness"].default_value = gp["roughness"]
+        if slot in ("glass", "glass_opaque"):
+            gp = pack["materials"]["glass"]["params"]
             b.inputs["IOR"].default_value = gp["ior"]
-            b.inputs["Transmission Weight"].default_value = gp["transmission"]
+            if slot == "glass":
+                b.inputs["Base Color"].default_value = (*gp["color"], 1)
+                b.inputs["Roughness"].default_value = gp["roughness"]
+                b.inputs["Transmission Weight"].default_value = gp["transmission"]
+            else:                   # from opaque_from_lod: no cabin behind it, as an engine
+                b.inputs["Base Color"].default_value = (*[c * 0.06 for c in gp["color"]], 1)
+                b.inputs["Roughness"].default_value = max(0.05, gp["roughness"])
+                b.inputs["Transmission Weight"].default_value = 0.0
             return m
 
         def tex(key, srgb):
@@ -2258,13 +2525,15 @@ def proof_main(pack_dir):
             K.CAR.objects.link(o)
         return new
 
-    def assign(objs, mats):
+    def assign(objs, mats, opaque=False):
         for o in objs:
             if o.type != 'MESH':
                 continue
             for i, m in enumerate(o.data.materials):
                 nm = m.name if m else ""
                 key = "glass" if "glass" in nm else ("wheels" if "wheels" in nm else "body")
+                if key == "glass" and opaque and "glass_opaque" in mats:
+                    key = "glass_opaque"
                 o.data.materials[i] = mats[key]
 
     def cam_from(rec):
@@ -2292,10 +2561,13 @@ def proof_main(pack_dir):
     paint = {k: v["color"] for k, v in pack["colors"].items()}
     mats = {s: material(s, paint) for s in ("body", "wheels", "glass")
             if pack["materials"].get(s)}
+    if "glass" in mats:
+        mats["glass_opaque"] = material("glass_opaque", paint)
+    opaque_from = pack["materials"].get("glass", {}).get("params", {}).get("opaque_from_lod", 99)
     lod_objs = {}
     for L_ in pack["lods"]:
         lod_objs[L_["lod"]] = load(L_["lod"])
-        assign(lod_objs[L_["lod"]], mats)
+        assign(lod_objs[L_["lod"]], mats, L_["lod"] >= opaque_from)
     cams = {k: cam_from(v) for k, v in pack["cameras"].items()}
 
     def show(lod):
@@ -2395,6 +2667,9 @@ def post(pack_dir):
             if hasB else None
         if B is not None:
             cov = (B["SSE"][..., 2] > 0.5).astype(np.float32)[..., None]
+            n = grow_detail(B, cov, slot_inside(pack_dir, pack, slot, A["BASE"].shape[0]),
+                            max(2, A["BASE"].shape[0] // 512))
+            print("detail grown into %d margin texels of %s" % (n, slot))
         else:
             cov = np.zeros(A["BASE"].shape[:2] + (1,), np.float32)
 
@@ -2438,6 +2713,54 @@ def post(pack_dir):
         save(np.concatenate([emit, sse[..., 1:2]], 2), "emissive")
         print("textures for %s: %d px, detail over %.1f%% of the texels" % (
             slot, base.shape[0], 100 * float(cov.mean())))
+
+
+def slot_inside(pack_dir, pack, slot, res):
+    """The texels some LOD0 triangle of the slot covers (image rows; PIL's fill)."""
+    import numpy as np
+    from PIL import Image, ImageDraw
+    g = read_glb(os.path.join(pack_dir, pack["lods"][0]["file"]))
+    im = Image.new("1", (res, res), 0)
+    d = ImageDraw.Draw(im)
+    for nd in g.values():
+        for pr in nd["prims"]:
+            if slot not in pr["material"] or pr["uv"] is None:
+                continue
+            T = pr["uv"][pr["idx"]] * res - 0.5          # v is already down in glTF
+            for t in T.tolist():
+                d.polygon([tuple(q) for q in t], fill=1)
+    return np.asarray(im, dtype=bool)
+
+
+def grow_detail(B, cov, inside, steps):
+    """The baked-down detail (pass B, baked with no margin: a margin would spill it onto
+    faces that are not under it) carried out into the margin texels round its islands,
+    steps texels at most, each the mean of its covered neighbors, so a seam across a
+    lettering or a lamp samples the detail on both sides, not the paint under it. Changes
+    B and cov in place; returns the texels grown."""
+    import numpy as np
+    c = cov[..., 0] > 0.5
+    out = ~inside
+    H, W = c.shape
+    nbr = [(dy, dx) for dy in (-1, 0, 1) for dx in (-1, 0, 1) if dy or dx]
+    grown = 0
+    for _ in range(steps):
+        nb = np.zeros((H, W), np.uint8)
+        for dy, dx in nbr:
+            nb += np.roll(c, (dy, dx), axis=(0, 1))
+        ys, xs = np.nonzero(out & ~c & (nb > 0))
+        if len(ys) == 0:
+            break
+        for arr in B.values():
+            acc = np.zeros((len(ys), arr.shape[2]), np.float32)
+            for dy, dx in nbr:
+                yy, xx = (ys - dy) % H, (xs - dx) % W
+                acc += arr[yy, xx] * c[yy, xx][:, None]
+            arr[ys, xs] = acc / nb[ys, xs][:, None]
+        c[ys, xs] = True
+        grown += len(ys)
+    cov[..., 0] = c
+    return grown
 
 
 # ---- glTF reading (numpy) ------------------------------------------------------------
@@ -2503,6 +2826,16 @@ def uv_overlap(tris_uv, res=2048):
     """Share of the covered texels (pixel centers at res x res) that two or more triangles
     cover."""
     import numpy as np
+    cnt = raster_count(tris_uv, res)
+    cov = int((cnt > 0).sum())
+    over = int((cnt > 1).sum())
+    out_of_unit = float(((tris_uv < -1e-4) | (tris_uv > 1 + 1e-4)).any(axis=2).mean())
+    return over / max(cov, 1), cov / (res * res), out_of_unit
+
+
+def raster_count(tris_uv, res):
+    """How many triangles (UVs with v down, as image rows) cover each pixel center."""
+    import numpy as np
     cnt = np.zeros((res, res), np.uint16)
     T = tris_uv * res - 0.5                        # pixel centers at integers
     x0 = np.floor(T[:, :, 0].min(1)).astype(int) + 1
@@ -2535,10 +2868,7 @@ def uv_overlap(tris_uv, res=2048):
             m = inb & (edge(a, b) > 0) & (edge(b, c) > 0) & (edge(c, a) > 0)
             m &= (X >= 0) & (X < res) & (Y >= 0) & (Y < res)
             np.add.at(cnt, (Y[m], X[m]), 1)
-    cov = int((cnt > 0).sum())
-    over = int((cnt > 1).sum())
-    out_of_unit = float(((tris_uv < -1e-4) | (tris_uv > 1 + 1e-4)).any(axis=2).mean())
-    return over / max(cov, 1), cov / (res * res), out_of_unit
+    return cnt
 
 
 def check(pack_dir, docs, seconds, stage_seconds):

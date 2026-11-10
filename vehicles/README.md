@@ -86,7 +86,9 @@ vehicles/blender.sh vehicles/game.py --car vanta_r --test           # 1024 / 512
 - **Baked down.** Lettering, ribbons and other flat relief go onto the surface under them;
   dense arrays (honeycombs) become cards; dense tires become lathes with the tread and
   sidewall marks baked on; over budget, taller relief such as bolt rows, then a collapse of
-  the densest small parts. Faces nothing can see are removed.
+  every part alike (never glass, lamps or wheels). Faces nothing can see are removed; a
+  face seen better from behind is turned round. Islands under baked lettering get more
+  texels, thin islands at least two texels across.
 - **Proof.** `game.jpg`: the pack alone in the kit's studio next to the procedural original
   from the hero view, a recolored copy, the textures and the four LODs. `--views a,b`
   compares more of the car's views (`proof/original_<view>.jpg` and `baked_<view>.jpg`);
