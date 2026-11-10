@@ -173,8 +173,10 @@ Decision for AT4 and AT5: effects are C++ components and code-made materials, no
 lights, a candela as 4 pi / 683 W, a nit as pi A / 683 W, times one gain), in Cycles on the
 GPU (OptiX, the light tree), with the weather's haze as a volume round the view and the
 streets wet (glossier and darker where they face up). `wip/03_blender/` holds the first,
-small render of the Corporate Core's street (1,923 lights); `core_night.jpg` and
-`core_street_night.jpg` here are the 8K renders.
+small render of the Corporate Core's street (1,923 lights); `core_night.jpg` (the core
+from the air, 1,879 of the plan's lights round it) and `core_street_night.jpg` here are the
+8K renders (7680 x 4320, 24 samples denoised, 8 minutes each on the RTX 4070 Ti with OptiX,
+the scene's load included).
 
 ## Recommendations for AT1 to AT7
 

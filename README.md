@@ -544,6 +544,12 @@ play features) lights the streets from the plan, with haze, rain and wet streets
 | The Corporate Core, the play features' lamps | The same, lit by the plan, in rain |
 | <img src="docs/progress/AT0/street_core_play.jpg" width="420"> | <img src="docs/progress/AT0/street_core_plan.jpg" width="420"> |
 
+Its Blender preview renders the same night in Cycles, lit by the plan's lights:
+
+| The Corporate Core by night, Blender preview (8K) | A Corporate Core street in rain (8K) |
+|---|---|
+| <img src="docs/progress/AT0/core_night.jpg" width="420"> | <img src="docs/progress/AT0/core_street_night.jpg" width="420"> |
+
 Plan: [`docs/atmosgen_scope.md`](docs/atmosgen_scope.md); what each milestone did:
 [`docs/atmosgen_milestones.md`](docs/atmosgen_milestones.md).
 
