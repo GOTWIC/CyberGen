@@ -32,6 +32,39 @@ vehicles/blender.sh vehicles/cars/NAME.py --out DIR --sheet      # DIR/sheet.jpg
 `BLENDER=/path/to/blender` picks another Blender. `--sheet` and `--preview` put their tiles
 together with `post.py`, run by the repo's `.venv` Python (`CYBERGEN_PYTHON` overrides).
 
+## The line-up
+
+`lineup.py` puts every car of `cars/` into one scene at one scale and renders it:
+
+```
+vehicles/blender.sh vehicles/lineup.py            # docs/progress/AG18/lineup.jpg, 3840 px wide
+vehicles/blender.sh vehicles/lineup.py --test     # 1920 px, 24 samples, into the cache
+```
+
+- **Cars.** Found by listing `cars/*.py`, so a new car joins with nothing to edit. Each is
+  built once by its own script with `--blend` into `~/.cache/cybergen/vehicles/lineup/<car>/`
+  (never in the repo) and built again only when its script or `carkit.py` is newer; its `CAR`
+  collection is then appended under an empty of its name. A car that fails to build or
+  append is left out with a message (`BUILD FAILED`, `SKIPPED`, `LEFT OUT` in the log, the
+  build's own output in `<car>/build.log`).
+- **Layout.** A column per brand in `BRANDS.md`'s order (a car's brand is the one whose
+  table lists its model, else the first word of its file name), its cars one behind
+  another, lowest in front, each row a little to the right of the one before. Rows are
+  spaced by the height of the cars in front, so none hides the one behind, and every car is
+  turned to show the camera the same three-quarter view of its nose and left flank. The
+  brand's name lies on the floor in front of its column. The frame's shape follows the
+  layout, between 2.7:1 and 16:9.
+- **Studio.** Its own floor and cove, as wide as the camera's distance asks (the camera
+  stands about 100 m off with a 105 mm lens), a pool of soft light over the cars; each car
+  keeps its own lights, and the image gets the sheets' bloom.
+- **Time.** About 1.5 minutes for 19 cars (4.5 million triangles): 25 s to build the cars
+  the first time, 3 s to append them, a minute to render 3840 x 1422 at 128 samples. A
+  `--test` takes 12 s once the cars are cached.
+- **Arguments.** `--out FILE`, `--cache DIR`, `--width N`, `--samples N`, `--only a,b` (some
+  cars), `--rebuild` (every car again), `--blend` (the scene as `lineup.blend` in the cache).
+
+The spacing, the camera's height and the turn are the constants at the top of `lineup.py`.
+
 ## Workflow
 
 1. **Stations and lines.** Draw the body as character lines (top centerline, hood crease,
