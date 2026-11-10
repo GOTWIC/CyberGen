@@ -16,8 +16,6 @@ class SCityGenOverlay;
 class UDecalComponent;
 class UMaterialInterface;
 class UMaterialParameterCollection;
-class UPointLightComponent;
-class USpotLightComponent;
 class UTexture2D;
 
 UCLASS(HideCategories = (Actor, Input, Replication, Rendering, Collision, HLOD, Physics,
@@ -49,21 +47,13 @@ public:
 	UPROPERTY(EditAnywhere, Category = "CityGen")
 	TArray<FVector> WalkPoints;
 
-	/** The street and wall lights' lamp heads. */
+	/** The street and wall lights' lamp heads (the light pools stand under them). */
 	UPROPERTY(EditAnywhere, Category = "CityGen")
 	TArray<FVector> LampPoints;
 
 	/** Per lamp: 0 a street light, 1 a wall light. */
 	UPROPERTY(EditAnywhere, Category = "CityGen")
 	TArray<uint8> LampKinds;
-
-	/** AG15: in front of each of M20's large facade signs (billboards, banners, holo-boards),
-	 *  where its light washes its facade by night, and its color. */
-	UPROPERTY(EditAnywhere, Category = "CityGen")
-	TArray<FVector> WashPoints;
-
-	UPROPERTY(EditAnywhere, Category = "CityGen")
-	TArray<FLinearColor> WashColors;
 
 	/** District names on the map, at LabelPoints. */
 	UPROPERTY(EditAnywhere, Category = "CityGen")
@@ -91,51 +81,13 @@ public:
 	UPROPERTY(EditAnywhere, Category = "CityGen")
 	TObjectPtr<UMaterialInterface> LightPoolMaterial;
 
-	/** AG15: how many lamps nearest the camera get a real light by night: a spot light under
-	 *  the lamp head pointing down, outside the lamp mesh's shadow. */
-	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
-	int32 LampLights = 192;
+	// (AT1: the lamps' lights are atmosgen's, the CityGenAtmos controller's live set, AG15's
+	// spot lamps and sign washes gone for good; the play features keep the light pools as
+	// the far tier, past atmosgen's live range, CityGen.PlayLamps 2, until AT7)
 
-	/** ... of which the nearest this many cast shadows. */
-	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
-	int32 ShadowedLamps = 8;
-
-	/** How many lamps past the lit ones get a light-pool decal on the ground under them. */
+	/** How many lamps get a light-pool decal on the ground under them. */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
 	int32 LampPools = 768;
-
-	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
-	float LampRadiusM = 30.f;
-
-	/** How far under the lamp head the spot light hangs (cm): below the lamp's housing, so
-	 *  the lamp mesh does not shadow its own light. */
-	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
-	float LampDropCm = 45.f;
-
-	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
-	float LampInnerConeDeg = 50.f;
-
-	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
-	float LampOuterConeDeg = 78.f;
-
-	/** 0.08 of the run-through's 1,500 and 400 (Swagnik, 2026-11-09): under the night's
-	 *  fixed exposure those left near-white pools on the road. */
-	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
-	float StreetLampCandela = 120.f;
-
-	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
-	float WallLampCandela = 32.f;
-
-	/** How many of the large signs nearest the camera wash their facade with a light. */
-	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
-	int32 WashLights = 32;
-
-	/** (600 before 2026-11-09: it painted whole facades in the sign's color) */
-	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
-	float WashCandela = 120.f;
-
-	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
-	float WashRadiusM = 25.f;
 
 	/** A light pool's radius on the ground (m). */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
@@ -186,10 +138,6 @@ public:
 	/** A JSON line of the state (the check reads it). */
 	UFUNCTION(BlueprintPure, Category = "CityGen")
 	FString GetStatus() const;
-
-	/** The lit lamps nearest the view, a JSON array: lamp index, distance (m), light index,
-	 *  place (cm), intensity (cd), shadows (the benchmark logs it with each shot). */
-	FString GetLampReport(int32 Count = 12) const;
 
 	bool IsMapOpen() const { return bMapOpen; }
 	bool IsDevMenuOpen() const { return bDevOpen; }
@@ -242,13 +190,7 @@ private:
 	TObjectPtr<APostProcessVolume> NightVolume;
 
 	UPROPERTY(Transient)
-	TArray<TObjectPtr<USpotLightComponent>> Lamps;
-
-	UPROPERTY(Transient)
 	TArray<TObjectPtr<UDecalComponent>> Pools;
-
-	UPROPERTY(Transient)
-	TArray<TObjectPtr<UPointLightComponent>> Washes;
 
 	TSharedPtr<SCityGenOverlay> Overlay;
 	bool bReady = false;
@@ -263,7 +205,6 @@ private:
 	double LampsAt = -1.0;
 	double UnderwaterAt = -1.0;
 	int32 UnderwaterOn = 0;
-	int32 LampsOn = 0;
 	int32 PoolsOn = 0;
 	FString ToastText;
 	double ToastUntil = 0.0;

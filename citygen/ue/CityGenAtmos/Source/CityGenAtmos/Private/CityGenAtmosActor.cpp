@@ -1,5 +1,7 @@
 #include "CityGenAtmosActor.h"
 
+#include "CityGenAtmosCell.h"
+
 #include "Camera/PlayerCameraManager.h"
 #include "Components/DecalComponent.h"
 #include "Components/ExponentialHeightFogComponent.h"
@@ -8,7 +10,6 @@
 #include "Components/RectLightComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/SpotLightComponent.h"
-#include "Dom/JsonObject.h"
 #include "Engine/ExponentialHeightFog.h"
 #include "Engine/PostProcessVolume.h"
 #include "Engine/StaticMesh.h"
@@ -20,17 +21,12 @@
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialParameterCollection.h"
 #include "Math/RandomStream.h"
-#include "Misc/FileHelper.h"
-#include "Misc/Paths.h"
-#include "Serialization/JsonReader.h"
-#include "Serialization/JsonSerializer.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogCityGenAtmos, Log, All);
 
 namespace
 {
 	constexpr double LiveEvery = 0.2;        // s between choosing the live set
-	constexpr double CellCm = 6400.0;        // the spatial index's cells (64 m)
 	constexpr float FadeShare = 0.2f;        // the farthest share of the mid range fades out
 	constexpr double WetSnapCm = 4000.0;     // the wet decal follows the view in 40 m steps
 	constexpr float WetHalfCm = 30000.f;     // ... 600 m square
@@ -41,16 +37,6 @@ namespace
 	const TCHAR* RainMaterial = TEXT("/Game/CityGen/Core/Atmos/M_CgRain.M_CgRain");
 	const TCHAR* WetMaterial = TEXT("/Game/CityGen/Core/Atmos/M_CgWet.M_CgWet");
 	const TCHAR* RainMesh = TEXT("/Engine/BasicShapes/Plane.Plane");
-
-	FVector Cm(const TArray<TSharedPtr<FJsonValue>>& P)
-	{
-		return FVector(P[0]->AsNumber() * 100.0, -P[1]->AsNumber() * 100.0, P[2]->AsNumber() * 100.0);
-	}
-
-	FIntPoint CellOf(const FVector& P)
-	{
-		return FIntPoint(FMath::FloorToInt32(P.X / CellCm), FMath::FloorToInt32(P.Y / CellCm));
-	}
 
 	uint32 Hash(uint32 A, uint32 B)
 	{
@@ -91,10 +77,16 @@ void ACityGenAtmos::BeginPlay()
 	bBegun = true;
 	AtmosCollection = LoadObject<UMaterialParameterCollection>(nullptr, AtmosMPC);
 	CityCollection = LoadObject<UMaterialParameterCollection>(nullptr, CityMPC);
-	if (!bPlanLoaded && !PlanDir.IsEmpty())
+	// (the cells streamed in before it began play: each later one registers itself)
+	for (TActorIterator<ACityGenAtmosCell> It(GetWorld()); It; ++It)
 	{
-		LoadPlan(PlanDir);
+		if (It->HasActorBegunPlay() || It->IsActorBeginningPlay())
+		{
+			RegisterCell(*It);
+		}
 	}
+	UE_LOG(LogCityGenAtmos, Display, TEXT("CityGen atmos: %s, %d schedules, %d cells with %d lights in at begin play"),
+		*City, ScheduleNames.Num(), SlotOfActor.Num(), RegisteredLights);
 	EnsureVolume();
 	SetFog(bFog);
 	SetRain(bRain);
@@ -106,141 +98,124 @@ void ACityGenAtmos::BeginPlay()
 void ACityGenAtmos::EndPlay(const EEndPlayReason::Type Reason)
 {
 	SetPlayLamps(true);
+	ReleaseAll();
 	Super::EndPlay(Reason);
 }
 
-// -- the plan --
+// -- the cells --
 
-bool ACityGenAtmos::LoadPlan(const FString& Dir)
+FIntPoint ACityGenAtmos::CellOf(const FVector& P) const
 {
-	const double T = FPlatformTime::Seconds();
-	FString Text;
-	if (!FFileHelper::LoadFileToString(Text, *FPaths::Combine(Dir, TEXT("atmos_plan.json"))))
+	const double C = FMath::Max(1.0, double(CellM) * 100.0);
+	return FIntPoint(FMath::FloorToInt32(P.X / C), FMath::FloorToInt32(P.Y / C));
+}
+
+void ACityGenAtmos::RegisterCell(ACityGenAtmosCell* Cell)
+{
+	if (!Cell || SlotOfActor.Contains(Cell))
 	{
-		UE_LOG(LogCityGenAtmos, Error, TEXT("CityGen atmos: no atmos_plan.json in %s"), *Dir);
-		return false;
+		return;
 	}
-	TSharedPtr<FJsonObject> J;
-	if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), J) || !J.IsValid())
+	const int32 N = Cell->LightInts.Num() / CityGenAtmosPack::Ints;
+	if (N <= 0 || Cell->LightFloats.Num() < N * CityGenAtmosPack::Floats)
 	{
-		UE_LOG(LogCityGenAtmos, Error, TEXT("CityGen atmos: atmos_plan.json is not JSON"));
-		return false;
+		return;
 	}
-	ReleaseAll();
-	Lights.Reset();
-	Cells.Reset();
-	Kinds.Reset();
-	Schedules.Reset();
-	ScheduleHours.Reset();
-	PlanDir = Dir;
-	PlanCity = J->GetStringField(TEXT("city"));
-	double D = 0.0;
-	if (J->TryGetNumberField(TEXT("night_ev100"), D)) { PlanEV100 = float(D); }
-	if (J->TryGetNumberField(TEXT("hour"), D)) { Hour = float(D); }
-	const TSharedPtr<FJsonObject>* W = nullptr;
-	if (J->TryGetObjectField(TEXT("weather_state"), W))
+	const int32 Slot = FreeSlots.Num() ? FreeSlots.Pop(EAllowShrinking::No) : Slots.AddDefaulted();
+	FSlot& S = Slots[Slot];
+	S.Actor = Cell;
+	S.Key = CellOf(Cell->GetActorLocation());
+	S.bUsed = true;
+	S.Lights.Reset(N);
+	const float* F = Cell->LightFloats.GetData();
+	const int32* I = Cell->LightInts.GetData();
+	for (int32 k = 0; k < N; ++k)
 	{
-		if ((*W)->TryGetNumberField(TEXT("fog_density"), D)) { FogDensity = float(D); }
-		if ((*W)->TryGetNumberField(TEXT("fog_falloff"), D)) { FogFalloff = float(D); }
-		if ((*W)->TryGetNumberField(TEXT("volumetric"), D)) { FogVolumetric = float(D); }
-		if ((*W)->TryGetNumberField(TEXT("rain"), D)) { RainRate = float(D); }
-		if ((*W)->TryGetNumberField(TEXT("wind_m_s"), D)) { WindMS = float(D); }
-		FString A;
-		if ((*W)->TryGetStringField(TEXT("fog_albedo"), A))
-		{
-			FogAlbedo = FLinearColor(FColor::FromHex(A));
-		}
+		const float* f = F + k * CityGenAtmosPack::Floats;
+		const int32* i = I + k * CityGenAtmosPack::Ints;
+		FCityGenAtmosLight L;
+		L.Pos = FVector(f[0], f[1], f[2]);
+		L.Rot = FRotator(f[3], f[4], 0.f);
+		L.Size = FVector2f(f[5], f[6]);
+		L.SourceCm = f[7];
+		L.Intensity = f[8];
+		L.Color = FLinearColor(f[9], f[10], f[11]);
+		L.ReachCm = f[12];
+		L.Inner = f[13];
+		L.Outer = f[14];
+		L.Flicker = f[15];
+		const uint32 Flags = uint32(i[0]);
+		L.Shape = uint8(Flags & 3u);
+		L.bShadow = (Flags & 4u) != 0;
+		L.bNearOnly = (Flags & 8u) != 0;
+		L.bOn = (Flags & 16u) != 0;
+		L.bNoSpecular = (Flags & 32u) != 0;
+		L.Schedule = uint8((Flags >> 8) & 0xffu);
+		L.Kind = uint8((Flags >> 16) & 0xffu);
+		L.Seed = uint32(i[1]);
+		S.Lights.Add(L);
 	}
-	const TSharedPtr<FJsonObject>* Tiers = nullptr;
-	if (J->TryGetObjectField(TEXT("tiers"), Tiers))
-	{
-		if ((*Tiers)->TryGetNumberField(TEXT("mid_m"), D)) { MidRangeM = float(D); }
-		if ((*Tiers)->TryGetNumberField(TEXT("near_m"), D)) { NearRangeM = float(D); }
-		int32 N = 0;
-		if ((*Tiers)->TryGetNumberField(TEXT("mid_max"), N)) { MaxLive = N; }
-		if ((*Tiers)->TryGetNumberField(TEXT("near_max"), N)) { MaxShadowed = N; }
-	}
-	const TSharedPtr<FJsonObject>* Sch = nullptr;
-	if (J->TryGetObjectField(TEXT("schedules"), Sch))
-	{
-		for (const auto& KV : (*Sch)->Values)
-		{
-			Schedules.Add(FString(*KV.Key));   // (5.8: the keys are shared strings)
-			TArray<float> H;
-			for (const TSharedPtr<FJsonValue>& V : KV.Value->AsArray()) { H.Add(float(V->AsNumber())); }
-			ScheduleHours.Add(H);
-		}
-	}
-	int32 Tiles = 0;
-	for (const TSharedPtr<FJsonValue>& TV : J->GetArrayField(TEXT("tiles")))
-	{
-		const FString File = TV->AsObject()->GetStringField(TEXT("file"));
-		FString TT;
-		TSharedPtr<FJsonObject> TJ;
-		if (!FFileHelper::LoadFileToString(TT, *FPaths::Combine(Dir, File)) ||
-			!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(TT), TJ) || !TJ.IsValid())
-		{
-			UE_LOG(LogCityGenAtmos, Warning, TEXT("CityGen atmos: cannot read %s"), *File);
-			continue;
-		}
-		++Tiles;
-		for (const TSharedPtr<FJsonValue>& LV : TJ->GetArrayField(TEXT("lights")))
-		{
-			const TSharedPtr<FJsonObject>& O = LV->AsObject();
-			FCityGenAtmosLight L;
-			L.Pos = Cm(O->GetArrayField(TEXT("pos")));
-			const TArray<TSharedPtr<FJsonValue>>& Aim = O->GetArrayField(TEXT("aim"));
-			// citygen's yaw turns counterclockwise from east, Unreal's clockwise (Y south)
-			L.Rot = FRotator(Aim[1]->AsNumber(), -Aim[0]->AsNumber(), 0.0);
-			const FString Shape = O->GetStringField(TEXT("shape"));
-			L.Shape = Shape == TEXT("spot") ? 0 : (Shape == TEXT("point") ? 1 : 2);
-			L.Candela = float(O->GetNumberField(TEXT("cd")));
-			const TArray<TSharedPtr<FJsonValue>>& C = O->GetArrayField(TEXT("color"));
-			L.Color = FLinearColor(float(C[0]->AsNumber()), float(C[1]->AsNumber()), float(C[2]->AsNumber()));
-			L.ReachCm = float(O->GetNumberField(TEXT("reach_m")) * 100.0);
-			const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
-			if (O->TryGetArrayField(TEXT("size"), Arr) && Arr->Num() == 2)
-			{
-				L.Size = FVector2f(float((*Arr)[0]->AsNumber() * 100.0), float((*Arr)[1]->AsNumber() * 100.0));
-				const double Area = FMath::Max(0.01, (*Arr)[0]->AsNumber() * (*Arr)[1]->AsNumber());
-				L.Nits = float(L.Candela / Area);
-			}
-			if (O->TryGetArrayField(TEXT("cone"), Arr) && Arr->Num() == 2)
-			{
-				L.Inner = float((*Arr)[0]->AsNumber());
-				L.Outer = float((*Arr)[1]->AsNumber());
-			}
-			if (O->TryGetNumberField(TEXT("barn_deg"), D)) { L.Barn = float(D); }
-			if (O->TryGetNumberField(TEXT("source_m"), D)) { L.SourceCm = float(D * 100.0); }
-			O->TryGetBoolField(TEXT("shadow"), L.bShadow);
-			O->TryGetBoolField(TEXT("on"), L.bOn);
-			L.bNearOnly = O->GetStringField(TEXT("tier")) == TEXT("near");
-			L.Flicker = float(O->GetNumberField(TEXT("flicker")));
-			const FString Kind = O->GetStringField(TEXT("kind"));
-			L.Kind = uint8(Kinds.AddUnique(Kind));
-			const int32 S = Schedules.IndexOfByKey(O->GetStringField(TEXT("schedule")));
-			L.Schedule = uint8(FMath::Max(0, S));
-			L.Seed = GetTypeHash(O->GetStringField(TEXT("id")));
-			const int32 Index = Lights.Add(L);
-			Cells.FindOrAdd(CellOf(L.Pos)).Add(Index);
-		}
-	}
-	bPlanLoaded = Lights.Num() > 0;
-	LoadSeconds = FPlatformTime::Seconds() - T;
+	SlotsAt.FindOrAdd(S.Key).Add(Slot);
+	SlotOfActor.Add(Cell, Slot);
+	RegisteredLights += N;
+	++Registrations;
 	LiveAt = -1.0;
-	UE_LOG(LogCityGenAtmos, Display, TEXT("CityGen atmos: %s, %d lights in %d tiles, %d cells, loaded in %.2f s"),
-		*PlanCity, Lights.Num(), Tiles, Cells.Num(), LoadSeconds);
-	return bPlanLoaded;
+}
+
+void ACityGenAtmos::UnregisterCell(ACityGenAtmosCell* Cell)
+{
+	int32 Slot = INDEX_NONE;
+	if (!Cell || !SlotOfActor.RemoveAndCopyValue(Cell, Slot) || !Slots.IsValidIndex(Slot))
+	{
+		return;
+	}
+	FSlot& S = Slots[Slot];
+	TArray<int64> Keys;
+	Live.GetKeys(Keys);
+	for (int64 K : Keys)
+	{
+		if (int32(K >> 24) == Slot)
+		{
+			Release(K);
+		}
+	}
+	Flickering.RemoveAll([Slot](int64 K) { return int32(K >> 24) == Slot; });
+	if (TArray<int32>* At = SlotsAt.Find(S.Key))
+	{
+		At->Remove(Slot);
+		if (At->Num() == 0)
+		{
+			SlotsAt.Remove(S.Key);
+		}
+	}
+	RegisteredLights -= S.Lights.Num();
+	S.Lights.Reset();
+	S.Actor.Reset();
+	S.bUsed = false;
+	FreeSlots.Add(Slot);
+	LiveAt = -1.0;
+}
+
+const FCityGenAtmosLight* ACityGenAtmos::LightOf(int64 Key) const
+{
+	const int32 Slot = int32(Key >> 24);
+	const int32 Index = int32(Key & 0xffffff);
+	if (!Slots.IsValidIndex(Slot) || !Slots[Slot].bUsed || !Slots[Slot].Lights.IsValidIndex(Index))
+	{
+		return nullptr;
+	}
+	return &Slots[Slot].Lights[Index];
 }
 
 float ACityGenAtmos::ScheduleAt(uint8 Schedule) const
 {
-	if (!ScheduleHours.IsValidIndex(Schedule) || ScheduleHours[Schedule].Num() != 24)
+	const int32 Base = int32(Schedule) * 24;
+	if (Base + 24 > ScheduleHours.Num())
 	{
 		return 1.f;
 	}
 	const int32 H = FMath::Clamp(FMath::FloorToInt32(FMath::Fmod(Hour + 24.f, 24.f)), 0, 23);
-	return ScheduleHours[Schedule][H];
+	return ScheduleHours[Base + H];
 }
 
 float ACityGenAtmos::Scale() const
@@ -296,27 +271,38 @@ ULocalLightComponent* ACityGenAtmos::Take(uint8 Shape)
 	return C;
 }
 
-void ACityGenAtmos::Release(int32 LightIndex)
+void ACityGenAtmos::Release(int64 Key)
 {
 	TObjectPtr<ULocalLightComponent> C;
-	if (!Live.RemoveAndCopyValue(LightIndex, C) || !C)
+	if (!Live.RemoveAndCopyValue(Key, C) || !C)
 	{
 		return;
 	}
 	C->SetVisibility(false);
-	if (Shadowed.Remove(LightIndex) > 0)
+	if (Shadowed.Remove(Key) > 0)
 	{
 		C->SetCastShadows(false);
 	}
-	const uint8 Shape = Lights[LightIndex].Shape;
-	(Shape == 0 ? FreeSpot : (Shape == 1 ? FreePoint : FreeRect)).Add(C);
+	// (back to the pool of its shape: its own class says which; a spot is a point light too)
+	if (C->IsA<USpotLightComponent>())
+	{
+		FreeSpot.Add(C);
+	}
+	else if (C->IsA<URectLightComponent>())
+	{
+		FreeRect.Add(C);
+	}
+	else
+	{
+		FreePoint.Add(C);
+	}
 }
 
 void ACityGenAtmos::ReleaseAll()
 {
-	TArray<int32> Keys;
+	TArray<int64> Keys;
 	Live.GetKeys(Keys);
-	for (int32 K : Keys)
+	for (int64 K : Keys)
 	{
 		Release(K);
 	}
@@ -330,13 +316,14 @@ void ACityGenAtmos::ApplyLight(ULocalLightComponent* C, const FCityGenAtmosLight
 	C->SetLightColor(L.Color);
 	C->SetAttenuationRadius(L.ReachCm);
 	C->SetVolumetricScatteringIntensity(VolumetricScattering);
+	// (a sign's or shopfront's stand-in leaves glossy surfaces to reflect the face itself)
+	C->SetSpecularScale(L.bNoSpecular ? 0.f : 1.f);
 	if (L.Shape == 2)
 	{
 		URectLightComponent* R = CastChecked<URectLightComponent>(C);
 		R->SetSourceWidth(L.Size.X);
 		R->SetSourceHeight(L.Size.Y);
-		R->SetBarnDoorAngle(L.Barn);
-		R->SetIntensity(L.Nits * K);
+		R->SetBarnDoorAngle(L.Inner);
 	}
 	else
 	{
@@ -347,8 +334,8 @@ void ACityGenAtmos::ApplyLight(ULocalLightComponent* C, const FCityGenAtmosLight
 			S->SetOuterConeAngle(L.Outer);
 		}
 		CastChecked<UPointLightComponent>(C)->SetSourceRadius(L.SourceCm);
-		C->SetIntensity(L.Candela * K);
 	}
+	C->SetIntensity(L.Intensity * K);
 	if (bool(C->CastShadows) != bShadowed)
 	{
 		C->SetCastShadows(bShadowed);
@@ -362,49 +349,53 @@ void ACityGenAtmos::UpdateLive()
 	const FVector View = ViewLocation();
 	const double MidCm = double(MidRangeM) * 100.0;
 	const double NearCm = double(NearRangeM) * 100.0;
-	const int32 Reach = FMath::CeilToInt32(MidCm / CellCm);
+	const int32 Reach = FMath::CeilToInt32(MidCm / FMath::Max(1.0, double(CellM) * 100.0));
 	const FIntPoint VC = CellOf(View);
-	TArray<TPair<double, int32>> Near;
+	TArray<TPair<double, int64>> Near;
 	for (int32 dx = -Reach; dx <= Reach; ++dx)
 	{
 		for (int32 dy = -Reach; dy <= Reach; ++dy)
 		{
-			const TArray<int32>* In = Cells.Find(FIntPoint(VC.X + dx, VC.Y + dy));
-			if (!In)
+			const TArray<int32>* At = SlotsAt.Find(FIntPoint(VC.X + dx, VC.Y + dy));
+			if (!At)
 			{
 				continue;
 			}
-			for (int32 i : *In)
+			for (int32 Slot : *At)
 			{
-				const FCityGenAtmosLight& L = Lights[i];
-				if (!L.bOn || ScheduleAt(L.Schedule) < 0.05f)
+				const TArray<FCityGenAtmosLight>& Ls = Slots[Slot].Lights;
+				for (int32 i = 0; i < Ls.Num(); ++i)
 				{
-					continue;
+					const FCityGenAtmosLight& L = Ls[i];
+					if (!L.bOn || ScheduleAt(L.Schedule) < 0.05f)
+					{
+						continue;
+					}
+					const double D = FVector::Dist(L.Pos, View);
+					if (D > MidCm || (L.bNearOnly && D > NearCm))
+					{
+						continue;
+					}
+					Near.Add(TPair<double, int64>(D, LiveKey(Slot, i)));
 				}
-				const double D = FVector::Dist(L.Pos, View);
-				if (D > MidCm || (L.bNearOnly && D > NearCm))
-				{
-					continue;
-				}
-				Near.Add(TPair<double, int32>(D, i));
 			}
 		}
 	}
 	Candidates = Near.Num();
-	Near.Sort([](const TPair<double, int32>& A, const TPair<double, int32>& B)
+	Near.Sort([](const TPair<double, int64>& A, const TPair<double, int64>& B)
 	{
 		return A.Key < B.Key || (A.Key == B.Key && A.Value < B.Value);
 	});
 	const int32 N = FMath::Min(Near.Num(), MaxLive);
-	TSet<int32> Want;
+	TSet<int64> Want;
 	Want.Reserve(N);
 	for (int32 k = 0; k < N; ++k)
 	{
 		Want.Add(Near[k].Value);
 	}
-	TArray<int32> Keys;
+	TArray<int64> Keys;
 	Live.GetKeys(Keys);
-	for (int32 K : Keys)
+	for (int64 K : Keys)
 	{
 		if (!Want.Contains(K))
 		{
@@ -412,10 +403,11 @@ void ACityGenAtmos::UpdateLive()
 		}
 	}
 	// the nearest that may cast shadows do, within the near range
-	TSet<int32> Shadow;
+	TSet<int64> Shadow;
 	for (int32 k = 0; k < N && Shadow.Num() < MaxShadowed; ++k)
 	{
-		if (Lights[Near[k].Value].bShadow && Near[k].Key <= NearCm)
+		const FCityGenAtmosLight* L = LightOf(Near[k].Value);
+		if (L && L->bShadow && Near[k].Key <= NearCm)
 		{
 			Shadow.Add(Near[k].Value);
 		}
@@ -424,23 +416,27 @@ void ACityGenAtmos::UpdateLive()
 	Flickering.Reset();
 	for (int32 k = 0; k < N; ++k)
 	{
-		const int32 i = Near[k].Value;
-		const FCityGenAtmosLight& L = Lights[i];
+		const int64 Key = Near[k].Value;
+		const FCityGenAtmosLight* L = LightOf(Key);
+		if (!L)
+		{
+			continue;
+		}
 		// (the farthest share of the live set fades out, so a light entering it does not pop)
 		const float Fade = float(FMath::Clamp((FarCm - Near[k].Key) / (FadeShare * FarCm), 0.0, 1.0));
-		TObjectPtr<ULocalLightComponent>* Have = Live.Find(i);
+		TObjectPtr<ULocalLightComponent>* Have = Live.Find(Key);
 		ULocalLightComponent* C = Have ? Have->Get() : nullptr;
 		if (!C)
 		{
-			C = Take(L.Shape);
-			Live.Add(i, C);
+			C = Take(L->Shape);
+			Live.Add(Key, C);
 		}
-		const bool bShadow = Shadow.Contains(i);
-		ApplyLight(C, L, Fade, bShadow);
-		if (bShadow) { Shadowed.Add(i); } else { Shadowed.Remove(i); }
-		if (L.Flicker > 0.f)
+		const bool bShadow = Shadow.Contains(Key);
+		ApplyLight(C, *L, Fade, bShadow);
+		if (bShadow) { Shadowed.Add(Key); } else { Shadowed.Remove(Key); }
+		if (L->Flicker > 0.f)
 		{
-			Flickering.Add(i);
+			Flickering.Add(Key);
 		}
 	}
 	UpdateMs = (FPlatformTime::Seconds() - T) * 1000.0;
@@ -452,18 +448,17 @@ void ACityGenAtmos::UpdateFlicker(double Now)
 	// a flickering light drops for a moment now and then: a hash of its seed and the 1/12 s
 	// step (no state, the same at any frame rate)
 	const uint32 Step = uint32(Now * 12.0);
-	for (int32 i : Flickering)
+	for (int64 Key : Flickering)
 	{
-		TObjectPtr<ULocalLightComponent>* C = Live.Find(i);
-		if (!C || !*C)
+		TObjectPtr<ULocalLightComponent>* C = Live.Find(Key);
+		const FCityGenAtmosLight* L = LightOf(Key);
+		if (!C || !*C || !L)
 		{
 			continue;
 		}
-		const FCityGenAtmosLight& L = Lights[i];
-		const float R = float(Hash(L.Seed, Step) & 0xffff) / 65535.f;
-		const float Drop = R < 0.18f ? L.Flicker : (R < 0.3f ? 0.3f * L.Flicker : 0.f);
-		const float Base = L.Shape == 2 ? L.Nits : L.Candela;
-		(*C)->SetIntensity(Base * Scale() * ScheduleAt(L.Schedule) * (1.f - Drop));
+		const float R = float(Hash(L->Seed, Step) & 0xffff) / 65535.f;
+		const float Drop = R < 0.18f ? L->Flicker : (R < 0.3f ? 0.3f * L->Flicker : 0.f);
+		(*C)->SetIntensity(L->Intensity * Scale() * ScheduleAt(L->Schedule) * (1.f - Drop));
 	}
 }
 
@@ -471,6 +466,9 @@ void ACityGenAtmos::SetPlayLamps(bool bOn) const
 {
 	// (while the plan's lights are on, the play features keep only their light pools under the
 	// lamps past the live range: AT0's far tier, `bFarPools`)
+	// (AT1: the play features keep only their light pools; with the plan's lights on, the
+	// pools stand past the live range, AT0's far tier, `bFarPools`; with them off, from the
+	// view out, as before atmosgen)
 	if (IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(TEXT("CityGen.PlayLamps")))
 	{
 		V->Set(bOn ? 1 : (bFarPools ? 2 : 0), ECVF_SetByCode);
@@ -487,8 +485,9 @@ void ACityGenAtmos::SetLightsOn(bool bOn)
 	if (!bOn)
 	{
 		ReleaseAll();
+		bShowing = false;
 	}
-	SetPlayLamps(!bOn || !bPlanLoaded);
+	SetPlayLamps(!bShowing);
 	LiveAt = -1.0;
 }
 
@@ -497,7 +496,7 @@ void ACityGenAtmos::SetFarPools(bool bOn)
 	bFarPools = bOn;
 	if (bLights)
 	{
-		SetPlayLamps(!bPlanLoaded);
+		SetPlayLamps(!bShowing);
 	}
 }
 
@@ -509,7 +508,7 @@ void ACityGenAtmos::SetTiers(int32 InLive, float RangeM, int32 InShadowed)
 	LiveAt = -1.0;
 	if (bLights)
 	{
-		SetPlayLamps(!bPlanLoaded);
+		SetPlayLamps(!bShowing);
 	}
 }
 
@@ -701,7 +700,7 @@ void ACityGenAtmos::PushParameters()
 		UKismetMaterialLibrary::SetScalarParameterValue(this, AtmosCollection, TEXT("FogDensity"), bFog ? FogDensity : 0.f);
 		UKismetMaterialLibrary::SetScalarParameterValue(this, AtmosCollection, TEXT("WindMS"), WindMS);
 	}
-	if (CityCollection && bLights && bPlanLoaded)
+	if (CityCollection && bLights && HasPlan())
 	{
 		UKismetMaterialLibrary::SetScalarParameterValue(this, CityCollection, TEXT("Hour"), Hour);
 	}
@@ -715,7 +714,21 @@ void ACityGenAtmos::Tick(float DeltaSeconds)
 	const double Now = FPlatformTime::Seconds();
 	FRotator ViewRot;
 	const FVector View = ViewLocation(&ViewRot);
-	if (bLights && bPlanLoaded)
+	// the plan's lights show by night (MPC_CityGen's Night, which the play features' day and
+	// night switch sets until AT3 drives the time): by day they cost nothing
+	const bool bWant = bLights && HasPlan() &&
+		(!CityCollection || UKismetMaterialLibrary::GetScalarParameterValue(this, CityCollection, TEXT("Night")) > 0.5f);
+	if (bWant != bShowing)
+	{
+		bShowing = bWant;
+		if (!bWant)
+		{
+			ReleaseAll();
+		}
+		SetPlayLamps(!bWant);
+		LiveAt = -1.0;
+	}
+	if (bShowing)
 	{
 		if (LiveAt < 0.0 || Now - LiveAt > LiveEvery)
 		{
@@ -744,23 +757,39 @@ void ACityGenAtmos::Tick(float DeltaSeconds)
 FString ACityGenAtmos::GetStatus() const
 {
 	int32 Spots = 0, Points = 0, Rects = 0;
+	TMap<uint8, int32> ByKind;
 	for (const auto& KV : Live)
 	{
-		const uint8 S = Lights[KV.Key].Shape;
-		Spots += S == 0 ? 1 : 0;
-		Points += S == 1 ? 1 : 0;
-		Rects += S == 2 ? 1 : 0;
+		const FCityGenAtmosLight* L = LightOf(KV.Key);
+		if (!L)
+		{
+			continue;
+		}
+		Spots += L->Shape == 0 ? 1 : 0;
+		Points += L->Shape == 1 ? 1 : 0;
+		Rects += L->Shape == 2 ? 1 : 0;
+		ByKind.FindOrAdd(L->Kind) += 1;
+	}
+	FString Kinds;
+	for (int32 k = 0; k < KindNames.Num(); ++k)
+	{
+		if (const int32* N = ByKind.Find(uint8(k)))
+		{
+			Kinds += FString::Printf(TEXT("%s\"%s\": %d"), Kinds.IsEmpty() ? TEXT("") : TEXT(", "),
+				*KindNames[k], *N);
+		}
 	}
 	const IConsoleVariable* RT = IConsoleManager::Get().FindConsoleVariable(TEXT("r.RayTracing"));
-	return FString::Printf(TEXT("{\"plan\": %s, \"city\": \"%s\", \"lights\": %d, \"cells\": %d, "
-		"\"load_s\": %.2f, \"on\": %s, \"live\": %d, \"spot\": %d, \"point\": %d, \"rect\": %d, "
-		"\"shadowed\": %d, \"candidates\": %d, \"max_live\": %d, \"mid_m\": %.0f, \"max_shadowed\": %d, "
-		"\"update_ms\": %.3f, \"update_ms_max\": %.3f, \"scale\": %.5f, \"hour\": %.2f, \"fog\": %s, "
-		"\"rain\": %s, \"wet\": %s, \"megalights\": %s, \"ray_tracing\": %d, \"components\": %d}"),
-		bPlanLoaded ? TEXT("true") : TEXT("false"), *PlanCity, Lights.Num(), Cells.Num(), LoadSeconds,
-		bLights ? TEXT("true") : TEXT("false"), Live.Num(), Spots, Points, Rects, Shadowed.Num(),
-		Candidates, MaxLive, MidRangeM, MaxShadowed, UpdateMs, UpdateMsMax, Scale(), Hour,
+	return FString::Printf(TEXT("{\"plan\": %s, \"city\": \"%s\", \"plan_hash\": \"%s\", \"lights\": %d, "
+		"\"cells\": %d, \"registrations\": %d, \"on\": %s, \"live\": %d, \"spot\": %d, \"point\": %d, "
+		"\"rect\": %d, \"live_kinds\": {%s}, \"shadowed\": %d, \"candidates\": %d, \"max_live\": %d, "
+		"\"mid_m\": %.0f, \"max_shadowed\": %d, \"update_ms\": %.3f, \"update_ms_max\": %.3f, "
+		"\"scale\": %.5f, \"hour\": %.2f, \"fog\": %s, \"rain\": %s, \"wet\": %s, \"megalights\": %s, "
+		"\"ray_tracing\": %d, \"components\": %d, \"showing\": %s}"),
+		HasPlan() ? TEXT("true") : TEXT("false"), *City, *PlanHash, RegisteredLights, SlotOfActor.Num(),
+		Registrations, bLights ? TEXT("true") : TEXT("false"), Live.Num(), Spots, Points, Rects, *Kinds,
+		Shadowed.Num(), Candidates, MaxLive, MidRangeM, MaxShadowed, UpdateMs, UpdateMsMax, Scale(), Hour,
 		bFog ? TEXT("true") : TEXT("false"), bRain ? TEXT("true") : TEXT("false"),
 		bWet ? TEXT("true") : TEXT("false"), bMegaLights ? TEXT("true") : TEXT("false"),
-		RT ? RT->GetInt() : -1, AllLights.Num());
+		RT ? RT->GetInt() : -1, AllLights.Num(), bShowing ? TEXT("true") : TEXT("false"));
 }

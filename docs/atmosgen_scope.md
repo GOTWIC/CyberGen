@@ -1,4 +1,4 @@
-# atmosgen: light, sky, air and weather (scope, v2: decided 2026-11-10, AT0 done)
+# atmosgen: light, sky, air and weather (scope, v2: decided 2026-11-10, AT0 and AT1 done)
 
 Stage 3 (atmosgen) of CyberGen's five stages. It takes a built city with its assets and
 makes the city's light and air: every light source that casts light, the sky, fog, smog,
@@ -201,7 +201,10 @@ stages have); never required to edit. Fields, all with defaults:
   (sodium, LED). Light pools only where a lamp is beyond the live set.
 - **Shop spill:** a rect light per lit storefront facing out across the sidewalk, color
   from the shop's use, by its hours (M11).
-- **Signs as light:** a billboard, banner or holo-board lights what it faces as a lit
+- **Signs as light** (AT1's rule for every light standing in for a lit face, a sign's or a
+  shopfront's: no specular highlight, the glossy surfaces reflect the face itself; a point
+  light before a billboard put a bright ball in it):
+  a billboard, banner or holo-board lights what it faces as a lit
   face would (a rect light the size of its face, its color from the sign page, falling off
   over the street and the facade opposite), not a point that floods its own wall; neon
   bands and shop signs as small colored lights near; some flicker, some broken, more where
@@ -271,7 +274,12 @@ its inputs.
   sees $p$. Targets by class (defaults, set in the spec): main sidewalks and crosswalks an
   average of 10 lx and a minimum of 2 lx; carriageways 7 lx; under decks 5 lx; alleys
   allowed as dark as 0.5 lx, never 0. The lux map is also a preview. (This is the check the
-  run-through's dark carriageways would have failed before Unreal.)
+  run-through's dark carriageways would have failed before Unreal.) AT1 set how a class
+  passes: its average over the city at its target, at most 5% of its points under its
+  minimum (broken lights and the dark stretches a gritty mood asks for), no alley point at
+  0, and in every district at least half the average with at most 15% under the minimum
+  (`atmosgen/lux.py`, `presets.UNDER_MIN_SHARE` and its neighbors); park paths are reported,
+  not judged.
 - **Budgets:** live and shadowed lights per 256 m cell and within the view range; volume
   and emitter counts per cell; the night's frame time against AG16's benchmark.
 - **Placement:** every light outside the meshes of its fixture and of every building; every

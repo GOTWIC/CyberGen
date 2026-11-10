@@ -11,7 +11,7 @@ your machine.
 |---|---|---|---|
 | 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M22 done |
 | 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG8, AG10, AG12 to AG17 done, the rest to come |
-| 3 | [atmosgen](#stage-3-atmosgen) | Lighting, sky, weather and atmospherics | AT0 done, the rest to come |
+| 3 | [atmosgen](#stage-3-atmosgen) | Lighting, sky, weather and atmospherics | AT0 and AT1 done, the rest to come |
 | 4 | [lifegen](#stage-4-lifegen) | Traffic, crowds, trains and aircraft, generated | Planned ([draft plan](docs/lifegen_scope.md)) |
 | 5 | [storygen](#stage-5-storygen) | Story, characters and cutscenes | Planned |
 
@@ -529,30 +529,37 @@ plan to Unreal through the same exporter.
 The look: near-photorealistic cyberpunk, clean or gritty by place (a spotless corporate
 core, gritty markets, old towns and poor districts), with rain and wet streets by default.
 
-Its first part is in place: the light plan. From a built city it places a light at every
-street and wall lamp's head, on every sign's lit face and in every shopfront, each with
-its photometry, color, hours and its district's mood (cool white and steady in a wealthy
-core, sodium, flickering and some broken in an old town), and draws its light map:
+The streets at night are in place. From a built city it plans every light that lights a
+street: each street and wall lamp by its kind (cobra heads over the road, post tops, wall
+packs), a light on the mast arm of every traffic signal, corner lights where a junction
+would be dark, columns along the highways, posts along pedestrian streets and promenades,
+wall packs down the alleys, the light under decks, in tunnels and on station platforms,
+every shopfront's spill and every sign's lit face, each with its photometry, color, hours
+and its district's mood (cool white and steady in a wealthy core, sodium, flickering and
+some broken in an old town). Then it checks the plan as a lighting engineer would: the
+light on every sidewalk, crosswalk, road and alley, buildings casting their shadows,
+against a target for each (a plan with dark streets is not delivered):
 
 ```bash
-.venv/bin/python -m atmosgen plan out/vesper_bay              # BUILD/atmos: the plan, per 256 m tile
+.venv/bin/python -m atmosgen plan out/vesper_bay              # BUILD/atmos: the plan and its light check
 .venv/bin/python -m atmosgen lux out/vesper_bay               # the light map and the lux map round the core
 .venv/bin/python -m atmosgen preview out/vesper_bay           # a Blender night render lit by the plan
 ```
 
 | The plan's lights, Delta Megacity | Light on the ground round the Corporate Core |
 |---|---|
-| <img src="docs/progress/AT0/wip/01_plan/preview_plan.png" width="420"> | <img src="docs/progress/AT0/wip/01_plan/preview_lux.png" width="420"> |
+| <img src="docs/progress/AT1/wip/01_plan/delta_preview_plan.png" width="420"> | <img src="docs/progress/AT1/wip/01_plan/delta_preview_lux.png" width="420"> |
 
-In Unreal, atmosgen's runtime plugin (`CityGenAtmos`, built by `citygen unreal` with the
-play features) lights the streets from the plan, with haze, rain and wet streets
-(prototypes for now):
+`citygen unreal` takes the plan into the Unreal level with the city: its lights travel with
+the level's streamed cells, and atmosgen's runtime plugin (`CityGenAtmos`, built with the
+play features) lights the nearest of them by night. Haze, rain and wet streets are prototypes
+for now (AT0):
 
-| Old Town by night, the play features' lamps | The same street lit by the plan, in rain |
+| A Corporate Core junction by night | An Old Town street in rain |
 |---|---|
-| <img src="docs/progress/AT0/street_old_town_play.jpg" width="420"> | <img src="docs/progress/AT0/street_old_town_plan.jpg" width="420"> |
-| The Corporate Core, the play features' lamps | The same, lit by the plan, in rain |
-| <img src="docs/progress/AT0/street_core_play.jpg" width="420"> | <img src="docs/progress/AT0/street_core_plan.jpg" width="420"> |
+| <img src="docs/progress/AT1/unreal/night_core_junction.jpg" width="420"> | <img src="docs/progress/AT1/bench/after/shots/night_plan_all_walk_d04.jpg" width="420"> |
+| An Old Town alley | A highway through the port |
+| <img src="docs/progress/AT1/unreal/night_oldtown_alley.jpg" width="420"> | <img src="docs/progress/AT1/unreal/night_highway.jpg" width="420"> |
 
 Its Blender preview renders the same night in Cycles, lit by the plan's lights:
 
@@ -568,7 +575,7 @@ Plan: [`docs/atmosgen_scope.md`](docs/atmosgen_scope.md); what each milestone di
 | | Milestone | What it adds | Status |
 |---|---|---|---|
 | AT0 | Groundwork | Look presets and art direction spec, the plan's format, lights for every lamp, sign and shopfront, the runtime plugin's start, a night test of Delta Megacity in Unreal (lights, haze, rain, wet streets), a Blender night preview | Done |
-| AT1 | Streets at night | Street and wall lights that light sidewalks and roads, shop light spilling onto the street, deck, tunnel and station lights, a check that every street is lit | Planned |
+| AT1 | Streets at night | Street and wall lights that light sidewalks and roads, lit junctions, highways and alleys, shop light spilling onto the street, deck, tunnel and station lights, a check that every street is lit, the lights in the Unreal level | Done |
 | AT2 | Neon and signs as light | Billboards, banners and holo-boards lighting the street and facades they face, neon spill, crown floods, aviation lights, searchlights, port and spaceport lights, flicker | Planned |
 | AT3 | Sky and time | Night, dusk and day skies, a cloud deck lit by the city, the moon, time of day driving every light and window | Planned |
 | AT4 | Air | Fog, haze, smog and mist over the water, light shafts, steam from manholes and vents | Planned |

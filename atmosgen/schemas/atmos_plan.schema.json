@@ -312,6 +312,12 @@
    "title": "Budgets",
    "type": "object"
   },
+  "checks": {
+   "additionalProperties": true,
+   "description": "AT1: the lux check's result (`lux.check`): `ok` and per walkway class its points, average, share under the minimum and targets. The exporter imports a plan only when it passed (scope 8: not delivered otherwise).",
+   "title": "Checks",
+   "type": "object"
+  },
   "city": {
    "title": "City",
    "type": "string"

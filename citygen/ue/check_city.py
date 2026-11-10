@@ -689,10 +689,12 @@ def status(actor):
 
 def play_features(world, man, slug):
     """The play features (the CityGenPlay plugin's actor), when the import made them: the
-    overlay on screen, the map and the developer menu open and close, night and day (the
-    lamps nearest the player lit by night), the free camera there and back, and a teleport
-    across the city onto a walkway, the player held until the city streamed in there and on
-    the ground after. With `shots`: the minimap, the map and the street by night."""
+    overlay on screen, the map and the developer menu open and close, night and day (AT1:
+    atmosgen's lights nearest the player live by night, its cells registered, when the
+    import placed its controller; else the light pools under the lamps), the free camera
+    there and back, and a teleport across the city onto a walkway, the player held until the
+    city streamed in there and on the ground after. With `shots`: the minimap, the map and
+    the street by night."""
     if not man.get("play"):
         return
     cls = getattr(unreal, "CityGenPlay", None)
@@ -724,6 +726,9 @@ def play_features(world, man, slug):
     a.set_night(True)
     yield from wait(2.0)
     got["night"] = status(a)
+    at = atmos_status(world)
+    if at is not None:
+        got["atmos_night"] = at
     if JOB.get("shots"):
         yield from ui_shot(world, "play_night")
     a.set_free_cam(True)
@@ -769,30 +774,43 @@ def play_features(world, man, slug):
     down = trace(world, loc, unreal.Vector(loc.x, loc.y, loc.z - 1000.0), [p])
     tp = got["teleport"]
     moved = math.hypot(tp["x"] - sx, tp["y"] - sy)
+    an = got.get("atmos_night")
+    # (AT1: by night atmosgen's live set lights the street; without its controller the light
+    # pools under the lamps do)
+    lit = (an["showing"] and an["cells"] > 0 and an["live"] > 0) if an is not None and \
+        man.get("atmos", {}).get("cells") else \
+        (got["night"].get("light_pools", 0) > 0 or got["night"]["lamp_points"] == 0)
     ok = (got["start"]["ready"] and got["start"]["overlay"] and got["start"]["map_texture"]
-          and got["map"] and got["menu"] and got["night"]["night"]
-          and (got["night"]["lamps_lit"] > 0 or got["night"]["lamp_points"] == 0)
+          and got["map"] and got["menu"] and got["night"]["night"] and lit
           and got["free_cam"]["free_cam"] and got["free_cam"]["pawn"].startswith("CityGenFreeCam")
           and not got["back"]["free_cam"] and got["back"]["pawn"] == pawn0
           and not tp["waiting"] and moved > 100.0 and down is not None)
     RES["checks"]["play_features"] = {
         "ok": ok, "pawn": pawn0, "walk_points": got["start"]["walk_points"],
-        "lamp_points": got["start"]["lamp_points"], "lamps_lit": got["night"]["lamps_lit"],
-        # (AG15: the spot lights casting shadows and the light pools past the lit lamps)
-        "lamps_shadowed": got["night"].get("lamps_shadowed"),
-        "light_pools": got["night"].get("light_pools"),
+        "lamp_points": got["start"]["lamp_points"],
+        # (AT1: atmosgen's live set by night, the play features' light pools past it)
+        "atmos_night": an, "light_pools": got["night"].get("light_pools"),
         "teleport_to": [round(tx, 1), round(ty, 1)],
         "teleported_m": round(moved, 1), "landed": down is not None, "states": got}
+    night = (f"{an['live']} atmos lights live of {an['lights']} in {an['cells']} cells, "
+             f"{an['shadowed']} shadowed" if an else "no atmos controller")
     RES["lines"].append(
-        f"play features: map, menu, night ({got['night']['lamps_lit']} lamps lit, "
+        f"play features: map, menu, night ({night}, "
         f"{got['night'].get('light_pools', 0)} light pools), free camera "
         f"and back, teleport {moved:.0f} m "
         + ("onto the ground" if down is not None else "with nothing under the player"))
 
 
+def atmos_status(world):
+    """The atmos controller's state (AT1), or None when the level has none."""
+    cls = getattr(unreal, "CityGenAtmos", None)
+    found = unreal.GameplayStatics.get_all_actors_of_class(world, cls) if cls else []
+    return json.loads(found[0].get_status()) if found else None
+
+
 def play_views(world, a, slug, prefix):
-    """The `--view`s named `<prefix>*` from the free camera in the play world (by night the
-    play features' lamps, light pools and sign washes live only there; streaming loads the
+    """The `--view`s named `<prefix>*` from the free camera in the play world (by night
+    atmosgen's lights and the light pools live only there; streaming loads the
     city around each view, where the editor's shots load at most `SHOT_MESHES` meshes near
     the city's middle): the camera moved to each eye, the city streamed in around it, the
     minimap hidden, a 1920 x 1080 HighResShot (no overlay)."""
@@ -817,50 +835,14 @@ def play_views(world, a, slug, prefix):
         yield from settle(world, slug, at=eye)
         yield from wait(4.0)
         yield from ui_shot(world, v["name"], "HighResShot 1920x1080", 180)
-        log(f"play view {v['name']}")
-        if os.environ.get("CITYGEN_UE_LAMP_DEBUG") == "1" and prefix == "night_":
-            yield from lamp_debug(world, a, v)
+        at = atmos_status(world)
+        log(f"play view {v['name']}" + (f": atmos {at['live']} live ({at['live_kinds']}), "
+                                         f"{at['shadowed']} shadowed" if at else ""))
     try:
         pc.player_camera_manager.unlock_fov()
         a.set_editor_property("b_show_minimap", True)
     except Exception:           # noqa: BLE001
         pass
-
-
-def lamp_debug(world, a, v):
-    """Tuning aid (CITYGEN_UE_LAMP_DEBUG=1, which also skips the walk's streaming,
-    collision and walking checks): the lamps' spot lights and pools near a night view in the
-    log, then the view again with the lamps' candelas times each of CITYGEN_UE_LAMP_SCALES
-    (comma separated, default 20), `<view>_x<scale>`."""
-    eye = ue(*v["eye"])
-    spots = list(a.get_components_by_class(unreal.SpotLightComponent))
-    pools = list(a.get_components_by_class(unreal.DecalComponent))
-    vis = [s for s in spots if s.is_visible()]
-    vis.sort(key=lambda s: (s.get_world_location() - eye).length())
-    for s in vis[:4]:
-        p = s.get_world_location()
-        log(f"lamp debug {v['name']}: spot at ({p.x:.0f}, {p.y:.0f}, {p.z:.0f}) "
-            f"{(p - eye).length() / 100.0:.0f} m from the eye, intensity "
-            f"{s.get_editor_property('intensity')} {s.get_editor_property('intensity_units')}, "
-            f"radius {s.get_editor_property('attenuation_radius')}, rot "
-            f"{s.get_world_rotation()}, cones {s.get_editor_property('inner_cone_angle')}/"
-            f"{s.get_editor_property('outer_cone_angle')}, mobility {s.mobility}")
-    pv = [d for d in pools if d.is_visible()]
-    log(f"lamp debug {v['name']}: {len(vis)} of {len(spots)} spots visible, {len(pv)} of "
-        f"{len(pools)} pools; candela street "
-        f"{a.get_editor_property('street_lamp_candela')} wall "
-        f"{a.get_editor_property('wall_lamp_candela')}; decal "
-        f"{pv[0].get_editor_property('decal_size') if pv else None} "
-        f"{pv[0].get_editor_property('decal_material') if pv else None}")
-    s0 = a.get_editor_property("street_lamp_candela")
-    w0 = a.get_editor_property("wall_lamp_candela")
-    for k in os.environ.get("CITYGEN_UE_LAMP_SCALES", "20").split(","):
-        a.set_editor_property("street_lamp_candela", s0 * float(k))
-        a.set_editor_property("wall_lamp_candela", w0 * float(k))
-        yield from wait(2.0)
-        yield from ui_shot(world, f"{v['name']}_x{k}", "HighResShot 1920x1080", 180)
-    a.set_editor_property("street_lamp_candela", s0)
-    a.set_editor_property("wall_lamp_candela", w0)
 
 
 def ui_shot(world, name, cmd="shot showui", timeout=30):

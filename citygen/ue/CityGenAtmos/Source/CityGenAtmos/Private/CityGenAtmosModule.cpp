@@ -1,7 +1,9 @@
-// The module and its console commands (the spike's benchmark passes drive them):
-// CityGenAtmos.Lights, .Fog, .Rain, .Wet, .MegaLights [0|1] (toggling without an argument),
-// CityGenAtmos.Tiers LIVE RANGE_M SHADOWED, .Hour H, .Gain G, .Scattering S, .Load DIR,
-// .Status (the state as one JSON line).
+// The module and its console commands (the benchmark's passes drive them):
+// CityGenAtmos.Lights, .Fog, .Rain, .Wet, .MegaLights, .FarPools [0|1] (toggling without an
+// argument), CityGenAtmos.Tiers LIVE RANGE_M SHADOWED, .Hour H, .Gain G, .Scattering S,
+// .Status (the state as one JSON line). AT1: the plan comes with the level (the importer's
+// controller and its cells' data actors), no longer from a folder (AT0's .Load and
+// -CityGenAtmosPlan are gone).
 
 #include "CityGenAtmosActor.h"
 #include "HAL/IConsoleManager.h"
@@ -72,14 +74,6 @@ namespace
 		{
 			ACityGenAtmos* A = AtmosIn(World);
 			if (A && Args.Num()) { A->VolumetricScattering = FCString::Atof(*Args[0]); A->SetTiers(A->MaxLive, A->MidRangeM, A->MaxShadowed); }
-		}));
-
-	FAutoConsoleCommandWithWorldAndArgs LoadCmd(TEXT("CityGenAtmos.Load"),
-		TEXT("CityGenAtmos.Load DIR: read a plan (BUILD/atmos)"),
-		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
-		{
-			ACityGenAtmos* A = AtmosIn(World);
-			if (A && Args.Num()) { A->LoadPlan(Args[0]); }
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs StatusCmd(TEXT("CityGenAtmos.Status"),

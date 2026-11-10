@@ -447,6 +447,26 @@ def test_nanite_pool(tmp_path, monkeypatch):
     assert "r.Nanite.Streaming.StreamingPoolSize=256\n" in ini.read_text()
 
 
+def test_project_runs_at_the_monitors_resolution(tmp_path):
+    """AT1: every import makes the game DPI-aware in the project's DefaultEngine.ini (a
+    125%-scaled 1440p screen gave a DPI-unaware game a 2048 x 1152 window Windows stretched),
+    the rest of the file as it was; Unreal's screen percentage left alone."""
+    up = tmp_path / "P" / "P.uproject"
+    (tmp_path / "P" / "Config").mkdir(parents=True)
+    ini = tmp_path / "P" / "Config" / "DefaultEngine.ini"
+    ini.write_bytes(b"[/Script/Engine.UserInterfaceSettings]\r\nApplicationScale=1.0\r\n")
+    assert U.set_project_ini(up)
+    assert ini.read_bytes() == (b"[/Script/Engine.UserInterfaceSettings]\r\n"
+                                b"bAllowHighDPIInGameMode=True\r\nApplicationScale=1.0\r\n")
+    assert not U.set_project_ini(up)
+    assert b"ScreenPercentage" not in ini.read_bytes()
+    # a project without the section gets it appended
+    ini.write_bytes(b"[SystemSettings]\nr.TextureStreaming=0\n")
+    assert U.set_project_ini(up)
+    assert ini.read_bytes().endswith(b"\n\n[/Script/Engine.UserInterfaceSettings]\n"
+                                     b"bAllowHighDPIInGameMode=True\n")
+
+
 def test_play_flags(tmp_path):
     """`--play`, `--fly-speed`, `--view-range`, `--no-startup` and `--no-hlod` parse; a play mode
     that is not one is refused before any editor runs."""

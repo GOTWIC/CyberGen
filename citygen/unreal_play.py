@@ -9,7 +9,8 @@
 - `play.json`: the map's bounds and size, the walkway graph's points thinned to one per
   WALK_GRID_M cell (where a walking player is teleported to; absolute heights on a terrain
   city), the street and wall lights' lamp heads (each instance's transform applied to its
-  prototype's `prop_light` parts) and a label point per district;
+  prototype's `prop_light` parts: the light pools stand under them, atmosgen's far tier since
+  AT1, when the lamps' own lights became atmosgen's) and a label point per district;
 
 and the manifest's `play` (files, hashes, counts). It installs the CityGenPlay plugin
 (citygen/ue/CityGenPlay, C++) into the project and builds it with UnrealBuildTool for the
@@ -283,49 +284,6 @@ def district_labels(build: Path) -> list[dict]:
     return sorted(out, key=lambda r: r["name"])
 
 
-WASH_KINDS = ("billboard", "banner", "holo_ad")      # AG15: M20's large signs on facades
-WASH_COLORS = ("ff2a6d", "05d9e8", "b967ff", "ffb000", "39ff8a", "f2f6ff")
-WASH_OUT_M = 1.5
-
-
-def _bases(build: Path) -> dict[str, float]:
-    """{building id: base_m} of the buildings M13 seats on a slope (city_model.json beside
-    the plan; empty on a flat city or without the model)."""
-    model = build / "city_model.json"
-    if not model.is_file():
-        return {}
-    data = json.loads(model.read_text(encoding="utf-8"))
-    return {b["id"]: float(b["base_m"]) for b in data.get("buildings", [])
-            if b.get("base_m") is not None}
-
-
-def sign_washes(build: Path) -> tuple[list[float], list[float]]:
-    """AG15: where M20's large facade signs (billboards, banners, holo-boards in front of a
-    facade) wash their facade by night: a point WASH_OUT_M in front of each (flat x, y, z,
-    meters; a slot's z is over its building's base, as the blockout lifts the signs, so on a
-    terrain city the building's `base_m` is added), and its neon color by its id (flat r, g,
-    b)."""
-    path = build / "gameplay.json"
-    if not path.is_file():
-        return [], []
-    gp = json.loads(path.read_text(encoding="utf-8"))
-    base = _bases(build) if any(s.get("kind") in WASH_KINDS
-                                for s in gp.get("sign_slots") or []) else {}
-    pts, cols = [], []
-    for s in sorted(gp.get("sign_slots") or [], key=lambda s: s["id"]):
-        if s.get("kind") not in WASH_KINDS or s.get("mount") not in ("facade", "front"):
-            continue
-        a = math.radians(float(s.get("yaw_deg", 0.0)))
-        x, y, z = s["position"]
-        z += base.get(s.get("building_id"), 0.0)
-        pts += [round(x + WASH_OUT_M * math.cos(a), 2), round(y + WASH_OUT_M * math.sin(a), 2),
-                round(z, 2)]
-        c = WASH_COLORS[int(hashlib.sha256(s["id"].encode("utf-8")).hexdigest()[:8], 16)
-                        % len(WASH_COLORS)]
-        cols += [round(int(c[k:k + 2], 16) / 255.0, 3) for k in (0, 2, 4)]
-    return pts, cols
-
-
 def _sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -345,12 +303,12 @@ def write_play(build: Path, plan_sha: str, plan: dict, instances: list[dict],
         size = render_map(plan, png)
     walk = walk_points(graphs)
     lamps, kinds = lamp_points(plan, instances)
-    washes, wash_colors = sign_washes(build)
-    data = {"version": 2, "city": plan["city"],   # (2: AG15, spot lamps and light pools)
+    # (3: AT1, the light pools under the lamps alone; their lights and the signs' are
+    # atmosgen's, AG15's sign washes gone)
+    data = {"version": 3, "city": plan["city"],
             "map": {"file": "unreal/map.png", "bounds": plan["bounds"], "size": list(size),
                     "sha256": _sha(png.read_bytes()), "source": source},
             "walk": walk, "lamps": lamps, "lamp_kinds": kinds,
-            "washes": washes, "wash_colors": wash_colors,
             "labels": district_labels(build)}
     text = json.dumps(data, separators=(",", ":")) + "\n"
     if not data_path.is_file() or data_path.read_text(encoding="utf-8") != text:
@@ -358,7 +316,7 @@ def write_play(build: Path, plan_sha: str, plan: dict, instances: list[dict],
     return {"data": "unreal/play.json", "map": "unreal/map.png", "map_bounds": plan["bounds"],
             "map_size": list(size), "map_sha256": data["map"]["sha256"],
             "hash": _sha(text.encode("utf-8"))[:16], "walk_points": len(walk) // 3,
-            "lamps": len(kinds), "washes": len(washes) // 3, "labels": len(data["labels"])}
+            "lamps": len(kinds), "labels": len(data["labels"])}
 
 
 # --- the plugin -------------------------------------------------------------------------------

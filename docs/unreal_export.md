@@ -236,27 +236,26 @@ lit by each building's own night since AG15: its schedule at `MPC_CityGen`'s `Ho
 light's color temperature; see "From AG15"), neon, LED strips, logos and signs glow
 brighter, the sun becomes a dim blue moon high in the sky, the sky light dims, the exposure
 is held (a fixed EV100, or the eye would adapt until the night looked like the day), and the
-lamps light the streets (AG15; the run-through's streets were black at night: a point light
-at the lamp head sat inside the lamp mesh's own shadow and reached nothing on the ground):
+streets are lit:
 
-- the 192 street and wall lights nearest the view get a real **spot light** each, hung
-  `LampDropCm` (45 cm) under the lamp head, outside the lamp mesh, pointing straight down
-  (cones 50 and 78 degrees, 1,500 cd for a street light and 400 for a wall light, 30 m and
-  18 m of reach), warm; the nearest 8 cast shadows, the rest none; the farthest quarter
-  fades, so a lamp entering the set does not pop;
-- under the 768 lamps past them (and the fading ones) a **light-pool decal**
-  (`/Game/CityGen/Core/M_CgLightPool`: a deferred decal, a warm emissive disc fading from
-  its middle, by `Night`, 7 m across a street light, 4 m a wall light), so the streets
-  read lit far beyond the real lights;
-- the 32 of M20's large facade signs nearest the view (billboards, banners, holo-boards in
-  front of a facade) **wash their facade**: a point light 1.5 m in front of each, in its
-  neon color, no shadow.
+- **by atmosgen** (AT1, "From AT1" below) when the city was imported with its atmos plan:
+  the street and wall lights, the junctions' mast arms and corner poles, the highways, the
+  alleys, the shopfronts, the signs, the decks, tunnels and stations, each as its plan says,
+  the nearest 512 within 300 m live, 16 of them shadowed;
+- under the lamps past atmosgen's live range (and under the nearest, without an atmos plan)
+  a **light-pool decal** (`/Game/CityGen/Core/M_CgLightPool`: a deferred decal, a warm
+  emissive disc fading from its middle, by `Night`, 7 m across a street light, 4 m a wall
+  light, under 768 lamps), so the far streets read lit: atmosgen's far tier until AT7.
 
-Setting night sets `MPC_CityGen`'s `Hour` to the actor's `NightHour` (21 by default).
-Stage 3 (atmosgen) takes the lighting over (decision 12.2 of its scope); the menu's switch is
-a developer's. Since AT0 the console variable `CityGen.PlayLamps` (1 by default) turns the
-lamps, pools and washes off when 0, which atmosgen's runtime sets while its plan's lights
-are on ("atmosgen's runtime (AT0)" below).
+AG15's spot lights under the 192 nearest lamps and its sign washes (a point light before
+each of the 32 nearest large signs) are gone since AT1 (decision 12.2 of atmosgen's scope:
+the lamps, washes, moon and night exposure move to atmosgen); a city imported without an atmos
+plan has the light pools alone by night (run `atmosgen plan` before `citygen unreal`).
+Setting night sets `MPC_CityGen`'s `Hour` to the actor's `NightHour` (21 by default; the
+atmos controller sets the plan's hour over it). The console variable `CityGen.PlayLamps` (1 by
+default) places the pools from the view out, 2 only past `CityGen.PlayPoolsFromM` (atmosgen's
+controller sets 2 while its lights show), 0 none. The menu's day and night switch is a
+developer's until AT3's time of day.
 
 **How it is built.** The play features are game logic (input, a drawn overlay, possession,
 teleporting), which Unreal's Python cannot write into a Blueprint's graph, so they are a
@@ -884,7 +883,11 @@ imported before; `citygen/bench.py`, the driver `UCityGenBench` in the play plug
   run's summary; and a run whose game or render thread median is 1.5 times the fastest
   run's while its GPU median stays within 15% (`bench.starved`: a first run after an
   import, or other work on the PC) is named under the table with the cores other processes
-  took meanwhile.
+  took meanwhile. Since AT1 the game is opted out of Windows' power throttling and run
+  above normal priority (`bench.unthrottle`): on the PC's hybrid CPU a game window that lost
+  the foreground to the desktop was moved to the efficiency cores, its game and render
+  threads twice as slow for minutes at the same GPU time (AT1's first after runs); each
+  sample also says whether the game had the foreground (`in_front`, the summary's `front`).
 
 **What the benchmark found on Delta Megacity** (`docs/progress/AG16/`): bound by the game
 thread, not the GPU. Every frame spent its async loading time, physics waited on bodies
@@ -965,6 +968,12 @@ play-in-editor and `-game` run). So the fixes cut what the level holds and strea
   level adds; with the cells and their HLODs coming and going it made 36 to 48 ms frames at
   256 m cells and 1 to 2.8 s frames at 128 m. A city's textures (AG6's library sets and its
   sign pages, a few hundred) fit whole: Delta's VRAM stayed at 7 GB.
+- **The game at the monitor's resolution** (AT1, `unreal.set_project_ini`:
+  `bAllowHighDPIInGameMode=True` in the project's `[/Script/Engine.UserInterfaceSettings]`,
+  written by every import): the game is DPI-aware, so a 2560 x 1440 monitor scaled 125% gives
+  it a 2560 x 1440 window (DPI-unaware it got 2048 x 1152, stretched by Windows, and the neon
+  strips shimmered). Unreal's automatic screen percentage is left as it is; the benchmark keeps
+  its own overrides.
 - **Tried and left out**: UE 5.8's experimental switches for physics bodies made off the
   game thread (`p.Chaos.EnableAsyncInitBody`) and incremental garbage collection
   (`gc.AllowIncrementalReachability`, `gc.AllowIncrementalGather`), no forced collection
@@ -1428,19 +1437,17 @@ of its own, `CityGenAtmos` (`citygen/ue/CityGenAtmos`), as the play features do 
   view (4,000, 25 m round it, 24 m tall), the wet decal (600 m square, 1.4 m deep round the
   street level, following the view in 40 m steps), and MegaLights by a post-process volume
   of its own.
-- **Console commands:** `CityGenAtmos.Lights`, `.Fog`, `.Rain`, `.Wet`, `.MegaLights [0|1]`,
-  `.Tiers LIVE RANGE_M SHADOWED`, `.Hour H`, `.Gain G`, `.Scattering S`, `.Load DIR`,
-  `.Status` (one JSON line: lights, live by shape, shadowed, candidates, the live set's
-  update time, the scale, the effects, `r.RayTracing`).
-- **AT0 places nothing in the level.** A game started with `-CityGenAtmosPlan=<dir>` gets the
-  controller from a world subsystem (`UCityGenAtmosSubsystem`), dark until a command turns
-  it on (`-CityGenAtmosOn` starts it lit). The plan's contribution
-  (`BUILD/atmos/unreal_contribution.atmos.json`: `atmos`, the controller, and
-  `atmos.lights.<tile>`, a spawner per tile) is layer 3's format; AT1 places them in the
-  level, the tiles' lights streamed with their cells, and replaces the play features'
-  lamps.
-- **The benchmark:** `--bench-atmos PLAN_DIR` runs the game with the plan, makes the assets
-  first and adds AT0's passes to `--bench-passes` (`bench.ATMOS_PASSES`: `night_plan`,
+- **Console commands:** `CityGenAtmos.Lights`, `.Fog`, `.Rain`, `.Wet`, `.MegaLights`,
+  `.FarPools [0|1]`, `.Tiers LIVE RANGE_M SHADOWED`, `.Hour H`, `.Gain G`, `.Scattering S`,
+  `.Status` (one JSON line: the cells and lights registered, live by shape and by kind,
+  shadowed, candidates, the live set's update time, the scale, the effects, `r.RayTracing`,
+  whether the lights show). AT0's `.Load DIR` is gone with `-CityGenAtmosPlan` (AT1).
+- **AT0 placed nothing in the level** (a game started with `-CityGenAtmosPlan=<dir>` got the
+  controller from a world subsystem). Since AT1 the import places the controller and the
+  plan's cells ("From AT1" below); the subsystem and the command line are gone.
+- **The benchmark:** `--bench-atmos` (a plan's folder in AT0, a flag since AT1: the level has
+  the plan) makes the assets first and adds atmosgen's passes to `--bench-passes`
+  (`bench.ATMOS_PASSES`: `night_plan`,
   `night_plan_fog`, `night_plan_all` with rain and wet streets, `night_plan_256` and
   `night_plan_1024` for the live set's size, `night_play_air` the effects over the play
   features' lamps, `night_plan_mega` and `night_plan_mega_2048` with MegaLights); a pass's
@@ -1449,6 +1456,64 @@ of its own, `CityGenAtmos` (`citygen/ue/CityGenAtmos`), as the play features do 
   (`bench.RT_INI`, for MegaLights), the project's settings untouched. `bench.busy` also waits
   for another benchmark's game (a packaged one too: `-CityGenBench=` on its command line)
   and its driver.
+
+### From AT1: streets at night
+
+The city's atmos plan comes with the import (`citygen unreal BUILD UPROJECT`, the plan in
+`BUILD/atmos` or `--atmos DIR`; `--no-atmos` leaves it out, and its actors from an earlier
+import go):
+
+- **Layer 3 of the manifest** (`citygen/unreal_atmos.write_atmos`, the manifest's `atmos`):
+  the controller's key (`atmos`) and hash, and a cell per 128 m cell of World Partition's
+  main grid that holds lights (`atmos.lights.<tile>.<quarter>`: citygen's 256 m tile and its
+  quarter, `sw`, `se`, `nw`, `ne`), its middle, light count and hash (of its lights' records
+  and the packing's version); `counts.atmos_cells`, `counts.atmos_lights`; `actor_hashes`,
+  `actor_kinds` (`atmos`, `atmos_cell`) and `manifest_changes` take them as actors. The
+  records themselves go to `BUILD/unreal/atmos.json` (`controller`: the city, the plan's
+  hash, the schedules' names and their 24 hourly values, the light kinds, the plan's night
+  exposure, hour, weather and tiers; `cells`: each cell's lights packed, `pack`). **A plan
+  whose lux check did not pass is not delivered** (scope 8): the manifest names it
+  (`atmos.skipped`) and the city imports without it; an AT0 plan, which has no check, too.
+- **Packed lights** (`CityGenAtmosCell.h`, `CityGenAtmosPack`): 16 floats a light in
+  Unreal's frame (position in cm, pitch and yaw, a rect's width and height, the source
+  radius, the intensity in candela, or nits for a rect, the linear color, the reach, a
+  spot's cones or a rect's barn door angle, the flicker depth) and 2 ints (flags: shape,
+  may cast shadows, near tier only, on or broken, no specular, schedule, kind and mount
+  indices; a seed from its record's hash).
+- **The importer** (`Importer.atmos_cells`, `atmos_controller`): a `CityGenAtmosCell`
+  actor per cell at its middle, spatially loaded (no primitive: World Partition streams it
+  by its location, in the main grid's 128 m cell holding it), its `LightFloats` and
+  `LightInts`, tags `cg.key`, `cg.hash`, `cg.type=atmos_lights`, `cg.category=atmos`,
+  `cg.tile`, folder `CityGen/Atmos`, made among the offloaded actors; then the
+  `CityGenAtmos` controller, always loaded, with the plan's settings (`cg.type=atmos`).
+  Both carry their own actor version (`ATMOS_VERSION`), so a new packing re-imports only
+  them. atmosgen's assets (`MPC_CityGenAtmos`, `M_CgRain`, `M_CgWet`) are made first when
+  the project lacks them (`unreal_atmos.make_assets`).
+- **The runtime** (`CityGenAtmos`): a cell registers its lights with the controller when it
+  begins play (the controller takes those already in when it begins) and takes them out at
+  its end play, as its World Partition cell streams; the controller keeps them by cell and
+  every 0.2 s picks the live set from the cells within the mid range of the view (the
+  nearest 512 within 300 m, 16 shadowed within 60 m: AT0's measured tiers), from pools of
+  spot, point and rect light components. Its lights show by night (`MPC_CityGen`'s
+  `Night`, the play features' switch until AT3), cost nothing by day, and while they show
+  the play features' light pools stand only past the live range (`CityGen.PlayLamps` 2).
+  The fog, rain and wet streets stay off until AT4 and AT5 (the benchmark's passes and the
+  console commands switch them).
+- **The play features** lose AG15's spot lamps and sign washes (their properties,
+  `play.json` version 3 without `washes`; `GetStatus` without `lamps_lit`); the light pools
+  stay.
+- **The check** (`check_city.py`): by night the controller's status (cells registered,
+  lights live by kind, shadowed) is part of the play features' check, which needs its
+  lights live near the player when the city has a plan (else the light pools); the night
+  views log the live set. `CITYGEN_UE_LAMP_DEBUG=1` still skips the walk's checks, straight
+  to the play features and their views.
+- **No highlight from a lit face's stand-in**: the lights standing in for a sign's or a
+  shopfront's lit face (kinds `sign`, `shop_sign`, `spill`) have specular scale 0 (the plan's
+  `specular`, flag bit 5 of the packed record): a glossy surface reflects the face itself,
+  through Lumen, and a light's highlight on it is a bright ball (the play features' sign washes
+  put one in nearly every billboard). The same rule holds for AT2's sign lights.
+- **A city without an atmos plan** imports as before (no controller, no cells), its night
+  lit by the light pools alone.
 
 ## Milestones and checks
 
@@ -1519,3 +1584,4 @@ of its own, `CityGenAtmos` (`citygen/ue/CityGenAtmos`), as the play features do 
 | #147 (a fix on its own) | No code change. Footbridges are faces of the pavement map, so the blockout draws each again (on M22 they had no faces and the blockout left them out): one object per footbridge, `<segment>.deck` (category `bridge`, collection `Waterfront`: its walk face, the slab under it, piers in the water), so an import over an earlier one creates their actors; AG7's footbridge road pieces now replace those keys (`replaces`), drawn from the map's faces under the same keys. A junction a footbridge meets has a slot where its stairs start, and the few junctions the unfold mends (`pavement.Assembly._unfold`) change shape in height: their plan entries and their actors' hashes move, updated in place. No new kind, part, slot or master | Not run here (the coordinating session's call) |
 | AG16 | Performance ("From AG16" above): the benchmark (`--bench`, `--bench-only`, `citygen/bench.py`, `UCityGenBench` in the play plugin, a world subsystem started by `-CityGenBench=<job>`; the last run's shots and graphs, other processes' CPU sampled through each run, CPU-starved runs named, `bench.starved`; the play actor's lamps logged with each shot); meshes shared across tiles (`share_meshes`, the manifest's `counts.shared_meshes`); records as components (`group_actors`, the manifest's `groups` and each record's `holder`; `BP_CityGenGroup`, its root static in the Blueprint, `CORE_VERSION` 3; `actor_hashes`, `actor_kinds` and `manifest_changes` count group actors and holders, not the records they hold; the check's shots count an actor's own and its parts' meshes); `NO_COLLISION` props; the masters read Custom Primitive Data through per-instance custom data (`STAGE2_VERSION` 10); main cells 128 m (`MAIN_CELL_M`), `VIEW_M` 768; the project's `r.TextureStreaming=0` and the Nanite pool from the city (`nanite_pool_mb`, `PROJECT_SETTINGS`); the play actor's underwater volumes enabled by distance; packs imported in chunks of 150 and let go of (`PACK_CHUNK`, `Meshes`, #84); offloads take their actors by guid (`actor_guids`), an actor whose class changes is destroyed and the level saved before anything is made (`clear_moved`), an actor that holds no records loses its members (`drop_members`), an entry with parts of its own keeps its actor; pruned meshes counted by their files | Delta Megacity on the Windows PC (`docs/progress/AG16/`): the before import (73,772 actors, 30 min, 39 GB committed), the fixes imported over it (13,644 actors with the final code), the benchmark before and after three runs each, hitch dumps; Vesper Bay imported and benchmarked with one command |
 | AT0 | atmosgen's runtime ("atmosgen's runtime (AT0)" above): the `CityGenAtmos` plugin installed and built with CityGenPlay (`unreal_play.PLUGINS`, one stamp), its assets made from code (`unreal_atmos.make_assets`, `ue/atmos_assets.py`: `MPC_CityGenAtmos`, `M_CgRain`, `M_CgWet`), the controller spawned by `-CityGenAtmosPlan`; `CityGen.PlayLamps` in the play features; the benchmark's `--bench-atmos`, `--bench-rt`, `ATMOS_PASSES` and commands per pass, `busy()` seeing any other benchmark; the plan's contribution format (layer 3). No change to the import: AT1 places the controller and the tiles' lights | the spike on Delta in CityAG16 by AG16's benchmark: night native 12.6 ms p95 before, 15.8 ms with the plan's lights, fog, rain and wet streets; MegaLights with hardware ray tracing 17.4 ms (`docs/progress/AT0/`) |
+| AT1 | Layer 3 ("From AT1" above): the manifest's `atmos` (`unreal_atmos.write_atmos`: the controller's key and hash, a cell per 128 m cell, `counts.atmos_cells` and `atmos_lights`; the records in `unreal/atmos.json`; a plan whose lux check failed is named and left out, `--atmos DIR` naming a folder without a plan is an error); `actor_hashes`, `actor_kinds` (`atmos`, `atmos_cell`); the importer's `atmos_cells` (a `CityGenAtmosCell` data actor per cell, spatially loaded, among the offloaded actors) and `atmos_controller` (`CityGenAtmos`, always loaded, the plan's settings), `ATMOS_VERSION`; atmosgen's assets made before the import (`make_assets`); the plugin: cells register their lights as they stream, the controller's pooled live set shows them by night (`MPC_CityGen`'s `Night`), its subsystem and `-CityGenAtmosPlan` gone; the play features without AG15's spot lamps and sign washes (`play.json` 3; `GetStatus` without `lamps_lit`), their pools past the live range; the check reads the controller's status by night; `--atmos`, `--no-atmos`, `--bench-atmos` a flag | Delta in CityAG16 (`docs/progress/AT1/`): imported over AG16's import (the controller and 500 cells created, nothing else touched, under 3 min), the check passing by night with views, the night benchmark before and after (three runs each) |

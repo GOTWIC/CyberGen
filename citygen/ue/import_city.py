@@ -72,6 +72,7 @@ HASH_TAG = "cg.hash"
 # unchanged build applies the change (stored hashes are "<version>.<content hash>")
 MESH_VERSION = "3"
 ACTOR_VERSION = "1"
+ATMOS_VERSION = "atmos1"  # AT1: the atmos controller's and cells' actors (their own versions)
 SWIM_BRUSH_CM = 200.0   # the cube brush a volume spawned from its class gets (CubeBuilder)
 SWIM_FRICTION = 0.3
 GRAPH_VARS = [("City", "string"), ("Graph", "name"), ("Hash", "string"), ("Ids", "[name"),
@@ -2420,6 +2421,8 @@ class Importer:
             n += len(self.s2["groups"] if "groups" in self.s2 else self.s2["instances"])
             n += len(self.s2.get("underwater", []))       # (AG12)
         n += int(self.plays())           # (the play features' actor)
+        if self.atmos_ok():
+            n += 1 + len(self.man["atmos"]["cells"])     # (AT1: the controller, its cells)
         return n + 1 + 3                 # (the sun, the sky light, the atmosphere)
 
     def plays(self):
@@ -2427,6 +2430,13 @@ class Importer:
         job wants them and the CityGenPlay plugin's class is there."""
         return bool(self.man.get("play")) and JOB.get("play_features", True) and \
             getattr(unreal, "CityGenPlay", None) is not None
+
+    def atmos_ok(self):
+        """Whether the import makes atmosgen's actors (AT1): the manifest has a delivered
+        plan, the job wants it and the CityGenAtmos plugin's classes are there."""
+        return bool((self.man.get("atmos") or {}).get("cells")) and \
+            JOB.get("atmos", True) and getattr(unreal, "CityGenAtmos", None) is not None and \
+            getattr(unreal, "CityGenAtmosCell", None) is not None
 
     def place(self, have, key, h, cls, make, update, folder, version=ACTOR_VERSION):
         """The actor of `key`: unchanged when its hash matches, else updated in place, else
@@ -2523,6 +2533,10 @@ class Importer:
                 out[i["key"]] = "BP_CityGenInstances_C"
         for s in self.man.get("swim", []):
             out[s["key"]] = "PhysicsVolume"
+        if self.atmos_ok():
+            out[self.man["atmos"]["key"]] = "CityGenAtmos"
+            for c in self.man["atmos"]["cells"]:
+                out[c["key"]] = "CityGenAtmosCell"
         if self.s2:
             for u in self.s2.get("underwater", []):
                 out[u["key"]] = "PostProcessVolume"
@@ -2592,12 +2606,14 @@ class Importer:
         self.swim(have)
         self.underwater(have)
         self.actors2(have)
+        self.atmos_cells(have)
         # (the last few: no more offloads, the always-loaded lighting and play actors among
         # them stay loaded with the last chunk)
         self.offload_n = 0
         self.player_start(have)
         self.lighting(have)
         self.play_features(have)
+        self.atmos_controller(have)
         REPORT.update(self.placed, self.to_place, force=True)
         self.live = []
         self.reload()
@@ -3075,15 +3091,10 @@ class Importer:
                                       for r in lab]),
                     ("night_collection", mpc())):
                 a.set_editor_property(k, v)
-            # AG15: the light pools under the lamps past the lit ones, the night's hour (a
-            # plugin built before AG15 has neither: the city imports with its lamps as were)
-            ws, wc = data.get("washes") or [], data.get("wash_colors") or []
+            # AG15: the light pools under the lamps (atmosgen's far tier since AT1), the
+            # night's hour (a plugin built before AG15 has neither)
             for k, v in (("light_pool_material", light_pool_material()),
-                         ("night_hour", float(JOB.get("night_hour", 21.0))),
-                         ("wash_points", [ue_loc(ws[i], ws[i + 1], ws[i + 2])
-                                          for i in range(0, len(ws), 3)]),
-                         ("wash_colors", [unreal.LinearColor(wc[i], wc[i + 1], wc[i + 2], 1.0)
-                                          for i in range(0, len(wc), 3)])):
+                         ("night_hour", float(JOB.get("night_hour", 21.0)))):
                 try:
                     a.set_editor_property(k, v)
                 except Exception as e:
@@ -3095,6 +3106,85 @@ class Importer:
                                        "lamps": len(data["lamp_kinds"]),
                                        "labels": len(data["labels"]),
                                        "map": tex.get_path_name()}
+
+    # -- atmosgen (AT1: the CityGenAtmos plugin's controller and its cells' data actors) --
+
+    def atmos_data(self):
+        if getattr(self, "_atmos", None) is None:
+            self._atmos = json.load(open(os.path.join(self.build, self.man["atmos"]["file"]),
+                                         encoding="utf-8"))
+        return self._atmos
+
+    def atmos_cells(self, have):
+        """A data actor per 128 m cell of the plan's lights (CityGenAtmosCell), at the cell's
+        middle and spatially loaded: World Partition streams it with its main grid cell, and
+        while loaded it registers its lights with the controller."""
+        if not self.atmos_ok():
+            info = self.man.get("atmos") or {}
+            self.stats["atmos"] = {
+                "made": False, "reason": info.get("skipped") or (
+                    "no CityGenAtmos class (the plugin is not built)" if info.get("cells")
+                    else "the manifest has no atmos plan")}
+            return
+        cls = unreal.CityGenAtmosCell
+        rec = {c["key"]: c for c in self.atmos_data()["cells"]}
+        for c in self.man["atmos"]["cells"]:
+            d = rec[c["key"]]
+
+            def make(c=c):
+                return self.eas.spawn_actor_from_class(cls, ue_loc(*c["center"]))
+
+            def update(a, h, c=c, d=d):
+                a.set_actor_location(ue_loc(*c["center"]), False, False)
+                a.set_editor_property("is_spatially_loaded", True)
+                a.set_editor_property("cell", c["cell"])
+                a.set_editor_property("count", int(c["count"]))
+                a.set_editor_property("light_floats", [float(v) for v in d["floats"]])
+                a.set_editor_property("light_ints", [int(v) for v in d["ints"]])
+                a.tags = self.tags(c["key"], h, [], "atmos_lights", "atmos", c["tile"], "")
+
+            self.place(have, c["key"], c["hash"], cls.static_class(), make, update,
+                       "CityGen/Atmos", version=ATMOS_VERSION)
+        self.stats["atmos"] = {"made": True, "cells": len(self.man["atmos"]["cells"]),
+                               "lights": self.man["atmos"]["lights"]}
+
+    def atmos_controller(self, have):
+        """The controller (CityGenAtmos), always loaded, with the plan's settings: its
+        schedules, light kinds, exposure, hour, weather and tiers."""
+        if not self.atmos_ok():
+            return
+        cls = unreal.CityGenAtmos
+        info = self.man["atmos"]
+        ctl = self.atmos_data()["controller"]
+
+        def make():
+            return self.eas.spawn_actor_from_class(cls, unreal.Vector(0.0, 0.0, 0.0))
+
+        def update(a, hv):
+            a.set_editor_property("is_spatially_loaded", False)
+            alb = ctl["fog_albedo"].lstrip("#")
+            rgb = [int(alb[k:k + 2], 16) / 255.0 for k in (0, 2, 4)]
+            lin = [c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in rgb]
+            for k, v in (("city", ctl["city"]), ("plan_hash", ctl["plan_hash"]),
+                         ("schedule_names", list(ctl["schedule_names"])),
+                         ("schedule_hours", [float(x) for x in ctl["schedule_hours"]]),
+                         ("kind_names", list(ctl["kind_names"])),
+                         ("plan_ev100", ctl["plan_ev100"]), ("hour", ctl["hour"]),
+                         ("fog_density", ctl["fog_density"]),
+                         ("fog_falloff", ctl["fog_falloff"]),
+                         ("fog_volumetric", ctl["fog_volumetric"]),
+                         ("fog_albedo", unreal.LinearColor(lin[0], lin[1], lin[2], 1.0)),
+                         ("rain_rate", ctl["rain_rate"]), ("wind_ms", ctl["wind_ms"]),
+                         ("max_live", ctl["max_live"]), ("mid_range_m", ctl["mid_range_m"]),
+                         ("max_shadowed", ctl["max_shadowed"]),
+                         ("near_range_m", ctl["near_range_m"]), ("cell_m", ctl["cell_m"]),
+                         ("lights", True)):
+                a.set_editor_property(k, v)
+            a.tags = self.tags(info["key"], hv, [], "atmos", "atmos", "", "")
+
+        self.place(have, info["key"], info["hash"], cls.static_class(), make, update,
+                   "CityGen/Atmos", version=ATMOS_VERSION)
+        self.stats.setdefault("atmos", {})["controller"] = True
 
     # -- what Play puts you in, and how far the level streams around you --
 

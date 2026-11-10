@@ -1,13 +1,14 @@
-// atmosgen's runtime controller (docs/atmosgen_scope.md 4.2, docs/unreal_export.md "From AT0"):
-// one actor per city level, always loaded. It reads a city's atmos plan (BUILD/atmos:
-// atmos_plan.json and lights/<tile>.json), keeps the plan's lights live near the view by tier
-// (near: shadowed, mid: unshadowed, far: none), drives the hour and the weather into the
-// material parameter collections, and holds the air and weather effects AT0 prototypes:
-// exponential height fog with volumetric fog, rain as instanced streak cards round the view,
-// wet streets as a deferred decal. AT1 to AT5 grow each part (tile spawners streamed with
-// their World Partition cells, the sky, the effects); the play features (CityGenPlay) keep
-// input, map, menu and free camera, their lamps going dark while the plan's lights are on
-// (the console variable CityGen.PlayLamps). Frames: Unreal cm, X east, Y south.
+// atmosgen's runtime controller (docs/atmosgen_scope.md 4.2, docs/unreal_export.md "From AT0"
+// and "From AT1"): one actor per city level, always loaded, placed by the importer with the
+// plan's settings (its schedules, tiers, exposure, hour and weather). The plan's lights live
+// in its cells' data actors (CityGenAtmosCell, one per 128 m World Partition cell, streamed
+// with it), which register their lights with the controller while loaded; the controller keeps
+// the nearest of them live by tier (near: shadowed, mid: unshadowed, far: none) from pools of
+// light components, drives the hour and the weather into the material parameter collections,
+// and holds the air and weather effects AT0 prototyped (height and volumetric fog, rain cards,
+// a wet decal). AT2 to AT5 grow each part; the play features (CityGenPlay) keep input, map,
+// menu and free camera, and their light pools as the far tier past the live range (the
+// console variable CityGen.PlayLamps). Frames: Unreal cm, X east, Y south.
 
 #pragma once
 
@@ -15,6 +16,7 @@
 #include "GameFramework/Info.h"
 #include "CityGenAtmosActor.generated.h"
 
+class ACityGenAtmosCell;
 class AExponentialHeightFog;
 class APostProcessVolume;
 class UDecalComponent;
@@ -30,19 +32,18 @@ struct FCityGenAtmosLight
 	FRotator Rot = FRotator::ZeroRotator;   // the light's +X along its aim
 	FVector2f Size = FVector2f::ZeroVector; // a rect's width and height (cm)
 	float SourceCm = 0.f;
-	float Candela = 0.f;                    // spot, point: the peak; rect: luminance x area
-	float Nits = 0.f;                       // a rect's luminance
+	float Intensity = 0.f;                  // spot, point: candela; rect: nits
 	FLinearColor Color = FLinearColor::White;
 	float ReachCm = 1000.f;
-	float Inner = 40.f;
+	float Inner = 40.f;                     // a spot's cones; a rect's barn door angle
 	float Outer = 70.f;
-	float Barn = 80.f;
 	uint8 Shape = 0;                        // 0 spot, 1 point, 2 rect
-	uint8 Kind = 0;                         // index into Kinds
-	uint8 Schedule = 0;                     // index into Schedules
+	uint8 Kind = 0;                         // index into KindNames
+	uint8 Schedule = 0;                     // index into ScheduleNames
 	bool bShadow = false;
 	bool bNearOnly = false;
 	bool bOn = true;
+	bool bNoSpecular = false;               // a lit face's stand-in: no highlight
 	float Flicker = 0.f;
 	uint32 Seed = 0;
 };
@@ -56,12 +57,56 @@ class CITYGENATMOS_API ACityGenAtmos : public AInfo
 public:
 	ACityGenAtmos();
 
-	/** The plan's folder (BUILD/atmos). AT0's spike reads it from disk; AT1 moves the tiles'
-	 *  lights into the level, streamed with their cells. */
-	UPROPERTY(EditAnywhere, Category = "CityGen")
-	FString PlanDir;
+	// -- the plan's settings (set by the importer from atmos_plan.json) --
 
-	/** Whether the plan's lights are on (the play features' lamps go dark while they are). */
+	UPROPERTY(EditAnywhere, Category = "CityGen")
+	FString City;
+
+	/** The plan's hash (the importer's: an import of another plan updates the actor). */
+	UPROPERTY(EditAnywhere, Category = "CityGen")
+	FString PlanHash;
+
+	/** Every schedule's name and its 24 hourly values (ScheduleHours: 24 per name). */
+	UPROPERTY(EditAnywhere, Category = "CityGen")
+	TArray<FString> ScheduleNames;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen")
+	TArray<float> ScheduleHours;
+
+	/** The light kinds the cells' records index (street_light, signal, corner, ...). */
+	UPROPERTY(EditAnywhere, Category = "CityGen")
+	TArray<FString> KindNames;
+
+	/** The exposure the plan's lights are set for (EV100). */
+	UPROPERTY(EditAnywhere, Category = "CityGen")
+	float PlanEV100 = 3.f;
+
+	/** The weather the fog and rain start from (the plan's weather state). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float FogDensity = 0.018f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float FogFalloff = 0.08f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float FogVolumetric = 1.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	FLinearColor FogAlbedo = FLinearColor(0.55f, 0.6f, 0.68f);
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float RainRate = 0.8f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float WindMS = 6.f;
+
+	/** The cells' size (m): World Partition's main grid. */
+	UPROPERTY(EditAnywhere, Category = "CityGen")
+	float CellM = 128.f;
+
+	// -- the runtime's switches --
+
+	/** Whether the plan's lights are on (they show by night: MPC_CityGen's Night). */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Lights")
 	bool bLights = true;
 
@@ -85,12 +130,12 @@ public:
 	UPROPERTY(EditAnywhere, Category = "CityGen|Lights")
 	float SceneEV100 = -3.f;
 
-	/** AT0's far tier: past the live range the play features' light-pool decals stay under
-	 *  the lamps (CityGen.PlayLamps 2), so the far streets still read lit. */
+	/** The far tier until AT7: past the live range the play features' light-pool decals stay
+	 *  under the lamps (CityGen.PlayLamps 2), so the far streets still read lit. */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Lights")
 	bool bFarPools = true;
 
-	/** A further gain on every light (art direction, the spike's tuning). */
+	/** A further gain on every light (art direction). */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Lights")
 	float Gain = 1.f;
 
@@ -123,8 +168,13 @@ public:
 	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
 	int32 RainCards = 4000;
 
-	UFUNCTION(BlueprintCallable, Category = "CityGen")
-	bool LoadPlan(const FString& Dir);
+	// -- the cells --
+
+	/** A cell's data actor brings its lights in (CityGenAtmosCell::BeginPlay). */
+	void RegisterCell(ACityGenAtmosCell* Cell);
+
+	/** ... and takes them out (EndPlay, as World Partition streams the cell out). */
+	void UnregisterCell(ACityGenAtmosCell* Cell);
 
 	UFUNCTION(BlueprintCallable, Category = "CityGen")
 	void SetLightsOn(bool bOn);
@@ -151,7 +201,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "CityGen")
 	void SetTiers(int32 Live, float RangeM, int32 Shadowed);
 
-	/** The state as one JSON line. */
+	/** The state as one JSON line (the check and the benchmark read it). */
 	UFUNCTION(BlueprintPure, Category = "CityGen")
 	FString GetStatus() const;
 
@@ -165,12 +215,24 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 
 private:
+	/** A registered cell: its actor, its 128 m key and its lights. */
+	struct FSlot
+	{
+		TWeakObjectPtr<ACityGenAtmosCell> Actor;
+		FIntPoint Key = FIntPoint::ZeroValue;
+		TArray<FCityGenAtmosLight> Lights;
+		bool bUsed = false;
+	};
+
+	static int64 LiveKey(int32 Slot, int32 Light) { return (int64(Slot) << 24) | int64(Light); }
+	const FCityGenAtmosLight* LightOf(int64 Key) const;
 	FVector ViewLocation(FRotator* OutRot = nullptr) const;
+	FIntPoint CellOf(const FVector& P) const;
 	void UpdateLive();
 	void UpdateFlicker(double Now);
 	void ApplyLight(ULocalLightComponent* C, const FCityGenAtmosLight& L, float Fade, bool bShadowed);
 	ULocalLightComponent* Take(uint8 Shape);
-	void Release(int32 LightIndex);
+	void Release(int64 Key);
 	void ReleaseAll();
 	void SetPlayLamps(bool bOn) const;
 	void EnsureFog();
@@ -180,26 +242,18 @@ private:
 	void PushParameters();
 	float ScheduleAt(uint8 Schedule) const;
 	float Scale() const;
+	bool HasPlan() const { return ScheduleNames.Num() > 0; }
 
-	// the plan
-	TArray<FCityGenAtmosLight> Lights;
-	TArray<FString> Kinds;
-	TArray<FString> Schedules;
-	TArray<TArray<float>> ScheduleHours;
-	TMap<FIntPoint, TArray<int32>> Cells;   // 64 m cells -> light indices
-	float PlanEV100 = 3.f;
-	float FogDensity = 0.018f;
-	float FogFalloff = 0.08f;
-	float FogVolumetric = 1.f;
-	FLinearColor FogAlbedo = FLinearColor(0.55f, 0.6f, 0.68f);
-	float RainRate = 0.8f;
-	float WindMS = 6.f;
-	FString PlanCity;
-	bool bPlanLoaded = false;
-	double LoadSeconds = 0.0;
+	// the registered cells and their index
+	TArray<FSlot> Slots;
+	TArray<int32> FreeSlots;
+	TMap<FIntPoint, TArray<int32>> SlotsAt;
+	TMap<TWeakObjectPtr<ACityGenAtmosCell>, int32> SlotOfActor;
+	int32 RegisteredLights = 0;
+	int32 Registrations = 0;
 
 	// the live set
-	TMap<int32, TObjectPtr<ULocalLightComponent>> Live;
+	TMap<int64, TObjectPtr<ULocalLightComponent>> Live;
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<ULocalLightComponent>> FreeSpot;
 	UPROPERTY(Transient)
@@ -208,8 +262,8 @@ private:
 	TArray<TObjectPtr<ULocalLightComponent>> FreeRect;
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<ULocalLightComponent>> AllLights;
-	TSet<int32> Shadowed;
-	TArray<int32> Flickering;
+	TSet<int64> Shadowed;
+	TArray<int64> Flickering;
 	double LiveAt = -1.0;
 	double UpdateMs = 0.0;
 	double UpdateMsMax = 0.0;
@@ -230,4 +284,5 @@ private:
 	TObjectPtr<UMaterialParameterCollection> CityCollection;
 	FVector WetAt = FVector(1e12);
 	bool bBegun = false;
+	bool bShowing = false;                  // the lights live now (on, a plan, by night)
 };
