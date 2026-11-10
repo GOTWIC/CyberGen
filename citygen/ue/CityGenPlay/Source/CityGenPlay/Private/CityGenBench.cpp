@@ -119,6 +119,11 @@ bool UCityGenBench::ReadJob()
 			O->TryGetNumberField(TEXT("screen_percentage"), Sp);
 			P.ScreenPercentage = float(Sp);
 			O->TryGetBoolField(TEXT("warm"), P.bWarm);
+			const TArray<TSharedPtr<FJsonValue>>* Cmds = nullptr;
+			if (O->TryGetArrayField(TEXT("commands"), Cmds))
+			{
+				for (const TSharedPtr<FJsonValue>& C : *Cmds) { P.Commands.Add(C->AsString()); }
+			}
 			const TArray<TSharedPtr<FJsonValue>>* Only = nullptr;
 			if (O->TryGetArrayField(TEXT("segments"), Only))
 			{
@@ -214,6 +219,12 @@ void UCityGenBench::StartPass()
 	if (ACityGenPlay* Play = ACityGenPlay::Find(GetWorld()))
 	{
 		Play->SetNight(P.bNight);
+	}
+	// AT0: the pass's own console commands (atmosgen's runtime: its lights, fog, rain, wet
+	// streets, MegaLights), after the night is set
+	for (const FString& C : P.Commands)
+	{
+		GEngine->Exec(GetWorld(), *C);
 	}
 	SegIndex = 0;
 	Event(FString::Printf(TEXT("\"op\": \"pass\", \"name\": \"%s\", \"night\": %s, \"screen_percentage\": %.1f, \"warm\": %s"),
@@ -449,11 +460,21 @@ void UCityGenBench::Tick(float DeltaTime)
 					UE_LOG(LogCityGenBench, Display, TEXT("lamps at %s: %s"), *FPaths::GetBaseFilename(Shot),
 						*Play->GetLampReport());
 				}
+				// (AT0: atmosgen's runtime state at the shot, if it is in the game)
+				if (!Passes[PassIndex].Commands.IsEmpty())
+				{
+					UE_LOG(LogCityGenBench, Display, TEXT("atmos at %s:"), *FPaths::GetBaseFilename(Shot));
+					GEngine->Exec(GetWorld(), TEXT("CityGenAtmos.Status"));
+				}
 				Stage = EStage::Shot;
 				ShotFrames = 0;
 				return;
 			}
 			Event(TEXT("\"op\": \"move\""));
+			if (!Passes[PassIndex].Commands.IsEmpty())
+			{
+				GEngine->Exec(GetWorld(), TEXT("CityGenAtmos.Status"));
+			}
 			Stage = EStage::Move;
 			StageStart = Now;
 		}
@@ -465,6 +486,10 @@ void UCityGenBench::Tick(float DeltaTime)
 		if (++ShotFrames >= 3)
 		{
 			Event(TEXT("\"op\": \"move\""));
+			if (!Passes[PassIndex].Commands.IsEmpty())
+			{
+				GEngine->Exec(GetWorld(), TEXT("CityGenAtmos.Status"));
+			}
 			Stage = EStage::Move;
 			StageStart = Now;
 		}

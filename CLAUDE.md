@@ -2240,14 +2240,50 @@ or the goldens move.
 
 ## Light and atmosphere generator (atmosgen)
 
-`docs/atmosgen_scope.md` (draft v1, its decisions in section 12 still open) is the plan for
-stage 3: a generator of light and air, not of geometry. A deterministic plan per city (every
-light that casts light, fog and smog volumes, steam emitters, rain shadow and wetness masks,
-sky glow, schedules by hour) keyed by M10's ids, checked (light on every walkway and
+`docs/atmosgen_scope.md` is the spec for stage 3 (milestones AT0 to AT7, section 13;
+Swagnik's decisions of 2026-11-10 in section 12), its log `docs/atmosgen_milestones.md`: a
+generator of light and air, not of geometry. A deterministic plan per city (every light
+that casts light, fog and smog volumes, steam emitters, rain shadow and wetness masks, sky
+glow, schedules by hour) keyed by M10's ids, checked (light on every walkway and
 carriageway) and previewed in Blender; layer 3 of the manifest; a C++ runtime plugin,
 `CityGenAtmos`, beside `CityGenPlay`, that renders it (lights per tile, time of day,
 weather, effects, post) and takes over the play features' lamps, pools, washes, moon and
-night exposure. Milestones AT0 to AT7, after AG16, whose benchmark is its baseline.
+night exposure. AG16's benchmark by night is its baseline; the night pass stays at or under
+16.7 ms p95 at native 1440p on the PC (decision 12.6). Package `atmosgen/` beside the
+others, which it reads only (citygen's model JSON, assetgen's `signs.json`); tests in
+`tests/atmosgen/` (`test_at_*.py`, no `conftest.py`).
+
+AT0 (contract and spike) is in place:
+- **Spec and presets** (`atmosgen/spec.py`, `presets.py`; `python -m atmosgen spec
+  validate|schema`): looks (`neon_rain` the default, `clear_night`, `smog_dusk`,
+  `overcast_day`), weather states, light temperatures, photometric classes (cobra head,
+  post top, wall pack, high mast, soffit, sign face, neon band, holo face, shop sign, shop
+  spill; physical units: candela, nits), schedules for every hour (24 values), tiers and
+  budgets; every district's mood from its archetype pulled by wealth and danger
+  (`spec.mood`: clean where wealthy and safe, gritty where poor and dangerous).
+- **Plan** (`planmodel.py`, schemas in `atmosgen/schemas/`; `atmosgen plan BUILD [--spec S]
+  [--out DIR]`, `plan.py`): `BUILD/atmos/atmos_plan.json`, `lights/<tile>.json` (citygen's
+  256 m tiles; a light per M6 street and wall light at its lamp head, per sign slot face as
+  a rect light in its sign's color, per M3 unit's shopfront; id `<owner>.light`, a hash per
+  record, schedule, flicker and broken by mood), `unreal_contribution.atmos.json` (layer 3's
+  format), `atmos_report.json/.txt`; only changed files written. `atmosgen lux BUILD`:
+  `preview_lux.png` (the plan's illuminance round the core, no occlusion until AT1) and
+  `preview_plan.png`.
+- **Emitter asks of assetgen** (`emitters.py`, assetgen scope 4.6): a lamp variant's
+  emitter (class, lens, normal, size) and a sign's lit face and emitted color; derived from
+  citygen until then (`Light.source`).
+- **Runtime** (`citygen/ue/CityGenAtmos`, built with CityGenPlay by
+  `unreal_play.build_plugin`; assets by `citygen/unreal_atmos.make_assets`,
+  `citygen/ue/atmos_assets.py`): the controller reads a plan, keeps a live set by tier, fog,
+  rain cards, a wet decal, MegaLights by a post-process volume; console commands
+  `CityGenAtmos.*`; spawned by `-CityGenAtmosPlan=<dir>` (AT1 places it at import).
+  `CityGen.PlayLamps` turns the play features' lamps off. The benchmark's
+  `--bench-atmos DIR`, `--bench-rt` and `bench.ATMOS_PASSES` (`docs/unreal_export.md`,
+  "atmosgen's runtime (AT0)").
+- **Blender night preview** (`atmosgen preview BUILD`, `preview.py`): AG15's night preview
+  (`assetgen.materials.preview.make_job`) lit by the plan's lights in Cycles, with the
+  weather's haze and wet streets (`ag6_preview.py`'s `atmos_lights`, `haze`, `wet`).
+- The spike's measurements and recommendations: `docs/progress/AT0/README.md`.
 
 ## Life generator (lifegen)
 

@@ -198,6 +198,24 @@ Derived in the brief meanwhile; worth recording in the model in a citygen sessio
   they sit at z 0 under the deck); AG7 puts them on the deck from the road's profile until
   citygen does.
 
+### 4.6 Asked by atmosgen (stage 3, AT0)
+
+atmosgen places a light where each fixture emits (`docs/atmosgen_scope.md` 4.1,
+`atmosgen/emitters.py`); two records would let it use what assetgen drew instead of
+citygen's prototypes:
+- **A lamp's emitter by variant** (AG8): in the props manifest's variant record,
+  `"emitter": {"cls": "cobra_head" | "post_top" | "wall_pack" | "high_mast" | "soffit",
+  "lens": [x, y, z], "normal": [x, y, z], "size": [w, h]}` in the variant's own frame (the
+  point and direction where light leaves the head, the lens's size).
+- **A sign's lit face** (AG8 and AG6): in `signs.json`'s slot record `"face": {"c": [x, y,
+  z], "n": [x, y, z], "size": [w, h], "two_sided": bool}` as drawn (a billboard's face on
+  its frame, a blade sign's two faces), and on its cell `"emit": {"color": "#rrggbb",
+  "nits": n}` (the page cell's mean lit color and luminance, which AG6 knows as it draws).
+
+Until then atmosgen derives both (M6's prototype lamp head, M20's slot with the prototype's
+frame, a cell's own color or the mean of its bright pixels); its plan counts which lights
+are derived. Neither changes an asset's bytes: a later AG8 or AG6 change records them.
+
 ## 5. Feature catalog
 
 ### 5.1 Buildings

@@ -19,6 +19,7 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "HAL/IConsoleManager.h"
 #include "InputCoreTypes.h"
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Materials/MaterialParameterCollection.h"
@@ -37,6 +38,15 @@ namespace
 	const FName SunKey(TEXT("cg.key=lighting.sun"));
 	const FName UnderwaterTag(TEXT("cg.type=underwater"));
 	const FName SkyKey(TEXT("cg.key=lighting.sky"));
+
+	// AT0: atmosgen's runtime (CityGenAtmos) sets this to 0 while its plan's lights are on;
+	// the lamps' spot lights, light pools and sign washes then go dark (decision 12.2: the
+	// lamps move to atmosgen)
+	TAutoConsoleVariable<int32> CVarPlayLamps(TEXT("CityGen.PlayLamps"), 1,
+		TEXT("The play features' lamps, light pools and sign washes by night (0: off, atmosgen's lights instead; "
+		     "2: only the light pools, under the lamps past CityGen.PlayPoolsFromM, atmosgen's far tier)"));
+	TAutoConsoleVariable<float> CVarPoolsFrom(TEXT("CityGen.PlayPoolsFromM"), 300.f,
+		TEXT("With CityGen.PlayLamps 2: the light pools under the lamps this far (m) from the view and farther"));
 }
 
 ACityGenPlay::ACityGenPlay()
@@ -559,10 +569,30 @@ void ACityGenPlay::SetNight(bool bOn)
 
 void ACityGenPlay::UpdateLamps()
 {
+	if (CVarPlayLamps.GetValueOnGameThread() == 0)
+	{
+		for (USpotLightComponent* L : Lamps)
+		{
+			L->SetVisibility(false);
+		}
+		for (UDecalComponent* D : Pools)
+		{
+			D->SetVisibility(false);
+		}
+		for (UPointLightComponent* W : Washes)
+		{
+			W->SetVisibility(false);
+		}
+		LampsOn = 0;
+		PoolsOn = 0;
+		return;
+	}
 	// the lamps nearest the view get the lights; the farthest of them fade, so a lamp
-	// coming into the set does not pop
+	// coming into the set does not pop (AT0: with CityGen.PlayLamps 2, none: atmosgen lights
+	// the near lamps, the pools only those past its range)
+	const bool bPoolsOnly = CVarPlayLamps.GetValueOnGameThread() == 2;
 	const FVector View = ViewLocation();
-	const int32 N = FMath::Min(Lamps.Num(), LampPoints.Num());
+	const int32 N = bPoolsOnly ? 0 : FMath::Min(Lamps.Num(), LampPoints.Num());
 	TArray<TPair<double, int32>> Near;
 	Near.Reserve(LampPoints.Num());
 	for (int32 i = 0; i < LampPoints.Num(); ++i)
@@ -596,7 +626,15 @@ void ACityGenPlay::UpdateLamps()
 	}
 	LampsOn = N;
 	// the light pools under the lamps past the lit ones (and under the fading ones)
-	const int32 P0 = FMath::Max(0, N - N / 4);
+	int32 P0 = FMath::Max(0, N - N / 4);
+	if (bPoolsOnly)
+	{
+		const double From = double(CVarPoolsFrom.GetValueOnGameThread()) * 100.0;
+		while (P0 < Near.Num() && Near[P0].Key < From * From)
+		{
+			++P0;
+		}
+	}
 	const int32 P = FMath::Min(Pools.Num(), FMath::Max(0, LampPoints.Num() - P0));
 	for (int32 k = 0; k < Pools.Num(); ++k)
 	{
@@ -614,7 +652,14 @@ void ACityGenPlay::UpdateLamps()
 	}
 	PoolsOn = P;
 	// the large signs nearest the view wash their facades in their color
-	if (Washes.Num() > 0)
+	if (bPoolsOnly)
+	{
+		for (UPointLightComponent* W : Washes)
+		{
+			W->SetVisibility(false);
+		}
+	}
+	else if (Washes.Num() > 0)
 	{
 		TArray<TPair<double, int32>> NearW;
 		NearW.Reserve(WashPoints.Num());

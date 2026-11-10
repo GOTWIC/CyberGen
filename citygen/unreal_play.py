@@ -37,6 +37,9 @@ WALK_SKIP = ("stairs", "elevator", "skybridge", "underpass", "elevated")
 LAMPS = {"street_light": 0, "wall_light": 1}       # prototype kind -> lamp kind
 PLUGIN = "CityGenPlay"
 PLUGIN_DIR = Path(__file__).parent / "ue" / PLUGIN
+# AT0: atmosgen's runtime (citygen/ue/CityGenAtmos) is built into the project beside the play
+# features, in the same UnrealBuildTool run (one stamp for both)
+PLUGINS = (PLUGIN, "CityGenAtmos")
 BUILT_STAMP = ".citygen_built"                     # the source hash the binaries were built from
 
 # the map's palette (sRGB): a night map, so the player arrow and labels stand out
@@ -360,60 +363,71 @@ def write_play(build: Path, plan_sha: str, plan: dict, instances: list[dict],
 
 # --- the plugin -------------------------------------------------------------------------------
 
-def plugin_files() -> list[Path]:
-    return sorted(p for p in PLUGIN_DIR.rglob("*") if p.is_file()
+def plugin_files(name: str = PLUGIN) -> list[Path]:
+    src = PLUGIN_DIR.parent / name
+    return sorted(p for p in src.rglob("*") if p.is_file()
                   and not any(x in p.parts for x in ("Binaries", "Intermediate")))
 
 
 def plugin_hash() -> str:
+    """One hash of every plugin's source (CityGenPlay's files as before, then AT0's
+    CityGenAtmos's under its name)."""
     h = hashlib.sha256()
-    for p in plugin_files():
-        h.update(p.relative_to(PLUGIN_DIR).as_posix().encode("utf-8") + b"\0")
-        h.update(p.read_bytes() + b"\0")
+    for name in PLUGINS:
+        base = PLUGIN_DIR.parent / name
+        for p in plugin_files(name):
+            rel = p.relative_to(base).as_posix()
+            h.update((rel if name == PLUGIN else f"{name}/{rel}").encode("utf-8") + b"\0")
+            h.update(p.read_bytes() + b"\0")
     return h.hexdigest()[:16]
 
 
 def install_plugin(uproject: Path) -> dict:
-    """The plugin's source in PROJECT/Plugins/CityGenPlay (files written only where they
-    differ, files it no longer has removed) and enabled in the .uproject."""
-    dest = uproject.parent / "Plugins" / PLUGIN
+    """Every plugin's source in PROJECT/Plugins/<name> (files written only where they
+    differ, files it no longer has removed), each enabled in the .uproject; `dir` is
+    CityGenPlay's."""
     wrote = removed = 0
-    want = {p.relative_to(PLUGIN_DIR).as_posix(): p for p in plugin_files()}
-    for rel, src in want.items():
-        d = dest / rel
-        data = src.read_bytes()
-        if not d.is_file() or d.read_bytes() != data:
-            d.parent.mkdir(parents=True, exist_ok=True)
-            d.write_bytes(data)
-            wrote += 1
-    if (dest / "Source").is_dir():
-        for p in (dest / "Source").rglob("*"):
-            if p.is_file() and p.relative_to(dest).as_posix() not in want:
-                p.unlink()
-                removed += 1
-    _enable(uproject, True)
-    return {"dir": str(dest), "wrote": wrote, "removed": removed}
+    for name in PLUGINS:
+        src = PLUGIN_DIR.parent / name
+        dest = uproject.parent / "Plugins" / name
+        want = {p.relative_to(src).as_posix(): p for p in plugin_files(name)}
+        for rel, f in want.items():
+            d = dest / rel
+            data = f.read_bytes()
+            if not d.is_file() or d.read_bytes() != data:
+                d.parent.mkdir(parents=True, exist_ok=True)
+                d.write_bytes(data)
+                wrote += 1
+        if (dest / "Source").is_dir():
+            for p in (dest / "Source").rglob("*"):
+                if p.is_file() and p.relative_to(dest).as_posix() not in want:
+                    p.unlink()
+                    removed += 1
+        _enable(uproject, True, name)
+    return {"dir": str(uproject.parent / "Plugins" / PLUGIN), "wrote": wrote,
+            "removed": removed, "plugins": list(PLUGINS)}
 
 
-def _enable(uproject: Path, on: bool) -> bool:
+def _enable(uproject: Path, on: bool, name: str = PLUGIN) -> bool:
     data = json.loads(uproject.read_text(encoding="utf-8-sig"))
     plugins = data.setdefault("Plugins", [])
-    have = [p for p in plugins if p.get("Name") == PLUGIN]
+    have = [p for p in plugins if p.get("Name") == name]
     if on and have and all(p.get("Enabled") for p in have):
         return False
     if not on and not have:
         return False
-    data["Plugins"] = [p for p in plugins if p.get("Name") != PLUGIN]
+    data["Plugins"] = [p for p in plugins if p.get("Name") != name]
     if on:
-        data["Plugins"].append({"Name": PLUGIN, "Enabled": True})
+        data["Plugins"].append({"Name": name, "Enabled": True})
     uproject.write_text(json.dumps(data, indent="\t") + "\n", encoding="utf-8", newline="\n")
     return True
 
 
 def remove_plugin(uproject: Path) -> None:
-    """The plugin out of the project (its folder and its .uproject entry)."""
-    shutil.rmtree(uproject.parent / "Plugins" / PLUGIN, ignore_errors=True)
-    _enable(uproject, False)
+    """The plugins out of the project (their folders and their .uproject entries)."""
+    for name in PLUGINS:
+        shutil.rmtree(uproject.parent / "Plugins" / name, ignore_errors=True)
+        _enable(uproject, False, name)
 
 
 def build_command(root: Path, uproject: Path) -> list[str]:

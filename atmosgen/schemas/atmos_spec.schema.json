@@ -1,0 +1,527 @@
+{
+ "$defs": {
+  "Budgets": {
+   "additionalProperties": false,
+   "description": "Decision 12.6: the night pass at or under 16.7 ms p95, native 1440p on the PC.",
+   "properties": {
+    "lights_per_cell": {
+     "default": 6000,
+     "minimum": 0,
+     "title": "Lights Per Cell",
+     "type": "integer"
+    },
+    "live": {
+     "default": 512,
+     "maximum": 8192,
+     "minimum": 0,
+     "title": "Live",
+     "type": "integer"
+    },
+    "night_p95_ms": {
+     "default": 16.7,
+     "title": "Night P95 Ms",
+     "type": "number"
+    },
+    "shadowed": {
+     "default": 16,
+     "maximum": 256,
+     "minimum": 0,
+     "title": "Shadowed",
+     "type": "integer"
+    }
+   },
+   "title": "Budgets",
+   "type": "object"
+  },
+  "DistrictMood": {
+   "additionalProperties": false,
+   "description": "A district's mood, by its name in the city model. Every field left out comes from its\narchetype's mood (`presets.MOOD`) pulled by the district's wealth and danger.",
+   "properties": {
+    "alleys": {
+     "anyOf": [
+      {
+       "maximum": 1.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "How dark the alleys are (0 lit as a street, 1 as dark as allowed).",
+     "title": "Alleys"
+    },
+    "broken": {
+     "anyOf": [
+      {
+       "maximum": 1.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Share of lights that are out.",
+     "title": "Broken"
+    },
+    "flicker": {
+     "anyOf": [
+      {
+       "maximum": 1.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Share of lights that flicker.",
+     "title": "Flicker"
+    },
+    "grit": {
+     "anyOf": [
+      {
+       "maximum": 1.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "0 clean, 1 gritty.",
+     "title": "Grit"
+    },
+    "haze": {
+     "anyOf": [
+      {
+       "maximum": 3.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A multiplier of the weather's fog here.",
+     "title": "Haze"
+    },
+    "lamp": {
+     "anyOf": [
+      {
+       "enum": [
+        "cobra_head",
+        "post_top",
+        "wall_pack",
+        "high_mast",
+        "soffit",
+        "sign_face",
+        "neon_band",
+        "holo_face",
+        "shop_sign",
+        "shop_spill"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The street lights' photometric class.",
+     "title": "Lamp"
+    },
+    "neon": {
+     "anyOf": [
+      {
+       "maximum": 3.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Neon density: a multiplier of the signs that light.",
+     "title": "Neon"
+    },
+    "palette": {
+     "description": "Neon colors here.",
+     "items": {
+      "description": "#rrggbb, lowercase.",
+      "pattern": "^#[0-9a-f]{6}$",
+      "type": "string"
+     },
+     "title": "Palette",
+     "type": "array"
+    },
+    "spill": {
+     "anyOf": [
+      {
+       "enum": [
+        "sodium",
+        "warm",
+        "neutral",
+        "cool",
+        "led_cool"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The shopfronts' light.",
+     "title": "Spill"
+    },
+    "temp": {
+     "anyOf": [
+      {
+       "enum": [
+        "sodium",
+        "warm",
+        "neutral",
+        "cool",
+        "led_cool"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The street lights' temperature.",
+     "title": "Temp"
+    }
+   },
+   "title": "DistrictMood",
+   "type": "object"
+  },
+  "LandmarkLights": {
+   "additionalProperties": false,
+   "description": "A landmark by its name in the city model: floods, crown and edge lights, searchlights.",
+   "properties": {
+    "color": {
+     "anyOf": [
+      {
+       "description": "#rrggbb, lowercase.",
+       "pattern": "^#[0-9a-f]{6}$",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Color"
+    },
+    "crown": {
+     "default": true,
+     "title": "Crown",
+     "type": "boolean"
+    },
+    "edges": {
+     "default": true,
+     "title": "Edges",
+     "type": "boolean"
+    },
+    "floods": {
+     "default": true,
+     "title": "Floods",
+     "type": "boolean"
+    },
+    "searchlights": {
+     "default": 0,
+     "maximum": 8,
+     "minimum": 0,
+     "title": "Searchlights",
+     "type": "integer"
+    }
+   },
+   "title": "LandmarkLights",
+   "type": "object"
+  },
+  "LightLevels": {
+   "additionalProperties": false,
+   "description": "Illuminance targets by walkway class, lux (scope 8): [average, minimum].",
+   "properties": {
+    "alley": {
+     "default": [
+      2.0,
+      0.5
+     ],
+     "maxItems": 2,
+     "minItems": 2,
+     "prefixItems": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "number"
+      }
+     ],
+     "title": "Alley",
+     "type": "array"
+    },
+    "carriageway": {
+     "default": [
+      7.0,
+      1.0
+     ],
+     "maxItems": 2,
+     "minItems": 2,
+     "prefixItems": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "number"
+      }
+     ],
+     "title": "Carriageway",
+     "type": "array"
+    },
+    "crosswalk": {
+     "default": [
+      10.0,
+      2.0
+     ],
+     "maxItems": 2,
+     "minItems": 2,
+     "prefixItems": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "number"
+      }
+     ],
+     "title": "Crosswalk",
+     "type": "array"
+    },
+    "night_ev100": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The night's exposure (default the look's reference_ev100).",
+     "title": "Night Ev100"
+    },
+    "sidewalk": {
+     "default": [
+      10.0,
+      2.0
+     ],
+     "maxItems": 2,
+     "minItems": 2,
+     "prefixItems": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "number"
+      }
+     ],
+     "title": "Sidewalk",
+     "type": "array"
+    },
+    "under_deck": {
+     "default": [
+      5.0,
+      1.0
+     ],
+     "maxItems": 2,
+     "minItems": 2,
+     "prefixItems": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "number"
+      }
+     ],
+     "title": "Under Deck",
+     "type": "array"
+    }
+   },
+   "title": "LightLevels",
+   "type": "object"
+  },
+  "Palette": {
+   "additionalProperties": false,
+   "description": "The city's neon colors and their weights, and its light temperatures.",
+   "properties": {
+    "neon": {
+     "description": "Neon colors and weights (default AG15's six accents, equal).",
+     "patternProperties": {
+      "^#[0-9a-f]{6}$": {
+       "maximum": 100.0,
+       "minimum": 0.0,
+       "type": "number"
+      }
+     },
+     "propertyNames": {
+      "description": "#rrggbb, lowercase."
+     },
+     "title": "Neon",
+     "type": "object"
+    },
+    "temps": {
+     "additionalProperties": {
+      "maximum": 100.0,
+      "minimum": 0.0,
+      "type": "number"
+     },
+     "description": "Weights of the light temperatures where a mood leaves the choice open.",
+     "propertyNames": {
+      "enum": [
+       "sodium",
+       "warm",
+       "neutral",
+       "cool",
+       "led_cool"
+      ]
+     },
+     "title": "Temps",
+     "type": "object"
+    }
+   },
+   "title": "Palette",
+   "type": "object"
+  }
+ },
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": false,
+ "properties": {
+  "$schema": {
+   "anyOf": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "title": "$Schema"
+  },
+  "budgets": {
+   "$ref": "#/$defs/Budgets"
+  },
+  "city": {
+   "anyOf": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "description": "City name (checked against the model).",
+   "title": "City"
+  },
+  "districts": {
+   "additionalProperties": {
+    "$ref": "#/$defs/DistrictMood"
+   },
+   "title": "Districts",
+   "type": "object"
+  },
+  "hour": {
+   "anyOf": [
+    {
+     "exclusiveMaximum": 24.0,
+     "minimum": 0.0,
+     "type": "number"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "description": "The start hour (default the look's).",
+   "title": "Hour"
+  },
+  "landmarks": {
+   "additionalProperties": {
+    "$ref": "#/$defs/LandmarkLights"
+   },
+   "title": "Landmarks",
+   "type": "object"
+  },
+  "light_levels": {
+   "$ref": "#/$defs/LightLevels"
+  },
+  "notes": {
+   "anyOf": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "description": "What the session inferred from the prompt.",
+   "title": "Notes"
+  },
+  "palette": {
+   "$ref": "#/$defs/Palette"
+  },
+  "preset": {
+   "default": "neon_rain",
+   "description": "The look (decision 12.4: neon_rain).",
+   "enum": [
+    "neon_rain",
+    "clear_night",
+    "smog_dusk",
+    "overcast_day"
+   ],
+   "title": "Preset",
+   "type": "string"
+  },
+  "version": {
+   "const": 1,
+   "default": 1,
+   "title": "Version",
+   "type": "integer"
+  },
+  "weather": {
+   "anyOf": [
+    {
+     "enum": [
+      "clear",
+      "drizzle",
+      "rain",
+      "fog",
+      "smog"
+     ],
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "description": "The start weather (default the look's).",
+   "title": "Weather"
+  }
+ },
+ "title": "atmosgen atmos spec",
+ "type": "object"
+}

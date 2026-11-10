@@ -1,0 +1,18 @@
+atmos plan: Delta Megacity (neon_rain, at0.c66599611353)
+lights: 47837 in 129 tiles (at most 1731 in a tile; budget 6000)
+  broken: 3833
+  flicker: 8243
+  shop_sign: 19984
+  sign: 5953
+  spill: 17506
+  street_light: 3277
+  wall_light: 1117
+sources: assetgen 0, derived 47837 (derived until assetgen records lamp lenses and sign faces, section 4.1)
+without a light: sign: neon density 591
+district moods:
+  d01 Transit Nexus (transit_hub): cobra_head, led_cool, grit 0.3, flicker 0.045, broken 0.018, neon 0.9
+  d02 Midtown (midtown_mixed): cobra_head, neutral, grit 0.21, flicker 0.04, broken 0.016, neon 0.8
+  d03 Corporate Core (corporate_core): cobra_head, cool, grit 0.0, flicker 0.0, broken 0.0, neon 0.6
+  d04 Old Town (old_town): wall_pack, sodium, grit 0.955, flicker 0.345, broken 0.115, neon 1.1
+  d05 Industrial Port (industrial_port): high_mast, sodium, grit 1.0, flicker 0.24, broken 0.12, neon 0.3
+  d06 Research Campus (research_campus): post_top, neutral, grit 0.0, flicker 0.0, broken 0.0, neon 0.3
