@@ -43,3 +43,75 @@ both over their 7 and 10 lx targets: the cobra heads can come down), but the jun
 not: 54% of their connector lanes' points fall under 1 lx and 25% of the crosswalks' under
 2 lx, since M6 keeps the lamps off the junctions. AT1 has to light them (signal mast arms,
 corner lights), and its lux check would have failed this plan.
+
+## The spike: Delta at night in Unreal
+
+**Setup.** Delta Megacity as AG16 left it (`C:/Users/swagn/CityGen/builds/ag16/delta_megacity`,
+imported into the CityAG16 project by AG16's final exporter; the build predates #159's water
+pieces, which touch no light), on the Windows PC (RTX 4070 Ti, 32 GB), AG16's benchmark
+route (three sidewalk walks in Old Town, Midtown and the Corporate Core, a 1.2 km drive, a
+flight at 150 m, a teleport) in a standalone game at 2560 x 1440, native (decision 12.6),
+three runs each, the median. The atmos plan is read by the `CityGenAtmos` controller in the
+game (`-CityGenAtmosPlan`); each pass switches it by console commands (`bench.ATMOS_PASSES`).
+The PC ran nothing else heavy (each run's `others` under 1.2 cores, all of it the desktop).
+
+**Before** (`bench/before`, no atmosgen in the game): night, native 1440p, p95 of the
+moving frames **12.6 ms** (walk 12.8, drive 11.9, fly 12.6), AG16's figure.
+
+**After** (`bench/after`, one game process per run, every pass on the same route):
+
+| Pass | What is on | p95 all | walk | drive | fly | GPU p95 | over the baseline |
+|---|---|---|---|---|---|---|---|
+| `night_native` | the play features' night (192 spot lamps, 8 shadowed, 768 light pools, 32 sign washes) | 12.7 | 12.8 | 12.0 | 12.6 | 11.1 | |
+| `night_plan` | the plan's lights: 512 live within 300 m, 16 shadowed within 60 m, the play features' pools past 300 m | 13.8 | 14.2 | 11.9 | 12.5 | 12.5 | +1.1 (walk +1.4) |
+| `night_plan_fog` | + exponential height fog with volumetric fog (200 m) | 14.7 | 15.1 | 12.8 | 13.0 | 13.5 | +2.0 (walk +2.3) |
+| `night_plan_all` | + rain (4,000 lit streak cards) and wet streets (a DBuffer decal) | **15.8** | **16.2** | 14.1 | 13.4 | 14.7 | **+3.1 (walk +3.4)** |
+| `night_plan_256` | all, 256 live within 250 m, 8 shadowed | 15.7 | 16.1 | 14.0 | 13.3 | 14.5 | +3.0 |
+| `night_plan_1024` | all, 1,024 live within 400 m | 16.1 | 16.5 | 14.1 | 14.1 | 14.9 | +3.4 |
+
+(ms; the spread of the three runs' p95 within 0.2 ms everywhere; no frame over 100 ms in a
+pass with atmosgen on but one walk's; loads unchanged.) Every pass stays under 16.7 ms p95,
+the budget of decision 12.6, walking too, but walking with everything on leaves 0.5 ms.
+
+**Where the time goes** (the GPU's passes, walking, ms a frame: `bench.json`'s
+`gpu_passes_ms`):
+
+| GPU pass | `night_native` | `night_plan` | `night_plan_fog` | `night_plan_all` |
+|---|---|---|---|---|
+| Lights (deferred direct lighting) | 1.93 | 3.01 | 3.01 | 2.64 |
+| Lumen reflections | 0.68 | 0.89 | 0.89 | **2.47** |
+| Volumetric fog | 0 | 0 | 0.90 | 0.83 |
+| Shadow depths | 1.14 | 1.26 | 1.27 | 1.30 |
+| Nanite base pass | 0.75 | 0.92 | 0.92 | 0.93 |
+
+- **The lights** cost about 1.1 ms of deferred lighting for 512 live (most of them rect
+  lights: the signs' faces and shopfronts), and the live set's size hardly matters: 256 to
+  1,024 live moves the frame 0.4 ms. The game thread pays nothing measurable: the live set's
+  update takes 0.2 to 1.1 ms every 0.2 s (7 ms the first time it fills its pools), and the
+  game thread's p95 fell (10.3 to 9.2 ms: the play features' 768 decals and their sort went).
+- **Volumetric fog** costs 0.9 ms with every live light scattering in it.
+- **Wet streets** cost 1.6 ms, nearly all of it in Lumen's reflections: the decal makes the
+  ground glossy (roughness 0 to 0.3), so Lumen traces reflections across every pixel of
+  street; the decal itself and the rain's 4,000 cards are below the profile's resolution.
+
+**What it looks like** (`bench/after/shots`, the last run's view at each segment's start,
+the same views in every pass): at street level the plan lights the city as its fixtures
+would; the Corporate Core's plaza lit cool white, Old Town's street sodium with magenta and
+green neon spilling from its shopfronts and signs onto wet cobbles that mirror them, rain
+falling through the light. The README pairs (`street_old_town_*.jpg`, `street_core_*.jpg`,
+2560 px) set each street's `night_native` beside its `night_plan_all`. Three things to fix,
+each for its milestone:
+
+- **Junctions stay dark** (left of the Corporate Core shot), as the lux map said: AT1.
+- **A neon band floods its own wall** (Old Town's green sign): a rect light flush against
+  its wall lights the wall at its full luminance; AT2's sign lights need a standoff or a
+  barn door aimed off the wall, and less of a band's luminance as light.
+- **The wet decal paints over** lane markings and reads as blotches on big paved yards from
+  the air (puddles by noise, not by the low spots): AT5's wetness belongs in the masters
+  (`MPC_CityGenAtmos`'s `Wetness` read by the road and paving masters, markings kept), its
+  puddles from the grade lines.
+
+From the air the plan's lights reach 300 m round the camera; past that the play features'
+light pools keep the far streets reading lit (`CityGen.PlayLamps 2`, added after the smoke
+run showed the far city dark without them). The far tier proper (light cards and the
+HLODs' emissive, scope 6.6) is AT7's; the pools are a stopgap that costs nothing measurable.
