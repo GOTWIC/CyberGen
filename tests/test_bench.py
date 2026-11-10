@@ -220,18 +220,23 @@ def test_atmos_assets_version():
     assert UA.assets_version().isdigit()
 
 
-def test_busy_sees_any_benchmark(monkeypatch):
+def test_busy_sees_any_benchmark():
     """AT0: another benchmark's game (a packaged one: the project's own executable) and its
-    driver count as busy; a shell that only names one in its command line does not."""
-    import subprocess
-    rows = ["101\tCityAG16.exe\tCityAG16.exe /Game/X -CityGenBench=C:/b/job.json -csvGpuStats",
-            "102\tpython.exe\tpython -u bench_packaged.py 3",
-            "103\tbash.exe\tbash -c until ! powershell ... -CityGenBench=* ; do sleep 60; done",
-            "104\tnotepad.exe\tnotepad.exe notes.txt",
-            "105\tUnrealEditor.exe\tUnrealEditor.exe P.uproject"]
-
-    class R:
-        stdout = "\n".join(rows)
-    monkeypatch.setattr(B.os, "name", "nt")
-    monkeypatch.setattr(subprocess, "run", lambda *a, **k: R())
-    assert B.busy() == ["CityAG16.exe 101", "python.exe 102", "UnrealEditor.exe 105"]
+    driver count as busy; a shell that only names one in its command line does not, nor this
+    benchmark's own driver, its launcher (the venv's python.exe runs the interpreter as a
+    child with the same command line) or the game it runs."""
+    procs = {
+        1: (0, "explorer.exe", "explorer.exe"),
+        10: (1, "bash.exe", "bash bench.sh at0 1 night_native"),
+        11: (10, "python.exe", "python -m citygen unreal B P --bench-only"),      # launcher
+        12: (11, "python.exe", "python -m citygen unreal B P --bench-only"),      # me
+        13: (12, "UnrealEditor.exe", "UnrealEditor.exe P.uproject -game -CityGenBench=j"),
+        101: (1, "CityAG16.exe", "CityAG16.exe /Game/X -CityGenBench=C:/b/job.json"),
+        102: (1, "python.exe", "python -u bench_packaged.py 3"),
+        103: (1, "bash.exe", "bash -c until ! powershell ... -CityGenBench=* ; do sleep 60"),
+        104: (1, "notepad.exe", "notepad.exe notes.txt"),
+        105: (1, "UnrealEditor.exe", "UnrealEditor.exe Q.uproject")}
+    assert B._busy(procs, 12) == ["CityAG16.exe 101", "python.exe 102", "UnrealEditor.exe 105"]
+    # (from the packaged run's side, this benchmark and its game are busy)
+    assert B._busy(procs, 102) == ["python.exe 11", "python.exe 12", "UnrealEditor.exe 13",
+                                   "CityAG16.exe 101", "UnrealEditor.exe 105"]

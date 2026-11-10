@@ -329,25 +329,50 @@ def job(route_: dict, out_dir: Path, passes=PASSES, warm: bool = True,
 
 def busy() -> list[str]:
     """Heavy processes that would skew a benchmark (another build, test run, Blender or
-    Unreal editor), as `name pid` strings; Windows only (else nothing)."""
+    Unreal editor, another benchmark), as `name pid` strings; Windows only (else nothing).
+    This process, its ancestors (the venv's python.exe launcher runs the interpreter as its
+    child, with the same command line) and its descendants are its own, never another's."""
     if os.name != "nt":
         return []
     try:
         out = subprocess.run(
             ["powershell", "-NoProfile", "-Command",
-             "Get-CimInstance Win32_Process | ForEach-Object { \"$($_.ProcessId)`t$($_.Name)`t$($_.CommandLine)\" }"],
+             "Get-CimInstance Win32_Process | ForEach-Object { "
+             "\"$($_.ProcessId)`t$($_.ParentProcessId)`t$($_.Name)`t$($_.CommandLine)\" }"],
             capture_output=True, text=True, timeout=60).stdout
     except (OSError, subprocess.SubprocessError):
         return []
-    hits = []
+    procs = {}
     for line in out.splitlines():
-        parts = line.split("\t", 2)
-        if len(parts) < 3:
+        parts = line.split("\t", 3)
+        if len(parts) < 4 or not parts[0].strip().isdigit():
             continue
-        pid, name, cmd = parts
+        pid, ppid, name, cmd = parts
+        procs[int(pid)] = (int(ppid) if ppid.strip().isdigit() else 0, name, cmd)
+    return _busy(procs, os.getpid())
+
+
+def _busy(procs: dict[int, tuple[int, str, str]], me: int) -> list[str]:
+    """`busy` on a process table {pid: (parent pid, name, command line)} seen from `me`."""
+    own = {me}
+    p = me
+    while p in procs and procs[p][0] not in own and procs[p][0] != 0:
+        p = procs[p][0]
+        own.add(p)                                   # (the launcher, the shell, ...)
+    kids = {}
+    for pid, (ppid, _, _) in procs.items():
+        kids.setdefault(ppid, []).append(pid)
+    todo = [me]
+    while todo:
+        for c in kids.get(todo.pop(), []):
+            if c not in own:
+                own.add(c)                           # (the game it runs, its helpers)
+                todo.append(c)
+    hits = []
+    for pid, (_, name, cmd) in sorted(procs.items()):
+        if pid in own:
+            continue
         low = (name + " " + cmd).lower()
-        if int(pid) == os.getpid():
-            continue
         # (AT0: another benchmark's game too, a packaged one among them: its executable is
         # the project's own, so only its -CityGenBench= names it; a shell that only names
         # it, waiting on it, is not one)
