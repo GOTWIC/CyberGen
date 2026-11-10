@@ -284,7 +284,8 @@ def cmd_unreal(args: argparse.Namespace) -> int:
               "citygen blockout)", file=sys.stderr)
         return EXIT_USAGE
     if args.manifest_only:
-        path = U.write_manifest(build, args.name, not args.blockout_only, not args.no_play)
+        path = U.write_manifest(build, args.name, not args.blockout_only, not args.no_play,
+                                atmos=False if args.no_atmos else args.atmos)
         print(f"wrote {path}")
         return EXIT_OK
     if args.uproject and args.new_project and not Path(args.uproject).is_file():
@@ -305,7 +306,8 @@ def cmd_unreal(args: argparse.Namespace) -> int:
                             timeout=args.timeout, assets=not args.blockout_only,
                             play=args.play, fly_speed=args.fly_speed,
                             startup=not args.no_startup, view_m=args.view_range,
-                            play_features=not args.no_play) \
+                            play_features=not args.no_play,
+                            atmos=False if args.no_atmos else args.atmos) \
             if not (args.check_only or args.bench_only) else None
         if res is not None:
             print(U.import_summary(res))
@@ -314,6 +316,7 @@ def cmd_unreal(args: argparse.Namespace) -> int:
                 return EXIT_INVALID
             print(U.play_summary(res))
             print(U.play_features_summary(res))
+            print(U.atmos_summary(res))
         if not args.no_hlod and res is not None:
             hl = U.build_hlods(build, args.uproject, engine=args.engine, timeout=args.timeout)
             print(U.hlod_summary(hl))
@@ -344,7 +347,8 @@ def cmd_unreal(args: argparse.Namespace) -> int:
                 return EXIT_USAGE
             br = B.bench(build, args.uproject, engine=args.engine, runs=args.bench_runs,
                          passes=passes, label=args.bench_label, out=args.bench_out,
-                         timeout=args.timeout, atmos=args.bench_atmos, rt=args.bench_rt)
+                         timeout=args.timeout, atmos=bool(args.bench_atmos),
+                         rt=args.bench_rt)
             print(B.table(br))
             print(f"wrote {br['out']}")
     except (RuntimeError, FileNotFoundError, subprocess.TimeoutExpired) as e:
@@ -661,6 +665,14 @@ def build_parser() -> argparse.ArgumentParser:
                          "map with teleport on M, a free camera on '.', and a developer menu "
                          "on Tab with day and night; without a compiler the city imports "
                          "without them)")
+    ue.add_argument("--atmos", metavar="PLAN_DIR",
+                    help="AT1: the city's atmos plan (atmosgen plan's output; default "
+                         "BUILD/atmos when it has one): atmosgen's controller and a data actor "
+                         "of lights per 128 m cell, the night's street lights, junctions, "
+                         "shop spill, signs and structures (a plan whose lux check failed is "
+                         "left out)")
+    ue.add_argument("--no-atmos", action="store_true",
+                    help="leave out the atmos plan (its actors from an earlier import go)")
     ue.add_argument("--check", action="store_true",
                     help="after the import, play the level in the editor: streaming, "
                          "ground traces, a walk along a sidewalk (always the walking "
@@ -693,11 +705,11 @@ def build_parser() -> argparse.ArgumentParser:
     ue.add_argument("--bench-passes", default="day_native,day_tsr67,night_native,night_tsr67",
                     help="the passes, by name (default all four)")
     ue.add_argument("--bench-out", metavar="DIR", help="the results' folder (default as above)")
-    ue.add_argument("--bench-atmos", metavar="PLAN_DIR",
-                    help="AT0: atmosgen's runtime in the benchmark's game with this atmos plan "
-                         "(BUILD/atmos), its assets made first; adds the spike's passes "
-                         "(night_plan, night_plan_fog, night_plan_all, ...: citygen.bench."
-                         "ATMOS_PASSES) to --bench-passes' choices")
+    ue.add_argument("--bench-atmos", action="store_true",
+                    help="AT0, AT1: adds atmosgen's passes (night_plan, night_plan_fog, "
+                         "night_plan_all, ...: citygen.bench.ATMOS_PASSES) to --bench-passes' "
+                         "choices; they switch the level's atmos controller (the import's, "
+                         "AT1) by console commands")
     ue.add_argument("--bench-rt", action="store_true",
                     help="AT0: hardware ray tracing on in the benchmark's game (MegaLights)")
     _progress_args(ue)

@@ -5,8 +5,6 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/DecalComponent.h"
 #include "Components/DirectionalLightComponent.h"
-#include "Components/PointLightComponent.h"
-#include "Components/SpotLightComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/SkyLightComponent.h"
 #include "Engine/DirectionalLight.h"
@@ -39,12 +37,11 @@ namespace
 	const FName UnderwaterTag(TEXT("cg.type=underwater"));
 	const FName SkyKey(TEXT("cg.key=lighting.sky"));
 
-	// AT0: atmosgen's runtime (CityGenAtmos) sets this to 0 while its plan's lights are on;
-	// the lamps' spot lights, light pools and sign washes then go dark (decision 12.2: the
-	// lamps move to atmosgen)
+	// AT1: the lamps' lights are atmosgen's (decision 12.2); its runtime (CityGenAtmos) sets
+	// this to 2 while its plan's lights show, so the pools stand only past its live range
 	TAutoConsoleVariable<int32> CVarPlayLamps(TEXT("CityGen.PlayLamps"), 1,
-		TEXT("The play features' lamps, light pools and sign washes by night (0: off, atmosgen's lights instead; "
-		     "2: only the light pools, under the lamps past CityGen.PlayPoolsFromM, atmosgen's far tier)"));
+		TEXT("The play features' light pools under the lamps by night (0: off; 1: from the view out; "
+		     "2: past CityGen.PlayPoolsFromM, atmosgen's far tier while its lights show)"));
 	TAutoConsoleVariable<float> CVarPoolsFrom(TEXT("CityGen.PlayPoolsFromM"), 300.f,
 		TEXT("With CityGen.PlayLamps 2: the light pools under the lamps this far (m) from the view and farther"));
 }
@@ -55,8 +52,8 @@ ACityGenPlay::ACityGenPlay()
 	PrimaryActorTick.bStartWithTickEnabled = true;
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	// an AInfo is hidden in the game, and a hidden actor's components draw nothing: the
-	// lamps' spot lights, light pools and sign washes are its components (run-through 2:
-	// Delta's streets stayed as dark with the lamps 20 times brighter)
+	// light pools are its components (run-through 2: Delta's streets stayed as dark with the
+	// lamps 20 times brighter)
 	SetHidden(false);
 #if WITH_EDITORONLY_DATA
 	bIsSpatiallyLoaded = false;              // World Partition: always loaded
@@ -106,42 +103,8 @@ void ACityGenPlay::Setup()
 	{
 		Viewport->AddViewportWidgetContent(Overlay.ToSharedRef(), 20);
 	}
-	// AG15: a spot light under each of the nearest lamp heads, pointing down (a spot shines
-	// along its +X: pitch -90), the nearest few with shadows; light-pool decals under the
-	// lamps past them (a decal projects along its +X too)
-	for (int32 i = 0; i < LampLights; ++i)
-	{
-		USpotLightComponent* L = NewObject<USpotLightComponent>(this);
-		L->SetMobility(EComponentMobility::Movable);
-		L->SetupAttachment(RootComponent);
-		L->SetUsingAbsoluteLocation(true);
-		L->SetUsingAbsoluteRotation(true);
-		L->SetWorldRotation(FRotator(-90.f, 0.f, 0.f));
-		L->SetIntensityUnits(ELightUnits::Candelas);
-		L->SetAttenuationRadius(LampRadiusM * 100.f);
-		L->SetInnerConeAngle(LampInnerConeDeg);
-		L->SetOuterConeAngle(LampOuterConeDeg);
-		L->SetSourceRadius(12.f);
-		L->SetCastShadows(i < ShadowedLamps);
-		L->SetLightColor(FLinearColor(1.0f, 0.74f, 0.46f));
-		L->SetVisibility(false);
-		L->RegisterComponent();
-		Lamps.Add(L);
-	}
-	for (int32 i = 0; i < WashLights && i < WashPoints.Num(); ++i)
-	{
-		UPointLightComponent* W = NewObject<UPointLightComponent>(this);
-		W->SetMobility(EComponentMobility::Movable);
-		W->SetupAttachment(RootComponent);
-		W->SetUsingAbsoluteLocation(true);
-		W->SetIntensityUnits(ELightUnits::Candelas);
-		W->SetAttenuationRadius(WashRadiusM * 100.f);
-		W->SetSourceRadius(150.f);
-		W->SetCastShadows(false);
-		W->SetVisibility(false);
-		W->RegisterComponent();
-		Washes.Add(W);
-	}
+	// AG15: light-pool decals under the lamps (a decal projects along its +X: pitch -90);
+	// AT1: the lamps' own lights are atmosgen's
 	if (LightPoolMaterial)
 	{
 		for (int32 i = 0; i < LampPools; ++i)
@@ -548,19 +511,10 @@ void ACityGenPlay::SetNight(bool bOn)
 	LampsAt = -1.0;
 	if (!bOn)
 	{
-		for (USpotLightComponent* L : Lamps)
-		{
-			L->SetVisibility(false);
-		}
 		for (UDecalComponent* D : Pools)
 		{
 			D->SetVisibility(false);
 		}
-		for (UPointLightComponent* W : Washes)
-		{
-			W->SetVisibility(false);
-		}
-		LampsOn = 0;
 		PoolsOn = 0;
 	}
 	Toast(bOn ? TEXT("Night") : TEXT("Day"), 1.5f);
@@ -571,28 +525,16 @@ void ACityGenPlay::UpdateLamps()
 {
 	if (CVarPlayLamps.GetValueOnGameThread() == 0)
 	{
-		for (USpotLightComponent* L : Lamps)
-		{
-			L->SetVisibility(false);
-		}
 		for (UDecalComponent* D : Pools)
 		{
 			D->SetVisibility(false);
 		}
-		for (UPointLightComponent* W : Washes)
-		{
-			W->SetVisibility(false);
-		}
-		LampsOn = 0;
 		PoolsOn = 0;
 		return;
 	}
-	// the lamps nearest the view get the lights; the farthest of them fade, so a lamp
-	// coming into the set does not pop (AT0: with CityGen.PlayLamps 2, none: atmosgen lights
-	// the near lamps, the pools only those past its range)
-	const bool bPoolsOnly = CVarPlayLamps.GetValueOnGameThread() == 2;
+	// the light pools under the lamps nearest the view (AT1: with CityGen.PlayLamps 2, only
+	// those past atmosgen's live range, its far tier)
 	const FVector View = ViewLocation();
-	const int32 N = bPoolsOnly ? 0 : FMath::Min(Lamps.Num(), LampPoints.Num());
 	TArray<TPair<double, int32>> Near;
 	Near.Reserve(LampPoints.Num());
 	for (int32 i = 0; i < LampPoints.Num(); ++i)
@@ -601,33 +543,8 @@ void ACityGenPlay::UpdateLamps()
 	}
 	// (a few thousand lamps: sorting them all five times a second costs nothing)
 	Near.Sort([](const TPair<double, int32>& A, const TPair<double, int32>& B) { return A.Key < B.Key; });
-	double Far = 1.0;
-	for (int32 k = 0; k < N; ++k)
-	{
-		Far = FMath::Max(Far, FMath::Sqrt(Near[k].Key));
-	}
-	for (int32 k = 0; k < Lamps.Num(); ++k)
-	{
-		USpotLightComponent* L = Lamps[k];
-		if (k >= N)
-		{
-			L->SetVisibility(false);
-			continue;
-		}
-		const int32 i = Near[k].Value;
-		const bool bWall = LampKinds.IsValidIndex(i) && LampKinds[i] == 1;
-		const double D = FMath::Sqrt(Near[k].Key);
-		// (the farthest quarter fades out, where the light-pool decals take over)
-		const float Fade = float(FMath::Clamp((Far - D) / (0.25 * Far), 0.0, 1.0));
-		L->SetWorldLocation(LampPoints[i] - FVector(0.0, 0.0, LampDropCm));
-		L->SetIntensity((bWall ? WallLampCandela : StreetLampCandela) * Fade);
-		L->SetAttenuationRadius(LampRadiusM * (bWall ? 60.f : 100.f));
-		L->SetVisibility(Fade > 0.f);
-	}
-	LampsOn = N;
-	// the light pools under the lamps past the lit ones (and under the fading ones)
-	int32 P0 = FMath::Max(0, N - N / 4);
-	if (bPoolsOnly)
+	int32 P0 = 0;
+	if (CVarPlayLamps.GetValueOnGameThread() == 2)
 	{
 		const double From = double(CVarPoolsFrom.GetValueOnGameThread()) * 100.0;
 		while (P0 < Near.Num() && Near[P0].Key < From * From)
@@ -651,38 +568,6 @@ void ACityGenPlay::UpdateLamps()
 		Dc->SetVisibility(true);
 	}
 	PoolsOn = P;
-	// the large signs nearest the view wash their facades in their color
-	if (bPoolsOnly)
-	{
-		for (UPointLightComponent* W : Washes)
-		{
-			W->SetVisibility(false);
-		}
-	}
-	else if (Washes.Num() > 0)
-	{
-		TArray<TPair<double, int32>> NearW;
-		NearW.Reserve(WashPoints.Num());
-		for (int32 i = 0; i < WashPoints.Num(); ++i)
-		{
-			NearW.Add(TPair<double, int32>(FVector::DistSquared(WashPoints[i], View), i));
-		}
-		NearW.Sort([](const TPair<double, int32>& A, const TPair<double, int32>& B) { return A.Key < B.Key; });
-		for (int32 k = 0; k < Washes.Num(); ++k)
-		{
-			UPointLightComponent* W = Washes[k];
-			if (k >= NearW.Num())
-			{
-				W->SetVisibility(false);
-				continue;
-			}
-			const int32 i = NearW[k].Value;
-			W->SetWorldLocation(WashPoints[i]);
-			W->SetLightColor(WashColors.IsValidIndex(i) ? WashColors[i] : FLinearColor::White);
-			W->SetIntensity(WashCandela);
-			W->SetVisibility(true);
-		}
-	}
 }
 
 // -- the tick --
@@ -752,51 +637,10 @@ void ACityGenPlay::UpdateUnderwater()
 	UnderwaterOn = On;
 }
 
-FString ACityGenPlay::GetLampReport(int32 Count) const
-{
-	const FVector View = ViewLocation();
-	TArray<TPair<double, int32>> Near;
-	for (int32 i = 0; i < LampPoints.Num(); ++i)
-	{
-		Near.Add(TPair<double, int32>(FVector::DistSquared(LampPoints[i], View), i));
-	}
-	Near.Sort([](const TPair<double, int32>& A, const TPair<double, int32>& B) { return A.Key < B.Key; });
-	FString Out = TEXT("[");
-	for (int32 k = 0; k < FMath::Min(Count, Near.Num()); ++k)
-	{
-		const FVector P = LampPoints[Near[k].Value];
-		// the light standing under this lamp, if any
-		int32 Li = INDEX_NONE;
-		for (int32 j = 0; j < Lamps.Num(); ++j)
-		{
-			if (Lamps[j]->IsVisible() &&
-				FVector::Dist(Lamps[j]->GetComponentLocation(), P - FVector(0.0, 0.0, LampDropCm)) < 1.0)
-			{
-				Li = j;
-				break;
-			}
-		}
-		const USpotLightComponent* L = Li != INDEX_NONE ? Lamps[Li] : nullptr;
-		Out += FString::Printf(TEXT("%s{\"lamp\": %d, \"m\": %.1f, \"light\": %d, \"at\": [%.0f, %.0f, %.0f], "
-			"\"cd\": %.1f, \"shadows\": %s, \"registered\": %s}"),
-			k ? TEXT(", ") : TEXT(""), Near[k].Value, FMath::Sqrt(Near[k].Key) / 100.0, Li, P.X, P.Y, P.Z,
-			L ? L->Intensity : 0.f, (L && L->CastShadows) ? TEXT("true") : TEXT("false"),
-			(L && L->IsRegistered()) ? TEXT("true") : TEXT("false"));
-	}
-	return Out + TEXT("]");
-}
-
 FString ACityGenPlay::GetStatus() const
 {
 	const APawn* Pawn = PC ? PC->GetPawn() : nullptr;
 	const FVector At = Pawn ? Pawn->GetActorLocation() : FVector::ZeroVector;
-	int32 Lit = 0;
-	int32 Shadowed = 0;
-	for (const USpotLightComponent* L : Lamps)
-	{
-		Lit += L->IsVisible() ? 1 : 0;
-		Shadowed += (L->IsVisible() && L->CastShadows) ? 1 : 0;
-	}
 	int32 PoolsVisible = 0;
 	for (const UDecalComponent* D : Pools)
 	{
@@ -804,13 +648,13 @@ FString ACityGenPlay::GetStatus() const
 	}
 	return FString::Printf(TEXT("{\"ready\": %s, \"night\": %s, \"map\": %s, \"menu\": %s, "
 		"\"free_cam\": %s, \"waiting\": %s, \"pawn\": \"%s\", \"x\": %.2f, \"y\": %.2f, \"z\": %.2f, "
-		"\"lamps_lit\": %d, \"lamps_shadowed\": %d, \"light_pools\": %d, "
+		"\"light_pools\": %d, "
 		"\"lamp_points\": %d, \"walk_points\": %d, \"map_texture\": %s, "
 		"\"overlay\": %s}"),
 		bReady ? TEXT("true") : TEXT("false"), bNight ? TEXT("true") : TEXT("false"),
 		bMapOpen ? TEXT("true") : TEXT("false"), bDevOpen ? TEXT("true") : TEXT("false"),
 		IsFreeCam() ? TEXT("true") : TEXT("false"), bWaiting ? TEXT("true") : TEXT("false"),
 		Pawn ? *Pawn->GetClass()->GetName() : TEXT(""), At.X / 100.0, -At.Y / 100.0, At.Z / 100.0,
-		Lit, Shadowed, PoolsVisible, LampPoints.Num(), WalkPoints.Num(), MapTexture ? TEXT("true") : TEXT("false"),
+		PoolsVisible, LampPoints.Num(), WalkPoints.Num(), MapTexture ? TEXT("true") : TEXT("false"),
 		Overlay.IsValid() ? TEXT("true") : TEXT("false"));
 }

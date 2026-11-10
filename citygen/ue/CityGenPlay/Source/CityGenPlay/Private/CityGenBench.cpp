@@ -454,12 +454,6 @@ void UCityGenBench::Tick(float DeltaTime)
 					*Passes[PassIndex].Name, *S.Name));
 				FScreenshotRequest::RequestScreenshot(Shot, false, false);
 				Event(FString::Printf(TEXT("\"op\": \"shot\", \"file\": \"%s\""), *Esc(Shot)));
-				// (the play features' lamps nearest the view, for a night view's light)
-				if (const ACityGenPlay* Play = ACityGenPlay::Find(GetWorld()))
-				{
-					UE_LOG(LogCityGenBench, Display, TEXT("lamps at %s: %s"), *FPaths::GetBaseFilename(Shot),
-						*Play->GetLampReport());
-				}
 				// (AT0: atmosgen's runtime state at the shot, if it is in the game)
 				if (!Passes[PassIndex].Commands.IsEmpty())
 				{

@@ -20,6 +20,14 @@ What atmosgen needs and the other stages do not record yet:
    blockout prototype's 0.3 m frame, the color of its cell (AG6's shop and POI cells name
    theirs; an ad cell's is the mean of its bright pixels on the page).
 
+3. **Fixtures for the lights the city has none for** (AT1; AG7, AG8): the plan lights what
+   M6 leaves dark (junction corners, highways and ramps, service roads, footbridges, alleys,
+   station platforms) on fixtures stage 2 does not draw yet, named by `Light.mount`: `pole`,
+   `mast_arm` (on a traffic signal's pole, over its junction), `wall` (a wall pack over an
+   alley), `canopy` (a platform's downlight). A fixture drawn at each such light's lens
+   (its `pos` plus its class's `drop_m`), headed its aim's way, would meet the ask; the
+   plan's report counts them (`mounts`, `asked`).
+
 Each derived light says so (`Light.source` "derived"); `plan.counts` and `sources` count
 them, so the asks' progress shows in every plan.
 """

@@ -33,7 +33,16 @@ Hours = Annotated[list[float], Field(min_length=24, max_length=24,
 Shape = Literal["spot", "point", "rect"]
 Tier = Literal["near", "mid"]
 LightKind = Literal["street_light", "wall_light", "sign", "shop_sign", "spill", "soffit",
-                    "flood", "aviation", "searchlight", "tunnel", "station", "high_mast"]
+                    "flood", "aviation", "searchlight", "tunnel", "station", "high_mast",
+                    "signal", "corner", "road", "alley", "underpass"]
+# what a light hangs on (AT1): the city's own fixture (an M6 prop, an M20 sign, an M3
+# shopfront, AG10's soffit fixture, AG7's tunnel strip), or one the plan asks of stage 2
+# (scope 4.1, `emitters.py`'s third ask): a pole at a junction corner, along a highway or a
+# service road, a mast arm on a traffic signal, a wall pack over an alley, a platform
+# downlight under a station's canopy
+Mount = Literal["prop", "sign", "facade", "soffit", "tunnel", "pole", "mast_arm", "wall",
+                "canopy"]
+ASKED = ("pole", "mast_arm", "wall", "canopy")
 
 
 class _Model(BaseModel):
@@ -76,6 +85,9 @@ class Light(_Model):
     source: Literal["derived", "assetgen"] = Field(
         "derived", description="Where its fixture's light came from: assetgen's emitter "
                                "record (the asks, section 4.1) or derived from citygen.")
+    mount: Mount = Field("prop", description="What it hangs on (AT1): the city's own "
+                                             "fixture, or one the plan asks of stage 2 "
+                                             "(pole, mast_arm, wall, canopy).")
     hash: str
 
 
@@ -175,6 +187,12 @@ class AtmosPlan(_Model):
     counts: dict[str, int]
     sources: dict[str, int] = Field(description="Lights by source: derived or assetgen "
                                                 "(the asks met).")
+    checks: dict = Field(default_factory=dict,
+                         description="AT1: the lux check's result (`lux.check`): `ok` and per "
+                                     "walkway class its points, average, share under the "
+                                     "minimum and targets. The exporter imports a plan "
+                                     "only when it passed (scope 8: not delivered "
+                                     "otherwise).")
 
 
 class ContributionEntry(_Model):

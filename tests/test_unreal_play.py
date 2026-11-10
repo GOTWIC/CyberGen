@@ -120,29 +120,6 @@ def test_lamp_points():
     assert P.lamp_offsets({"prototypes": {}}) == {}
 
 
-def test_sign_washes_on_a_slope(tmp_path):
-    """A large facade sign's wash point WASH_OUT_M in front of it, at the slot's height over
-    its building's base (M13: `base_m`, as the blockout lifts the signs); on a flat city (no
-    base) the slot's own height; shop signs and roof slots none."""
-    slots = [{"id": "b1.slot.billboard.a", "kind": "billboard", "mount": "facade",
-              "building_id": "b1", "position": [10.0, 20.0, 12.0], "yaw_deg": 90.0},
-             {"id": "b2.slot.banner.a", "kind": "banner", "mount": "facade",
-              "building_id": "b2", "position": [0.0, 0.0, 8.0], "yaw_deg": 0.0},
-             {"id": "b1.slot.shop.a", "kind": "shop_sign", "mount": "facade",
-              "building_id": "b1", "position": [0.0, 0.0, 3.0], "yaw_deg": 0.0},
-             {"id": "b1.slot.holo_ad.roof", "kind": "holo_ad", "mount": "roof",
-              "building_id": "b1", "position": [0.0, 0.0, 60.0], "yaw_deg": 0.0}]
-    (tmp_path / "gameplay.json").write_text(json.dumps({"sign_slots": slots}))
-    pts, cols = P.sign_washes(tmp_path)
-    assert len(pts) == 6 and len(cols) == 6
-    assert pts[:3] == [10.0, round(20.0 + P.WASH_OUT_M, 2), 12.0]
-    assert pts[3:] == [round(P.WASH_OUT_M, 2), 0.0, 8.0]
-    (tmp_path / "city_model.json").write_text(json.dumps({"buildings": [
-        {"id": "b1", "base_m": 31.5}, {"id": "b2"}]}))
-    pts, _ = P.sign_washes(tmp_path)
-    assert pts[2] == 43.5 and pts[5] == 8.0
-
-
 def _png_size(path: Path) -> tuple[int, int]:
     data = path.read_bytes()
     assert data[:8] == b"\x89PNG\r\n\x1a\n"

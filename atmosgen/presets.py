@@ -70,22 +70,45 @@ NEON = ("#ff2a6d", "#05d9e8", "#b967ff", "#ffb000", "#39ff8a", "#f2f6ff")   # AG
 # attenuation radius (m); cones in degrees; tilt the aim off straight down, toward the
 # fixture's own forward (the arm's direction, over the carriageway); shadow: may cast
 # shadows in the near tier; drop how far under the lamp head the light hangs (outside the
-# head's mesh, scope 8's placement check)
+# head's mesh, scope 8's placement check).
+#
+# The profile (AT1) is Unreal's own, so the lux check (`lux.py`) and the runtime agree: a
+# spot's intensity toward a direction gamma off its aim is
+#   I(gamma) = cd * t^2,  t = clamp((cos gamma - cos outer) / (cos inner - cos outer), 0, 1)
+# (flat to the inner cone, falling to 0 at the outer: `SpotAttenuation` in the engine's
+# shaders), a point's cd all round, a face's cd * cos(gamma) in front of it; each times the
+# window clamp(1 - (d / reach)^4, 0, 1)^2. AT1's street classes are wide (a batwing in the
+# large): a cobra head 1200 cd to 62 degrees off its aim, so a carriageway lit from both
+# sides between its poles (M6: every 25 to 35 m on each side, staggered) reads lit from
+# lamp to lamp (#81) at about 10 to 15 lx, where AT0's 6000 cd in a 45 degree cone gave
+# 52 lx under the heads and the junctions dark.
 PHOTOMETRY = {
-    "cobra_head": {"shape": "spot", "cd": 6000.0, "reach_m": 40.0, "inner": 45.0,
-                   "outer": 74.0, "tilt": 15.0, "source_m": 0.25, "shadow": True,
+    "cobra_head": {"shape": "spot", "cd": 1200.0, "reach_m": 40.0, "inner": 62.0,
+                   "outer": 80.0, "tilt": 15.0, "source_m": 0.25, "shadow": True,
                    "drop_m": 0.3},
-    "post_top":   {"shape": "point", "cd": 450.0, "reach_m": 22.0, "source_m": 0.3,
+    "post_top":   {"shape": "point", "cd": 600.0, "reach_m": 28.0, "source_m": 0.3,
                    "shadow": True, "drop_m": 0.1},
-    "wall_pack":  {"shape": "spot", "cd": 1500.0, "reach_m": 20.0, "inner": 40.0,
-                   "outer": 70.0, "tilt": 35.0, "source_m": 0.15, "shadow": True,
+    "wall_pack":  {"shape": "spot", "cd": 420.0, "reach_m": 24.0, "inner": 65.0,
+                   "outer": 86.0, "tilt": 20.0, "source_m": 0.15, "shadow": True,
                    "drop_m": 0.2},
     "high_mast":  {"shape": "spot", "cd": 40000.0, "reach_m": 120.0, "inner": 55.0,
                    "outer": 78.0, "tilt": 0.0, "source_m": 0.8, "shadow": True,
                    "drop_m": 0.5},
-    "soffit":     {"shape": "spot", "cd": 800.0, "reach_m": 16.0, "inner": 50.0,
-                   "outer": 76.0, "tilt": 0.0, "source_m": 0.3, "shadow": False,
+    # a highway's columns: 12 m over the road, a twin arm in the median or one at the edge
+    "highway":    {"shape": "spot", "cd": 2600.0, "reach_m": 60.0, "inner": 64.0,
+                   "outer": 80.0, "tilt": 10.0, "source_m": 0.3, "shadow": False,
+                   "drop_m": 0.3},
+    "soffit":     {"shape": "spot", "cd": 320.0, "reach_m": 18.0, "inner": 60.0,
+                   "outer": 82.0, "tilt": 0.0, "source_m": 0.3, "shadow": False,
                    "drop_m": 0.1},
+    # a road tunnel's wall strips and an underpass's ceiling strip (AG7)
+    "tunnel":     {"shape": "spot", "cd": 380.0, "reach_m": 16.0, "inner": 60.0,
+                   "outer": 85.0, "tilt": 25.0, "source_m": 0.3, "shadow": False,
+                   "drop_m": 0.05},
+    # a station platform's downlights under its canopy
+    "platform":   {"shape": "spot", "cd": 260.0, "reach_m": 14.0, "inner": 60.0,
+                   "outer": 82.0, "tilt": 0.0, "source_m": 0.2, "shadow": False,
+                   "drop_m": 0.05},
     "sign_face":  {"shape": "rect", "nits": 320.0, "reach_m": 35.0, "barn_deg": 80.0,
                    "out_m": 0.15, "shadow": False},
     "neon_band":  {"shape": "rect", "nits": 650.0, "reach_m": 18.0, "barn_deg": 85.0,
@@ -151,6 +174,42 @@ MOOD_DEFAULT = "midtown_mixed"
 # lux by walkway class: (average, minimum)
 LIGHT_LEVELS = {"sidewalk": (10.0, 2.0), "crosswalk": (10.0, 2.0), "carriageway": (7.0, 1.0),
                 "under_deck": (5.0, 1.0), "alley": (2.0, 0.5)}
+# the lux check (AT1, scope 8): a class passes when its average over the city is at its
+# target and at most UNDER_MIN_SHARE of its points fall under its minimum (broken lights
+# and the dark stretches a gritty district's mood asks for: decision 12.5); in every
+# district at least DISTRICT_AVG_SHARE of the average and at most DISTRICT_UNDER_SHARE
+# under the minimum; an alley point never at 0 (ZERO_LX)
+UNDER_MIN_SHARE = 0.05
+DISTRICT_AVG_SHARE = 0.5
+DISTRICT_UNDER_SHARE = 0.15
+DISTRICT_MIN_POINTS = 50          # (a district with fewer points of a class is not judged)
+ZERO_LX = 0.05
+SAMPLE_M = 2.0                    # the check's points along every walkway and lane
+
+# AT1's lights on fixtures the city does not have yet (scope 4.1's asks, `emitters.py`):
+# poles along the roads M6 gives no street lights (highways and ramps, service roads), wall
+# packs along the alleys, poles at the junction corners the lux check finds dark
+ROAD_LIGHTS = {
+    # class: (light class, spacing m, mounting height over the road m, arm m)
+    "highway": ("highway", 42.0, 12.0, 2.5),
+    "service": ("cobra_head", 30.0, 8.0, 1.5),
+}
+ALLEY_STEP_M = (9.0, 10.0)        # wall packs every a + b * the mood's alley darkness (m)
+ALLEY_PACK_Z_M = 4.0
+CORNER_POLE_Z_M = 8.0             # a corner pole's head over the ground
+CORNER_ARM_M = 1.5
+CORNER_MAX = 6                    # corner lights a junction gets at most
+SIGNAL_ARM_M = (6.0, 0.55)        # a signal's mast arm: at most 6 m, 0.55 of the way in
+SIGNAL_HEAD_Z_M = 7.0
+FILL_MIN_POINTS = 3               # a walkway or road with this many points dark gets a fill
+FILL_ROUNDS = 4                   # ... light at its darkest, a round at a time
+FILL_SOFFIT_Z_M = 7.5             # a fill light under a deck: under its soffit
+PED_STEP_M = 16.0                 # a pedestrian street's posts (M6 gives it no lamps)
+PED_POST_Z_M = 4.5
+TUNNEL_STEP_M = 10.0
+UNDERPASS_STEP_M = 6.0
+PLATFORM_STEP_M = 7.0
+PLATFORM_Z_M = 3.6                # a platform's downlights over its floor
 
 # the tiers the runtime keeps live near the view: near (shadowed), mid (unshadowed), far
 # (no light: emissive points or light cards, AT7)
@@ -176,6 +235,7 @@ def _hours(on: float, off: float, level: float = 1.0, rest: float = 0.0) -> tupl
 
 SCHEDULES = {
     "dusk_dawn": _hours(18, 7),                    # street lights: on from dusk to dawn
+    "tunnel": _hours(18, 7, 1.0, 0.6),             # tunnels: always, brighter by night
     "always": _hours(0, 24),                       # tunnels, decks, stations
     "shop": _hours(9, 22, 1.0, 0.15),              # a shop's spill (its security light after)
     "food": _hours(7, 24, 1.0, 0.1),

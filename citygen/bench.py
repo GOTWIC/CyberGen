@@ -48,11 +48,12 @@ RESOLUTION = (2560, 1440)    # 1440p (decision 13.4's target: the Windows PC)
 TSR_PERCENT = 67.0
 PASSES = (("day_native", False, 100.0), ("day_tsr67", False, TSR_PERCENT),
           ("night_native", True, 100.0), ("night_tsr67", True, TSR_PERCENT))
-# AT0 (atmosgen's spike, docs/progress/AT0): passes that switch atmosgen's runtime
-# (CityGenAtmos) by console commands at their start, with `--bench-atmos PLAN_DIR`: the plan's
-# lights by tile with a live set by tier (the play features' lamps dark), volumetric fog, rain
-# and wet streets, MegaLights (with `--bench-rt`). A pass without commands of its own switches
-# all of it off, so passes do not leak into each other.
+# AT0 and AT1 (atmosgen, docs/progress/AT0, AT1): passes that switch atmosgen's runtime
+# (CityGenAtmos, the controller the import places with the city's atmos plan since AT1) by
+# console commands at their start, with `--bench-atmos`: the plan's lights with a live set by
+# tier (the play features' light pools past it), volumetric fog, rain and wet streets,
+# MegaLights (with `--bench-rt`). A pass without commands of its own switches all of it off,
+# so passes do not leak into each other.
 ATMOS_OFF = ("CityGenAtmos.Lights 0", "CityGenAtmos.Fog 0", "CityGenAtmos.Rain 0",
              "CityGenAtmos.Wet 0", "CityGenAtmos.MegaLights 0")
 
@@ -452,12 +453,10 @@ def others_summary(samples: list[dict]) -> dict | None:
 
 def run_game(root: Path, uproject: Path, level: str, job_path: Path, log: Path,
              resolution=RESOLUTION, timeout: float = 3600.0,
-             samples: list | None = None, atmos: Path | None = None,
-             rt: bool = False) -> int:
+             samples: list | None = None, rt: bool = False) -> int:
     """The standalone game on `level` with the bench's job; its exit code. With `samples`,
     the CPU other processes take is appended to it every SAMPLE_S seconds while it plays.
-    AT0: `atmos`, an atmos plan's folder the game's CityGenAtmos reads
-    (`-CityGenAtmosPlan`); `rt`, hardware ray tracing on for this game alone (MegaLights)."""
+    AT0: `rt`, hardware ray tracing on for this game alone (MegaLights)."""
     from .unreal import editor_binary
     exe = editor_binary(root, gui=True)
     ini = ("[/Script/Engine.UserInterfaceSettings]:bAllowHighDPIInGameMode=True,"
@@ -472,8 +471,6 @@ def run_game(root: Path, uproject: Path, level: str, job_path: Path, log: Path,
            # engine leaves a game DPI-unaware, BaseEngine.ini's bAllowHighDPIInGameMode, and
            # an unattended one too, bAllowHighDpiWhenUnattended)
            f"-ini:Engine:{ini}", "-NoScreenMessages"]
-    if atmos is not None:
-        cmd.append(f"-CityGenAtmosPlan={Path(atmos).resolve().as_posix()}")
     with open(log, "wb") as f:
         proc = subprocess.Popen(cmd, stdout=f, stderr=subprocess.STDOUT)
         t0 = time.time()
@@ -497,12 +494,12 @@ def run_game(root: Path, uproject: Path, level: str, job_path: Path, log: Path,
 def bench(build_dir: str | Path, uproject: str | Path, engine: str | None = None,
           runs: int = 3, passes=PASSES, label: str = "bench", out: str | Path | None = None,
           resolution=RESOLUTION, wait_idle: bool = True, timeout: float = 3600.0,
-          say=print, atmos: str | Path | None = None, rt: bool = False) -> dict:
+          say=print, atmos: bool = False, rt: bool = False) -> dict:
     """`citygen unreal --bench`: `runs` game processes over the route, each run's raw frames
     kept in BUILD/unreal/bench/<label>/run<k>, the results (`combine`) written to `out`
-    (default docs/progress/AG16/bench/<city>/<label>). AT0: `atmos` an atmos plan's folder
-    (atmosgen's runtime in the game, its assets made first; `ATMOS_PASSES`), `rt` hardware
-    ray tracing on in the game."""
+    (default docs/progress/AG16/bench/<city>/<label>). `atmos` (AT1): the passes switch the
+    level's atmos controller (the import placed it with the city's plan; its assets made
+    first; `ATMOS_PASSES`); `rt` (AT0) hardware ray tracing on in the game."""
     from .unreal import find_engine
     build = Path(build_dir).resolve()
     up = Path(uproject).resolve()
@@ -522,9 +519,10 @@ def bench(build_dir: str | Path, uproject: str | Path, engine: str | None = None
     if not pl.get("ok"):
         raise RuntimeError(f"the play plugin (the benchmark's driver) did not build: "
                            f"{pl.get('error')}")
-    if atmos is not None:
-        if not (Path(atmos) / "atmos_plan.json").is_file():
-            raise RuntimeError(f"{atmos}: no atmos_plan.json (run atmosgen plan)")
+    if atmos:
+        if not (man.get("atmos") or {}).get("cells"):
+            raise RuntimeError("the level has no atmos plan: import the city with one first "
+                               "(atmosgen plan, then citygen unreal)")
         from .unreal_atmos import make_assets
         ma = make_assets(root, up, raw / "atmos_assets_log.txt")
         if not ma.get("ok"):
@@ -555,7 +553,7 @@ def bench(build_dir: str | Path, uproject: str | Path, engine: str | None = None
         t = time.time()
         samples: list[dict] = []
         code = run_game(root, up, level, jp, rd / "game_log.txt", resolution, timeout,
-                        samples=samples, atmos=Path(atmos) if atmos else None, rt=use_rt)
+                        samples=samples, rt=use_rt)
         (rd / "others.json").write_text(json.dumps(samples, indent=0) + "\n",
                                         encoding="utf-8", newline="\n")
         if not (rd / "frames.csv").is_file():

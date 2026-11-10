@@ -31,6 +31,11 @@ The play features (`unreal_play`, docs/unreal_export.md "Play features"): `map.p
 `play.json` beside the manifest (its `play`), and the CityGenPlay plugin (C++) installed and
 built in the project before the import, the city imported without them when it cannot be.
 
+Stage 3 (atmosgen, AT1: `unreal_atmos`): a city's atmos plan (BUILD/atmos, or `atmos`) as
+layer 3, the manifest's `atmos`: the CityGenAtmos controller (key `atmos`) and a data actor
+of lights per 128 m cell, their records in `atmos.json` beside the manifest; a plan whose lux
+check failed is left out.
+
 Then it runs the editor headless (`UnrealEditor-Cmd UPROJECT -run=pythonscript`) on
 `citygen/ue/import_city.py`, which reads only those files (stdlib and the `unreal` module).
 citygen itself makes no network call; the Unreal MCP plugin is the interactive route (a
@@ -1035,13 +1040,15 @@ def share_meshes(packs: dict, placed: list[dict]) -> int:
 
 
 def build_manifest(build_dir: str | Path, name: str | None = None,
-                   assets: bool = True, play: bool = False) -> dict:
+                   assets: bool = True, play: bool = False,
+                   atmos: str | Path | bool | None = None) -> dict:
     """The manifest of a blockout output (see the module docstring), with the prototypes'
     meshes and the flat graphs beside it: (manifest, prototype meshes, flat graphs). With
     `assets` (the default), stage 2's contributions in BUILD_DIR/assets are layered over the
     blockout (`stage2`); a build without them gives the blockout's manifest alone. With
     `play`, the play features' map and data are written to BUILD_DIR/unreal (`unreal_play`)
-    and the manifest's `play` names them."""
+    and the manifest's `play` names them. `atmos` (AT1): the atmos plan's folder (None:
+    BUILD/atmos when it has one, False: none), the manifest's `atmos` (`unreal_atmos`)."""
     build = Path(build_dir)
     contribs = contributions(build) if assets else []
     plan = json.loads((build / "blockout_plan.json").read_text(encoding="utf-8"))
@@ -1134,6 +1141,16 @@ def build_manifest(build_dir: str | Path, name: str | None = None,
     if contribs:
         man["stage2"] = stage2(man, build, contribs)
         man["counts"]["actors"] = len(actor_hashes(man))
+    if atmos is not False:
+        from . import unreal_atmos
+        at = unreal_atmos.write_atmos(build, atmos or None)
+        if at is not None:
+            # layer 3 (AT1): a plan that failed its lux check is named, not imported
+            man["atmos"] = at
+            if at.get("cells"):
+                man["counts"]["atmos_cells"] = len(at["cells"])
+                man["counts"]["atmos_lights"] = at["lights"]
+                man["counts"]["actors"] = len(actor_hashes(man))
     man["hash"] = content_hash({k: v for k, v in man.items() if k != "plan_sha256"})
     return man, meshes, graphs
 
@@ -1163,6 +1180,9 @@ def actor_hashes(man: dict) -> dict[str, str]:
     out.update({k: content_hash([k, "v1"]) for k in LIGHTING})
     if man.get("play"):
         out[PLAY_KEY] = man["play"]["hash"]      # (the play features' actor)
+    if (man.get("atmos") or {}).get("cells"):
+        from .unreal_atmos import actor_hashes as atmos_hashes
+        out.update(atmos_hashes(man["atmos"]))   # (AT1: the controller and its cells)
     return out
 
 
@@ -1184,6 +1204,10 @@ def actor_kinds(man: dict) -> dict[str, str]:
         out.update({u["key"]: "underwater" for u in s2.get("underwater", [])})
     if man.get("play"):
         out[PLAY_KEY] = "play"
+    at = man.get("atmos") or {}
+    if at.get("cells"):
+        out[at["key"]] = "atmos"
+        out.update({c["key"]: "atmos_cell" for c in at["cells"]})
     return out
 
 
@@ -1201,7 +1225,8 @@ def manifest_changes(old: dict, new: dict) -> dict[str, list[str]]:
 
 
 def write_manifest(build_dir: str | Path, name: str | None = None,
-                   assets: bool = True, play: bool = True) -> Path:
+                   assets: bool = True, play: bool = True,
+                   atmos: str | Path | bool | None = None) -> Path:
     """BUILD_DIR/unreal/manifest.json, prototypes.glb and graphs.json (and with `play` the
     play features' map.png and play.json); the manifest's path. `assets` False: the blockout
     alone, stage 2's contributions left out."""
@@ -1210,7 +1235,7 @@ def write_manifest(build_dir: str | Path, name: str | None = None,
         if not (build / f).is_file():
             raise FileNotFoundError(f"{build / f}: not a blockout output (run citygen build "
                                     f"--blockout or citygen blockout)")
-    man, meshes, graphs = build_manifest(build, name, assets, play)
+    man, meshes, graphs = build_manifest(build, name, assets, play, atmos)
     out = build / OUT_DIR
     out.mkdir(parents=True, exist_ok=True)
     write_glb(meshes, man["materials"], out / "prototypes.glb")
@@ -1636,7 +1661,7 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
                 name: str | None = None, timeout: float = 7200.0,
                 assets: bool = True, play: str = "fly", fly_speed: float = FLY_SPEED_M_S,
                 startup: bool = True, view_m: float = VIEW_M,
-                play_features: bool = True) -> dict:
+                play_features: bool = True, atmos: str | Path | bool | None = None) -> dict:
     """`citygen unreal`: the manifest, then the headless import; the importer's result
     (created, updated, deleted and unchanged actors and assets, timings). `assets` False
     imports the blockout alone (stage 2's actors, if imported before, go; its meshes
@@ -1645,7 +1670,10 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
     far the level streams around the player; `startup` makes the city the project's
     startup and default map. `play_features`: the CityGenPlay plugin built into the project
     first (`unreal_play.build_plugin`), then its actor with the city's map and data; when
-    the plugin cannot be built, the city imports without them (`play_plugin` says why)."""
+    the plugin cannot be built, the city imports without them (`play_plugin` says why).
+    `atmos` (AT1): the atmos plan's folder (None: BUILD/atmos when there is one, False:
+    none); its controller and cells come with the plugin (CityGenAtmos, built with the play
+    features) and atmosgen's assets (made first, `unreal_atmos.make_assets`)."""
     if play not in PLAY_MODES:
         raise ValueError(f"play: {play!r} is not one of {', '.join(PLAY_MODES)}")
     from . import unreal_play
@@ -1659,14 +1687,22 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
     plugin = (unreal_play.build_plugin(root, up, build / OUT_DIR / "plugin_build_log.txt")
               if play_features else {"ok": False, "built": False, "error": "--no-play"})
     t = time.time()
-    man_path = write_manifest(build, name, assets, play=plugin["ok"])
+    man_path = write_manifest(build, name, assets, play=plugin["ok"],
+                              atmos=atmos if plugin["ok"] else False)
     manifest_s = round(time.time() - t, 1)
+    atmos_res = None
+    man_at = json.loads(man_path.read_text(encoding="utf-8")).get("atmos") or {}
+    if man_at.get("cells"):
+        from .unreal_atmos import make_assets
+        atmos_res = make_assets(root, up, build / OUT_DIR / "atmos_assets_log.txt")
+        if not atmos_res.get("ok"):
+            raise RuntimeError(f"atmosgen's assets: {atmos_res.get('error')}")
     added = prepare_project(up)
     out = man_path.parent
     job = {"mode": "import", "manifest": str(man_path), "build_dir": str(build),
            "result": str(out / "import_result.json"), "play": play,
            "fly_speed_m_s": float(fly_speed), "view_m": float(view_m),
-           "play_features": bool(plugin["ok"])}
+           "play_features": bool(plugin["ok"]), "atmos": bool(man_at.get("cells"))}
     # (exp_fast_import) the engine's -fastexit: the process ends when the import script
     # returns, everything saved; the editor's teardown of a city's objects takes minutes
     # (Greyhook with stage 2: 5 to 6), the derived data cache writes each entry whole
@@ -1682,6 +1718,12 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
     res["manifest_s"] = manifest_s
     res["plugins_enabled"] = added
     res["play_plugin"] = plugin
+    if man_at:
+        res["atmos_plan"] = {k: man_at.get(k) for k in ("plan", "skipped", "lights")
+                             if man_at.get(k) is not None}
+        res["atmos_plan"]["cells"] = len(man_at.get("cells") or [])
+        if atmos_res is not None:
+            res["atmos_plan"]["assets"] = {"made": atmos_res.get("made", False)}
     if res.get("ok") and startup:
         res["startup_map_changed"] = set_startup_map(up, res["level"])
         res["startup_map"] = res["level"]
@@ -1785,6 +1827,16 @@ def play_features_summary(res: dict) -> str:
                 f"{pf.get('walk_points', 0)} walkway points, {pf.get('lamps', 0)} lamps; {built}")
     why = pl.get("error") or pf.get("reason") or "not made"
     return f"Play features: left out ({why})"
+
+
+def atmos_summary(res: dict) -> str:
+    """What the import did with the city's atmos plan (AT1)."""
+    ap, st = res.get("atmos_plan") or {}, res.get("atmos") or {}
+    if st.get("made"):
+        return (f"Atmos (stage 3): the plan's {st.get('lights', 0)} lights in {st.get('cells', 0)} "
+                f"cell actors and its controller, from {ap.get('plan')}")
+    why = ap.get("skipped") or st.get("reason") or "no atmos plan (run atmosgen plan)"
+    return f"Atmos (stage 3): left out ({why})"
 
 
 def play_summary(res: dict) -> str:

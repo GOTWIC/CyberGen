@@ -2285,6 +2285,39 @@ AT0 (contract and spike) is in place:
   weather's haze and wet streets (`ag6_preview.py`'s `atmos_lights`, `haze`, `wet`).
 - The spike's measurements and recommendations: `docs/progress/AT0/README.md`.
 
+AT1 (streets at night) is in place:
+- **Lights by photometric class** (`presets.PHOTOMETRY`, Unreal's own profile: a spot's
+  peak flat to its inner cone, falling as $t^2$ to its outer, a point's all round, a face's
+  by its cosine, each in the engine's reach window): cobra heads 1200 cd to 62 degrees (AT0's
+  6000 cd in 45 lit 52 lx under the heads and the junctions dark), post tops, wall packs,
+  highway columns, soffit, tunnel and platform classes.
+- **New lights** (`atmosgen/plan.py`): a mast arm on every traffic signal over its junction
+  (`signals`); highway and ramp columns (a twin arm in a median, else staggered at the edges),
+  service roads, footbridge posts (`roads`); wall packs along alleys spaced by the mood's
+  alley darkness (`alleys`); AG10's soffit lights under M14's decks (`decks`, AG10's own
+  `_ground_streets` and `_lights`); AG7's tunnel and underpass strips (`tunnels`); platform
+  downlights in elevated and underground stations (`stations`); corner poles at the
+  junctions the lux check finds dark (`corners`: at the junction ends of its legs'
+  sidewalks and its crosswalks, the one leaving fewest points dark first, at most
+  `CORNER_MAX`). Each light's `mount` says what it hangs on; `pole`, `mast_arm`, `wall`
+  and `canopy` are fixtures asked of stage 2 (`emitters.py`'s third ask, assetgen scope 4.6).
+- **The lux check** (`atmosgen/lux.py`, scope 8): every walkway and lane every 2 m by class
+  (sidewalk, crosswalk, carriageway, under_deck, alley; park paths reported), with occlusion
+  against the building masses and deck slabs (`Occluders`, a 1 m raster of lowest bottom and
+  highest top, marched every meter), at 23:00; a class passes on its city average, at most 5%
+  under its minimum, no alley point dark, and per district half the average and 15%
+  (`presets.UNDER_MIN_SHARE`, ...). The plan's `checks.lux`; `atmosgen plan` exits 1 when it
+  fails, and the exporter leaves such a plan out. `preview_lux.png` with occlusion.
+- **Exporter** (`citygen/unreal_atmos.write_atmos`, the manifest's `atmos`, `atmos.json`):
+  the `CityGenAtmos` controller (key `atmos`, always loaded, the plan's settings) and a
+  `CityGenAtmosCell` data actor per 128 m cell (`atmos.lights.<tile>.<quarter>`, spatially
+  loaded, its lights packed: 16 floats and 2 ints each) placed by the import (`--atmos DIR`,
+  default BUILD/atmos; `--no-atmos`); a cell registers its lights with the controller as it
+  streams in, the controller's pooled live set (512 within 300 m, 16 shadowed) renders them
+  by night (`MPC_CityGen`'s `Night`). `-CityGenAtmosPlan` and the subsystem are gone; the play
+  features lose AG15's spot lamps and washes (`play.json` 3), keeping the light pools as the
+  far tier; `--bench-atmos` is a flag. `docs/unreal_export.md`, "From AT1".
+
 ## Life generator (lifegen)
 
 `docs/lifegen_scope.md` (draft v0, its decisions in section 12 still open) is the plan for

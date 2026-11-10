@@ -216,6 +216,17 @@ Until then atmosgen derives both (M6's prototype lamp head, M20's slot with the 
 frame, a cell's own color or the mean of its bright pixels); its plan counts which lights
 are derived. Neither changes an asset's bytes: a later AG8 or AG6 change records them.
 
+AT1 adds a third ask, **fixtures for the lights the city has none for** (AG7, AG8): the plan
+lights what M6 leaves dark with lights whose `mount` names a fixture stage 2 does not draw
+yet: `pole` (a lighting column at a junction corner the lux check finds dark, along a highway
+or ramp, a twin arm in its median, along a service road, a post on a footbridge's railing),
+`mast_arm` (a luminaire on a mast arm over the junction from a traffic signal's pole: a
+combination pole), `wall` (a wall pack over an alley) and `canopy` (a station platform's
+downlight). Each light's record gives the lens (its `pos` plus its class's `drop_m`), the
+heading and the class; a column, arm, pack or downlight drawn there (the column's foot on the
+ground or the road under it) would make the light come from a fixture. Until then the light
+is right and the fixture is missing; the plan's report counts them by mount.
+
 ## 5. Feature catalog
 
 ### 5.1 Buildings

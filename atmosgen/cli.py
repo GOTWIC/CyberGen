@@ -3,7 +3,9 @@
     atmosgen spec validate SPEC [--build BUILD]     the atmos spec, against a built city
     atmosgen spec schema [OUT]                      its JSON schema
     atmosgen plan schema [--which W] [OUT]          the plan's schemas
-    atmosgen plan BUILD [--spec S] [--out DIR]      the atmos plan (BUILD/atmos)
+    atmosgen plan BUILD [--spec S] [--out DIR]      the atmos plan (BUILD/atmos) and its lux
+                                                    check (exit 1 when it fails: the plan is
+                                                    not delivered)
     atmosgen lux BUILD [--plan DIR]                 the lux map of the core (preview_lux.png)
                                                     and the plan's map (preview_plan.png)
     atmosgen preview BUILD [--plan DIR] ...         a Blender night preview from the plan
@@ -55,6 +57,10 @@ def cmd_plan(args) -> int:
     rep = build_plan(args.build, args.spec, args.out)
     sys.stdout.write(report_text(rep))
     print(f"{len(rep['wrote'])} files written to {rep['out']} in {rep['seconds']} s")
+    if not rep["ok"]:
+        print("FAIL: the lux check failed; the plan is not delivered (the exporter leaves it "
+              "out)", file=sys.stderr)
+        return 1
     return 0
 
 
@@ -94,8 +100,8 @@ def main(argv=None) -> int:
                                   "file)")
     pp.add_argument("--which", default="atmos_plan",
                     choices=("atmos_plan", "tile_lights", "contribution"))
-    lx = sub.add_parser("lux", help="the plan's lux map round the corporate core (no "
-                                    "occlusion until AT1)")
+    lx = sub.add_parser("lux", help="the plan's lux map round the corporate core, with "
+                                    "occlusion")
     lx.add_argument("build")
     lx.add_argument("--plan", help="the plan's folder (default BUILD/atmos)")
     lx.add_argument("--out", help="the image (default PLAN/preview_lux.png)")
