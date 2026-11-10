@@ -349,11 +349,13 @@ def busy() -> list[str]:
         if int(pid) == os.getpid():
             continue
         # (AT0: another benchmark's game too, a packaged one among them: its executable is
-        # the project's own, so only its -CityGenBench= names it)
+        # the project's own, so only its -CityGenBench= names it; a shell that only names
+        # it, waiting on it, is not one)
+        shell = name.lower().split(".")[0] in ("bash", "sh", "powershell", "pwsh", "cmd")
         if ("unrealeditor" in name.lower() or "blender" in name.lower() or
-                "-citygenbench=" in low or "automationtool" in low or
-                ("python" in name.lower() and re.search(r"citygen (build|sweep)|assetgen|pytest",
-                                                         low))):
+                (not shell and ("-citygenbench=" in low or "automationtool" in low)) or
+                ("python" in name.lower() and re.search(
+                    r"citygen (build|sweep)|assetgen|pytest|bench", low))):
             hits.append(f"{name} {pid}")
     return hits
 

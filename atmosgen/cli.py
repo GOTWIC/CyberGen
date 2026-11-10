@@ -5,6 +5,7 @@
     atmosgen plan schema [--which W] [OUT]          the plan's schemas
     atmosgen plan BUILD [--spec S] [--out DIR]      the atmos plan (BUILD/atmos)
     atmosgen lux BUILD [--plan DIR]                 the lux map of the core (preview_lux.png)
+                                                    and the plan's map (preview_plan.png)
     atmosgen preview BUILD [--plan DIR] ...         a Blender night preview from the plan
 """
 
@@ -58,9 +59,10 @@ def cmd_plan(args) -> int:
 
 
 def cmd_lux(args) -> int:
-    from .lux import lux_preview
+    from .lux import lux_preview, plan_map
     rep = lux_preview(args.build, args.plan, args.out, size_m=args.size, cell_m=args.cell,
                       hour=args.hour)
+    rep["plan_map"] = plan_map(args.build, args.plan)["image"]
     print(json.dumps({k: v for k, v in rep.items() if k != "grid"}, indent=1))
     return 0
 

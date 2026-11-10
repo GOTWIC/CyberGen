@@ -184,3 +184,53 @@ def lux_preview(build, plan=None, out=None, size_m: float = 600.0, cell_m: float
     return {"image": str(dest), "district": name, "center": [round(cx, 1), round(cy, 1)],
             "size_m": size_m, "cell_m": cell_m, "lights": len(lights), "hour": hour,
             "max_lx": round(float(E.max()), 1), "classes": summary}
+
+
+KIND_COLORS = {"street_light": "#ffd27a", "wall_light": "#ff9a3d", "sign": "#ff2a6d",
+               "shop_sign": "#b967ff", "spill": "#05d9e8"}
+
+
+def plan_map(build, plan=None, out=None) -> dict:
+    """`preview_plan.png`: every light of the plan over the districts, by kind (broken ones
+    grey), the city at a glance."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    build = Path(build)
+    pdir = Path(plan) if plan else build / "atmos"
+    pl = json.loads((pdir / "atmos_plan.json").read_text(encoding="utf-8"))
+    m = json.loads((build / "city_model.json").read_text(encoding="utf-8"))
+    pts: dict[str, list] = {}
+    for t in pl["tiles"]:
+        for L in json.loads((pdir / t["file"]).read_text(encoding="utf-8"))["lights"]:
+            pts.setdefault(L["kind"] if L["on"] else "broken", []).append(L["pos"][:2])
+    x0, y0, x1, y1 = m["bounds"]
+    fig = plt.figure(figsize=(10, 10.4), dpi=200)
+    ax = fig.add_axes([0.02, 0.05, 0.96, 0.9])
+    ax.set_facecolor("#05070d")
+    for d in m["districts"]:
+        ex = d["polygon"]["exterior"]
+        ax.fill([p[0] for p in ex], [p[1] for p in ex], color="#111827", lw=0.4,
+                ec="#2a3550")
+    order = ("spill", "shop_sign", "sign", "wall_light", "street_light", "broken")
+    for k in order:
+        if k not in pts:
+            continue
+        a = np.array(pts[k])
+        ax.scatter(a[:, 0], a[:, 1], s=0.15 if k in ("spill", "shop_sign") else 0.35,
+                   c=KIND_COLORS.get(k, "#555555"), lw=0,
+                   label=f"{k.replace('_', ' ')} ({len(a)})")
+    ax.set_xlim(x0, x1)
+    ax.set_ylim(y0, y1)
+    ax.set_aspect("equal")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    leg = ax.legend(loc="lower left", fontsize=7, markerscale=12, facecolor="#0b0f1a",
+                    labelcolor="#d8deea", framealpha=0.9)
+    leg.get_frame().set_edgecolor("#2a3550")
+    ax.set_title(f"{pl['city']}: the atmos plan's {pl['counts']['all']} lights by kind "
+                 f"({pl['preset']}, {pl['hour']:g}:00)", fontsize=9, color="#d8deea")
+    dest = Path(out) if out else pdir / "preview_plan.png"
+    fig.savefig(dest, facecolor="#05070d")
+    plt.close(fig)
+    return {"image": str(dest), "kinds": {k: len(v) for k, v in pts.items()}}
