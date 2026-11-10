@@ -35,13 +35,18 @@ WEATHER = {
 
 # a look: the start hour and weather, the exposure its light is set for (reference_ev100,
 # by night; the day's comes from the sun), bloom, the grade (shadows and highlights tint),
-# the night sky (moon share of the sun, cloud deck height and how much city light it takes)
+# the night sky (moon share of the sun, cloud deck height and how much city light it takes).
+# The night's reference exposure is the one its streets' light is exposed right at: a road
+# at E lux (reflectance about 0.08) shows L = 0.08 E / pi cd/m2, middle gray at
+# EV100 = log2(8 L); AT0 set 3 for its 52 lx streets, AT1's streets average 15 to 18 lx: 1.5
+# (the runtime shows the scene at the play features' -3 and scales every light by
+# 2^(-3 - reference) until AT3 moves the exposure)
 LOOK = {
-    "neon_rain": {"hour": 23.0, "weather": "rain", "reference_ev100": 3.0, "bloom": 0.9,
+    "neon_rain": {"hour": 23.0, "weather": "rain", "reference_ev100": 1.5, "bloom": 0.9,
                   "grade_shadows": "#163a52", "grade_highlights": "#ff4fb4",
                   "saturation": 1.1, "contrast": 1.08, "grain": 0.15, "chromatic": 0.15,
                   "moon": 0.0, "stars": 0.0, "cloud_deck_m": 420.0, "cloud_glow": 1.0},
-    "clear_night": {"hour": 22.0, "weather": "clear", "reference_ev100": 2.5, "bloom": 0.6,
+    "clear_night": {"hour": 22.0, "weather": "clear", "reference_ev100": 1.0, "bloom": 0.6,
                     "grade_shadows": "#101c33", "grade_highlights": "#ffd9a8",
                     "saturation": 1.0, "contrast": 1.05, "grain": 0.08, "chromatic": 0.05,
                     "moon": 0.03, "stars": 0.4, "cloud_deck_m": 0.0, "cloud_glow": 0.0},

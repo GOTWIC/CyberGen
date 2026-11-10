@@ -11,7 +11,7 @@ grows here as it lands, as in [`citygen_milestones.md`](citygen_milestones.md) a
 | Milestone | What it adds | Status | Outputs |
 |---|---|---|---|
 | AT0 | Contract and spike: the atmos spec and presets, the plan schema, the emitter asks of assetgen, the `CityGenAtmos` plugin's skeleton built by the exporter; a spike on Delta at night against AG16's benchmark (lights per tile from a plan against the play features' 192, MegaLights against the tiers, rain, wet streets and volumetric fog, effects from code); a Blender night preview | Done | [`docs/progress/AT0`](progress/AT0) |
-| AT1 | Streets at night: street and wall lights by photometric class, shop spill, deck soffits, tunnels and stations; the lux check and map; tile spawners and the live set, replacing the play features' lamps and pools | Planned | |
+| AT1 | Streets at night: street and wall lights by photometric class, mast arms and corner poles at the junctions, highway, service road, pedestrian street and alley lights, deck soffits, tunnels and stations, shop spill; the lux check with occlusion and its map, a fill at the dark points; the controller and a data actor per 128 m cell placed by the import with the pooled live set, replacing the play features' lamps and washes | Done | [`docs/progress/AT1`](progress/AT1) |
 | AT2 | Neon and signs as light: lit faces replacing the washes, neon spill, floods, aviation lights, searchlights, port and spaceport lighting, flicker and broken lights, district palettes | Planned | |
 | AT3 | Sky and time: night, dusk and day skies, the cloud deck, the moon, time of day driving `Hour`, the schedules and the exposure | Planned | |
 | AT4 | Air: height and volumetric fog, mist, smog and undercity haze, light shafts, steam and smoke | Planned | |

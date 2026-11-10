@@ -1,4 +1,4 @@
-# atmosgen: light, sky, air and weather (scope, v2: decided 2026-11-10, AT0 done)
+# atmosgen: light, sky, air and weather (scope, v2: decided 2026-11-10, AT0 and AT1 done)
 
 Stage 3 (atmosgen) of CyberGen's five stages. It takes a built city with its assets and
 makes the city's light and air: every light source that casts light, the sky, fog, smog,
@@ -271,7 +271,12 @@ its inputs.
   sees $p$. Targets by class (defaults, set in the spec): main sidewalks and crosswalks an
   average of 10 lx and a minimum of 2 lx; carriageways 7 lx; under decks 5 lx; alleys
   allowed as dark as 0.5 lx, never 0. The lux map is also a preview. (This is the check the
-  run-through's dark carriageways would have failed before Unreal.)
+  run-through's dark carriageways would have failed before Unreal.) AT1 set how a class
+  passes: its average over the city at its target, at most 5% of its points under its
+  minimum (broken lights and the dark stretches a gritty mood asks for), no alley point at
+  0, and in every district at least half the average with at most 15% under the minimum
+  (`atmosgen/lux.py`, `presets.UNDER_MIN_SHARE` and its neighbors); park paths are reported,
+  not judged.
 - **Budgets:** live and shadowed lights per 256 m cell and within the view range; volume
   and emitter counts per cell; the night's frame time against AG16's benchmark.
 - **Placement:** every light outside the meshes of its fixture and of every building; every
