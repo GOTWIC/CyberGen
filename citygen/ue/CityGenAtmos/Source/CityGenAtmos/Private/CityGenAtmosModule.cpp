@@ -35,6 +35,7 @@ namespace
 	CG_ATMOS_TOGGLE(FogCmd, "CityGenAtmos.Fog", "CityGenAtmos.Fog [0|1]: height and volumetric fog by the plan's weather", bFog, SetFog)
 	CG_ATMOS_TOGGLE(RainCmd, "CityGenAtmos.Rain", "CityGenAtmos.Rain [0|1]: rain streaks round the view", bRain, SetRain)
 	CG_ATMOS_TOGGLE(WetCmd, "CityGenAtmos.Wet", "CityGenAtmos.Wet [0|1]: wet streets (a deferred decal round the view)", bWet, SetWet)
+	CG_ATMOS_TOGGLE(PoolsCmd, "CityGenAtmos.FarPools", "CityGenAtmos.FarPools [0|1]: the play features' light pools past the live range (the far tier)", bFarPools, SetFarPools)
 	CG_ATMOS_TOGGLE(MegaCmd, "CityGenAtmos.MegaLights", "CityGenAtmos.MegaLights [0|1]: MegaLights by the actor's post-process volume", bMegaLights, SetMegaLights)
 #undef CG_ATMOS_TOGGLE
 

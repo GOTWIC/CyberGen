@@ -85,6 +85,11 @@ public:
 	UPROPERTY(EditAnywhere, Category = "CityGen|Lights")
 	float SceneEV100 = -3.f;
 
+	/** AT0's far tier: past the live range the play features' light-pool decals stay under
+	 *  the lamps (CityGen.PlayLamps 2), so the far streets still read lit. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Lights")
+	bool bFarPools = true;
+
 	/** A further gain on every light (art direction, the spike's tuning). */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Lights")
 	float Gain = 1.f;
@@ -138,6 +143,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "CityGen")
 	void SetMegaLights(bool bOn);
+
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	void SetFarPools(bool bOn);
 
 	/** The tiers: live count, mid range (m), shadowed count. */
 	UFUNCTION(BlueprintCallable, Category = "CityGen")

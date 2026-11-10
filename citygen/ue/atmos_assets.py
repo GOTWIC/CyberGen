@@ -25,7 +25,7 @@ import unreal
 
 JOB = json.load(open(os.environ["CITYGEN_UE_JOB"], encoding="utf-8"))
 FOLDER = "/Game/CityGen/Core/Atmos"
-VERSION = "1"
+VERSION = "2"   # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air)
 EAL = unreal.EditorAssetLibrary
 AT = unreal.AssetToolsHelpers.get_asset_tools()
 MEL = unreal.MaterialEditingLibrary
@@ -183,7 +183,7 @@ for (int k = 0; k < 2; k++) {
   amp *= 0.55;
   sc *= 3.1;
 }
-return smoothstep(0.62, 0.7, n);
+return smoothstep(0.7, 0.76, n);
 """
 
 

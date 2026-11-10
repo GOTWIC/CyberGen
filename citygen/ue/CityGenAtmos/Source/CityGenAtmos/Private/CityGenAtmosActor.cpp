@@ -469,9 +469,15 @@ void ACityGenAtmos::UpdateFlicker(double Now)
 
 void ACityGenAtmos::SetPlayLamps(bool bOn) const
 {
+	// (while the plan's lights are on, the play features keep only their light pools under the
+	// lamps past the live range: AT0's far tier, `bFarPools`)
 	if (IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(TEXT("CityGen.PlayLamps")))
 	{
-		V->Set(bOn ? 1 : 0, ECVF_SetByCode);
+		V->Set(bOn ? 1 : (bFarPools ? 2 : 0), ECVF_SetByCode);
+	}
+	if (IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(TEXT("CityGen.PlayPoolsFromM")))
+	{
+		V->Set(MidRangeM, ECVF_SetByCode);
 	}
 }
 
@@ -486,12 +492,25 @@ void ACityGenAtmos::SetLightsOn(bool bOn)
 	LiveAt = -1.0;
 }
 
+void ACityGenAtmos::SetFarPools(bool bOn)
+{
+	bFarPools = bOn;
+	if (bLights)
+	{
+		SetPlayLamps(!bPlanLoaded);
+	}
+}
+
 void ACityGenAtmos::SetTiers(int32 InLive, float RangeM, int32 InShadowed)
 {
 	MaxLive = FMath::Max(0, InLive);
 	MidRangeM = FMath::Max(1.f, RangeM);
 	MaxShadowed = FMath::Max(0, InShadowed);
 	LiveAt = -1.0;
+	if (bLights)
+	{
+		SetPlayLamps(!bPlanLoaded);
+	}
 }
 
 void ACityGenAtmos::SetHour(float InHour)
