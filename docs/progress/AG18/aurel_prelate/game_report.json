@@ -8,7 +8,7 @@
    104384,
    59991,
    20246,
-   5101
+   5103
   ],
   "lod0_parts": {
    "body": 53088,
@@ -42,8 +42,8 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 27596295,
- "seconds": 579.6,
+ "pack_bytes": 28908508,
+ "seconds": 35.2,
  "stage_seconds": {
   "build": 0.4,
   "render_original": 24.8,
@@ -52,8 +52,9 @@
   "uv": 39.9,
   "bake": 416.7,
   "lods_export": 10.4,
-  "textures": 7.982439041137695,
-  "proof": 71.31326794624329
+  "lods_only": 9.7,
+  "textures": 0.0,
+  "proof": 25.520068883895874
  },
  "baked_down": {
   "relief": {
@@ -145,7 +146,7 @@
   "script": "vehicles/cars/aurel_prelate.py",
   "script_sha256": "da28fc97971457c323a5fac8ae363ae2cf15bfd00fa50c470c97d666c126d4d5",
   "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
-  "game_sha256": "78354a4b976828201baedac5dd92294b8b30189ddfb47178987bade118c5e99a",
+  "game_sha256": "9e6108a54d1f801bd18195adc59470f9bd92b6d763a2afc8f84531218c054eab",
   "original_triangles": 215832,
   "original_objects": 95
  },
@@ -184,7 +185,7 @@
     },
     {
      "lod": 3,
-     "triangles": 5101,
+     "triangles": 5103,
      "budget": 5000,
      "ok": true
     }
@@ -352,7 +353,7 @@
     {
      "lod": 3,
      "deviation_m": [
-      0.0059,
+      0.0058,
       0.0065,
       0.0007
      ],
@@ -396,13 +397,13 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 16.28,
-     "bent_share": 0.0358,
-     "texture_share": 0.0197,
-     "miss_share": 0.097,
+     "normal_p95_deg": 17.34,
+     "bent_share": 0.0371,
+     "texture_share": 0.0244,
+     "miss_share": 0.0853,
      "lod": 3,
      "limits": {
-      "p95": 36.0,
+      "p95": 40.0,
       "bent": 0.1,
       "tex": 0.04
      },

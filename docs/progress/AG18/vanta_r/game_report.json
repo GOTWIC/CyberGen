@@ -8,7 +8,7 @@
    118974,
    59992,
    19800,
-   5138
+   5107
   ],
   "lod0_parts": {
    "body": 69990,
@@ -46,8 +46,8 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 31486219,
- "seconds": 434.3,
+ "pack_bytes": 32940805,
+ "seconds": 42.3,
  "stage_seconds": {
   "build": 0.5,
   "render_original": 25.6,
@@ -56,8 +56,9 @@
   "uv": 48.0,
   "bake": 251.5,
   "lods_export": 12.4,
-  "textures": 8.384926795959473,
-  "proof": 81.4127299785614
+  "lods_only": 12.2,
+  "textures": 0.0,
+  "proof": 30.066203832626343
  },
  "baked_down": {
   "card_src": {
@@ -138,7 +139,7 @@
   "script": "vehicles/cars/vanta_r.py",
   "script_sha256": "5af82e8775bac6f88aa1e842b7e6aa0f88a1e721750ca746a4c3b1cc1b9aa9ae",
   "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
-  "game_sha256": "78354a4b976828201baedac5dd92294b8b30189ddfb47178987bade118c5e99a",
+  "game_sha256": "9e6108a54d1f801bd18195adc59470f9bd92b6d763a2afc8f84531218c054eab",
   "original_triangles": 240286,
   "original_objects": 93
  },
@@ -177,7 +178,7 @@
     },
     {
      "lod": 3,
-     "triangles": 5138,
+     "triangles": 5107,
      "budget": 5000,
      "ok": true
     }
@@ -389,13 +390,13 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 32.27,
-     "bent_share": 0.0783,
-     "texture_share": 0.0149,
-     "miss_share": 0.0276,
+     "normal_p95_deg": 30.67,
+     "bent_share": 0.0731,
+     "texture_share": 0.0101,
+     "miss_share": 0.022,
      "lod": 3,
      "limits": {
-      "p95": 36.0,
+      "p95": 40.0,
       "bent": 0.1,
       "tex": 0.04
      },

@@ -8,7 +8,7 @@
    136232,
    59994,
    19956,
-   5098
+   5083
   ],
   "lod0_parts": {
    "body": 83068,
@@ -46,8 +46,8 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 32280954,
- "seconds": 432.7,
+ "pack_bytes": 33836876,
+ "seconds": 42.9,
  "stage_seconds": {
   "build": 0.5,
   "render_original": 23.6,
@@ -56,8 +56,9 @@
   "uv": 49.0,
   "bake": 235.4,
   "lods_export": 13.4,
-  "textures": 8.397596836090088,
-  "proof": 95.2947359085083
+  "lods_only": 14.6,
+  "textures": 0.0,
+  "proof": 28.327070236206055
  },
  "baked_down": {
   "card_src": {
@@ -138,7 +139,7 @@
   "script": "vehicles/cars/halcyon_sable.py",
   "script_sha256": "c2587df6b36a5a3ade3a97c50e52ab6011f28c51c261dfd91708e285f0146de4",
   "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
-  "game_sha256": "78354a4b976828201baedac5dd92294b8b30189ddfb47178987bade118c5e99a",
+  "game_sha256": "9e6108a54d1f801bd18195adc59470f9bd92b6d763a2afc8f84531218c054eab",
   "original_triangles": 250465,
   "original_objects": 97
  },
@@ -177,7 +178,7 @@
     },
     {
      "lod": 3,
-     "triangles": 5098,
+     "triangles": 5083,
      "budget": 5000,
      "ok": true
     }
@@ -389,13 +390,13 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 26.35,
-     "bent_share": 0.0536,
-     "texture_share": 0.0089,
-     "miss_share": 0.0231,
+     "normal_p95_deg": 20.74,
+     "bent_share": 0.0377,
+     "texture_share": 0.0079,
+     "miss_share": 0.0136,
      "lod": 3,
      "limits": {
-      "p95": 36.0,
+      "p95": 40.0,
       "bent": 0.1,
       "tex": 0.04
      },

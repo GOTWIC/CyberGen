@@ -8,7 +8,7 @@
    147405,
    59995,
    19869,
-   5045
+   5058
   ],
   "lod0_parts": {
    "body": 38477,
@@ -42,8 +42,8 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 30063307,
- "seconds": 532.3,
+ "pack_bytes": 31394944,
+ "seconds": 36.8,
  "stage_seconds": {
   "build": 1.2,
   "render_original": 22.8,
@@ -52,8 +52,9 @@
   "uv": 31.6,
   "bake": 361.9,
   "lods_export": 11.0,
-  "textures": 11.175335884094238,
-  "proof": 73.78334903717041
+  "lods_only": 10.3,
+  "textures": 0.0,
+  "proof": 26.526803255081177
  },
  "baked_down": {
   "collapse": {
@@ -146,7 +147,7 @@
   "script": "vehicles/cars/orrin_lumen.py",
   "script_sha256": "9118021838ae343b769492cd70766cb65f23cff220c9ae74d32d59a259d4c4bd",
   "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
-  "game_sha256": "28ceb9b68fceeef6fd97951924d366f4ba79766024cb8a18efcbbc8d7fa784f7",
+  "game_sha256": "9e6108a54d1f801bd18195adc59470f9bd92b6d763a2afc8f84531218c054eab",
   "original_triangles": 293582,
   "original_objects": 47
  },
@@ -185,7 +186,7 @@
     },
     {
      "lod": 3,
-     "triangles": 5045,
+     "triangles": 5058,
      "budget": 5000,
      "ok": true
     }
@@ -397,13 +398,13 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 7.21,
-     "bent_share": 0.004,
-     "texture_share": 0.0039,
-     "miss_share": 0.0085,
+     "normal_p95_deg": 7.24,
+     "bent_share": 0.0044,
+     "texture_share": 0.0034,
+     "miss_share": 0.0073,
      "lod": 3,
      "limits": {
-      "p95": 36.0,
+      "p95": 40.0,
       "bent": 0.1,
       "tex": 0.04
      },

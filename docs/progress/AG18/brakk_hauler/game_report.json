@@ -1,17 +1,17 @@
 {
  "car": "brakk_hauler",
  "title": "Brakk Hauler",
- "ok": true,
+ "ok": false,
  "triangles": {
   "original": 230460,
   "lods": [
-   123053,
-   59997,
-   19497,
-   4848
+   123501,
+   59990,
+   20196,
+   8216
   ],
   "lod0_parts": {
-   "body": 81637,
+   "body": 82085,
    "glass": 880,
    "wheel_fl": 10134,
    "wheel_fr": 10134,
@@ -23,22 +23,38 @@
   "original": 123,
   "parts": 6
  },
+ "size_class": {
+  "name": "large",
+  "exterior_m2": 63.6,
+  "rule": "large when the body's exterior is 55 m2 or more",
+  "lod_budgets": [
+   150000,
+   60000,
+   20000,
+   8000
+  ],
+  "texel_floor_px_per_m": {
+   "body": 240.0,
+   "wheels": 240.0
+  }
+ },
  "textures": {
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 31080255,
- "seconds": 337.1,
+ "pack_bytes": 40484653,
+ "seconds": 40.2,
  "stage_seconds": {
   "build": 0.8,
-  "render_original": 85.6,
-  "parts": 6.4,
+  "render_original": 22.4,
+  "parts": 9.8,
   "nodes": 0.0,
-  "uv": 10.9,
-  "bake": 103.7,
-  "lods_export": 1.9,
-  "textures": 7.27134895324707,
-  "proof": 120.350741147995
+  "uv": 349.3,
+  "bake": 216.9,
+  "lods_export": 16.7,
+  "lods_only": 15.3,
+  "textures": 0.0,
+  "proof": 24.879208087921143
  },
  "baked_down": {
   "relief": {
@@ -59,31 +75,36 @@
  "texel_px_per_m": {
   "body": {
    "exterior": {
-    "area_m2": 63.288,
-    "p5": 325.3,
-    "median": 340.1
+    "area_m2": 63.595,
+    "p5": 324.4,
+    "median": 339.5
    },
    "underside": {
-    "area_m2": 1.124,
-    "p5": 136.2,
-    "median": 340.0
+    "area_m2": 0.911,
+    "p5": 135.9,
+    "median": 339.4
    },
    "cabin": {
-    "area_m2": 6.663,
-    "p5": 135.8,
-    "median": 316.4
+    "area_m2": 6.629,
+    "p5": 135.6,
+    "median": 315.9
+   },
+   "lamp_in_gaps": {
+    "area_m2": 0.176,
+    "p5": 118.7,
+    "median": 118.7
    }
   },
   "wheels": {
    "exterior": {
     "area_m2": 7.402,
-    "p5": 489.5,
-    "median": 536.0
+    "p5": 506.1,
+    "median": 553.3
    },
    "underside": {
     "area_m2": 0.184,
-    "p5": 187.6,
-    "median": 558.6
+    "p5": 193.7,
+    "median": 573.2
    }
   }
  },
@@ -93,7 +114,7 @@
   "script": "vehicles/cars/brakk_hauler.py",
   "script_sha256": "2a227531e2fc8422ff8576db925bc5fcf58970fc50eb6dbc38f6f14a755b87ac",
   "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
-  "game_sha256": "67c3771ba2cb69ac1405d92e8369e067fba321081d4a4193f60050a8eab2adc6",
+  "game_sha256": "9e6108a54d1f801bd18195adc59470f9bd92b6d763a2afc8f84531218c054eab",
   "original_triangles": 230460,
   "original_objects": 123
  },
@@ -114,26 +135,26 @@
    "detail": [
     {
      "lod": 0,
-     "triangles": 123053,
+     "triangles": 123501,
      "budget": 150000,
      "ok": true
     },
     {
      "lod": 1,
-     "triangles": 59997,
+     "triangles": 59990,
      "budget": 60000,
      "ok": true
     },
     {
      "lod": 2,
-     "triangles": 19497,
+     "triangles": 20196,
      "budget": 20000,
      "ok": true
     },
     {
      "lod": 3,
-     "triangles": 4848,
-     "budget": 5000,
+     "triangles": 8216,
+     "budget": 8000,
      "ok": true
     }
    ]
@@ -145,13 +166,13 @@
     "limit": 0.005,
     "slots": {
      "body": {
-      "overlap": 5e-05,
-      "coverage": 0.469,
+      "overlap": 0.00091,
+      "coverage": 0.564,
       "outside_unit": 0.0
      },
      "wheels": {
       "overlap": 0.0,
-      "coverage": 0.5177,
+      "coverage": 0.5517,
       "outside_unit": 0.0
      }
     }
@@ -162,15 +183,15 @@
    "ok": true,
    "detail": {
     "body": {
-     "p5": 325.3,
-     "median": 340.1,
-     "floor": 300.0,
+     "p5": 324.4,
+     "median": 339.5,
+     "floor": 240.0,
      "ok": true
     },
     "wheels": {
-     "p5": 489.5,
-     "median": 536.0,
-     "floor": 300.0,
+     "p5": 506.1,
+     "median": 553.3,
+     "floor": 240.0,
      "ok": true
     }
    }
@@ -286,9 +307,9 @@
     {
      "lod": 2,
      "deviation_m": [
-      0.006,
-      0.0028,
-      0.0005
+      0.0004,
+      0.0021,
+      0.0011
      ],
      "tolerance_m": [
       0.0853,
@@ -300,15 +321,60 @@
     {
      "lod": 3,
      "deviation_m": [
-      0.006,
-      0.0028,
-      0.0084
+      0.0003,
+      0.0,
+      0.0002
      ],
      "tolerance_m": [
       0.0853,
       0.033,
       0.0312
      ],
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "lod_fidelity",
+   "ok": false,
+   "detail": [
+    {
+     "normal_p95_deg": 12.39,
+     "bent_share": 0.0089,
+     "texture_share": 0.002,
+     "miss_share": 0.0123,
+     "lod": 1,
+     "limits": {
+      "p95": 12.0,
+      "bent": 0.02,
+      "tex": 0.01
+     },
+     "ok": false
+    },
+    {
+     "normal_p95_deg": 18.87,
+     "bent_share": 0.0245,
+     "texture_share": 0.0061,
+     "miss_share": 0.0065,
+     "lod": 2,
+     "limits": {
+      "p95": 25.0,
+      "bent": 0.05,
+      "tex": 0.025
+     },
+     "ok": true
+    },
+    {
+     "normal_p95_deg": 14.17,
+     "bent_share": 0.0127,
+     "texture_share": 0.0043,
+     "miss_share": 0.016,
+     "lod": 3,
+     "limits": {
+      "p95": 40.0,
+      "bent": 0.1,
+      "tex": 0.04
+     },
      "ok": true
     }
    ]

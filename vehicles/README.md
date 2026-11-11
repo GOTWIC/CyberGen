@@ -107,8 +107,9 @@ vehicles/blender.sh vehicles/game.py --car vanta_r --test           # 1024 / 512
   look at them at full size.
 - **Checks.** Budgets, UV overlap, texel density, files, wheel pivots, LOD bounds, LOD
   fidelity, hull count (`game_report.json`); the run fails when one fails.
-- **Time.** About 4 to 6 minutes a car at full size (most of it the bakes and the proof);
-  packs are 18 to 31 MB and never go in git.
+- **Time.** About 8 to 14 minutes a car at full size, up to 27 for the largest (most of it
+  the bakes, the LOD fits and the proof); `--lods` alone 1 to 4 minutes. Packs are 20 to
+  51 MB and never go in git.
 
 ## Workflow
 

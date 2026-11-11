@@ -8,7 +8,7 @@
    145410,
    59992,
    19803,
-   5026
+   5037
   ],
   "lod0_parts": {
    "body": 43530,
@@ -42,8 +42,8 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 30892165,
- "seconds": 485.2,
+ "pack_bytes": 32139511,
+ "seconds": 36.5,
  "stage_seconds": {
   "build": 1.0,
   "render_original": 25.2,
@@ -52,8 +52,9 @@
   "uv": 20.7,
   "bake": 314.0,
   "lods_export": 11.0,
-  "textures": 11.261899948120117,
-  "proof": 77.92051005363464
+  "lods_only": 10.6,
+  "textures": 0.0,
+  "proof": 25.8587589263916
  },
  "baked_down": {
   "collapse": {
@@ -145,7 +146,7 @@
   "script": "vehicles/cars/orrin_pebble.py",
   "script_sha256": "e76935301c007e562f045b25963801a27506e16b2e28336ced768bad7411d13b",
   "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
-  "game_sha256": "78354a4b976828201baedac5dd92294b8b30189ddfb47178987bade118c5e99a",
+  "game_sha256": "9e6108a54d1f801bd18195adc59470f9bd92b6d763a2afc8f84531218c054eab",
   "original_triangles": 266030,
   "original_objects": 48
  },
@@ -184,7 +185,7 @@
     },
     {
      "lod": 3,
-     "triangles": 5026,
+     "triangles": 5037,
      "budget": 5000,
      "ok": true
     }
@@ -352,8 +353,8 @@
     {
      "lod": 3,
      "deviation_m": [
-      0.0004,
-      0.0001,
+      0.0002,
+      0.0,
       0.0002
      ],
      "tolerance_m": [
@@ -396,13 +397,13 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 6.55,
-     "bent_share": 0.0063,
-     "texture_share": 0.0093,
-     "miss_share": 0.0102,
+     "normal_p95_deg": 6.2,
+     "bent_share": 0.0062,
+     "texture_share": 0.0094,
+     "miss_share": 0.0123,
      "lod": 3,
      "limits": {
-      "p95": 36.0,
+      "p95": 40.0,
       "bent": 0.1,
       "tex": 0.04
      },

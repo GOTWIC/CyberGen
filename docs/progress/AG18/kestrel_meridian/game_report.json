@@ -1,14 +1,14 @@
 {
  "car": "kestrel_meridian",
  "title": "Kestrel Aerodyne Meridian",
- "ok": true,
+ "ok": false,
  "triangles": {
   "original": 90334,
   "lods": [
    61929,
    37156,
    19897,
-   5084
+   5351
   ],
   "lod0_parts": {
    "body": 60665,
@@ -19,11 +19,26 @@
   "original": 110,
   "parts": 2
  },
+ "size_class": {
+  "name": "standard",
+  "exterior_m2": 41.76,
+  "rule": "large when the body's exterior is 55 m2 or more",
+  "lod_budgets": [
+   150000,
+   60000,
+   20000,
+   5000
+  ],
+  "texel_floor_px_per_m": {
+   "body": 300.0,
+   "wheels": 300.0
+  }
+ },
  "textures": {
   "body": 4096
  },
- "pack_bytes": 25715760,
- "seconds": 464.9,
+ "pack_bytes": 27145499,
+ "seconds": 42.3,
  "stage_seconds": {
   "build": 0.2,
   "render_original": 82.3,
@@ -32,8 +47,9 @@
   "uv": 92.8,
   "bake": 121.1,
   "lods_export": 9.6,
-  "textures": 5.920777797698975,
-  "proof": 145.49047875404358
+  "lods_only": 17.0,
+  "textures": 0.0,
+  "proof": 25.330312967300415
  },
  "baked_down": {
   "relief": {
@@ -81,7 +97,7 @@
   "script": "vehicles/cars/kestrel_meridian.py",
   "script_sha256": "6721720365425c67d736f7c0f951ba020838111e61bba54331fb01a228c46cf1",
   "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
-  "game_sha256": "8eece639aaa11a6d467231ecceefa1b724ad06162ada805edb3b0a05a998f25e",
+  "game_sha256": "9e6108a54d1f801bd18195adc59470f9bd92b6d763a2afc8f84531218c054eab",
   "original_triangles": 90334,
   "original_objects": 110
  },
@@ -120,7 +136,7 @@
     },
     {
      "lod": 3,
-     "triangles": 5084,
+     "triangles": 5351,
      "budget": 5000,
      "ok": true
     }
@@ -194,7 +210,7 @@
      "deviation_m": [
       0.0028,
       0.0033,
-      0.0022
+      0.0
      ],
      "tolerance_m": [
       0.0797,
@@ -207,7 +223,7 @@
   },
   {
    "check": "lod_fidelity",
-   "ok": true,
+   "ok": false,
    "detail": [
     {
      "normal_p95_deg": 1.76,
@@ -236,17 +252,17 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 32.53,
-     "bent_share": 0.0664,
-     "texture_share": 0.0289,
-     "miss_share": 0.0444,
+     "normal_p95_deg": 41.7,
+     "bent_share": 0.0757,
+     "texture_share": 0.0402,
+     "miss_share": 0.1209,
      "lod": 3,
      "limits": {
-      "p95": null,
-      "bent": 0.15,
-      "tex": 0.05
+      "p95": 40.0,
+      "bent": 0.1,
+      "tex": 0.04
      },
-     "ok": true
+     "ok": false
     }
    ]
   },
