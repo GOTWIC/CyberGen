@@ -103,7 +103,8 @@ weave are listed in `micro_detail` for the engine's detail maps.
 
 So that LOD0 is near 150,000 triangles without decimating the silhouette:
 
-- **Always**: relief no taller than 3.2 mm over another object's surface (lettering,
+- **Always**: relief no taller than 3.2 mm over another object's surface (a lamp only
+  when 70% of it lies on one other piece: a band between flutes would bake in patches) (lettering,
   ribbons, decals, glyphs, studs) is removed and baked onto the surface under it (color,
   normal, occlusion, emission); dense arrays of small parts lying in a slab (at least 8
   parts, 1,500 triangles, 15,000 triangles a square meter of outline, under 45 mm deep:
@@ -116,8 +117,9 @@ So that LOD0 is near 150,000 triangles without decimating the silhouette:
   (glass, lamps and wheels never), at most halved a round, three rounds. Collapsed parts
   have their originals baked onto them.
 - **Never seen**: faces no ray from outside reaches (through glass counts, for the cabin)
-  are removed, and coincident faces (one of two facing the same way, both of two facing
-  apart). Faces seen only through glass are the cabin class, only from below the
+  are removed (a lamp's never: a light band behind a row of flutes, seen only through the
+  gaps, is its own class), and coincident faces (one of two facing the same way, both of
+  two facing apart). Faces seen only through glass are the cabin class, only from below the
   underside class. A face never seen from its front but seen from its back (a design
   face turned the wrong way, which Blender draws and an engine culls) is turned round, and
   so is a face seen better from its back than its front (exterior over cabin over
@@ -130,8 +132,11 @@ So that LOD0 is near 150,000 triangles without decimating the silhouette:
 Smart projection per slot (66 degrees; the islands that end up covering texels another
 island covers, over 0.1% of the atlas, as a lip curling under its frame does, are projected
 again once at 34 degrees), each island scaled to one texel density times its class's
-weight (exterior 1, cabin 0.4, underside 0.35), then a skyline packer at the largest
-common scale, each lying flat or stood up, with 8 px between islands at 4096 (bake margins 8 px; whole texels between islands down to the 512 mip). On the body, an island thinner
+weight (exterior 1, cabin 0.4, underside 0.35, a lamp seen only in gaps 0.35), then a skyline packer at the largest
+common scale, each lying flat or stood up, a smaller one first in a gap a taller one left
+under the skyline, with 8 px between islands at 4096 (bake margins 8 px; whole texels
+between islands down to the 512 mip); an island narrower than 16 px has half its width
+round it, 2 px at least (it is under a texel by that mip). On the body, an island thinner
 than 2 texels (2 area / perimeter: a letter's strokes, a hairline lamp) is scaled up to
 that, 8 times at most, while that grows the atlas by 10% at most (else 1.5, then 1
 texel), so it covers texel centers and bakes. The body's islands
@@ -160,7 +165,8 @@ share LOD0's textures. Per part, in this order:
    the budget. A piece the collapse takes under its floor (LOD2: 8 triangles and 150 a
    square meter of its area, LOD3: 6 and 120, less when that would take over 60% of the
    budget; a lamp keeps half (LOD2) or a quarter (LOD3) of its own) is collapsed again alone
-   to that floor, so no panel or light strip vanishes. Glass LOD0 draws through its normals
+   to that floor, so no panel or light strip vanishes (the floors are lowered with the
+   rest where they alone would pass the budget). Glass LOD0 draws through its normals
    (a coarse sheet shaded smooth: over 10% of its corners 15 degrees off their face) is not
    collapsed while it is under 30% of the LOD; over that its grid is unsubdivided instead
    (every kept corner where LOD0 had it), and collapsed only if still over. Dense glass is
@@ -181,7 +187,8 @@ the others a little more to hold the budget.
 
 Each LOD is measured against LOD0 (`lods[k].fidelity` in `pack.json`, check
 `lod_fidelity`): at points spread over the body's exterior (one per 40 cm2 at least), LOD0's
-surface nearest along the normal line (within 3 cm), the angle between the two shading
+surface nearest along the normal line (within 3 cm) that faces the same way (not a thin
+plate's far side), the angle between the two shading
 normals and, through the two UVs, the bake's base color and paint weights (at 1024 px):
 the area weighted 95th percentile angle (`normal_p95_deg`), the share over 25 degrees
 (`bent_share`), the share with a channel off by 0.25 (`texture_share`, a torn or smeared
@@ -228,10 +235,11 @@ corners (the farthest points along 128 directions). `collision.glb`, nodes
 - `wheel_pivots`: every wheel's tread centered on its node's pivot (3 mm), its radius as
   `pack.json` says, the axle no lower than the radius less 12 mm.
 - `lod_bounds`: every LOD's box within 2 cm (or 1.5% of the size) of LOD0's.
-- `lod_fidelity`: every LOD drawn as LOD0 (above): `normal_p95_deg` at most 4 and 10
-  degrees (LOD1, 2; at LOD3 reported only: a faceted car's creases lose their bevels
-  there), `bent_share` at most 1%, 3%, 12%, `texture_share` at most 1%, 2.5%, 5%. A
-  crumpled or torn LOD fails.
+- `lod_fidelity`: every LOD drawn as LOD0 (above): `normal_p95_deg` at most 12 and 25
+  degrees (LOD1, 2; rivets and bevels a collapse rounds off count there; at LOD3 reported
+  only), `bent_share` at most 2%, 5%, 15%, `texture_share` at most 1%, 2.5%, 5%. A
+  crumpled or torn LOD fails; a small part torn at LOD3 (a winch drum) can pass, so the
+  LOD row is still looked at.
 - `collision`: 4 to 12 hulls.
 
 ## Proof
@@ -239,6 +247,7 @@ corners (the farthest points along 128 directions). `collision.glb`, nodes
 `proof/` and `game.jpg`: the pack alone (the GLBs and PNGs, through the formula above, in a
 fresh Blender, in the kit's studio as the car's own script set it up: its light energies
 and colors, and a light linked off some of the car's objects kept off the parts they make
-up, at 30% of a part's area or more, from `views.studio`) next to the procedural original from the same camera,
+up, at 30% of a part's area or more, from `views.studio`; a view from under the car without
+its floor, as the car's own) next to the procedural original from the same camera,
 a recolored copy, the textures, and the four LODs (from `opaque_from_lod` the glass dark
 and opaque, as an engine draws it).

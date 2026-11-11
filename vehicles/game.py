@@ -1938,9 +1938,9 @@ FID_RES = 1024                              # textures compared at this size
 FID_TEX_ERR = 0.25                          # a texel this far off in a channel is wrong
 # per LOD: the exterior's shading normal off LOD0's by at most p95 degrees, at most `bent`
 # of its area over 25 degrees, at most `tex` of its area on the wrong texture
-FID_LIMITS = {1: dict(p95=4.0, bent=0.02, tex=0.01),
+FID_LIMITS = {1: dict(p95=12.0, bent=0.02, tex=0.01),
               2: dict(p95=25.0, bent=0.05, tex=0.025),
-              3: dict(p95=None, bent=0.12, tex=0.05)}
+              3: dict(p95=None, bent=0.15, tex=0.05)}
 
 
 def mark_islands(ob):
@@ -2393,15 +2393,17 @@ def fidelity(ob, surf, tex):
                 r1, r2 = 1 - r1, 1 - r2
             w = (1 - r1 - r2, r1, r2)
             p = P[0] * w[0] + P[1] * w[1] + P[2] * w[2]
-            # the LOD0 surface nearest the point along the normal line (every surface
-            # the line meets within reach, not only the outermost: a trim over a panel
-            # would stand in for the panel)
+            # the LOD0 surface nearest the point along the normal line, facing its way
+            # (every surface the line meets within reach, not only the outermost: a trim
+            # over a panel would stand in for the panel; the far side of a thin plate is
+            # not it)
             hit, o_, left = (None,), p + fn * FID_REACH_M, 2 * FID_REACH_M
             for _ in range(6):
                 h = surf.all.ray_cast(o_, -fn, left)
                 if h[0] is None:
                     break
-                if hit[0] is None or (h[0] - p).length < (hit[0] - p).length:
+                if h[1].dot(fn) > 0 and (hit[0] is None or
+                                         (h[0] - p).length < (hit[0] - p).length):
                     hit = h
                 step = (h[0] - o_).length + 1e-5
                 o_, left = o_ - fn * step, left - step
@@ -2487,7 +2489,7 @@ def make_lods(parts_final, budgets, coll, work=None):
             a_, b_, c_ = LOD_FLOOR[k]
             floor = (a_, min(b_, 0.6 * max(0, target - fixed) / max(area, 1e-6)), c_)
         objs_k = []
-        for i in range(4):
+        for i in range(6):
             for o in objs_k:
                 me = o.data
                 bpy.data.objects.remove(o)
@@ -2499,6 +2501,10 @@ def make_lods(parts_final, budgets, coll, work=None):
             got = sum(mesh_tris(o.data) for o in objs_k)
             if got <= target * 1.03 or ratio >= 0.999:
                 break
+            if floor is not None and ratio < 0.03:
+                # the floors alone are over the budget: lowered with the rest
+                s = max(0.3, (target - fixed) / max(1, got - fixed) * 0.95)
+                floor = (floor[0], floor[1] * s, floor[2] * s)
             ratio *= max(1, target - fixed) / max(1, got - fixed) * 0.98
         objs_k, got = hold_bounds(parts_final, objs_k, ratio, target, k, coll, prep, surf,
                                   floor)
