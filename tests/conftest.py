@@ -1,8 +1,13 @@
 import copy
 import json
+import os
 from pathlib import Path
 
 import pytest
+
+# AG18 step H: no test reads the machine's vehicle library (the packs' cache); the tests of
+# the parked hero vehicles name a library of their own (`tests/assetgen/test_ag_vehicles.py`)
+os.environ.setdefault("ASSETGEN_VEHICLES", "off")
 
 # Every run can be paused, stopped and resumed (`python tests/testctl.py`; Swagnik,
 # 2026-11-08): the hooks live in testctl.py and are registered here by name.

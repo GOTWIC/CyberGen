@@ -1050,14 +1050,19 @@ def build_manifest(build_dir: str | Path, name: str | None = None,
     `play`, the play features' map and data are written to BUILD_DIR/unreal (`unreal_play`)
     and the manifest's `play` names them. `atmos` (AT1): the atmos plan's folder (None:
     BUILD/atmos when it has one, False: none), the manifest's `atmos` (`unreal_atmos`).
-    `vehicles` (AG18): the vehicle library (None: $CITYGEN_VEHICLES, else the packs'
-    cache) the contributions' placement entries draw on, the manifest's `vehicles`
-    (`unreal_vehicles`); `all_vehicles` takes every car of the library, placed or not."""
+    `vehicles` (AG18): the vehicle library (None: $CITYGEN_VEHICLES, else the one the
+    placements' contribution names, else the packs' cache) the contributions' placement
+    entries draw on, the manifest's `vehicles` (`unreal_vehicles`); `all_vehicles` takes
+    every car of the library, placed or not. Stage 2's entries a placement replaces (AG8's
+    parked car variants of its tile) are left out of stage 2."""
     from . import unreal_vehicles as UV
     build = Path(build_dir)
     contribs = contributions(build) if assets else []
+    if vehicles is None:
+        vehicles = UV.named_library(contribs)
     # (AG18: the vehicle placements apart; without them the contributions are as they were)
     contribs, placed = UV.split(contribs)
+    contribs = UV.without_replaced(contribs, placed)
     plan = json.loads((build / "blockout_plan.json").read_text(encoding="utf-8"))
     city = name or plan["city"]
     mats = {k: material_params(k, v) for k, v in sorted(plan["materials"].items())}

@@ -45,6 +45,8 @@ def _tile_of(man: dict) -> dict[str, str]:
     for a in s2.get("actors", []) + s2.get("groups", []) + s2.get("instances", []) + \
             s2.get("underwater", []):
         out[a["key"]] = a.get("tile", "")
+    for r in (man.get("vehicles") or {}).get("placements", []):
+        out[r["key"]] = r["tile"]          # (AG18: a placement actor per tile)
     return out
 
 
@@ -91,6 +93,28 @@ def count(man: dict) -> dict:
         e["instances"] += r["count"] if "count" in r else len(r["xforms"])
         if nanite.get(r["mesh"], True) and r["mesh"] not in lod:
             e["meshes"].add(r["mesh"])
+    veh = man.get("vehicles") or {}
+    vstat = None
+    if veh.get("placements"):
+        # AG18: a placement actor holds an instanced component per car model and part, an
+        # instance per vehicle; its meshes are not Nanite (no root pages)
+        vstat = {"vehicles": 0, "components": 0, "instances": 0, "models": 0,
+                 "triangles_lod0": 0}
+        models = set()
+        for r in veh["placements"]:
+            e = t(r["tile"])
+            for car, m in r["models"].items():
+                rec = veh["cars"][car]
+                n = len(rec["parts"])
+                e["components"] += n
+                e["instances"] += n * len(m["ids"])
+                vstat["components"] += n
+                vstat["instances"] += n * len(m["ids"])
+                vstat["vehicles"] += len(m["ids"])
+                vstat["triangles_lod0"] += rec["lods"][0]["triangles"] * len(m["ids"])
+                models.add(car)
+        vstat["models"] = len(models)
+        vstat["meshes"] = sum(len(veh["cars"][c]["parts"]) for c in models)
     city_meshes = set()
     for e in tiles.values():
         city_meshes |= e["meshes"]
@@ -103,6 +127,8 @@ def count(man: dict) -> dict:
     pool = U.nanite_pool_mb(man)
     city["root_pages_max"] = int((U.NANITE_BUFFER_MB - pool) / ROOT_PAGE_MB)
     city["nanite_pool_mb"] = pool
+    if vstat is not None:
+        city["vehicles"] = vstat
     return {"city": city, "tiles": out_tiles}
 
 

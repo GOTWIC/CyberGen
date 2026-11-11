@@ -1626,6 +1626,23 @@ placements that show it. A later stage that moves a vehicle places one static me
 per part instead, with the paint as its Custom Primitive Data 0 to 8 (the masters read it
 there when there is no per-instance data) and the glass's Cast Shadow off.
 
+**Parked in the cities (AG18 step H).** assetgen's parked vehicles stage (`assetgen vehicles`,
+in `assetgen build` after the props; `assetgen/parked/`) writes
+`BUILD/assets/unreal_contribution.vehicles.json`: a placement entry per tile in which AG8
+draws parked cars (`vehicles.parked.<tile>`), replacing AG8's entry of that tile
+(`prop.parked_vehicle.<tile>`, also M15's prototype actor's key), with the `library` it drew on
+and the cars it placed (`cars`: title, kind, the sha256 of each `pack.json`). The exporter
+leaves the stage 2 entries a placement replaces out of stage 2
+(`unreal_vehicles.without_replaced`), so AG8's variants go with the blockout's prototype; and
+when neither `--vehicles` nor `$CITYGEN_VEHICLES` names a library it reads the one the
+placements' contribution names, where that folder is there (`named_library`), else the packs'
+cache. A build without the vehicle library on its machine (or with the asset spec's
+`vehicles.parked` set to `variants`) has no such file and exports exactly as before. AG16's
+scene count (`assetgen/scene.py`) adds a placement's actor, its components (one per model and
+part) and instances (one per vehicle and part) to its tile, and the city's `vehicles` (cars,
+models, components, instances, meshes, triangles at LOD0); the vehicles' meshes are not
+Nanite, so they take no root pages. Results: `docs/progress/AG18/city/`.
+
 **The check** (`citygen unreal BUILD UPROJECT --check-vehicles [--shots DIR]`,
 `unreal_vehicles.check`, `citygen/ue/check_vehicles.py` in the full editor): each mesh's LOD
 count and triangles against the pack (Unreal's build drops a few degenerate triangles: within

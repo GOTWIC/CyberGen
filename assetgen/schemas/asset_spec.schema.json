@@ -439,6 +439,47 @@
       },
       "title": "OwnerStyle",
       "type": "object"
+    },
+    "VehicleStyle": {
+      "additionalProperties": false,
+      "description": "AG18 step H: AG8's parked cars as the hero vehicles of the vehicle library\n(`assetgen/parked/`).",
+      "properties": {
+        "parked": {
+          "default": "packs",
+          "description": "packs: the library's vehicles where it is on this machine; variants: AG8's own parked car variants, as before AG18.",
+          "enum": [
+            "packs",
+            "variants"
+          ],
+          "title": "Parked",
+          "type": "string"
+        },
+        "library": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The vehicle library's folder (default $ASSETGEN_VEHICLES, $CITYGEN_VEHICLES, else ~/.cache/cybergen/vehicles/game).",
+          "title": "Library"
+        },
+        "weights": {
+          "additionalProperties": {
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "type": "number"
+          },
+          "description": "A multiplier per model (a pack's car name) on its district weights; 0 leaves it out.",
+          "title": "Weights",
+          "type": "object"
+        }
+      },
+      "title": "VehicleStyle",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -568,6 +609,18 @@
       },
       "title": "Landmarks",
       "type": "object"
+    },
+    "vehicles": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/VehicleStyle"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "AG18: the parked cars as hero vehicles (left out: the library's, where it is on this machine)."
     },
     "notes": {
       "anyOf": [
