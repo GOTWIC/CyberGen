@@ -2241,7 +2241,7 @@ waits for Swagnik's review.
   packs, out of every later step until redone.
 - **Next:** an Unreal test of the packs and the exporter taking them, then step H (the
   vehicles into the cities), then the design improvements (steps A to E).
-- Phases after the designs (improvements, game-ready meshes, AG8's parked vehicles and
+- The other phases (improvements, AG8's parked vehicles and
   stage 4's fleet drawing on them) are listed in the scope with their plan.
 
 Progress output: `assetgen build`, `preview`, `materials preview|board`, `library`, `streets`,
