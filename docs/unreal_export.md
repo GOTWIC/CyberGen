@@ -1515,6 +1515,128 @@ import go):
 - **A city without an atmos plan** imports as before (no controller, no cells), its night
   lit by the light pools alone.
 
+## AG18's vehicles
+
+AG18's hero vehicles come into Unreal as a library of their game packs (the contract in
+`vehicles/GAME.md`), imported once a project and shared by every city, and placed by entries
+of layer 2 (`citygen/unreal_vehicles.py` on the venv side; `Importer.vehicles`,
+`Importer.vehicle_actors` and the masters in `citygen/ue/import_city.py`).
+
+**The library.** A folder of packs, one per car (`<car>/pack.json`, `lod0.glb` to `lod3.glb`,
+`collision.glb`, five textures per baked slot): by default the packs' cache
+`~/.cache/cybergen/vehicles/game`, else `$CITYGEN_VEHICLES` or `citygen unreal --vehicles DIR`.
+`--all-vehicles` imports every car of it, placed or not; otherwise only the cars the
+placements name. What a pack must hold: `pack.json` of format `cybergen.vehicle_pack` version
+1 with four LODs, the files it names (`read_pack` refuses a pack missing one), parts with
+their pivots, the `body` slot's five textures (and the `wheels` slot's unless it is a hover
+car, whose `wheels` is null), the glass parameters, the show colors, `dimensions`, and the
+hulls in `collision.glb` as `UCX_body_<nn>` nodes.
+
+**The manifest's `vehicles`** (only when a contribution places a vehicle, or with
+`--all-vehicles`; a city without either exports byte for byte as before): `library`,
+`folder` (`/Game/CityGen/Vehicles`), `paint_cpd` (9), per car (`cars`) its title, kind, size
+class, folder, the pack's directory, every file's sha256, its textures (slot, map, sRGB,
+kind), LODs (file, triangles per part, `screen_size`, whether the file carries tangents),
+parts (kind, pivot, material, a wheel's radius, side, axle, `steers`, `spins`,
+`uv_shared_with`), the body and wheels slots' parameters, the glass parameters, the show
+colors, `emissive_strength`, `micro_detail`, `dimensions` and the hulls (read from
+`collision.glb`, welded by position, in the car's frame: vertices and triangles), and a
+`hash` of all that and the import's version (not of the folder it was read from); the
+placements with their hashes, the keys they replace (`replaced`) and counts. `actor_hashes`,
+`actor_kinds` (`vehicles`) and `manifest_changes` take each placement as an actor, a
+replaced key as gone.
+
+**The placement format** (any `unreal_contribution.*.json`, an entry of kind `vehicles`; the
+other entries of its file go to stage 2 as before, a file of placements alone does not reach
+stage 2):
+
+```json
+{"key": "vehicles.parked.t+01+00", "kind": "vehicles", "hash": "<16 hex>",
+ "tile": "t+01+00", "pivot": [384.0, 128.0, 0.0], "replaces": ["prop.parked_car.t+01+00"],
+ "vehicles": [{"car": "tanager_mino", "id": "d03.prop.parked_car.e372n168",
+               "xform": [-12.4, 40.1, 0.0, 87.5],
+               "paint": [[0.7, 0.05, 0.03], [0.8, 0.78, 0.72], [0.95, 0.62, 0.03]],
+               "steer_deg": 0.0}]}
+```
+
+`xform` is x, y, z (meters) and yaw (degrees) from the entry's pivot in citygen's frame, the
+car's x forward; `paint` the primary, secondary and accent colors, linear, in the pack's
+channels (left out: the pack's show colors); `steer_deg` turns the wheels and brakes that
+steer about their own z; `id` the vehicle's citygen id. A key may not be another actor's;
+`replaces` drops the actors of those keys (M15's parked car prototypes, AG8's variants).
+
+**What the importer makes of a car** (`/Game/CityGen/Vehicles/<car>`, made again only when its
+hash changes, by `VEHICLE_MESH_VERSION` or the masters' `VEHICLE_VERSION`):
+
+- **Textures** `Textures/T_<car>_<slot>_<map>`: base color and emissive sRGB (default
+  compression; the emissive's alpha is the specular level), the normal map linear with its
+  green channel flipped (the packs' are OpenGL's), ORM and mask linear in BC7 (both alphas
+  are data: the clear coat weight, the shade on the paint); texture group Vehicle.
+- **Meshes** `SM_<car>_<part>`, one per part (`body`, `glass`, `wheel_<tag>`, `brake_<tag>`),
+  each the pack's LOD0 node with LOD1 to LOD3 from the other files as its engine LODs (screen
+  sizes 1.0, 0.35, 0.15, 0.05: LOD0 within about 8 m of a standard car, LOD3 past about 60 m;
+  a large vehicle's bigger bounds switch farther out), imported through Interchange in the
+  node's frame (a wheel's origin is its axle's middle, so it spins about its local y and
+  steers about its local z; a brake shares its wheel's pivot), the pack's normals kept, UVs at
+  full precision (half floats are off by up to two texels of the 4,096 atlas), tangents
+  computed by Unreal (MikkTSpace on the file's normals and UVs, as the bake's). **No Nanite**:
+  the glass is translucent (Nanite draws no translucency), the LODs are the pack's own (the
+  glass dark and opaque from `opaque_from_lod`, LOD3's remade wheels with their rim faces),
+  which Nanite would replace with its own clusters, and the Mac's editor renders with Nanite
+  off (a Nanite mesh draws its coarse fallback). The glass mesh has a second slot,
+  `MI_<car>_glass_dark`, that its LODs from `opaque_from_lod` draw with. The body's simple
+  collision is the pack's hulls, one convex element each (GeometryScript), used for complex
+  traces too; wheels, brakes and glass have none (wheels are the engine's raycasts). Each
+  mesh carries `cg.hash`, `cg.car`, `cg.part`, `cg.kind` and `cg.pivot` (its pivot in the car's
+  frame, JSON) as metadata. The LOD source meshes are deleted once the chains are made.
+- **`/Game/CityGen/Core/M_CgVehicle`** (body and wheels; an instance a car and slot,
+  `Materials/MI_<car>_<slot>`): the contract's albedo,
+  $\text{base}\,(1 - w) + (R\,P_1 + G\,P_2 + B\,P_3)\,A$ with $w = R + G + B$ from the mask and
+  `Paint1` to `Paint3` (vector parameters on Custom Primitive Data 0, 3 and 6, each read
+  through a per-instance custom data node with the parameter as its default, AG16's
+  `per_instance`; the instance's defaults are the pack's show colors), roughness, metallic
+  and occlusion from ORM, shading model Clear Coat with ORM's alpha as the coat and
+  `CoatRoughness` the pack's `coat_roughness` (through material attributes: the clear coat
+  inputs are not material properties Python can connect), specular from the emissive's
+  alpha, the normal map, the paint's flake (the contract's `micro_detail`: 2,600 cells a meter,
+  a hashed tilt of 0.06 on the painted share in the mesh's own space, faded out by 3 m),
+  emission $E \cdot S / 15 \cdot \mathrm{lerp}(\text{GlowDay}, \text{GlowNight}, \text{Night})$
+  with $S$ the pack's `emissive_strength` (`EmissiveStrength`), `GlowDay` 8 and `GlowNight` 2
+  (`MPC_CityGen`'s Night, as the other emissive masters: the night's fixed exposure).
+- **`M_CgVehicleGlass`** (`MI_<car>_glass`): thin translucent (Surface per-pixel lighting),
+  black with a coverage of 4% where the glass transmits, its specular from the IOR, its
+  roughness, and the glass color squared as the transmittance (the packs' glass is thick: two
+  sheets a few mm apart, and the proof's ray is tinted at both). A face whose normal points
+  toward `GlassCenter` (the middle of the car's box, set per car) is the inner sheet and is
+  left out: from outside it is the far side's glass seen through the near side, drawn in the
+  same mesh in triangle order, not by depth, and it composited over the near glass in black
+  and bright patches. **`M_CgVehicleGlassDark`** (`MI_<car>_glass_dark`): opaque, the glass
+  color times 0.06, as the proof draws LOD2 and LOD3.
+
+**What the importer makes of a placement**: a `BP_CityGenGroup` actor at the entry's pivot
+(key the entry's, `cg.type=vehicles`, `cg.category=vehicle`, `cg.tile=`, `cg.id=` per vehicle,
+`cg.vehicle=` per model; folder `CityGen/vehicle`) holding, per model and part, a hierarchical
+instanced static mesh component (`cg.member`, `cg.key=<entry>.<car>.<part>`, `cg.vehicle=`,
+`cg.part=`, `cg.id=` per vehicle in instance order) with an instance per vehicle (its transform
+composed with the part's pivot; a steering wheel turned by `steer_deg`) and nine floats of
+per-instance custom data (the paint): a tile's parked cars of one model are one component a
+part. The body collides (`BlockAll`), the rest not; the glass casts no shadow (each sheet of the
+thick glass shadowed the other in blocky patches). A car made again in an import updates the
+placements that show it. A later stage that moves a vehicle places one static mesh component
+per part instead, with the paint as its Custom Primitive Data 0 to 8 (the masters read it
+there when there is no per-instance data) and the glass's Cast Shadow off.
+
+**The check** (`citygen unreal BUILD UPROJECT --check-vehicles [--shots DIR]`,
+`unreal_vehicles.check`, `citygen/ue/check_vehicles.py` in the full editor): each mesh's LOD
+count and triangles against the pack (Unreal's build drops a few degenerate triangles: within
+2%), no Nanite, the glass's dark slot from `opaque_from_lod`, the hulls; each placement's
+components, instance counts, ids and every instance at its pivot (1 cm); traces down and across
+onto every placed body, hitting it and never a wheel or the glass; a wheel spun and steered by
+script about its pivot; with `--shots`, by day and by night, each car from its pack's hero
+camera (the proof's), one car at each LOD forced, the wheel turned, the hulls in place of a
+body, and the line-up of the AG18 check where the build has one. Results and shots:
+`docs/progress/AG18/unreal/`.
+
 ## Milestones and checks
 
 - **Every milestone** updates the exporter in its own PR for what it adds or changes (a new
@@ -1584,4 +1706,5 @@ import go):
 | #147 (a fix on its own) | No code change. Footbridges are faces of the pavement map, so the blockout draws each again (on M22 they had no faces and the blockout left them out): one object per footbridge, `<segment>.deck` (category `bridge`, collection `Waterfront`: its walk face, the slab under it, piers in the water), so an import over an earlier one creates their actors; AG7's footbridge road pieces now replace those keys (`replaces`), drawn from the map's faces under the same keys. A junction a footbridge meets has a slot where its stairs start, and the few junctions the unfold mends (`pavement.Assembly._unfold`) change shape in height: their plan entries and their actors' hashes move, updated in place. No new kind, part, slot or master | Not run here (the coordinating session's call) |
 | AG16 | Performance ("From AG16" above): the benchmark (`--bench`, `--bench-only`, `citygen/bench.py`, `UCityGenBench` in the play plugin, a world subsystem started by `-CityGenBench=<job>`; the last run's shots and graphs, other processes' CPU sampled through each run, CPU-starved runs named, `bench.starved`; the play actor's lamps logged with each shot); meshes shared across tiles (`share_meshes`, the manifest's `counts.shared_meshes`); records as components (`group_actors`, the manifest's `groups` and each record's `holder`; `BP_CityGenGroup`, its root static in the Blueprint, `CORE_VERSION` 3; `actor_hashes`, `actor_kinds` and `manifest_changes` count group actors and holders, not the records they hold; the check's shots count an actor's own and its parts' meshes); `NO_COLLISION` props; the masters read Custom Primitive Data through per-instance custom data (`STAGE2_VERSION` 10); main cells 128 m (`MAIN_CELL_M`), `VIEW_M` 768; the project's `r.TextureStreaming=0` and the Nanite pool from the city (`nanite_pool_mb`, `PROJECT_SETTINGS`); the play actor's underwater volumes enabled by distance; packs imported in chunks of 150 and let go of (`PACK_CHUNK`, `Meshes`, #84); offloads take their actors by guid (`actor_guids`), an actor whose class changes is destroyed and the level saved before anything is made (`clear_moved`), an actor that holds no records loses its members (`drop_members`), an entry with parts of its own keeps its actor; pruned meshes counted by their files | Delta Megacity on the Windows PC (`docs/progress/AG16/`): the before import (73,772 actors, 30 min, 39 GB committed), the fixes imported over it (13,644 actors with the final code), the benchmark before and after three runs each, hitch dumps; Vesper Bay imported and benchmarked with one command |
 | AT0 | atmosgen's runtime ("atmosgen's runtime (AT0)" above): the `CityGenAtmos` plugin installed and built with CityGenPlay (`unreal_play.PLUGINS`, one stamp), its assets made from code (`unreal_atmos.make_assets`, `ue/atmos_assets.py`: `MPC_CityGenAtmos`, `M_CgRain`, `M_CgWet`), the controller spawned by `-CityGenAtmosPlan`; `CityGen.PlayLamps` in the play features; the benchmark's `--bench-atmos`, `--bench-rt`, `ATMOS_PASSES` and commands per pass, `busy()` seeing any other benchmark; the plan's contribution format (layer 3). No change to the import: AT1 places the controller and the tiles' lights | the spike on Delta in CityAG16 by AG16's benchmark: night native 12.6 ms p95 before, 15.8 ms with the plan's lights, fog, rain and wet streets; MegaLights with hardware ray tracing 17.4 ms (`docs/progress/AT0/`) |
+| AG18 (vehicle packs) | AG18's vehicles ("AG18's vehicles" above): `citygen/unreal_vehicles.py` (the library: `--vehicles`, `$CITYGEN_VEHICLES`, the packs' cache; `--all-vehicles`; placement entries of kind `vehicles` in any contribution, the manifest's `vehicles`, `actor_hashes`, `actor_kinds`, `manifest_changes`), the importer's `vehicles` step (textures, `M_CgVehicle`, `M_CgVehicleGlass`, `M_CgVehicleGlassDark`, a mesh per car and part with the pack's four LODs, no Nanite, the hulls as the body's collision) and `vehicle_actors` (a `BP_CityGenGroup` per placement, a hierarchical instanced component per model and part, the paint in per-instance custom data), `--check-vehicles` (`check_vehicles.py`); tests `tests/test_unreal_vehicles.py`. A city without placements exports as before | Seven packs (vanta_r, brakk_mule, kestrel_dart, tanager_mino, aurel_prelate, orrin_aria, halcyon_ridge) in a line-up of their own in a throwaway project: imported, imported again (nothing changed), checked (every check passing) and shot by day and night (`docs/progress/AG18/unreal/`) |
 | AT1 | Layer 3 ("From AT1" above): the manifest's `atmos` (`unreal_atmos.write_atmos`: the controller's key and hash, a cell per 128 m cell, `counts.atmos_cells` and `atmos_lights`; the records in `unreal/atmos.json`; a plan whose lux check failed is named and left out, `--atmos DIR` naming a folder without a plan is an error); `actor_hashes`, `actor_kinds` (`atmos`, `atmos_cell`); the importer's `atmos_cells` (a `CityGenAtmosCell` data actor per cell, spatially loaded, among the offloaded actors) and `atmos_controller` (`CityGenAtmos`, always loaded, the plan's settings), `ATMOS_VERSION`; atmosgen's assets made before the import (`make_assets`); the plugin: cells register their lights as they stream, the controller's pooled live set shows them by night (`MPC_CityGen`'s `Night`), its subsystem and `-CityGenAtmosPlan` gone; the play features without AG15's spot lamps and sign washes (`play.json` 3; `GetStatus` without `lamps_lit`), their pools past the live range; the check reads the controller's status by night; `--atmos`, `--no-atmos`, `--bench-atmos` a flag | Delta in CityAG16 (`docs/progress/AT1/`): imported over AG16's import (the controller and 500 cells created, nothing else touched, under 3 min), the check passing by night with views, the night benchmark before and after (three runs each) |
