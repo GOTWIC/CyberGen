@@ -7,6 +7,7 @@
 #include "Components/DirectionalLightComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/SkyLightComponent.h"
+#include "CoreGlobals.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/PostProcessVolume.h"
@@ -638,6 +639,48 @@ void ACityGenPlay::UpdateUnderwater()
 	UnderwaterOn = On;
 }
 
+// -- the developer menu's rows --
+
+bool ACityGenPlay::ClickMenuRow(const FString& Row)
+{
+	const FString R = Row.ToLower();
+	if (R == TEXT("night"))
+	{
+		SetNight(!IsNight());
+	}
+	else if (R == TEXT("freecam"))
+	{
+		SetFreeCam(!IsFreeCam());
+	}
+	else if (R == TEXT("minimap"))
+	{
+		bShowMinimap = !bShowMinimap;
+	}
+	else if (R == TEXT("messages"))
+	{
+		GAreScreenMessagesEnabled = !GAreScreenMessagesEnabled;
+	}
+	else if (!GetAtmos())
+	{
+		return false;                           // (the weather rows are hidden)
+	}
+	else if (R == TEXT("fog") || R == TEXT("rain") || R == TEXT("wet"))
+	{
+		const FString Name = R.Left(1).ToUpper() + R.Mid(1);
+		SetAtmosFlag(FName(TEXT("Set") + Name), !GetAtmosFlag(FName(TEXT("b") + Name)));
+	}
+	else if (R == TEXT("hour+") || R == TEXT("hour-"))
+	{
+		const int32 Step = R == TEXT("hour-") ? 23 : 1;
+		SetAtmosHour(float((FMath::FloorToInt32(GetAtmosHour()) + Step) % 24));
+	}
+	else
+	{
+		return false;
+	}
+	return true;
+}
+
 // -- atmosgen's weather prototypes (the developer menu's rows) --
 
 AActor* ACityGenPlay::GetAtmos() const
@@ -731,11 +774,14 @@ FString ACityGenPlay::GetStatus() const
 		"\"free_cam\": %s, \"waiting\": %s, \"pawn\": \"%s\", \"x\": %.2f, \"y\": %.2f, \"z\": %.2f, "
 		"\"light_pools\": %d, "
 		"\"lamp_points\": %d, \"walk_points\": %d, \"map_texture\": %s, "
-		"\"overlay\": %s, \"atmos\": %s}"),
+		"\"overlay\": %s, \"atmos\": %s, \"fog\": %s, \"rain\": %s, \"wet\": %s, \"hour\": %.2f}"),
 		bReady ? TEXT("true") : TEXT("false"), bNight ? TEXT("true") : TEXT("false"),
 		bMapOpen ? TEXT("true") : TEXT("false"), bDevOpen ? TEXT("true") : TEXT("false"),
 		IsFreeCam() ? TEXT("true") : TEXT("false"), bWaiting ? TEXT("true") : TEXT("false"),
 		Pawn ? *Pawn->GetClass()->GetName() : TEXT(""), At.X / 100.0, -At.Y / 100.0, At.Z / 100.0,
 		PoolsVisible, LampPoints.Num(), WalkPoints.Num(), MapTexture ? TEXT("true") : TEXT("false"),
-		Overlay.IsValid() ? TEXT("true") : TEXT("false"), GetAtmos() ? TEXT("true") : TEXT("false"));
+		Overlay.IsValid() ? TEXT("true") : TEXT("false"), GetAtmos() ? TEXT("true") : TEXT("false"),
+		GetAtmosFlag(TEXT("bFog")) ? TEXT("true") : TEXT("false"),
+		GetAtmosFlag(TEXT("bRain")) ? TEXT("true") : TEXT("false"),
+		GetAtmosFlag(TEXT("bWet")) ? TEXT("true") : TEXT("false"), GetAtmosHour());
 }

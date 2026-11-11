@@ -24,6 +24,23 @@ namespace
 		// atmosgen's weather prototypes, shown when the level has its controller
 		RowFog = 5, RowRain = 6, RowWet = 7, RowHour = 8, RowHourDown = 9, RowHourUp = 10 };
 
+	/** A row's name for ACityGenPlay::ClickMenuRow (the console's CityGen.MenuRow). */
+	const TCHAR* RowName(int32 Row)
+	{
+		switch (Row)
+		{
+		case RowNight: return TEXT("night");
+		case RowFreeCam: return TEXT("freecam");
+		case RowMinimap: return TEXT("minimap");
+		case RowMessages: return TEXT("messages");
+		case RowFog: return TEXT("fog");
+		case RowRain: return TEXT("rain");
+		case RowWet: return TEXT("wet");
+		case RowHourDown: return TEXT("hour-");
+		default: return TEXT("hour+");    // the hour row and its > arrow
+		}
+	}
+
 	/** The engine's on-screen messages (a big city's "texture streaming pool ... exhausted"
 	 *  among them, drawn over the minimap): shown or not, the switch the console's
 	 *  DisableAllScreenMessages and EnableAllScreenMessages set. */
@@ -358,33 +375,7 @@ FReply SCityGenOverlay::OnMouseButtonDown(const FGeometry& Geometry, const FPoin
 			{
 				continue;
 			}
-			if (Row.Value == RowNight)
-			{
-				P->SetNight(!P->IsNight());
-			}
-			else if (Row.Value == RowFreeCam)
-			{
-				P->SetFreeCam(!P->IsFreeCam());
-			}
-			else if (Row.Value == RowMinimap)
-			{
-				P->bShowMinimap = !P->bShowMinimap;
-			}
-			else if (Row.Value == RowMessages)
-			{
-				GAreScreenMessagesEnabled = !GAreScreenMessagesEnabled;
-			}
-			else if (Row.Value == RowFog || Row.Value == RowRain || Row.Value == RowWet)
-			{
-				const TCHAR* Flag = Row.Value == RowFog ? TEXT("bFog") : Row.Value == RowRain ? TEXT("bRain") : TEXT("bWet");
-				const TCHAR* Set = Row.Value == RowFog ? TEXT("SetFog") : Row.Value == RowRain ? TEXT("SetRain") : TEXT("SetWet");
-				P->SetAtmosFlag(Set, !P->GetAtmosFlag(Flag));
-			}
-			else if (Row.Value == RowHour || Row.Value == RowHourUp || Row.Value == RowHourDown)
-			{
-				const int32 Step = Row.Value == RowHourDown ? 23 : 1;
-				P->SetAtmosHour(float((FMath::FloorToInt32(P->GetAtmosHour()) + Step) % 24));
-			}
+			P->ClickMenuRow(RowName(Row.Value));
 			return FReply::Handled();
 		}
 	}

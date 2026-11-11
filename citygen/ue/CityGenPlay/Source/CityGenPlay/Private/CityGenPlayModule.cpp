@@ -1,6 +1,7 @@
 // The module and its console commands (also what `citygen unreal --check` drives):
 // CityGen.Map, CityGen.FreeCam, CityGen.Menu, CityGen.Night [0|1] (toggling without an
-// argument), CityGen.Teleport X Y (citygen meters) and CityGen.Status. At game start (not in
+// argument), CityGen.MenuRow ROW (a click on a developer menu row), CityGen.Teleport X Y
+// (citygen meters) and CityGen.Status. At game start (not in
 // the editor) it also puts the game window at the monitor's native resolution.
 
 #include "CityGenPlayActor.h"
@@ -143,6 +144,17 @@ namespace
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 		{
 			if (ACityGenPlay* P = PlayIn(World)) { P->SetNight(Flag(Args, P->IsNight())); }
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs MenuRowCommand(TEXT("CityGen.MenuRow"),
+		TEXT("CityGen.MenuRow ROW: what a click on a developer menu row does (night, freecam, minimap, messages, fog, rain, wet, hour+, hour-)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenPlay* P = PlayIn(World);
+			if (P && Args.Num() && !P->ClickMenuRow(Args[0]))
+			{
+				UE_LOG(LogTemp, Warning, TEXT("CityGen: no developer menu row %s"), *Args[0]);
+			}
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs TeleportCommand(TEXT("CityGen.Teleport"),

@@ -301,6 +301,7 @@ imports without the play features.
   `city_model.json`, else the gameplay layer's zones).
 - **Console commands** (in the play window): `CityGen.Map [0|1]`, `CityGen.FreeCam
   [0|1]`, `CityGen.Menu [0|1]`, `CityGen.Night [0|1]` (each toggles without an argument),
+  `CityGen.MenuRow ROW` (a click on a developer menu row, "A packaged game" below),
   `CityGen.Teleport X Y` (citygen meters), `CityGen.Status` (the state as one JSON line).
   The actor's functions are callable from Python too (`set_night`, `set_map_open`,
   `set_free_cam`, `teleport_player_to_citygen`, `get_status`).
@@ -1550,8 +1551,11 @@ level). Three fixes made Delta Megacity's packaged game (after AT1) play as the 
   lights and the windows by night). The play features find the controller by its class name
   and drive it through its UFUNCTIONs and properties (`ACityGenPlay::GetAtmos`,
   `SetAtmosFlag`, `SetAtmosHour`), so CityGenPlay does not link CityGenAtmos; without a
-  controller the rows are hidden. `CityGen.Status` gives `atmos`. AT5's weather states
-  replace these rows.
+  controller the rows are hidden. Every row's click is `ACityGenPlay::ClickMenuRow(row)`
+  (`night`, `freecam`, `minimap`, `messages`, `fog`, `rain`, `wet`, `hour+`, `hour-`),
+  also the console's `CityGen.MenuRow ROW`, so a script or the benchmark's pass commands
+  drive the menu as a click does; `CityGen.Status` gives `atmos`, `fog`, `rain`, `wet` and
+  `hour`. AT5's weather states replace these rows.
 
 ## Milestones and checks
 

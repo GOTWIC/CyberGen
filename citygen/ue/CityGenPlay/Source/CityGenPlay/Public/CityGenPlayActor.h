@@ -143,6 +143,13 @@ public:
 	// states). The controller (CityGenAtmos) is found by its class name and driven through its
 	// UFUNCTIONs and properties, so the play features build and run without that plugin. --
 
+	/** What a click on a developer menu row does, by the row's name: night, freecam,
+	 *  minimap, messages, and with an atmos controller fog, rain, wet, hour+ and hour- (the
+	 *  overlay's clicks and the console's CityGen.MenuRow). False for a row the menu does not
+	 *  show. */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	bool ClickMenuRow(const FString& Row);
+
 	/** The level's atmos controller, else null (the menu then shows no weather rows). */
 	AActor* GetAtmos() const;
 
