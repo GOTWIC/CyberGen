@@ -60,8 +60,8 @@ CARD_MIN_PARTS = 8
 CARD_THICK_M = 0.045
 TIRE_LATHE_TRIS = 6000          # a tire denser than this is rebuilt as a lathe (over budget)
 TIRE_SEGMENTS = 64
-WEIGHT = {0: 1.0, 1: 0.35, 2: 0.4}  # texel density by face class: exterior, underside, cabin
-CLASS_NAMES = {0: "exterior", 1: "underside", 2: "cabin"}
+WEIGHT = {0: 1.0, 1: 0.35, 2: 0.4, 3: 0.35}  # texel density by face class: exterior,
+CLASS_NAMES = {0: "exterior", 1: "underside", 2: "cabin", 3: "lamp_in_gaps"}  # ... (below)
 CAGE_M, REACH_M = 0.015, 0.035  # baking the detail: cage out, ray reach under the surface
 TEXEL_FLOOR = {"body": 300.0, "wheels": 300.0}  # px/m on exterior faces at 4096 / 2048
 CORE_WHEEL = ("tire", "rim", "hub", "ring", "disc", "drum", "caliper")
@@ -1102,9 +1102,11 @@ def visibility(bm, glass_tree):
     return cls, flip
 
 
-def cull(ob, glass_tree):
+def cull(ob, glass_tree, lit=()):
     """Removes coincident and never seen faces of a part, stores each face's class (FACE
-    int cg_class). Returns (faces removed as coincident, as hidden)."""
+    int cg_class). A lamp's faces (materials in lit) are never removed as unseen: a light
+    band seen only through the gaps of a row of flutes catches too few of the rays.
+    Returns (faces removed as coincident, as hidden)."""
     bm = bmesh.new()
     bm.from_mesh(ob.data)
     bm.normal_update()
@@ -1123,11 +1125,13 @@ def cull(ob, glass_tree):
         log("  %s: %d faces seen only from behind turned round" % (ob.name, len(fl)))
     lay = bm.faces.layers.int.get("cg_class") or bm.faces.layers.int.new("cg_class")
     hidden = []
+    mats = ob.data.materials
+    lamp = {i for i, m in enumerate(mats) if m is not None and m.name in lit}
     for f, k in zip(bm.faces, cls):
-        if k < 0:
+        if k < 0 and f.material_index not in lamp:
             hidden.append(f)
         else:
-            f[lay] = k
+            f[lay] = k if k >= 0 else 3     # a lamp no ray reached: seen only in gaps
     bmesh.ops.delete(bm, geom=hidden, context='FACES')
     bm.to_mesh(ob.data)
     bm.free()
@@ -1430,14 +1434,35 @@ def pack_uv(U, islands, pad):
         return min(pad, max(pad * PAD_MIN, 0.5 * min(rects[i][4], rects[i][5]) * S))
 
     def skyline(S):
-        """Bottom-left on a skyline: each rectangle where its top ends lowest."""
+        """Bottom-left on a skyline: each rectangle where its top ends lowest; a rectangle
+        that fits a gap a taller one left under the skyline goes there first (the waste
+        map: gaps cut guillotine-wise, the best short side fit)."""
         sky = [[0.0, 1.0, 0.0]]                     # segments: x, width, height
+        free = []                                   # gaps under the skyline: x, y, w, h
+        tiny = pad
         pos = {}
         for i in order:
+            g_ = gap(i, S)
+            wi, hi = rects[i][4] * S + g_, rects[i][5] * S + g_
+            fit = None
+            for fi, (fx, fy, fw, fh) in enumerate(free):
+                for rot, (w, h) in ((False, (wi, hi)), (True, (hi, wi))):
+                    if w <= fw + 1e-12 and h <= fh + 1e-12:
+                        side = min(fw - w, fh - h)
+                        if fit is None or side < fit[0]:
+                            fit = (side, fi, rot, w, h)
+            if fit is not None:
+                _, fi, rot, w, h = fit
+                fx, fy, fw, fh = free.pop(fi)
+                pos[i] = (fx, fy, rot)
+                if fw - w > tiny:
+                    free.append((fx + w, fy, fw - w, h if fw - w < fh - h else fh))
+                if fh - h > tiny:
+                    free.append((fx, fy + h, fw if fw - w < fh - h else w, fh - h))
+                continue
             best = None
             for rot in (False, True):           # lying flat, or stood up where that fits lower
-                g_ = gap(i, S)
-                w, h = rects[i][4] * S + g_, rects[i][5] * S + g_
+                w, h = wi, hi
                 if rot:
                     w, h = h, w
                 if w > 1 or h > 1:
@@ -1462,6 +1487,9 @@ def pack_uv(U, islands, pad):
                 if sx + sw <= x + 1e-12 or sx >= x + w - 1e-12:
                     new.append(seg)
                     continue
+                a0, a1 = max(sx, x), min(sx + sw, x + w)
+                if y - sy > tiny and a1 - a0 > tiny:
+                    free.append((a0, sy, a1 - a0, y - sy))
                 if sx < x:
                     new.append([sx, x - sx, sy])
                 if sx + sw > x + w:
@@ -2644,7 +2672,8 @@ def main_build(A):
         culled = {}
         for part, ob in objs.items():
             if part != "glass" and part not in twins:
-                culled[part] = cull(ob, glass_tree if part == "body" else None)
+                culled[part] = cull(ob, glass_tree if part == "body" else None,
+                                    {mi.name for mi in infos.values() if mi.emissive})
         total = sum(mesh_tris(objs[twins.get(k, k)].data) for k in objs)
         log("low: %d triangles (%s); removed (coincident, hidden) %s; twins %s" % (
             total, ", ".join("%s %d" % (k, mesh_tris(o.data)) for k, o in sorted(objs.items())),
