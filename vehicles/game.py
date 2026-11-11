@@ -2667,7 +2667,7 @@ def stand_ins(prep, out, coll, budget):
     flattened into a spike). One no larger than LOD_STANDIN_M becomes its convex hull
     (LOD_HULL_DIRS corners at most, closed and clean) where the hull stays as close to it
     (both ways, the hull's faces on the part or on what it stands against, whose faces
-    there are gone) or the part is on the edge of the box; a larger one becomes its hull
+    there are gone); a part on the edge of the box never goes; a larger one becomes its hull
     where that is within LOD_HULL_LARGE_M of it (a cable coiled on a drum), else is
     collapsed again alone at LOD_WRECK_MORE times its triangles, as is a lamp. The
     cheapest first, while they cost no more than budget triangles over the collapses;
@@ -2687,7 +2687,7 @@ def stand_ins(prep, out, coll, budget):
     isl = {}
     for x, y in zip(pa.data, ia.data if ia else pa.data):
         isl.setdefault(x.value, []).append(y.value if ia else -1)
-    trees = {}
+    trees, edges = {}, set()
     O = _piece_faces(out, key=key)
     every = BVHTree.FromPolygons([v.co for v in prep.vertices],
                                  [list(p.vertices) for p in prep.polygons])
@@ -2719,14 +2719,16 @@ def stand_ins(prep, out, coll, budget):
             hdev = max(_dev(_samples(hv, hf), every, 0.9), _dev(_samples(vs, fs), th, 0.9))
             # a large part's hull only where it is that part to within LOD_HULL_LARGE_M (a
             # fluted sill strip, a box)
-            if hdev <= (LOD_HULL_LARGE_M if big else tol) or edge:
+            if edge:
+                edges.add(q)
+            if hdev <= (LOD_HULL_LARGE_M if big else tol):
                 cand.append((-e, q, h, len(h.polygons) - got))
                 trees[q] = tp
                 continue
             bpy.data.meshes.remove(h)
         if big:
             cand.append((-e, q, None, more))
-        else:
+        elif not edge:          # (a part on the edge of the box stays as it is)
             what[q] = "dropped"
     # the cheapest first (most parts put right for the triangles), while the budget lasts;
     # past it a small part goes, a large one stays as the collapse left it
@@ -2735,7 +2737,7 @@ def stand_ins(prep, out, coll, budget):
         if spent + extra > budget:
             if h is not None:
                 bpy.data.meshes.remove(h)
-            if -ne <= LOD_STANDIN_M and q not in lit:
+            if -ne <= LOD_STANDIN_M and q not in lit and q not in edges:
                 what[q] = "dropped"
             continue
         spent += extra

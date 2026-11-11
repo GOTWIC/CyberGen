@@ -182,8 +182,7 @@ budget still steps down), and share LOD0's textures. Per part, in this order:
    cable went); a lamp never does: the parts left out that hold it up stay.
 2. **Welded** (LOD3). Pieces that meet edge to edge (panels; never a lamp, whose faces the
    collapse would draw across its bezel) are welded where their vertices coincide (1.5 mm),
-   so the collapse moves their shared border
-   as one and opens no gap between them.
+   so the collapse moves their shared border as one and opens no gap between them.
 3. **Coplanar faces merged.** Faces within 0.5 degrees of one plane (LOD2 1, LOD3 2) are
    merged and triangulated again, so a flat door is a few long triangles and the budget goes
    to the curves; never across a UV island's border, a face class's or a piece's, and never
@@ -210,10 +209,11 @@ budget still steps down), and share LOD0's textures. Per part, in this order:
    (halved while the collapse alone cannot pay): a part no larger than 60 cm becomes its
    convex hull (26 corners at most, closed and clean) where the hull keeps within that
    distance of it both ways (its faces on the part or on what the part stands against, whose
-   faces there were removed as unseen) or the part is on the edge of the box; a larger one
+   faces there were removed as unseen); a larger one
    becomes its hull where that is within 3 cm of it (a cable coiled on a drum), else, as a
-   lamp, is collapsed again alone at twice its triangles. A small wreck past the budget
-   goes. Every vertex is then kept inside the part's own LOD0 box (the collapse places some
+   lamp, is collapsed again alone at twice its triangles. Any other small wreck, or one past
+   the budget, goes, unless it is on the edge of the box (it stays as the collapse left it).
+   Every vertex is then kept inside the part's own LOD0 box (the collapse places some
    past the surface).
 6. **Wheels at LOD3** are made anew: a round tube of 20 segments through LOD0's tire
    envelope (bead, sidewall, tread edges) with its own round normals, and a flat disc
