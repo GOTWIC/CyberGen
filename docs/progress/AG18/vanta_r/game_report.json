@@ -5,18 +5,18 @@
  "triangles": {
   "original": 240286,
   "lods": [
-   116731,
-   59987,
-   19240,
-   4801
+   118974,
+   59992,
+   19800,
+   5138
   ],
   "lod0_parts": {
-   "body": 68355,
+   "body": 69990,
    "glass": 2976,
-   "wheel_fl": 11528,
-   "wheel_fr": 11528,
-   "wheel_rl": 10764,
-   "wheel_rr": 10764,
+   "wheel_fl": 11680,
+   "wheel_fr": 11680,
+   "wheel_rl": 10916,
+   "wheel_rr": 10916,
    "brake_fl": 204,
    "brake_fr": 204,
    "brake_rl": 204,
@@ -27,22 +27,37 @@
   "original": 93,
   "parts": 10
  },
+ "size_class": {
+  "name": "standard",
+  "exterior_m2": 35.62,
+  "rule": "large when the body's exterior is 55 m2 or more",
+  "lod_budgets": [
+   150000,
+   60000,
+   20000,
+   5000
+  ],
+  "texel_floor_px_per_m": {
+   "body": 300.0,
+   "wheels": 300.0
+  }
+ },
  "textures": {
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 21482925,
- "seconds": 270.9,
+ "pack_bytes": 31486219,
+ "seconds": 434.3,
  "stage_seconds": {
   "build": 0.5,
-  "render_original": 21.0,
-  "parts": 4.2,
+  "render_original": 25.6,
+  "parts": 6.2,
   "nodes": 0.0,
-  "uv": 2.4,
-  "bake": 157.6,
-  "lods_export": 1.7,
-  "textures": 6.992828845977783,
-  "proof": 76.41945910453796
+  "uv": 48.0,
+  "bake": 251.5,
+  "lods_export": 12.4,
+  "textures": 8.384926795959473,
+  "proof": 81.4127299785614
  },
  "baked_down": {
   "card_src": {
@@ -54,11 +69,10 @@
    ]
   },
   "relief": {
-   "pieces": 7,
-   "triangles": 6568,
+   "pieces": 6,
+   "triangles": 6536,
    "names": [
     "decals",
-    "led.marker",
     "led.name",
     "lettering",
     "lines",
@@ -80,31 +94,41 @@
  "texel_px_per_m": {
   "body": {
    "exterior": {
-    "area_m2": 35.491,
-    "p5": 430.1,
-    "median": 448.1
+    "area_m2": 35.62,
+    "p5": 423.4,
+    "median": 436.5
    },
    "underside": {
-    "area_m2": 0.199,
-    "p5": 156.5,
-    "median": 454.7
+    "area_m2": 0.178,
+    "p5": 153.2,
+    "median": 447.2
    },
    "cabin": {
-    "area_m2": 11.389,
-    "p5": 179.0,
-    "median": 179.1
+    "area_m2": 11.827,
+    "p5": 174.3,
+    "median": 174.4
+   },
+   "lamp_in_gaps": {
+    "area_m2": 0.172,
+    "p5": 140.0,
+    "median": 152.5
    }
   },
   "wheels": {
    "exterior": {
     "area_m2": 5.092,
-    "p5": 364.3,
-    "median": 399.6
+    "p5": 387.4,
+    "median": 422.3
    },
    "underside": {
     "area_m2": 0.024,
-    "p5": 139.8,
-    "median": 399.6
+    "p5": 147.8,
+    "median": 416.6
+   },
+   "lamp_in_gaps": {
+    "area_m2": 0.035,
+    "p5": 147.8,
+    "median": 147.8
    }
   }
  },
@@ -114,7 +138,7 @@
   "script": "vehicles/cars/vanta_r.py",
   "script_sha256": "5af82e8775bac6f88aa1e842b7e6aa0f88a1e721750ca746a4c3b1cc1b9aa9ae",
   "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
-  "game_sha256": "67c3771ba2cb69ac1405d92e8369e067fba321081d4a4193f60050a8eab2adc6",
+  "game_sha256": "78354a4b976828201baedac5dd92294b8b30189ddfb47178987bade118c5e99a",
   "original_triangles": 240286,
   "original_objects": 93
  },
@@ -135,25 +159,25 @@
    "detail": [
     {
      "lod": 0,
-     "triangles": 116731,
+     "triangles": 118974,
      "budget": 150000,
      "ok": true
     },
     {
      "lod": 1,
-     "triangles": 59987,
+     "triangles": 59992,
      "budget": 60000,
      "ok": true
     },
     {
      "lod": 2,
-     "triangles": 19240,
+     "triangles": 19800,
      "budget": 20000,
      "ok": true
     },
     {
      "lod": 3,
-     "triangles": 4801,
+     "triangles": 5138,
      "budget": 5000,
      "ok": true
     }
@@ -166,13 +190,13 @@
     "limit": 0.005,
     "slots": {
      "body": {
-      "overlap": 1e-05,
-      "coverage": 0.4797,
+      "overlap": 0.001,
+      "coverage": 0.5455,
       "outside_unit": 0.0
      },
      "wheels": {
       "overlap": 0.0,
-      "coverage": 0.1948,
+      "coverage": 0.2179,
       "outside_unit": 0.0
      }
     }
@@ -183,14 +207,14 @@
    "ok": true,
    "detail": {
     "body": {
-     "p5": 430.1,
-     "median": 448.1,
+     "p5": 423.4,
+     "median": 436.5,
      "floor": 300.0,
      "ok": true
     },
     "wheels": {
-     "p5": 364.3,
-     "median": 399.6,
+     "p5": 387.4,
+     "median": 422.3,
      "floor": 300.0,
      "ok": true
     }
@@ -295,7 +319,7 @@
      "deviation_m": [
       0.0,
       0.0,
-      0.0001
+      0.0
      ],
      "tolerance_m": [
       0.0703,
@@ -307,8 +331,8 @@
     {
      "lod": 2,
      "deviation_m": [
-      0.0008,
-      0.0003,
+      0.0007,
+      0.0007,
       0.0038
      ],
      "tolerance_m": [
@@ -321,15 +345,60 @@
     {
      "lod": 3,
      "deviation_m": [
-      0.0042,
-      0.0082,
-      0.0083
+      0.0005,
+      0.0007,
+      0.0
      ],
      "tolerance_m": [
       0.0703,
       0.0309,
       0.02
      ],
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "lod_fidelity",
+   "ok": true,
+   "detail": [
+    {
+     "normal_p95_deg": 1.59,
+     "bent_share": 0.0016,
+     "texture_share": 0.0006,
+     "miss_share": 0.0018,
+     "lod": 1,
+     "limits": {
+      "p95": 12.0,
+      "bent": 0.02,
+      "tex": 0.01
+     },
+     "ok": true
+    },
+    {
+     "normal_p95_deg": 12.99,
+     "bent_share": 0.0052,
+     "texture_share": 0.001,
+     "miss_share": 0.0006,
+     "lod": 2,
+     "limits": {
+      "p95": 25.0,
+      "bent": 0.05,
+      "tex": 0.025
+     },
+     "ok": true
+    },
+    {
+     "normal_p95_deg": 32.27,
+     "bent_share": 0.0783,
+     "texture_share": 0.0149,
+     "miss_share": 0.0276,
+     "lod": 3,
+     "limits": {
+      "p95": 36.0,
+      "bent": 0.1,
+      "tex": 0.04
+     },
      "ok": true
     }
    ]
