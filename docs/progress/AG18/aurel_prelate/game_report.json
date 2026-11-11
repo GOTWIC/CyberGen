@@ -6,9 +6,9 @@
   "original": 215832,
   "lods": [
    122026,
-   59992,
-   19372,
-   4837
+   59996,
+   20173,
+   5239
   ],
   "lod0_parts": {
    "body": 71058,
@@ -27,18 +27,18 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 19769035,
- "seconds": 583.9,
+ "pack_bytes": 27697703,
+ "seconds": 427.5,
  "stage_seconds": {
   "build": 0.4,
-  "render_original": 84.6,
-  "parts": 6.5,
+  "render_original": 19.5,
+  "parts": 6.4,
   "nodes": 0.0,
-  "uv": 5.9,
-  "bake": 344.2,
-  "lods_export": 2.0,
-  "textures": 8.057661771774292,
-  "proof": 131.94247794151306
+  "uv": 5.8,
+  "bake": 316.2,
+  "lods_export": 10.5,
+  "textures": 7.869549036026001,
+  "proof": 60.44222402572632
  },
  "baked_down": {
   "relief": {
@@ -125,7 +125,7 @@
   "script": "vehicles/cars/aurel_prelate.py",
   "script_sha256": "da28fc97971457c323a5fac8ae363ae2cf15bfd00fa50c470c97d666c126d4d5",
   "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
-  "game_sha256": "1cb5d3c68c885eda9ec8e5f7c3126bfb3590b59d6165a8d2596418155f0b1c1d",
+  "game_sha256": "5176bac6ab23cacc49424406bbff9e92bc23fcf15da00a467b945c5437f956c9",
   "original_triangles": 215832,
   "original_objects": 95
  },
@@ -152,19 +152,19 @@
     },
     {
      "lod": 1,
-     "triangles": 59992,
+     "triangles": 59996,
      "budget": 60000,
      "ok": true
     },
     {
      "lod": 2,
-     "triangles": 19372,
+     "triangles": 20173,
      "budget": 20000,
      "ok": true
     },
     {
      "lod": 3,
-     "triangles": 4837,
+     "triangles": 5239,
      "budget": 5000,
      "ok": true
     }
@@ -320,7 +320,7 @@
      "deviation_m": [
       0.0,
       0.001,
-      0.002
+      0.0043
      ],
      "tolerance_m": [
       0.0779,
@@ -332,15 +332,60 @@
     {
      "lod": 3,
      "deviation_m": [
-      0.008,
-      0.001,
-      0.0069
+      0.0058,
+      0.0065,
+      0.0007
      ],
      "tolerance_m": [
       0.0779,
       0.0302,
       0.02
      ],
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "lod_fidelity",
+   "ok": true,
+   "detail": [
+    {
+     "normal_p95_deg": 1.27,
+     "bent_share": 0.0021,
+     "texture_share": 0.0009,
+     "miss_share": 0.0005,
+     "lod": 1,
+     "limits": {
+      "p95": 4.0,
+      "bent": 0.01,
+      "tex": 0.01
+     },
+     "ok": true
+    },
+    {
+     "normal_p95_deg": 4.41,
+     "bent_share": 0.0082,
+     "texture_share": 0.002,
+     "miss_share": 0.0006,
+     "lod": 2,
+     "limits": {
+      "p95": 10.0,
+      "bent": 0.03,
+      "tex": 0.025
+     },
+     "ok": true
+    },
+    {
+     "normal_p95_deg": 22.17,
+     "bent_share": 0.0473,
+     "texture_share": 0.0108,
+     "miss_share": 0.0125,
+     "lod": 3,
+     "limits": {
+      "p95": 35.0,
+      "bent": 0.08,
+      "tex": 0.04
+     },
      "ok": true
     }
    ]

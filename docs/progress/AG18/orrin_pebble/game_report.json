@@ -6,9 +6,9 @@
   "original": 266030,
   "lods": [
    145435,
-   59992,
-   18423,
-   4599
+   59994,
+   19723,
+   5123
   ],
   "lod0_parts": {
    "body": 45259,
@@ -27,18 +27,18 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 21634460,
- "seconds": 533.9,
+ "pack_bytes": 30353549,
+ "seconds": 410.7,
  "stage_seconds": {
   "build": 1.0,
-  "render_original": 84.0,
-  "parts": 24.5,
+  "render_original": 21.1,
+  "parts": 24.1,
   "nodes": 0.0,
   "uv": 2.5,
-  "bake": 286.2,
-  "lods_export": 2.4,
-  "textures": 10.384734869003296,
-  "proof": 122.64995384216309
+  "bake": 270.2,
+  "lods_export": 8.4,
+  "textures": 10.348099946975708,
+  "proof": 72.88372421264648
  },
  "baked_down": {
   "collapse": {
@@ -120,7 +120,7 @@
   "script": "vehicles/cars/orrin_pebble.py",
   "script_sha256": "e76935301c007e562f045b25963801a27506e16b2e28336ced768bad7411d13b",
   "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
-  "game_sha256": "1cb5d3c68c885eda9ec8e5f7c3126bfb3590b59d6165a8d2596418155f0b1c1d",
+  "game_sha256": "5176bac6ab23cacc49424406bbff9e92bc23fcf15da00a467b945c5437f956c9",
   "original_triangles": 266030,
   "original_objects": 48
  },
@@ -147,19 +147,19 @@
     },
     {
      "lod": 1,
-     "triangles": 59992,
+     "triangles": 59994,
      "budget": 60000,
      "ok": true
     },
     {
      "lod": 2,
-     "triangles": 18423,
+     "triangles": 19723,
      "budget": 20000,
      "ok": true
     },
     {
      "lod": 3,
-     "triangles": 4599,
+     "triangles": 5123,
      "budget": 5000,
      "ok": true
     }
@@ -313,8 +313,8 @@
     {
      "lod": 2,
      "deviation_m": [
-      0.0006,
       0.0001,
+      0.0,
       0.0018
      ],
      "tolerance_m": [
@@ -327,15 +327,60 @@
     {
      "lod": 3,
      "deviation_m": [
-      0.0112,
+      0.0009,
       0.006,
-      0.0059
+      0.0006
      ],
      "tolerance_m": [
       0.0423,
       0.0242,
       0.0228
      ],
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "lod_fidelity",
+   "ok": true,
+   "detail": [
+    {
+     "normal_p95_deg": 0.75,
+     "bent_share": 0.0029,
+     "texture_share": 0.0003,
+     "miss_share": 0.0,
+     "lod": 1,
+     "limits": {
+      "p95": 4.0,
+      "bent": 0.01,
+      "tex": 0.01
+     },
+     "ok": true
+    },
+    {
+     "normal_p95_deg": 1.93,
+     "bent_share": 0.0025,
+     "texture_share": 0.0012,
+     "miss_share": 0.0011,
+     "lod": 2,
+     "limits": {
+      "p95": 10.0,
+      "bent": 0.03,
+      "tex": 0.025
+     },
+     "ok": true
+    },
+    {
+     "normal_p95_deg": 8.21,
+     "bent_share": 0.0191,
+     "texture_share": 0.0149,
+     "miss_share": 0.017,
+     "lod": 3,
+     "limits": {
+      "p95": 35.0,
+      "bent": 0.08,
+      "tex": 0.04
+     },
      "ok": true
     }
    ]

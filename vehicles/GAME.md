@@ -18,7 +18,8 @@ vehicles/blender.sh vehicles/game.py --car vanta_r --test          # 1024 / 512,
 | `--test` | 1024 / 512 textures, a quarter of the samples, half-size renders |
 | `--docs` | also writes `docs/progress/AG18/<car>/game.jpg` and `game_report.json` |
 | `--views a,b` | more views compared in `proof/` (the car's own, e.g. `nose,tail,wheel`) |
-| `--keep-work` | keeps the raw bakes in `work/` |
+| `--keep-work` | keeps the raw bakes and LOD0's parts (`work/lod_input.blend`) in `work/` |
+| `--lods-only` | the LODs again from an earlier `--keep-work` run (seconds, plus the proof's LOD views and the checks), for work on the LODs |
 
 The car's script is not changed and gives no hints: everything is decided by rules on the
 built objects (below). One run is one job under `blender.sh`'s lock; it runs a second
@@ -141,12 +142,47 @@ it. Measured density (px/m, area weighted median and 5th percentile, per class) 
 
 ## LODs
 
-LOD0 the parts as above. LOD1 to LOD3 are collapses of LOD0 (body and glass symmetric in
-y) to their budgets (60,000, 20,000, 5,000), each at most 60% of the LOD before it (a car
-under budget still steps down), sharing LOD0's UVs and textures; LOD2 and LOD3 drop the
-cabin's faces. A LOD whose box falls short of LOD0's by more than `lod_bounds` allows (a
-glass crown collapsed away) has the parts that reach that side collapsed again at twice
-their ratio, the others a little more to hold the budget.
+LOD0 the parts as above. LOD1 to LOD3 are made from LOD0 to their budgets (60,000, 20,000,
+5,000), each at most 60% of the LOD before it (a car under budget still steps down), and
+share LOD0's textures. Per part, in this order:
+
+1. **Left out.** From LOD2 the cabin's faces; from LOD2 every piece no larger than 5 cm
+   (LOD3: 12 cm) in any direction (bolts, sensors, small vents; lamps never); at LOD3 the
+   faces seen only from below.
+2. **Coplanar faces merged.** Faces within 0.5 degrees of one plane (LOD2 1, LOD3 2) are
+   merged and triangulated again, so a flat door is a few long triangles and the budget goes
+   to the curves; never across a UV island's border, a face class's or a piece's, and never
+   a face LOD0 shades curved (its normals off its plane: a bevel, glass drawn smooth over
+   flat facets).
+3. **Collapsed** (Blender's collapse, body symmetric in y) at one ratio for every part to
+   the budget. A piece the collapse takes under its floor (LOD2: 8 triangles and 150 a
+   square meter of its area, LOD3: 6 and 120, less when that would take over 60% of the
+   budget; a lamp keeps half (LOD2) or a quarter (LOD3) of its own) is collapsed again alone
+   to that floor, so no panel or light strip vanishes. Glass LOD0 draws through its normals
+   (a coarse sheet shaded smooth: over 10% of its corners 15 degrees off their face) is not
+   collapsed while it is under 30% of the LOD; from LOD3 its grid is unsubdivided instead
+   (every kept corner where LOD0 had it). Dense glass is collapsed as any part.
+4. **Wheels at LOD3**: the tire is a round tube of 20 segments through LOD0's tire envelope
+   (bead, sidewall, tread edges), with its own round normals; the rest of the wheel is
+   collapsed.
+5. **UVs and normals laid on from LOD0.** Every corner takes the UV and the shading normal
+   LOD0 draws at the point of the face's own UV island straight under it (along the face
+   normal, else the nearest; a point a little inside the face, so the two sides of a crease
+   keep theirs). A face reads only its own island, so a texture cannot tear across an
+   island's border however the collapse moved it, and the LOD shades as LOD0 does
+   (recomputed normals on a coarse mesh ripple in every reflection).
+
+A LOD whose box falls short of LOD0's by more than `lod_bounds` allows (a glass crown
+collapsed away) has the parts that reach that side collapsed again at twice their ratio,
+the others a little more to hold the budget.
+
+Each LOD is measured against LOD0 (`lods[k].fidelity` in `pack.json`, check
+`lod_fidelity`): at points spread over the body's exterior (one per 40 cm2 at least), LOD0's
+surface nearest along the normal line (within 3 cm), the angle between the two shading
+normals and, through the two UVs, the bake's base color and paint weights (at 1024 px):
+the area weighted 95th percentile angle (`normal_p95_deg`), the share over 25 degrees
+(`bent_share`), the share with a channel off by 0.25 (`texture_share`, a torn or smeared
+texture) and the share with no LOD0 within reach (`miss_share`, reported only).
 
 ## Collision
 
@@ -165,7 +201,7 @@ corners (the farthest points along 128 directions). `collision.glb`, nodes
 | `kind` | `wheeled` or `hover` |
 | `dimensions` | length, width, height, min and max (LOD0, wheels included) |
 | `wheelbase`, `track`, `ride_height` | axle to axle; per axle (0 the front) left to right; the body's lowest point |
-| `lods` | per LOD: file, triangles, budget, triangles per part |
+| `lods` | per LOD: file, triangles, budget, triangles per part; from LOD1 `fidelity` (see LODs) |
 | `parts` | per node: name, kind (`body`, `glass`, `wheel`, `brake`), material, pivot; wheels and brakes also radius, width, side, axle, `steers`, `spins`, `follows`, `uv_shared_with` |
 | `materials` | per slot: textures (file, size, color space, channels) and params |
 | `colors`, `tinted_materials` | show colors per channel; the materials that follow them |
@@ -173,7 +209,7 @@ corners (the farthest points along 128 directions). `collision.glb`, nodes
 | `micro_detail` | detail left to the engine's detail maps |
 | `lights` | every emissive surface grouped into lamps: role (`head`, `tail`, `marker`, `wheel`, `cabin`, `glow`, `lamp`, `emitter`), part, position, size, facing, area, color, strength |
 | `collision` | file and hulls |
-| `views`, `cameras` | the hero view and the cameras of the proof renders |
+| `views`, `cameras` | the hero view, the studio as the car's script set it up (`views.studio`: per light its energy and color, and `unlit`, the parts a light was linked off), and the cameras of the proof renders |
 | `baked_down` | what was removed or replaced, and how |
 | `uv` | islands, measured texel density, its floor, the density factor of the islands under baked-down detail (`detail_boost`) |
 | `build` | test or full, samples, seconds per stage |
@@ -189,11 +225,16 @@ corners (the farthest points along 128 directions). `collision.glb`, nodes
 - `wheel_pivots`: every wheel's tread centered on its node's pivot (3 mm), its radius as
   `pack.json` says, the axle no lower than the radius less 12 mm.
 - `lod_bounds`: every LOD's box within 2 cm (or 1.5% of the size) of LOD0's.
+- `lod_fidelity`: every LOD drawn as LOD0 (above): `normal_p95_deg` at most 4, 10, 35
+  degrees (LOD1, 2, 3), `bent_share` at most 1%, 3%, 8%, `texture_share` at most 1%, 2.5%,
+  4%. A crumpled or torn LOD fails.
 - `collision`: 4 to 12 hulls.
 
 ## Proof
 
 `proof/` and `game.jpg`: the pack alone (the GLBs and PNGs, through the formula above, in a
-fresh Blender, in the kit's studio) next to the procedural original from the same camera,
+fresh Blender, in the kit's studio as the car's own script set it up: its light energies
+and colors, and a light linked off some of the car's objects kept off the parts they make
+up, at 30% of a part's area or more, from `views.studio`) next to the procedural original from the same camera,
 a recolored copy, the textures, and the four LODs (from `opaque_from_lod` the glass dark
 and opaque, as an engine draws it).
