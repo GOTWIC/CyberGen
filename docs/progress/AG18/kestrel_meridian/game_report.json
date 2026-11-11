@@ -5,13 +5,13 @@
  "triangles": {
   "original": 90334,
   "lods": [
-   61515,
-   36909,
-   19871,
-   5073
+   61929,
+   37156,
+   19897,
+   5084
   ],
   "lod0_parts": {
-   "body": 60251,
+   "body": 60665,
    "glass": 1264
   }
  },
@@ -22,18 +22,18 @@
  "textures": {
   "body": 4096
  },
- "pack_bytes": 27055170,
- "seconds": 541.3,
+ "pack_bytes": 25715760,
+ "seconds": 464.9,
  "stage_seconds": {
   "build": 0.2,
-  "render_original": 80.4,
-  "parts": 7.5,
+  "render_original": 82.3,
+  "parts": 7.4,
   "nodes": 0.0,
-  "uv": 98.9,
-  "bake": 126.8,
-  "lods_export": 10.3,
-  "textures": 5.943846225738525,
-  "proof": 211.0948669910431
+  "uv": 92.8,
+  "bake": 121.1,
+  "lods_export": 9.6,
+  "textures": 5.920777797698975,
+  "proof": 145.49047875404358
  },
  "baked_down": {
   "relief": {
@@ -55,18 +55,23 @@
   "body": {
    "exterior": {
     "area_m2": 41.759,
-    "p5": 339.1,
-    "median": 342.7
+    "p5": 337.6,
+    "median": 348.2
    },
    "cabin": {
     "area_m2": 23.535,
-    "p5": 136.8,
-    "median": 137.1
+    "p5": 137.7,
+    "median": 139.2
    },
    "underside": {
     "area_m2": 0.809,
-    "p5": 119.9,
-    "median": 137.6
+    "p5": 121.7,
+    "median": 343.3
+   },
+   "lamp_in_gaps": {
+    "area_m2": 0.618,
+    "p5": 121.7,
+    "median": 121.7
    }
   }
  },
@@ -76,7 +81,7 @@
   "script": "vehicles/cars/kestrel_meridian.py",
   "script_sha256": "6721720365425c67d736f7c0f951ba020838111e61bba54331fb01a228c46cf1",
   "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
-  "game_sha256": "41f5f16c7cf9769a0c7d8b5940c39d8348a22ecf7a01af9cd446e9838e2b602f",
+  "game_sha256": "8eece639aaa11a6d467231ecceefa1b724ad06162ada805edb3b0a05a998f25e",
   "original_triangles": 90334,
   "original_objects": 110
  },
@@ -97,25 +102,25 @@
    "detail": [
     {
      "lod": 0,
-     "triangles": 61515,
+     "triangles": 61929,
      "budget": 150000,
      "ok": true
     },
     {
      "lod": 1,
-     "triangles": 36909,
+     "triangles": 37156,
      "budget": 60000,
      "ok": true
     },
     {
      "lod": 2,
-     "triangles": 19871,
+     "triangles": 19897,
      "budget": 20000,
      "ok": true
     },
     {
      "lod": 3,
-     "triangles": 5073,
+     "triangles": 5084,
      "budget": 5000,
      "ok": true
     }
@@ -128,8 +133,8 @@
     "limit": 0.005,
     "slots": {
      "body": {
-      "overlap": 0.00367,
-      "coverage": 0.3343,
+      "overlap": 0.00375,
+      "coverage": 0.4273,
       "outside_unit": 0.0
      }
     }
@@ -140,8 +145,8 @@
    "ok": true,
    "detail": {
     "body": {
-     "p5": 339.1,
-     "median": 342.7,
+     "p5": 337.6,
+     "median": 348.2,
      "floor": 300.0,
      "ok": true
     }
@@ -188,7 +193,7 @@
      "lod": 3,
      "deviation_m": [
       0.0028,
-      0.002,
+      0.0033,
       0.0022
      ],
      "tolerance_m": [
@@ -205,40 +210,40 @@
    "ok": true,
    "detail": [
     {
-     "normal_p95_deg": 1.59,
-     "bent_share": 0.0046,
-     "texture_share": 0.0019,
-     "miss_share": 0.0,
+     "normal_p95_deg": 1.76,
+     "bent_share": 0.0027,
+     "texture_share": 0.0012,
+     "miss_share": 0.0013,
      "lod": 1,
      "limits": {
-      "p95": 4.0,
-      "bent": 0.01,
+      "p95": 12.0,
+      "bent": 0.02,
       "tex": 0.01
      },
      "ok": true
     },
     {
-     "normal_p95_deg": 4.55,
-     "bent_share": 0.008,
-     "texture_share": 0.0054,
-     "miss_share": 0.0011,
+     "normal_p95_deg": 7.2,
+     "bent_share": 0.0055,
+     "texture_share": 0.004,
+     "miss_share": 0.0023,
      "lod": 2,
      "limits": {
-      "p95": 10.0,
-      "bent": 0.03,
+      "p95": 25.0,
+      "bent": 0.05,
       "tex": 0.025
      },
      "ok": true
     },
     {
-     "normal_p95_deg": 76.03,
-     "bent_share": 0.0862,
-     "texture_share": 0.0384,
-     "miss_share": 0.0318,
+     "normal_p95_deg": 32.53,
+     "bent_share": 0.0664,
+     "texture_share": 0.0289,
+     "miss_share": 0.0444,
      "lod": 3,
      "limits": {
       "p95": null,
-      "bent": 0.12,
+      "bent": 0.15,
       "tex": 0.05
      },
      "ok": true
@@ -255,7 +260,7 @@
      216,
      330,
      170,
-     272,
+     284,
      154,
      224,
      158,
