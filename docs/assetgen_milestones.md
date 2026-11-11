@@ -2853,7 +2853,7 @@ as they were:
   carriageway by design); the stage's own check measures them.
 - **Paint** (`table.paint`): color is never a brand's, so the palette is the car's role's
   (luxury, sport, private, fleet, work) with the district's colors added (neon in the
-  entertainment market, faded tones in the old town, monochrome in the corporate core);
+  entertainment market, faded tones in the old town, deep blues, wines and teals in the corporate core);
   primary by hash, secondary the primary, a dark trim or a second color, accent from a short
   list; drawn again while the car before it on the curb is the same model in the same color.
 - **Hover cars parked** are set down: the pack's lowest point (pods or skids) on the asphalt,
@@ -2885,7 +2885,7 @@ placed as 17 models (Orrin Lumen 136, Aurel Regent 109, Orrin Pebble 101, Halcyo
 Aurel Prelate 83, Tanager Cab 76, Halcyon Ridge 66, Aurel Zenith 60, Tanager Mino 48, Vanta-R
 36, Orrin Aria 22, Tanager Porter 22, Brakk Bastion 16, Kestrel Meridian 16, Kestrel Dart 10,
 Brakk Mule 9, Brakk Hauler 8; the Kestrel Atlas has no weight there), 86 hover cars set down,
-49 primary colors, the longest run of one model along a curb 3. In the scene: the 22 placement
+54 primary colors, the longest run of one model along a curb 3. In the scene: the 22 placement
 actors replace AG8's 22 parked car actors (13,943 actors as before), 1,528 instanced
 components (AG8's 211 go: 71,567 to 72,884), 5,930 part instances (AG8's 912 go), 12 fewer
 distinct Nanite meshes (AG8's variants; the vehicles' 104 meshes are not Nanite), 114.8 million

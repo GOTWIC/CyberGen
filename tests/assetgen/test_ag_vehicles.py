@@ -231,3 +231,38 @@ def test_exporter_and_scene(tmp_path):
     assert v["components"] == 4 + 2 and v["instances"] == 2 * 4 + 2
     assert sc["city"]["actors"] == len(hashes)
     assert "vehicles" not in SC.count(before)["city"]
+
+
+def test_preview_job(tmp_path):
+    """The textured preview: AG8's parked car entries a placement replaces are not drawn,
+    the vehicles are, near a street view's eye (LOD2) and in a view from above of their
+    tiles (LOD3), each with its three paints."""
+    from assetgen.materials import preview as MV
+    key = "prop.parked_vehicle.t+00+00"
+    part = {"node": "prop.parked_vehicle.sleek.v0", "glb": "props/variants/p.glb",
+            "xforms": [[10, 10, 0, 0, 1, 1, 1]], "ids": ["a"]}
+    other = {"node": "prop.bench.sleek.v0", "glb": "props/variants/b.glb",
+             "xforms": [[12, 10, 0, 0, 1, 1, 1]], "ids": ["b"]}
+    (tmp_path / "unreal_contribution.props.json").write_text(json.dumps({"entries": [
+        {"key": key, "pivot": [128, 128, 0], "parts": [part]},
+        {"key": "prop.bench.t+00+00", "pivot": [128, 128, 0], "parts": [other]}]}))
+    (tmp_path / "unreal_contribution.signs.json").write_text(json.dumps({"entries": []}))
+    paint = [[0.1, 0.2, 0.3], [0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]
+    (tmp_path / VB.CONTRIB).write_text(json.dumps({
+        "library": str(tmp_path / "lib"), "cars": {"tanager_mino": {}},
+        "entries": [{"key": "vehicles.parked.t+00+00", "tile": "t+00+00",
+                     "pivot": [128, 128, 0], "replaces": [key],
+                     "vehicles": [{"car": "tanager_mino", "id": "a",
+                                   "xform": [10, 10, 0.05, 90.0], "paint": paint}]}]}))
+    views = [{"name": "street", "ortho": False, "eye": [140, 140, 2], "shell_tiles": []},
+             {"name": "iso_d01", "ortho": True, "shell_tiles": ["t+00+00"]},
+             {"name": "iso_d02", "ortho": True, "shell_tiles": ["t+01+00"]}]
+    got = MV._ag8(tmp_path, views)
+    assert got["vehicles"] == {"tanager_mino": str(tmp_path / "lib" / "tanager_mino")}
+    assert not any("parked_vehicle" in f for f in got["families"]) and key in got["removed"]
+    st, iso, far = views
+    assert list(st["ag8"]["points"]) == ["prop.bench.sleek.v0"]
+    want = [138.0, 138.0, 0.05, 90.0] + [c for col in paint for c in col]
+    assert st["vehicles"] == {"lod": MV.VEHICLE_LOD_NEAR, "cars": {"tanager_mino": [want]}}
+    assert iso["vehicles"] == {"lod": MV.VEHICLE_LOD_FAR, "cars": {"tanager_mino": [want]}}
+    assert far["vehicles"] == {}

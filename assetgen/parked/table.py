@@ -23,8 +23,8 @@ multiplies a model's weight everywhere (0 leaves it out of the city).
 **Paint.** Color is never part of a brand's language (`vehicles/BRANDS.md`), so a car's paint
 is drawn per placement, from the palette of its role (`ROLE`: what the car is used for, not
 who made it) with the district's own colors added (`DISTRICT_COLORS`: neon in the
-entertainment market, faded tones in the old town, monochrome in the corporate core), by a
-hash of its id: the primary color; the secondary (the car's second paint channel: a spine, a
+entertainment market, faded tones in the old town, deep blues, wines and teals in the
+corporate core), by a hash of its id: the primary color; the secondary (the car's second paint channel: a spine, a
 roof, a lower body) the primary again, a dark trim or a second color of the palette; the
 accent (calipers, small trims) from `ACCENTS`. Colors are given in sRGB and stored linear, as
 the packs' show colors are.
@@ -117,8 +117,8 @@ ROLE = {
 
 # sRGB hex, (name, weight)
 PALETTES = {
-    "luxury": {"#0b0c0e": 6, "#f1efe8": 5, "#a9adb2": 4, "#2b2e33": 4, "#121c33": 3,
-               "#4a1219": 2, "#b8a27c": 2, "#5a4632": 1, "#16301f": 1},
+    "luxury": {"#0b0c0e": 4, "#f1efe8": 4, "#a9adb2": 3, "#2b2e33": 3, "#121c33": 3,
+               "#4a1219": 3, "#b8a27c": 2, "#5a4632": 1, "#16301f": 2, "#3d2a5c": 1},
     "sport": {"#c1121b": 4, "#f2c40c": 3, "#ef6c11": 2, "#7ccf1c": 1, "#11b2c9": 2,
               "#c71d8b": 1, "#f4f4f2": 4, "#0d0d0f": 4, "#3c4147": 3, "#4b2a8a": 1,
               "#1a4fd0": 2},
@@ -135,7 +135,7 @@ DISTRICT_COLORS = {
                              "#ff7a00": 2},
     "old_town": {"#7a6a4f": 2, "#556b2f": 2, "#8c5a3c": 2, "#5f7f8a": 2},
     "megablock_residential": {"#6e7f5a": 1, "#8a7d6b": 1},
-    "corporate_core": {"#0b0c0e": 3, "#f1efe8": 3, "#9aa0a6": 3},
+    "corporate_core": {"#9aa0a6": 1, "#123a6b": 2, "#6b0f1a": 2, "#0f5257": 2, "#b0892f": 1},
     "research_campus": {"#e9eef2": 2, "#9ec9d6": 1},
     "spaceport": {"#e9eaec": 2, "#ff5a1f": 1},
     "industrial_port": {"#f2b705": 2, "#e8641b": 1},
