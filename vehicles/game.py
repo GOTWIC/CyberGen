@@ -52,7 +52,7 @@ T0 = time.time()
 # budgets and rules (GAME.md says why)
 LOD_TRIS = (150000, 60000, 20000, 5000)
 FLAT_RELIEF_M = 0.0032          # relief this low is always baked onto the surface under it
-RELIEF_ONE_SURFACE = 0.7       # relief lies on one piece: this share of its points at least
+RELIEF_ONE_SURFACE = 0.7       # a lamp is relief on one piece: this share of its points
 TALL_RELIEF_M = 0.0125          # relief up to this tall is baked down when over the budget
 CARD_DENSITY = 15000.0          # triangles per m2 of a dense array's outline: a card
 CARD_MIN_TRIS = 1500
@@ -723,7 +723,7 @@ def world_bvh(pieces):
     return BVHTree.FromPolygons(vs, ps), owner
 
 
-def find_relief(pieces):
+def find_relief(pieces, lit=()):
     """Each piece's height over the surfaces of other pieces it lies on, when every one of
     its vertices is within TALL_RELIEF_M of another piece's surface."""
     tree, owner = world_bvh([p for p in pieces if p.part != "glass"])
@@ -751,9 +751,10 @@ def find_relief(pieces):
                 break
             h = max(h, best[0])
             under[best[1]] = under.get(best[1], 0) + 1
-        # relief lies on one surface: a piece whose points fall on many others (a light
-        # band behind a row of flutes) is no relief, its bake would land in patches
-        if h is not None and max(under.values()) < RELIEF_ONE_SURFACE * sum(under.values()):
+        # a lamp is relief only on one surface: one whose points fall on many others (a
+        # light band behind a row of flutes) would bake in patches; it stays as it is
+        if h is not None and p.mat in lit and \
+                max(under.values()) < RELIEF_ONE_SURFACE * sum(under.values()):
             log("  not relief: %s lies on %d pieces, %.0f%% on the most" % (
                 p.name, len(under), 100 * max(under.values()) / sum(under.values())))
             h = None
@@ -2633,7 +2634,7 @@ def main_build(A):
     studio = studio_record(K, pieces)
 
     # 3. bake down: flat relief and cards always
-    find_relief(pieces)
+    find_relief(pieces, {mi.name for mi in infos.values() if mi.emissive})
     tree_all, owner = world_bvh([p for p in pieces if p.part == "body"])
     cards = find_cards(pieces, tree_all, owner)
     for c in cards:
