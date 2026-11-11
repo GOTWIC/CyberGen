@@ -1534,7 +1534,7 @@ def stage2_master(master, defaults=None):
 
 # --- AG18's vehicles (citygen/unreal_vehicles.py; the packs' contract: vehicles/GAME.md) ------
 
-VEHICLE_VERSION = "5"        # of the vehicle masters (`cg.vehicle` metadata)
+VEHICLE_VERSION = "6"        # of the vehicle masters (`cg.vehicle` metadata)
 VEHICLE_MESH_VERSION = "3"   # of what the importer makes of a car (with its manifest hash)
 VEHICLE_ACTOR_VERSION = "2"  # of the placement actors (2: the glass casts no shadow)
 # the paint per placement: Custom Primitive Data, or per-instance custom data on an
@@ -1697,11 +1697,36 @@ def vehicle_glass_master(opaque):
         MEL.connect_material_property(r2, "", MP.MP_ROUGHNESS)
     else:
         trans = sparam(m, "Transmission", -700, 360, 1.0)
+        # the inner sheet: a face whose normal points into the car (toward GlassCenter, the
+        # middle of the car's box, mesh space cm). Seen from outside it is the far side's
+        # glass behind the near one, drawn in the same mesh in triangle order, not by depth:
+        # it composited over the near glass in black and bright patches (the Aurels' glass
+        # roofs). Left out, the near outer sheet shows the cabin and the far outer sheet,
+        # facing away, is culled, as a single sheet of glass draws
+        lp = expr(m, unreal.MaterialExpressionLocalPosition, -900, 500)
+        nw = expr(m, unreal.MaterialExpressionVertexNormalWS, -900, 600)
+        nl = expr(m, unreal.MaterialExpressionTransform, -750, 600,
+                  transform_source_type=unreal.MaterialVectorCoordTransformSource
+                  .TRANSFORMSOURCE_WORLD,
+                  transform_type=unreal.MaterialVectorCoordTransform.TRANSFORM_LOCAL)
+        link(nw, "", nl, "Input")
+        ctr = vparam(m, "GlassCenter", -900, 700, (0.0, 0.0, 100.0))
+        inner = custom(m, -450, 520, "return dot(N, P - C) < 0.0 ? 1.0 : 0.0;",
+                       ["N", "P", "C"], cmot(F1), "CgGlassInner")
+        link(nl, "", inner, "N")
+        link(lp, "", inner, "P")
+        link(ctr, "", inner, "C")
         # the surface: black, a coverage that is the reflection's share only where the glass
         # does not transmit; what shows through is tinted by the glass color
-        op = custom(m, -450, 360, "return saturate(1.0 - T) * 0.9 + 0.04;", ["T"], cmot(F1),
-                    "CgGlassCoverage")
+        op = custom(m, -450, 360, "return (saturate(1.0 - T) * 0.9 + 0.04) * (1.0 - In);",
+                    ["T", "In"], cmot(F1), "CgGlassCoverage")
         link(trans, "", op, "T")
+        link(inner, "", op, "In")
+        sp2 = custom(m, -300, 280, "return S * (1.0 - In);", ["S", "In"], cmot(F1),
+                     "CgGlassSpecular")
+        link(spec, "", sp2, "S")
+        link(inner, "", sp2, "In")
+        MEL.connect_material_property(sp2, "", MP.MP_SPECULAR)
         black = expr(m, unreal.MaterialExpressionConstant3Vector, -450, -120,
                      constant=unreal.LinearColor(0.0, 0.0, 0.0, 1.0))
         MEL.connect_material_property(black, "", MP.MP_BASE_COLOR)
@@ -1712,10 +1737,11 @@ def vehicle_glass_master(opaque):
         m.set_editor_property("translucency_lighting_mode",
                               unreal.TranslucencyLightingMode.TLM_SURFACE_PER_PIXEL_LIGHTING)
         tto = expr(m, unreal.MaterialExpressionThinTranslucentMaterialOutput, -150, 0)
-        tint = custom(m, -450, 0, "return lerp(float3(1, 1, 1), C * C, T);", ["C", "T"],
-                      cmot(F3), "CgGlassTint")
+        tint = custom(m, -450, 0, "return lerp(float3(1, 1, 1), C * C, T * (1.0 - In));",
+                      ["C", "T", "In"], cmot(F3), "CgGlassTint")
         link(col, "", tint, "C")
         link(trans, "", tint, "T")
+        link(inner, "", tint, "In")
         link(tint, "", tto, "Transmittance Color")
     for f in usage_flags(m):
         m.set_editor_property(f, True)
@@ -2706,6 +2732,14 @@ class Importer:
             if not opaque:
                 MEL.set_material_instance_scalar_parameter_value(
                     mi, "Transmission", float(g.get("transmission", 1.0)))
+                # (the middle of the car's box, in the mesh's own space: the inner sheet's
+                # faces point toward it)
+                d = rec.get("dimensions") or {}
+                lo, hi = d.get("min", [0, 0, 0]), d.get("max", [0, 0, 2])
+                MEL.set_material_instance_vector_parameter_value(
+                    mi, "GlassCenter", unreal.LinearColor(
+                        50.0 * (lo[0] + hi[0]), -50.0 * (lo[1] + hi[1]),
+                        50.0 * (lo[2] + hi[2]), 1.0))
             EAL.save_loaded_asset(mi, only_if_is_dirty=False)
             out[name] = mi
         return out
