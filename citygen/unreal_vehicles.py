@@ -113,6 +113,15 @@ def _accessor(doc: dict, blob: bytes, k: int) -> list:
     return out
 
 
+def tangents(path: Path) -> bool:
+    """Whether every primitive of a glTF file carries its tangents (GAME.md says they are in
+    the glTF; Blender's exporter leaves them out of a mesh it cannot compute them for, and
+    the importer then has Unreal compute them, MikkTSpace as the bake's)."""
+    doc, _ = _glb(path)
+    return all("TANGENT" in p["attributes"] for m in doc.get("meshes", [])
+               for p in m["primitives"])
+
+
 def hulls(path: Path) -> list[dict]:
     """The convex hulls of a pack's collision.glb in the car's frame (x forward, y left, z up,
     meters; glTF's (x, y, z) is the car's (x, -z, y)): name, vertices and triangles."""
@@ -193,7 +202,8 @@ def read_pack(folder: Path) -> dict:
         "folder": f"{FOLDER}/{car}", "dir": str(folder.resolve()),
         "files": dict(sorted(files.items())), "textures": dict(sorted(textures.items())),
         "lods": [{"lod": r["lod"], "file": r["file"], "triangles": r["triangles"],
-                  "parts": r.get("parts", {}), "screen_size": SCREEN_SIZES[r["lod"]]}
+                  "parts": r.get("parts", {}), "screen_size": SCREEN_SIZES[r["lod"]],
+                  "tangents": tangents(folder / r["file"])}
                  for r in lods],
         "parts": parts,
         "materials": {s: dict((pk["materials"].get(s) or {}).get("params") or {})
@@ -300,6 +310,37 @@ def section(placements: list, library: Path | None = None, all_cars: bool = Fals
     sec["hash"] = content_hash([VERSION, {c: v["hash"] for c, v in cars.items()},
                                 [r["hash"] for r in recs]])
     return sec
+
+
+def check(build_dir: str | Path, uproject: str | Path, engine: str | None = None,
+          shots: str | Path | None = None, timeout: float = 3600.0, width: int = 1920,
+          lod_cars: list[str] | None = None, wheel_car: str | None = None,
+          hull_car: str | None = None) -> dict:
+    """`citygen unreal --check-vehicles`: the imported level's vehicles checked in the
+    editor (`ue/check_vehicles.py`): meshes, LODs, glass, hulls, placements, pivots, traces;
+    with `shots`, views by day and night (the line-up, each car from its pack's hero camera,
+    `lod_cars` at each LOD, `wheel_car`'s wheel spun and steered, `hull_car`'s hulls)."""
+    from . import unreal as U
+    build = Path(build_dir).resolve()
+    man_path = build / U.OUT_DIR / "manifest.json"
+    root = U.find_engine(engine)
+    if root is None:
+        raise RuntimeError("no Unreal Engine found (pass --engine or set CITYGEN_UE_ROOT)")
+    man = json.loads(man_path.read_text(encoding="utf-8"))
+    cars = sorted((man.get("vehicles") or {}).get("cars", {}))
+    if not cars:
+        raise RuntimeError(f"{man_path}: no vehicles (import a build with placements)")
+    job = {"mode": "check_vehicles", "manifest": str(man_path),
+           "result": str(build / U.OUT_DIR / "check_vehicles_result.json"),
+           "shots": str(Path(shots).resolve()) if shots else None, "width": int(width),
+           "lod_cars": lod_cars if lod_cars is not None else cars[:1],
+           "wheel_car": wheel_car or next(
+               (c for c in cars if any(p["kind"] == "wheel"
+                                       for p in man["vehicles"]["cars"][c]["parts"])), None),
+           "hull_car": hull_car or cars[0]}
+    return U.run_editor(root, Path(uproject).resolve(), U.UE_DIR / "check_vehicles.py", job,
+                        build / U.OUT_DIR / "check_vehicles_log.txt", timeout=timeout,
+                        gui=True, extra=["-RenderOffscreen"])
 
 
 def actor_hashes(sec: dict | None) -> dict[str, str]:

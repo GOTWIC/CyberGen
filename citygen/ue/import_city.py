@@ -1534,8 +1534,8 @@ def stage2_master(master, defaults=None):
 
 # --- AG18's vehicles (citygen/unreal_vehicles.py; the packs' contract: vehicles/GAME.md) ------
 
-VEHICLE_VERSION = "1"        # of the vehicle masters (`cg.vehicle` metadata)
-VEHICLE_MESH_VERSION = "1"   # of what the importer makes of a car (with its manifest hash)
+VEHICLE_VERSION = "2"        # of the vehicle masters (`cg.vehicle` metadata)
+VEHICLE_MESH_VERSION = "2"   # of what the importer makes of a car (with its manifest hash)
 # the paint per placement: Custom Primitive Data, or per-instance custom data on an
 # instanced component, three linear colors (citygen.unreal_vehicles.PAINT_CPD)
 PAINT_INDEX = (0, 3, 6)
@@ -1634,8 +1634,8 @@ def vehicle_master(defaults):
                   ["E", "Strength", "GlowDay", "GlowNight", "Night"], cmot(F3), "CgVehicleEmit")
     link(tex["emissive"], "RGBA", emit, "E")
     link(sparam(m, "EmissiveStrength", -1000, 2450, 15.0), "", emit, "Strength")
-    link(sparam(m, "GlowDay", -1000, 2530, 40.0), "", emit, "GlowDay")
-    link(sparam(m, "GlowNight", -1000, 2610, 4.0), "", emit, "GlowNight")
+    link(sparam(m, "GlowDay", -1000, 2530, 8.0), "", emit, "GlowDay")
+    link(sparam(m, "GlowNight", -1000, 2610, 2.0), "", emit, "GlowNight")
     link(night(m, -1000, 2690), "", emit, "Night")
     att = expr(m, unreal.MaterialExpressionMakeMaterialAttributes, -300, 300)
     link(alb, "", att, "BaseColor")
@@ -1880,12 +1880,22 @@ class Importer:
 
     # -- meshes --
 
-    def pipeline(self, nanite=True, bake=True, water=False, pack=False):
+    def pipeline(self, nanite=True, bake=True, water=False, pack=False, tangents=False):
         """M15's import settings; stage 2's packs keep each mesh in its node's frame (`bake`
         off: the actor stands at the node's pivot) and build Nanite only where asked (`pack`:
         per mesh, by the pack step); AG12's water packs keep their vertex colors and UV1 (the
-        current) at full precision, with no lightmap UVs written over it (`water`)."""
+        current) at full precision, with no lightmap UVs written over it (`water`); AG18's
+        LOD files without tangents get them computed, MikkTSpace (`tangents`)."""
         gp = unreal.InterchangeGenericAssetsPipeline()
+        if tangents:
+            cmn = gp.get_editor_property("common_meshes_properties")
+            for k, v in (("recompute_tangents", True), ("use_mikk_t_space", True)):
+                try:
+                    if cmn.get_editor_property(k) != v:
+                        log(f"pipeline {k}: {v} (was {cmn.get_editor_property(k)})")
+                    cmn.set_editor_property(k, v)
+                except Exception as e:          # (a property this engine version lacks)
+                    log(f"pipeline {k}: {e}")
         gp.set_editor_property("asset_type_sub_folders", False)
         gp.set_editor_property("scene_name_sub_folder", False)
         gp.set_editor_property("use_source_name_for_asset", False)  # a one-node tile too
@@ -2722,6 +2732,14 @@ class Importer:
                                unreal.CollisionTraceFlag.CTF_USE_SIMPLE_AS_COMPLEX, NEVER)
         return len(hulls)
 
+    def vehicle_pipeline(self, has_tangents):
+        """Stage 2's pack settings (each part in its node's frame, the packs' own normals, no
+        Nanite); a LOD file without tangents (Blender's exporter leaves them out where it
+        cannot compute them: every pack's LOD0 body) gets them computed by Unreal, MikkTSpace
+        on the file's own normals as the bake's were. Left at zero they turned the normal map
+        into black blotches and speckle (the Aurel's roof, the Vanta-R's flanks)."""
+        return self.pipeline(nanite=False, bake=False, tangents=not has_tangents)
+
     def make_car(self, car, rec, h, sms):
         st = self.stats["vehicles"]
         tex = self.car_textures(car, rec)
@@ -2733,7 +2751,7 @@ class Importer:
         for lo in rec["lods"]:
             folder = f"{src}/LOD{lo['lod']}"
             self.import_glb(os.path.join(rec["dir"], lo["file"]), folder,
-                            self.pipeline(nanite=False, bake=False))
+                            self.vehicle_pipeline(lo.get("tangents", True)))
             found = {}
             for a in EAL.list_assets(folder, recursive=False):
                 o = unreal.load_asset(a)
@@ -2762,21 +2780,15 @@ class Importer:
                 if mi is not None:
                     s.set_editor_property("material_interface", mi)
                 slots.append(s)
-            if p["kind"] == "glass" and opaque_from < len(rec["lods"]):
-                # (from opaque_from_lod the glass has no cabin behind it: dark and opaque)
-                dark = unreal.StaticMaterial()
-                dark.set_editor_property("material_interface", mats["pack_glass_dark"])
-                dark.set_editor_property("material_slot_name", unreal.Name("pack_glass_dark"))
-                dark.set_editor_property("uv_channel_data", slots[0].get_editor_property(
-                    "uv_channel_data"))
-                slots.append(dark)
             sm.set_editor_property("static_materials", slots)
             if p["kind"] == "glass" and opaque_from < len(rec["lods"]):
+                # (from opaque_from_lod the glass has no cabin behind it: dark and opaque, a
+                # slot of its own that those LODs' sections draw with)
+                sm.add_material(mats["pack_glass_dark"])
+                dark = len(sm.get_editor_property("static_materials")) - 1
                 for k in range(opaque_from, len(rec["lods"])):
-                    for sec in range(sms.get_number_sections(sm, k)
-                                     if hasattr(sms, "get_number_sections")
-                                     else sm.get_num_sections(k)):
-                        sms.set_lod_material_slot(sm, len(slots) - 1, k, sec)
+                    for sec in range(sm.get_num_sections(k)):
+                        sms.set_lod_material_slot(sm, dark, k, sec)
             bs = sm.get_editor_property("body_setup")
             if p["kind"] == "body":
                 st["hulls"] += self.car_hulls(sm, rec.get("hulls") or [])
