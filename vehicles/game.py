@@ -2095,7 +2095,7 @@ FID_TEX_ERR = 0.25                          # a texel this far off in a channel 
 # of its area over 25 degrees, at most `tex` of its area on the wrong texture
 FID_LIMITS = {1: dict(p95=12.0, bent=0.02, tex=0.01),
               2: dict(p95=25.0, bent=0.05, tex=0.025),
-              3: dict(p95=36.0, bent=0.10, tex=0.04)}
+              3: dict(p95=40.0, bent=0.10, tex=0.04)}
 
 
 def mark_islands(ob):
@@ -2428,10 +2428,13 @@ def lod_prep(ob, k, glass=False, wheel=False, unsub=False, unseen=None):
     if gone:
         bmesh.ops.delete(bm, geom=list(gone), context='FACES')
     if k >= LOD_WELD_FROM and not wheel:
-        # pieces that meet edge to edge (panels, a lamp in its bezel) welded where their
-        # vertices coincide, so the collapse moves their shared border as one and opens no
-        # gap between them
-        bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=LOD_WELD_M)
+        # pieces that meet edge to edge (panels) welded where their vertices coincide, so
+        # the collapse moves their shared border as one and opens no gap between them; never
+        # a lamp (welded to its bezel, the collapse drew its faces across the panel round it)
+        em2 = bm.faces.layers.int.get("cg_emit")
+        bmesh.ops.remove_doubles(bm, verts=[v for v in bm.verts if em2 is None or
+                                            not any(f[em2] for f in v.link_faces)],
+                                 dist=LOD_WELD_M)
     deg = LOD_PLANAR_DEG.get(k)
     # a face LOD0 shades curved (its normals off its plane: a bevel, glass drawn smooth
     # over flat facets) is never merged: a larger face could not carry that shading

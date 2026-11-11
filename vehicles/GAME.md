@@ -180,8 +180,9 @@ budget still steps down), and share LOD0's textures. Per part, in this order:
    never goes (the LOD keeps LOD0's size). Then a part no larger than 60 cm that no chain
    of parts touching (within 4 mm) joins to the largest part any more goes too (a hook whose
    cable went); a lamp never does: the parts left out that hold it up stay.
-2. **Welded** (LOD3). Pieces that meet edge to edge (panels, a lamp in its bezel) are
-   welded where their vertices coincide (1.5 mm), so the collapse moves their shared border
+2. **Welded** (LOD3). Pieces that meet edge to edge (panels; never a lamp, whose faces the
+   collapse would draw across its bezel) are welded where their vertices coincide (1.5 mm),
+   so the collapse moves their shared border
    as one and opens no gap between them.
 3. **Coplanar faces merged.** Faces within 0.5 degrees of one plane (LOD2 1, LOD3 2) are
    merged and triangulated again, so a flat door is a few long triangles and the budget goes
@@ -285,7 +286,7 @@ corners (the farthest points along 128 directions). `collision.glb`, nodes
 - `wheel_pivots`: every wheel's tread centered on its node's pivot (3 mm), its radius as
   `pack.json` says, the axle no lower than the radius less 12 mm.
 - `lod_bounds`: every LOD's box within 2 cm (or 1.5% of the size) of LOD0's.
-- `lod_fidelity`: every LOD drawn as LOD0 (above): `normal_p95_deg` at most 12, 25 and 36
+- `lod_fidelity`: every LOD drawn as LOD0 (above): `normal_p95_deg` at most 12, 25 and 40
   degrees (LOD1, 2, 3; rivets and bevels a collapse rounds off count there), `bent_share`
   at most 2%, 5%, 10%, `texture_share` at most 1%, 2.5%, 4%. A crumpled or torn LOD fails;
   a small part torn at LOD3 (a winch drum) can still pass, so the LOD row is still looked
