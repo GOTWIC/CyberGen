@@ -256,6 +256,7 @@ PROGRESS = "CYBERGEN_PROGRESS"
 # the importer's phases by the stage they show under
 STAGE_OF = {"core": "materials", "materials": "materials", "textures2": "materials",
             "materials2": "materials", "meshes": "meshes", "meshes2": "meshes2",
+            "vehicles": "vehicles",
             "level": "level", "actors": "actors", "play": "settings", "streaming": "settings",
             "graphs": "settings", "save": "save", "prune": "prune", "save_pruned": "prune",
             "digests": "digests"}
@@ -1531,6 +1532,207 @@ def stage2_master(master, defaults=None):
     return m
 
 
+# --- AG18's vehicles (citygen/unreal_vehicles.py; the packs' contract: vehicles/GAME.md) ------
+
+VEHICLE_VERSION = "1"        # of the vehicle masters (`cg.vehicle` metadata)
+VEHICLE_MESH_VERSION = "1"   # of what the importer makes of a car (with its manifest hash)
+# the paint per placement: Custom Primitive Data, or per-instance custom data on an
+# instanced component, three linear colors (citygen.unreal_vehicles.PAINT_CPD)
+PAINT_INDEX = (0, 3, 6)
+VEHICLE_TEXTURE = {           # map -> (sRGB, compression, sampler)
+    "base_color": (True, "TC_DEFAULT", "SAMPLERTYPE_COLOR"),
+    "emissive": (True, "TC_DEFAULT", "SAMPLERTYPE_COLOR"),
+    "normal": (False, "TC_NORMALMAP", "SAMPLERTYPE_NORMAL"),
+    # (alpha is data in both: the clear coat weight, the shade on the paint; BC7 keeps all
+    # four channels at full precision, linear)
+    "orm": (False, "TC_BC7", "SAMPLERTYPE_LINEAR_COLOR"),
+    "mask": (False, "TC_BC7", "SAMPLERTYPE_LINEAR_COLOR")}
+# the contract's albedo: w = R + G + B, albedo = base (1 - w) + (R P1 + G P2 + B P3) A
+VEHICLE_ALBEDO_CODE = """
+float w = saturate(M.r + M.g + M.b);
+return Base.rgb * (1.0 - w) + (M.r * P1 + M.g * P2 + M.b * P3) * M.a;
+"""
+# the contract's micro_detail: the paint's flake (2600 cells a meter, bump 0.06), finer than
+# a texel, so drawn here: a hashed tilt of the tangent space normal per cell of the mesh's own
+# space, on the painted share only, faded out by 3 m (beyond, under a pixel, it would only
+# shimmer)
+VEHICLE_FLAKE_CODE = """
+float3 n = N;
+float k = saturate(1.0 - Depth / Fade) * saturate(M.r + M.g + M.b) * Bump;
+if (k > 0.0005) {
+  float3 c = floor(LP * Cells / 100.0);
+  float2 h = frac(sin(float2(dot(c, float3(12.9898, 78.233, 37.719)),
+                             dot(c, float3(39.346, 11.135, 83.155)))) * 43758.5453) * 2.0 - 1.0;
+  n = normalize(float3(n.xy + h * k, n.z));
+}
+return n;
+"""
+# emission: the texture is the emitter's color times its strength over the pack's
+# emissive_strength (Blender's strength), so Strength / 15 is the emission in Blender's
+# units of a strength 15 lamp, shown at GlowDay by day and GlowNight by night (MPC_CityGen's
+# Night, as the other emissive masters)
+VEHICLE_EMIT_CODE = """
+return E.rgb * (Strength / 15.0) * lerp(GlowDay, GlowNight, Night);
+"""
+
+
+def vehicle_master(defaults):
+    """/Game/CityGen/Core/M_CgVehicle: the packs' body and wheels slots (GAME.md): the
+    contract's albedo from the base color, the mask and three paint colors (Paint1 to 3:
+    Custom Primitive Data 0, 3, 6, read through per-instance custom data, so an instanced
+    component's instances each have their own; the instance's show colors their default),
+    roughness, metallic and occlusion from ORM, clear coat (shading model Clear Coat) from
+    ORM's alpha with CoatRoughness, the normal map (OpenGL, flipped at import), the paint's
+    flake, specular from the emissive texture's alpha, emission by EmissiveStrength and
+    Night. Built through material attributes (the clear coat inputs are not material
+    properties Python can connect)."""
+    path = f"{CORE}/M_CgVehicle"
+    m = unreal.load_asset(path) if EAL.does_asset_exist(path) else None
+    if m is not None and meta(m, "cg.vehicle") == VEHICLE_VERSION:
+        return instanced(m)
+    if m is None:
+        m = AT.create_asset("M_CgVehicle", CORE, unreal.Material, unreal.MaterialFactoryNew())
+    else:
+        MEL.delete_all_material_expressions(m)
+    uv = expr(m, unreal.MaterialExpressionTextureCoordinate, -1600, 0, coordinate_index=0)
+    tex = {}
+    for k, (name, mp) in enumerate((("BaseTex", "base_color"), ("NormalTex", "normal"),
+                                    ("OrmTex", "orm"), ("MaskTex", "mask"),
+                                    ("EmisTex", "emissive"))):
+        t = expr(m, unreal.MaterialExpressionTextureSampleParameter2D, -1300, k * 300,
+                 parameter_name=name,
+                 sampler_type=getattr(unreal.MaterialSamplerType, VEHICLE_TEXTURE[mp][2]))
+        if defaults.get(mp) is not None:
+            t.set_editor_property("texture", defaults[mp])
+        link(uv, "", t, "UVs")
+        tex[mp] = t
+    paints = []
+    for k, i in enumerate(PAINT_INDEX):
+        v = expr(m, unreal.MaterialExpressionVectorParameter, -1300, 1600 + 120 * k,
+                 parameter_name=f"Paint{k + 1}",
+                 default_value=unreal.LinearColor(0.5, 0.5, 0.5, 1),
+                 use_custom_primitive_data=True, primitive_data_index=i)
+        paints.append(per_instance(m, v, i, -1300, 1600 + 120 * k, vector=True))
+    alb = custom(m, -800, 0, VEHICLE_ALBEDO_CODE, ["Base", "M", "P1", "P2", "P3"], cmot(F3),
+                 "CgVehicleAlbedo")
+    link(tex["base_color"], "RGBA", alb, "Base")
+    link(tex["mask"], "RGBA", alb, "M")
+    for k, p in enumerate(paints):
+        link(p, "", alb, f"P{k + 1}")
+    lp = expr(m, unreal.MaterialExpressionLocalPosition, -1300, 2000)
+    depth = expr(m, unreal.MaterialExpressionPixelDepth, -1300, 2100)
+    flake = custom(m, -800, 300, VEHICLE_FLAKE_CODE,
+                   ["N", "M", "LP", "Depth", "Cells", "Bump", "Fade"], cmot(F3), "CgVehicleFlake")
+    link(tex["normal"], "RGB", flake, "N")
+    link(tex["mask"], "RGBA", flake, "M")
+    link(lp, "", flake, "LP")
+    link(depth, "", flake, "Depth")
+    link(sparam(m, "FlakeCells", -1000, 2200, 2600.0), "", flake, "Cells")
+    link(sparam(m, "FlakeBump", -1000, 2280, 0.06), "", flake, "Bump")
+    link(sparam(m, "FlakeFadeCm", -1000, 2360, 300.0), "", flake, "Fade")
+    emit = custom(m, -800, 1200, VEHICLE_EMIT_CODE,
+                  ["E", "Strength", "GlowDay", "GlowNight", "Night"], cmot(F3), "CgVehicleEmit")
+    link(tex["emissive"], "RGBA", emit, "E")
+    link(sparam(m, "EmissiveStrength", -1000, 2450, 15.0), "", emit, "Strength")
+    link(sparam(m, "GlowDay", -1000, 2530, 40.0), "", emit, "GlowDay")
+    link(sparam(m, "GlowNight", -1000, 2610, 4.0), "", emit, "GlowNight")
+    link(night(m, -1000, 2690), "", emit, "Night")
+    att = expr(m, unreal.MaterialExpressionMakeMaterialAttributes, -300, 300)
+    link(alb, "", att, "BaseColor")
+    link(tex["orm"], "G", att, "Roughness")
+    link(tex["orm"], "B", att, "Metallic")
+    link(tex["orm"], "R", att, "AmbientOcclusion")
+    link(tex["emissive"], "A", att, "Specular")
+    link(flake, "", att, "Normal")
+    link(emit, "", att, "EmissiveColor")
+    link(tex["orm"], "A", att, "ClearCoat")
+    link(sparam(m, "CoatRoughness", -1000, 2770, 0.06), "", att, "ClearCoatRoughness")
+    m.set_editor_property("use_material_attributes", True)
+    m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_CLEAR_COAT)
+    MEL.connect_material_property(att, "", unreal.MaterialProperty.MP_MATERIAL_ATTRIBUTES)
+    for f in usage_flags(m):
+        m.set_editor_property(f, True)
+    MEL.recompile_material(m)
+    EAL.set_metadata_tag(m, "cg.vehicle", VEHICLE_VERSION)
+    EAL.save_loaded_asset(m, only_if_is_dirty=False)
+    return m
+
+
+def vehicle_glass_master(opaque):
+    """/Game/CityGen/Core/M_CgVehicleGlass (the pack's glass: thin translucent, the glass
+    color tinting what shows through it, its reflection by its IOR and roughness) and
+    M_CgVehicleGlassDark (from the pack's `opaque_from_lod`: no cabin behind it, the glass
+    drawn dark and opaque, the color times 0.06 as the pack's proof draws it)."""
+    name = "M_CgVehicleGlassDark" if opaque else "M_CgVehicleGlass"
+    path = f"{CORE}/{name}"
+    m = unreal.load_asset(path) if EAL.does_asset_exist(path) else None
+    if m is not None and meta(m, "cg.vehicle") == VEHICLE_VERSION:
+        return instanced(m)
+    if m is None:
+        m = AT.create_asset(name, CORE, unreal.Material, unreal.MaterialFactoryNew())
+    else:
+        MEL.delete_all_material_expressions(m)
+    MP = unreal.MaterialProperty
+    col = vparam(m, "GlassColor", -700, 0, (0.3, 0.33, 0.36))
+    rough = sparam(m, "Roughness", -700, 200, 0.0)
+    ior = sparam(m, "IOR", -700, 280, 1.5)
+    # (a dielectric's reflectance at normal incidence, as Unreal's Specular: 0.5 is 4%)
+    spec = custom(m, -450, 280, "float f = (I - 1.0) / (I + 1.0); return saturate(f * f / 0.08);",
+                  ["I"], cmot(F1), "CgIorSpecular")
+    link(ior, "", spec, "I")
+    MEL.connect_material_property(spec, "", MP.MP_SPECULAR)
+    if opaque:
+        dark = expr(m, unreal.MaterialExpressionMultiply, -450, 0, const_b=0.06)
+        link(col, "", dark, "A")
+        r2 = expr(m, unreal.MaterialExpressionMax, -450, 200, const_b=0.05)
+        link(rough, "", r2, "A")
+        MEL.connect_material_property(dark, "", MP.MP_BASE_COLOR)
+        MEL.connect_material_property(r2, "", MP.MP_ROUGHNESS)
+    else:
+        trans = sparam(m, "Transmission", -700, 360, 1.0)
+        # the surface: black, a coverage that is the reflection's share only where the glass
+        # does not transmit; what shows through is tinted by the glass color
+        op = custom(m, -450, 360, "return saturate(1.0 - T) * 0.9 + 0.04;", ["T"], cmot(F1),
+                    "CgGlassCoverage")
+        link(trans, "", op, "T")
+        black = expr(m, unreal.MaterialExpressionConstant3Vector, -450, -120,
+                     constant=unreal.LinearColor(0.0, 0.0, 0.0, 1.0))
+        MEL.connect_material_property(black, "", MP.MP_BASE_COLOR)
+        MEL.connect_material_property(rough, "", MP.MP_ROUGHNESS)
+        MEL.connect_material_property(op, "", MP.MP_OPACITY)
+        m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
+        m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_THIN_TRANSLUCENT)
+        m.set_editor_property("translucency_lighting_mode",
+                              unreal.TranslucencyLightingMode.TLM_SURFACE_PER_PIXEL_LIGHTING)
+        tto = expr(m, unreal.MaterialExpressionThinTranslucentMaterialOutput, -150, 0)
+        tint = custom(m, -450, 0, "return lerp(float3(1, 1, 1), C, T);", ["C", "T"],
+                      cmot(F3), "CgGlassTint")
+        link(col, "", tint, "C")
+        link(trans, "", tint, "T")
+        link(tint, "", tto, "Transmittance Color")
+    for f in usage_flags(m):
+        m.set_editor_property(f, True)
+    MEL.recompile_material(m)
+    EAL.set_metadata_tag(m, "cg.vehicle", VEHICLE_VERSION)
+    EAL.save_loaded_asset(m, only_if_is_dirty=False)
+    return m
+
+
+def car_xform(xf, pivot, steer=0.0):
+    """A part's instance transform in its holder's frame: the car at xf ([x, y, z, yaw] in
+    citygen meters and degrees from the holder's pivot), the part at its pivot in the car's
+    frame (x forward, y left, z up), turned by `steer` degrees about its own z."""
+    a = math.radians(xf[3])
+    ca, sa = math.cos(a), math.sin(a)
+    px, py, pz = pivot
+    x = xf[0] + ca * px - sa * py
+    y = xf[1] + sa * px + ca * py
+    z = xf[2] + pz
+    return unreal.Transform(unreal.Vector(x * 100.0, -y * 100.0, z * 100.0),
+                            unreal.Rotator(roll=0.0, pitch=0.0, yaw=-(xf[3] + steer)),
+                            unreal.Vector(1.0, 1.0, 1.0))
+
+
 # --- the city ---------------------------------------------------------------------------------
 
 def delete_assets(paths):
@@ -1620,6 +1822,9 @@ class Importer:
         self.live, self.offloaded = [], []
         self.skip = set(self.s2["replaced"]) | {a["key"] for a in self.s2["actors"]} \
             if self.s2 else set()
+        # (AG18: the actors a vehicle placement replaces, M15's parked car prototypes)
+        self.skip |= set((man.get("vehicles") or {}).get("replaced", []))
+        self.veh_meshes = {}
         if self.s2:
             self.stats["stage2"] = {
                 "actors": len(self.s2["actors"]),
@@ -2353,6 +2558,311 @@ class Importer:
             st["meshes"]["imported"] += 1
             st["lod_chains"] += 1
 
+    # -- AG18's vehicles --
+
+    def vehicles(self):
+        """The manifest's cars (AG18's game packs), each made once a project under
+        /Game/CityGen/Vehicles/<car> and again only when its hash changes: its textures,
+        material instances (body and wheels on M_CgVehicle, the glass on M_CgVehicleGlass and,
+        from the pack's opaque_from_lod, M_CgVehicleGlassDark) and a static mesh per part
+        (SM_<car>_<part>) with the pack's four LODs as its LODs (no Nanite: the glass is
+        translucent, the LODs are the pack's own, the paint per instance), the wheels and
+        brakes at their pivots, the body's simple collision the pack's convex hulls."""
+        self.veh_meshes = {}
+        veh = self.man.get("vehicles")
+        if not veh:
+            return
+        st = self.stats["vehicles"] = {"cars": {"made": 0, "kept": 0}, "textures": 0,
+                                       "meshes": 0, "hulls": 0, "placements": 0,
+                                       "instances": 0}
+        sms = unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem) or \
+            unreal.get_default_object(unreal.StaticMeshEditorSubsystem)
+        cars = sorted(veh["cars"].items())
+        REPORT.update(0, len(cars), force=True)
+        for n, (car, rec) in enumerate(cars):
+            h = f"{VEHICLE_MESH_VERSION}.{rec['hash']}"
+            got = {}
+            for p in rec["parts"]:
+                path = f"{rec['folder']}/SM_{car}_{p['name']}"
+                sm = unreal.load_asset(path) if EAL.does_asset_exist(path) else None
+                if sm is None or meta(sm, HASH_TAG) != h:
+                    got = None
+                    break
+                got[p["name"]] = sm
+            if got is None:
+                got = self.make_car(car, rec, h, sms)
+                st["cars"]["made"] += 1
+            else:
+                st["cars"]["kept"] += 1
+            for part, sm in got.items():
+                self.veh_meshes[(car, part)] = sm
+            REPORT.update(n + 1, len(cars), detail=car, force=n + 1 == len(cars))
+            log(f"vehicle {n + 1}/{len(cars)} {car}")
+
+    def car_textures(self, car, rec):
+        st = self.stats["vehicles"]
+        TCS = unreal.TextureCompressionSettings
+        out = {}
+        for name, t in sorted(rec["textures"].items()):
+            slot, mp = t["slot"], t["map"]
+            srgb, comp, _ = VEHICLE_TEXTURE[mp]
+            folder = f"{rec['folder']}/Textures"
+            asset = f"T_{car}_{slot}_{mp}"
+            path = f"{folder}/{asset}"
+            h = f"{TEXTURE_VERSION}.{t['sha256'][:16]}"
+            tex = unreal.load_asset(path) if EAL.does_asset_exist(path) else None
+            if tex is None or meta(tex, HASH_TAG) != h:
+                task = unreal.AssetImportTask()
+                for k, v in (("filename", os.path.join(rec["dir"], t["file"])),
+                             ("destination_path", folder), ("destination_name", asset),
+                             ("automated", True), ("replace_existing", True), ("save", False)):
+                    task.set_editor_property(k, v)
+                AT.import_asset_tasks([task])
+                tex = unreal.load_asset(path)
+                if tex is None:
+                    raise RuntimeError(f"{car}: texture {t['file']} did not import")
+                tex.set_editor_property("srgb", srgb)
+                tex.set_editor_property("compression_settings", getattr(TCS, comp))
+                if mp == "normal":
+                    # (the packs' normal maps are OpenGL's, green up; Unreal's are DirectX's)
+                    tex.set_editor_property("flip_green_channel", True)
+                tex.set_editor_property("lod_group", unreal.TextureGroup.TEXTUREGROUP_VEHICLE
+                                        if hasattr(unreal.TextureGroup, "TEXTUREGROUP_VEHICLE")
+                                        else unreal.TextureGroup.TEXTUREGROUP_WORLD)
+                EAL.set_metadata_tag(tex, HASH_TAG, h)
+                EAL.save_loaded_asset(tex, only_if_is_dirty=False)
+                st["textures"] += 1
+            out[(slot, mp)] = tex
+        return out
+
+    def car_materials(self, car, rec, tex):
+        """The car's material instances by the pack's glTF material name."""
+        defaults = {mp: t for (slot, mp), t in tex.items() if slot == "body"}
+        body_m = vehicle_master(defaults)
+        folder = f"{rec['folder']}/Materials"
+        out = {}
+
+        def mi_of(name, parent):
+            path = f"{folder}/{name}"
+            if EAL.does_asset_exist(path):
+                mi = unreal.load_asset(path)
+            else:
+                mi = AT.create_asset(name, folder, unreal.MaterialInstanceConstant,
+                                     unreal.MaterialInstanceConstantFactoryNew())
+            MEL.set_material_instance_parent(mi, parent)
+            return mi
+
+        cols = [rec["colors"].get(c, [0.5, 0.5, 0.5]) for c in ("primary", "secondary",
+                                                                  "accent")]
+        for slot in ("body", "wheels"):
+            if slot not in rec["materials"]:
+                continue                 # (a hover car has no wheels)
+            mi = mi_of(f"MI_{car}_{slot}", body_m)
+            for pname, mp in (("BaseTex", "base_color"), ("NormalTex", "normal"),
+                              ("OrmTex", "orm"), ("MaskTex", "mask"), ("EmisTex", "emissive")):
+                MEL.set_material_instance_texture_parameter_value(mi, pname, tex[(slot, mp)])
+            prm = rec["materials"].get(slot) or {}
+            MEL.set_material_instance_scalar_parameter_value(
+                mi, "CoatRoughness", float(prm.get("coat_roughness", 0.06)))
+            MEL.set_material_instance_scalar_parameter_value(
+                mi, "EmissiveStrength", float(prm.get("emissive_strength",
+                                                      rec["emissive_strength"])))
+            for k, c in enumerate(cols):
+                MEL.set_material_instance_vector_parameter_value(
+                    mi, f"Paint{k + 1}", unreal.LinearColor(c[0], c[1], c[2], 1.0))
+            EAL.save_loaded_asset(mi, only_if_is_dirty=False)
+            out[f"pack_{slot}"] = mi
+        g = rec.get("glass") or {}
+        for name, opaque in (("pack_glass", False), ("pack_glass_dark", True)):
+            mi = mi_of(f"MI_{car}_{name[5:]}", vehicle_glass_master(opaque))
+            c = g.get("color", [0.3, 0.33, 0.36])
+            MEL.set_material_instance_vector_parameter_value(
+                mi, "GlassColor", unreal.LinearColor(c[0], c[1], c[2], 1.0))
+            MEL.set_material_instance_scalar_parameter_value(mi, "Roughness",
+                                                             float(g.get("roughness", 0.0)))
+            MEL.set_material_instance_scalar_parameter_value(mi, "IOR", float(g.get("ior", 1.5)))
+            if not opaque:
+                MEL.set_material_instance_scalar_parameter_value(
+                    mi, "Transmission", float(g.get("transmission", 1.0)))
+            EAL.save_loaded_asset(mi, only_if_is_dirty=False)
+            out[name] = mi
+        return out
+
+    def car_hulls(self, sm, hulls):
+        """The body's simple collision: the pack's convex hulls (car frame, meters) as one
+        convex element each (GeometryScript makes one per connected piece of a dynamic mesh
+        of them), used as complex too."""
+        GS = getattr(unreal, "GeometryScript_Collision", None)
+        bs = sm.get_editor_property("body_setup")
+        if GS is None or bs is None or not hulls:
+            return 0
+        dm = unreal.DynamicMesh()
+        ME = unreal.GeometryScript_MeshEdits
+        for h in hulls:
+            ids = []
+            for x, y, z in h["vertices"]:
+                r = ME.add_vertex_to_mesh(dm, unreal.Vector(x * 100.0, -y * 100.0, z * 100.0))
+                ids.append(r[1] if isinstance(r, tuple) else r)
+            for a, b, c in h["triangles"]:
+                # (y flipped: the triangle turns the other way round)
+                ME.add_triangle_to_mesh(dm, unreal.IntVector(ids[a], ids[c], ids[b]), 0)
+        o = unreal.GeometryScriptCollisionFromMeshOptions()
+        for k, v in (("emit_transaction", False),
+                     ("method", unreal.GeometryScriptCollisionGenerationMethod.CONVEX_HULLS),
+                     ("auto_detect_spheres", False), ("auto_detect_capsules", False),
+                     ("auto_detect_boxes", False), ("simplify_hulls", False),
+                     ("remove_fully_contained_shapes", False), ("max_convex_hulls_per_mesh", 1)):
+            o.set_editor_property(k, v)
+        bs.set_editor_property("collision_trace_flag",
+                               unreal.CollisionTraceFlag.CTF_USE_SIMPLE_AS_COMPLEX, NEVER)
+        GS.set_static_mesh_collision_from_mesh(
+            dm, sm, o, unreal.GeometryScriptSetStaticMeshCollisionOptions())
+        bs = sm.get_editor_property("body_setup")
+        bs.set_editor_property("collision_trace_flag",
+                               unreal.CollisionTraceFlag.CTF_USE_SIMPLE_AS_COMPLEX, NEVER)
+        return len(hulls)
+
+    def make_car(self, car, rec, h, sms):
+        st = self.stats["vehicles"]
+        tex = self.car_textures(car, rec)
+        mats = self.car_materials(car, rec, tex)
+        src = f"{rec['folder']}/Source"
+        if EAL.does_directory_exist(src):
+            delete_assets(EAL.list_assets(src, recursive=True))
+        lods = {}
+        for lo in rec["lods"]:
+            folder = f"{src}/LOD{lo['lod']}"
+            self.import_glb(os.path.join(rec["dir"], lo["file"]), folder,
+                            self.pipeline(nanite=False, bake=False))
+            found = {}
+            for a in EAL.list_assets(folder, recursive=False):
+                o = unreal.load_asset(a)
+                if isinstance(o, unreal.StaticMesh):
+                    found[o.get_name().lower()] = o
+            lods[lo["lod"]] = found
+        opaque_from = int((rec.get("glass") or {}).get("opaque_from_lod", 99))
+        out = []
+        got = {}
+        for p in rec["parts"]:
+            name = p["name"]
+            path = f"{rec['folder']}/SM_{car}_{name}"
+            chain = [lods[k].get(name.lower()) for k in range(len(rec["lods"]))]
+            if any(c is None for c in chain):
+                raise RuntimeError(f"{car}: part {name} missing from a LOD file "
+                                   f"({[k for k, c in enumerate(chain) if c is None]})")
+            if EAL.does_asset_exist(path):
+                EAL.delete_asset(path)
+            sm = EAL.duplicate_asset(chain[0].get_path_name().split(".")[0], path)
+            for k, lo in enumerate(chain[1:], 1):
+                sms.set_lod_from_static_mesh(sm, k, lo, 0, True)
+            sms.set_lod_screen_sizes(sm, [float(lo["screen_size"]) for lo in rec["lods"]])
+            slots = []
+            for s in sm.get_editor_property("static_materials"):
+                mi = mats.get(str(s.material_slot_name).lower())
+                if mi is not None:
+                    s.set_editor_property("material_interface", mi)
+                slots.append(s)
+            if p["kind"] == "glass" and opaque_from < len(rec["lods"]):
+                # (from opaque_from_lod the glass has no cabin behind it: dark and opaque)
+                dark = unreal.StaticMaterial()
+                dark.set_editor_property("material_interface", mats["pack_glass_dark"])
+                dark.set_editor_property("material_slot_name", unreal.Name("pack_glass_dark"))
+                dark.set_editor_property("uv_channel_data", slots[0].get_editor_property(
+                    "uv_channel_data"))
+                slots.append(dark)
+            sm.set_editor_property("static_materials", slots)
+            if p["kind"] == "glass" and opaque_from < len(rec["lods"]):
+                for k in range(opaque_from, len(rec["lods"])):
+                    for sec in range(sms.get_number_sections(sm, k)
+                                     if hasattr(sms, "get_number_sections")
+                                     else sm.get_num_sections(k)):
+                        sms.set_lod_material_slot(sm, len(slots) - 1, k, sec)
+            bs = sm.get_editor_property("body_setup")
+            if p["kind"] == "body":
+                st["hulls"] += self.car_hulls(sm, rec.get("hulls") or [])
+            elif bs is not None:
+                # (wheels, brakes and glass: no collision; the wheels are the engine's raycasts)
+                sms.remove_collisions(sm)
+                bs.set_editor_property("collision_trace_flag",
+                                       unreal.CollisionTraceFlag.CTF_USE_SIMPLE_AS_COMPLEX,
+                                       NEVER)
+            EAL.set_metadata_tag(sm, HASH_TAG, h)
+            for k, v in (("cg.car", car), ("cg.part", name), ("cg.kind", p["kind"]),
+                         ("cg.pivot", json.dumps(p["pivot"]))):
+                EAL.set_metadata_tag(sm, k, v)
+            out.append(sm)
+            got[name] = sm
+            st["meshes"] += 1
+        EAL.save_loaded_assets(out, False)
+        # (the LOD sources: their data is in the chains now)
+        delete_assets(EAL.list_assets(src, recursive=True))
+        return got
+
+    def vehicle_actors(self, have):
+        """A BP_CityGenGroup actor per placement entry at its pivot: per car model and part
+        an instanced component (hierarchical: the meshes are not Nanite) of the car's mesh,
+        an instance per vehicle at its transform composed with the part's pivot (a steering
+        wheel turned by the vehicle's steer angle), each instance's paint in its per-instance
+        custom data (nine floats: Paint1 to 3), tagged `cg.member`, `cg.key=<entry>.<car>.
+        <part>`, `cg.vehicle=`, `cg.part=` and `cg.id=` per vehicle in instance order; the
+        body collides (its hulls), the rest not."""
+        veh = self.man.get("vehicles")
+        if not veh:
+            return
+        st = self.stats["vehicles"]
+        gcls = blueprint(f"{CORE}/BP_CityGenGroup", unreal.Actor, [], static_root=True)
+        cars = veh["cars"]
+        for r in veh["placements"]:
+            loc = ue_loc(*r["pivot"])
+            rot = unreal.Rotator(roll=0.0, pitch=0.0, yaw=-r.get("yaw_deg", 0.0))
+
+            def make(loc=loc, rot=rot):
+                return self.eas.spawn_actor_from_class(gcls, loc, rot)
+
+            def update(a, h, r=r, loc=loc, rot=rot):
+                a.set_actor_location_and_rotation(loc, rot, False, False)
+                a.root_component.set_mobility(unreal.ComponentMobility.STATIC)
+                self.member_components(a, [])            # (the ones it had go)
+                sds = unreal.get_engine_subsystem(unreal.SubobjectDataSubsystem)
+                lib = unreal.SubobjectDataBlueprintFunctionLibrary
+                root = sds.k2_gather_subobject_data_for_instance(a)[0]
+                ids = []
+                for car, m in sorted(r["models"].items()):
+                    ids += m["ids"]
+                    for p in cars[car]["parts"]:
+                        sm = self.veh_meshes[(car, p["name"])]
+                        hd, why = sds.add_new_subobject(unreal.AddNewSubobjectParams(
+                            parent_handle=root,
+                            new_class=unreal.HierarchicalInstancedStaticMeshComponent))
+                        comp = lib.get_object(lib.get_data(hd))
+                        if comp is None:
+                            raise RuntimeError(f"{r['key']}: no component added ({why})")
+                        comp.set_static_mesh(sm)
+                        comp.set_mobility(unreal.ComponentMobility.STATIC)
+                        comp.clear_instances()
+                        steer = p.get("steers") and p["kind"] in ("wheel", "brake")
+                        comp.add_instances([car_xform(xf, p["pivot"], s if steer else 0.0)
+                                            for xf, s in zip(m["xforms"], m["steer"])],
+                                           False, False)
+                        comp.set_num_custom_data_floats(len(m["paint"][0]))
+                        for i, paint in enumerate(m["paint"]):
+                            for j, v in enumerate(paint):
+                                comp.set_custom_data_value(i, j, float(v), False)
+                        comp.set_collision_profile_name("BlockAll" if p["kind"] == "body"
+                                                        else "NoCollision")
+                        tags = ["cg.member", f"cg.key={r['key']}.{car}.{p['name']}",
+                                "cg.type=vehicle", "cg.category=vehicle", f"cg.kind={car}",
+                                f"cg.vehicle={car}", f"cg.part={p['name']}"]
+                        tags += [f"cg.id={i}" for i in m["ids"]]
+                        comp.set_editor_property("component_tags",
+                                                 [unreal.Name(t) for t in tags])
+                        st["instances"] += len(m["ids"])
+                a.tags = self.tags(r["key"], h, ids, "vehicles", "vehicle", r["tile"], "") + \
+                    [unreal.Name(f"cg.vehicle={c}") for c in sorted(r["models"])]
+                st["placements"] += 1
+
+            self.place(have, r["key"], r["hash"], gcls, make, update, "CityGen/vehicle")
+
     # -- the level --
 
     def level(self):
@@ -2423,6 +2933,7 @@ class Importer:
         n += int(self.plays())           # (the play features' actor)
         if self.atmos_ok():
             n += 1 + len(self.man["atmos"]["cells"])     # (AT1: the controller, its cells)
+        n += len((self.man.get("vehicles") or {}).get("placements", []))     # (AG18)
         return n + 1 + 3                 # (the sun, the sky light, the atmosphere)
 
     def plays(self):
@@ -2549,6 +3060,8 @@ class Importer:
             else:
                 for r in self.s2["instances"]:
                     out[r["key"]] = "BP_CityGenInstances_C"
+        for r in (self.man.get("vehicles") or {}).get("placements", []):
+            out[r["key"]] = "BP_CityGenGroup_C"          # (AG18)
         return out
 
     def clear_moved(self, have):
@@ -2606,6 +3119,7 @@ class Importer:
         self.swim(have)
         self.underwater(have)
         self.actors2(have)
+        self.vehicle_actors(have)
         self.atmos_cells(have)
         # (the last few: no more offloads, the always-loaded lighting and play actors among
         # them stay loaded with the last chunk)
@@ -3349,13 +3863,16 @@ class Importer:
             tiles=len(self.man["tiles"]), actors=self.actor_count(),
             packs=len(self.s2["packs"]) if self.s2 else 0,
             meshes2=sum(len(pk["meshes"]) for pk in self.s2["packs"]) if self.s2 else 0,
-            textures=len(self.s2.get("textures") or {}) if self.s2 else 0)
+            textures=len(self.s2.get("textures") or {}) if self.s2 else 0,
+            cars=len((self.man.get("vehicles") or {}).get("cars", {})))
         base = self.timed("core", base_material)
         self.timed("materials", self.materials, base)
         self.timed("textures2", self.textures2)
         self.timed("materials2", self.materials2)
         self.timed("meshes", self.meshes)
         self.timed("meshes2", self.meshes2)
+        if self.man.get("vehicles"):
+            self.timed("vehicles", self.vehicles)        # (AG18)
         self.timed("level", self.level)
         self.timed("actors", self.actors)
         self.timed("play", self.play)

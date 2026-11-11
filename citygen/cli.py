@@ -285,7 +285,8 @@ def cmd_unreal(args: argparse.Namespace) -> int:
         return EXIT_USAGE
     if args.manifest_only:
         path = U.write_manifest(build, args.name, not args.blockout_only, not args.no_play,
-                                atmos=False if args.no_atmos else args.atmos)
+                                atmos=False if args.no_atmos else args.atmos,
+                                vehicles=args.vehicles, all_vehicles=args.all_vehicles)
         print(f"wrote {path}")
         return EXIT_OK
     if args.uproject and args.new_project and not Path(args.uproject).is_file():
@@ -307,7 +308,8 @@ def cmd_unreal(args: argparse.Namespace) -> int:
                             play=args.play, fly_speed=args.fly_speed,
                             startup=not args.no_startup, view_m=args.view_range,
                             play_features=not args.no_play,
-                            atmos=False if args.no_atmos else args.atmos) \
+                            atmos=False if args.no_atmos else args.atmos,
+                            vehicles=args.vehicles, all_vehicles=args.all_vehicles) \
             if not (args.check_only or args.bench_only) else None
         if res is not None:
             print(U.import_summary(res))
@@ -673,6 +675,13 @@ def build_parser() -> argparse.ArgumentParser:
                          "left out)")
     ue.add_argument("--no-atmos", action="store_true",
                     help="leave out the atmos plan (its actors from an earlier import go)")
+    ue.add_argument("--vehicles", metavar="LIBRARY_DIR",
+                    help="AG18: the vehicle library (game packs, vehicles/GAME.md) that the "
+                         "contributions' vehicle placements draw on (default "
+                         "$CITYGEN_VEHICLES, else ~/.cache/cybergen/vehicles/game); its cars "
+                         "imported once a project under /Game/CityGen/Vehicles")
+    ue.add_argument("--all-vehicles", action="store_true",
+                    help="import every car of the vehicle library, placed or not")
     ue.add_argument("--check", action="store_true",
                     help="after the import, play the level in the editor: streaming, "
                          "ground traces, a walk along a sidewalk (always the walking "
