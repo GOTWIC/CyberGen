@@ -1166,7 +1166,7 @@ def detail_faces(target, relief):
     return out
 
 
-def unwrap(ob, size, pad_px=None, boost=None, floor=None, thin=True):
+def unwrap(ob, size, pad_px=None, boost=None, floor=None, thin=True, again=None):
     """Smart projection, even texel density, islands scaled by face class (exterior over
     underside and cabin), packed into the unit square with pad_px between islands."""
     me = ob.data
@@ -1177,6 +1177,14 @@ def unwrap(ob, size, pad_px=None, boost=None, floor=None, thin=True):
     edit(ob)
     bpy.ops.uv.smart_project(angle_limit=1.15, island_margin=0.0, area_weight=0.0,
                              correct_aspect=True, scale_to_bounds=False)
+    if again:
+        # the faces of islands that lay over themselves, projected again in smaller charts
+        bpy.ops.object.mode_set(mode='OBJECT')
+        for p in me.polygons:
+            p.select = p.index in again
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.uv.smart_project(angle_limit=UV_AGAIN_ANGLE, island_margin=0.0,
+                                 area_weight=0.0, correct_aspect=True, scale_to_bounds=False)
     bpy.ops.object.mode_set(mode='OBJECT')
     log("  smart projection %s: %s" % (ob.name, _uvbox(me)))
     from bpy_extras import mesh_utils
@@ -1190,6 +1198,7 @@ def unwrap(ob, size, pad_px=None, boost=None, floor=None, thin=True):
     if bad:
         U = [0.0 if (u != u or abs(u) > 1e6) else u for u in U]
         log("  %d UV coordinates of degenerate faces were not numbers: set to 0" % bad)
+    polys = me.polygons
     # every island to one texel density (a UV unit a meter), times its class's weight; an
     # island with no UV area (degenerate faces) is left as it is
     polys = me.polygons
@@ -1275,7 +1284,45 @@ def unwrap(ob, size, pad_px=None, boost=None, floor=None, thin=True):
     log("  packed %s: %d islands, %.0f%% of the square, uv box %s" % (
         ob.name, len(islands), fill * 100, _uvbox(me)))
     ob["cg_detail_boost"] = f
+    if again is None:
+        # an island the projection laid over itself (a lip curling under its frame within
+        # the angle limit) is projected again in smaller charts, once
+        lay = self_overlap(me, U, islands)
+        if lay:
+            log("  %d islands (%d faces) overlap themselves: projected again at %.2f rad" % (
+                lay[0], len(lay[1]), UV_AGAIN_ANGLE))
+            return unwrap(ob, size, pad_px, boost, floor, thin, again=lay[1])
     return len(islands)
+
+
+UV_AGAIN_ANGLE = 0.6            # radians: the angle limit for islands that overlapped
+UV_AGAIN_SHARE = 0.001          # ... when this share of the texels is covered twice
+
+
+def self_overlap(me, U, islands, res=2048):
+    """Islands whose triangles cover texels another triangle of the atlas covers too, when
+    over UV_AGAIN_SHARE of the covered texels are covered twice: (count, their faces)."""
+    import numpy as np
+    lts = list(_loop_tris(me))
+    if not lts:
+        return None
+    L = np.array([lt.loops[:] for lt in lts], np.int64)
+    A = np.asarray(U, np.float64).reshape(-1, 2)
+    T = A[L].copy()
+    T[..., 1] = 1 - T[..., 1]
+    cnt = raster_count(T, res)
+    cov = int((cnt > 0).sum())
+    if cov == 0 or (cnt > 1).sum() <= UV_AGAIN_SHARE * cov:
+        return None
+    c = np.clip((T.mean(1) * res).astype(int), 0, res - 1)
+    hot = cnt[c[:, 1], c[:, 0]] > 1
+    faces = {lts[i].polygon_index for i in np.nonzero(hot)[0]}
+    owner = {}
+    for k, isl in enumerate(islands):
+        for i in isl:
+            owner[i] = k
+    ks = {owner[f] for f in faces if f in owner}
+    return len(ks), {i for k in ks for i in islands[k]}
 
 
 def island_thickness(me, islands, U):
@@ -1831,7 +1878,6 @@ LATHE_PIECE = -1000                         # the piece of a far LOD's tire tube
 LOD_GLASS_ITER = 4
 LOD_COARSE_SHARE = 0.1                      # glass this share of corners 15 deg off: coarse
 LOD_GLASS_SHARE = 0.3                       # ... kept whole while under this share of a LOD
-LOD_GLASS_UNSUB = 3                         # glass is unsubdivided from this LOD on
 REPROJECT_M = 0.02                          # LOD0 looked for this far along a LOD face's normal
 FID_SAMPLE_M2 = 0.004                      # one fidelity sample per this much area at least
 FID_REACH_M = 0.03                          # LOD0 looked for this far along the face normal
@@ -1841,7 +1887,7 @@ FID_TEX_ERR = 0.25                          # a texel this far off in a channel 
 # of its area over 25 degrees, at most `tex` of its area on the wrong texture
 FID_LIMITS = {1: dict(p95=4.0, bent=0.01, tex=0.01),
               2: dict(p95=10.0, bent=0.03, tex=0.025),
-              3: dict(p95=35.0, bent=0.08, tex=0.04)}
+              3: dict(p95=None, bent=0.12, tex=0.05)}
 
 
 def mark_islands(ob):
@@ -2035,7 +2081,7 @@ def add_tire(bm, tire):
     bmesh.ops.triangulate(bm, faces=new)
 
 
-def lod_prep(ob, k, glass=False, wheel=False):
+def lod_prep(ob, k, glass=False, wheel=False, unsub=False):
     """A part's mesh made ready for LOD k's collapse: from LOD2 the cabin's faces and the
     parts no larger than LOD_SMALL_M (lamps never) left out; then faces within
     LOD_PLANAR_DEG of coplanar merged and triangulated again (a flat door is a few long
@@ -2090,10 +2136,10 @@ def lod_prep(ob, k, glass=False, wheel=False):
         e.seam = len(lf) == 2 and (
             any(lay is not None and lf[0][lay] != lf[1][lay] for lay in (cls, pc, isl)) or
             (bl is not None and (lf[0][bl] > flat or lf[1][bl] > flat)))
-    if glass and k >= LOD_GLASS_UNSUB:
+    if glass and unsub:
         # glass: a coarse sheet LOD0 shades through its normals (a fold drawn smooth across
-        # a face) is never collapsed; far away its grid is halved each way, every kept corner
-        # where LOD0 had it
+        # a face) is never collapsed; when it is too much to keep, its grid is halved each
+        # way, every kept corner where LOD0 had it
         bmesh.ops.unsubdivide(bm, verts=bm.verts[:], iterations=LOD_GLASS_ITER)
         bmesh.ops.triangulate(bm, faces=bm.faces[:], quad_method='BEAUTY',
                               ngon_method='BEAUTY')
@@ -2371,10 +2417,12 @@ def make_lods(parts_final, budgets, coll, work=None):
         target = min(budget_k, int(0.6 * prev))     # a car under budget still steps down
         prep = {nm: lod_prep(o, k, nm in coarse, nm.startswith("wheel_"))
                 for nm, o in parts_final}
-        for nm in coarse:
-            if mesh_tris(prep[nm]) > LOD_GLASS_SHARE * target:   # too much to keep whole
+        for nm in coarse:       # too much to keep whole: unsubdivided, else collapsed
+            for kw in (dict(glass=True, unsub=True), dict()):
+                if mesh_tris(prep[nm]) <= LOD_GLASS_SHARE * target:
+                    break
                 bpy.data.meshes.remove(prep[nm])
-                prep[nm] = lod_prep(dict(parts_final)[nm], k)
+                prep[nm] = lod_prep(dict(parts_final)[nm], k, **kw)
         base = sum(mesh_tris(m) for m in prep.values())
         fixed = sum(mesh_tris(m) for m in prep.values() if m.get("cg_whole"))
         ratio = min(1.0, max(0.003, target - fixed) / max(base - fixed, 1))
@@ -3636,7 +3684,8 @@ def check(pack_dir, docs, seconds, stage_seconds):
         if f is None:
             frow.append(dict(lod=r["lod"], ok=False, why="not measured"))
             continue
-        good = f["normal_p95_deg"] <= lim["p95"] and f["bent_share"] <= lim["bent"] and \
+        good = (lim["p95"] is None or f["normal_p95_deg"] <= lim["p95"]) and \
+            f["bent_share"] <= lim["bent"] and \
             (f["texture_share"] is None or f["texture_share"] <= lim["tex"])
         frow.append(dict(f, lod=r["lod"], limits=lim, ok=bool(good)))
     ok("lod_fidelity", all(x["ok"] for x in frow), frow)

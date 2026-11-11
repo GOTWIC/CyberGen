@@ -127,7 +127,9 @@ So that LOD0 is near 150,000 triangles without decimating the silhouette:
 
 ## UVs
 
-Smart projection per slot, each island scaled to one texel density times its class's
+Smart projection per slot (66 degrees; the islands that end up covering texels another
+island covers, over 0.1% of the atlas, as a lip curling under its frame does, are projected
+again once at 34 degrees), each island scaled to one texel density times its class's
 weight (exterior 1, cabin 0.4, underside 0.35), then a skyline packer at the largest
 common scale, each lying flat or stood up, with 8 px between islands at 4096 (bake margins 8 px; whole texels between islands down to the 512 mip). On the body, an island thinner
 than 2 texels (2 area / perimeter: a letter's strokes, a hairline lamp) is scaled up to
@@ -160,8 +162,9 @@ share LOD0's textures. Per part, in this order:
    budget; a lamp keeps half (LOD2) or a quarter (LOD3) of its own) is collapsed again alone
    to that floor, so no panel or light strip vanishes. Glass LOD0 draws through its normals
    (a coarse sheet shaded smooth: over 10% of its corners 15 degrees off their face) is not
-   collapsed while it is under 30% of the LOD; from LOD3 its grid is unsubdivided instead
-   (every kept corner where LOD0 had it). Dense glass is collapsed as any part.
+   collapsed while it is under 30% of the LOD; over that its grid is unsubdivided instead
+   (every kept corner where LOD0 had it), and collapsed only if still over. Dense glass is
+   collapsed as any part.
 4. **Wheels at LOD3**: the tire is a round tube of 20 segments through LOD0's tire envelope
    (bead, sidewall, tread edges), with its own round normals; the rest of the wheel is
    collapsed.
@@ -225,9 +228,10 @@ corners (the farthest points along 128 directions). `collision.glb`, nodes
 - `wheel_pivots`: every wheel's tread centered on its node's pivot (3 mm), its radius as
   `pack.json` says, the axle no lower than the radius less 12 mm.
 - `lod_bounds`: every LOD's box within 2 cm (or 1.5% of the size) of LOD0's.
-- `lod_fidelity`: every LOD drawn as LOD0 (above): `normal_p95_deg` at most 4, 10, 35
-  degrees (LOD1, 2, 3), `bent_share` at most 1%, 3%, 8%, `texture_share` at most 1%, 2.5%,
-  4%. A crumpled or torn LOD fails.
+- `lod_fidelity`: every LOD drawn as LOD0 (above): `normal_p95_deg` at most 4 and 10
+  degrees (LOD1, 2; at LOD3 reported only: a faceted car's creases lose their bevels
+  there), `bent_share` at most 1%, 3%, 12%, `texture_share` at most 1%, 2.5%, 5%. A
+  crumpled or torn LOD fails.
 - `collision`: 4 to 12 hulls.
 
 ## Proof

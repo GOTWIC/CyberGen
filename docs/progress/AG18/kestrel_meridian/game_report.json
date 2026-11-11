@@ -1,0 +1,270 @@
+{
+ "car": "kestrel_meridian",
+ "title": "Kestrel Aerodyne Meridian",
+ "ok": true,
+ "triangles": {
+  "original": 90334,
+  "lods": [
+   61515,
+   36909,
+   19871,
+   5073
+  ],
+  "lod0_parts": {
+   "body": 60251,
+   "glass": 1264
+  }
+ },
+ "objects": {
+  "original": 110,
+  "parts": 2
+ },
+ "textures": {
+  "body": 4096
+ },
+ "pack_bytes": 27055170,
+ "seconds": 541.3,
+ "stage_seconds": {
+  "build": 0.2,
+  "render_original": 80.4,
+  "parts": 7.5,
+  "nodes": 0.0,
+  "uv": 98.9,
+  "bake": 126.8,
+  "lods_export": 10.3,
+  "textures": 5.943846225738525,
+  "proof": 211.0948669910431
+ },
+ "baked_down": {
+  "relief": {
+   "pieces": 8,
+   "triangles": 3116,
+   "names": [
+    "decals",
+    "fasteners",
+    "led.marker",
+    "led.visor",
+    "lettering",
+    "pod.stencils",
+    "sensors",
+    "visor.slits"
+   ]
+  }
+ },
+ "texel_px_per_m": {
+  "body": {
+   "exterior": {
+    "area_m2": 41.759,
+    "p5": 339.1,
+    "median": 342.7
+   },
+   "cabin": {
+    "area_m2": 23.535,
+    "p5": 136.8,
+    "median": 137.1
+   },
+   "underside": {
+    "area_m2": 0.809,
+    "p5": 119.9,
+    "median": 137.6
+   }
+  }
+ },
+ "lights": 55,
+ "collision_hulls": 12,
+ "source": {
+  "script": "vehicles/cars/kestrel_meridian.py",
+  "script_sha256": "6721720365425c67d736f7c0f951ba020838111e61bba54331fb01a228c46cf1",
+  "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
+  "game_sha256": "41f5f16c7cf9769a0c7d8b5940c39d8348a22ecf7a01af9cd446e9838e2b602f",
+  "original_triangles": 90334,
+  "original_objects": 110
+ },
+ "test": false,
+ "checks": [
+  {
+   "check": "files",
+   "ok": true,
+   "detail": {
+    "files": 10,
+    "missing": [],
+    "unreadable": []
+   }
+  },
+  {
+   "check": "budgets",
+   "ok": true,
+   "detail": [
+    {
+     "lod": 0,
+     "triangles": 61515,
+     "budget": 150000,
+     "ok": true
+    },
+    {
+     "lod": 1,
+     "triangles": 36909,
+     "budget": 60000,
+     "ok": true
+    },
+    {
+     "lod": 2,
+     "triangles": 19871,
+     "budget": 20000,
+     "ok": true
+    },
+    {
+     "lod": 3,
+     "triangles": 5073,
+     "budget": 5000,
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "uv_overlap",
+   "ok": true,
+   "detail": {
+    "limit": 0.005,
+    "slots": {
+     "body": {
+      "overlap": 0.00367,
+      "coverage": 0.3343,
+      "outside_unit": 0.0
+     }
+    }
+   }
+  },
+  {
+   "check": "texel_density",
+   "ok": true,
+   "detail": {
+    "body": {
+     "p5": 339.1,
+     "median": 342.7,
+     "floor": 300.0,
+     "ok": true
+    }
+   }
+  },
+  {
+   "check": "wheel_pivots",
+   "ok": true,
+   "detail": []
+  },
+  {
+   "check": "lod_bounds",
+   "ok": true,
+   "detail": [
+    {
+     "lod": 1,
+     "deviation_m": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tolerance_m": [
+      0.0797,
+      0.0311,
+      0.0209
+     ],
+     "ok": true
+    },
+    {
+     "lod": 2,
+     "deviation_m": [
+      0.0,
+      0.0,
+      0.0005
+     ],
+     "tolerance_m": [
+      0.0797,
+      0.0311,
+      0.0209
+     ],
+     "ok": true
+    },
+    {
+     "lod": 3,
+     "deviation_m": [
+      0.0028,
+      0.002,
+      0.0022
+     ],
+     "tolerance_m": [
+      0.0797,
+      0.0311,
+      0.0209
+     ],
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "lod_fidelity",
+   "ok": true,
+   "detail": [
+    {
+     "normal_p95_deg": 1.59,
+     "bent_share": 0.0046,
+     "texture_share": 0.0019,
+     "miss_share": 0.0,
+     "lod": 1,
+     "limits": {
+      "p95": 4.0,
+      "bent": 0.01,
+      "tex": 0.01
+     },
+     "ok": true
+    },
+    {
+     "normal_p95_deg": 4.55,
+     "bent_share": 0.008,
+     "texture_share": 0.0054,
+     "miss_share": 0.0011,
+     "lod": 2,
+     "limits": {
+      "p95": 10.0,
+      "bent": 0.03,
+      "tex": 0.025
+     },
+     "ok": true
+    },
+    {
+     "normal_p95_deg": 76.03,
+     "bent_share": 0.0862,
+     "texture_share": 0.0384,
+     "miss_share": 0.0318,
+     "lod": 3,
+     "limits": {
+      "p95": null,
+      "bent": 0.12,
+      "tex": 0.05
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "collision",
+   "ok": true,
+   "detail": {
+    "hulls": 12,
+    "vertices": [
+     292,
+     216,
+     330,
+     170,
+     272,
+     154,
+     224,
+     158,
+     344,
+     140,
+     232,
+     178
+    ]
+   }
+  }
+ ]
+}
