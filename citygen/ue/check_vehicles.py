@@ -384,8 +384,8 @@ def passes(world, actors, by_key, cars, lineup, when):
         if "parking.row" in by_key:
             r = by_key["parking.row"]
             c = r["pivot"]
-            yield from shot(f"parking_{when}", ue(c[0] + 4.5, c[1] - 9, 3), ue(c[0] + 4.5, c[1], 0.6),
-                            50.0)
+            yield from shot(f"parking_{when}", ue(c[0] + 6.8, c[1] - 13.0, 3.5),
+                            ue(c[0] + 6.8, c[1], 0.6), 50.0)
         for car, rec in sorted(cars.items()):
             r = hero_of(by_key, car)
             if r is None:
