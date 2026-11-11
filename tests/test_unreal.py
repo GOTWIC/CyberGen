@@ -840,8 +840,8 @@ def test_stage2_textures(build, manifest, tmp_path):
     src = (Path(U.__file__).parent / "ue" / "import_city.py").read_text()
     assert 'f"{folder}/Textures/"' in src and "own_textures(mi, " in src
     assert "comp.get_material_index(unreal.Name(slot))" in src
-    # the masters' usage flags: Nanite too (opaque and masked), on new and existing masters
-    assert '"used_with_nanite"' in src and src.count("in usage_flags(m)") == 3
+    # the masters' usage flags: Nanite too (opaque and masked), on new and existing masters (AG18: two more)
+    assert '"used_with_nanite"' in src and src.count("in usage_flags(m)") == 5
     # a big prune deletes package files on an empty level, then loads the city again
     assert "delete_files if files else delete_assets" in src and "scan_paths_synchronous(" in src
     bad = copy.deepcopy(fake)
