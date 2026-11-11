@@ -1534,8 +1534,9 @@ def stage2_master(master, defaults=None):
 
 # --- AG18's vehicles (citygen/unreal_vehicles.py; the packs' contract: vehicles/GAME.md) ------
 
-VEHICLE_VERSION = "4"        # of the vehicle masters (`cg.vehicle` metadata)
+VEHICLE_VERSION = "5"        # of the vehicle masters (`cg.vehicle` metadata)
 VEHICLE_MESH_VERSION = "3"   # of what the importer makes of a car (with its manifest hash)
+VEHICLE_ACTOR_VERSION = "2"  # of the placement actors (2: the glass casts no shadow)
 # the paint per placement: Custom Primitive Data, or per-instance custom data on an
 # instanced component, three linear colors (citygen.unreal_vehicles.PAINT_CPD)
 PAINT_INDEX = (0, 3, 6)
@@ -1660,7 +1661,10 @@ def vehicle_master(defaults):
 
 def vehicle_glass_master(opaque):
     """/Game/CityGen/Core/M_CgVehicleGlass (the pack's glass: thin translucent, the glass
-    color tinting what shows through it, its reflection by its IOR and roughness) and
+    color squared tinting what shows through it, its reflection by its IOR and roughness;
+    the packs' glass is thick, two sheets a few mm apart, and a ray through it is tinted
+    twice in the proof's Cycles render, while the engine draws only the outer sheet from
+    outside, the inner one facing in and culled) and
     M_CgVehicleGlassDark (from the pack's `opaque_from_lod`: no cabin behind it, the glass
     drawn dark and opaque, the color times 0.06 as the pack's proof draws it)."""
     name = "M_CgVehicleGlassDark" if opaque else "M_CgVehicleGlass"
@@ -1708,7 +1712,7 @@ def vehicle_glass_master(opaque):
         m.set_editor_property("translucency_lighting_mode",
                               unreal.TranslucencyLightingMode.TLM_SURFACE_PER_PIXEL_LIGHTING)
         tto = expr(m, unreal.MaterialExpressionThinTranslucentMaterialOutput, -150, 0)
-        tint = custom(m, -450, 0, "return lerp(float3(1, 1, 1), C, T);", ["C", "T"],
+        tint = custom(m, -450, 0, "return lerp(float3(1, 1, 1), C * C, T);", ["C", "T"],
                       cmot(F3), "CgGlassTint")
         link(col, "", tint, "C")
         link(trans, "", tint, "T")
@@ -2870,6 +2874,11 @@ class Importer:
                                 comp.set_custom_data_value(i, j, float(v), False)
                         comp.set_collision_profile_name("BlockAll" if p["kind"] == "body"
                                                         else "NoCollision")
+                        if p["kind"] == "glass":
+                            # (the packs' glass is thick, an outer and an inner sheet a few
+                            # mm apart: cast into the shadow maps, each sheet shadowed the
+                            # other in blocky black patches, the Aurels' glass roofs worst)
+                            comp.set_cast_shadow(False)
                         tags = ["cg.member", f"cg.key={r['key']}.{car}.{p['name']}",
                                 "cg.type=vehicle", "cg.category=vehicle", f"cg.kind={car}",
                                 f"cg.vehicle={car}", f"cg.part={p['name']}"]
@@ -2887,7 +2896,7 @@ class Importer:
             if old is not None and set(r["models"]) & getattr(self, "veh_made", set()):
                 old.tags = [t for t in old.tags if not str(t).startswith(HASH_TAG + "=")]
             self.place(have, r["key"], r["hash"], gcls, make, update, "CityGen/vehicle",
-                       version=f"{ACTOR_VERSION}.v{VEHICLE_MESH_VERSION}")
+                       version=f"{ACTOR_VERSION}.v{VEHICLE_ACTOR_VERSION}")
 
     # -- the level --
 

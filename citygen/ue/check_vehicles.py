@@ -334,16 +334,15 @@ def hull_actor(rec, pivot, xf):
         for x, y, z in h["vertices"]:
             r = ME.add_vertex_to_mesh(dm, unreal.Vector(x * 100.0, -y * 100.0, z * 100.0))
             ids.append(r[1] if isinstance(r, tuple) else r)
-        for a, b, c in h["triangles"]:
+        for i, j, k in h["triangles"]:
             # (y flipped: the triangle turns the other way round)
-            ME.add_triangle_to_mesh(dm, unreal.IntVector(ids[a], ids[c], ids[b]), 0)
+            ME.add_triangle_to_mesh(dm, unreal.IntVector(ids[i], ids[k], ids[j]), 0)
     N = getattr(unreal, "GeometryScript_Normals", None)
     if N is not None:
         try:
             N.set_per_face_normals(dm)
         except Exception as e:
             log(f"hull normals: {e}")
-    comp.notify_mesh_updated()
     mat = unreal.load_asset("/Game/CityGen/Core/M_CityGen")
     if mat is not None:
         comp.set_material(0, mat)
@@ -355,9 +354,19 @@ def views(world, man, actors):
     by_key = {r["key"]: r for r in veh["placements"]}
     cars = veh["cars"]
     lineup = [k for k in actors if k.startswith(("lineup.", "parking."))]
-    for when in ("day", "night"):
+    # (by day first, the details by day too, the night last: the scene lit again after the
+    # night took seconds to converge, and the first view after it was dark in its shadows)
+    yield from passes(world, actors, by_key, cars, lineup, "day")
+    yield from details(world, actors, by_key, cars)
+    yield from passes(world, actors, by_key, cars, lineup, "night")
+    night(False, world)
+    set_hidden(actors, set(actors))
+
+
+def passes(world, actors, by_key, cars, lineup, when):
+    if True:
         night(when == "night", world)
-        yield from wait(1.0)
+        yield from wait(3.0 if when == "night" else 1.0)
         set_hidden(actors, set(lineup))
         yield from shot(f"lineup_{when}", ue(0, -24, 7), ue(0, 12, 0.5), 50.0)
         yield from shot(f"lineup_high_{when}", ue(-30, -26, 22), ue(0, 12, 0), 45.0)
@@ -376,8 +385,9 @@ def views(world, man, actors):
             cam = hero_camera(rec, r["pivot"], xf)
             if cam:
                 yield from shot(f"hero_{car}_{when}", cam[0], cam[1], cam[2], 1600)
-    night(False, world)
-    yield from wait(0.5)
+
+
+def details(world, actors, by_key, cars):
     # LODs forced in turn: the pack's LOD views (from opaque_from_lod the glass dark)
     for car in JOB.get("lod_cars") or []:
         r = by_key.get(f"hero.{car}")
