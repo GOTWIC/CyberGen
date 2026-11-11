@@ -28,7 +28,7 @@ as it lands, as in [`citygen_milestones.md`](citygen_milestones.md).
 | Sky tube fixes | Fixes between milestones (issues #94, #97): sky tubes on plain pylons drawn as before M19 (masts an option), ribs at citygen's rings along the whole line, an LED band in the line's color on each lit one (neon, brighter by night) | Done | [`docs/progress/sky_tubes`](progress/sky_tubes) |
 | AG16 | Performance (scope 14.17, issue #96): a benchmark in a standalone game process, frame time, VRAM, RAM and import targets for Delta on the Windows PC, structural fixes from what it shows, budgets in the build; upscaling measured, DLSS later | Planned | |
 | AG17 | Road surfaces by construction (scope 14.18), with stage 1's M22: AG7's road, junction, sidewalk, median and corner pieces meshed from M22's pavement map, their boundaries the map's stored vertices never split, interiors by constrained triangulation, barriers along stored edges, decals on the face that holds them; a `street_watertight` check (every interior map edge in exactly two pieces at the same positions); AG14's step and strip checks reading 0 | Done | [`docs/progress/AG17`](progress/AG17) |
-| AG18 | Hero vehicles (scope 14.19): hand-designed cars, trucks and hover vehicles as Blender scripts on a shared kit, seven made-up brands, one multi-view sheet a car; not a generator, not game-ready yet | In progress | [`docs/progress/AG18`](progress/AG18) |
+| AG18 | Hero vehicles (scope 14.19): hand-designed cars, trucks and hover vehicles as Blender scripts on a shared kit, seven made-up brands, one multi-view sheet a car; not a generator; game packs (LODs, baked textures, collision) for 18 of them | In progress | [`docs/progress/AG18`](progress/AG18) |
 
 ## AG0: contract and spike
 
@@ -2675,7 +2675,7 @@ the Unreal tests updated); results `docs/progress/AG16/`.
 
 ## AG18: hero vehicles (in progress)
 
-**Phase 1 built, waiting for review.** Scope 14.19 (Swagnik, 2026-11-10): vehicles designed one by one, not
+**Phase 1 built, waiting for review; phase 3 (game packs) built for 18 vehicles.** Scope 14.19 (Swagnik, 2026-11-10): vehicles designed one by one, not
 generated. Everything is in `vehicles/` (the kit `carkit.py`, a script per car in `cars/`,
 the brand book `BRANDS.md`, the design brief `BRIEF.md`, `post.py`, the render queue
 `blender.sh`); a car's sheet and notes are in `docs/progress/AG18/<car>/`. The concept
@@ -2726,6 +2726,75 @@ building it and looking at its sheet. Rebuilt `.blend` and `.glb` files are not 
   wheel, panel edges that move under subdivision. Show colors cluster (three blues, three
   purples, two olives) because cars were designed in parallel; color is not part of a brand.
 - **Improvements and the plan for them:** scope 14.19.
+
+### Phase 3: game packs (built 2026-11-11)
+
+Scope steps F and G, for the 18 vehicles other than Vex. `vehicles/game.py` (run through
+`blender.sh`: `vehicles/blender.sh vehicles/game.py --car NAME [--docs]`) turns a car's
+script, unchanged, into a pack in `~/.cache/cybergen/vehicles/game/<car>/` (never in git);
+`--docs` writes the proof `game.jpg` and `game_report.json` into `docs/progress/AG18/<car>/`.
+The format is the contract in [`vehicles/GAME.md`](../vehicles/GAME.md).
+
+- **PR #194, the tool and three pilots** (vanta_r, kestrel_dart, brakk_hauler): nodes
+  `body`, `glass`, `wheel_<tag>`, `brake_<tag>` with pivots on the axles; body (4096) and
+  wheels (2048) atlases of five textures each, the paint a mask so any color can be set;
+  four LODs, 4 to 12 convex hulls, `pack.json`; the checks. Blender 5.2's UV packer collapses
+  every island when one has no area, so the tool packs its own (a skyline packer).
+- **PR #196, batch 1** (Halcyon, Orrin, Aurel): faces seen better from behind turned
+  round, glass parameters from the material most of it wears, no collapse of glass, lamps or
+  wheels, thin islands to 2 texels and islands under lettering at up to twice the density,
+  baked detail grown into the island margins, cabin-only emitters clipped.
+- **PR #198, batch 2** (clean LODs, hover cars, Brakk trucks): small parts and the cabin
+  left out first, coplanar faces merged, one collapse with a floor per piece and lamp, UVs
+  and shading normals laid on from LOD0 island by island; check `lod_fidelity`;
+  `--keep-work` then `--lods-only` for the LODs in seconds; the proof's studio as the car's
+  script sets it up.
+- **PR #199, batch 3** (LOD3, the Mule, Tanager, every car on the final tool): size class
+  (large from 55 m2 of exterior: LOD3 8,000 triangles and a 240 px/m texel floor, else 5,000
+  and 300); LOD3 leaves out the unseen, small loose and floating parts, welds panels,
+  replaces wrecked parts by convex hulls and makes each wheel anew with a rim face baked for
+  it; wheel twins by translation or mirror share texels (the Mule's six wheels pack as two).
+
+| Car | Original | LOD0 / LOD1 / LOD2 / LOD3 | Size class | Pack | Checks |
+|---|---|---|---|---|---|
+| vanta_r | 240,286 | 118,974 / 59,992 / 19,800 / 5,107 | standard | 32.9 MB | 8 of 8 |
+| halcyon_sable | 250,465 | 136,232 / 59,994 / 19,956 / 5,083 | standard | 33.8 MB | 8 of 8 |
+| halcyon_ridge | 223,779 | 132,317 / 59,986 / 20,145 / 5,162 | standard | 34.5 MB | 7 of 8 (`uv_overlap` 0.00515 against 0.005) |
+| kestrel_dart | 72,340 | 52,746 / 31,644 / 19,549 / 5,420 | standard | 26.2 MB | 8 of 8 |
+| kestrel_meridian | 90,334 | 61,929 / 37,156 / 19,897 / 5,351 | standard | 27.1 MB | 7 of 8 (`lod_fidelity`: LOD3 normal p95 41.7 against 40, texture share 0.0402 against 0.04) |
+| kestrel_atlas | 151,203 | 87,139 / 52,282 / 20,080 / 8,215 | large | 34.9 MB | 8 of 8 |
+| orrin_lumen | 293,582 | 147,405 / 59,995 / 19,869 / 5,058 | standard | 31.4 MB | 8 of 8 |
+| orrin_pebble | 266,030 | 145,410 / 59,992 / 19,803 / 5,037 | standard | 32.1 MB | 8 of 8 |
+| orrin_aria | 501,460 | 145,601 / 59,999 / 20,221 / 5,121 | standard | 35.9 MB | 8 of 8 |
+| brakk_hauler | 230,460 | 123,501 / 59,990 / 20,196 / 8,216 | large | 40.5 MB | 7 of 8 (`lod_fidelity`: LOD1 normal p95 12.39 against 12) |
+| brakk_bastion | 269,389 | 145,477 / 59,997 / 20,168 / 8,078 | large | 41.3 MB | 8 of 8 |
+| brakk_mule | 364,552 | 145,809 / 59,993 / 20,527 / 8,104 | large | 51.1 MB | 8 of 8 |
+| aurel_prelate | 215,832 | 104,384 / 59,991 / 20,246 / 5,103 | standard | 28.9 MB | 8 of 8 |
+| aurel_regent | 228,554 | 110,611 / 59,991 / 20,593 / 5,137 | standard | 27.9 MB | 8 of 8 |
+| aurel_zenith | 129,135 | 72,511 / 43,503 / 20,290 / 5,116 | standard | 20.2 MB | 8 of 8 |
+| tanager_mino | 223,689 | 122,326 / 59,990 / 19,864 / 4,896 | standard | 31.7 MB | 8 of 8 |
+| tanager_cab | 285,996 | 140,079 / 59,989 / 20,172 / 8,191 | large | 33.5 MB | 8 of 8 |
+| tanager_porter | 314,760 | 149,066 / 59,992 / 20,535 / 8,323 | large | 34.2 MB | 8 of 8 |
+
+The tool's main ideas:
+- **No hints from the car:** wheels, glass, paint channels and what to bake down found by
+  rules on the built objects; fix the tool, not the car.
+- **Detail baked, silhouette kept:** flat relief, lettering and dense arrays baked onto the
+  surface under them, dense tires rebuilt as lathes, faces nothing sees removed, over budget
+  a collapse of every part alike but glass, lamps and wheels.
+- **Color as a parameter:** no paint hue baked; a mask of three paint channels and a shade
+  recolors the car in the engine.
+- **LODs that shade as LOD0:** every LOD takes its UVs and shading normals from LOD0, island
+  by island, and is measured against it (`lod_fidelity`).
+- **Proof beside the original:** the pack alone, rendered from its files in the car's own
+  studio next to the procedural original, a recolored copy, the textures and the LODs.
+
+Open: the three marginal failures above (recorded, not fixed); LOD3 details still crude up
+close (a winch drum, small rims and grilles); bake faults on kestrel_meridian's louvre and
+aurel_zenith's grille; nothing imported into Unreal yet. The three Vex vehicles are to be
+redesigned (Swagnik, 2026-11-10) and have no packs. Next: an Unreal test of the packs and
+the exporter taking them, then step H (the vehicles into the generated cities), then the
+design improvements A to E.
 
 The roster with sizes and sheets: [`docs/progress/AG18/README.md`](progress/AG18/README.md).
 
