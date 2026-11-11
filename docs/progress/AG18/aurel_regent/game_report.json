@@ -5,40 +5,56 @@
  "triangles": {
   "original": 228554,
   "lods": [
-   128621,
+   110611,
    59991,
-   19221,
-   4790
+   20593,
+   5137
   ],
   "lod0_parts": {
-   "body": 79209,
+   "body": 60871,
    "glass": 3020,
-   "wheel_fl": 11598,
-   "wheel_fr": 11598,
-   "wheel_rl": 11598,
-   "wheel_rr": 11598
+   "wheel_fl": 11680,
+   "wheel_fr": 11680,
+   "wheel_rl": 11680,
+   "wheel_rr": 11680
   }
  },
  "objects": {
   "original": 114,
   "parts": 6
  },
+ "size_class": {
+  "name": "standard",
+  "exterior_m2": 48.18,
+  "rule": "large when the body's exterior is 55 m2 or more",
+  "lod_budgets": [
+   150000,
+   60000,
+   20000,
+   5000
+  ],
+  "texel_floor_px_per_m": {
+   "body": 300.0,
+   "wheels": 300.0
+  }
+ },
  "textures": {
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 20835857,
- "seconds": 654.0,
+ "pack_bytes": 27858320,
+ "seconds": 39.3,
  "stage_seconds": {
   "build": 0.4,
-  "render_original": 68.5,
-  "parts": 7.5,
+  "render_original": 21.5,
+  "parts": 9.0,
   "nodes": 0.0,
-  "uv": 6.1,
-  "bake": 438.3,
-  "lods_export": 2.2,
-  "textures": 8.067073106765747,
-  "proof": 122.73811101913452
+  "uv": 43.2,
+  "bake": 492.1,
+  "lods_export": 12.4,
+  "lods_only": 10.5,
+  "textures": 0.0,
+  "proof": 28.815034866333008
  },
  "baked_down": {
   "relief": {
@@ -100,31 +116,36 @@
  "texel_px_per_m": {
   "body": {
    "exterior": {
-    "area_m2": 48.915,
-    "p5": 342.0,
-    "median": 344.1
+    "area_m2": 48.175,
+    "p5": 342.5,
+    "median": 344.6
    },
    "cabin": {
     "area_m2": 33.125,
-    "p5": 137.4,
-    "median": 137.5
+    "p5": 137.6,
+    "median": 137.7
    },
    "underside": {
-    "area_m2": 0.226,
-    "p5": 120.2,
-    "median": 344.6
+    "area_m2": 0.096,
+    "p5": 333.5,
+    "median": 345.1
+   },
+   "lamp_in_gaps": {
+    "area_m2": 0.649,
+    "p5": 120.4,
+    "median": 120.4
    }
   },
   "wheels": {
    "exterior": {
-    "area_m2": 4.511,
-    "p5": 358.2,
-    "median": 390.6
+    "area_m2": 4.054,
+    "p5": 356.0,
+    "median": 391.8
    },
    "underside": {
-    "area_m2": 0.003,
-    "p5": 136.7,
-    "median": 379.8
+    "area_m2": 0.005,
+    "p5": 136.5,
+    "median": 387.4
    }
   }
  },
@@ -134,7 +155,7 @@
   "script": "vehicles/cars/aurel_regent.py",
   "script_sha256": "37fa661e27d95c6c49cc100b00188b1a8ad2c773df195f4a4f7b43862c713e87",
   "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
-  "game_sha256": "bc764c159cb90ebe69119f57e00d0b4769d5c30f4e3c1a21ed10cbf06ef1204f",
+  "game_sha256": "9e6108a54d1f801bd18195adc59470f9bd92b6d763a2afc8f84531218c054eab",
   "original_triangles": 228554,
   "original_objects": 114
  },
@@ -155,7 +176,7 @@
    "detail": [
     {
      "lod": 0,
-     "triangles": 128621,
+     "triangles": 110611,
      "budget": 150000,
      "ok": true
     },
@@ -167,13 +188,13 @@
     },
     {
      "lod": 2,
-     "triangles": 19221,
+     "triangles": 20593,
      "budget": 20000,
      "ok": true
     },
     {
      "lod": 3,
-     "triangles": 4790,
+     "triangles": 5137,
      "budget": 5000,
      "ok": true
     }
@@ -186,13 +207,13 @@
     "limit": 0.005,
     "slots": {
      "body": {
-      "overlap": 0.00056,
-      "coverage": 0.5205,
+      "overlap": 0.00059,
+      "coverage": 0.5154,
       "outside_unit": 0.0
      },
      "wheels": {
       "overlap": 0.0,
-      "coverage": 0.1641,
+      "coverage": 0.1487,
       "outside_unit": 0.0
      }
     }
@@ -203,14 +224,14 @@
    "ok": true,
    "detail": {
     "body": {
-     "p5": 342.0,
-     "median": 344.1,
+     "p5": 342.5,
+     "median": 344.6,
      "floor": 300.0,
      "ok": true
     },
     "wheels": {
-     "p5": 358.2,
-     "median": 390.6,
+     "p5": 356.0,
+     "median": 391.8,
      "floor": 300.0,
      "ok": true
     }
@@ -315,7 +336,7 @@
      "deviation_m": [
       0.0,
       0.0,
-      0.0001
+      0.0
      ],
      "tolerance_m": [
       0.0889,
@@ -329,7 +350,7 @@
      "deviation_m": [
       0.0,
       0.001,
-      0.0049
+      0.0036
      ],
      "tolerance_m": [
       0.0889,
@@ -341,15 +362,60 @@
     {
      "lod": 3,
      "deviation_m": [
-      0.0086,
-      0.001,
-      0.0055
+      0.0,
+      0.0065,
+      0.0003
      ],
      "tolerance_m": [
       0.0889,
       0.0311,
       0.022
      ],
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "lod_fidelity",
+   "ok": true,
+   "detail": [
+    {
+     "normal_p95_deg": 0.83,
+     "bent_share": 0.0003,
+     "texture_share": 0.0,
+     "miss_share": 0.0,
+     "lod": 1,
+     "limits": {
+      "p95": 12.0,
+      "bent": 0.02,
+      "tex": 0.01
+     },
+     "ok": true
+    },
+    {
+     "normal_p95_deg": 2.05,
+     "bent_share": 0.0043,
+     "texture_share": 0.0025,
+     "miss_share": 0.0021,
+     "lod": 2,
+     "limits": {
+      "p95": 25.0,
+      "bent": 0.05,
+      "tex": 0.025
+     },
+     "ok": true
+    },
+    {
+     "normal_p95_deg": 8.12,
+     "bent_share": 0.0191,
+     "texture_share": 0.0069,
+     "miss_share": 0.0152,
+     "lod": 3,
+     "limits": {
+      "p95": 40.0,
+      "bent": 0.1,
+      "tex": 0.04
+     },
      "ok": true
     }
    ]
@@ -362,15 +428,15 @@
     "vertices": [
      256,
      138,
-     218,
+     224,
      108,
      236,
      86,
      212,
      174,
-     284,
+     250,
      94,
-     336
+     232
     ]
    }
   }

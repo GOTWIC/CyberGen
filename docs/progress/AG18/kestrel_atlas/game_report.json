@@ -8,7 +8,7 @@
    87139,
    52282,
    20080,
-   5256
+   8215
   ],
   "lod0_parts": {
    "body": 86403,
@@ -19,21 +19,37 @@
   "original": 155,
   "parts": 2
  },
+ "size_class": {
+  "name": "large",
+  "exterior_m2": 76.05,
+  "rule": "large when the body's exterior is 55 m2 or more",
+  "lod_budgets": [
+   150000,
+   60000,
+   20000,
+   8000
+  ],
+  "texel_floor_px_per_m": {
+   "body": 240.0,
+   "wheels": 240.0
+  }
+ },
  "textures": {
   "body": 4096
  },
- "pack_bytes": 33054640,
- "seconds": 514.6,
+ "pack_bytes": 34888721,
+ "seconds": 56.8,
  "stage_seconds": {
   "build": 0.3,
-  "render_original": 81.4,
-  "parts": 9.7,
+  "render_original": 24.4,
+  "parts": 10.1,
   "nodes": 0.0,
-  "uv": 98.7,
-  "bake": 158.6,
-  "lods_export": 30.1,
-  "textures": 6.90687894821167,
-  "proof": 128.64797496795654
+  "uv": 164.0,
+  "bake": 182.0,
+  "lods_export": 31.2,
+  "lods_only": 27.1,
+  "textures": 0.0,
+  "proof": 29.638833045959473
  },
  "baked_down": {
   "relief": {
@@ -69,13 +85,13 @@
    },
    "cabin": {
     "area_m2": 11.105,
-    "p5": 128.2,
-    "median": 314.8
+    "p5": 128.1,
+    "median": 314.7
    },
    "underside": {
     "area_m2": 1.414,
     "p5": 112.1,
-    "median": 320.3
+    "median": 320.2
    },
    "lamp_in_gaps": {
     "area_m2": 1.033,
@@ -90,7 +106,7 @@
   "script": "vehicles/cars/kestrel_atlas.py",
   "script_sha256": "7233b4fec97c51f6005241ffd298f5cf884b3e91b7fa31da5207297cea6c4ae4",
   "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
-  "game_sha256": "8eece639aaa11a6d467231ecceefa1b724ad06162ada805edb3b0a05a998f25e",
+  "game_sha256": "9e6108a54d1f801bd18195adc59470f9bd92b6d763a2afc8f84531218c054eab",
   "original_triangles": 151203,
   "original_objects": 155
  },
@@ -129,8 +145,8 @@
     },
     {
      "lod": 3,
-     "triangles": 5256,
-     "budget": 5000,
+     "triangles": 8215,
+     "budget": 8000,
      "ok": true
     }
    ]
@@ -142,8 +158,8 @@
     "limit": 0.005,
     "slots": {
      "body": {
-      "overlap": 0.00338,
-      "coverage": 0.5157,
+      "overlap": 0.00341,
+      "coverage": 0.5147,
       "outside_unit": 0.0
      }
     }
@@ -156,7 +172,7 @@
     "body": {
      "p5": 310.1,
      "median": 320.5,
-     "floor": 300.0,
+     "floor": 240.0,
      "ok": true
     }
    }
@@ -201,9 +217,9 @@
     {
      "lod": 3,
      "deviation_m": [
-      0.0403,
-      0.005,
-      0.0018
+      0.0,
+      0.0,
+      0.0003
      ],
      "tolerance_m": [
       0.0886,
@@ -221,7 +237,7 @@
     {
      "normal_p95_deg": 2.0,
      "bent_share": 0.0063,
-     "texture_share": 0.0033,
+     "texture_share": 0.0031,
      "miss_share": 0.0101,
      "lod": 1,
      "limits": {
@@ -234,7 +250,7 @@
     {
      "normal_p95_deg": 22.27,
      "bent_share": 0.0369,
-     "texture_share": 0.0116,
+     "texture_share": 0.0111,
      "miss_share": 0.0071,
      "lod": 2,
      "limits": {
@@ -245,15 +261,15 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 35.73,
-     "bent_share": 0.0904,
-     "texture_share": 0.0366,
-     "miss_share": 0.0745,
+     "normal_p95_deg": 35.07,
+     "bent_share": 0.0845,
+     "texture_share": 0.0288,
+     "miss_share": 0.0716,
      "lod": 3,
      "limits": {
-      "p95": null,
-      "bent": 0.15,
-      "tex": 0.05
+      "p95": 40.0,
+      "bent": 0.1,
+      "tex": 0.04
      },
      "ok": true
     }

@@ -7,8 +7,8 @@
   "lods": [
    145477,
    59997,
-   20169,
-   5077
+   20168,
+   8078
   ],
   "lod0_parts": {
    "body": 82957,
@@ -23,22 +23,38 @@
   "original": 153,
   "parts": 6
  },
+ "size_class": {
+  "name": "large",
+  "exterior_m2": 60.77,
+  "rule": "large when the body's exterior is 55 m2 or more",
+  "lod_budgets": [
+   150000,
+   60000,
+   20000,
+   8000
+  ],
+  "texel_floor_px_per_m": {
+   "body": 240.0,
+   "wheels": 240.0
+  }
+ },
  "textures": {
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 39136344,
- "seconds": 577.8,
+ "pack_bytes": 41258566,
+ "seconds": 41.3,
  "stage_seconds": {
   "build": 0.9,
-  "render_original": 72.0,
-  "parts": 18.7,
+  "render_original": 19.9,
+  "parts": 18.3,
   "nodes": 0.0,
-  "uv": 127.6,
-  "bake": 217.9,
-  "lods_export": 24.6,
-  "textures": 7.992377758026123,
-  "proof": 107.80159091949463
+  "uv": 190.4,
+  "bake": 390.5,
+  "lods_export": 17.4,
+  "lods_only": 15.9,
+  "textures": 0.0,
+  "proof": 25.41908288002014
  },
  "baked_down": {
   "relief": {
@@ -68,35 +84,35 @@
   "body": {
    "exterior": {
     "area_m2": 60.773,
-    "p5": 307.1,
-    "median": 318.9
+    "p5": 306.8,
+    "median": 318.5
    },
    "underside": {
     "area_m2": 3.484,
-    "p5": 111.3,
-    "median": 318.3
+    "p5": 111.1,
+    "median": 317.9
    },
    "cabin": {
     "area_m2": 6.831,
-    "p5": 127.2,
-    "median": 318.2
+    "p5": 127.0,
+    "median": 317.8
    },
    "lamp_in_gaps": {
     "area_m2": 0.19,
-    "p5": 111.3,
-    "median": 111.3
+    "p5": 111.1,
+    "median": 111.1
    }
   },
   "wheels": {
    "exterior": {
     "area_m2": 13.517,
-    "p5": 348.8,
-    "median": 377.8
+    "p5": 346.0,
+    "median": 374.1
    },
    "underside": {
     "area_m2": 0.388,
-    "p5": 132.2,
-    "median": 383.1
+    "p5": 130.9,
+    "median": 380.1
    }
   }
  },
@@ -106,7 +122,7 @@
   "script": "vehicles/cars/brakk_bastion.py",
   "script_sha256": "9cae1c68db6b30a9c35bce7874869d4709826cda9f9957f3b17f5fc53e673318",
   "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
-  "game_sha256": "8eece639aaa11a6d467231ecceefa1b724ad06162ada805edb3b0a05a998f25e",
+  "game_sha256": "9e6108a54d1f801bd18195adc59470f9bd92b6d763a2afc8f84531218c054eab",
   "original_triangles": 269389,
   "original_objects": 153
  },
@@ -139,14 +155,14 @@
     },
     {
      "lod": 2,
-     "triangles": 20169,
+     "triangles": 20168,
      "budget": 20000,
      "ok": true
     },
     {
      "lod": 3,
-     "triangles": 5077,
-     "budget": 5000,
+     "triangles": 8078,
+     "budget": 8000,
      "ok": true
     }
    ]
@@ -158,13 +174,13 @@
     "limit": 0.005,
     "slots": {
      "body": {
-      "overlap": 0.00139,
-      "coverage": 0.4954,
+      "overlap": 0.00147,
+      "coverage": 0.4942,
       "outside_unit": 0.0
      },
      "wheels": {
       "overlap": 0.0,
-      "coverage": 0.4715,
+      "coverage": 0.4621,
       "outside_unit": 0.0
      }
     }
@@ -175,15 +191,15 @@
    "ok": true,
    "detail": {
     "body": {
-     "p5": 307.1,
-     "median": 318.9,
-     "floor": 300.0,
+     "p5": 306.8,
+     "median": 318.5,
+     "floor": 240.0,
      "ok": true
     },
     "wheels": {
-     "p5": 348.8,
-     "median": 377.8,
-     "floor": 300.0,
+     "p5": 346.0,
+     "median": 374.1,
+     "floor": 240.0,
      "ok": true
     }
    }
@@ -313,9 +329,9 @@
     {
      "lod": 3,
      "deviation_m": [
-      0.0114,
-      0.0153,
-      0.0294
+      0.0006,
+      0.0,
+      0.0021
      ],
      "tolerance_m": [
       0.0775,
@@ -333,7 +349,7 @@
     {
      "normal_p95_deg": 8.93,
      "bent_share": 0.0052,
-     "texture_share": 0.0019,
+     "texture_share": 0.0022,
      "miss_share": 0.0057,
      "lod": 1,
      "limits": {
@@ -344,10 +360,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 20.06,
-     "bent_share": 0.0336,
-     "texture_share": 0.006,
-     "miss_share": 0.0103,
+     "normal_p95_deg": 20.14,
+     "bent_share": 0.0337,
+     "texture_share": 0.0069,
+     "miss_share": 0.0105,
      "lod": 2,
      "limits": {
       "p95": 25.0,
@@ -357,15 +373,15 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 40.5,
-     "bent_share": 0.1217,
-     "texture_share": 0.0169,
-     "miss_share": 0.0588,
+     "normal_p95_deg": 16.91,
+     "bent_share": 0.0213,
+     "texture_share": 0.0056,
+     "miss_share": 0.0084,
      "lod": 3,
      "limits": {
-      "p95": null,
-      "bent": 0.15,
-      "tex": 0.05
+      "p95": 40.0,
+      "bent": 0.1,
+      "tex": 0.04
      },
      "ok": true
     }

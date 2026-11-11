@@ -91,17 +91,25 @@ vehicles/blender.sh vehicles/game.py --car vanta_r --test           # 1024 / 512
   texels, thin islands at least two texels across.
 - **LODs.** Small parts and the cabin left out first, flat faces merged, then a collapse
   with a floor per panel and lamp; every LOD takes its UVs and shading normals from LOD0,
-  island by island, so it shades as LOD0 does and no texture tears; far tires are round
-  tubes. Each LOD is measured against LOD0 (normals, textures) and fails when crumpled.
-  `--keep-work` then `--lods-only` remakes only the LODs in seconds.
+  island by island, so it shades as LOD0 does and no texture tears. The far LOD (LOD3)
+  also leaves out what the opaque glass hides, welds panels that meet, drops parts that
+  would float, turns parts the collapse wrecks into their convex hulls, and makes each
+  wheel anew: a round tire and a disc wearing the rim face baked for it from the side. Each
+  LOD is measured against LOD0 (normals, textures) and fails when crumpled. `--keep-work`
+  then `--lods-only` remakes only the LODs in seconds.
+- **Size class.** Large vehicles (55 m2 of body exterior or more: trucks, vans) get an
+  8,000 triangle LOD3 (5,000 otherwise) and a lower texel floor.
+- **Shared wheels.** A wheel that is another one moved or mirrored shares its texels
+  (never mirrored when lettering is baked onto it).
 - **Proof.** `game.jpg`: the pack alone in the studio as the car's script set it up next to the procedural original
   from the hero view, a recolored copy, the textures and the four LODs. `--views a,b`
   compares more of the car's views (`proof/original_<view>.jpg` and `baked_<view>.jpg`);
   look at them at full size.
 - **Checks.** Budgets, UV overlap, texel density, files, wheel pivots, LOD bounds, LOD
   fidelity, hull count (`game_report.json`); the run fails when one fails.
-- **Time.** About 4 to 6 minutes a car at full size (most of it the bakes and the proof);
-  packs are 18 to 31 MB and never go in git.
+- **Time.** About 8 to 14 minutes a car at full size, up to 27 for the largest (most of it
+  the bakes, the LOD fits and the proof); `--lods` alone 1 to 4 minutes. Packs are 20 to
+  51 MB and never go in git.
 
 ## Workflow
 
