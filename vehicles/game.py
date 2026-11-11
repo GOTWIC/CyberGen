@@ -69,7 +69,7 @@ CLASS_NAMES = {0: "exterior", 1: "underside", 2: "cabin", 3: "lamp_in_gaps",  # 
                4: "rim_face"}                 # the far LODs' rim faces (rim_disc)
 CAGE_M, REACH_M = 0.015, 0.035  # baking the detail: cage out, ray reach under the surface
 TEXEL_FLOOR = {"body": 300.0, "wheels": 300.0}  # px/m on exterior faces at 4096 / 2048
-TEXEL_FLOOR_LARGE = {"body": 300.0, "wheels": 300.0}  # ... for the large class
+TEXEL_FLOOR_LARGE = {"body": 240.0, "wheels": 240.0}  # ... for the large class (never under 220)
 CORE_WHEEL = ("tire", "rim", "hub", "ring", "disc", "drum", "caliper")
 DETAIL_BOOST = 2.0              # texel density under baked lettering and decals, at most
 DETAIL_MARGIN = 1.03            # ... while the exterior's 5th percentile stays this over the floor
@@ -556,8 +556,8 @@ def wheel_groups(objs, dg):
         zs = [(t.matrix_world @ V3(c)).z for c in t.bound_box]
         if min(zs) > 0.03:
             continue
-        mem = [o for o in objs if o.type == 'MESH' and "." in o.name and
-               o.name.split(".", 1)[1] == tag and
+        # (<kind>.<tag> with a kind of one word or more: cover.slots.<tag> too)
+        mem = [o for o in objs if o.type == 'MESH' and o.name.endswith("." + tag) and
                (o.matrix_world.translation - piv).length < 1e-3]
         out.append((tag, piv, mem))
     return out
@@ -978,32 +978,47 @@ def collapse_mesh(p, ratio):
 # ---------------------------------------------------------------------------------------
 # parts: meshes joined, hidden faces removed
 # ---------------------------------------------------------------------------------------
-def find_twins(objs, wheels):
-    """Right wheels (and brakes) that are their left partner mirrored, vertex for vertex:
-    {right key: left key}. A twin is made from its partner after the UVs, so the pair
-    shares its texels."""
+def find_twins(objs, wheels, lettered=()):
+    """Wheels (and brakes) that are another wheel's mesh moved (on the same side: the six
+    alike wheels of a truck) or mirrored (on the other side), vertex for vertex about their
+    pivots: {twin key: source key}. A wheel with lettering baked onto it (tags in lettered)
+    is never mirrored (its text would read backwards). A twin is made from its source
+    after the UVs, so they share their texels. Sources are taken left side first, front to
+    rear."""
+    from collections import Counter
     twins = {}
-    for tag, piv, mem in wheels:
-        if piv.y <= 0:
-            continue
-        for tag2, piv2, mem2 in wheels:
-            if tag2 == tag or abs(piv2.x - piv.x) > 1e-3 or abs(piv2.y + piv.y) > 1e-3 or \
-                    abs(piv2.z - piv.z) > 1e-3:
+    order = sorted(wheels, key=lambda w: (w[1].y <= 0, -w[1].x, w[0]))
+
+    def key_of(va, piv, sy):
+        return Counter((round(v.co.x - piv.x, 3), round((v.co.y - piv.y) * sy, 3),
+                        round(v.co.z - piv.z, 3)) for v in va)
+    for kind in ("wheel", "brake"):
+        prim = []
+        for tag, piv, mem in order:
+            a = objs.get(kind + ":" + tag)
+            if a is None:
                 continue
-            for kind in ("wheel", "brake"):
-                a, b = objs.get(kind + ":" + tag), objs.get(kind + ":" + tag2)
-                if a is None or b is None:
+            va = a.data.vertices
+            found = None
+            for tag2, piv2, b, kb in prim:
+                if len(b.data.vertices) != len(va) or \
+                        len(b.data.polygons) != len(a.data.polygons):
                     continue
-                va, vb = a.data.vertices, b.data.vertices
-                if len(va) != len(vb) or len(a.data.polygons) != len(b.data.polygons):
+                if abs(piv2.z - piv.z) > 1e-3:
                     continue
-                # the same points mirrored (in any order: a mirrored bevel numbers its
-                # vertices its own way), allowing a few to round the other way
-                ka = sorted((round(v.co.x, 3), round(-v.co.y, 3), round(v.co.z, 3)) for v in va)
-                kb = sorted((round(v.co.x, 3), round(v.co.y, 3), round(v.co.z, 3)) for v in vb)
-                same = sum(1 for p, q in zip(ka, kb) if p == q)
-                if same >= 0.98 * len(ka):
-                    twins[kind + ":" + tag2] = kind + ":" + tag
+                mirror = (piv.y > 0) != (piv2.y > 0)
+                if mirror and (tag in lettered or tag2 in lettered):
+                    continue
+                # the same points about the pivot (in any order: a mirrored bevel numbers
+                # its vertices its own way), allowing a few to round the other way
+                ka = key_of(va, piv, -1 if mirror else 1)
+                if sum((ka & kb).values()) >= 0.98 * len(va):
+                    found = tag2
+                    break
+            if found is not None:
+                twins[kind + ":" + tag] = kind + ":" + found
+            else:
+                prim.append((tag, piv, a, key_of(va, piv, 1)))
     return twins
 
 
@@ -3251,7 +3266,9 @@ def main_build(A):
         parts = part_meshes(pieces, cards)
         objs = {part: join_meshes("tmp_" + part, [m for m, _ in lst], low_coll)
                 for part, lst in parts.items()}
-        twins = find_twins(objs, wheels)
+        lettered = {p.part.split(":")[1] for p in pieces
+                    if p.op == "relief" and p.part.startswith("wheel:")}
+        twins = find_twins(objs, wheels, lettered)
         glass_tree = None
         if "glass" in objs:
             bmg = bmesh.new()
@@ -3275,7 +3292,7 @@ def main_build(A):
             a = ob.data.attributes.get("cg_piece")
             if a is None or part in twins:
                 continue
-            k = 2 if part in twins.values() else 1
+            k = 1 + sum(1 for v in twins.values() if v == part)
             for poly, x in zip(ob.data.polygons, a.data):
                 per_piece[x.value] = per_piece.get(x.value, 0) + k * (len(poly.vertices) - 2)
         for ob in list(objs.values()):
@@ -3341,12 +3358,12 @@ def main_build(A):
     if body is not None and "cg_class" in body.data.attributes:
         ext = sum(p.area for p, x in zip(body.data.polygons,
                                          body.data.attributes["cg_class"].data) if x.value == 0)
-    size = size_class(ext)
+    size_cls = size_class(ext)
     if A.lods is None:
-        A.lods = list(size["lod_budgets"])
-    floors = size["texel_floor_px_per_m"]
+        A.lods = list(size_cls["lod_budgets"])
+    floors = size_cls["texel_floor_px_per_m"]
     log("size class %s (body exterior %.1f m2): LODs %s, texel floor %s" % (
-        size["name"], ext, A.lods, floors))
+        size_cls["name"], ext, A.lods, floors))
 
     # 5. normals, UVs
     t = time.time()
@@ -3392,7 +3409,13 @@ def main_build(A):
         for key, src_key in twins.items():
             old = nodes[key]
             me = old.data
-            new = mirror_copy(nodes[src_key], "tmp_twin", low_coll)
+            piv = old.location.copy()
+            src_ob = nodes[src_key]
+            if (piv.y > 0) != (src_ob.location.y > 0):
+                new = mirror_copy(src_ob, "tmp_twin", low_coll)
+            else:                   # the same wheel further along: a copy
+                new = new_obj("tmp_twin", src_ob.data.copy(), low_coll)
+            new.location = piv
             bpy.data.objects.remove(old)
             bpy.data.meshes.remove(me)
             nodes[key] = new
@@ -3606,7 +3629,7 @@ def main_build(A):
             for o in hull_obs]),
         views=dict(hero=hero_view, studio=studio), cameras=cams,
         baked_down=baked_down,
-        size_class=dict(size, lod_budgets=list(A.lods)),
+        size_class=dict(size_cls, lod_budgets=list(A.lods)),
         uv=dict(islands=uvinfo, texel_px_per_m=texel,
                 detail_boost=round(body.get("cg_detail_boost", 1.0), 3) if body else None,
                 texel_floor_px_per_m={k: round(v * (A.body_size if k == "body"
@@ -4387,6 +4410,7 @@ def check(pack_dir, docs, seconds, stage_seconds):
                        lods=[r["triangles"] for r in pack["lods"]],
                        lod0_parts=pack["lods"][0]["parts"]),
         objects=dict(original=pack["source"]["original_objects"], parts=len(pack["parts"])),
+        size_class=pack.get("size_class"),
         textures=tex_sizes, pack_bytes=size, seconds=seconds,
         stage_seconds=json.loads(stage_seconds) if stage_seconds else None,
         baked_down={k: dict(pieces=len(v), triangles=sum(x["triangles"] for x in v),
@@ -4478,8 +4502,10 @@ def compose_proof(pack_dir, pack, report):
         y += row[0].height + gap
     d = ImageDraw.Draw(out)
     fails = [c["check"] for c in report["checks"] if not c["ok"]]
-    d.text((16, H - 56), "%s (%s): checks %s; textures %s; pack %.0f MB" % (
-        pack["title"], pack["car"], "all pass" if not fails else "FAILED: " + ", ".join(fails),
+    sc = pack.get("size_class") or {}
+    d.text((16, H - 56), "%s (%s, %s): checks %s; textures %s; pack %.0f MB" % (
+        pack["title"], pack["car"], sc.get("name", "standard"),
+        "all pass" if not fails else "FAILED: " + ", ".join(fails),
         ", ".join("%s %d" % kv for kv in report["textures"].items()),
         report["pack_bytes"] / 1e6), font=font, fill=(200, 204, 210))
     out.save(os.path.join(pack_dir, "game.jpg"), quality=90)
