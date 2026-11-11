@@ -324,7 +324,8 @@ def cmd_unreal(args: argparse.Namespace) -> int:
             print(U.hlod_summary(hl))
             if not hl.get("ok"):
                 return EXIT_INVALID
-        if args.check or args.check_only:
+        # (--check-only with --check-vehicles alone: the vehicle check, not the city's)
+        if args.check or (args.check_only and not args.check_vehicles):
             if any(len(v) not in (7, 8) for v in args.view):
                 print("error: --view NAME EX EY EZ TX TY TZ [LENS]", file=sys.stderr)
                 return EXIT_USAGE

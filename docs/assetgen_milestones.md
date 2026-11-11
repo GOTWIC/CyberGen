@@ -2789,12 +2789,30 @@ The tool's main ideas:
 - **Proof beside the original:** the pack alone, rendered from its files in the car's own
   studio next to the procedural original, a recolored copy, the textures and the LODs.
 
+### The packs in Unreal (2026-11-11)
+
+The exporter takes the packs (`citygen/unreal_vehicles.py`; `docs/unreal_export.md`,
+"AG18's vehicles"): a library imported once a project under `/Game/CityGen/Vehicles/<car>`
+(per part a static mesh with the pack's four LODs as engine LODs, no Nanite, the hulls as the
+body's collision; `M_CgVehicle` with the contract's albedo, three paint colors in per-instance
+custom data, clear coat, flake and emission by Night; `M_CgVehicleGlass` thin translucent,
+`M_CgVehicleGlassDark` from `opaque_from_lod`), placed by contribution entries of kind
+`vehicles` (car, transform, paint, steer, citygen id; one instanced component per model and
+part), checked by `citygen unreal --check-vehicles`. Seven packs (Vanta-R, Mule, Dart, Mino,
+Prelate, Aria, Ridge) in a line-up of their own in their show colors and two other paint sets,
+each LOD forced, a wheel spun and steered, traces onto every body, by day and night:
+[`docs/progress/AG18/unreal`](progress/AG18/unreal). What the engine showed (in `GAME.md`,
+"In an engine"): LOD0 bodies without tangents (Unreal computes them), UVs to import at full
+precision, thick glass drawn only from its outer sheet and tinted twice, no glass shadows, and
+LOD3's hull stand-ins without a material (fixed in `game.py`; the two Aurels remade with
+`--lods-only`; the other packs are stale by `game.py`'s hash only, their content the same).
+
 Open: the three marginal failures above (recorded, not fixed); LOD3 details still crude up
 close (a winch drum, small rims and grilles); bake faults on kestrel_meridian's louvre and
-aurel_zenith's grille; nothing imported into Unreal yet. The three Vex vehicles are to be
-redesigned (Swagnik, 2026-11-10) and have no packs. Next: an Unreal test of the packs and
-the exporter taking them, then step H (the vehicles into the generated cities), then the
-design improvements A to E.
+aurel_zenith's grille. The three Vex vehicles are to be
+redesigned (Swagnik, 2026-11-10) and have no packs. Next: step H (the vehicles into the
+generated cities: AG8's parked vehicles as placement entries), then the design improvements
+A to E.
 
 The roster with sizes and sheets: [`docs/progress/AG18/README.md`](progress/AG18/README.md).
 

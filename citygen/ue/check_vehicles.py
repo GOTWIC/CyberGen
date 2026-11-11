@@ -29,7 +29,6 @@ import unreal
 JOB = json.load(open(os.environ["CITYGEN_UE_JOB"], encoding="utf-8"))
 T0 = time.time()
 RES = {"ok": False, "checks": {}, "shots": []}
-EAL = unreal.EditorAssetLibrary
 NIGHT_EV100 = -3.0          # the play features' night exposure (CityGenPlayActor)
 VISIBILITY = getattr(unreal.TraceTypeQuery, "ECC_VISIBILITY", None) or \
     unreal.TraceTypeQuery.TRACE_TYPE_QUERY1
