@@ -1308,14 +1308,23 @@ target is a current AAA open-world game's hero vehicles.
   one instanced component per model and part); `citygen unreal --check-vehicles`. What the
   engine taught the contract is in `vehicles/GAME.md`, "In an engine" (tangents, UV
   precision, thick glass, a hull's material, fixed in `game.py`). Results:
-  `docs/progress/AG18/unreal/`. For step H: AG8 writes a placement entry per tile (key, tile,
-  pivot, `replaces` the parked car prototype or its variants' entry) with a vehicle per parked
-  car; the exporter does the rest.
+  `docs/progress/AG18/unreal/`. Step H writes a placement entry per tile (key, tile, pivot,
+  `replaces` AG8's parked car entry of the tile) with a vehicle per parked car; the exporter
+  drops what it replaces and does the rest.
 - **Vex** (Swagnik, 2026-11-10): the three Vex vehicles (`vex_wraith`, `vex_halo`,
   `vex_strix`) are to be redesigned; they have no packs and are out of every later step
   until redone.
-- **Phase 4, into the city**: AG8's `parked_vehicle` families draw the hero models by
-  district style and in many colors; stage 4's fleet (lifegen) drives them.
+- **Phase 4, into the city** (step H done 2026-11-11): a stage of its own after AG8's props
+  (`assetgen/parked/`, `assetgen vehicles`, in `assetgen build`) makes every M6 parked car a
+  pack vehicle, by a table of weights per district archetype scaled by wealth and danger, in a
+  paint drawn per placement from its role's palette and the district's colors, where its
+  footprint lies on its own carriageway off the crosswalks and its neighbors (else left out
+  with a reason; hover cars set down on their lowest point), as placement entries per tile
+  replacing AG8's parked car entries (`unreal_contribution.vehicles.json`); without the
+  library on the machine AG8's variants stay. Bays and lanes were left as stage 1 makes them:
+  the 6.5 m spacing and the parking lane's width already fit every pack (Vesper Bay places
+  all 912 parked cars). Results: `docs/progress/AG18/city/`. Stage 4's fleet (lifegen) drives
+  them later.
 - **Unreal:** nothing in phases 1 and 2. From phase 3: static meshes with LOD chains (or
   Nanite where it pays), a paint master whose color is Custom Primitive Data, glass and
   emissive masters that follow `MPC_CityGen`'s Night, wheels and doors as components with
@@ -1374,8 +1383,9 @@ target is a current AAA open-world game's hero vehicles.
     with a pose per view); more than one small tile on a sheet; a table of show colors.
 
 **Plan** (each step a session or two, after Swagnik's review of phase 1). F and G are done
-(phase 3), and the packs are in the exporter and tested in Unreal (2026-11-11). Next, in
-this order: H (the vehicles into the generated cities), then the design improvements A to E.
+(phase 3), and the packs are in the exporter and tested in Unreal (2026-11-11); H is done
+(2026-11-11: the vehicles parked in the generated cities). Next: the design improvements A to
+E.
 
 | Step | Work | Covers |
 |---|---|---|

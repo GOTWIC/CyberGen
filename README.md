@@ -490,8 +490,11 @@ hovering, coupes, sedans, pickups, vans and a limousine. One sheet each in
 [`docs/progress/AG18`](docs/progress/AG18); the scripts and the kit are in [`vehicles/`](vehicles).
 Eighteen of them come as game packs for an engine (four LODs, baked textures with the paint
 color set in the engine, wheels on their axles, collision): `vehicles/blender.sh
-vehicles/game.py --car vanta_r`, format in [`vehicles/GAME.md`](vehicles/GAME.md). Not in
-the cities yet.
+vehicles/game.py --car vanta_r`, format in [`vehicles/GAME.md`](vehicles/GAME.md). Where the
+packs are on the machine, `assetgen build` parks them along the city's curbs in place of the
+simple parked cars: the model chosen by the district (luxury cars where it is wealthy, work
+trucks in the port, everyday cars everywhere), the paint by the car, and `citygen unreal`
+brings them in ([`docs/progress/AG18/city`](docs/progress/AG18/city)).
 
 ### Milestones
 
@@ -515,7 +518,7 @@ the cities yet.
 | AG15 | Cyberpunk facades and night | Seven new facade styles and window patterns beyond grids, two or three finishes a building, neighboring towers never alike; every building lit its own way at night with crown lights and logos; lamps that light the streets in Unreal | Done |
 | AG16 | Performance | A benchmark through each city in Unreal (`citygen unreal --bench`), and the fixes that make a whole city run smoothly walking, driving and flying, by day and night: meshes shared, far fewer actors, streaming and HLODs tuned, the far city as it looks up close | Done |
 | AG17 | Road surfaces | Roads, junctions, sidewalks, medians and barriers drawn from the pavement map, joined seamlessly | Done |
-| AG18 | Hero vehicles | Cars, trucks and hover vehicles designed by hand in Blender, seven made-up brands; not a generator | In progress: 21 designs done, game packs for 18 (the three Vex to be redesigned); into the cities next |
+| AG18 | Hero vehicles | Cars, trucks and hover vehicles designed by hand in Blender, seven made-up brands; not a generator | In progress: 21 designs done, game packs for 18 (the three Vex to be redesigned), parked in the cities; design improvements next |
 
 ---
 
