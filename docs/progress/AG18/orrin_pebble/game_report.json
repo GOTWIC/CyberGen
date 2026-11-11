@@ -5,18 +5,18 @@
  "triangles": {
   "original": 266030,
   "lods": [
-   145435,
-   59992,
-   18423,
-   4599
+   145410,
+   59993,
+   19807,
+   5125
   ],
   "lod0_parts": {
-   "body": 45259,
+   "body": 43530,
    "glass": 62848,
-   "wheel_fl": 9332,
-   "wheel_fr": 9332,
-   "wheel_rl": 9332,
-   "wheel_rr": 9332
+   "wheel_fl": 9758,
+   "wheel_fr": 9758,
+   "wheel_rl": 9758,
+   "wheel_rr": 9758
   }
  },
  "objects": {
@@ -27,18 +27,18 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 21634460,
- "seconds": 533.9,
+ "pack_bytes": 31468098,
+ "seconds": 415.0,
  "stage_seconds": {
   "build": 1.0,
-  "render_original": 84.0,
-  "parts": 24.5,
+  "render_original": 20.8,
+  "parts": 24.0,
   "nodes": 0.0,
-  "uv": 2.5,
-  "bake": 286.2,
-  "lods_export": 2.4,
-  "textures": 10.384734869003296,
-  "proof": 122.64995384216309
+  "uv": 9.1,
+  "bake": 266.3,
+  "lods_export": 9.8,
+  "textures": 10.90690279006958,
+  "proof": 72.82638812065125
  },
  "baked_down": {
   "collapse": {
@@ -86,31 +86,41 @@
  "texel_px_per_m": {
   "body": {
    "exterior": {
-    "area_m2": 11.106,
-    "p5": 494.5,
-    "median": 510.5
+    "area_m2": 11.1,
+    "p5": 505.8,
+    "median": 520.0
    },
    "cabin": {
-    "area_m2": 8.282,
-    "p5": 205.9,
-    "median": 509.2
+    "area_m2": 8.29,
+    "p5": 208.9,
+    "median": 519.7
    },
    "underside": {
-    "area_m2": 0.627,
-    "p5": 161.2,
-    "median": 181.9
+    "area_m2": 0.642,
+    "p5": 166.8,
+    "median": 188.2
+   },
+   "lamp_in_gaps": {
+    "area_m2": 0.199,
+    "p5": 194.1,
+    "median": 211.4
    }
   },
   "wheels": {
    "exterior": {
     "area_m2": 3.092,
-    "p5": 484.5,
-    "median": 529.2
+    "p5": 502.8,
+    "median": 554.2
    },
    "underside": {
     "area_m2": 0.017,
-    "p5": 182.3,
-    "median": 526.8
+    "p5": 532.1,
+    "median": 554.6
+   },
+   "lamp_in_gaps": {
+    "area_m2": 0.057,
+    "p5": 194.0,
+    "median": 194.0
    }
   }
  },
@@ -120,7 +130,7 @@
   "script": "vehicles/cars/orrin_pebble.py",
   "script_sha256": "e76935301c007e562f045b25963801a27506e16b2e28336ced768bad7411d13b",
   "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
-  "game_sha256": "1cb5d3c68c885eda9ec8e5f7c3126bfb3590b59d6165a8d2596418155f0b1c1d",
+  "game_sha256": "8eece639aaa11a6d467231ecceefa1b724ad06162ada805edb3b0a05a998f25e",
   "original_triangles": 266030,
   "original_objects": 48
  },
@@ -141,25 +151,25 @@
    "detail": [
     {
      "lod": 0,
-     "triangles": 145435,
+     "triangles": 145410,
      "budget": 150000,
      "ok": true
     },
     {
      "lod": 1,
-     "triangles": 59992,
+     "triangles": 59993,
      "budget": 60000,
      "ok": true
     },
     {
      "lod": 2,
-     "triangles": 18423,
+     "triangles": 19807,
      "budget": 20000,
      "ok": true
     },
     {
      "lod": 3,
-     "triangles": 4599,
+     "triangles": 5125,
      "budget": 5000,
      "ok": true
     }
@@ -172,13 +182,13 @@
     "limit": 0.005,
     "slots": {
      "body": {
-      "overlap": 0.00186,
-      "coverage": 0.33,
+      "overlap": 8e-05,
+      "coverage": 0.344,
       "outside_unit": 0.0
      },
      "wheels": {
       "overlap": 0.0,
-      "coverage": 0.2072,
+      "coverage": 0.2289,
       "outside_unit": 0.0
      }
     }
@@ -189,14 +199,14 @@
    "ok": true,
    "detail": {
     "body": {
-     "p5": 494.5,
-     "median": 510.5,
+     "p5": 505.8,
+     "median": 520.0,
      "floor": 300.0,
      "ok": true
     },
     "wheels": {
-     "p5": 484.5,
-     "median": 529.2,
+     "p5": 502.8,
+     "median": 554.2,
      "floor": 300.0,
      "ok": true
     }
@@ -313,8 +323,8 @@
     {
      "lod": 2,
      "deviation_m": [
-      0.0006,
       0.0001,
+      0.0,
       0.0018
      ],
      "tolerance_m": [
@@ -327,9 +337,9 @@
     {
      "lod": 3,
      "deviation_m": [
-      0.0112,
-      0.006,
-      0.0059
+      0.0002,
+      0.0,
+      0.0006
      ],
      "tolerance_m": [
       0.0423,
@@ -341,14 +351,59 @@
    ]
   },
   {
+   "check": "lod_fidelity",
+   "ok": true,
+   "detail": [
+    {
+     "normal_p95_deg": 0.79,
+     "bent_share": 0.0003,
+     "texture_share": 0.0005,
+     "miss_share": 0.0016,
+     "lod": 1,
+     "limits": {
+      "p95": 12.0,
+      "bent": 0.02,
+      "tex": 0.01
+     },
+     "ok": true
+    },
+    {
+     "normal_p95_deg": 2.25,
+     "bent_share": 0.0006,
+     "texture_share": 0.0019,
+     "miss_share": 0.0034,
+     "lod": 2,
+     "limits": {
+      "p95": 25.0,
+      "bent": 0.05,
+      "tex": 0.025
+     },
+     "ok": true
+    },
+    {
+     "normal_p95_deg": 7.77,
+     "bent_share": 0.0064,
+     "texture_share": 0.0113,
+     "miss_share": 0.0332,
+     "lod": 3,
+     "limits": {
+      "p95": null,
+      "bent": 0.15,
+      "tex": 0.05
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
    "check": "collision",
    "ok": true,
    "detail": {
     "hulls": 6,
     "vertices": [
-     482,
+     486,
      356,
-     358,
+     342,
      261,
      532,
      358

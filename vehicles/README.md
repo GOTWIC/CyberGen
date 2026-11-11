@@ -89,12 +89,17 @@ vehicles/blender.sh vehicles/game.py --car vanta_r --test           # 1024 / 512
   every part alike (never glass, lamps or wheels). Faces nothing can see are removed; a
   face seen better from behind is turned round. Islands under baked lettering get more
   texels, thin islands at least two texels across.
-- **Proof.** `game.jpg`: the pack alone in the kit's studio next to the procedural original
+- **LODs.** Small parts and the cabin left out first, flat faces merged, then a collapse
+  with a floor per panel and lamp; every LOD takes its UVs and shading normals from LOD0,
+  island by island, so it shades as LOD0 does and no texture tears; far tires are round
+  tubes. Each LOD is measured against LOD0 (normals, textures) and fails when crumpled.
+  `--keep-work` then `--lods-only` remakes only the LODs in seconds.
+- **Proof.** `game.jpg`: the pack alone in the studio as the car's script set it up next to the procedural original
   from the hero view, a recolored copy, the textures and the four LODs. `--views a,b`
   compares more of the car's views (`proof/original_<view>.jpg` and `baked_<view>.jpg`);
   look at them at full size.
-- **Checks.** Budgets, UV overlap, texel density, files, wheel pivots, LOD bounds, hull
-  count (`game_report.json`); the run fails when one fails.
+- **Checks.** Budgets, UV overlap, texel density, files, wheel pivots, LOD bounds, LOD
+  fidelity, hull count (`game_report.json`); the run fails when one fails.
 - **Time.** About 4 to 6 minutes a car at full size (most of it the bakes and the proof);
   packs are 18 to 31 MB and never go in git.
 
