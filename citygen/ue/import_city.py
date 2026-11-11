@@ -1534,8 +1534,8 @@ def stage2_master(master, defaults=None):
 
 # --- AG18's vehicles (citygen/unreal_vehicles.py; the packs' contract: vehicles/GAME.md) ------
 
-VEHICLE_VERSION = "2"        # of the vehicle masters (`cg.vehicle` metadata)
-VEHICLE_MESH_VERSION = "2"   # of what the importer makes of a car (with its manifest hash)
+VEHICLE_VERSION = "4"        # of the vehicle masters (`cg.vehicle` metadata)
+VEHICLE_MESH_VERSION = "3"   # of what the importer makes of a car (with its manifest hash)
 # the paint per placement: Custom Primitive Data, or per-instance custom data on an
 # instanced component, three linear colors (citygen.unreal_vehicles.PAINT_CPD)
 PAINT_INDEX = (0, 3, 6)
@@ -1668,10 +1668,13 @@ def vehicle_glass_master(opaque):
     m = unreal.load_asset(path) if EAL.does_asset_exist(path) else None
     if m is not None and meta(m, "cg.vehicle") == VEHICLE_VERSION:
         return instanced(m)
-    if m is None:
-        m = AT.create_asset(name, CORE, unreal.Material, unreal.MaterialFactoryNew())
-    else:
-        MEL.delete_all_material_expressions(m)
+    if m is not None:
+        # (made anew, not rebuilt in place: deleting every expression leaves the thin
+        # translucent output, a material takes one, and with two it failed to compile and
+        # drew the default material's checker; the cars' instances are made again with it,
+        # their hash names VEHICLE_VERSION)
+        EAL.delete_asset(path)
+    m = AT.create_asset(name, CORE, unreal.Material, unreal.MaterialFactoryNew())
     MP = unreal.MaterialProperty
     col = vparam(m, "GlassColor", -700, 0, (0.3, 0.33, 0.36))
     rough = sparam(m, "Roughness", -700, 200, 0.0)
@@ -1880,16 +1883,18 @@ class Importer:
 
     # -- meshes --
 
-    def pipeline(self, nanite=True, bake=True, water=False, pack=False, tangents=False):
+    def pipeline(self, nanite=True, bake=True, water=False, pack=False, vehicle=False):
         """M15's import settings; stage 2's packs keep each mesh in its node's frame (`bake`
         off: the actor stands at the node's pivot) and build Nanite only where asked (`pack`:
         per mesh, by the pack step); AG12's water packs keep their vertex colors and UV1 (the
         current) at full precision, with no lightmap UVs written over it (`water`); AG18's
-        LOD files without tangents get them computed, MikkTSpace (`tangents`)."""
+        vehicle packs their UVs at full precision too (a 4096 atlas: half floats are off by
+        up to two texels near 1) and tangents computed, MikkTSpace (`vehicle`)."""
         gp = unreal.InterchangeGenericAssetsPipeline()
-        if tangents:
+        if vehicle:
             cmn = gp.get_editor_property("common_meshes_properties")
-            for k, v in (("recompute_tangents", True), ("use_mikk_t_space", True)):
+            for k, v in (("recompute_tangents", True), ("use_mikk_t_space", True),
+                         ("use_full_precision_u_vs", True)):
                 try:
                     if cmn.get_editor_property(k) != v:
                         log(f"pipeline {k}: {v} (was {cmn.get_editor_property(k)})")
@@ -2589,8 +2594,10 @@ class Importer:
             unreal.get_default_object(unreal.StaticMeshEditorSubsystem)
         cars = sorted(veh["cars"].items())
         REPORT.update(0, len(cars), force=True)
+        self.veh_made = set()
         for n, (car, rec) in enumerate(cars):
-            h = f"{VEHICLE_MESH_VERSION}.{rec['hash']}"
+            # (the masters' version too: a master made anew takes its instances' parent)
+            h = f"{VEHICLE_MESH_VERSION}.{VEHICLE_VERSION}.{rec['hash']}"
             got = {}
             for p in rec["parts"]:
                 path = f"{rec['folder']}/SM_{car}_{p['name']}"
@@ -2602,6 +2609,7 @@ class Importer:
             if got is None:
                 got = self.make_car(car, rec, h, sms)
                 st["cars"]["made"] += 1
+                self.veh_made.add(car)
             else:
                 st["cars"]["kept"] += 1
             for part, sm in got.items():
@@ -2734,11 +2742,11 @@ class Importer:
 
     def vehicle_pipeline(self, has_tangents):
         """Stage 2's pack settings (each part in its node's frame, the packs' own normals, no
-        Nanite); a LOD file without tangents (Blender's exporter leaves them out where it
-        cannot compute them: every pack's LOD0 body) gets them computed by Unreal, MikkTSpace
-        on the file's own normals as the bake's were. Left at zero they turned the normal map
-        into black blotches and speckle (the Aurel's roof, the Vanta-R's flanks)."""
-        return self.pipeline(nanite=False, bake=False, tangents=not has_tangents)
+        Nanite), UVs at full precision, tangents computed by Unreal (MikkTSpace on the file's
+        own normals and UVs, as the bake's were; the engine's mesh build computes them for
+        every LOD file, and Blender's exporter leaves them out of every pack's LOD0 body)."""
+        del has_tangents
+        return self.pipeline(nanite=False, bake=False, vehicle=True)
 
     def make_car(self, car, rec, h, sms):
         st = self.stats["vehicles"]
@@ -2873,7 +2881,13 @@ class Importer:
                     [unreal.Name(f"cg.vehicle={c}") for c in sorted(r["models"])]
                 st["placements"] += 1
 
-            self.place(have, r["key"], r["hash"], gcls, make, update, "CityGen/vehicle")
+            # (a car made again this import: its meshes are new objects at the same paths,
+            # so the actors placing it are updated to point at them)
+            old = have.get(r["key"])
+            if old is not None and set(r["models"]) & getattr(self, "veh_made", set()):
+                old.tags = [t for t in old.tags if not str(t).startswith(HASH_TAG + "=")]
+            self.place(have, r["key"], r["hash"], gcls, make, update, "CityGen/vehicle",
+                       version=f"{ACTOR_VERSION}.v{VEHICLE_MESH_VERSION}")
 
     # -- the level --
 
