@@ -118,7 +118,7 @@ So that LOD0 is near 150,000 triangles without decimating the silhouette:
   sidewall lettering baked onto it.
 - **Over the budget, in this order**: relief up to 12.5 mm (bolt rows, badges, lenses),
   most triangles first; then every part of 600 triangles or more alike, body panels too
-  (glass, lamps and wheels never), at most halved a round, three rounds. Collapsed parts
+  (glass, lamps and wheels never), at most halved a round, four rounds. Collapsed parts
   have their originals baked onto them.
 - **Never seen**: faces no ray from outside reaches (through glass counts, for the cabin)
   are removed (a lamp's never: a light band behind a row of flutes, seen only through the
@@ -135,7 +135,7 @@ So that LOD0 is near 150,000 triangles without decimating the silhouette:
 
 Smart projection per slot (66 degrees; the islands that end up covering texels another
 island covers, over 0.1% of the atlas, as a lip curling under its frame does, are projected
-again once at 34 degrees), each island scaled to one texel density times its class's
+again at 34 degrees, those still lying over themselves once more at 20), each island scaled to one texel density times its class's
 weight (exterior 1, cabin 0.4, underside 0.35, a lamp seen only in gaps 0.35, a rim face
 0.5), then a skyline packer at the largest
 common scale, each lying flat or stood up, a smaller one first in a gap a taller one left
@@ -157,9 +157,11 @@ it. Measured density (px/m, area weighted median and 5th percentile, per class) 
 A vehicle whose body has 55 m2 of exterior or more (faces of class exterior after the
 unseen ones are removed: trucks, vans, the hauler class) is **large**, else **standard**.
 The class sets the LOD budgets (LOD3 8,000 triangles large, 5,000 standard) and the texel
-floor of `texel_density` (large: 240 px/m, standard: 300 px/m; set so that the Mule, the largest, passes with a few percent to spare, and never under 220). `pack.json`'s
-`size_class` records the class, the exterior it was measured on, the rule, the budgets and
-the floor; the report repeats them.
+floor of `texel_density` (large: 240 px/m, standard: 300 px/m; set so that the Mule, the
+largest, passes with a few percent to spare, and never under 220 px/m). The lower floor is
+what the check asks only: the unwrap's detail boost keeps the standard floor's margin in
+every class. `pack.json`'s `size_class` records the class, the exterior it was measured
+on, the rule, the budgets and the floor; the report and the proof's footer repeat them.
 
 ## LODs
 

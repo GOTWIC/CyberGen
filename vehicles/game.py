@@ -1214,17 +1214,18 @@ def unwrap(ob, size, pad_px=None, boost=None, floor=None, thin=True, again=None)
     edit(ob)
     bpy.ops.uv.smart_project(angle_limit=1.15, island_margin=0.0, area_weight=0.0,
                              correct_aspect=True, scale_to_bounds=False)
-    if again:
+    for k, faces in enumerate(again or []):
         # the faces of islands that lay over themselves, projected again in smaller charts
+        # (a second time, smaller still, those that still did)
         bpy.ops.mesh.select_all(action='DESELECT')
         bme = bmesh.from_edit_mesh(me)
         bme.faces.ensure_lookup_table()
-        for i in again:
+        for i in faces:
             bme.faces[i].select_set(True)
         bme.select_flush_mode()
         bmesh.update_edit_mesh(me)
         log("  projected again: %d faces selected" % sum(1 for f in bme.faces if f.select))
-        bpy.ops.uv.smart_project(angle_limit=UV_AGAIN_ANGLE, island_margin=0.0,
+        bpy.ops.uv.smart_project(angle_limit=UV_AGAIN_ANGLES[k], island_margin=0.0,
                                  area_weight=0.0, correct_aspect=True, scale_to_bounds=False)
     bpy.ops.object.mode_set(mode='OBJECT')
     log("  smart projection %s: %s" % (ob.name, _uvbox(me)))
@@ -1325,18 +1326,20 @@ def unwrap(ob, size, pad_px=None, boost=None, floor=None, thin=True, again=None)
     log("  packed %s: %d islands, %.0f%% of the square, uv box %s" % (
         ob.name, len(islands), fill * 100, _uvbox(me)))
     ob["cg_detail_boost"] = f
-    if again is None:
+    if len(again or []) < len(UV_AGAIN_ANGLES):
         # an island the projection laid over itself (a lip curling under its frame within
-        # the angle limit) is projected again in smaller charts, once
+        # the angle limit) is projected again in smaller charts; twice at most
         lay = self_overlap(me, U, islands)
         if lay:
+            n = len(again or [])
             log("  %d islands (%d faces) overlap themselves: projected again at %.2f rad" % (
-                lay[0], len(lay[1]), UV_AGAIN_ANGLE))
-            return unwrap(ob, size, pad_px, boost, floor, thin, again=lay[1])
+                lay[0], len(lay[1]), UV_AGAIN_ANGLES[n]))
+            return unwrap(ob, size, pad_px, boost, floor, thin,
+                          again=list(again or []) + [lay[1]])
     return len(islands)
 
 
-UV_AGAIN_ANGLE = 0.6            # radians: the angle limit for islands that overlapped
+UV_AGAIN_ANGLES = (0.6, 0.35)   # radians: the angle limits for islands that overlapped
 UV_AGAIN_SHARE = 0.001          # ... when this share of the texels is covered twice
 
 
@@ -3269,9 +3272,9 @@ def main_build(A):
     bpy.context.scene.collection.children.link(low_coll)
     # over the budget, in this order: taller relief; then every part of 600 triangles or
     # more alike, panels too, at most halved a round (a round that crushed the small dense
-    # parts alone turned turbine wheels and light strips into polygons), three rounds; the
+    # parts alone turned turbine wheels and light strips into polygons), four rounds; the
     # glass never (a collapsed canopy shows its facets in every reflection)
-    steps = ["tall", "collapse", "collapse", "collapse"]
+    steps = ["tall", "collapse", "collapse", "collapse", "collapse"]
     while True:
         parts = part_meshes(pieces, cards)
         objs = {part: join_meshes("tmp_" + part, [m for m, _ in lst], low_coll)
