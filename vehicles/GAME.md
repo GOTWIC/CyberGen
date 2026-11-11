@@ -293,6 +293,35 @@ corners (the farthest points along 128 directions). `collision.glb`, nodes
   at.
 - `collision`: 4 to 12 hulls.
 
+## In an engine
+
+What the first import into Unreal Engine 5.8 showed (2026-11-11; the exporter's side in
+`docs/unreal_export.md`, "AG18's vehicles"; shots in `docs/progress/AG18/unreal/`):
+
+- **Tangents.** Blender's glTF exporter leaves the tangents out of a mesh it cannot compute
+  them for: every pack's LOD0 `body` (and every LOD0 part of the Tanagers) has none; LOD1 to
+  LOD3 have them. An engine computes them, MikkTSpace on the file's normals and UVs, as the
+  bake's were (Unreal does so for every LOD whatever the file holds).
+- **UV precision.** The atlases are 4,096 px: UVs stored as half floats (Unreal's default)
+  are off by up to two texels near 1; import them at full precision.
+- **Glass is thick.** Nearly all of it is two sheets a few millimeters apart, the outer one
+  facing out and the inner one facing into the cabin. Seen from outside, the far side's inner
+  sheet faces the viewer through the near outer sheet; an engine sorting translucency per
+  object draws the two in triangle order and composites them in patches (black and bright on
+  the Aurels' glass roofs), and in shadow maps each sheet shadows the other. So an engine
+  draws only the faces that point away from the car's middle (the inner sheet left out from
+  outside), casts no shadow from the glass, and tints what shows through by the glass color
+  squared (the proof's ray crosses both sheets). From inside the cabin the glass would then be
+  invisible; a driver's view needs the inner sheet back.
+- **Hulls carry their part's material.** LOD3's convex hull stand-ins (step 5 of the LODs)
+  came out with no material, a glTF primitive with none, which an engine draws with its
+  default (Unreal's checker): the two Aurels with covers had one each. Fixed: a hull wears its
+  part's material slot (`stand_ins`); `aurel_prelate` and `aurel_regent` remade with
+  `--lods-only`.
+- **Triangles.** Unreal's build drops a few degenerate triangles (at most 0.3% of a part).
+- **Emission.** The emissive texture times `emissive_strength` is Blender's strength; the
+  engine scales a strength of 15 to its own day and night levels.
+
 ## Proof
 
 `proof/` and `game.jpg`: the pack alone (the GLBs and PNGs, through the formula above, in a

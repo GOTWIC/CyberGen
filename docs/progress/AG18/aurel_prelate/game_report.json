@@ -42,8 +42,8 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 28908508,
- "seconds": 35.2,
+ "pack_bytes": 28908071,
+ "seconds": 41.4,
  "stage_seconds": {
   "build": 0.4,
   "render_original": 24.8,
@@ -54,7 +54,7 @@
   "lods_export": 10.4,
   "lods_only": 9.7,
   "textures": 0.0,
-  "proof": 25.520068883895874
+  "proof": 31.69472575187683
  },
  "baked_down": {
   "relief": {
@@ -146,7 +146,7 @@
   "script": "vehicles/cars/aurel_prelate.py",
   "script_sha256": "da28fc97971457c323a5fac8ae363ae2cf15bfd00fa50c470c97d666c126d4d5",
   "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
-  "game_sha256": "9e6108a54d1f801bd18195adc59470f9bd92b6d763a2afc8f84531218c054eab",
+  "game_sha256": "d465cc36c23ee311f11607a1d6df3c589e936e5c61db3dee4b3568780c548a2e",
   "original_triangles": 215832,
   "original_objects": 95
  },

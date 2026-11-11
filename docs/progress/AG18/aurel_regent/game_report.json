@@ -42,8 +42,8 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 27858320,
- "seconds": 39.3,
+ "pack_bytes": 27857414,
+ "seconds": 42.5,
  "stage_seconds": {
   "build": 0.4,
   "render_original": 21.5,
@@ -52,9 +52,9 @@
   "uv": 43.2,
   "bake": 492.1,
   "lods_export": 12.4,
-  "lods_only": 10.5,
+  "lods_only": 10.6,
   "textures": 0.0,
-  "proof": 28.815034866333008
+  "proof": 31.892213106155396
  },
  "baked_down": {
   "relief": {
@@ -155,7 +155,7 @@
   "script": "vehicles/cars/aurel_regent.py",
   "script_sha256": "37fa661e27d95c6c49cc100b00188b1a8ad2c773df195f4a4f7b43862c713e87",
   "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
-  "game_sha256": "9e6108a54d1f801bd18195adc59470f9bd92b6d763a2afc8f84531218c054eab",
+  "game_sha256": "d465cc36c23ee311f11607a1d6df3c589e936e5c61db3dee4b3568780c548a2e",
   "original_triangles": 228554,
   "original_objects": 114
  },

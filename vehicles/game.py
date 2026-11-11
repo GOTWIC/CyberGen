@@ -2678,6 +2678,12 @@ def stand_ins(prep, out, coll, budget):
     if pa is None or key not in out.attributes:
         return out, {}
     piece = {x.value: y.value for x, y in zip(pa.data, prep.attributes["cg_piece"].data)}
+    # each part's material slot (a hull made for it wears it: a hull with none joined into
+    # the LOD came out as a glTF primitive with no material, which an engine draws with its
+    # default material, Unreal's checker; found importing the Aurels into Unreal)
+    mat_of = {}
+    for poly, x in zip(prep.polygons, pa.data):
+        mat_of.setdefault(x.value, poly.material_index)
     lit = set()
     if "cg_emit" in prep.attributes:
         lit = {x.value for x, e in zip(pa.data, prep.attributes["cg_emit"].data) if e.value}
@@ -2755,6 +2761,10 @@ def stand_ins(prep, out, coll, budget):
             hit = trees[q].find_nearest(poly.center)
             hi_.append(isl[q][hit[2]] if hit[2] is not None else -1)
         h.attributes.new("cg_island", 'INT', 'FACE').data.foreach_set("value", hi_)
+        for m in out.materials:
+            h.materials.append(m)
+        if len(h.materials):
+            h.polygons.foreach_set("material_index", [mat_of.get(q, 0)] * len(h.polygons))
         hulls.append(h)
         what[q] = "hull"
     if not what:

@@ -1300,8 +1300,17 @@ target is a current AAA open-world game's hero vehicles.
   `docs/progress/AG18/<car>/`. Open: three cars fail one check each by a hair
   (`kestrel_meridian` and `brakk_hauler` `lod_fidelity`, `halcyon_ridge` `uv_overlap`),
   recorded, not fixed; LOD3 details still crude up close (a winch drum, small rims and
-  grilles); bake faults on `kestrel_meridian`'s louvre and `aurel_zenith`'s grille; nothing
-  imported into Unreal yet.
+  grilles); bake faults on `kestrel_meridian`'s louvre and `aurel_zenith`'s grille.
+- **Phase 3 in Unreal** (2026-11-11): the exporter takes the packs as a library imported
+  once a project (`/Game/CityGen/Vehicles/<car>`: a mesh a part with the pack's LODs, no
+  Nanite; `M_CgVehicle` recoloring per instance; thin translucent glass) and places them by
+  layer 2 entries of kind `vehicles` (car, transform, three paint colors, steer, citygen id;
+  one instanced component per model and part); `citygen unreal --check-vehicles`. What the
+  engine taught the contract is in `vehicles/GAME.md`, "In an engine" (tangents, UV
+  precision, thick glass, a hull's material, fixed in `game.py`). Results:
+  `docs/progress/AG18/unreal/`. For step H: AG8 writes a placement entry per tile (key, tile,
+  pivot, `replaces` the parked car prototype or its variants' entry) with a vehicle per parked
+  car; the exporter does the rest.
 - **Vex** (Swagnik, 2026-11-10): the three Vex vehicles (`vex_wraith`, `vex_halo`,
   `vex_strix`) are to be redesigned; they have no packs and are out of every later step
   until redone.
@@ -1365,8 +1374,8 @@ target is a current AAA open-world game's hero vehicles.
     with a pose per view); more than one small tile on a sheet; a table of show colors.
 
 **Plan** (each step a session or two, after Swagnik's review of phase 1). F and G are done
-(phase 3). Next, in this order: an Unreal test of the packs and the exporter taking them,
-then H (the vehicles into the generated cities), then the design improvements A to E.
+(phase 3), and the packs are in the exporter and tested in Unreal (2026-11-11). Next, in
+this order: H (the vehicles into the generated cities), then the design improvements A to E.
 
 | Step | Work | Covers |
 |---|---|---|
