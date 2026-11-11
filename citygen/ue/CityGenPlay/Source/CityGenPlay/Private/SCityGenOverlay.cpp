@@ -20,7 +20,9 @@ namespace
 	constexpr float Margin = 20.f;
 	constexpr float MiniSize = 240.f;
 	constexpr double MinScale = 8.0;        // cm per Slate unit, zoomed in all the way
-	enum EMenuRow : int32 { RowNight = 1, RowFreeCam = 2, RowMinimap = 3, RowMessages = 4 };
+	enum EMenuRow : int32 { RowNight = 1, RowFreeCam = 2, RowMinimap = 3, RowMessages = 4,
+		// atmosgen's weather prototypes, shown when the level has its controller
+		RowFog = 5, RowRain = 6, RowWet = 7, RowHour = 8, RowHourDown = 9, RowHourUp = 10 };
 
 	/** The engine's on-screen messages (a big city's "texture streaming pool ... exhausted"
 	 *  among them, drawn over the minimap): shown or not, the switch the console's
@@ -259,11 +261,20 @@ int32 SCityGenOverlay::PaintMenu(FSlateWindowElementList& Out, int32 Layer, cons
 	constexpr double W = 320.0, RowH = 34.0;
 	const FVector2D Min(LastSize.X - W - Margin, Margin);
 	struct FRow { int32 Id; FString Label; FString Value; };
-	const TArray<FRow> Rows = {
+	TArray<FRow> Rows = {
 		{RowNight, TEXT("Time of day"), P->IsNight() ? TEXT("Night") : TEXT("Day")},
 		{RowFreeCam, TEXT("Free camera  ( . )"), P->IsFreeCam() ? TEXT("On") : TEXT("Off")},
 		{RowMinimap, TEXT("Minimap"), P->bShowMinimap ? TEXT("On") : TEXT("Off")},
 		{RowMessages, TEXT("Engine messages"), EngineMessages() ? TEXT("On") : TEXT("Off")}};
+	if (P->GetAtmos())
+	{
+		auto OnOff = [P](const TCHAR* Flag) { return FString(P->GetAtmosFlag(Flag) ? TEXT("On") : TEXT("Off")); };
+		Rows.Add({RowFog, TEXT("Fog"), OnOff(TEXT("bFog"))});
+		Rows.Add({RowRain, TEXT("Rain"), OnOff(TEXT("bRain"))});
+		Rows.Add({RowWet, TEXT("Wet streets"), OnOff(TEXT("bWet"))});
+		Rows.Add({RowHour, TEXT("Hour (lights by night)"),
+			FString::Printf(TEXT("%02d:00"), FMath::FloorToInt32(P->GetAtmosHour()) % 24)});
+	}
 	const FVector2D Max(Min.X + W, Min.Y + 56.0 + Rows.Num() * RowH + 34.0);
 	DrawRect(Out, Layer, Geometry, Min, Max, Panel);
 	DrawFrame(Out, Layer + 1, Geometry, Min, Max, FLinearColor(Accent.R, Accent.G, Accent.B, 0.5f), 1.5f);
@@ -273,12 +284,26 @@ int32 SCityGenOverlay::PaintMenu(FSlateWindowElementList& Out, int32 Layer, cons
 	{
 		const FVector2D R0(Min.X + 8.0, Min.Y + 52.0 + i * RowH), R1(Max.X - 8.0, R0.Y + RowH - 4.0);
 		const FSlateRect Rect(F(R0), F(R1));
+		const bool bHour = Rows[i].Id == RowHour;
+		if (bHour)
+		{
+			// the hour steps back and on by an hour: its arrows first, so a click there is theirs
+			const FSlateRect Down(F(FVector2D(R1.X - 104.0, R0.Y)), F(FVector2D(R1.X - 80.0, R1.Y)));
+			const FSlateRect Up(F(FVector2D(R1.X - 26.0, R0.Y)), F(R1));
+			MenuRows.Add(TPair<FSlateRect, int32>(Down, RowHourDown));
+			MenuRows.Add(TPair<FSlateRect, int32>(Up, RowHourUp));
+		}
 		MenuRows.Add(TPair<FSlateRect, int32>(Rect, Rows[i].Id));
 		const bool bOver = bHover && Rect.ContainsPoint(F(Hover));
 		DrawRect(Out, Layer + 1, Geometry, R0, R1, bOver ? FLinearColor(0.2f, 0.45f, 0.6f, 0.55f)
 			: FLinearColor(1.f, 1.f, 1.f, 0.05f));
 		DrawText(Out, Layer + 2, Geometry, Rows[i].Label, R0 + FVector2D(10.0, 7.0), 12, Ink);
 		DrawText(Out, Layer + 2, Geometry, Rows[i].Value, FVector2D(R1.X - 70.0, R0.Y + 7.0), 12, Accent, true);
+		if (bHour)
+		{
+			DrawText(Out, Layer + 2, Geometry, TEXT("<"), FVector2D(R1.X - 92.0, R0.Y + 15.0), 12, Accent, true, true);
+			DrawText(Out, Layer + 2, Geometry, TEXT(">"), FVector2D(R1.X - 13.0, R0.Y + 15.0), 12, Accent, true, true);
+		}
 	}
 	DrawText(Out, Layer + 2, Geometry, TEXT("Click a row to change it.  Tab or Esc closes."),
 		FVector2D(Min.X + 16.0, Max.Y - 26.0), 10, Dim);
@@ -348,6 +373,17 @@ FReply SCityGenOverlay::OnMouseButtonDown(const FGeometry& Geometry, const FPoin
 			else if (Row.Value == RowMessages)
 			{
 				GAreScreenMessagesEnabled = !GAreScreenMessagesEnabled;
+			}
+			else if (Row.Value == RowFog || Row.Value == RowRain || Row.Value == RowWet)
+			{
+				const TCHAR* Flag = Row.Value == RowFog ? TEXT("bFog") : Row.Value == RowRain ? TEXT("bRain") : TEXT("bWet");
+				const TCHAR* Set = Row.Value == RowFog ? TEXT("SetFog") : Row.Value == RowRain ? TEXT("SetRain") : TEXT("SetWet");
+				P->SetAtmosFlag(Set, !P->GetAtmosFlag(Flag));
+			}
+			else if (Row.Value == RowHour || Row.Value == RowHourUp || Row.Value == RowHourDown)
+			{
+				const int32 Step = Row.Value == RowHourDown ? 23 : 1;
+				P->SetAtmosHour(float((FMath::FloorToInt32(P->GetAtmosHour()) + Step) % 24));
 			}
 			return FReply::Handled();
 		}

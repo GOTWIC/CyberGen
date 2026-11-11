@@ -229,7 +229,7 @@ developer menu with day and night, unless `--no-play`:
 | (always) | the minimap, top left: the city around you, north up, your heading as an arrow, the city's name, day or night, the keys |
 | M | the map, full screen: the whole city with district names; the wheel zooms about the cursor, the right button drags it, the left button teleports you there (a walking player onto the nearest walkway, held until the city has streamed in around it; a flying one at its height, at least 30 m over the walkway there); M or Esc closes it |
 | . | the free camera: in the game (not the editor's eject), a spectator pawn with no collision, flown with W A S D, E or Space up, Q or C down, the mouse; the wheel sets its speed (2 to 500 m/s); `.` again goes back to the player, who waited where they were |
-| Tab | the developer menu: time of day (day or night), the free camera, the minimap, the engine's on-screen messages; click a row to change it; Tab or Esc closes it |
+| Tab | the developer menu: time of day (day or night), the free camera, the minimap, the engine's on-screen messages, and with an atmos plan atmosgen's weather prototypes (fog, rain, wet streets) and the hour its lights' schedules read (`<` and `>` step it, a click on the row steps on); click a row to change it; Tab or Esc closes it |
 
 By night (`MPC_CityGen`'s `Night` 1) the windows' rooms light up (AG6's night interiors,
 lit by each building's own night since AG15: its schedule at `MPC_CityGen`'s `Hour`, its
@@ -973,7 +973,9 @@ play-in-editor and `-game` run). So the fixes cut what the level holds and strea
   written by every import): the game is DPI-aware, so a 2560 x 1440 monitor scaled 125% gives
   it a 2560 x 1440 window (DPI-unaware it got 2048 x 1152, stretched by Windows, and the neon
   strips shimmered). Unreal's automatic screen percentage is left as it is; the benchmark keeps
-  its own overrides.
+  its own overrides. A packaged game with no saved settings still picked its window before
+  it was DPI-aware: the play features now put it at the monitor's native resolution ("A
+  packaged game" below).
 - **Tried and left out**: UE 5.8's experimental switches for physics bodies made off the
   game thread (`p.Chaos.EnableAsyncInitBody`) and incremental garbage collection
   (`gc.AllowIncrementalReachability`, `gc.AllowIncrementalGather`), no forced collection
@@ -1515,6 +1517,42 @@ import go):
 - **A city without an atmos plan** imports as before (no controller, no cells), its night
   lit by the light pools alone.
 
+### A packaged game
+
+A project a city was imported into packages as any Unreal project (UAT's `BuildCookRun`,
+for example Development Win64 with `-cook -stage -pak -archive` and `-map=` the city's
+level). Three fixes made Delta Megacity's packaged game (after AT1) play as the editor's
+`-game` does:
+
+- **What the runtimes load by path is cooked.** A cook takes only what the maps reference.
+  The atmos controller loads `MPC_CityGenAtmos`, `M_CgRain` and `M_CgWet` by path (and the
+  rain cards' `/Engine/BasicShapes/Plane`), so the packaged game logged "SkipPackage ... does
+  not exist" and `CityGenAtmos.Rain` and `.Wet` did nothing. Every import writes
+  `unreal.ALWAYS_COOK` (`/Game/CityGen/Core/Atmos`, `/Engine/BasicShapes`) as
+  `+DirectoriesToAlwaysCook` in the project's `Config/DefaultGame.ini`
+  (`[/Script/UnrealEd.ProjectPackagingSettings]`; `unreal.set_project_ini`, the section's
+  other lines kept). Whatever a runtime loads by path belongs in one of those folders (a
+  test reads the plugins' sources for `/Game` and `/Engine` paths); the rest of
+  `/Game/CityGen/Core` (the masters, `MPC_CityGen`, the textures) the level references
+  through its materials and the play actor. CityGenPlay loads nothing by path.
+- **The monitor's native resolution.** The game is DPI-aware (AT1, above), but a game with no
+  saved settings picks its window before that, from the desktop as a DPI-unaware process
+  sees it: 2048 x 1152 on a 1440p screen at 125%. At game start (not in the editor), once the
+  engine is up, the play plugin's module sets windowed fullscreen at the primary monitor's
+  native resolution (`FCityGenPlayModule`, `NativeResolution`), unless the player's saved
+  `GameUserSettings.ini` has a resolution or the command line sets the window (`-ResX`,
+  `-ResY`, `-windowed`, `-fullscreen`, the benchmark's `-CityGenBench=`). It saves nothing,
+  so every start does the same; Unreal's automatic screen percentage is left as it is. The
+  log says `CityGen play: window 2048x1152 -> 2560x1440 windowed fullscreen`.
+- **Weather in the developer menu.** With an atmos controller in the level, the Tab menu has
+  rows for AT0's prototypes, Fog, Rain and Wet streets (the controller's `SetFog`,
+  `SetRain`, `SetWet`), and the hour (`SetHour`, a step of an hour: the schedules of its
+  lights and the windows by night). The play features find the controller by its class name
+  and drive it through its UFUNCTIONs and properties (`ACityGenPlay::GetAtmos`,
+  `SetAtmosFlag`, `SetAtmosHour`), so CityGenPlay does not link CityGenAtmos; without a
+  controller the rows are hidden. `CityGen.Status` gives `atmos`. AT5's weather states
+  replace these rows.
+
 ## Milestones and checks
 
 - **Every milestone** updates the exporter in its own PR for what it adds or changes (a new
@@ -1585,3 +1623,4 @@ import go):
 | AG16 | Performance ("From AG16" above): the benchmark (`--bench`, `--bench-only`, `citygen/bench.py`, `UCityGenBench` in the play plugin, a world subsystem started by `-CityGenBench=<job>`; the last run's shots and graphs, other processes' CPU sampled through each run, CPU-starved runs named, `bench.starved`; the play actor's lamps logged with each shot); meshes shared across tiles (`share_meshes`, the manifest's `counts.shared_meshes`); records as components (`group_actors`, the manifest's `groups` and each record's `holder`; `BP_CityGenGroup`, its root static in the Blueprint, `CORE_VERSION` 3; `actor_hashes`, `actor_kinds` and `manifest_changes` count group actors and holders, not the records they hold; the check's shots count an actor's own and its parts' meshes); `NO_COLLISION` props; the masters read Custom Primitive Data through per-instance custom data (`STAGE2_VERSION` 10); main cells 128 m (`MAIN_CELL_M`), `VIEW_M` 768; the project's `r.TextureStreaming=0` and the Nanite pool from the city (`nanite_pool_mb`, `PROJECT_SETTINGS`); the play actor's underwater volumes enabled by distance; packs imported in chunks of 150 and let go of (`PACK_CHUNK`, `Meshes`, #84); offloads take their actors by guid (`actor_guids`), an actor whose class changes is destroyed and the level saved before anything is made (`clear_moved`), an actor that holds no records loses its members (`drop_members`), an entry with parts of its own keeps its actor; pruned meshes counted by their files | Delta Megacity on the Windows PC (`docs/progress/AG16/`): the before import (73,772 actors, 30 min, 39 GB committed), the fixes imported over it (13,644 actors with the final code), the benchmark before and after three runs each, hitch dumps; Vesper Bay imported and benchmarked with one command |
 | AT0 | atmosgen's runtime ("atmosgen's runtime (AT0)" above): the `CityGenAtmos` plugin installed and built with CityGenPlay (`unreal_play.PLUGINS`, one stamp), its assets made from code (`unreal_atmos.make_assets`, `ue/atmos_assets.py`: `MPC_CityGenAtmos`, `M_CgRain`, `M_CgWet`), the controller spawned by `-CityGenAtmosPlan`; `CityGen.PlayLamps` in the play features; the benchmark's `--bench-atmos`, `--bench-rt`, `ATMOS_PASSES` and commands per pass, `busy()` seeing any other benchmark; the plan's contribution format (layer 3). No change to the import: AT1 places the controller and the tiles' lights | the spike on Delta in CityAG16 by AG16's benchmark: night native 12.6 ms p95 before, 15.8 ms with the plan's lights, fog, rain and wet streets; MegaLights with hardware ray tracing 17.4 ms (`docs/progress/AT0/`) |
 | AT1 | Layer 3 ("From AT1" above): the manifest's `atmos` (`unreal_atmos.write_atmos`: the controller's key and hash, a cell per 128 m cell, `counts.atmos_cells` and `atmos_lights`; the records in `unreal/atmos.json`; a plan whose lux check failed is named and left out, `--atmos DIR` naming a folder without a plan is an error); `actor_hashes`, `actor_kinds` (`atmos`, `atmos_cell`); the importer's `atmos_cells` (a `CityGenAtmosCell` data actor per cell, spatially loaded, among the offloaded actors) and `atmos_controller` (`CityGenAtmos`, always loaded, the plan's settings), `ATMOS_VERSION`; atmosgen's assets made before the import (`make_assets`); the plugin: cells register their lights as they stream, the controller's pooled live set shows them by night (`MPC_CityGen`'s `Night`), its subsystem and `-CityGenAtmosPlan` gone; the play features without AG15's spot lamps and sign washes (`play.json` 3; `GetStatus` without `lamps_lit`), their pools past the live range; the check reads the controller's status by night; `--atmos`, `--no-atmos`, `--bench-atmos` a flag | Delta in CityAG16 (`docs/progress/AT1/`): imported over AG16's import (the controller and 500 cells created, nothing else touched, under 3 min), the check passing by night with views, the night benchmark before and after (three runs each) |
+| Packaged game (a fix on its own, 2026-11-10) | "A packaged game" above: `unreal.ALWAYS_COOK` written to the project's DefaultGame.ini by every import (`set_project_ini`, `set_engine_ini(..., file, entries)`), so the atmos assets loaded by path are cooked; the play module puts a game with no saved resolution at the monitor's native resolution, windowed fullscreen; the Tab menu's Fog, Rain, Wet streets and hour rows drive the atmos controller. | Delta imported again into the AT1 project, packaged (Development Win64) and played: no missing CityGen package, a 2560 x 1440 window, the weather rows by night. |

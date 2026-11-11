@@ -467,6 +467,45 @@ def test_project_runs_at_the_monitors_resolution(tmp_path):
                                      b"bAllowHighDPIInGameMode=True\n")
 
 
+def test_project_cooks_what_the_runtimes_load_by_path(tmp_path):
+    """Every import lists the folders the runtimes load assets from by path (atmos's MPC,
+    rain and wet materials, the rain cards' plane) in the project's DefaultGame.ini, so a
+    packaged game cooks them; the section's other lines, a blank line before the next
+    section and the file's line endings stay as they were, and a second import changes
+    nothing."""
+    up = tmp_path / "P" / "P.uproject"
+    (tmp_path / "P" / "Config").mkdir(parents=True)
+    game = tmp_path / "P" / "Config" / "DefaultGame.ini"
+    game.write_bytes(b"[/Script/EngineSettings.GeneralProjectSettings]\r\nProjectID=X\r\n\r\n"
+                     b"[/Script/UnrealEd.ProjectPackagingSettings]\r\nBuildConfiguration=PPBC_Development\r\n"
+                     b'+DirectoriesToAlwaysCook=(Path="/Game/Mine")\r\n\r\n[Other]\r\nA=1\r\n')
+    assert U.set_project_ini(up)
+    assert game.read_bytes() == (
+        b"[/Script/EngineSettings.GeneralProjectSettings]\r\nProjectID=X\r\n\r\n"
+        b"[/Script/UnrealEd.ProjectPackagingSettings]\r\nBuildConfiguration=PPBC_Development\r\n"
+        b'+DirectoriesToAlwaysCook=(Path="/Game/Mine")\r\n'
+        b'+DirectoriesToAlwaysCook=(Path="/Game/CityGen/Core/Atmos")\r\n'
+        b'+DirectoriesToAlwaysCook=(Path="/Engine/BasicShapes")\r\n\r\n[Other]\r\nA=1\r\n')
+    assert not U.set_project_ini(up)
+    # a project without the section (the templates' DefaultGame.ini) gets it appended
+    game.write_bytes(b"[/Script/EngineSettings.GeneralProjectSettings]\nProjectID=X\n")
+    assert U.set_project_ini(up)
+    assert game.read_bytes().endswith(
+        b"ProjectID=X\n\n[/Script/UnrealEd.ProjectPackagingSettings]\n"
+        b'+DirectoriesToAlwaysCook=(Path="/Game/CityGen/Core/Atmos")\n'
+        b'+DirectoriesToAlwaysCook=(Path="/Engine/BasicShapes")\n')
+    # every folder a runtime loads from by path is one of them
+    import re
+    src = Path(U.__file__).parent / "ue"
+    paths = set()
+    for f in list(src.glob("CityGen*/Source/**/*.cpp")) + list(src.glob("CityGen*/Source/**/*.h")):
+        paths |= set(re.findall(r'TEXT\("(/(?:Game|Engine)/[^".]+)\.', f.read_text(encoding="utf-8")))
+    assert paths
+    for p in paths:
+        assert any(p.startswith(d + "/") for d in U.ALWAYS_COOK) or \
+            p == "/Game/CityGen/Core/MPC_CityGen", p
+
+
 def test_play_flags(tmp_path):
     """`--play`, `--fly-speed`, `--view-range`, `--no-startup` and `--no-hlod` parse; a play mode
     that is not one is refused before any editor runs."""

@@ -1386,18 +1386,34 @@ PROJECT_SETTINGS = [("r.TextureStreaming", "0")]
 # `-ini` override did this for its runs alone. Unreal's automatic screen percentage stays.
 UI_SECTION = "[/Script/Engine.UserInterfaceSettings]"
 UI_SETTINGS = [("bAllowHighDPIInGameMode", "True")]
+# A packaged game cooks only what its maps reference. The runtimes load some assets by path
+# (CityGenAtmos: MPC_CityGenAtmos, M_CgRain and M_CgWet under /Game/CityGen/Core/Atmos, and
+# the rain cards' /Engine/BasicShapes/Plane), so a packaged Delta had no rain, wet streets or
+# atmos parameters ("LoadPackage: SkipPackage ... does not exist"). Every import lists their
+# folders in the project's DefaultGame.ini, and whatever a runtime loads by path lives in one
+# of them (the rest of /Game/CityGen/Core, the masters, MPC_CityGen and the textures, the
+# level references through its materials and the play actor; CityGenPlay loads nothing by
+# path).
+COOK_SECTION = "[/Script/UnrealEd.ProjectPackagingSettings]"
+ALWAYS_COOK = ["/Game/CityGen/Core/Atmos", "/Engine/BasicShapes"]
 
 
 def set_project_ini(uproject: str | Path) -> bool:
     """The game's settings every import makes the project's defaults (`UI_SETTINGS` in its
-    DefaultEngine.ini). True when the file changed."""
-    return set_engine_ini(uproject, UI_SECTION, UI_SETTINGS)
+    DefaultEngine.ini, `ALWAYS_COOK` in its DefaultGame.ini). True when a file changed."""
+    ui = set_engine_ini(uproject, UI_SECTION, UI_SETTINGS)
+    cook = set_engine_ini(uproject, COOK_SECTION, [], file="DefaultGame.ini",
+                          entries=[f'+DirectoriesToAlwaysCook=(Path="{d}")'
+                                   for d in ALWAYS_COOK])
+    return ui or cook
 
 
-def set_engine_ini(uproject: str | Path, section: str, want: list[tuple[str, str]]) -> bool:
-    """Set keys of one section of the project's Config/DefaultEngine.ini, the rest of the
-    file as it was (its encoding and line endings too). True when it changed."""
-    ini = Path(uproject).parent / "Config" / "DefaultEngine.ini"
+def set_engine_ini(uproject: str | Path, section: str, want: list[tuple[str, str]],
+                   file: str = "DefaultEngine.ini", entries: list[str] = ()) -> bool:
+    """Set keys of one section of the project's Config/DefaultEngine.ini (or `file`) and
+    have each line of `entries` (array entries, `+Key=Value`) in it, the rest of the file as
+    it was (its encoding and line endings too). True when it changed."""
+    ini = Path(uproject).parent / "Config" / file
     raw = ini.read_bytes() if ini.is_file() else b""
     bom = b"\xef\xbb\xbf" if raw.startswith(b"\xef\xbb\xbf") else b""
     text = raw.decode("utf-8-sig")
@@ -1406,7 +1422,7 @@ def set_engine_ini(uproject: str | Path, section: str, want: list[tuple[str, str
     start = next((i for i, ln in enumerate(lines) if ln.strip() == section), None)
     if start is None:
         lines += ([""] if lines and lines[-1].strip() else []) + [section] + \
-            [f"{k}={v}" for k, v in want]
+            [f"{k}={v}" for k, v in want] + list(entries)
     else:
         end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("[")),
                    len(lines))
@@ -1418,6 +1434,12 @@ def set_engine_ini(uproject: str | Path, section: str, want: list[tuple[str, str
                 end += 1
             else:
                 lines[at] = f"{k}={v}"
+        for e in entries:
+            if not any(lines[i].strip() == e for i in range(start + 1, end)):
+                # (after the section's last line, before any blank lines that end it)
+                last = max(i for i in range(start, end) if lines[i].strip())
+                lines.insert(last + 1, e)
+                end += 1
     new = bom + (nl.join(lines) + nl).encode("utf-8")
     if new == raw:
         return False
