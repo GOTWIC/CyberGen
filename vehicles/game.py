@@ -2233,6 +2233,16 @@ class Surface:
         if self.uv is not None:
             if not me.uv_layers:
                 me.uv_layers.new(name="UVMap")
+            # a degenerate face (no area, no normal) can land on no number: its corner
+            # takes the UV of another corner of its face, else 0
+            for p in me.polygons:
+                good = [li for li in p.loop_indices if U[2 * li] == U[2 * li] and
+                        U[2 * li + 1] == U[2 * li + 1]]
+                for li in p.loop_indices:
+                    if li not in good:
+                        U[2 * li], U[2 * li + 1] = (U[2 * good[0]], U[2 * good[0] + 1]) \
+                            if good else (0.0, 0.0)
+            N = [n if all(x == x for x in n) and any(n) else (0.0, 0.0, 1.0) for n in N]
             me.uv_layers.active.data.foreach_set("uv", U)
         me.shade_smooth()
         tire = me.attributes.get("cg_tire")
@@ -3374,7 +3384,9 @@ def main_build(A):
     if body is not None:
         marked = detail_faces(body, [p for p in pieces if p.op == "relief" and p.part == "body"])
         uvinfo["body"] = unwrap(body, A.body_size, boost=marked,
-                                floor=floors["body"] * A.body_size / 4096)
+                                floor=TEXEL_FLOOR["body"] * A.body_size / 4096)
+        # (the detail boost keeps the standard floor's margin in every class: the large
+        # class's lower floor is what the check asks, not room to spend on detail)
     if glass is not None:
         unwrap(glass, 1024)
     prim = [nodes[k] for k in sorted(nodes) if k not in twins]
