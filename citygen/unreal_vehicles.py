@@ -343,6 +343,18 @@ def check(build_dir: str | Path, uproject: str | Path, engine: str | None = None
                         gui=True, extra=["-RenderOffscreen"])
 
 
+def check_summary(res: dict) -> str:
+    """One line per check of `check` and the shots."""
+    if not res.get("checks"):
+        return f"FAIL: vehicle check: {(res.get('error') or 'no result').strip()[-300:]}"
+    lines = []
+    for k, c in res["checks"].items():
+        lines.append(f"{'PASS' if c.get('ok') else 'FAIL'}: vehicles {k}"
+                     + (f": {'; '.join(c['bad'][:3])}" if c.get("bad") else ""))
+    lines.append(f"vehicle shots: {len(res.get('shots') or [])}; log {res.get('log')}")
+    return "\n".join(lines)
+
+
 def actor_hashes(sec: dict | None) -> dict[str, str]:
     """A placement's actor by key (BP_CityGenGroup), with the hash the importer compares."""
     return {r["key"]: r["hash"] for r in (sec or {}).get("placements", [])}

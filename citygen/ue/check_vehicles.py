@@ -363,13 +363,24 @@ def views(world, man, actors):
     set_hidden(actors, set(actors))
 
 
+def hero_of(by_key, car):
+    """The placement to look at a car in: its own (`hero.<car>`, the line-up's), else the
+    first that places it (its first vehicle of that model)."""
+    r = by_key.get(f"hero.{car}")
+    if r is None:
+        r = next((x for k, x in sorted(by_key.items()) if car in x["models"]), None)
+    return r
+
+
 def passes(world, actors, by_key, cars, lineup, when):
     if True:
         night(when == "night", world)
         yield from wait(3.0 if when == "night" else 1.0)
-        set_hidden(actors, set(lineup))
-        yield from shot(f"lineup_{when}", ue(0, -24, 7), ue(0, 12, 0.5), 50.0)
-        yield from shot(f"lineup_high_{when}", ue(-30, -26, 22), ue(0, 12, 0), 45.0)
+        if lineup:
+            # (the check's own line-up: docs/progress/AG18/unreal)
+            set_hidden(actors, set(lineup))
+            yield from shot(f"lineup_{when}", ue(0, -24, 7), ue(0, 12, 0.5), 50.0)
+            yield from shot(f"lineup_high_{when}", ue(-30, -26, 22), ue(0, 12, 0), 45.0)
         set_hidden(actors, {"parking.row"})
         if "parking.row" in by_key:
             r = by_key["parking.row"]
@@ -377,7 +388,7 @@ def passes(world, actors, by_key, cars, lineup, when):
             yield from shot(f"parking_{when}", ue(c[0] + 4.5, c[1] - 9, 3), ue(c[0] + 4.5, c[1], 0.6),
                             50.0)
         for car, rec in sorted(cars.items()):
-            r = by_key.get(f"hero.{car}")
+            r = hero_of(by_key, car)
             if r is None:
                 continue
             set_hidden(actors, {r["key"]})
@@ -390,7 +401,7 @@ def passes(world, actors, by_key, cars, lineup, when):
 def details(world, actors, by_key, cars):
     # LODs forced in turn: the pack's LOD views (from opaque_from_lod the glass dark)
     for car in JOB.get("lod_cars") or []:
-        r = by_key.get(f"hero.{car}")
+        r = hero_of(by_key, car)
         if r is None:
             continue
         a = actors[r["key"]]
@@ -406,7 +417,7 @@ def details(world, actors, by_key, cars):
             c.set_forced_lod_model(0)
     # the wheels: one spun about its axle and one steered, in place
     car = JOB.get("wheel_car")
-    r = by_key.get(f"hero.{car}") if car else None
+    r = hero_of(by_key, car) if car else None
     if r is not None:
         a = actors[r["key"]]
         set_hidden(actors, {r["key"], f"steer.{car}"})
@@ -447,7 +458,7 @@ def details(world, actors, by_key, cars):
                             ue(p0[0] + 1.0, p0[1], 0.3), 45.0, 1280)
     # the hulls in place of a car's body
     car = JOB.get("hull_car")
-    r = by_key.get(f"hero.{car}") if car else None
+    r = hero_of(by_key, car) if car else None
     if r is not None:
         a = actors[r["key"]]
         set_hidden(actors, {r["key"]})

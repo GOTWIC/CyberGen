@@ -337,6 +337,14 @@ def cmd_unreal(args: argparse.Namespace) -> int:
             if not chk.get("ok"):
                 print(chk.get("error", ""), file=sys.stderr)
                 return EXIT_INVALID
+        if args.check_vehicles:
+            from . import unreal_vehicles as UV
+            chk = UV.check(build, args.uproject, engine=args.engine, shots=args.shots,
+                           timeout=args.timeout, width=args.shot_width)
+            print(UV.check_summary(chk))
+            if not chk.get("ok"):
+                print(chk.get("error", ""), file=sys.stderr)
+                return EXIT_INVALID
         if args.bench or args.bench_only:
             from . import bench as B
             want = [n.strip() for n in args.bench_passes.split(",") if n.strip()]
@@ -682,6 +690,11 @@ def build_parser() -> argparse.ArgumentParser:
                          "imported once a project under /Game/CityGen/Vehicles")
     ue.add_argument("--all-vehicles", action="store_true",
                     help="import every car of the vehicle library, placed or not")
+    ue.add_argument("--check-vehicles", action="store_true",
+                    help="AG18: after the import (or with --check-only alone), check the "
+                         "level's vehicles in the editor (LODs, glass, hulls, placements, "
+                         "wheel pivots, traces onto the bodies) and with --shots render "
+                         "them by day and night (unreal_vehicles.check)")
     ue.add_argument("--check", action="store_true",
                     help="after the import, play the level in the editor: streaming, "
                          "ground traces, a walk along a sidewalk (always the walking "
