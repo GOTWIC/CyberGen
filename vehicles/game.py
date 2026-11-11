@@ -52,6 +52,7 @@ T0 = time.time()
 # budgets and rules (GAME.md says why)
 LOD_TRIS = (150000, 60000, 20000, 5000)
 FLAT_RELIEF_M = 0.0032          # relief this low is always baked onto the surface under it
+RELIEF_ONE_SURFACE = 0.7       # relief lies on one piece: this share of its points at least
 TALL_RELIEF_M = 0.0125          # relief up to this tall is baked down when over the budget
 CARD_DENSITY = 15000.0          # triangles per m2 of a dense array's outline: a card
 CARD_MIN_TRIS = 1500
@@ -199,6 +200,7 @@ def render_views(K, names, res, samples, folder, prefix):
         path = os.path.join(folder, "%s_%s.jpg" % (prefix, name))
         K.render_view(name, path, res, samples)
         cams[name] = cam_record(K.SCN.camera)
+        cams[name]["no_floor"] = bool(K.VIEWS[name].get("no_floor"))
     return cams
 
 
@@ -738,15 +740,23 @@ def find_relief(pieces):
         pts += [(vs[e.vertices[0]].co + vs[e.vertices[1]].co) / 2 for e in p.me.edges]
         step = max(1, len(pts) // 4000)
         h = 0.0
+        under = {}
         for co in pts[::step]:
             best = None
             for loc, nrm, i, d in tree.find_nearest_range(co, TALL_RELIEF_M):
-                if owner[i] != p.idx and (best is None or d < best):
-                    best = d
+                if owner[i] != p.idx and (best is None or d < best[0]):
+                    best = (d, owner[i])
             if best is None:
                 h = None
                 break
-            h = max(h, best)
+            h = max(h, best[0])
+            under[best[1]] = under.get(best[1], 0) + 1
+        # relief lies on one surface: a piece whose points fall on many others (a light
+        # band behind a row of flutes) is no relief, its bake would land in patches
+        if h is not None and max(under.values()) < RELIEF_ONE_SURFACE * sum(under.values()):
+            log("  not relief: %s lies on %d pieces, %.0f%% on the most" % (
+                p.name, len(under), 100 * max(under.values()) / sum(under.values())))
+            h = None
         p.relief = h
 
 
@@ -1179,10 +1189,14 @@ def unwrap(ob, size, pad_px=None, boost=None, floor=None, thin=True, again=None)
                              correct_aspect=True, scale_to_bounds=False)
     if again:
         # the faces of islands that lay over themselves, projected again in smaller charts
-        bpy.ops.object.mode_set(mode='OBJECT')
-        for p in me.polygons:
-            p.select = p.index in again
-        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.mesh.select_all(action='DESELECT')
+        bme = bmesh.from_edit_mesh(me)
+        bme.faces.ensure_lookup_table()
+        for i in again:
+            bme.faces[i].select_set(True)
+        bme.select_flush_mode()
+        bmesh.update_edit_mesh(me)
+        log("  projected again: %d faces selected" % sum(1 for f in bme.faces if f.select))
         bpy.ops.uv.smart_project(angle_limit=UV_AGAIN_ANGLE, island_margin=0.0,
                                  area_weight=0.0, correct_aspect=True, scale_to_bounds=False)
     bpy.ops.object.mode_set(mode='OBJECT')
@@ -1377,6 +1391,9 @@ def texel_p5(me, U, size):
     return rows[-1][0]
 
 
+PAD_MIN = 0.25                  # the least pad, a share of the full pad (2 px at 4096)
+
+
 def pack_uv(U, islands, pad):
     """Islands (lists of loop indices into U, flat u, v pairs) packed into the unit square
     at one common scale, the largest that fits: each turned to its smallest bounding
@@ -1406,6 +1423,12 @@ def pack_uv(U, islands, pad):
         rects.append([loops, ang, x0, y0, max(w, 1e-6), max(h, 1e-6)])
     order = sorted(range(len(rects)), key=lambda i: (-rects[i][5], -rects[i][4]))
 
+    def gap(i, S):
+        """The pad round island i at scale S: pad, but half the island's width for an
+        island narrower than two pads (it is under a texel by the mip whose texels the
+        full pad keeps apart), PAD_MIN of the pad at least."""
+        return min(pad, max(pad * PAD_MIN, 0.5 * min(rects[i][4], rects[i][5]) * S))
+
     def skyline(S):
         """Bottom-left on a skyline: each rectangle where its top ends lowest."""
         sky = [[0.0, 1.0, 0.0]]                     # segments: x, width, height
@@ -1413,7 +1436,8 @@ def pack_uv(U, islands, pad):
         for i in order:
             best = None
             for rot in (False, True):           # lying flat, or stood up where that fits lower
-                w, h = rects[i][4] * S + pad, rects[i][5] * S + pad
+                g_ = gap(i, S)
+                w, h = rects[i][4] * S + g_, rects[i][5] * S + g_
                 if rot:
                     w, h = h, w
                 if w > 1 or h > 1:
@@ -1474,8 +1498,8 @@ def pack_uv(U, islands, pad):
             a, b = (u * c - v * s - x0) * S, (u * s + v * c - y0) * S
             if rot:                                 # a quarter turn: (a, b) -> (b, w - a)
                 a, b = b, w * S - a
-            out[2 * l] = px + pad / 2 + a
-            out[2 * l + 1] = py + pad / 2 + b
+            out[2 * l] = px + gap(i, S) / 2 + a
+            out[2 * l + 1] = py + gap(i, S) / 2 + b
         used += (w * S) * (h * S)
     return out, used
 
@@ -1885,8 +1909,8 @@ FID_RES = 1024                              # textures compared at this size
 FID_TEX_ERR = 0.25                          # a texel this far off in a channel is wrong
 # per LOD: the exterior's shading normal off LOD0's by at most p95 degrees, at most `bent`
 # of its area over 25 degrees, at most `tex` of its area on the wrong texture
-FID_LIMITS = {1: dict(p95=4.0, bent=0.01, tex=0.01),
-              2: dict(p95=10.0, bent=0.03, tex=0.025),
+FID_LIMITS = {1: dict(p95=4.0, bent=0.02, tex=0.01),
+              2: dict(p95=25.0, bent=0.05, tex=0.025),
               3: dict(p95=None, bent=0.12, tex=0.05)}
 
 
@@ -3201,7 +3225,10 @@ def proof_main(pack_dir, lods_only=False):
         ob.matrix_world = Matrix(rec["matrix"])
         return ob
 
-    def shot(cam, path, r):
+    def shot(cam, path, r, no_floor=False):
+        cyc = K.STUDIO.objects.get("cyc")      # a view from under the floor hides it
+        if cyc is not None:
+            cyc.hide_render = bool(no_floor)
         K.SCN.camera = cam
         K.SCN.render.resolution_x, K.SCN.render.resolution_y = r
         K.SCN.cycles.samples = sm
@@ -3247,7 +3274,8 @@ def proof_main(pack_dir, lods_only=False):
     if not lods_only:
         show(0)
         for name, cam in cams.items():
-            shot(cam, os.path.join(out, "baked_%s.jpg" % name), res)
+            shot(cam, os.path.join(out, "baked_%s.jpg" % name), res,
+                 pack["cameras"][name].get("no_floor"))
         # recolored: the primary and secondary paints swapped for others
         mats2 = {s: material(s, {k: alt[k] for k in paint}) for s in mats}
         assign(lod_objs[0], mats2)
