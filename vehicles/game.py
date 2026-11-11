@@ -2679,6 +2679,12 @@ def stand_ins(prep, out, coll, budget):
     if "cg_emit" in prep.attributes:
         lit = {x.value for x, e in zip(pa.data, prep.attributes["cg_emit"].data) if e.value}
     P = _piece_faces(prep, key=key)
+    # each part's faces' UV islands, in _piece_faces' order
+    ia = prep.attributes.get("cg_island")
+    isl = {}
+    for x, y in zip(pa.data, ia.data if ia else pa.data):
+        isl.setdefault(x.value, []).append(y.value if ia else -1)
+    trees = {}
     O = _piece_faces(out, key=key)
     every = BVHTree.FromPolygons([v.co for v in prep.vertices],
                                  [list(p.vertices) for p in prep.polygons])
@@ -2712,6 +2718,7 @@ def stand_ins(prep, out, coll, budget):
             # fluted sill strip, a box)
             if hdev <= (LOD_HULL_LARGE_M if big else tol) or edge:
                 cand.append((-e, q, h, len(h.polygons) - got))
+                trees[q] = tp
                 continue
             bpy.data.meshes.remove(h)
         if big:
@@ -2733,10 +2740,16 @@ def stand_ins(prep, out, coll, budget):
             again[q] = len(P[q][1])
             what[q] = "collapsed again"
             continue
-        for nm_, val in (("cg_piece", piece[q]), ("cg_lp", q), ("cg_island", -1),
-                         ("cg_class", 0)):
+        for nm_, val in (("cg_piece", piece[q]), ("cg_lp", q), ("cg_class", 0)):
             h.attributes.new(nm_, 'INT', 'FACE').data.foreach_set("value",
                                                                   [val] * len(h.polygons))
+        # a hull face wears the island of its own part's face nearest it (never a lamp's or
+        # a neighbor's the ray would find first)
+        hi_ = []
+        for poly in h.polygons:
+            hit = trees[q].find_nearest(poly.center)
+            hi_.append(isl[q][hit[2]] if hit[2] is not None else -1)
+        h.attributes.new("cg_island", 'INT', 'FACE').data.foreach_set("value", hi_)
         hulls.append(h)
         what[q] = "hull"
     if not what:
