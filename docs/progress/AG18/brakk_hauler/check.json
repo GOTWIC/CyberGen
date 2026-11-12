@@ -6,7 +6,7 @@
   2.08
  ],
  "top_z": 2.08,
- "objects": 123,
+ "objects": 156,
  "palette": {
   "paint": [
    0.78,
@@ -30,59 +30,59 @@
   ]
  },
  "tires": {
-  "verdict": "look",
+  "verdict": "ok",
   "wheels": [
    {
     "tag": "fl",
-    "clearance_mm": 7.1,
+    "clearance_mm": 47.8,
     "nearest": "chassis",
     "at": [
-     1.83,
-     0.746,
-     0.687
+     1.951,
+     0.718,
+     0.65
     ],
     "foot_mm": 0.0,
     "steer_hits": "chassis",
-    "steer_deg": 0,
-    "verdict": "look"
+    "steer_deg": 20,
+    "verdict": "ok"
    },
    {
     "tag": "rl",
-    "clearance_mm": 13.5,
+    "clearance_mm": 33.1,
     "nearest": "springs",
     "at": [
      -1.558,
-     0.718,
+     0.698,
      0.814
     ],
     "foot_mm": 0.0,
-    "verdict": "look"
+    "verdict": "ok"
    },
    {
     "tag": "fr",
-    "clearance_mm": 7.1,
+    "clearance_mm": 47.8,
     "nearest": "chassis",
     "at": [
-     1.83,
-     -0.746,
-     0.687
+     1.809,
+     -0.718,
+     0.65
     ],
     "foot_mm": 0.0,
     "steer_hits": "chassis",
-    "steer_deg": 0,
-    "verdict": "look"
+    "steer_deg": 20,
+    "verdict": "ok"
    },
    {
     "tag": "rr",
-    "clearance_mm": 13.5,
+    "clearance_mm": 33.1,
     "nearest": "springs",
     "at": [
      -1.558,
-     -0.718,
+     -0.698,
      0.814
     ],
     "foot_mm": 0.0,
-    "verdict": "look"
+    "verdict": "ok"
    }
   ]
  },
@@ -93,18 +93,19 @@
   "under_floor": []
  },
  "symmetry": {
-  "verdict": "look",
+  "verdict": "ok",
   "center_off_mm": 0.0,
-  "objects": 6,
+  "objects": 0,
   "asymmetric": [
    {
-    "object": "wipers",
+    "object": "antenna",
     "off_mm": 200.5,
     "at": [
      -0.758,
      0.499,
      2.08
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "interior.wheel",
@@ -113,7 +114,8 @@
      0.517,
      0.339,
      1.06
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "interior.screens",
@@ -122,7 +124,8 @@
      0.728,
      0.31,
      1.331
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "hooks",
@@ -131,7 +134,18 @@
      2.828,
      0.055,
      0.537
-    ]
+    ],
+    "meant": true
+   },
+   {
+    "object": "wipers",
+    "off_mm": 26.0,
+    "at": [
+     0.956,
+     -0.217,
+     1.528
+    ],
+    "meant": true
    },
    {
     "object": "winch.rollers",
@@ -140,7 +154,18 @@
      2.82,
      0.018,
      0.59
-    ]
+    ],
+    "meant": true
+   },
+   {
+    "object": "wiper.blades",
+    "off_mm": 9.6,
+    "at": [
+     1.034,
+     -0.428,
+     1.348
+    ],
+    "meant": true
    },
    {
     "object": "bed.tread",
@@ -149,7 +174,8 @@
      -1.154,
      -0.532,
      0.744
-    ]
+    ],
+    "meant": true
    }
   ]
  },
@@ -158,6 +184,7 @@
   "open_edges": [],
   "open_mm": 0,
   "cutter_holes": [],
+  "cut_loops": 4,
   "pieces": {
    "hull": {
     "closed": true,
@@ -170,25 +197,13 @@
   }
  },
  "through": {
-  "verdict": "look",
-  "parts": [
-   {
-    "object": "interior.tub",
-    "out_mm": 33.4,
-    "share": 0.41,
-    "at": [
-     -0.969,
-     0.798,
-     0.542
-    ],
-    "meant": false
-   }
-  ],
-  "count": 1
+  "verdict": "ok",
+  "parts": [],
+  "count": 0
  },
  "triangles": {
   "verdict": "ok",
-  "total": 230460,
+  "total": 259196,
   "budget": 400000,
   "top": [
    [
@@ -216,12 +231,12 @@
     9904
    ],
    [
-    "bolts",
-    9024
-   ],
-   [
     "lettering",
     8210
+   ],
+   [
+    "bolts",
+    8064
    ]
   ],
   "groups": [
@@ -243,21 +258,21 @@
    ],
    [
     "hull",
-    16226
+    17582
    ],
    [
     "rim",
     15840
    ],
    [
-    "bolts",
-    9024
+    "pylon",
+    11968
    ],
    [
-    "lettering",
-    8210
+    "lamp",
+    11676
    ]
   ]
  },
- "verdict": "look"
+ "verdict": "ok"
 }

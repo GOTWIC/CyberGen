@@ -5,7 +5,7 @@
 - **Brand, model, type:** Brakk Industrial Hauler, crew cab pickup truck with an open load bed (all names made up).
 - **Seats:** 4 (two buckets, a rear bench), four doors.
 - **Size:** 5.69 m long, 2.20 m wide over the tires, 1.95 m high at the roof bar (2.08 m with the antenna); wheelbase 3.50 m; tires 0.90 m in diameter, 0.32 m wide; hull floor at 0.48 m, lowest point (rear axle housing) 0.31 m.
-- **Triangles:** 230,460 in 123 objects.
+- **Triangles:** 259,196 in 156 objects.
 - **Build:** `vehicles/blender.sh vehicles/cars/brakk_hauler.py --out docs/progress/AG18/brakk_hauler --sheet`
 
 ## The design
@@ -18,11 +18,50 @@
 - Lugged tires with side biters and raised sidewall lettering on dished steel rims with a bolted bead ring.
 - Show color: signal ochre, with graphite plates and red recovery points.
 
+## Step B: lamps, cut lines, glass (2026-11-12)
+
+The Brakk pilot on step B's kit (`docs/assetgen_milestones.md`, AG18, step B), and the first
+car on `vehicles/brands/brakk.py` (tube, bolt, plate, on_side, on_plane, stencil, chevrons,
+coil and the wheel, bound to this car's sizes as its own copy built it: 88 segments, the
+small dish, no hub motor). The sheet, clay, zebra and check above are of this build.
+
+- Light pylons: each is now a housing of plates sunk 30 mm into its chamfered corner with
+  two pockets 50 mm deep. The tall one holds an LED bar right under the lens in a V of
+  reflector plates (white in front, red behind, under clear and red lenses); the one at its
+  foot an amber cell on a reflector plate under an amber lens (an amber reflector bowl first,
+  but its emitter sat too deep for the game pack, which baked it white). Each window has a bolted bezel, four bolts a
+  window, and the tall one a guard of four bars on two posts. The bar was a lit strip lying
+  on a box.
+- Roof bar: the housing's front is a frame with a pocket behind it; eight cells between
+  dividers, three LED modules in reflector cups each, behind one clear lens; bolts along its
+  top; the amber end lamps are reflectors in pockets of bolted end plates under amber lenses.
+- Work lamps on the sail frame: housings with two reflectors under a clear lens and a guard
+  of two bars each. The stop lamp over the rear window: ten LEDs in cups under a red lens in
+  a slim housing.
+- Cut lines: a fuel flap cut through each quarter (its hinge on the front edge; two of the
+  quarter's bolts moved out of its way); 3.5 mm shut lines everywhere (8 mm before; the
+  plates keep their broad 8 mm bevel).
+- Glass: the windshield and side windows in `"frame"` mode, thick frames made on one side
+  and mirrored (the old frames were mirrored off at their corners and faced into the car).
+- Wipers: the kit's wiper (a boss, a tapered arm, a yoke, a blade lying on the glass), both
+  parked to the left; the antenna an object of its own.
+- Street distances: the front upper wishbones' ball joints lower in the rims (inner pivots
+  0.86 to 0.78 m, outer 0.63 to 0.58 m) and the tie rods 6 cm nearer the axle: the front
+  tires 7.1 mm from the chassis and steering 0 degrees before, 47.8 mm and 20 degrees now;
+  the rear dampers 2 cm inboard and the rear fender gussets 3 cm shorter: 13.5 mm to the
+  springs before, 33.1 mm now; the cabin tub's floor narrowed into the hull's floor slope and
+  its back wall shaped to the hull, the dash 3 cm shorter: 41% of the tub in the open before,
+  none now.
+- Checks: every one `ok` (tires, symmetry and through were `look`). The one-sided parts
+  (driver's wheel and screens, wipers, antenna, the winch hook, the tread plate's lozenges)
+  are told to the checks as meant.
+- About 259,000 triangles (230,000 before).
+
 ## Brakk family cues (for the Bastion and the Mule)
 
 Geometry and texture only, none of it depends on the color:
 
-1. **Plate and chamfer.** Flat plates, all edges sharp, one chamfer size (about 0.12 m, 45 degrees) on every top edge and on the nose and tail corners in plan. Wide panel gaps (8 mm) and a broad edge bevel.
+1. **Plate and chamfer.** Flat plates, all edges sharp, one chamfer size (about 0.12 m, 45 degrees) on every top edge and on the nose and tail corners in plan. Shut lines of 3.5 mm (8 mm before step B) and a broad edge bevel (8 mm).
 2. **Wheels outside the hull** under separate three-facet fender plates with a folded edge and two rows of bolt heads; never a well cut into the body.
 3. **Light pylons:** a tall housing with a vertical bar and an amber cell at its foot, standing on each chamfered corner (white in front, red behind), and one full-width bar of eight cells over the windshield with amber end lamps.
 4. **The ribbed slab** as a face: horizontal trapezoid ribs in body color on a dark plate, the name on a bolted plate above them. Cargo walls take the same rib upright (corrugation); doors take it lying as rub strips.

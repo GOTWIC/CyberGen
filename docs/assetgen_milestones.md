@@ -3155,6 +3155,24 @@ Vanta-R the same).
   rebuilt, every check passing: 144,693, 59,996, 20,358, 5,057 triangles, standard class,
   texels 404 px/m (5th percentile), LOD3 12.7 of 40 degrees, 0.016 of 0.10 bent, 0.014 of
   0.04 texture. Not published.
+- **Brakk Hauler** (`docs/progress/AG18/brakk_hauler/`, the Brakk pilot, now on
+  `vehicles/brands/brakk.py`, its wheel bound to the car's sizes as its copy built it): the
+  corner pylons housings of plates sunk 30 mm into the chamfers with two pockets 50 mm deep,
+  an LED bar right under a clear (front) or red (rear) lens in a V of reflector plates and an
+  amber cell on a reflector plate under an amber lens, bolted bezels, a guard of bars over
+  the bar; the roof bar a frame over a pocket, eight cells of three LED modules in reflector
+  cups behind one clear lens, amber end lamps in pockets of bolted end plates; work lamps
+  and the stop lamp as housings with reflectors or LEDs under lenses; a fuel flap cut through
+  each quarter; 3.5 mm shut lines (8 mm before; the plates keep their 8 mm bevel); thick
+  glass frames in `"frame"` mode; the kit's wipers. Street distances: the front upper
+  wishbones' ball joints lower and the tie rods nearer the axle (7.1 mm and no steering to
+  47.8 mm and 20 degrees), the rear dampers inboard and the fender gussets shorter (13.5 mm
+  to 33.1 mm), the cabin tub inside the hull (41% in the open to none). 259,196 triangles
+  (230,460). Every check `ok` (tires, symmetry and through were `look`; the one-sided parts
+  told as meant). The amber cells first stood as reflector bowls whose emitters baked white
+  in the pack; they are lit faces under the lens now. Pack rebuilt, every check passing:
+  139,138, 57,536, 20,230, 8,071 triangles, large class, texels 331 px/m (5th percentile),
+  LOD3 18.4 of 40 degrees, 0.025 of 0.10 bent, 0.0058 of 0.04 texture. Not published.
 - **Next**: a pilot car of each of the other five brands (lamps by `BRANDS.md`, each
   switching to its `vehicles/brands/` module), shown to Swagnik before the other twelve;
   step A's street-distance findings (tires in the body, cabin tubs in the wells) on each car
