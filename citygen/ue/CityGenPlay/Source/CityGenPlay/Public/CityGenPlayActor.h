@@ -139,6 +139,30 @@ public:
 	UFUNCTION(BlueprintPure, Category = "CityGen")
 	FString GetStatus() const;
 
+	// -- atmosgen's weather prototypes in the developer menu (AT5 replaces them with weather
+	// states). The controller (CityGenAtmos) is found by its class name and driven through its
+	// UFUNCTIONs and properties, so the play features build and run without that plugin. --
+
+	/** What a click on a developer menu row does, by the row's name: night, freecam,
+	 *  minimap, messages, and with an atmos controller fog, rain, wet, hour+ and hour- (the
+	 *  overlay's clicks and the console's CityGen.MenuRow). False for a row the menu does not
+	 *  show. */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	bool ClickMenuRow(const FString& Row);
+
+	/** The level's atmos controller, else null (the menu then shows no weather rows). */
+	AActor* GetAtmos() const;
+
+	/** One of the controller's switches: bFog, bRain, bWet. */
+	bool GetAtmosFlag(FName Property) const;
+
+	/** Calls SetFog, SetRain or SetWet on the controller. */
+	void SetAtmosFlag(FName Function, bool bOn);
+
+	/** The controller's hour (0 to 24), and SetHour. */
+	float GetAtmosHour() const;
+	void SetAtmosHour(float InHour);
+
 	bool IsMapOpen() const { return bMapOpen; }
 	bool IsDevMenuOpen() const { return bDevOpen; }
 	bool IsFreeCam() const;
@@ -208,6 +232,8 @@ private:
 	int32 PoolsOn = 0;
 	FString ToastText;
 	double ToastUntil = 0.0;
+	mutable TWeakObjectPtr<AActor> Atmos;
+	mutable double AtmosLookAt = -1.0;
 
 	// the day's lighting, kept to go back to it
 	bool bDaySaved = false;

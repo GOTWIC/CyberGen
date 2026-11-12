@@ -7,6 +7,7 @@
 #include "Components/DirectionalLightComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/SkyLightComponent.h"
+#include "CoreGlobals.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/PostProcessVolume.h"
@@ -36,6 +37,7 @@ namespace
 	const FName SunKey(TEXT("cg.key=lighting.sun"));
 	const FName UnderwaterTag(TEXT("cg.type=underwater"));
 	const FName SkyKey(TEXT("cg.key=lighting.sky"));
+	const FName AtmosClass(TEXT("CityGenAtmos"));  // atmosgen's controller, ACityGenAtmos
 
 	// AT1: the lamps' lights are atmosgen's (decision 12.2); its runtime (CityGenAtmos) sets
 	// this to 2 while its plan's lights show, so the pools stand only past its live range
@@ -637,6 +639,128 @@ void ACityGenPlay::UpdateUnderwater()
 	UnderwaterOn = On;
 }
 
+// -- the developer menu's rows --
+
+bool ACityGenPlay::ClickMenuRow(const FString& Row)
+{
+	const FString R = Row.ToLower();
+	if (R == TEXT("night"))
+	{
+		SetNight(!IsNight());
+	}
+	else if (R == TEXT("freecam"))
+	{
+		SetFreeCam(!IsFreeCam());
+	}
+	else if (R == TEXT("minimap"))
+	{
+		bShowMinimap = !bShowMinimap;
+	}
+	else if (R == TEXT("messages"))
+	{
+		GAreScreenMessagesEnabled = !GAreScreenMessagesEnabled;
+	}
+	else if (!GetAtmos())
+	{
+		return false;                           // (the weather rows are hidden)
+	}
+	else if (R == TEXT("fog") || R == TEXT("rain") || R == TEXT("wet"))
+	{
+		const FString Name = R.Left(1).ToUpper() + R.Mid(1);
+		SetAtmosFlag(FName(TEXT("Set") + Name), !GetAtmosFlag(FName(TEXT("b") + Name)));
+	}
+	else if (R == TEXT("hour+") || R == TEXT("hour-"))
+	{
+		const int32 Step = R == TEXT("hour-") ? 23 : 1;
+		SetAtmosHour(float((FMath::FloorToInt32(GetAtmosHour()) + Step) % 24));
+	}
+	else
+	{
+		return false;
+	}
+	return true;
+}
+
+// -- atmosgen's weather prototypes (the developer menu's rows) --
+
+AActor* ACityGenPlay::GetAtmos() const
+{
+	if (Atmos.IsValid())
+	{
+		return Atmos.Get();
+	}
+	// (the controller is always loaded and placed with the level: look for it at most once a
+	// second, and only in a level's first minute)
+	const UWorld* World = GetWorld();
+	const double Now = World ? World->GetTimeSeconds() : 0.0;
+	if (!World || Now > 60.0 || (AtmosLookAt >= 0.0 && Now - AtmosLookAt < 1.0))
+	{
+		return nullptr;
+	}
+	AtmosLookAt = Now;
+	for (TActorIterator<AActor> It(const_cast<UWorld*>(World)); It; ++It)
+	{
+		if (It->GetClass()->GetFName() == AtmosClass)
+		{
+			Atmos = *It;
+			return *It;
+		}
+	}
+	return nullptr;
+}
+
+bool ACityGenPlay::GetAtmosFlag(FName Property) const
+{
+	const AActor* A = GetAtmos();
+	const FBoolProperty* P = A ? FindFProperty<FBoolProperty>(A->GetClass(), Property) : nullptr;
+	return P && P->GetPropertyValue_InContainer(A);
+}
+
+float ACityGenPlay::GetAtmosHour() const
+{
+	const AActor* A = GetAtmos();
+	const FFloatProperty* P = A ? FindFProperty<FFloatProperty>(A->GetClass(), TEXT("Hour")) : nullptr;
+	return P ? P->GetPropertyValue_InContainer(A) : 0.f;
+}
+
+namespace
+{
+	/** Calls a UFUNCTION of one bool or float parameter. */
+	void CallOne(AActor* A, FName Name, bool bValue, float Value)
+	{
+		UFunction* F = A ? A->FindFunction(Name) : nullptr;
+		if (!F)
+		{
+			return;
+		}
+		uint8* Parms = static_cast<uint8*>(FMemory_Alloca(FMath::Max<int32>(F->ParmsSize, 1)));
+		FMemory::Memzero(Parms, F->ParmsSize);
+		for (TFieldIterator<FProperty> It(F); It && It->HasAnyPropertyFlags(CPF_Parm); ++It)
+		{
+			if (FBoolProperty* B = CastField<FBoolProperty>(*It))
+			{
+				B->SetPropertyValue_InContainer(Parms, bValue);
+			}
+			else if (FFloatProperty* V = CastField<FFloatProperty>(*It))
+			{
+				V->SetPropertyValue_InContainer(Parms, Value);
+			}
+			break;
+		}
+		A->ProcessEvent(F, Parms);
+	}
+}
+
+void ACityGenPlay::SetAtmosFlag(FName Function, bool bOn)
+{
+	CallOne(GetAtmos(), Function, bOn, 0.f);
+}
+
+void ACityGenPlay::SetAtmosHour(float InHour)
+{
+	CallOne(GetAtmos(), TEXT("SetHour"), false, InHour);
+}
+
 FString ACityGenPlay::GetStatus() const
 {
 	const APawn* Pawn = PC ? PC->GetPawn() : nullptr;
@@ -650,11 +774,14 @@ FString ACityGenPlay::GetStatus() const
 		"\"free_cam\": %s, \"waiting\": %s, \"pawn\": \"%s\", \"x\": %.2f, \"y\": %.2f, \"z\": %.2f, "
 		"\"light_pools\": %d, "
 		"\"lamp_points\": %d, \"walk_points\": %d, \"map_texture\": %s, "
-		"\"overlay\": %s}"),
+		"\"overlay\": %s, \"atmos\": %s, \"fog\": %s, \"rain\": %s, \"wet\": %s, \"hour\": %.2f}"),
 		bReady ? TEXT("true") : TEXT("false"), bNight ? TEXT("true") : TEXT("false"),
 		bMapOpen ? TEXT("true") : TEXT("false"), bDevOpen ? TEXT("true") : TEXT("false"),
 		IsFreeCam() ? TEXT("true") : TEXT("false"), bWaiting ? TEXT("true") : TEXT("false"),
 		Pawn ? *Pawn->GetClass()->GetName() : TEXT(""), At.X / 100.0, -At.Y / 100.0, At.Z / 100.0,
 		PoolsVisible, LampPoints.Num(), WalkPoints.Num(), MapTexture ? TEXT("true") : TEXT("false"),
-		Overlay.IsValid() ? TEXT("true") : TEXT("false"));
+		Overlay.IsValid() ? TEXT("true") : TEXT("false"), GetAtmos() ? TEXT("true") : TEXT("false"),
+		GetAtmosFlag(TEXT("bFog")) ? TEXT("true") : TEXT("false"),
+		GetAtmosFlag(TEXT("bRain")) ? TEXT("true") : TEXT("false"),
+		GetAtmosFlag(TEXT("bWet")) ? TEXT("true") : TEXT("false"), GetAtmosHour());
 }

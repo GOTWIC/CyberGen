@@ -229,7 +229,7 @@ developer menu with day and night, unless `--no-play`:
 | (always) | the minimap, top left: the city around you, north up, your heading as an arrow, the city's name, day or night, the keys |
 | M | the map, full screen: the whole city with district names; the wheel zooms about the cursor, the right button drags it, the left button teleports you there (a walking player onto the nearest walkway, held until the city has streamed in around it; a flying one at its height, at least 30 m over the walkway there); M or Esc closes it |
 | . | the free camera: in the game (not the editor's eject), a spectator pawn with no collision, flown with W A S D, E or Space up, Q or C down, the mouse; the wheel sets its speed (2 to 500 m/s); `.` again goes back to the player, who waited where they were |
-| Tab | the developer menu: time of day (day or night), the free camera, the minimap, the engine's on-screen messages; click a row to change it; Tab or Esc closes it |
+| Tab | the developer menu: time of day (day or night), the free camera, the minimap, the engine's on-screen messages, and with an atmos plan atmosgen's weather prototypes (fog, rain, wet streets) and the hour its lights' schedules read (`<` and `>` step it, a click on the row steps on); click a row to change it; Tab or Esc closes it |
 
 By night (`MPC_CityGen`'s `Night` 1) the windows' rooms light up (AG6's night interiors,
 lit by each building's own night since AG15: its schedule at `MPC_CityGen`'s `Hour`, its
@@ -301,6 +301,7 @@ imports without the play features.
   `city_model.json`, else the gameplay layer's zones).
 - **Console commands** (in the play window): `CityGen.Map [0|1]`, `CityGen.FreeCam
   [0|1]`, `CityGen.Menu [0|1]`, `CityGen.Night [0|1]` (each toggles without an argument),
+  `CityGen.MenuRow ROW` (a click on a developer menu row, "A packaged game" below),
   `CityGen.Teleport X Y` (citygen meters), `CityGen.Status` (the state as one JSON line).
   The actor's functions are callable from Python too (`set_night`, `set_map_open`,
   `set_free_cam`, `teleport_player_to_citygen`, `get_status`).
@@ -973,7 +974,9 @@ play-in-editor and `-game` run). So the fixes cut what the level holds and strea
   written by every import): the game is DPI-aware, so a 2560 x 1440 monitor scaled 125% gives
   it a 2560 x 1440 window (DPI-unaware it got 2048 x 1152, stretched by Windows, and the neon
   strips shimmered). Unreal's automatic screen percentage is left as it is; the benchmark keeps
-  its own overrides.
+  its own overrides. A packaged game with no saved settings still picked its window before
+  it was DPI-aware: the play features now put it at the monitor's native resolution ("A
+  packaged game" below).
 - **Tried and left out**: UE 5.8's experimental switches for physics bodies made off the
   game thread (`p.Chaos.EnableAsyncInitBody`) and incremental garbage collection
   (`gc.AllowIncrementalReachability`, `gc.AllowIncrementalGather`), no forced collection
@@ -1515,6 +1518,45 @@ import go):
 - **A city without an atmos plan** imports as before (no controller, no cells), its night
   lit by the light pools alone.
 
+### A packaged game
+
+A project a city was imported into packages as any Unreal project (UAT's `BuildCookRun`,
+for example Development Win64 with `-cook -stage -pak -archive` and `-map=` the city's
+level). Three fixes made Delta Megacity's packaged game (after AT1) play as the editor's
+`-game` does:
+
+- **What the runtimes load by path is cooked.** A cook takes only what the maps reference.
+  The atmos controller loads `MPC_CityGenAtmos`, `M_CgRain` and `M_CgWet` by path (and the
+  rain cards' `/Engine/BasicShapes/Plane`), so the packaged game logged "SkipPackage ... does
+  not exist" and `CityGenAtmos.Rain` and `.Wet` did nothing. Every import writes
+  `unreal.ALWAYS_COOK` (`/Game/CityGen/Core/Atmos`, `/Engine/BasicShapes`) as
+  `+DirectoriesToAlwaysCook` in the project's `Config/DefaultGame.ini`
+  (`[/Script/UnrealEd.ProjectPackagingSettings]`; `unreal.set_project_ini`, the section's
+  other lines kept). Whatever a runtime loads by path belongs in one of those folders (a
+  test reads the plugins' sources for `/Game` and `/Engine` paths); the rest of
+  `/Game/CityGen/Core` (the masters, `MPC_CityGen`, the textures) the level references
+  through its materials and the play actor. CityGenPlay loads nothing by path.
+- **The monitor's native resolution.** The game is DPI-aware (AT1, above), but a game with no
+  saved settings picks its window before that, from the desktop as a DPI-unaware process
+  sees it: 2048 x 1152 on a 1440p screen at 125%. At game start (not in the editor), once the
+  engine is up, the play plugin's module sets windowed fullscreen at the primary monitor's
+  native resolution (`FCityGenPlayModule`, `NativeResolution`), unless the player's saved
+  `GameUserSettings.ini` has a resolution or the command line sets the window (`-ResX`,
+  `-ResY`, `-windowed`, `-fullscreen`, the benchmark's `-CityGenBench=`). It saves nothing,
+  so every start does the same; Unreal's automatic screen percentage is left as it is. The
+  log says `CityGen play: window 2048x1152 -> 2560x1440 windowed fullscreen`.
+- **Weather in the developer menu.** With an atmos controller in the level, the Tab menu has
+  rows for AT0's prototypes, Fog, Rain and Wet streets (the controller's `SetFog`,
+  `SetRain`, `SetWet`), and the hour (`SetHour`, a step of an hour: the schedules of its
+  lights and the windows by night). The play features find the controller by its class name
+  and drive it through its UFUNCTIONs and properties (`ACityGenPlay::GetAtmos`,
+  `SetAtmosFlag`, `SetAtmosHour`), so CityGenPlay does not link CityGenAtmos; without a
+  controller the rows are hidden. Every row's click is `ACityGenPlay::ClickMenuRow(row)`
+  (`night`, `freecam`, `minimap`, `messages`, `fog`, `rain`, `wet`, `hour+`, `hour-`),
+  also the console's `CityGen.MenuRow ROW`, so a script or the benchmark's pass commands
+  drive the menu as a click does; `CityGen.Status` gives `atmos`, `fog`, `rain`, `wet` and
+  `hour`. AT5's weather states replace these rows.
+
 ## AG18's vehicles
 
 AG18's hero vehicles come into Unreal as a library of their game packs (the contract in
@@ -1726,3 +1768,4 @@ body, and the line-up of the AG18 check where the build has one. Results and sho
 | AG18 (vehicle packs) | AG18's vehicles ("AG18's vehicles" above): `citygen/unreal_vehicles.py` (the library: `--vehicles`, `$CITYGEN_VEHICLES`, the packs' cache; `--all-vehicles`; placement entries of kind `vehicles` in any contribution, the manifest's `vehicles`, `actor_hashes`, `actor_kinds`, `manifest_changes`), the importer's `vehicles` step (textures, `M_CgVehicle`, `M_CgVehicleGlass`, `M_CgVehicleGlassDark`, a mesh per car and part with the pack's four LODs, no Nanite, the hulls as the body's collision) and `vehicle_actors` (a `BP_CityGenGroup` per placement, a hierarchical instanced component per model and part, the paint in per-instance custom data), `--check-vehicles` (`check_vehicles.py`); tests `tests/test_unreal_vehicles.py`. A city without placements exports as before | Seven packs (vanta_r, brakk_mule, kestrel_dart, tanager_mino, aurel_prelate, orrin_aria, halcyon_ridge) in a line-up of their own in a throwaway project: imported, imported again (nothing changed), checked (every check passing) and shot by day and night (`docs/progress/AG18/unreal/`) |
 | AG18 step H (parked vehicles) | "Parked in the cities" above: assetgen's `unreal_contribution.vehicles.json` (a placement per tile replacing AG8's `prop.parked_vehicle.<tile>`, its `library`); `unreal_vehicles.without_replaced` (stage 2's entries a placement replaces left out of stage 2) and `named_library` (the placements' own library when neither `--vehicles` nor `$CITYGEN_VEHICLES` names one); AG16's scene count takes the placements; `CityGenAtmos` builds under the Mac's Clang again (two loops that returned at once, `-Wunreachable-code-loop-increment`). A city without placements exports as before | Vesper Bay in a throwaway project (`docs/progress/AG18/city/`): 912 parked cars as 17 models in 22 placements, imported (23 min), imported again (nothing changed), the city check and the vehicle check passing, shots by day and night |
 | AT1 | Layer 3 ("From AT1" above): the manifest's `atmos` (`unreal_atmos.write_atmos`: the controller's key and hash, a cell per 128 m cell, `counts.atmos_cells` and `atmos_lights`; the records in `unreal/atmos.json`; a plan whose lux check failed is named and left out, `--atmos DIR` naming a folder without a plan is an error); `actor_hashes`, `actor_kinds` (`atmos`, `atmos_cell`); the importer's `atmos_cells` (a `CityGenAtmosCell` data actor per cell, spatially loaded, among the offloaded actors) and `atmos_controller` (`CityGenAtmos`, always loaded, the plan's settings), `ATMOS_VERSION`; atmosgen's assets made before the import (`make_assets`); the plugin: cells register their lights as they stream, the controller's pooled live set shows them by night (`MPC_CityGen`'s `Night`), its subsystem and `-CityGenAtmosPlan` gone; the play features without AG15's spot lamps and sign washes (`play.json` 3; `GetStatus` without `lamps_lit`), their pools past the live range; the check reads the controller's status by night; `--atmos`, `--no-atmos`, `--bench-atmos` a flag | Delta in CityAG16 (`docs/progress/AT1/`): imported over AG16's import (the controller and 500 cells created, nothing else touched, under 3 min), the check passing by night with views, the night benchmark before and after (three runs each) |
+| Packaged game (a fix on its own, 2026-11-10) | "A packaged game" above: `unreal.ALWAYS_COOK` written to the project's DefaultGame.ini by every import (`set_project_ini`, `set_engine_ini(..., file, entries)`), so the atmos assets loaded by path are cooked; the play module puts a game with no saved resolution at the monitor's native resolution, windowed fullscreen; the Tab menu's Fog, Rain, Wet streets and hour rows drive the atmos controller. | Delta imported again into the AT1 project, packaged (Development Win64) and played: no missing CityGen package, a 2560 x 1440 window, the weather rows by night. |
