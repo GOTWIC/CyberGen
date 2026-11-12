@@ -137,18 +137,33 @@ def blender_args():
 # ---------------------------------------------------------------------------------------
 # the car as designed
 # ---------------------------------------------------------------------------------------
+# A pack is the car parked and shut: a script that poses an opening part for its sheet (a
+# taxi's sliding door) builds it closed when CYBERGEN_SHUT is set, and the scripts written
+# before that convention by the variable of their own named here. (carkit.Group's poses are
+# per view and never reach a pack.)
+SHUT_ENV = {"tanager_cab": "CAB_SHUT"}
+
+
 def build_car(car, out):
     """Runs the car's own script here (it empties the scene, builds, and with no render
-    argument only counts) and returns the kit module it used."""
+    argument only counts), shut (SHUT_ENV), and returns the kit module it used."""
     script = os.path.join(HERE, "cars", car + ".py")
     if not os.path.exists(script):
         raise SystemExit("no car %s (%s)" % (car, script))
     saved = sys.argv
     sys.argv = [saved[0], "--", "--out", os.path.join(out, "build")]
+    shut = ["CYBERGEN_SHUT"] + ([SHUT_ENV[car]] if car in SHUT_ENV else [])
+    before = {k: os.environ.get(k) for k in shut}
+    os.environ.update({k: "1" for k in shut})
     try:
         runpy.run_path(script, run_name="__main__")
     finally:
         sys.argv = saved
+        for k, v in before.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
     return sys.modules["carkit"]
 
 
@@ -1075,9 +1090,15 @@ DIRS = None
 RANK = {-1: 0, 1: 1, 2: 2, 0: 3}    # face classes, worst to best seen
 
 
-def visibility(bm, glass_tree):
+BELLY_EYE_M = 0.5       # under a floating vehicle: no eye looks up from lower than this
+
+
+def visibility(bm, glass_tree, floats=False):
     """Face classes by rays: 0 seen from outside (exterior), 1 seen only from below
-    (underside), 2 seen only through glass (cabin), -1 never seen (removed). A face never
+    (underside), 2 seen only through glass (cabin), -1 never seen (removed). On a vehicle
+    with no wheels (floats: it hovers, and sets down when parked) a ray going down counts
+    as from below when it leaves a point under BELLY_EYE_M: its belly is underside, as a
+    wheeled car's floor behind its sills and wheels (the texels go to what is seen). A face never
     seen from its front but seen from its back is a face the design turned the wrong way
     (Blender draws both sides; an engine culls back faces): its class from the back, and
     its index in the second list, to be turned round. So is a face seen better from its
@@ -1100,7 +1121,8 @@ def visibility(bm, glass_tree):
                 if tree.ray_cast(o, d)[0] is not None:
                     continue
                 through = glass_tree is not None and glass_tree.ray_cast(o, d)[0] is not None
-                k = 2 if through else (0 if d.z > -0.3 else 1)
+                below = d.z <= -0.3 or (floats and d.z < 0 and o.z < BELLY_EYE_M)
+                k = 2 if through else (1 if below else 0)
                 if best == -1 or (k == 0) or (k == 1 and best == 2):
                     best = k
                 if best == 0:
@@ -1125,7 +1147,7 @@ def visibility(bm, glass_tree):
     return cls, flip
 
 
-def cull(ob, glass_tree, lit=()):
+def cull(ob, glass_tree, lit=(), floats=False):
     """Removes coincident and never seen faces of a part, stores each face's class (FACE
     int cg_class). A lamp's faces (materials in lit) are never removed as unseen: a light
     band seen only through the gaps of a row of flutes catches too few of the rays.
@@ -1136,7 +1158,7 @@ def cull(ob, glass_tree, lit=()):
     dup = dedupe_faces(bm) + [f for f in bm.faces if f.calc_area() < 1e-9]
     bmesh.ops.delete(bm, geom=list(set(dup)), context='FACES')
     bm.faces.ensure_lookup_table()
-    cls, flip = visibility(bm, glass_tree)
+    cls, flip = visibility(bm, glass_tree, floats)
     if flip:
         fl = [bm.faces[i] for i in flip]
         bmesh.ops.reverse_faces(bm, faces=fl)
@@ -1216,7 +1238,7 @@ def unwrap(ob, size, pad_px=None, boost=None, floor=None, thin=True, again=None)
                              correct_aspect=True, scale_to_bounds=False)
     for k, faces in enumerate(again or []):
         # the faces of islands that lay over themselves, projected again in smaller charts
-        # (a second time, smaller still, those that still did)
+        # (a second and a third time, smaller still, those that still did)
         bpy.ops.mesh.select_all(action='DESELECT')
         bme = bmesh.from_edit_mesh(me)
         bme.faces.ensure_lookup_table()
@@ -1328,7 +1350,7 @@ def unwrap(ob, size, pad_px=None, boost=None, floor=None, thin=True, again=None)
     ob["cg_detail_boost"] = f
     if len(again or []) < len(UV_AGAIN_ANGLES):
         # an island the projection laid over itself (a lip curling under its frame within
-        # the angle limit) is projected again in smaller charts; twice at most
+        # the angle limit) is projected again in smaller charts; three times at most
         lay = self_overlap(me, U, islands)
         if lay:
             n = len(again or [])
@@ -1339,7 +1361,7 @@ def unwrap(ob, size, pad_px=None, boost=None, floor=None, thin=True, again=None)
     return len(islands)
 
 
-UV_AGAIN_ANGLES = (0.6, 0.35)   # radians: the angle limits for islands that overlapped
+UV_AGAIN_ANGLES = (0.6, 0.35, 0.2)  # radians: the angle limits for islands that overlapped
 UV_AGAIN_SHARE = 0.001          # ... when this share of the texels is covered twice
 
 
@@ -2098,6 +2120,23 @@ FID_LIMITS = {1: dict(p95=12.0, bent=0.02, tex=0.01),
               3: dict(p95=40.0, bent=0.10, tex=0.04)}
 
 
+LOD_BENT_MORE = 2.5         # short of the fidelity limits: the pieces most off LOD0's normals
+LOD_BENT_SHARE = 0.7        # ... (those that carry this share of the area off, LOD_BENT_PIECES
+LOD_BENT_PIECES = 12        # ... at most) are given this many times their triangles
+
+
+def fid_over(fid, k):
+    """A LOD's fidelity as a share of its limits: the worst of its measures over its limit
+    (over 1: the check fails)."""
+    lim = FID_LIMITS.get(k)
+    if lim is None or fid is None:
+        return 0.0
+    r = [fid["normal_p95_deg"] / lim["p95"], fid["bent_share"] / lim["bent"]]
+    if fid.get("texture_share") is not None:
+        r.append(fid["texture_share"] / lim["tex"])
+    return max(r)
+
+
 def mark_islands(ob):
     """cg_island: the UV island of each face."""
     from bpy_extras import mesh_utils
@@ -2636,13 +2675,25 @@ def _dev(pts, tree, q=1.0):
     return ds[min(len(ds) - 1, int(q * (len(ds) - 1)))]
 
 
+def _closed(fs):
+    """Whether faces make closed surfaces: every edge between exactly two of them."""
+    n = {}
+    for f in fs:
+        for a, b in zip(f, list(f[1:]) + list(f[:1])):
+            k = (a, b) if a < b else (b, a)
+            n[k] = n.get(k, 0) + 1
+    return bool(n) and all(c == 2 for c in n.values())
+
+
 def _wreck(vs, fs, o):
     """How far a part's collapse (o: its (vertices, faces), None when it went) is off the
     part as prepared (vs, fs): (size, tolerance, deviation, the part's tree). The
     deviation: the farthest point of the collapse (faces' and edges' middles; a large
     part's 98th percentile) from the part, or the part's 95th percentile from the
     collapse. The tolerance: LOD_WRECK_M or LOD_WRECK_SHARE of a small part's size; for a
-    larger part LOD_HULL_LARGE_M or LOD_WRECK_LARGE of its size."""
+    larger part LOD_HULL_LARGE_M or LOD_WRECK_LARGE of its size. A small closed solid the
+    collapse left open (a flute or a bolt folded into a sliver: a shard showing its dark
+    inside, though every point of it is near the solid) is off by any measure."""
     lo = [min(v[i] for v in vs) for i in range(3)]
     hi = [max(v[i] for v in vs) for i in range(3)]
     e = sqrt(sum((hi[i] - lo[i]) ** 2 for i in range(3)))
@@ -2653,6 +2704,8 @@ def _wreck(vs, fs, o):
     if o is None:
         return e, tol, float("inf"), tp
     ov, of = o
+    if small and _closed(fs) and not _closed(of):
+        return e, tol, float("inf"), tp
     to = BVHTree.FromPolygons(ov, of)
     dev = max(_dev(_samples(ov, of), tp, 1.0 if small else 0.98),
               _dev(_samples(vs, fs), to, 0.95))
@@ -2737,36 +2790,58 @@ def stand_ins(prep, out, coll, budget):
         elif not edge:          # (a part on the edge of the box stays as it is)
             what[q] = "dropped"
     # the cheapest first (most parts put right for the triangles), while the budget lasts;
-    # past it a small part goes, a large one stays as the collapse left it
+    # past it a small part goes, a large one stays as the collapse left it. The small
+    # wrecked parts of one piece (a row of flutes, a bolt circle) fare alike: hulls for all
+    # of them when the budget has room for them all, else none (a row with gaps reads as
+    # damage)
+    row_of = {r[1]: r for r in cand}
+    members = {}
+    for ne, q, h, extra in cand:
+        if h is not None and -ne <= LOD_STANDIN_M and q not in lit:
+            members.setdefault(piece.get(q), []).append(q)
+    members = {g: sorted(qs) for g, qs in members.items() if len(qs) > 1}
+    grouped = {q: g for g, qs in members.items() for q in qs}
+    units, seen = [], set()
+    for r in cand:
+        g = grouped.get(r[1])
+        if g is None:
+            units.append((r[3], (r[0], r[1]), [r]))
+        elif g not in seen:
+            seen.add(g)
+            rows = [row_of[q] for q in members[g]]
+            units.append((sum(x[3] for x in rows), (0.0, members[g][0]), rows))
     hulls, spent = [], 0
-    for ne, q, h, extra in sorted(cand, key=lambda r: (r[3], r[0], r[1])):
-        if spent + extra > budget:
-            if h is not None:
-                bpy.data.meshes.remove(h)
-            if -ne <= LOD_STANDIN_M and q not in lit and q not in edges:
-                what[q] = "dropped"
-            continue
-        spent += extra
-        if h is None:
-            again[q] = len(P[q][1])
-            what[q] = "collapsed again"
-            continue
-        for nm_, val in (("cg_piece", piece[q]), ("cg_lp", q), ("cg_class", 0)):
-            h.attributes.new(nm_, 'INT', 'FACE').data.foreach_set("value",
-                                                                  [val] * len(h.polygons))
-        # a hull face wears the island of its own part's face nearest it (never a lamp's or
-        # a neighbor's the ray would find first)
-        hi_ = []
-        for poly in h.polygons:
-            hit = trees[q].find_nearest(poly.center)
-            hi_.append(isl[q][hit[2]] if hit[2] is not None else -1)
-        h.attributes.new("cg_island", 'INT', 'FACE').data.foreach_set("value", hi_)
-        for m in out.materials:
-            h.materials.append(m)
-        if len(h.materials):
-            h.polygons.foreach_set("material_index", [mat_of.get(q, 0)] * len(h.polygons))
-        hulls.append(h)
-        what[q] = "hull"
+    for cost, _, rows in sorted(units, key=lambda u: (u[0], u[1])):
+        over = spent + cost > budget
+        if not over:
+            spent += cost
+        for ne, q, h, extra in rows:
+            if over:
+                if h is not None:
+                    bpy.data.meshes.remove(h)
+                if -ne <= LOD_STANDIN_M and q not in lit and q not in edges:
+                    what[q] = "dropped"
+                continue
+            if h is None:
+                again[q] = len(P[q][1])
+                what[q] = "collapsed again"
+                continue
+            for nm_, val in (("cg_piece", piece[q]), ("cg_lp", q), ("cg_class", 0)):
+                h.attributes.new(nm_, 'INT', 'FACE').data.foreach_set(
+                    "value", [val] * len(h.polygons))
+            # a hull face wears the island of its own part's face nearest it (never a
+            # lamp's or a neighbor's the ray would find first)
+            hi_ = []
+            for poly in h.polygons:
+                hit = trees[q].find_nearest(poly.center)
+                hi_.append(isl[q][hit[2]] if hit[2] is not None else -1)
+            h.attributes.new("cg_island", 'INT', 'FACE').data.foreach_set("value", hi_)
+            for m in out.materials:
+                h.materials.append(m)
+            if len(h.materials):
+                h.polygons.foreach_set("material_index", [mat_of.get(q, 0)] * len(h.polygons))
+            hulls.append(h)
+            what[q] = "hull"
     if not what:
         return out, what
     parts = [_only(out, set(O) - set(what), key)]
@@ -2785,18 +2860,20 @@ def stand_ins(prep, out, coll, budget):
 
 
 def lod_part(ob, prep, ratio, name, coll, surf, symmetric=False, floor=None, far=None,
-             clamp=False):
+             clamp=False, more=None):
     """A part of a LOD: its prepared mesh collapsed to ratio of its triangles; a piece the
     collapse took under its floor (LOD_FLOOR: a few triangles and so many a square meter
     of its area, never more than it has) collapsed again alone to that floor, so no panel
-    vanishes; UVs and shading normals laid on again from LOD0's surface."""
+    vanishes; a piece in more ({piece: factor}) collapsed again alone to that many times
+    the triangles the common ratio left it; UVs and shading normals laid on again from
+    LOD0's surface."""
     if prep.get("cg_whole"):
         ratio = 1.0
     me = prep.copy()
     out = _collapse(me, ratio, coll, symmetric)
     bpy.data.meshes.remove(me)
     fl = floor
-    if fl is not None and ratio < 0.999 and "cg_piece" in prep.attributes:
+    if (fl is not None or more) and ratio < 0.999 and "cg_piece" in prep.attributes:
         have, got = _piece_tris(prep), _piece_tris(out)
         area = {}
         for p, x in zip(prep.polygons, prep.attributes["cg_piece"].data):
@@ -2807,11 +2884,15 @@ def lod_part(ob, prep, ratio, name, coll, surf, symmetric=False, floor=None, far
                                            prep.attributes["cg_emit"].data) if e.value}
         redo = {}
         for q, n in have.items():
-            want = min(n, int(fl[0] + fl[1] * area[q]))
-            if q == LATHE_PIECE:
-                want = n
-            if q in lit:            # a lamp keeps its shape (a light strip collapsed breaks)
-                want = max(want, min(n, int(fl[2] * n)))
+            want = 0
+            if fl is not None:
+                want = min(n, int(fl[0] + fl[1] * area[q]))
+                if q == LATHE_PIECE:
+                    want = n
+                if q in lit:        # a lamp keeps its shape (a light strip collapsed breaks)
+                    want = max(want, min(n, int(fl[2] * n)))
+            if more and q in more:
+                want = max(want, min(n, int(more[q] * max(got.get(q, 0), 4))))
             if got.get(q, 0) < want:
                 redo[q] = want
         if redo:
@@ -2849,7 +2930,7 @@ def lod_part(ob, prep, ratio, name, coll, surf, symmetric=False, floor=None, far
 
 
 def hold_bounds(parts_final, objs_k, ratio, target, k, coll, prep, surf, floor=None,
-                hb=None):
+                hb=None, more=None):
     """A LOD whose box falls short of LOD0's by more than the check allows (lod_bounds: 2 cm
     or 1.5% of the size; a glass dome's crown collapsed away): the parts that reach LOD0's
     box on that side are collapsed again at twice their ratio, the others a little more to
@@ -2897,7 +2978,8 @@ def hold_bounds(parts_final, objs_k, ratio, target, k, coll, prep, surf, floor=N
         objs_k = [lod_part(o, prep[nm], rat[nm],
                            "LOD%d_%s" % (k, nm), coll, surf[nm],
                            symmetric=(nm in ("body", "glass")), floor=floor,
-                           far=hb if nm == "body" else None, clamp=k >= LOD_WRECK_FROM)
+                           far=hb if nm == "body" else None, clamp=k >= LOD_WRECK_FROM,
+                           more=more if nm == "body" else None)
                   for nm, o in parts_final]
     return objs_k, sum(mesh_tris(o.data) for o in objs_k)
 
@@ -2922,16 +3004,19 @@ def fid_textures(work, slot="body"):
     return np.concatenate(out, 2)
 
 
-def fidelity(ob, surf, tex):
+def fidelity(ob, surf, tex, off=None):
     """How a LOD's exterior draws next to LOD0's, measured where LOD0 lies under each point
     of it (a ray back along the face normal, FID_REACH_M either way): the angle between the
     two shading normals and, through the two UVs, the bake's colors (a torn texture shows
     another island's). Points spread by area, one a FID_SAMPLE_M2 at least. Returns the
     area weighted 95th percentile angle, the share over 25 degrees, the share with a texel
-    off by FID_TEX_ERR, and the share with no LOD0 within reach."""
+    off by FID_TEX_ERR, and the share with no LOD0 within reach. off = (a dict, degrees):
+    the dict is filled with each piece's area whose normal is more than that off LOD0's."""
     me = ob.data
     a = me.attributes.get("cg_class")
     cls = [x.value for x in a.data] if a else [0] * len(me.polygons)
+    pa = me.attributes.get("cg_piece")
+    pcs = [x.value for x in pa.data] if pa else [0] * len(me.polygons)
     uvl = me.uv_layers.active.data if me.uv_layers else None
     cn = [V3(x.vector) for x in me.corner_normals]
     co = [v.co for v in me.vertices]
@@ -2987,6 +3072,9 @@ def fidelity(ob, surf, tex):
                 i1 = min(R - 1, max(0, int(uv0[1] * R))), min(R - 1, max(0, int(uv0[0] * R)))
                 terr = float(abs(tex[i0] - tex[i1]).max())
             rows.append((ang, terr, A / n))
+            if off is not None and ang > off[1]:
+                q = pcs[lt.polygon_index]
+                off[0][q] = off[0].get(q, 0.0) + A / n
     if not rows:
         return None
     rows.sort()
@@ -3091,11 +3179,24 @@ def make_lods(parts_final, budgets, coll, work=None):
                     break
                 bpy.data.meshes.remove(prep[nm])
                 prep[nm] = lod_prep(dict(parts_final)[nm], k, unseen=hid.get(nm), **kw)
-        if k >= LOD_GLASS_WHOLE_FROM and "glass" in prep and "glass" not in coarse and \
-                mesh_tris(prep["glass"]) <= LOD_GLASS_WHOLE * target:
-            # flat panes merged to a few triangles: kept as they are (a pane collapsed
-            # further pulls away from its frame)
-            prep["glass"]["cg_whole"] = True
+        if k >= LOD_GLASS_WHOLE_FROM and "glass" in prep and "glass" not in coarse:
+            if mesh_tris(prep["glass"]) > LOD_GLASS_WHOLE * target:
+                # dense glass (a canopy's subdivided sheet), too much to keep: its grid
+                # halved each way with every kept corner where LOD0 had it, when that fits
+                # (collapsed, a far LOD's dark opaque glass comes out wavy and off its frame)
+                un = lod_prep(dict(parts_final)["glass"], k, glass=True, unsub=True,
+                              unseen=hid.get("glass"))
+                if mesh_tris(un) <= LOD_GLASS_SHARE.get(k, 0.2) * target:
+                    log("  LOD%d: dense glass unsubdivided, %d to %d triangles, kept whole" % (
+                        k, mesh_tris(prep["glass"]), mesh_tris(un)))
+                    bpy.data.meshes.remove(prep["glass"])
+                    prep["glass"] = un
+                else:
+                    bpy.data.meshes.remove(un)
+            elif mesh_tris(prep["glass"]) <= LOD_GLASS_WHOLE * target:
+                # flat panes merged to a few triangles: kept as they are (a pane collapsed
+                # further pulls away from its frame)
+                prep["glass"]["cg_whole"] = True
         base = sum(mesh_tris(m) for m in prep.values())
         fixed = sum(mesh_tris(m) for m in prep.values() if m.get("cg_whole"))
         ratio = min(1.0, max(0.003, target - fixed) / max(base - fixed, 1))
@@ -3106,35 +3207,75 @@ def make_lods(parts_final, budgets, coll, work=None):
                        for p in m.polygons)
             a_, b_, c_ = LOD_FLOOR[k]
             floor = (a_, min(b_, 0.6 * max(0, target - fixed) / max(area, 1e-6)), c_)
-        objs_k = []
-        hb = int(LOD_HULL_SHARE * target) if k >= LOD_WRECK_FROM else None
-        for i in range(10 if k >= LOD_WRECK_FROM else 6):
-            for o in objs_k:
+        hb0 = int(LOD_HULL_SHARE * target) if k >= LOD_WRECK_FROM else None
+
+        def solve(ratio, floor, hb, more):
+            """The LOD's parts at the budget (more: body pieces given more triangles, the
+            rest paying), its box held, and how its body draws next to LOD0's."""
+            objs_k = []
+            for i in range(10 if k >= LOD_WRECK_FROM else 6):
+                for o in objs_k:
+                    me = o.data
+                    bpy.data.objects.remove(o)
+                    bpy.data.meshes.remove(me)
+                objs_k = [lod_part(o, prep[nm], ratio,
+                                   "LOD%d_%s" % (k, nm), coll, surf[nm],
+                                   symmetric=(nm in ("body", "glass")), floor=floor,
+                                   far=hb if nm == "body" else None,
+                                   clamp=k >= LOD_WRECK_FROM,
+                                   more=more if nm == "body" else None)
+                          for nm, o in parts_final]
+                got = sum(mesh_tris(o.data) for o in objs_k)
+                if got <= target * 1.03 or ratio >= 0.999:
+                    break
+                if hb and ratio < 0.03:
+                    hb //= 2            # the hulls too, when the collapse alone cannot pay
+                if floor is not None and ratio < 0.03:
+                    # the floors alone are over the budget: lowered with the rest
+                    s = max(0.3, (target - fixed) / max(1, got - fixed) * 0.95)
+                    floor = (floor[0], floor[1] * s, floor[2] * s)
+                ratio *= max(1, target - fixed) / max(1, got - fixed) * 0.98
+            objs_k, got = hold_bounds(parts_final, objs_k, ratio, target, k, coll, prep, surf,
+                                      floor, hb, more)
+            fid, bent = None, {}
+            if body0 is not None:
+                lim = FID_LIMITS.get(k)
+                fid = fidelity(objs_k[[nm for nm, _ in parts_final].index("body")],
+                               surf["body"], tex, (bent, lim["p95"]) if lim else None)
+            return objs_k, got, ratio, fid, bent
+
+        objs_k, got, ratio1, fid, bent = solve(ratio, floor, hb0, None)
+        # short of the fidelity limits: the pieces that carry most of the area drawn off
+        # LOD0's normals (round bars and springs collapsed to a few sides) are given
+        # LOD_BENT_MORE times their triangles, the rest pay, and the LOD is kept when its
+        # body then draws nearer LOD0; twice at most
+        for _ in range(2):
+            if fid is None or fid_over(fid, k) <= 1.0 or not bent:
+                break
+            tot_bent, acc, more = sum(bent.values()), 0.0, {}
+            for q, a_ in sorted(bent.items(), key=lambda kv: (-kv[1], kv[0])):
+                if q < 0 or acc >= LOD_BENT_SHARE * tot_bent or len(more) >= LOD_BENT_PIECES:
+                    continue
+                more[q] = LOD_BENT_MORE
+                acc += a_
+            if not more:
+                break
+            objs2, got2, ratio2, fid2, bent2 = solve(ratio, floor, hb0, more)
+            better = fid2 is not None and fid_over(fid2, k) < fid_over(fid, k)
+            log("  LOD%d short of its fidelity limits (%.2f of them): %d pieces off LOD0's "
+                "normals given %.1f times their triangles: %.2f, %s" % (
+                    k, fid_over(fid, k), len(more), LOD_BENT_MORE,
+                    fid_over(fid2, k) if fid2 else -1, "kept" if better else "not kept"))
+            drop = objs_k if better else objs2
+            if better:
+                objs_k, got, ratio1, fid, bent = objs2, got2, ratio2, fid2, bent2
+            for o in drop:
                 me = o.data
                 bpy.data.objects.remove(o)
                 bpy.data.meshes.remove(me)
-            objs_k = [lod_part(o, prep[nm], ratio,
-                               "LOD%d_%s" % (k, nm), coll, surf[nm],
-                               symmetric=(nm in ("body", "glass")), floor=floor,
-                               far=hb if nm == "body" else None,
-                               clamp=k >= LOD_WRECK_FROM)
-                      for nm, o in parts_final]
-            got = sum(mesh_tris(o.data) for o in objs_k)
-            if got <= target * 1.03 or ratio >= 0.999:
+            if not better:
                 break
-            if hb and ratio < 0.03:
-                hb //= 2            # the hulls too, when the collapse alone cannot pay
-            if floor is not None and ratio < 0.03:
-                # the floors alone are over the budget: lowered with the rest
-                s = max(0.3, (target - fixed) / max(1, got - fixed) * 0.95)
-                floor = (floor[0], floor[1] * s, floor[2] * s)
-            ratio *= max(1, target - fixed) / max(1, got - fixed) * 0.98
-        objs_k, got = hold_bounds(parts_final, objs_k, ratio, target, k, coll, prep, surf,
-                                  floor, hb)
-        fid = None
-        if body0 is not None:
-            fid = fidelity(objs_k[[nm for nm, _ in parts_final].index("body")], surf["body"],
-                           tex)
+        ratio = ratio1
         for m in prep.values():
             bpy.data.meshes.remove(m)
         log("LOD%d: %d triangles (prepared %d, target %d, ratio %.3f), %.1f s; fidelity %s" % (
@@ -3320,7 +3461,8 @@ def main_build(A):
         for part, ob in objs.items():
             if part != "glass" and part not in twins:
                 culled[part] = cull(ob, glass_tree if part == "body" else None,
-                                    {mi.name for mi in infos.values() if mi.emissive})
+                                    {mi.name for mi in infos.values() if mi.emissive},
+                                    floats=not wheels)
         total = sum(mesh_tris(objs[twins.get(k, k)].data) for k in objs)
         log("low: %d triangles (%s); removed (coincident, hidden) %s; twins %s" % (
             total, ", ".join("%s %d" % (k, mesh_tris(o.data)) for k, o in sorted(objs.items())),

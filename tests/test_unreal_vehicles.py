@@ -149,6 +149,8 @@ def test_read_pack(lib):
     assert wheel["pivot"] == [1.4, 0.8, 0.3] and wheel["steers"]
     assert rec["colors"]["primary"] == [0.4, 0.05, 0.02]
     assert rec["glass"]["opaque_from_lod"] == 2
+    # the glass's box in the car's frame (the importer: an eye inside it is in the cabin)
+    assert rec["glass_box"] == {"min": [-1.0, -0.8, 1.2], "max": [1.0, 0.8, 1.6]}
     # the hulls welded (a box: 8 corners, 12 triangles), in the car's frame (glTF's y up)
     assert [h["name"] for h in rec["hulls"]] == ["UCX_body_00", "UCX_body_01"]
     h = rec["hulls"][0]
