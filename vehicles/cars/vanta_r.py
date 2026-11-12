@@ -36,6 +36,7 @@ LINES = "CHGSUMRFB"
 #        S shoulder crest, U widest line, M cladding line, R rocker, F floor edge, B floor
 ORDER = ["N0", "N1", "A1", "A2", "A3", "W0", "RF", "BP", "SC", "RA", "RB", "T1"]
 PT = {}
+STATIONS = []
 
 
 def stations():
@@ -80,18 +81,24 @@ def stations():
         T["SC"][j] = V3(T["BP"][j]).lerp(V3(T["RA"][j]), 0.12)
     S = K.fill([T[k] for k in ORDER])
     PT.update(K.table(ORDER, LINES, S))
+    STATIONS[:] = S
     return S
 
 
 PMAT = dict(hood="carbon", bumper_f="paint", fender_f="paint", door="paint", quarter="paint",
             deck="carbon", bumper_r="paint", roof="carbon", glass_ws="glass",
-            glass_side="glass", glass_rear="glass", trim="gloss_black", sill="cladding",
+            glass_side="glass", glass_rear="glass", trim="frit", sill="cladding",
             floor="underbody", mouth="void", mouth_frame="cladding",
             lightband="gloss_black", tail="void", tail_frame="cladding", scoop="void",
-            vent="void", well="well")
+            vent="void", well="well", lamp_f="lamp_housing", lens_f="lens_clear",
+            lamp_r="lamp_housing", lens_r="lens_red", cut="void", slit="void")
+GAP = 0.00175                       # 3.5 mm shut lines
+LAMP_F_W, LAMP_F_D = 0.038, 0.055   # the front light channel: width, depth
+LAMP_R_W, LAMP_R_D = 0.030, 0.034
+LAMP = {}                           # the light channels' paths on the skin
 FRONT_C = V3((2.285, 0, 0.285))     # middle of the mouth
 REAR_C = V3((-2.20, 0, 0.56))       # middle of the tail panel
-BAND_W = 0.05
+BAND_W = 0.058                      # the light bands round the mouth and the tail
 MOUTH_D, TAIL_D = 0.235, 0.16
 CAPS = {}
 
@@ -151,21 +158,62 @@ def station_crease(i, j):
     return 0.0
 
 
-def build_hull():
+def band_mid(i, center):
+    """The middle line of the light band round an end of the body (station i), line by
+    line: the band is BAND_W wide all round, square to the lip."""
+    ring = [type("P", (), dict(co=V3(p)))() for p in STATIONS[i]]
+    off = K._even_band(ring, center, BAND_W, True, False)
+    return [V3(p) + o * 0.5 for p, o in zip(STATIONS[i], off)]
+
+
+def cutters():
+    """Everything cut into the hull, laid on it while it stands uncut: the wheel wells, the
+    light channels under their lenses, the handles' and the charge flap's shut lines, the
+    slots over the fenders."""
+    P = PT
     wells = Geo()
     K.well_cutter(wells, FA_X, F_R, F_ARCH, 0.675, ARCH_ANG)
     K.well_cutter(wells, RA_X, R_R, R_ARCH, 0.62, ARCH_ANG)
+    # front: a channel in the band under the nose lip, turning down the outer edge
+    mid = band_mid(0, FRONT_C)
+    front = Geo()
+    LAMP["front"] = K.groove(front, [mid[0].lerp(mid[1], 0.45)] + mid[1:5]
+                             + [mid[4].lerp(mid[5], 0.85)],
+                             width=LAMP_F_W, depth=LAMP_F_D, mirror=True)
+    # rear: one channel across the tail and down both sides
+    mid = band_mid(-1, REAR_C)
+    hp = [mid[4].lerp(mid[5], 0.8)] + mid[4:0:-1]
+    path = hp + [mid[0]] + [my(p) for p in hp[::-1]]
+    rear = Geo()
+    LAMP["rear"] = K.groove(rear, path, width=LAMP_R_W, depth=LAMP_R_D)
+    # shut lines: a flush handle in each door, the charge flap on each quarter
+    cut = Geo()
+    K.groove(cut, K.rounded(-0.44, 0.708, 0.17, 0.026), 'y', closed=True, mirror=True)
+    K.groove(cut, K.ngon(-1.965, 0.60, 0.062, 6), 'y', closed=True, mirror=True)
+    # slots over the wheels
+    slits = Geo()
+    for x0, ya, yb in ((1.56, 0.80, 0.925), (-1.14, 0.845, 0.95)):
+        for k in range(5):
+            x = x0 - k * 0.062
+            K.pocket(slits, [(x + 0.008, ya), (x - 0.012, yb), (x - 0.028, yb), (x - 0.008, ya)],
+                     'z', depth=0.02, mirror=True)
+    return [(wells, "well"), (front, "lamp_f", "skin", "lens_f"),
+            (rear, "lamp_r", "skin", "lens_r"), (cut, "cut", "drop"), (slits, "slit")]
+
+
+def build_hull():
     body = K.build_body(
         stations(), panel_of, PMAT, line_crease, station_crease,
         front=dict(center=FRONT_C, depth=MOUTH_D, band=BAND_W, band_panel="lightband",
-                   band_lines=5, frame="mouth_frame", inner="mouth"),
+                   band_lines=5, frame="mouth_frame", inner="mouth", even=True),
         rear=dict(center=REAR_C, depth=TAIL_D, band=BAND_W, band_panel="lightband",
-                  band_lines=5, frame="tail_frame", inner="tail"),
+                  band_lines=5, frame="tail_frame", inner="tail", even=True),
         recesses=[(3, 0, 0.085, 0.03),      # hood extractor
                   (4, 4, 0.035, 0.03),      # vent behind the front wheel
                   (9, 0, 0.09, 0.025)],     # deck vents
-        glass=[("glass_ws", 0.035), ("glass_side", 0.028), ("glass_rear", 0.04)],
-        cutters=[(wells, "well")], subdiv=SUBDIV)
+        glass=[("glass_ws", 0.035, "trim", "frit"), ("glass_side", 0.028, "trim", "frit"),
+               ("glass_rear", 0.04, "trim", "frit")],
+        cutters=cutters, subdiv=SUBDIV, gap=GAP)
     CAPS["mouth"], CAPS["tail"] = body.caps["front"], body.caps["rear"]
 
 
@@ -174,19 +222,12 @@ def build_hull():
 # ---------------------------------------------------------------------------------------
 def build_details():
     P = PT
-    # ---- front lights: a strip under the nose lip, turning down the outer edge
-    top = [P["N0"]["C"].lerp(P["N0"]["H"], 0.45)] + [P["N0"][n] for n in "HGSU"]
-    top.append(P["N0"]["U"].lerp(P["N0"]["M"], 0.85))
-    path = [band_point(p, FRONT_C, BAND_W * 0.5, 0.0) for p in top]
-    g = Geo()
-    g.sweep(path, [(-0.009, -0.004), (0.009, -0.004), (0.009, 0.006), (-0.009, 0.006)],
-            up=(1, 0, 0))
-    g.obj("led.front", "led_front", mirror=True)
+    build_lamps()
 
     # ---- mouth: struts, honeycomb in the middle, slats in the side ducts, splitter
     xb = FRONT_C.x - MOUTH_D
     g = Geo()
-    a = V3((2.262, 0.40, 0.44))
+    a = V3((2.262, 0.40, 0.392))
     b = V3((2.225, 0.45, 0.125))
     g.sweep([a, b], [(-0.03, -0.21), (0.03, -0.21), (0.022, 0.0), (-0.022, 0.0)], up=(1, 0, 0))
     g.obj("mouth.struts", "paint", bevel=0.004, mirror=True)
@@ -217,14 +258,6 @@ def build_details():
              (1.90, 0.932, 0.095)], (0, 0.014, 0))
     g.obj("splitter", "carbon", bevel=0.003, mirror=True)
 
-    # ---- rear lights: one bar across the tail and down both sides
-    half = [P["T1"]["U"].lerp(P["T1"]["M"], 0.8)] + [P["T1"][n] for n in "USGH"]
-    hp = [band_point(p, REAR_C, BAND_W * 0.5, 0.0) for p in half]
-    path = hp + [band_point(P["T1"]["C"], REAR_C, BAND_W * 0.5, 0.0)] + [my(p) for p in hp[::-1]]
-    g = Geo()
-    g.sweep(path, [(-0.008, -0.006), (0.008, -0.006), (0.008, 0.004), (-0.008, 0.004)],
-            up=(-1, 0, 0))
-    g.obj("led.rear", "led_rear")
     xt = REAR_C.x + TAIL_D
     g = Geo()
     half = [(p.y, p.z) for p in CAPS["tail"]]
@@ -343,6 +376,56 @@ def build_details():
     g.obj("wing.plates", "paint", bevel=0.003, mirror=True)
 
 
+def along(tr, s0=0.0, s1=None, step=0.03):
+    """Frames every step along a traced path between the lengths s0 and s1:
+    [(point, normal, tangent, side)], side = tangent x normal."""
+    P = [q for q, _ in tr]
+    S = [0.0]
+    for a, b in zip(P, P[1:]):
+        S.append(S[-1] + (b - a).length)
+    s1 = S[-1] if s1 is None else min(s1, S[-1])
+    n = max(1, int(round((s1 - s0) / step)))
+    out, i = [], 0
+    for k in range(n + 1):
+        s = s0 + (s1 - s0) * k / n
+        while i < len(S) - 2 and S[i + 1] < s:
+            i += 1
+        t = (s - S[i]) / max(S[i + 1] - S[i], 1e-9)
+        tg = (P[i + 1] - P[i]).normalized()
+        nn = tr[i][1].lerp(tr[i + 1][1], t).normalized()
+        out.append((P[i].lerp(P[i + 1], t), nn, tg, tg.cross(nn).normalized()))
+    return out
+
+
+def build_lamps():
+    """What stands in the light channels, under their lenses."""
+    # front: a light guide along the whole channel, a row of small projectors in cups on
+    # the run under the lip, bright liners on the floor
+    total = K_len(LAMP["front"])
+    fr = along(LAMP["front"], 0.012, total - 0.012, 0.012)
+    L = K.Lamp("lamp.front", lit="led_front")
+    L.guide([q - n * 0.009 - sd * 0.0125 for q, n, _, sd in fr], r=0.0032, sleeve=1.5,
+            up=[n for _, n, _, _ in fr])
+    for q, n, _, sd in along(LAMP["front"], 0.30, 0.30 + 2 * 0.085, 0.085):
+        L.projector(q - n * 0.006 + sd * 0.0055, n, r=0.0115, depth=0.045, seg=20)
+    L.obj(mirror=True)
+    # rear: a red guide round the whole tail behind bright ribs
+    rr = along(LAMP["rear"], 0.012, K_len(LAMP["rear"]) - 0.012, 0.012)
+    L = K.Lamp("lamp.rear", lit="led_rear")
+    ups = [n for _, n, _, _ in rr]
+    L.chrome.sweep([q - n * (LAMP_R_D - 0.003) for q, n, _, _ in rr],
+                   [(-0.010, -0.001), (0.010, -0.001), (0.010, 0.001), (-0.010, 0.001)], up=ups)
+    L.guide([q - n * 0.016 for q, n, _, _ in rr], r=0.004, sleeve=1.6, up=ups)
+    for q, n, tg, sd in along(LAMP["rear"], 0.03, K_len(LAMP["rear"]) - 0.03, 0.032):
+        L.chrome.box(q - n * 0.018, (0.0022, LAMP_R_W - 0.006, 0.022),
+                     rot=Matrix((tg, sd, n)).transposed())
+    L.obj()
+
+
+def K_len(tr):
+    return sum((b[0] - a[0]).length for a, b in zip(tr, tr[1:]))
+
+
 def build_surface_details():
     # roof: a slim light bar and a fin, seated on the roof as built
     zr = on_body(-0.10, 0.0, 'z')[0].z
@@ -379,29 +462,12 @@ def build_surface_details():
     g = Geo()
     text_flat(g, "H A L C Y O N", 0.034, (-2.1412, 0, 0.645), (0, -1, 0), (0, 0, 1), spacing=1.3)
     g.obj("led.name", "led_rear")
-    # door handle slots, charge flap outlines
-    g = Geo()
-    ribbon(g, [(-0.36, 0.705), (-0.52, 0.712)], 'y', 0.02)
-    hexa = [(-1.965 + 0.062 * cos(rad(a)), 0.60 + 0.062 * sin(rad(a))) for a in range(0, 360, 60)]
-    ribbon(g, hexa, 'y', 0.004, closed=True)
-    for x0, ya, yb in ((1.56, 0.80, 0.925), (-1.14, 0.845, 0.95)):
-        for k in range(5):
-            x = x0 - k * 0.062
-            ribbon(g, [(x, ya), (x - 0.02, yb)], 'z', 0.02)
-    g.obj("lines", "void", mirror=True)
-    # wiper: a blade lying on the glass and its arm
-    g = Geo()
-    blade = []
-    for k in range(9):
-        t = k / 8
-        loc, n = on_body(0.945 - 0.085 * t, -0.04 + 0.62 * t, 'z')
-        blade.append(loc + n * 0.014)
-    g.sweep(blade, [(-0.004, -0.008), (0.004, -0.008), (0.004, 0.006), (-0.004, 0.006)],
-            up=(0, 0, 1))
-    piv, _ = on_body(0.975, 0.14, 'z')
-    g.sweep([piv + V3((0, 0, 0.012)), blade[4] + V3((0, 0, 0.012))],
-            [(-0.006, -0.004), (0.006, -0.004), (0.006, 0.004), (-0.006, 0.004)], up=(0, 0, 1))
-    g.obj("wiper", "cladding", bevel=0.0015)
+    # wiper: an arm on a boss at the cowl, its blade lying on the glass
+    g, gb = Geo(), Geo()
+    a, b = on_body(0.945, -0.04, 'z')[0], on_body(0.86, 0.58, 'z')[0]
+    K.wiper(g, gb, on_body(0.985, 0.14, 'z')[0], a, b)
+    g.obj("wiper", "cladding", bevel=0.0012)
+    gb.obj("wiper.blade", "rubber")
     # markers and decals
     g = Geo()
     ribbon(g, [(2.03, 0.425), (1.935, 0.44)], 'y', 0.012)
@@ -479,6 +545,7 @@ def build_interior():
 # views of its own, and the build
 # ---------------------------------------------------------------------------------------
 K.VIEWS.update(
+
     wheel=dict(dir=(0.55, 1.0, 0.12), lens=85, target=(FA_X, 0.9, 0.36), fit=("tire.fl",),
                margin=0.0),
     nose=dict(dir=(1.0, 0.45, 0.10), lens=85, target=(2.1, 0.45, 0.35), dist=2.6),

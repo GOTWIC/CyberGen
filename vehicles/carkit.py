@@ -12,7 +12,7 @@ import shutil
 import subprocess
 import sys
 import time
-from math import atan2, cos, hypot, pi, sin
+from math import asin, atan2, cos, hypot, pi, sin
 from math import radians as rad
 
 import bmesh
@@ -262,6 +262,52 @@ def glass(name="glass", color=(0.30, 0.33, 0.36), ior=1.5, rough=0.0):
     leans or looks at the sky; 1.1 to 1.2 is a coated glass that does not. A dark color is
     a smoked glass. Name it glass... and build_body makes its panels thin glass."""
     return pbr(name, color, 0.0, rough, **{"Transmission Weight": 1.0, "IOR": ior})
+
+
+def lens(name, color=(1.0, 1.0, 1.0), ior=1.49, rough=0.0):
+    """A lamp's lens, MAT[name]: clear or tinted glass that lets light through to what is
+    behind it (a shadow ray passes, tinted), so the reflectors and the housing of a lamp are
+    lit by the studio as the eye expects. Name it lens... and build_body makes its panels
+    thin lenses."""
+    m, b = glass(name, color, ior, rough)
+    nt = m.node_tree
+    out = next(n for n in nt.nodes if n.type == 'OUTPUT_MATERIAL')
+    lp = nt.nodes.new('ShaderNodeLightPath')
+    tr = nt.nodes.new('ShaderNodeBsdfTransparent')
+    tr.inputs["Color"].default_value = (*[0.25 + 0.75 * c for c in color], 1.0)
+    mx = nt.nodes.new('ShaderNodeMixShader')
+    nt.links.new(lp.outputs["Is Shadow Ray"], mx.inputs["Fac"])
+    nt.links.new(b.outputs[0], mx.inputs[1])
+    nt.links.new(tr.outputs[0], mx.inputs[2])
+    nt.links.new(mx.outputs[0], out.inputs["Surface"])
+    return m, b
+
+
+# materials made when first asked for (need(), build_body's pmat, Geo.obj): a car that asks
+# for none of them builds exactly as it did before they were there
+LAZY = dict(
+    lamp_housing=lambda: pbr("lamp_housing", (0.012, 0.012, 0.014), 0.0, 0.32),
+    chrome=lambda: pbr("chrome", (0.86, 0.87, 0.89), 1.0, 0.07),
+    lens_clear=lambda: lens("lens_clear"),
+    lens_smoke=lambda: lens("lens_smoke", (0.40, 0.42, 0.45)),
+    lens_red=lambda: lens("lens_red", (0.85, 0.035, 0.02)),
+    lens_amber=lambda: lens("lens_amber", (0.95, 0.42, 0.03)),
+    optic=lambda: lens("optic", (0.94, 0.96, 1.0), 1.49, 0.28),
+    frit=lambda: pbr("frit", (0.004, 0.004, 0.005), 0.0, 0.05,
+                     **{"Coat Weight": 1.0, "Coat Roughness": 0.02}),
+    mirror=lambda: pbr("mirror", (0.82, 0.84, 0.86), 1.0, 0.015),
+    seal=lambda: pbr("seal", (0.011, 0.011, 0.012), 0.0, 0.62),
+)
+
+
+def need(*names):
+    """MAT[name] for the first name, every name given made if it is one of the kit's
+    later materials (LAZY: lamp_housing, chrome, lens_clear, lens_smoke, lens_red,
+    lens_amber, optic, frit, mirror, seal) and not there yet."""
+    for n in names:
+        if n not in MAT and n in LAZY:
+            LAZY[n]()
+    return MAT[names[0]]
 
 
 def materials(**palette):
@@ -536,7 +582,7 @@ class Geo:
         moves it and rot (an Euler, three angles or a matrix) turns it about its origin; a
         mirror is then about the turned object's own y = 0."""
         me = self.mesh(name, flip_y)
-        me.materials.append(MAT[mat])
+        me.materials.append(need(mat))
         ob = bpy.data.objects.new(name, me)
         (coll or CAR).objects.link(ob)
         if loc is not None:
@@ -596,6 +642,7 @@ def band_point(p, center, w, out=0.0):
 # ---------------------------------------------------------------------------------------
 BODY = []           # the body parts the projector sees
 PIECES = {}         # every body piece built, by name (the checks read it)
+CUTS = []           # the paths of the grooves and pockets laid while a hull stands uncut
 _BVH = [None]
 
 
@@ -651,6 +698,41 @@ class Body:
         self.raw = set()            # the cutters' panels
         self.closed = True          # a closed hull (both caps given, mirrored or wrapped)
         self.gap = 0.0              # the gap its panels were built with
+        self.skin = None            # the uncut hull's tree, when the cutters were a function
+        self.cuts = []              # the paths of its grooves and pockets (the checks)
+
+
+def _even_band(ring, center, band, mirror, wrap):
+    """Offsets (in y, z) that take each point of a cap's ring band inward, square to the
+    ring: a band of one width all round."""
+    q = [(v.co.y, v.co.z) for v in ring]
+    n = len(q)
+
+    def inward(a, b):
+        ex, ey = b[0] - a[0], b[1] - a[1]
+        ln = hypot(ex, ey) or 1.0
+        nx, ny = -ey / ln, ex / ln
+        mx, my_ = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
+        if nx * (center.y - mx) + ny * (center.z - my_) < 0:
+            nx, ny = -nx, -ny
+        return nx, ny
+
+    out = []
+    for i in range(n):
+        if wrap:
+            a, b = q[i - 1], q[(i + 1) % n]
+        else:
+            a = q[i - 1] if i > 0 else ((-q[1][0], q[1][1]) if mirror else None)
+            b = q[i + 1] if i < n - 1 else ((-q[n - 2][0], q[n - 2][1]) if mirror else None)
+        ns = [inward(a, q[i])] if a is not None and a != q[i] else []
+        ns += [inward(q[i], b)] if b is not None and b != q[i] else []
+        if len(ns) == 2:
+            d = max(0.3, 1 + ns[0][0] * ns[1][0] + ns[0][1] * ns[1][1])
+            o = ((ns[0][0] + ns[1][0]) / d, (ns[0][1] + ns[1][1]) / d)
+        else:
+            o = ns[0] if ns else (0.0, 0.0)
+        out.append(V3((0.0, o[0] * band, o[1] * band)))
+    return out
 
 
 def shrink(bm, d):
@@ -676,7 +758,7 @@ def shrink(bm, d):
 def build_body(stations, panel_of, pmat, line_crease=0.0, station_crease=0.0, name="body",
                front=None, rear=None, recesses=(), glass=(), cutters=(), subdiv=3,
                mirror=True, wrap=False, gap=0.0012, thick=0.014, glass_thick=0.006,
-               project=True, bevel=None, bevel_segs=2):
+               project=True, bevel=None, bevel_segs=2, lens_thick=0.003):
     """One body piece: a quad cage of len(stations) x lines points, creased, subdivided,
     cut, split into panels with gaps, each panel given a rim and bevelled edges.
 
@@ -693,15 +775,32 @@ def build_body(stations, panel_of, pmat, line_crease=0.0, station_crease=0.0, na
                     depth=, inner=P, frame=P, band=0.05, band_panel=P, band_lines=N,
                     lip=0.008, reach=0.12) makes a recessed mouth: a band round the lip
                     (band_panel on its first N intervals, frame on the rest), a frame
-                    going in, and the inner face depth behind the center.
+                    going in, and the inner face depth behind the center. The band's
+                    points are drawn toward the center, so it is narrow where the lip
+                    runs past the center (the top of a wide mouth); even=True makes it
+                    band wide all round, measured square to the lip: room for a lamp.
+                    caps[key + ".band"] holds the band's (lip point, inner point) pairs.
     recesses        (i, j, thickness, depth[, inner panel, wall panel]): quad (i, j) inset
                     and sunk on both sides (vents; "vent" by default).
     glass           (panel, inset[, trim panel]): a trim frame round the panel's faces with
-                    sharp corners ("trim" by default).
+                    sharp corners ("trim" by default). (panel, inset, trim, "frame") is the
+                    same frame made on the left half before it is mirrored, so it is the
+                    same on both sides and faces out; (panel, inset, trim, "frit") makes
+                    the band part of the glass instead: no gap between them, the glass's
+                    thickness, for a trim panel in a frit material (a black border printed
+                    on the glass).
     cutters         (Geo, panel) solids cut out of the hull, the cut faces becoming that
                     panel, which is kept as it is (no gap, rim or bevel): wheel wells.
                     (Geo, panel, "drop") drops the cut faces instead: a hole (a window, an
-                    open locker). A cutter on one side only cuts that side.
+                    open locker), or with groove() a shut line. (Geo, panel, "skin", P)
+                    keeps the cut faces as panel (a pocket) and makes the skin the cutter
+                    took away a panel P of its own with the gap all round: a lamp's lens
+                    over its housing (a lens... material makes it a thin lens), a handle or
+                    a flap over its recess. (Geo, P, "cover") makes the skin panel P and
+                    drops the cut faces. A cutter on one side only cuts that side.
+                    A function instead of the list is called once the cage stands, uncut:
+                    on_body() and snap() then see that hull, so groove() and pocket() can
+                    lay cutters on the surface; it returns the list.
     mirror, wrap    mirror=False builds the cage as given; wrap=True joins the last line
                     to the first (a tube about the x axis).
     project         whether on_body(), ribbon() and text_on_body() see this piece.
@@ -766,9 +865,14 @@ def build_body(stations, panel_of, pmat, line_crease=0.0, station_crease=0.0, na
         band_panel = spec.get("band_panel", frame)
         band_lines = spec.get("band_lines", k)
         r1, r2 = [], []
-        for v in ring:
+        even = _even_band(ring, center, band, mirror, wrap) if spec.get("even") else None
+        for iv, v in enumerate(ring):
             L = hypot(center.y - v.co.y, center.z - v.co.z)
-            r1.append(bm.verts.new(band_point(v.co, center, band, sgn * lip)))
+            if even is not None:
+                r1.append(bm.verts.new(v.co + even[iv] + V3((sgn * lip, 0, 0))))
+            else:
+                r1.append(bm.verts.new(band_point(v.co, center, band, sgn * lip)))
+            res.caps.setdefault(key + ".band", []).append((v.co.copy(), r1[-1].co.copy()))
             p = band_point(v.co, center, min(spec.get("reach", 0.12), L * 0.6), 0.0)
             p.x = center.x + sgn * spec["depth"]
             r2.append(bm.verts.new(p))
@@ -786,6 +890,34 @@ def build_body(stations, panel_of, pmat, line_crease=0.0, station_crease=0.0, na
 
     cap(VV[0], front, -1, "front")
     cap(VV[-1], rear, 1, "rear")
+
+    group = {}                                          # frit: panels shrunk as one
+    for gl in glass:
+        if len(gl) <= 3:
+            continue
+        pn, t, trim = gl[:3]
+        if gl[3] not in ("frame", "frit"):
+            raise ValueError("build_body(%s): glass mode %r" % (name, gl[3]))
+        fs = [f for f in bm.faces if f.material_index == pidx(pn)]
+        r = bmesh.ops.inset_region(bm, faces=fs, thickness=t, depth=0.0,
+                                   use_even_offset=True, use_boundary=not mirror)
+        rim = set(r["faces"])
+        for f in rim:
+            f.material_index = pidx(trim)
+        loop = {e for f in fs for e in f.edges if any(g in rim for g in e.link_faces)}
+        for e in loop:
+            e[cr] = 1.0
+        for v in {v for e in loop for v in e.verts}:
+            es = [e for e in v.link_edges if e in loop]
+            if len(es) == 2:
+                d1 = (es[0].other_vert(v).co - v.co).normalized()
+                d2 = (es[1].other_vert(v).co - v.co).normalized()
+                if d1.angle(d2) < rad(150):
+                    v[vc] = 1.0
+        if gl[3] == "frit":
+            both = sorted(set(group.get(pn, (pn,))) | set(group.get(trim, (trim,))))
+            for q in both:
+                group[q] = both
 
     if mirror:
         bmesh.ops.mirror(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], axis='Y',
@@ -810,6 +942,8 @@ def build_body(stations, panel_of, pmat, line_crease=0.0, station_crease=0.0, na
             for f in fs:
                 f.material_index = pidx(inner)
     for gl in glass:
+        if len(gl) > 3:
+            continue
         pn, t = gl[:2]
         trim = gl[2] if len(gl) > 2 else "trim"
         fs = [f for f in bm.faces if f.material_index == pidx(pn)]
@@ -828,13 +962,6 @@ def build_body(stations, panel_of, pmat, line_crease=0.0, station_crease=0.0, na
                 d2 = (es[1].other_vert(v).co - v.co).normalized()
                 if d1.angle(d2) < rad(150):
                     v[vc] = 1.0
-    raw, dropped = set(), set()
-    for ct in cutters:
-        pidx(ct[1])
-        raw.add(ct[1])
-        if len(ct) > 2 and ct[2] == "drop":
-            dropped.add(ct[1])
-    res.raw = raw
     res.closed = bool(front is not None and rear is not None and (mirror or wrap))
     res.gap = gap
     PIECES[name] = res
@@ -842,17 +969,40 @@ def build_body(stations, panel_of, pmat, line_crease=0.0, station_crease=0.0, na
     me = bpy.data.meshes.new(name + ".hull")
     bm.to_mesh(me)
     bm.free()
-    pm, back = {}, {}
-    for pn in panels:
-        pm[pn] = bpy.data.materials.new("P_" + pn)
-        back[pm[pn].name] = pn
-        me.materials.append(pm[pn])
     hull = bpy.data.objects.new(name + ".hull", me)
     CAR.objects.link(hull)
     md = hull.modifiers.new("subd", 'SUBSURF')
     md.levels = subdiv
     md.render_levels = subdiv
     md.subdivision_type = 'CATMULL_CLARK'
+    if callable(cutters):
+        # the cage stands, uncut: the car lays its cutters on it
+        res.skin = body_bvh([hull])
+        del CUTS[:]
+        cutters = list(cutters() or ())
+        res.cuts = list(CUTS)
+        del CUTS[:]
+        _BVH[0] = None
+    raw, dropped, skins = set(), set(), {}
+    for ct in cutters:
+        mode = ct[2] if len(ct) > 2 else None
+        if mode not in (None, "drop", "skin", "cover"):
+            raise ValueError("build_body(%s): cutter mode %r" % (name, mode))
+        pidx(ct[1])
+        if mode == "cover":
+            dropped.add(ct[1])
+            continue
+        raw.add(ct[1])
+        if mode == "drop":
+            dropped.add(ct[1])
+        elif mode == "skin":
+            pidx(ct[3])
+    res.raw = raw
+    pm, back = {}, {}
+    for pn in panels:
+        pm[pn] = bpy.data.materials.new("P_" + pn)
+        back[pm[pn].name] = pn
+        me.materials.append(pm[pn])
     cuts = []
     for k, ct in enumerate(cutters):
         g, pn = ct[0], ct[1]
@@ -861,6 +1011,25 @@ def build_body(stations, panel_of, pmat, line_crease=0.0, station_crease=0.0, na
         cut = bpy.data.objects.new("cut", cme)
         CAR.objects.link(cut)
         cuts.append(cut)
+        mode = ct[2] if len(ct) > 2 else None
+        if mode in ("skin", "cover"):
+            # the skin this cutter takes away: the hull inside it, less the cutter's faces
+            tmp = bpy.data.objects.new("skin", me)
+            CAR.objects.link(tmp)
+            sd = tmp.modifiers.new("subd", 'SUBSURF')
+            sd.levels = sd.render_levels = subdiv
+            sd.subdivision_type = 'CATMULL_CLARK'
+            bo = tmp.modifiers.new("skin", 'BOOLEAN')
+            bo.operation = 'INTERSECT'
+            bo.object = cut
+            bo.solver = 'EXACT'
+            try:
+                bo.material_mode = 'TRANSFER'
+            except Exception:
+                pass
+            sm = evaluated_mesh(tmp)
+            bpy.data.objects.remove(tmp)
+            skins.setdefault(ct[3] if mode == "skin" else pn, []).append((sm, pm[pn].name))
         md = hull.modifiers.new("cut%d" % k, 'BOOLEAN')
         md.operation = 'DIFFERENCE'
         md.object = cut
@@ -877,23 +1046,51 @@ def build_body(stations, panel_of, pmat, line_crease=0.0, station_crease=0.0, na
         bpy.data.meshes.remove(old)
 
     # split into panels
+    jobs = []
     for idx, pn in enumerate(names):
         pb = bmesh.new()
         pb.from_mesh(out)
-        dele = [f for f in pb.faces if f.material_index != idx]
-        if len(dele) == len(pb.faces) or pn in dropped:
+        grp = [names.index(q) for q in group.get(pn, (pn,)) if q in names]
+        dele = [f for f in pb.faces if f.material_index not in grp]
+        if not any(f.material_index == idx for f in pb.faces) or pn in dropped:
             pb.free()
             continue
         bmesh.ops.delete(pb, geom=dele, context='FACES')
+        if pn not in raw and gap:
+            shrink(pb, gap)
+        if len(grp) > 1:
+            bmesh.ops.delete(pb, geom=[f for f in pb.faces if f.material_index != idx],
+                             context='FACES')
+        jobs.append((pn, pb))
+    for pn, lst in skins.items():
+        pb = bmesh.new()
+        for sm, cutmat in lst:
+            tb = bmesh.new()
+            tb.from_mesh(sm)
+            ci = {i for i, mt in enumerate(sm.materials) if mt is not None and mt.name == cutmat}
+            bmesh.ops.delete(tb, geom=[f for f in tb.faces if f.material_index in ci],
+                             context='FACES')
+            tme = bpy.data.meshes.new("skin")
+            tb.to_mesh(tme)
+            tb.free()
+            pb.from_mesh(tme)
+            bpy.data.meshes.remove(tme)
+            bpy.data.meshes.remove(sm)
+        if not pb.faces:
+            log("build_body(%s): the cutter of %r takes no skin away" % (name, pn))
+            pb.free()
+            continue
+        if gap:
+            shrink(pb, gap)
+        jobs.append((pn, pb))
+    for pn, pb in jobs:
         for f in pb.faces:
             f.material_index = 0
         mat = pmat[pn]
-        if pn not in raw and gap:
-            shrink(pb, gap)
         pme = bpy.data.meshes.new(name + "." + pn)
         pb.to_mesh(pme)
         pb.free()
-        pme.materials.append(MAT[mat])
+        pme.materials.append(need(mat))
         ob = bpy.data.objects.new(name + "." + pn, pme)
         CAR.objects.link(ob)
         res.parts[pn] = ob
@@ -903,8 +1100,8 @@ def build_body(stations, panel_of, pmat, line_crease=0.0, station_crease=0.0, na
             BODY.append(ob)
         md = ob.modifiers.new("solid", 'SOLIDIFY')
         md.offset = -1.0
-        if mat.startswith("glass"):
-            md.thickness = glass_thick
+        if mat.startswith(("glass", "lens", "frit")):
+            md.thickness = lens_thick if mat.startswith("lens") else glass_thick
             pme.shade_smooth()
             continue
         md.thickness = thick
@@ -995,6 +1192,8 @@ def _tree(objs):
         if _BVH[0] is None:
             body_bvh()
         return _BVH[0]
+    if isinstance(objs, BVHTree):
+        return objs
     objs = [objs] if isinstance(objs, bpy.types.Object) else list(objs)
     key = tuple(ob.name for ob in objs)
     if key not in _TREES:
@@ -1286,6 +1485,342 @@ def stud(g, loc, n, prof, seg):
     """A lathe profile standing on the surface point loc along its normal n."""
     xf = Matrix.Translation(loc) @ V3((0, 1, 0)).rotation_difference(n).to_matrix().to_4x4()
     g.lathe(prof, seg, xf=xf)
+
+
+# ---------------------------------------------------------------------------------------
+# cut lines, pockets and lamps
+# ---------------------------------------------------------------------------------------
+def rounded(cx, cy, w, h, r=None, n=5):
+    """A rounded rectangle as 2D points, counterclockwise: w by h about (cx, cy), corners
+    of radius r (half the shorter side by default: a slot) in n steps."""
+    r = min(w, h) / 2 if r is None else min(r, w / 2, h / 2)
+    out = []
+    for sx, sy, a0 in ((1, -1, -90), (1, 1, 0), (-1, 1, 90), (-1, -1, 180)):
+        ox, oy = cx + sx * (w / 2 - r), cy + sy * (h / 2 - r)
+        for k in range(n + 1):
+            a = rad(a0 + 90.0 * k / n)
+            q = (ox + r * cos(a), oy + r * sin(a))
+            if not out or hypot(q[0] - out[-1][0], q[1] - out[-1][1]) > 1e-6:
+                out.append(q)
+    if hypot(out[0][0] - out[-1][0], out[0][1] - out[-1][1]) < 1e-6:
+        out.pop()
+    return out
+
+
+def ngon(cx, cy, r, n, rot=0.0):
+    """A regular polygon as 2D points, counterclockwise, its first corner at rot degrees."""
+    return [(cx + r * cos(rad(rot) + 2 * pi * k / n), cy + r * sin(rad(rot) + 2 * pi * k / n))
+            for k in range(n)]
+
+
+def trace(pts, proj=None, closed=False, step=0.008, objs=None, out=None, smooth=3):
+    """A path laid on the surface, [(point, normal)]: pts in projection with proj (as
+    on_body), else 3D points near the surface, snapped onto it; a point every step and at
+    every corner. Points that miss the surface are left out. smooth: rounds of averaging
+    each normal with its neighbors along the path (a path beside a crease finds normals of
+    both sides of it, and what is swept along it would twist)."""
+    P = [V3((q[0], q[1], q[2] if len(q) > 2 else 0.0)) for q in pts]
+    if closed:
+        P = P + [P[0]]
+    sam = []
+    for a, b in zip(P, P[1:]):
+        n = max(1, int((b - a).length / step + 0.999))
+        sam += [a.lerp(b, k / n) for k in range(n)]
+    if not closed:
+        sam.append(P[-1])
+    res = []
+    for q in sam:
+        loc, nn = on_body(q.x, q.y, proj, objs) if proj else snap(q, objs, out)
+        if loc is not None and (not res or (loc - res[-1][0]).length > 1e-5):
+            res.append((loc, nn))
+    if closed and len(res) > 2 and (res[0][0] - res[-1][0]).length < 1e-5:
+        res.pop()
+    m = len(res)
+    for _ in range(smooth if m > 2 else 0):
+        N = [n for _, n in res]
+        for i in range(m):
+            a = N[i - 1] if (closed or i > 0) else N[i]
+            b = N[(i + 1) % m] if (closed or i < m - 1) else N[i]
+            res[i] = (res[i][0], (a + 2 * N[i] + b).normalized())
+    return res
+
+
+def _both(P, mirror):
+    return [(1, P)] + ([(-1, [V3((p.x, -p.y, p.z)) for p in P])] if mirror else [])
+
+
+def groove(g, pts, proj=None, width=0.0006, depth=0.006, proud=0.006, closed=False,
+           step=0.008, mirror=False, objs=None, out=None, up=None):
+    """A cut line's cutter in g: a thin blade through the skin along a path (as trace()),
+    for build_body's cutters function. Passed as (g, panel, "drop") the panels it cuts get
+    the body's gap on both sides of it, so the line is width + 2 gap wide, a shut line like
+    any other: a hood's or a hatch's edge, the split between two doors; closed for an
+    outline (a flap, a flush handle). Wider and deeper, as (g, housing, "skin", lens), it is
+    a light channel under a lens: width and depth may then be functions of the share of
+    the path run (0 to 1), and up the one way out of the channel where it should not be
+    the skin's normal (a channel cut level into a nose that leans). mirror: the right side
+    too. Returns the path [(point, way out)]."""
+    tr = trace(pts, proj, closed, step, objs, out)
+    if len(tr) < (3 if closed else 2):
+        log("groove(): the path misses the body")
+        return tr
+    P = [q for q, _ in tr]
+    N = [n for _, n in tr] if up is None else [V3(up).normalized()] * len(P)
+    wf = width if callable(width) else (lambda t: width)
+    df = depth if callable(depth) else (lambda t: depth)
+    while True:
+        # the sections; one that folds back over the one before it (the inside of a turn
+        # tighter than the channel is wide or deep) is left out, the straighter of the two
+        m = len(P)
+        S = [0.0]
+        for a, b in zip(P, P[1:] + (P[:1] if closed else [])):
+            S.append(S[-1] + (b - a).length)
+        ring, E, T, turn = [], [[], []], [], []
+        for i in range(m):
+            tp = (P[i] - P[i - 1]).normalized() if (closed or i > 0) else None
+            tn = (P[(i + 1) % m] - P[i]).normalized() if (closed or i < m - 1) else None
+            tp, tn = tp or tn, tn or tp
+            t = (tp + tn).normalized()
+            sd = t.cross(N[i]).normalized()
+            upv = sd.cross(t).normalized()
+            k = 1.0 / max(0.35, ((1 + tp.dot(tn)) / 2) ** 0.5)
+            f = S[i] / S[-1]
+            a = sd * (wf(f) / 2 * k)
+            ring += [P[i] - a - upv * df(f), P[i] + a - upv * df(f), P[i] + a + upv * proud,
+                     P[i] - a + upv * proud]
+            E[0].append(P[i] + a)
+            E[1].append(P[i] - a)
+            T.append(t)
+            turn.append(1 - tp.dot(tn))
+        bad = None
+        for i in range(m if closed else m - 1):
+            i2 = (i + 1) % m
+            tt = (P[i2] - P[i]).normalized()
+            if any((ring[4 * i2 + j] - ring[4 * i + j]).dot(tt) <= 1e-5 for j in range(4)):
+                cand = [c for c in (i, i2) if closed or 0 < c < m - 1]
+                if cand:
+                    bad = min(cand, key=lambda c: turn[c])
+                    break
+        if bad is None or m <= (4 if closed else 3):
+            break
+        P.pop(bad)
+        N.pop(bad)
+    faces = []
+    for i in range(m if closed else m - 1):
+        i2 = (i + 1) % m
+        faces += [(4 * i + j, 4 * i + (j + 1) % 4, 4 * i2 + (j + 1) % 4, 4 * i2 + j)
+                  for j in range(4)]
+    if not closed:
+        faces += [(0, 1, 2, 3), tuple(4 * (m - 1) + j for j in range(4))]
+    wide = max(wf(0.0), wf(0.5), wf(1.0)) >= 0.004
+    for sgn, Q in _both(ring, mirror):
+        g.add(Q, faces)
+        for e in (E if wide else [P]):
+            q = [V3((v.x, sgn * v.y, v.z)) for v in e]
+            CUTS.append(q + ([q[0]] if closed else []))
+    return list(zip(P, N))
+
+
+class Pocket:
+    """What pocket() returns: where a pocket was cut (its left one when mirrored), for
+    building what stands in it. P, N: its outline on the skin; d: the way in; b: the
+    floor's normal (pointing in); c, n: the skin's point and normal at its middle."""
+
+    def __init__(self, P, N, d, b, c0, proj, tree):
+        self.P, self.N, self.d, self.b, self._c0 = P, N, d, b, c0
+        self.proj, self.tree = proj, tree
+        mid = sum(P, V3()) / len(P)
+        hit = tree.ray_cast(mid - d * 0.5, d)
+        self.c = hit[0] if hit[0] is not None else mid
+        self.n = (hit[1] if hit[0] is not None else -d).copy()
+        if self.n.dot(d) > 0:
+            self.n = -self.n
+
+    def on(self, a, b=None, back=0.0):
+        """The skin's point at (a, b) of the pocket's projection (or under the 3D point a,
+        seen along the way in), moved back along the way in. None off the skin."""
+        if b is not None and self.proj:
+            loc = on_body(a, b, self.proj, self.tree)[0]
+        else:
+            loc = self.tree.ray_cast(V3(a) - self.d * 0.5, self.d)[0]
+        return None if loc is None else loc + self.d * back
+
+    def at(self, a, b=None, lift=0.0):
+        """The floor's point behind on(a, b), lift off it toward the outside."""
+        q = self.on(a, b)
+        if q is None:
+            return None
+        return q + self.d * ((self._c0 - q.dot(self.b)) / self.d.dot(self.b) - lift)
+
+    def deep(self, a, b=None):
+        """How deep the pocket is behind on(a, b)."""
+        q = self.on(a, b)
+        return None if q is None else (self.at(a, b) - q).length
+
+
+def pocket(g, pts, proj=None, depth=0.05, proud=0.006, dir=None, back=None, step=0.01,
+           mirror=False, objs=None, out=None):
+    """A pocket's cutter in g, for build_body's cutters function: the outline pts (as
+    trace(), closed) pushed straight in along dir (the skin's own way in at the outline by
+    default) to a flat floor at least depth behind every point of the outline (back: the
+    floor's normal when it should not be dir, such as a lamp's back standing upright in a
+    leaning nose). Passed as (g, housing, "skin", lens) it is a lamp's housing under its
+    lens, or a recess under a handle; as (g, panel) a plain recess; as (g, panel, "drop")
+    a hole. mirror: the right side too. Returns a Pocket (None when the outline misses)."""
+    tr = trace(pts, proj, True, step, objs, out)
+    if len(tr) < 3:
+        log("pocket(): the outline misses the body")
+        return None
+    P, N = [q for q, _ in tr], [n for _, n in tr]
+    d = V3(dir).normalized() if dir is not None else -sum(N, V3()).normalized()
+    b = V3(back).normalized() if back is not None else d
+    if b.dot(d) < 0:
+        b = -b
+    tree = _tree(objs)
+    # the lid: a flat cap in front of everything of the skin inside the outline
+    mid = sum(P, V3()) / len(P)
+    front = min(q.dot(d) for q in P)
+    for q in [mid] + [mid.lerp(q, 0.5) for q in P[::max(1, len(P) // 12)]]:
+        hit = tree.ray_cast(q - d * 0.5, d)[0]
+        if hit is not None and (hit - q).length < 0.3:
+            front = min(front, hit.dot(d))
+    c0 = max((q + d * depth).dot(b) for q in P)
+    top = [q + d * (front - proud - q.dot(d)) for q in P]
+    bot = [q + d * ((c0 - q.dot(b)) / d.dot(b)) for q in P]
+    n = len(P)
+    faces = [tuple(range(n)), tuple(range(n, 2 * n))]
+    faces += [(i, (i + 1) % n, n + (i + 1) % n, n + i) for i in range(n)]
+    for sgn, Q in _both(top + bot, mirror):
+        g.add(Q, faces)
+    for sgn, Q in _both(P, mirror):
+        CUTS.append(Q + [Q[0]])
+    return Pocket(P, N, d, b, c0, proj, tree)
+
+
+class Lamp:
+    """The inside of a lamp, gathered by material and made into objects by obj():
+    <name>.housing (dark plastic), .chrome (reflectors, bezels), .glass (clear lenses),
+    .optic (frosted light guides) and .lit (the emitters, in the lit material: led_front,
+    led_rear, led_accent, ... ; a call's own lit= puts its emitter in another one, such as
+    an amber turn signal beside a white lamp). The Geos are open to a car's own parts:
+    lamp.housing.box(...), lamp.chrome.prism(...), lamp.emit("led_rear").box(...)."""
+
+    def __init__(self, name, lit="led_front", housing="lamp_housing", chrome="chrome",
+                 glass="lens_clear", optic="optic"):
+        self.name, self.lit = name, lit
+        self.mats = dict(housing=housing, chrome=chrome, glass=glass, optic=optic)
+        self.housing, self.chrome, self.glass, self.optic = Geo(), Geo(), Geo(), Geo()
+        self.lits = {}
+
+    def emit(self, lit=None):
+        return self.lits.setdefault(lit or self.lit, Geo())
+
+    def projector(self, at, dir, r=0.032, depth=0.055, lit=None, seg=24):
+        """A projector module shining along dir, its bezel's front at at: a bright bezel,
+        a dark barrel, a clear convex lens and the emitter behind it."""
+        kw = dict(axis=dir, at=at)
+        self.chrome.lathe([(0.0, r), (0.0, r * 1.22), (-0.004, r * 1.28), (-0.016, r * 1.28),
+                           (-0.016, r)], seg, **kw)
+        self.housing.lathe([(-0.016, r), (-0.016, r * 1.05), (-depth, r * 0.66),
+                            (-depth, r * 0.6)], seg, **kw)
+        self.housing.lathe([(-depth, 0.0006), (-depth, r * 0.66), (-depth - 0.003, r * 0.66),
+                            (-depth - 0.003, 0.0006)], seg, **kw)
+        a, h = r * 0.97, r * 0.5
+        rs = (a * a + h * h) / (2 * h)
+        tm = asin(min(1.0, a / rs))
+        dome = [(-0.006 + h - rs * (1 - cos(tm * k / 8)), max(0.0006, rs * sin(tm * k / 8)))
+                for k in range(9)]
+        self.glass.lathe([(-0.014, 0.0006), (-0.014, a)] + dome[::-1], seg, **kw)
+        e0 = -depth * 0.78
+        self.emit(lit).lathe([(e0, 0.0006), (e0, r * 0.5), (e0 + 0.003, r * 0.5),
+                              (e0 + 0.003, 0.0006)], max(8, seg // 2), **kw)
+
+    def reflector(self, at, dir, r=0.04, depth=0.03, lit=None, seg=10, led=None):
+        """A faceted reflector bowl opening along dir, its rim at at, an emitter in its
+        base."""
+        kw = dict(axis=dir, at=at)
+        r0 = led or r * 0.2
+        inner = []
+        for k in range(7):
+            q = r0 + (r - r0) * k / 6
+            inner.append((-depth * (1 - (q / r) ** 2), q))
+        self.chrome.lathe(inner + [(0.0, r * 1.07), (-depth - 0.003, r0 * 1.2),
+                                   (-depth - 0.003, r0 * 0.5), (inner[0][0], r0 * 0.5)],
+                          seg, **kw)
+        e0 = inner[0][0] - 0.001
+        self.emit(lit).lathe([(e0, 0.0005), (e0, r0), (e0 + 0.006, r0 * 0.85),
+                              (e0 + 0.006, 0.0005)], max(8, seg), **kw)
+
+    def leds(self, a, b, n, dir, r=0.008, lit=None, seg=8):
+        """n small emitters in cups, spread from a to b, shining along dir."""
+        a, b = V3(a), V3(b)
+        for k in range(n):
+            self.reflector(a.lerp(b, (k + 0.5) / n), dir, r, r * 0.8, lit, seg)
+
+    def guide(self, path, r=0.0045, sleeve=1.7, lit=None, closed=False, up=(0, 0, 1), n=8):
+        """A light guide along a path: a lit core in a frosted sleeve sleeve times as thick
+        (0: the bare core)."""
+        self.emit(lit).pipe(path, r, n, closed, up)
+        if sleeve:
+            self.optic.pipe(path, r * sleeve, max(n, 10), closed, up)
+
+    def bar(self, path, w, h, up=(0, 0, 1), lit=None, closed=False):
+        """A lit bar along a path: w across (square to up), h along up."""
+        self.emit(lit).sweep(path, [(-w / 2, -h / 2), (w / 2, -h / 2), (w / 2, h / 2),
+                                    (-w / 2, h / 2)], up=up, closed=closed)
+
+    def fins(self, a, b, c, d, n, w, th, tilt, out, which="housing", **kw):
+        """n blades from the a-b edge to the d-c edge (Geo.louvers) in the housing's
+        material, or the chrome's: the inner structure behind a tail lamp's lens."""
+        getattr(self, which).louvers(a, b, c, d, n, w, th, tilt, out, **kw)
+
+    def obj(self, mirror=False, coll=None):
+        """The objects, {part: object}."""
+        res = {}
+        for key, bev, sharp in (("housing", 0.0012, None), ("chrome", 0.0, 35.0),
+                                ("glass", 0.0, 40.0), ("optic", 0.0, 40.0)):
+            g = getattr(self, key)
+            if g.v:
+                res[key] = g.obj("%s.%s" % (self.name, key), self.mats[key], bevel=bev,
+                                 mirror=mirror, sharp=sharp, coll=coll)
+        many = len(self.lits) > 1
+        for lit, g in self.lits.items():
+            if g.v:
+                nm = "%s.lit" % self.name + ("." + lit if many else "")
+                res["lit." + lit] = g.obj(nm, lit, mirror=mirror, coll=coll)
+        return res
+
+
+def wiper(arm, blade, pivot, a, b, objs=None, out=None, boss=0.016):
+    """A wiper at rest on the glass: a boss on the surface at pivot, a tapered arm from it
+    to the blade's middle, a yoke, the blade's spine and its rubber lying on the glass from
+    a to b (3D points near the surface, snapped onto it as built). arm and blade are the
+    Geos of the metal and of the rubber."""
+    tr = trace([a, b], None, False, 0.03, objs, out)
+    pv, pn = snap(pivot, objs, out)
+    if len(tr) < 2 or pv is None:
+        log("wiper(): off the glass")
+        return
+    P, N = [q for q, _ in tr], [n for _, n in tr]
+    xf = Matrix.Translation(pv) @ V3((0, 1, 0)).rotation_difference(pn).to_matrix().to_4x4()
+    arm.lathe([(-0.002, 0.001), (-0.002, boss), (0.010, boss), (0.016, boss * 0.6),
+               (0.016, 0.001)], 16, xf=xf)
+    k = len(P) // 2
+    mid, mn = P[k] + N[k] * 0.022, N[k]
+    top = pv + pn * 0.014
+    t = (mid - top).normalized()
+    sd0, sd1 = pn.cross(t).normalized(), mn.cross(t).normalized()
+    arm.hexa([top + sd0 * 0.008, top - sd0 * 0.008, mid - sd1 * 0.0045, mid + sd1 * 0.0045,
+              top + sd0 * 0.008 + pn * 0.006, top - sd0 * 0.008 + pn * 0.006,
+              mid - sd1 * 0.0045 + mn * 0.004, mid + sd1 * 0.0045 + mn * 0.004])
+    along = (P[-1] - P[0]).normalized()
+    arm.box(P[k] + mn * 0.016, (0.05, 0.012, 0.012),
+            rot=Matrix((along, mn.cross(along).normalized(), mn)).transposed())
+    arm.sweep([q + n * 0.0115 for q, n in tr],
+              [(-0.005, -0.002), (0.005, -0.002), (0.0035, 0.003), (-0.0035, 0.003)], up=N)
+    blade.sweep([q + n * 0.005 for q, n in tr],
+                [(-0.0022, -0.0048), (0.0022, -0.0048), (0.003, 0.0046), (-0.003, 0.0046)],
+                up=N)
 
 
 _FONT = [None]
