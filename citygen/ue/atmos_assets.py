@@ -35,8 +35,8 @@ import unreal
 
 JOB = json.load(open(os.environ["CITYGEN_UE_JOB"], encoding="utf-8"))
 FOLDER = "/Game/CityGen/Core/Atmos"
-VERSION = "5"   # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air);
-                # 3 (AT2): M_CgBeacon and M_CgBeam; 4, 5 (AT3): M_CgSky
+VERSION = "7"   # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air);
+                # 3 (AT2): M_CgBeacon and M_CgBeam; 4 to 7 (AT3): M_CgSky
 EAL = unreal.EditorAssetLibrary
 AT = unreal.AssetToolsHelpers.get_asset_tools()
 MEL = unreal.MaterialEditingLibrary
@@ -376,14 +376,17 @@ if (DeckCm > 0.0 && d.z > 0.003 && CamPos.z < DeckCm) {
     sc = sc * 2.03 + float2(17.3, 5.1);
   }
   nsum /= 0.95;
-  float cov = smoothstep(1.0 - Cover - 0.13, 1.0 - Cover + 0.13, nsum);
+  float cov = smoothstep(1.0 - Cover - 0.2, 1.0 - Cover + 0.2, nsum);
+  // (the deck's own texture: thicker and thinner, so a closed deck is not one flat sheet)
+  float tex = saturate(0.35 + 1.3 * (nsum - 0.5) + 0.4 * cov);
   float dens = cov * saturate(1.0 - t / 4.0e6);
   float2 uv = (CamPos.xy + d.xy * t - GlowLo.xy) / max(GlowHi.xy - GlowLo.xy, 1.0);
   float3 gl = Texture2DSampleLevel(Glow, GlowSampler, saturate(uv), 0).rgb;
   float inside = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
   gl = gl * gl * GlowMax * GlowScale * inside;
   float thin = 1.0 - cov;
-  float3 cl = LightIllum * (CloudLit * (0.55 + 0.9 * thin)) + SkyLum * 0.45 + gl * (0.6 + 0.4 * cov);
+  float3 cl = (LightIllum * CloudLit * (0.5 + 0.9 * thin) + SkyLum * 0.45) * (0.55 + 0.7 * tex)
+    + gl * (0.25 + 0.75 * tex);
   float haze = 1.0 - exp(-t / 1.4e6);
   cl = lerp(cl, SkyLum + gl * 0.3, haze * 0.85);
   col = lerp(col, cl, dens);
@@ -391,7 +394,7 @@ if (DeckCm > 0.0 && d.z > 0.003 && CamPos.z < DeckCm) {
 return col;
 """
 
-SKY_SCALARS = (("DeckCm", 42000.0), ("Cover", 0.8), ("Stars", 0.0), ("StarLum", 0.15),
+SKY_SCALARS = (("DeckCm", 42000.0), ("Cover", 0.8), ("Stars", 0.0), ("StarLum", 0.6),
                ("MoonLum", 0.5), ("MoonRad", 0.0046), ("MoonVis", 0.0), ("SunDiskOn", 1.0),
                ("GlowMax", 1.0), ("GlowScale", 0.0), ("CloudLit", 0.03), ("Wind", 2.0))
 SKY_VECTORS = (("SunDir", (0.0, 0.0, 1.0, 0.0)), ("MoonDir", (0.0, 0.5, 0.5, 0.0)),

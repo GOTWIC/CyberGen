@@ -2434,7 +2434,7 @@ AT3 (sky and time) is in place:
   onto the cloud deck's underside by a Lambertian footprint, CLOUD_ALBEDO E / pi times the
   look's `cloud_glow`; `BUILD/atmos/sky_glow.png` (square-root encoded linear RGB, row 0 the
   north) and the plan's `sky.glow` (bounds, `max_nits`, peak, mean); Delta's core glows at
-  1.9 cd/m2, 0.36 over the city. `atmosgen lux` adds `preview_sky.png`.
+  0.6 cd/m2, 0.12 over the city. `atmosgen lux` adds `preview_sky.png`.
 - **Exporter and runtime** (`docs/unreal_export.md`, "From AT3"): the controller's sky
   settings (`unreal_atmos.sky_settings`) and the glow as a texture per city
   (`Atmos/T_<City>_SkyGlow`), `ATMOS_VERSION` atmos3; `ACityGenAtmos::ApplyTime` drives the

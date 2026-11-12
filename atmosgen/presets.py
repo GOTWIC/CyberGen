@@ -122,10 +122,10 @@ MOON_DEG = 0.53                   # its disk's angular diameter
 # Lambertian emitter's footprint at its height,
 #   E(r) = Phi h^2 / (pi (h^2 + r^2)^2),
 # and its underside shows CLOUD_ALBEDO E / pi (cd/m2, a rain deck's dark base), times the
-# look's cloud_glow. Delta's core then glows at about 1.9 cd/m2, a heavily lit city's overcast
-# sky (some 12 mag/arcsec2), 0.36 on average over the city.
+# look's cloud_glow. Delta's core then glows at about 0.6 cd/m2, a brightly lit city's overcast
+# sky (some 13 mag/arcsec2), 0.12 on average over the city.
 GROUND_REFLECT = 0.12
-ESCAPE = (0.12, 0.2)
+ESCAPE = (0.04, 0.07)
 CLOUD_ALBEDO = 0.45
 GLOW_CELL_M = 64.0
 GLOW_REACH = 3.0                  # the footprint summed out to this times the deck's height

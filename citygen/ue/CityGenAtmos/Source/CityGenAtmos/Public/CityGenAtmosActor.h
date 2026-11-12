@@ -310,7 +310,7 @@ public:
 	float GlowGain = 1.f;
 
 	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
-	float CloudLit = 0.03f;
+	float CloudLit = 0.1f;
 
 	/** The named hours: the play features' day and night, and dusk (the sun just set). */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Time")

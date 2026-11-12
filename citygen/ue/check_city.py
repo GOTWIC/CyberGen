@@ -872,6 +872,12 @@ def play_views(world, a, slug, prefix):
     except Exception:           # noqa: BLE001 (a plugin without the property)
         pass
     for v in views:
+        # (AT3: a view named `*_clear` with the cloud deck opened to a few clouds, for the
+        # moon and the stars; the plan's cover again after it)
+        clear = v["name"].endswith("_clear")
+        if clear:
+            cover = (atmos_status(world) or {}).get("cover", 0.8)
+            unreal.SystemLibrary.execute_console_command(world, "CityGenAtmos.Cover 0.2")
         eye, tg = ue(*v["eye"]), ue(*v["target"])
         cam.set_actor_location(eye, False, True)
         pc.set_control_rotation(unreal.MathLibrary.find_look_at_rotation(eye, tg))
@@ -884,6 +890,8 @@ def play_views(world, a, slug, prefix):
         yield from wait(4.0)
         yield from ui_shot(world, v["name"], "HighResShot 1920x1080", 180)
         at = atmos_status(world)
+        if clear:
+            unreal.SystemLibrary.execute_console_command(world, f"CityGenAtmos.Cover {cover:g}")
         log(f"play view {v['name']}" + (f": atmos {at['live']} live ({at['live_kinds']}), "
                                          f"{at['shadowed']} shadowed, {at.get('high', 0)} high"
                                          if at else ""))
