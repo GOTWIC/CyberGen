@@ -229,6 +229,19 @@ def test_sky_and_time_passes():
     assert "CityGenAtmos.Sky 1" in B.ATMOS_OFF
 
 
+def test_others_summary_names_who_took_the_foreground():
+    """AT3: the samples say which processes took the game's foreground and how often it was
+    taken back; the summary adds them up."""
+    s = [{"t": 0.0, "cores": 0.0, "top": [], "unthrottle": {"above_normal": True}},
+         {"t": 30.0, "in_front": True, "lost_to": ["Overwolf.exe"], "retaken": 1,
+          "cores": 0.5, "top": [["Overwolf", 0.3]]},
+         {"t": 60.0, "in_front": False, "lost_to": ["Overwolf.exe", ""], "retaken": 0,
+          "cores": 0.2, "top": [["claude", 0.1]]}]
+    o = B.others_summary(s)
+    assert o["front"] == 0.5 and o["retaken"] == 1
+    assert o["lost_to"] == {"Overwolf.exe": 2, "(none)": 1}
+
+
 def test_atmos_assets_version():
     from citygen import unreal_atmos as UA
     assert UA.assets_version().isdigit()

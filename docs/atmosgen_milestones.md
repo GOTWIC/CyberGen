@@ -13,7 +13,7 @@ grows here as it lands, as in [`citygen_milestones.md`](citygen_milestones.md) a
 | AT0 | Contract and spike: the atmos spec and presets, the plan schema, the emitter asks of assetgen, the `CityGenAtmos` plugin's skeleton built by the exporter; a spike on Delta at night against AG16's benchmark (lights per tile from a plan against the play features' 192, MegaLights against the tiers, rain, wet streets and volumetric fog, effects from code); a Blender night preview | Done | [`docs/progress/AT0`](progress/AT0) |
 | AT1 | Streets at night: street and wall lights by photometric class, mast arms and corner poles at the junctions, highway, service road, pedestrian street and alley lights, deck soffits, tunnels and stations, shop spill; the lux check with occlusion and its map, a fill at the dark points; the controller and a data actor per 128 m cell placed by the import with the pooled live set, replacing the play features' lamps and washes | Done | [`docs/progress/AT1`](progress/AT1) |
 | AT2 | Neon and signs as light: billboards, banners and holo-boards as lit faces stood off their walls (a faces check), neon spill from neon bands and shop signs, crown floods in AG15's LED accents and uplights, blinking aviation lights, sweeping searchlights, port high masts and crane floods, spaceport apron and pad lights, flicker and dying signs by danger, district palettes and grit; the high tier, beacons and beams in the runtime | Done | [`docs/progress/AT2`](progress/AT2) |
-| AT3 | Sky and time: night, dusk and day skies, the cloud deck, the moon, time of day driving `Hour`, the schedules and the exposure | Planned | |
+| AT3 | Sky and time: the sun and the moon by latitude, day and phase; the exposure held per hour (night -3 EV100, the day's, dusk between), Night, the sun's light, the sky light and the stars by the sun's elevation; street lights set by the sun; the cloud deck lit from below by the plan's upward light (a glow raster per city); in Unreal a sky dome (sky atmosphere, sun disk, stars, the moon's phase, the deck lit by the sun, the moon and the city), one light as the sun then the moon, and the play features' time-of-day slider replacing their night switch | Done | [`docs/progress/AT3`](progress/AT3) |
 | AT4 | Air: height and volumetric fog, mist, smog and undercity haze, light shafts, steam and smoke | Planned | |
 | AT5 | Weather: rain and its shadow, wetness, puddles, drips, splashes, rings, wind, states and transitions | Planned | |
 | AT6 | Looks and art direction: post and grading per look and district, `atmosgen review`, the skill | Planned | |
@@ -61,6 +61,60 @@ recommendations: [`docs/progress/AT0/README.md`](progress/AT0/README.md).
 - **Tests:** `tests/atmosgen/test_at_plan.py`; `tests/test_bench.py` (the spike's job,
   `busy`), `tests/test_unreal_play.py` (both plugins installed), `tests/test_no_network.py`
   (atmosgen too).
+
+## AT3: sky and time
+
+Built on the Windows PC (2026-11-12), on main after AT2 (#203). Report, measurements and images:
+[`docs/progress/AT3/README.md`](progress/AT3/README.md).
+
+- **The sun and the moon** (`atmosgen/sky.py`): the sun's elevation and azimuth by the hour from
+  the city's latitude and the sun's declination on the day of the year (Cooper's approximation,
+  solar time: the sun culminates at 12); the moon trails it by its phase (`lag_h` 24 times the
+  phase, its declination the sun's mirrored by the phase, its light by its lit fraction). Spec
+  `sky` (`SkySpec`): latitude (default 35), day of the year (172), moon phase (0.62, a waning
+  gibbous up in the east-southeast by 23:00), the day hour (16), and the look's moon, stars and
+  cloud deck overridden; `presets.SKY`, each look's `moon`, `stars`, `cloud_deck_m`,
+  `cloud_cover`, `cloud_glow`.
+- **Curves over the sun's elevation** (`presets.SUN_CURVE`, the same keys in the plan, the
+  runtime and the Blender preview): the exposure from the night's held -3 EV100 (the play
+  features' night, in Unreal's frame) to the day's (`DAY_EV100` 1.6, less `OVERCAST_EV` times a
+  closed deck's cover: neon rain's day 0.8), `Night` (1 under -12 degrees, 0.42 at sunset, 0
+  over +10), the sun's light (on to -8 degrees: it lights the twilight sky from under the
+  horizon), the sky light and the stars. The plan's lights keep the night's scale,
+  $2^{-3 - EV_{ref}}$, at every hour, so at dusk they read dimmer under the brighter exposure.
+- **The named hours**: day (16:00), dusk (where the sun stands at -3 degrees in the evening:
+  19:28 at 35 north on day 172), night (the look's hour when it is night, else 23); a row per
+  hour in the plan (`sky.by_hour`).
+- **Schedules the sun sets** (`sky.schedules`): `dusk_dawn` on from the sun at +3 degrees to -3
+  (the street lights), `tunnel` 0.6 by day; the lux check and the plan read the plan's own
+  schedules.
+- **The sky glow** (`sky.glow`): every light's upward flux (a spot's cone above the horizontal,
+  half a point's or a vertical face's, `ESCAPE` 0.04 of it leaving the street canyons, and
+  `GROUND_REFLECT` 0.12 of the rest bounced with 0.07 leaving) on a 64 m raster, convolved with a
+  Lambertian emitter's footprint at the deck's height, $E(r) = \Phi h^2 / (\pi (h^2 + r^2)^2)$,
+  shown as `CLOUD_ALBEDO` 0.45 $E / \pi$ times the look's `cloud_glow`; `sky_glow.png` (linear RGB,
+  square-root encoded, row 0 the north) and the plan's `sky.glow`. Delta: 13.8 Mlm up, the deck
+  0.62 cd/m2 over the core, 0.12 over the city. `atmosgen lux` writes `preview_sky.png`.
+- **Exporter** (`docs/unreal_export.md`, "From AT3"): `unreal_atmos.sky_settings` into the
+  controller's record and hash, the glow beside the manifest and imported as
+  `Atmos/T_<City>_SkyGlow`; `ATMOS_VERSION` atmos3.
+- **Runtime** (`ACityGenAtmos::ApplyTime`, `EnsureDome`, `FindLighting`): the importer's
+  `lighting.sun` as the sun, then the moon (faded in from the sun at -12 degrees to -16), the
+  sky light, the exposure held by the controller's volume (no adaptation pumping), MPC_CityGen's
+  `Night` and `Hour`, every light's schedule interpolated between the hours, `TimeSpeed`; the sky
+  dome `M_CgSky` (atmos assets version 7): the sky atmosphere and the sun's disk, stars, the moon
+  with its phase, maria and halo, the cloud deck met along the view ray at its height, lit by the
+  atmosphere's light at the deck and from below by the glow texture, fading into the haze. Console
+  `CityGenAtmos.Hour day|dusk|night`, `.Sky`, `.Exposure`, `.TimeSpeed`, `.Cover`.
+- **Play features**: day and night are the controller's hours (`SetNamedHour`), the Tab menu's
+  time row a slider (`SetTimeOfDay`, `ClickMenuRow("hour=H")`); their own night switch only
+  without a controller.
+- **Benchmark and check**: passes `dusk_plan(_all)`, `day_plan(_all)`, `night_plan_nosky`;
+  `bench.busy` counts a game or a screen recorder (`GAMES`: javaw, ow-obs, obs); the check
+  reads the sky by night, dusk and day and renders `dusk_*`, `t<HHMM>_*` and `*_clear` views.
+- **Blender**: `atmosgen preview --hour H` at a twilight hour renders a dusk sky
+  (`ag6_preview.dusk_world`), the windows at the plan's Night, the lights dimmed by the
+  exposure's step.
 
 ## AT2: neon and signs as light
 

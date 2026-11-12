@@ -58,6 +58,7 @@ namespace
 	const TCHAR* SkyMaterialPath = TEXT("/Game/CityGen/Core/Atmos/M_CgSky.M_CgSky");
 	const TCHAR* DomeMesh = TEXT("/Engine/BasicShapes/Sphere.Sphere");
 	constexpr float DomeScale = 100000.f;
+	constexpr double DomeRecenterCm = 2000000.0; // (20 km: the dome is 50 km round)
 	const FName SunKey(TEXT("cg.key=lighting.sun"));
 	const FName SkyKey(TEXT("cg.key=lighting.sky"));
 	constexpr double TimeEvery = 1.0 / 15.0; // s between moving the sun while the hour runs
@@ -1086,7 +1087,10 @@ void ACityGenAtmos::Tick(float DeltaSeconds)
 			PushParameters();
 		}
 	}
-	if (Dome)
+	// (the dome stays where it is, round the city: its material meets the deck along the view
+	// ray from the camera's own position, so only a camera DomeRecenterCm from its middle moves
+	// it: no render state sent for it frame after frame)
+	if (Dome && FVector::Dist(Dome->GetComponentLocation(), View) > DomeRecenterCm)
 	{
 		Dome->SetWorldLocation(View);
 	}
@@ -1301,7 +1305,10 @@ void ACityGenAtmos::EnsureDome()
 	Dome->bVisibleInRayTracing = false;
 	Dome->SetMobility(EComponentMobility::Movable);
 	Dome->SetWorldScale3D(FVector(DomeScale));
-	Dome->SetWorldLocation(ViewLocation());
+	// (round the glow's middle, the city's, else the view)
+	Dome->SetWorldLocation(GlowBounds.Num() >= 4
+		? FVector(0.5 * (GlowBounds[0] + GlowBounds[2]), 0.5 * (GlowBounds[1] + GlowBounds[3]), 0.0)
+		: ViewLocation());
 	Dome->RegisterComponent();
 }
 

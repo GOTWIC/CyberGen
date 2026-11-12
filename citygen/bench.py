@@ -494,6 +494,12 @@ def unthrottle(pid: int) -> dict:
 
 def in_front(pid: int) -> bool | None:
     """Windows: whether the foreground window belongs to `pid`."""
+    own = front_owner()
+    return None if own is None else own[0] == pid
+
+
+def front_owner() -> tuple[int, str] | None:
+    """Windows: the process owning the foreground window, (pid, name), (0, "") with none."""
     if os.name != "nt":
         return None
     import ctypes
@@ -501,10 +507,64 @@ def in_front(pid: int) -> bool | None:
     u = ctypes.windll.user32
     w = u.GetForegroundWindow()
     if not w:
-        return False
+        return 0, ""
     owner = wintypes.DWORD()
     u.GetWindowThreadProcessId(w, ctypes.byref(owner))
-    return owner.value == pid
+    name = ""
+    k = ctypes.windll.kernel32
+    h = k.OpenProcess(0x1000, False, owner.value)        # QUERY_LIMITED_INFORMATION
+    if h:
+        try:
+            buf = ctypes.create_unicode_buffer(1024)
+            size = wintypes.DWORD(1024)
+            if k.QueryFullProcessImageNameW(h, 0, buf, ctypes.byref(size)):
+                name = os.path.basename(buf.value)
+        finally:
+            k.CloseHandle(h)
+    return owner.value, name
+
+
+# AT3: a game window that lost the foreground (nobody at the desktop: a notification, another
+# app's window) is given it back, checked every FRONT_EVERY seconds: the input of the
+# foreground window's thread joined for a moment, so Windows lets this process set it
+# (SetForegroundWindow alone is refused to a background process); no keys are sent
+FRONT_EVERY = 2.0
+
+
+def take_front(pid: int) -> bool:
+    """Windows: the foreground to `pid`'s main visible window; whether it holds it now."""
+    if os.name != "nt":
+        return False
+    import ctypes
+    from ctypes import wintypes
+    u = ctypes.windll.user32
+    k = ctypes.windll.kernel32
+    found = []
+    proto = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+
+    def each(hwnd, _):
+        owner = wintypes.DWORD()
+        u.GetWindowThreadProcessId(hwnd, ctypes.byref(owner))
+        if owner.value == pid and u.IsWindowVisible(hwnd) and not u.GetWindow(hwnd, 4):
+            found.append(hwnd)                       # (visible, unowned: GW_OWNER 4)
+        return True
+
+    u.EnumWindows(proto(each), 0)
+    if not found:
+        return False
+    hwnd = found[0]
+    fg = u.GetForegroundWindow()
+    fg_thread = u.GetWindowThreadProcessId(fg, None) if fg else 0
+    me = k.GetCurrentThreadId()
+    joined = bool(fg_thread and fg_thread != me and u.AttachThreadInput(me, fg_thread, True))
+    try:
+        u.ShowWindow(hwnd, 5)                        # SW_SHOW
+        u.BringWindowToTop(hwnd)
+        u.SetForegroundWindow(hwnd)
+    finally:
+        if joined:
+            u.AttachThreadInput(me, fg_thread, False)
+    return in_front(pid) is True
 
 
 def others_summary(samples: list[dict]) -> dict | None:
@@ -519,8 +579,15 @@ def others_summary(samples: list[dict]) -> dict | None:
         for n, c in x["top"]:
             tot[n] = tot.get(n, 0.0) + c / len(samples)
     fr = [x["in_front"] for x in samples if x.get("in_front") is not None]
+    # (AT3: who took the foreground, and how often it was taken back)
+    lost: dict[str, int] = {}
+    for x in samples:
+        for n in x.get("lost_to", []):
+            lost[n or "(none)"] = lost.get(n or "(none)", 0) + 1
     return {"samples": len(samples),
             "front": round(sum(fr) / len(fr), 2) if fr else None, "unthrottle": un,
+            "lost_to": dict(sorted(lost.items(), key=lambda kv: (-kv[1], kv[0]))),
+            "retaken": sum(x.get("retaken", 0) for x in samples),
             "cores_mean": round(statistics.fmean(x["cores"] for x in samples), 2),
             "cores_max": round(max(x["cores"] for x in samples), 2),
             "top": [[n, round(c, 2)] for n, c in
@@ -555,19 +622,35 @@ def run_game(root: Path, uproject: Path, level: str, job_path: Path, log: Path,
         t0 = time.time()
         watch = samples is not None and os.name == "nt"
         prev, tl = (cpu_times(), t0) if watch else ({}, t0)
+        # (AT3: the foreground watched every FRONT_EVERY s, taken back when lost; the
+        # processes it was lost to and the times it was taken back go in the next sample)
+        lost_to, retaken, front_at = [], 0, t0
         while True:
             left = timeout - (time.time() - t0)
+            step = min(left, FRONT_EVERY if watch else left)
             try:
-                return proc.wait(timeout=max(0.1, min(left, SAMPLE_S) if watch else left))
+                return proc.wait(timeout=max(0.1, step))
             except subprocess.TimeoutExpired:
                 if time.time() - t0 >= timeout:
                     proc.kill()
                     proc.wait()
                     raise
+                if not watch:
+                    continue
+                own = front_owner()
+                # (a game still loading has no window: nothing to take back yet)
+                if own is not None and own[0] != proc.pid and time.time() - t0 > 20.0:
+                    lost_to.append(own[1])
+                    retaken += 1 if take_front(proc.pid) else 0
+                if time.time() - front_at < SAMPLE_S:
+                    continue
+                front_at = time.time()
                 cur, now = cpu_times(), time.time()
                 samples.append({"t": round(now - t0, 1), "in_front": in_front(proc.pid),
+                                "lost_to": sorted(set(lost_to)), "retaken": retaken,
                                 **others(prev, cur, now - tl, {proc.pid, os.getpid()})})
                 prev, tl = cur, now
+                lost_to, retaken = [], 0
 
 
 def bench(build_dir: str | Path, uproject: str | Path, engine: str | None = None,
