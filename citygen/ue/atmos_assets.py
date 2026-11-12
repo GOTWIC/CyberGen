@@ -35,8 +35,8 @@ import unreal
 
 JOB = json.load(open(os.environ["CITYGEN_UE_JOB"], encoding="utf-8"))
 FOLDER = "/Game/CityGen/Core/Atmos"
-VERSION = "7"   # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air);
-                # 3 (AT2): M_CgBeacon and M_CgBeam; 4 to 7 (AT3): M_CgSky
+VERSION = "8"   # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air);
+                # 3 (AT2): M_CgBeacon and M_CgBeam; 4 to 8 (AT3): M_CgSky
 EAL = unreal.EditorAssetLibrary
 AT = unreal.AssetToolsHelpers.get_asset_tools()
 MEL = unreal.MaterialEditingLibrary
@@ -320,7 +320,45 @@ SKY = """
 float3 d = normalize(-CV);
 float3 col = SkyLum + SunDisk * SunDiskOn;
 float above = saturate(d.z * 12.0 + 0.05);
-// stars
+// the cloud deck (worked out first: the stars only where it leaves the sky open)
+float dens = 0.0;
+float3 cl = 0.0;
+if (DeckCm > 0.0 && d.z > 0.003 && CamPos.z < DeckCm) {
+  float t = (DeckCm - CamPos.z) / d.z;
+  float2 p = (CamPos.xy + d.xy * t) * 0.01;
+  float2 w = p + float2(1.0, 0.35) * Time * Wind;
+  float nsum = 0.0;
+  float amp = 0.55;
+  float2 sc = w / 1600.0;
+  for (int k = 0; k < 4; k++) {
+    float2 i0 = floor(sc);
+    float2 f0 = frac(sc);
+    f0 = f0 * f0 * (3.0 - 2.0 * f0);
+    float a0 = frac(sin(dot(i0, float2(127.1, 311.7))) * 43758.5453);
+    float b0 = frac(sin(dot(i0 + float2(1, 0), float2(127.1, 311.7))) * 43758.5453);
+    float c0 = frac(sin(dot(i0 + float2(0, 1), float2(127.1, 311.7))) * 43758.5453);
+    float e0 = frac(sin(dot(i0 + float2(1, 1), float2(127.1, 311.7))) * 43758.5453);
+    nsum += amp * lerp(lerp(a0, b0, f0.x), lerp(c0, e0, f0.x), f0.y);
+    amp *= 0.5;
+    sc = sc * 2.03 + float2(17.3, 5.1);
+  }
+  nsum /= 0.92;
+  float cov = smoothstep(1.0 - Cover - 0.2, 1.0 - Cover + 0.2, nsum);
+  // (the deck's own texture: thicker and thinner, so a closed deck is not one flat sheet)
+  float tex = saturate(0.35 + 1.3 * (nsum - 0.5) + 0.4 * cov);
+  dens = cov * saturate(1.0 - t / 4.0e6);
+  float2 uv = (CamPos.xy + d.xy * t - GlowLo.xy) / max(GlowHi.xy - GlowLo.xy, 1.0);
+  float3 gl = Texture2DSampleLevel(Glow, GlowSampler, saturate(uv), 0).rgb;
+  float inside = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
+  gl = gl * gl * GlowMax * GlowScale * inside;
+  float thin = 1.0 - cov;
+  cl = (LightIllum * CloudLit * (0.5 + 0.9 * thin) + SkyLum * 0.45) * (0.55 + 0.7 * tex)
+    + gl * (0.25 + 0.75 * tex);
+  float haze = 1.0 - exp(-t / 1.4e6);
+  cl = lerp(cl, SkyLum + gl * 0.3, haze * 0.85);
+}
+// stars (none where the deck is closed or none show)
+if (Stars > 0.0 && dens < 0.98) {
 float3 sd = d * 620.0;
 float3 cell = floor(sd);
 float hs = frac(sin(dot(cell, float3(12.9898, 78.233, 37.719))) * 43758.5453);
@@ -329,11 +367,12 @@ float dist = length(sd - (cell + 0.25 + 0.5 * off));
 float star = hs > 1.0 - 0.012 * Stars ? saturate(1.0 - dist * 3.0) : 0.0;
 float tw = 0.7 + 0.3 * sin(Time * (1.5 + 5.0 * hs) + hs * 91.0);
 col += star * star * tw * StarLum * (0.3 + 2.5 * pow(frac(hs * 977.0), 4.0)) * above;
+}
 // the moon
 float3 m = normalize(MoonDir);
 float md = dot(d, m);
 float rad = MoonRad;
-if (MoonVis > 0.0) {
+if (MoonVis > 0.0 && md > 0.85) {           // (its disk and halo: within 32 degrees of it)
   float3 u = normalize(cross(m, float3(0.0, 0.0, 1.0)) + float3(1e-5, 0.0, 0.0));
   float3 v = cross(u, m);
   float2 q = float2(dot(d, u), dot(d, v)) / sin(rad);
@@ -355,42 +394,7 @@ if (MoonVis > 0.0) {
   float ang = acos(clamp(md, -1.0, 1.0));
   col += MoonTint * MoonLum * MoonVis * above * 0.004 * exp(-ang * 14.0);
 }
-// the cloud deck
-if (DeckCm > 0.0 && d.z > 0.003 && CamPos.z < DeckCm) {
-  float t = (DeckCm - CamPos.z) / d.z;
-  float2 p = (CamPos.xy + d.xy * t) * 0.01;
-  float2 w = p + float2(1.0, 0.35) * Time * Wind;
-  float nsum = 0.0;
-  float amp = 0.55;
-  float2 sc = w / 1600.0;
-  for (int k = 0; k < 5; k++) {
-    float2 i0 = floor(sc);
-    float2 f0 = frac(sc);
-    f0 = f0 * f0 * (3.0 - 2.0 * f0);
-    float a0 = frac(sin(dot(i0, float2(127.1, 311.7))) * 43758.5453);
-    float b0 = frac(sin(dot(i0 + float2(1, 0), float2(127.1, 311.7))) * 43758.5453);
-    float c0 = frac(sin(dot(i0 + float2(0, 1), float2(127.1, 311.7))) * 43758.5453);
-    float e0 = frac(sin(dot(i0 + float2(1, 1), float2(127.1, 311.7))) * 43758.5453);
-    nsum += amp * lerp(lerp(a0, b0, f0.x), lerp(c0, e0, f0.x), f0.y);
-    amp *= 0.5;
-    sc = sc * 2.03 + float2(17.3, 5.1);
-  }
-  nsum /= 0.95;
-  float cov = smoothstep(1.0 - Cover - 0.2, 1.0 - Cover + 0.2, nsum);
-  // (the deck's own texture: thicker and thinner, so a closed deck is not one flat sheet)
-  float tex = saturate(0.35 + 1.3 * (nsum - 0.5) + 0.4 * cov);
-  float dens = cov * saturate(1.0 - t / 4.0e6);
-  float2 uv = (CamPos.xy + d.xy * t - GlowLo.xy) / max(GlowHi.xy - GlowLo.xy, 1.0);
-  float3 gl = Texture2DSampleLevel(Glow, GlowSampler, saturate(uv), 0).rgb;
-  float inside = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
-  gl = gl * gl * GlowMax * GlowScale * inside;
-  float thin = 1.0 - cov;
-  float3 cl = (LightIllum * CloudLit * (0.5 + 0.9 * thin) + SkyLum * 0.45) * (0.55 + 0.7 * tex)
-    + gl * (0.25 + 0.75 * tex);
-  float haze = 1.0 - exp(-t / 1.4e6);
-  cl = lerp(cl, SkyLum + gl * 0.3, haze * 0.85);
-  col = lerp(col, cl, dens);
-}
+col = lerp(col, cl, dens);
 return col;
 """
 
