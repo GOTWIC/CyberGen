@@ -8,7 +8,13 @@
 // and holds the air and weather effects AT0 prototyped (height and volumetric fog, rain cards,
 // a wet decal). AT2 to AT5 grow each part; the play features (CityGenPlay) keep input, map,
 // menu and free camera, and their light pools as the far tier past the live range (the
-// console variable CityGen.PlayLamps). Frames: Unreal cm, X east, Y south.
+// console variable CityGen.PlayLamps). AT2 (neon and signs as light): a high tier of its own
+// (crown floods, uplights, searchlights, high masts: the nearest MaxHigh within HighRangeM,
+// never taking the street's place in the mid set), blinking aviation lights and sweeping
+// searchlights (each animated from the world's time), and the stand-ins for their fixtures
+// until stage 2 draws them: a red beacon per aviation light (an instanced glow per cell,
+// blinking with its light in M_CgBeacon) and a beam per searchlight (a cone in M_CgBeam,
+// additive, fading along it), shown by night. Frames: Unreal cm, X east, Y south.
 
 #pragma once
 
@@ -22,6 +28,8 @@ class APostProcessVolume;
 class UDecalComponent;
 class UInstancedStaticMeshComponent;
 class ULocalLightComponent;
+class UStaticMeshComponent;
+class UPrimitiveComponent;
 class UMaterialInterface;
 class UMaterialParameterCollection;
 
@@ -44,7 +52,12 @@ struct FCityGenAtmosLight
 	bool bNearOnly = false;
 	bool bOn = true;
 	bool bNoSpecular = false;               // a lit face's stand-in: no highlight
+	bool bHigh = false;                     // AT2: the high tier (its own pool)
+	uint8 Anim = 0;                         // AT2: 0 none, 1 blink, 2 sweep
 	float Flicker = 0.f;
+	float AnimPeriod = 0.f;                 // s
+	float AnimAmount = 0.f;                 // a blink's on share, a sweep's swing (deg)
+	float AnimPhase = 0.f;                  // 0 to 1
 	uint32 Seed = 0;
 };
 
@@ -125,6 +138,26 @@ public:
 	UPROPERTY(EditAnywhere, Category = "CityGen|Lights")
 	float NearRangeM = 60.f;
 
+	/** AT2: the high tier (crown floods, uplights, searchlights, high masts), a pool of its
+	 *  own: at most this many live ... */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Lights")
+	int32 MaxHigh = 48;
+
+	/** ... within this distance (m): World Partition's loading range keeps its cells in. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Lights")
+	float HighRangeM = 750.f;
+
+	/** AT2: the aviation beacons' and searchlight beams' glow (art direction). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Lights")
+	float BeaconGlow = 1.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Lights")
+	float BeamGlow = 1.f;
+
+	/** AT2: draw the beacons and beams (the fixtures' stand-ins). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Lights")
+	bool bFixtures = true;
+
 	/** The exposure the scene is shown at (EV100): the play features hold the night at -3. The
 	 *  plan's lights are set for its own night exposure; each is scaled by 2^(this - that). */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Lights")
@@ -201,6 +234,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "CityGen")
 	void SetTiers(int32 Live, float RangeM, int32 Shadowed);
 
+	/** AT2: the high tier: live count, range (m). */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	void SetHigh(int32 InHigh, float RangeM);
+
+	/** AT2: the beacons and beams on or off. */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	void SetFixtures(bool bOn);
+
 	/** The state as one JSON line (the check and the benchmark read it). */
 	UFUNCTION(BlueprintPure, Category = "CityGen")
 	FString GetStatus() const;
@@ -215,12 +256,17 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 
 private:
-	/** A registered cell: its actor, its 128 m key and its lights. */
+	/** A registered cell: its actor, its 128 m key and its lights; AT2: its high tier's
+	 *  lights, its beacons (one instanced component) and its beams (a component each, by
+	 *  their light's index). */
 	struct FSlot
 	{
 		TWeakObjectPtr<ACityGenAtmosCell> Actor;
 		FIntPoint Key = FIntPoint::ZeroValue;
 		TArray<FCityGenAtmosLight> Lights;
+		TArray<int32> High;
+		TWeakObjectPtr<UInstancedStaticMeshComponent> Beacons;
+		TArray<TPair<int32, TWeakObjectPtr<UStaticMeshComponent>>> Beams;
 		bool bUsed = false;
 	};
 
@@ -230,6 +276,13 @@ private:
 	FIntPoint CellOf(const FVector& P) const;
 	void UpdateLive();
 	void UpdateFlicker(double Now);
+	void UpdateBeams(double T);
+	void MakeFixtures(int32 Slot);
+	void DropFixtures(int32 Slot);
+	void ShowFixtures(bool bOn);
+	FRotator AnimRot(const FCityGenAtmosLight& L, double T) const;
+	float AnimGain(const FCityGenAtmosLight& L, double T) const;
+	double WorldTime() const;
 	void ApplyLight(ULocalLightComponent* C, const FCityGenAtmosLight& L, float Fade, bool bShadowed);
 	ULocalLightComponent* Take(uint8 Shape);
 	void Release(int64 Key);
@@ -263,7 +316,18 @@ private:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<ULocalLightComponent>> AllLights;
 	TSet<int64> Shadowed;
-	TArray<int64> Flickering;
+	TArray<int64> Flickering;               // (AT2: and the blinking and sweeping)
+	int32 LiveHigh = 0;
+	int32 CandidatesHigh = 0;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UPrimitiveComponent>> Fixtures;   // (beacons and beams, kept from GC)
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> BeaconMaterial;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> BeamMaterial;
+	bool bFixturesShown = false;
+	int32 BeaconCount = 0;
+	int32 BeamCount = 0;
 	double LiveAt = -1.0;
 	double UpdateMs = 0.0;
 	double UpdateMsMax = 0.0;

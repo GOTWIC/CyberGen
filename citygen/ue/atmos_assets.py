@@ -10,6 +10,11 @@ run headless by `citygen.unreal_atmos.make_assets`, the job in $CITYGEN_UE_JOB):
   with the wind; the actor draws them as instanced cards round the view.
 - `M_CgWet`: wet streets, a deferred (DBuffer) decal darkening the surfaces it covers and
   making them glossy, with puddles by a value noise on the world's plan.
+- AT2: `M_CgBeacon`, an aviation light's red glow (unlit, on the instanced spheres the
+  controller places per cell), blinking from its per-instance data as the light does; and
+  `M_CgBeam`, a searchlight's beam (additive and unlit on a cone along its aim, its color,
+  glow and half length in the component's custom primitive data), fading along it, soft at
+  its silhouette and where it meets a surface.
 
 Niagara is not used: UE 5.8 exposes no API to author a Niagara emitter from code (its
 editor library builds nothing; only an engine template could be duplicated and fed user
@@ -25,7 +30,8 @@ import unreal
 
 JOB = json.load(open(os.environ["CITYGEN_UE_JOB"], encoding="utf-8"))
 FOLDER = "/Game/CityGen/Core/Atmos"
-VERSION = "2"   # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air)
+VERSION = "3"   # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air);
+                # 3 (AT2): M_CgBeacon and M_CgBeam
 EAL = unreal.EditorAssetLibrary
 AT = unreal.AssetToolsHelpers.get_asset_tools()
 MEL = unreal.MaterialEditingLibrary
@@ -216,6 +222,86 @@ def wet(c):
     return m, True
 
 
+# AT2: an aviation light's red glow blinks as its light does (CityGenAtmos's AnimGain: on for
+# the first `Duty` of each `Period`, from `Phase`), from the per-instance data the controller
+# sets (phase, period, on share, glow)
+BEACON = """
+float on = frac(Time / max(Period, 0.01) + Phase) < Duty ? 1.0 : 0.012;
+return float3(1.0, 0.07, 0.02) * Glow * on;
+"""
+# a searchlight's beam: a cone from the light (its apex, the mesh's +Z) along its aim, lit in
+# the haze: brightest near the light and fading along it, soft at its silhouette, faded near
+# the eye and where it meets a surface (depth fade)
+BEAM = """
+float3 up = normalize(Up);
+float z = dot(WP - OP, up);
+float t = saturate((H - z) / max(2.0 * H, 1.0));
+float along = (1.0 - t) * (1.0 - t) * saturate(t * 60.0);
+float edge = saturate(abs(dot(normalize(CV), normalize(N))));
+float near_ = saturate((Depth - 300.0) / 3000.0);
+return float3(R, G, B) * Glow * along * edge * edge * near_ * Fade;
+"""
+
+
+def beacon():
+    m, made = material("M_CgBeacon")
+    if not made:
+        return m, False
+    m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
+    tm = expr(m, unreal.MaterialExpressionTime, -900, 0)
+    ins = [tm]
+    names = ["Time"]
+    for k, n in enumerate(("Phase", "Period", "Duty", "Glow")):
+        ins.append(expr(m, unreal.MaterialExpressionPerInstanceCustomData, -900, 120 + 110 * k,
+                        data_index=k, default_value=(0.0, 2.0, 0.3, 20.0)[k]))
+        names.append(n)
+    em = custom(m, -500, 100, BEACON, names, "CMOT_FLOAT3", "CgBeacon")
+    for a, n in zip(ins, names):
+        link(a, "", em, n)
+    MEL.connect_material_property(em, "", MP.MP_EMISSIVE_COLOR)
+    m.set_editor_property("used_with_instanced_static_meshes", True)
+    MEL.recompile_material(m)
+    EAL.set_metadata_tag(m, "cg.atmos", VERSION)
+    EAL.save_loaded_asset(m, only_if_is_dirty=False)
+    return m, True
+
+
+def beam():
+    m, made = material("M_CgBeam")
+    if not made:
+        return m, False
+    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_ADDITIVE)
+    m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
+    names, ins = [], []
+    for k, n in enumerate(("R", "G", "B", "Glow", "H")):
+        ins.append(expr(m, unreal.MaterialExpressionScalarParameter, -1000, 110 * k,
+                        parameter_name=f"Beam{n}", use_custom_primitive_data=True,
+                        primitive_data_index=k,
+                        default_value=(1.0, 1.0, 1.0, 0.08, 20000.0)[k]))
+        names.append(n)
+    for cls, n in ((unreal.MaterialExpressionWorldPosition, "WP"),
+                   (unreal.MaterialExpressionObjectPositionWS, "OP"),
+                   (unreal.MaterialExpressionObjectOrientation, "Up"),
+                   (unreal.MaterialExpressionCameraVectorWS, "CV"),
+                   (unreal.MaterialExpressionVertexNormalWS, "N"),
+                   (unreal.MaterialExpressionPixelDepth, "Depth")):
+        ins.append(expr(m, cls, -1000, 600 + 100 * len(names)))
+        names.append(n)
+    fade = expr(m, unreal.MaterialExpressionDepthFade, -1000, 1400, fade_distance_default=400.0)
+    one = expr(m, unreal.MaterialExpressionConstant, -1200, 1400, r=1.0)
+    link(one, "", fade, "Opacity")
+    ins.append(fade)
+    names.append("Fade")
+    em = custom(m, -500, 300, BEAM, names, "CMOT_FLOAT3", "CgBeam")
+    for a, n in zip(ins, names):
+        link(a, "", em, n)
+    MEL.connect_material_property(em, "", MP.MP_EMISSIVE_COLOR)
+    MEL.recompile_material(m)
+    EAL.set_metadata_tag(m, "cg.atmos", VERSION)
+    EAL.save_loaded_asset(m, only_if_is_dirty=False)
+    return m, True
+
+
 def main():
     res = {"ok": False, "version": VERSION}
     try:
@@ -224,6 +310,8 @@ def main():
         c, res["collection_made"] = collection()
         _, res["rain_made"] = rain(c)
         _, res["wet_made"] = wet(c)
+        _, res["beacon_made"] = beacon()
+        _, res["beam_made"] = beam()
         res["ok"] = True
     except Exception:
         res["error"] = traceback.format_exc()

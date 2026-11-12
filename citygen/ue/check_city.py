@@ -792,8 +792,10 @@ def play_features(world, man, slug):
         "atmos_night": an, "light_pools": got["night"].get("light_pools"),
         "teleport_to": [round(tx, 1), round(ty, 1)],
         "teleported_m": round(moved, 1), "landed": down is not None, "states": got}
+    # (AT2: of them in the high tier, and the aviation beacons and searchlight beams loaded)
     night = (f"{an['live']} atmos lights live of {an['lights']} in {an['cells']} cells, "
-             f"{an['shadowed']} shadowed" if an else "no atmos controller")
+             f"{an['shadowed']} shadowed, {an.get('high', 0)} high, {an.get('beacons', 0)} "
+             f"beacons, {an.get('beams', 0)} beams" if an else "no atmos controller")
     RES["lines"].append(
         f"play features: map, menu, night ({night}, "
         f"{got['night'].get('light_pools', 0)} light pools), free camera "
@@ -837,7 +839,8 @@ def play_views(world, a, slug, prefix):
         yield from ui_shot(world, v["name"], "HighResShot 1920x1080", 180)
         at = atmos_status(world)
         log(f"play view {v['name']}" + (f": atmos {at['live']} live ({at['live_kinds']}), "
-                                         f"{at['shadowed']} shadowed" if at else ""))
+                                         f"{at['shadowed']} shadowed, {at.get('high', 0)} high"
+                                         if at else ""))
     try:
         pc.player_camera_manager.unlock_fov()
         a.set_editor_property("b_show_minimap", True)

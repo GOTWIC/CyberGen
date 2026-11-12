@@ -13,6 +13,10 @@
   hash of its lights' records. The bulky arrays go to `BUILD/unreal/atmos.json` beside the
   manifest, which keeps the keys and hashes. A plan whose lux check did not pass (or an AT0
   plan, which has none) is not delivered (scope 8): the city imports without it.
+- AT2: the packing's version 2 (`PACK_VERSION`): 19 floats a light (a blink's or a sweep's
+  period, amount and phase after AT1's 16), the flags' bit 6 the high tier and bits 28-29 the
+  animation; the controller's `max_high` and `high_range_m` (the plan's high tier); a plan
+  whose faces check failed is not delivered either.
 """
 
 from __future__ import annotations
@@ -29,10 +33,11 @@ PLAN_DIR = "atmos"                          # BUILD/atmos: `atmosgen plan`'s def
 DATA = "atmos.json"                         # BUILD/unreal/atmos.json
 CONTROLLER_KEY = "atmos"
 CELL_M = 128.0                              # World Partition's main cells (unreal.MAIN_CELL_M)
-PACK_VERSION = 1
-FLOATS = 16                                 # CityGenAtmosCell.h, CityGenAtmosPack
+PACK_VERSION = 2                            # 2 (AT2): the high tier, a blink or a sweep
+FLOATS = 19                                 # CityGenAtmosCell.h, CityGenAtmosPack
 INTS = 2
 SHAPES = {"spot": 0, "point": 1, "rect": 2}
+ANIMS = {"blink": 1, "sweep": 2}
 QUARTERS = {(0, 0): "sw", (1, 0): "se", (0, 1): "nw", (1, 1): "ne"}
 
 
@@ -95,7 +100,8 @@ def _r(v: float, k: int = 3) -> float:
 def pack(L: dict, schedules: list[str], kinds: list[str], mounts: list[str]):
     """A light's record as the cell actor holds it (CityGenAtmosCell.h): FLOATS floats in
     Unreal's frame (cm, X east, Y south, pitch and yaw in degrees, yaw turned: citygen's
-    counterclockwise heading is Unreal's -yaw) and INTS ints (flags, seed)."""
+    counterclockwise heading is Unreal's -yaw; AT2: its animation's period, amount and
+    phase) and INTS ints (flags, seed)."""
     x, y, z = L["pos"]
     yaw, pitch = L["aim"]
     shape = SHAPES[L["shape"]]
@@ -109,11 +115,15 @@ def pack(L: dict, schedules: list[str], kinds: list[str], mounts: list[str]):
          _r(w * 100.0, 1), _r(h * 100.0, 1), _r(float(L.get("source_m") or 0.0) * 100.0, 1),
          _r(inten, 2), _r(col[0], 4), _r(col[1], 4), _r(col[2], 4),
          _r(float(L["reach_m"]) * 100.0, 1), _r(inner), _r(outer), _r(L.get("flicker", 0.0))]
+    an = L.get("anim") or {}
+    f += [_r(an.get("period_s", 0.0)), _r(an.get("amount", 0.0)), _r(an.get("phase", 0.0))]
     flags = (shape | (4 if L.get("shadow") else 0) | (8 if L.get("tier") == "near" else 0)
              | (16 if L.get("on", True) else 0)
              | (32 if float(L.get("specular", 1.0)) < 0.5 else 0)
+             | (64 if L.get("tier") == "high" else 0)
              | (schedules.index(L["schedule"]) << 8)
-             | (kinds.index(L["kind"]) << 16) | (mounts.index(L.get("mount", "prop")) << 24))
+             | (kinds.index(L["kind"]) << 16) | (mounts.index(L.get("mount", "prop")) << 24)
+             | (ANIMS.get(an.get("mode"), 0) << 28))
     seed = int(L["hash"][:8], 16)
     if seed >= 2 ** 31:
         seed -= 2 ** 32
@@ -140,6 +150,9 @@ def atmos_data(pdir: Path) -> tuple[dict | None, str]:
         return None, "the plan has no lux check (an AT0 plan: run atmosgen plan again)"
     if not lux.get("ok"):
         return None, "the plan's lux check failed (scope 8: not delivered)"
+    faces = (plan.get("checks") or {}).get("faces")
+    if faces is not None and not faces.get("ok"):
+        return None, "the plan's faces check failed (AT2: a lit face floods its wall)"
     schedules = sorted(plan["schedules"])
     kinds, mounts = _kinds(), _mounts()
     cells: dict[tuple[int, int], list[dict]] = {}
@@ -175,7 +188,9 @@ def atmos_data(pdir: Path) -> tuple[dict | None, str]:
            "max_live": int(tiers.get("mid_max", 512)),
            "mid_range_m": float(tiers.get("mid_m", 300.0)),
            "max_shadowed": int(tiers.get("near_max", 16)),
-           "near_range_m": float(tiers.get("near_m", 60.0)), "cell_m": CELL_M}
+           "near_range_m": float(tiers.get("near_m", 60.0)),
+           "max_high": int(tiers.get("high_max", 0)),
+           "high_range_m": float(tiers.get("high_m", 750.0)), "cell_m": CELL_M}
     return {"version": PACK_VERSION, "controller": ctl, "cells": out}, ""
 
 

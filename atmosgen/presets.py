@@ -10,7 +10,7 @@ that to AT3).
 
 from __future__ import annotations
 
-PRESET_VERSION = 1
+PRESET_VERSION = 2
 
 # --- looks and weather ------------------------------------------------------------------------
 
@@ -118,16 +118,59 @@ PHOTOMETRY = {
     "platform":   {"shape": "spot", "cd": 260.0, "reach_m": 14.0, "inner": 60.0,
                    "outer": 82.0, "tilt": 0.0, "source_m": 0.2, "shadow": False,
                    "drop_m": 0.05},
-    "sign_face":  {"shape": "rect", "nits": 320.0, "reach_m": 35.0, "barn_deg": 80.0,
-                   "out_m": 0.15, "shadow": False},
-    "neon_band":  {"shape": "rect", "nits": 650.0, "reach_m": 18.0, "barn_deg": 85.0,
-                   "out_m": 0.1, "shadow": False},
-    "holo_face":  {"shape": "rect", "nits": 180.0, "reach_m": 30.0, "barn_deg": 85.0,
-                   "out_m": 0.05, "shadow": False},
-    "shop_sign":  {"shape": "rect", "nits": 450.0, "reach_m": 10.0, "barn_deg": 80.0,
-                   "out_m": 0.1, "shadow": False},
+    # AT2: the lit faces (billboards, banners, holo-boards) are rect lights the size of their
+    # face, stood off `out_m` in front of the face as drawn (a facade sign's face is on its
+    # 0.3 m frame, emitters.FRAME_M), so the light's plane is 0.95 m out of the wall: a rect
+    # light lights only what is in front of its plane, so its own wall and what stands out of
+    # it (stage 2's cornices, fins and panels reach 0.91 m, `envelope.OVERHANG_MM`) stay out
+    # of it, where AT0's light 0.15 m in front of the face lit them grazing; `nits` the face's
+    # luminance, `light` the share of it the light stands in for (AT0: "less of a band's
+    # luminance as light"), times the sign page's own brightness (`emitters.SignColors.emit`).
+    "sign_face":  {"shape": "rect", "nits": 320.0, "light": 0.6, "reach_m": 35.0,
+                   "barn_deg": 80.0, "out_m": 0.65, "shadow": False},
+    "banner_face": {"shape": "rect", "nits": 400.0, "light": 0.35, "reach_m": 25.0,
+                    "barn_deg": 80.0, "out_m": 0.65, "shadow": False},
+    "holo_face":  {"shape": "rect", "nits": 180.0, "light": 0.5, "reach_m": 30.0,
+                   "barn_deg": 85.0, "out_m": 0.3, "shadow": False},
+    # AT2's neon spill: neon bands and shop signs as small colored lights near them (scope
+    # 6.1), near tier only: a spot stood off the sign and aimed out and down onto the
+    # sidewalk (its cone short of 90 degrees, so the wall it hangs on, behind its plane, stays
+    # dark), a blade sign (hung square off its wall, lit both ways) a point at its middle
+    "neon_spill": {"shape": "spot", "nits": 650.0, "light": 0.3, "reach_m": 10.0,
+                   "inner": 45.0, "outer": 76.0, "pitch": -35.0, "out_m": 0.5,
+                   "source_m": 0.2, "shadow": False, "drop_m": 0.0},
+    "shop_neon":  {"shape": "spot", "nits": 450.0, "light": 0.3, "reach_m": 8.0,
+                   "inner": 45.0, "outer": 76.0, "pitch": -40.0, "out_m": 0.4,
+                   "source_m": 0.15, "shadow": False, "drop_m": 0.0},
+    "blade_neon": {"shape": "point", "nits": 450.0, "light": 0.2, "reach_m": 6.0,
+                   "source_m": 0.3, "shadow": False, "drop_m": 0.0},
     "shop_spill": {"shape": "rect", "nits": 110.0, "reach_m": 12.0, "barn_deg": 70.0,
                    "out_m": 0.25, "shadow": False, "height_m": 2.8, "sill_m": 0.3},
+    # AT2's buildings at night: crown floods (a spot below a tower's crown, `out_m` off its
+    # facade, aimed up into it; its cone, intensity and reach from the geometry, `plan.floods`)
+    # and facade uplights (from the podium or the ground up the shaft), in the high tier
+    "crown_flood": {"shape": "spot", "cd": 0.0, "reach_m": 60.0, "inner": 20.0,
+                    "outer": 36.0, "source_m": 0.3, "shadow": False, "drop_m": 0.0,
+                    "out_m": 4.0, "lux": 70.0},
+    "facade_flood": {"shape": "spot", "cd": 0.0, "reach_m": 60.0, "inner": 20.0,
+                     "outer": 36.0, "source_m": 0.3, "shadow": False, "drop_m": 0.0,
+                     "out_m": 3.0, "lux": 45.0},
+    # an aviation warning light (red, ICAO and FAA obstruction lights: flashing at the top,
+    # steady at the levels under it); a small light on its roof or mast, its glow the
+    # runtime's beacon
+    "aviation":   {"shape": "point", "cd": 300.0, "reach_m": 14.0, "source_m": 0.15,
+                   "shadow": False, "drop_m": 0.0},
+    # a searchlight on a roof sweeping the sky (its beam the runtime's, through the haze)
+    "searchlight": {"shape": "spot", "cd": 2.0e6, "reach_m": 300.0, "inner": 1.2,
+                    "outer": 2.6, "source_m": 0.4, "shadow": False, "drop_m": 0.0},
+    # a crane's boom floods, straight down onto its quay and the ship
+    "boom_flood": {"shape": "spot", "cd": 12000.0, "reach_m": 70.0, "inner": 48.0,
+                   "outer": 72.0, "tilt": 0.0, "source_m": 0.4, "shadow": False,
+                   "drop_m": 0.3},
+    # an airfield's ground lights (the apron's edges, a launch pad's rim): small lights in
+    # the pavement, seen more than they light
+    "ground_light": {"shape": "point", "cd": 40.0, "reach_m": 5.0, "source_m": 0.1,
+                     "shadow": False, "drop_m": 0.0},
 }
 CLASSES = tuple(PHOTOMETRY)
 
@@ -137,11 +180,43 @@ CLASSES = tuple(PHOTOMETRY)
 # highlight: a glossy surface already reflects the face itself (its emissive, through Lumen),
 # and a light's highlight on it is a bright ball (the play features' sign washes put one in
 # every billboard). The same holds for AT2's sign lights.
-NO_SPECULAR_KINDS = ("sign", "shop_sign", "spill")
+NO_SPECULAR_KINDS = ("sign", "shop_sign", "spill", "neon")
 
-SIGN_CLASS = {"billboard": "sign_face", "banner": "neon_band", "neon": "neon_band",
-              "holo_ad": "holo_face", "shop_sign": "shop_sign"}
-SIGN_NEAR_ONLY = ("shop_sign",)
+# (kind, mount) -> class; a kind alone for any mount
+SIGN_CLASS = {"billboard": "sign_face", "banner": "banner_face", "neon": "neon_spill",
+              "holo_ad": "holo_face", "shop_sign": "shop_neon",
+              ("shop_sign", "blade"): "blade_neon"}
+SIGN_NEAR_ONLY = ("shop_sign", "neon")
+# the plan's light kind of each sign kind: a lit face (`sign`), neon spill (`neon`, `shop_sign`)
+SIGN_KIND = {"billboard": "sign", "banner": "sign", "holo_ad": "sign", "neon": "neon",
+             "shop_sign": "shop_sign"}
+LIT_FACES = ("sign_face", "banner_face", "holo_face")
+# a sign page cell's brightness scales its light: its mean luminance over SIGN_LUMA_REF
+# (a page's typical lit share), within SIGN_LUMA_SCALE
+SIGN_LUMA_REF = 0.22
+SIGN_LUMA_SCALE = (0.4, 1.4)
+# the faces check (AT2, `lux.face_check`): a lit face's light on its own wall and on what
+# stands out of it up to FACE_WALL_OUT_M (stage 2's facade parts: 0.91 m), FACE_WALL_RING_M
+# round the face, at most FACE_WALL_MAX_LX; and what it throws on the facade opposite
+# (reported)
+FACE_WALL_OUT_M = 0.9
+FACE_WALL_RING_M = 1.0
+FACE_WALL_MAX_LX = 1.0
+
+# --- flicker and broken lights by kind (AT2) ---------------------------------------------------
+
+# a mood's flicker and broken shares (at danger 1) times these by kind: neon fails more often
+# than an LED billboard or a street lamp; a shopfront's tube now and then; safety lights
+# (aviation, an airfield's ground lights, searchlights) and the structures' lights never
+FLICKER_BY_KIND = {"spill": 0.3, "sign": 0.5, "neon": 1.6, "shop_sign": 1.3, "flood": 0.25,
+                   "high_mast": 0.3}
+BROKEN_BY_KIND = {"flood": 0.5}
+KEPT_KINDS = ("tunnel", "underpass", "station", "soffit", "aviation", "runway",
+              "searchlight", "corner")
+# a sign never goes dark while its face glows (assetgen draws the face lit): a broken one
+# flickers deep instead, a dying tube
+DYING_KINDS = ("sign", "neon", "shop_sign")
+DYING_DEPTH = (0.8, 0.95)
 
 # --- district moods (scope 5: palette, haze, neon density, flicker, alleys, grit) -----------
 
@@ -183,6 +258,73 @@ MOOD = {
                               "haze": 1.4, "grit": 0.9, "crowns": False},
 }
 MOOD_DEFAULT = "midtown_mixed"
+
+# AT2's district palettes (scope 5: clean or gritty by place, decision 12.5): the neon colors
+# a district's signs take where their page names none, its floods' accents where AG15 names
+# none, its searchlights' tints; the corporate core cool cyan, white and violet, markets
+# magenta, violet and amber, old towns red, amber and green, the port sodium amber
+PALETTES = {
+    "corporate_core":        ("#05d9e8", "#f2f6ff", "#b967ff", "#4d7cff"),
+    "residential_heights":   ("#ffb000", "#f2f6ff", "#ff7a5c", "#05d9e8"),
+    "research_campus":       ("#05d9e8", "#f2f6ff", "#39ff8a"),
+    "midtown_mixed":         NEON,
+    "transit_hub":           ("#05d9e8", "#ff2a6d", "#f2f6ff", "#ffb000"),
+    "spaceport":             ("#f2f6ff", "#05d9e8", "#ff3b30"),
+    "entertainment_market":  ("#ff2a6d", "#b967ff", "#ffb000", "#05d9e8", "#39ff8a"),
+    "old_town":              ("#ff3b30", "#ffb000", "#39ff8a", "#ff2a6d"),
+    "megablock_residential": ("#ffb000", "#ff2a6d", "#39ff8a", "#ff5a1f"),
+    "industrial_port":       ("#ffb000", "#ff5a1f", "#39ff8a"),
+}
+# per archetype: the floods' white (where AG15 gives a tower no crown LEDs), the share of its
+# towers whose crowns are flooded (pulled by wealth and grit, `spec.mood`), its searchlights
+# (on its tallest towers, two to a roof)
+FLOODS = {
+    "corporate_core":        {"flood": "led_cool", "floods": 0.75, "searchlights": 0},
+    "residential_heights":   {"flood": "warm", "floods": 0.3, "searchlights": 0},
+    "research_campus":       {"flood": "neutral", "floods": 0.35, "searchlights": 0},
+    "midtown_mixed":         {"flood": "neutral", "floods": 0.45, "searchlights": 2},
+    "transit_hub":           {"flood": "led_cool", "floods": 0.5, "searchlights": 2},
+    "spaceport":             {"flood": "neutral", "floods": 0.3, "searchlights": 2},
+    "entertainment_market":  {"flood": "warm", "floods": 0.55, "searchlights": 4},
+    "old_town":              {"flood": "sodium", "floods": 0.1, "searchlights": 0},
+    "megablock_residential": {"flood": "sodium", "floods": 0.1, "searchlights": 0},
+    "industrial_port":       {"flood": "sodium", "floods": 0.05, "searchlights": 0},
+}
+# grit (decision 12.5): in a gritty district a share of the lamps burn another temperature
+# (mixed sodium, old mercury and fluorescent, new LED) and their output varies (aged lamps
+# and dirty lenses); a clean one is uniform. Share and dimming grow past MIX_FROM grit.
+MIX_FROM = 0.3
+MIX_SHARE = 0.6                   # (of the grit past MIX_FROM)
+MIX_DIM = 0.45                    # (lamps dimmer by up to this times the grit past MIX_FROM)
+MIX_COLORS = {"sodium": "#ffb35c", "mercury": "#c9f0dc", "fluoro": "#e8fff4",
+              "led": "#dfe8ff"}
+MIX_KINDS = ("street_light", "wall_light", "alley", "road", "signal")
+# searchlights a landmark gets by its kind when the spec names none (LandmarkLights)
+LANDMARK_SEARCHLIGHTS = {"megatower": 4, "arcology": 3, "spire": 2, "wheel": 0}
+
+# --- buildings and megasites at night (AT2) ---------------------------------------------------
+
+CROWN_ZONE = (0.18, 8.0, 40.0)    # a crown's lit zone: this share of the height, within
+CROWN_SIDE_MIN_M = 6.0            # a facade side narrower gets no flood
+CROWN_SPLIT_M = 45.0              # a side wider gets two floods
+FLOOD_UP_M = (0.3, 60.0)          # an uplight lights this share of the shaft, at most
+FLOOD_THIN_ROLES = ("mast", "spire", "halo", "strut", "frame", "column", "antenna", "link",
+                    "pod", "band")
+AVIATION_MIN_M = 60.0             # obstruction lights on anything this tall (FAA: 200 ft) ...
+AVIATION_PORT_MIN_M = 40.0        # ... this tall in a spaceport's district or megasite
+AVIATION_STEP_M = 90.0            # steady levels under the flashing top, every this far down
+AVIATION_COLOR = "#ff200a"
+AVIATION_BLINK = (2.0, 0.3)       # (period s, on share): 30 flashes a minute
+AVIATION_STEADY = 0.4             # a steady level's intensity, of the top's
+SEARCHLIGHT_PITCH = (62.0, 80.0)
+SEARCHLIGHT_SWEEP = (22.0, 40.0)  # sweep amplitude (deg)
+SEARCHLIGHT_PERIOD = (14.0, 26.0)
+HIGH_MAST_STEP_M = 90.0           # a port's yard: a high mast every this far
+HIGH_MAST_Z_M = 30.0
+APRON_MAST_STEP_M = 80.0          # an apron's masts along its long sides
+APRON_EDGE_STEP_M = 30.0          # its blue edge lights
+PAD_RIM_STEP_M = 6.0              # a launch pad's rim lights
+GROUND_COLORS = {"apron": "#2a5cff", "rim": "#39ff8a", "rim_alt": "#f2f6ff"}
 
 # --- light levels (scope 8) and the tiers (6.1) -----------------------------------------------
 
@@ -227,14 +369,20 @@ PLATFORM_STEP_M = 7.0
 PLATFORM_Z_M = 3.6                # a platform's downlights over its floor
 
 # the tiers the runtime keeps live near the view: near (shadowed), mid (unshadowed), far
-# (no light: emissive points or light cards, AT7)
+# (no light: emissive points or light cards, AT7). AT2's `high` tier: the lights seen from
+# afar (crown floods and uplights, searchlights, a port's high masts), a pool of their own
+# within World Partition's loading range (768 m), so they never take the street's place in
+# the mid set nor it theirs
 TIERS = {"near": {"radius_m": 60.0, "max": 16},
          "mid": {"radius_m": 300.0, "max": 512},
+         "high": {"radius_m": 750.0, "max": 48},
          "far": {"radius_m": 1500.0, "max": 0}}
+HIGH_KINDS = ("flood", "searchlight", "high_mast")
 
 # budgets: lights per 256 m cell in the plan, live and shadowed near the view, the night's
 # frame time at p95, native 1440p on the PC by AG16's benchmark (decision 12.6)
-BUDGETS = {"lights_per_cell": 6000, "live": 512, "shadowed": 16, "night_p95_ms": 16.7}
+BUDGETS = {"lights_per_cell": 6000, "live": 512, "shadowed": 16, "high": 48,
+           "night_p95_ms": 16.7}
 
 # --- schedules (decision 12.3: data for every hour) -------------------------------------------
 

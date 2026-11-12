@@ -190,12 +190,9 @@ def _aim(L) -> tuple[float, float, float]:
             math.sin(pitch))
 
 
-def contribution(L: dict, gx, gy, gz) -> np.ndarray:
-    """A light's illuminance on a level floor at points offset (gx, gy, gz) from it (point
-    minus light, m), before occlusion and its schedule."""
-    d2 = gx * gx + gy * gy + gz * gz
-    d = np.sqrt(np.maximum(d2, 1e-6))
-    cos_in = np.clip(-gz / d, 0.0, 1.0)          # (a floor lit from above)
+def _intensity(L: dict, gx, gy, gz, d) -> np.ndarray:
+    """A light's intensity (cd) toward points offset (gx, gy, gz) from it, by its profile,
+    times Unreal's window at its reach."""
     ax, ay, az = _aim(L)
     cos_g = (gx * ax + gy * ay + gz * az) / d
     if L["shape"] == "spot":
@@ -208,8 +205,88 @@ def contribution(L: dict, gx, gy, gz) -> np.ndarray:
     else:
         I = np.full_like(d, float(L["cd"]))
     R = float(L["reach_m"])
-    win = np.clip(1.0 - (d / R) ** 4, 0.0, 1.0) ** 2
-    return I * cos_in / np.maximum(d2, 0.01) * win
+    return I * np.clip(1.0 - (d / R) ** 4, 0.0, 1.0) ** 2
+
+
+def contribution(L: dict, gx, gy, gz) -> np.ndarray:
+    """A light's illuminance on a level floor at points offset (gx, gy, gz) from it (point
+    minus light, m), before occlusion and its schedule."""
+    d2 = gx * gx + gy * gy + gz * gz
+    d = np.sqrt(np.maximum(d2, 1e-6))
+    cos_in = np.clip(-gz / d, 0.0, 1.0)          # (a floor lit from above)
+    return _intensity(L, gx, gy, gz, d) * cos_in / np.maximum(d2, 0.01)
+
+
+def on_surface(L: dict, pts: np.ndarray, normal) -> np.ndarray:
+    """A light's illuminance on surfaces at points `pts` (n x 3, absolute) facing `normal`
+    (a unit vector, the same for all), before occlusion and its schedule (AT2: a wall)."""
+    g = pts - np.array([float(v) for v in L["pos"]])
+    d2 = (g * g).sum(axis=1)
+    d = np.sqrt(np.maximum(d2, 1e-6))
+    cos_in = np.clip(-(g @ np.asarray(normal, dtype=np.float64)) / d, 0.0, 1.0)
+    return _intensity(L, g[:, 0], g[:, 1], g[:, 2], d) * cos_in / np.maximum(d2, 0.01)
+
+
+def face_check(walls: list[dict], occ: "Occluders | None") -> dict:
+    """AT2's faces check: each lit face's light (a billboard's, banner's or holo-board's rect)
+    on its own wall, probed `presets.FACE_WALL_OUT_M` out of it (what stands out of a
+    facade) at eight points `FACE_WALL_RING_M` round the face, must stay under
+    `FACE_WALL_MAX_LX` (AT0's band flooded its wall); and what it throws on the facade
+    opposite (the first building it meets straight out, within its reach) is reported."""
+    out_m, ring = P.FACE_WALL_OUT_M, P.FACE_WALL_RING_M
+    worst, over, first = 0.0, 0, []
+    opp, reached = [], 0
+    for f in walls:
+        # (without its barn doors: Unreal's are 20 cm, which hardly cut a face meters wide)
+        L = {**f["light"], "barn_deg": 90.0}
+        a = math.radians(f["yaw"])
+        n = np.array([math.cos(a), math.sin(a), 0.0])
+        t = np.array([-math.sin(a), math.cos(a), 0.0])
+        up = np.array([0.0, 0.0, 1.0])
+        w, h = f["size"]
+        wall = np.array(f["wall"], dtype=np.float64)
+        e = 0.0
+        # the wall and the fronts of what stands out of it (facing out), and the sides of
+        # what stands out half way (facing along the wall, both ways), round the face
+        for o, normals in ((0.0, (n,)), (0.5 * out_m, (n, t, -t)), (out_m, (n,))):
+            c = wall + n * o
+            pts = np.array([c + t * i * (w / 2.0 + ring) + up * j * (h / 2.0 + ring)
+                            for i in (-1, 0, 1) for j in (-1, 0, 1) if i or j])
+            for nv in normals:
+                e = max(e, float(on_surface(L, pts, nv).max()))
+        worst = max(worst, e)
+        if e > P.FACE_WALL_MAX_LX:
+            over += 1
+            if len(first) < 5:
+                first.append(f"{L['id']} {e:.1f} lx")
+        if occ is None:
+            continue
+        # straight out from the light, every meter, to the first building cell at its height
+        lx, ly, lz = (float(v) for v in L["pos"])
+        s = np.arange(1.0, float(L["reach_m"]), 1.0)
+        bx, by = lx + n[0] * s, ly + n[1] * s
+        hit = np.flatnonzero(occ.blocked(bx, by, np.full(s.shape, lz)))
+        if hit.size:
+            k = int(hit[0])
+            p = np.array([[bx[k] - n[0] * 0.6, by[k] - n[1] * 0.6, lz]])
+            opp.append(float(on_surface(L, p, -n)[0]))
+            reached += 1
+    o = np.array(opp) if opp else np.zeros(0)
+    return {"ok": over == 0, "faces": len(walls), "own_wall_max_lx": round(worst, 3),
+            "own_wall_limit_lx": P.FACE_WALL_MAX_LX, "over": over, "first_over": first,
+            "opposite": {"reached": reached,
+                         "share": round(reached / len(walls), 3) if walls else 0.0,
+                         "median_lx": round(float(np.median(o)), 2) if o.size else 0.0,
+                         "p90_lx": round(float(np.percentile(o, 90)), 2) if o.size else 0.0}}
+
+
+def face_text(res: dict) -> str:
+    o = res["opposite"]
+    return (f"lit faces: {res['faces']}, their own walls at most {res['own_wall_max_lx']} lx "
+            f"(limit {res['own_wall_limit_lx']}): {'PASS' if res['ok'] else 'FAIL'}"
+            + (f" ({res['over']} over: {', '.join(res['first_over'])})" if res["over"] else "")
+            + f"\n  the facade opposite reached by {o['reached']} ({100 * o['share']:.0f}%), "
+              f"median {o['median_lx']} lx, 90th percentile {o['p90_lx']} lx\n")
 
 
 def share(L: dict, schedules: dict, hour: float = CHECK_HOUR) -> float:
@@ -626,7 +703,9 @@ KIND_COLORS = {"street_light": "#ffd27a", "wall_light": "#ff9a3d", "sign": "#ff2
                "shop_sign": "#b967ff", "spill": "#05d9e8", "signal": "#ff4040",
                "corner": "#ffffff", "road": "#ffe066", "alley": "#c08040",
                "soffit": "#9fd8ff", "tunnel": "#80ff80", "underpass": "#80ff80",
-               "station": "#40c0ff"}
+               "station": "#40c0ff", "neon": "#39ff8a", "flood": "#f2f6ff",
+               "aviation": "#ff200a", "searchlight": "#ffffff", "high_mast": "#ffb35c",
+               "runway": "#2a5cff"}
 
 
 def plan_map(build, plan=None, out=None) -> dict:
@@ -651,8 +730,9 @@ def plan_map(build, plan=None, out=None) -> dict:
         ex = d["polygon"]["exterior"]
         ax.fill([p[0] for p in ex], [p[1] for p in ex], color="#111827", lw=0.4,
                 ec="#2a3550")
-    order = ("spill", "shop_sign", "sign", "wall_light", "street_light", "alley", "road",
-             "signal", "corner", "soffit", "tunnel", "underpass", "station", "broken")
+    order = ("spill", "shop_sign", "neon", "sign", "wall_light", "street_light", "alley",
+             "road", "signal", "corner", "soffit", "tunnel", "underpass", "station",
+             "high_mast", "runway", "flood", "searchlight", "aviation", "broken")
     for k in order + tuple(sorted(set(pts) - set(order))):
         if k not in pts:
             continue

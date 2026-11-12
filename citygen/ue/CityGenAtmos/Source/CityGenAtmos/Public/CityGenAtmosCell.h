@@ -1,6 +1,7 @@
-// AT1: one 128 m cell's lights of a city's atmos plan (docs/unreal_export.md, "From AT1"): a
-// data actor the importer places at the cell's middle, spatially loaded, so World Partition
-// streams it with its cell (the main grid's 128 m cells). It holds its lights' records packed
+// AT1: one 128 m cell's lights of a city's atmos plan (docs/unreal_export.md, "From AT1" and
+// "From AT2"): a data actor the importer places at the cell's middle, spatially loaded, so
+// World Partition streams it with its cell (the main grid's 128 m cells). It holds its
+// lights' records packed
 // (no light component of its own) and registers them with the level's CityGenAtmos
 // controller while it is loaded; the controller's pooled live set renders the nearest.
 // Frames: Unreal cm, X east, Y south.
@@ -17,12 +18,13 @@ namespace CityGenAtmosPack
 	// floats: x, y, z (cm), pitch, yaw (deg; the light's +X along its aim), width, height
 	// (cm, a rect's), source radius (cm), intensity (cd for a spot or point, nits for a
 	// rect), r, g, b (linear), reach (cm), inner, outer (deg, a spot's cones; a rect's barn
-	// door angle in inner), flicker depth
-	constexpr int32 Floats = 16;
+	// door angle in inner), flicker depth; AT2: its animation's period (s), amount (a
+	// blink's on share, a sweep's swing in degrees either way) and phase (0 to 1)
+	constexpr int32 Floats = 19;
 	// ints: flags (bits 0-1 shape: 0 spot, 1 point, 2 rect; 2 may cast shadows; 3 near tier
-	// only; 4 on, not broken; 5 no specular, a lit face's stand-in; 8-15 schedule index;
-	// 16-23 kind index; 24-27 mount index),
-	// seed (a hash of its id)
+	// only; 4 on, not broken; 5 no specular, a lit face's stand-in; 6 the high tier (AT2);
+	// 8-15 schedule index; 16-23 kind index; 24-27 mount index; 28-29 animation (AT2):
+	// 0 none, 1 blink, 2 sweep), seed (a hash of its id)
 	constexpr int32 Ints = 2;
 }
 

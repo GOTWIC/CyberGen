@@ -1,6 +1,7 @@
 // The module and its console commands (the benchmark's passes drive them):
-// CityGenAtmos.Lights, .Fog, .Rain, .Wet, .MegaLights, .FarPools [0|1] (toggling without an
-// argument), CityGenAtmos.Tiers LIVE RANGE_M SHADOWED, .Hour H, .Gain G, .Scattering S,
+// CityGenAtmos.Lights, .Fog, .Rain, .Wet, .MegaLights, .FarPools, .Fixtures [0|1] (toggling without an
+// argument), CityGenAtmos.Tiers LIVE RANGE_M SHADOWED, .High LIVE RANGE_M (AT2), .Hour H, .Gain G,
+// .Scattering S,
 // .Status (the state as one JSON line). AT1: the plan comes with the level (the importer's
 // controller and its cells' data actors), no longer from a folder (AT0's .Load and
 // -CityGenAtmosPlan are gone).
@@ -39,7 +40,19 @@ namespace
 	CG_ATMOS_TOGGLE(WetCmd, "CityGenAtmos.Wet", "CityGenAtmos.Wet [0|1]: wet streets (a deferred decal round the view)", bWet, SetWet)
 	CG_ATMOS_TOGGLE(PoolsCmd, "CityGenAtmos.FarPools", "CityGenAtmos.FarPools [0|1]: the play features' light pools past the live range (the far tier)", bFarPools, SetFarPools)
 	CG_ATMOS_TOGGLE(MegaCmd, "CityGenAtmos.MegaLights", "CityGenAtmos.MegaLights [0|1]: MegaLights by the actor's post-process volume", bMegaLights, SetMegaLights)
+	CG_ATMOS_TOGGLE(FixturesCmd, "CityGenAtmos.Fixtures", "CityGenAtmos.Fixtures [0|1]: AT2's aviation beacons and searchlight beams", bFixtures, SetFixtures)
 #undef CG_ATMOS_TOGGLE
+
+	FAutoConsoleCommandWithWorldAndArgs HighCmd(TEXT("CityGenAtmos.High"),
+		TEXT("CityGenAtmos.High LIVE RANGE_M: AT2's high tier (floods, searchlights, high masts): its size and range (m)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenAtmos* A = AtmosIn(World);
+			if (A && Args.Num() >= 2)
+			{
+				A->SetHigh(FCString::Atoi(*Args[0]), FCString::Atof(*Args[1]));
+			}
+		}));
 
 	FAutoConsoleCommandWithWorldAndArgs TiersCmd(TEXT("CityGenAtmos.Tiers"),
 		TEXT("CityGenAtmos.Tiers LIVE RANGE_M SHADOWED: the live set's size, its range (m) and how many cast shadows"),
