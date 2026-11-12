@@ -3131,6 +3131,19 @@ Vanta-R the same).
   step A's street-distance findings (tires in the body, cabin tubs in the wells) on each car
   as it is redone.
 
+### Parked in Delta Megacity on the PC (2026-11-12)
+
+Results: [`docs/progress/AG18/delta_at3/`](progress/AG18/delta_at3/README.md).
+
+- **The packs** fetched from the release (12, then 12b) on the PC, none built; `carkit.setup_render`
+  now takes OptiX, CUDA, HIP or oneAPI where Blender has no Metal (on Windows the renders and
+  bakes had fallen back to the CPU).
+- **Delta Megacity** with AT3's plan: 3,431 parked cars as 18 models in 57 placements (456.0 M
+  triangles at LOD0, 18.6 M at LOD3), imported over the AT3 import; the city check passes with
+  them; the vehicle check's meshes, placements and wheels pass, the Kestrel Atlas's collision
+  fails (side traces hit 76 of 114: its hulls leave the open cab uncovered at middle height, the
+  same in 12 and 12b).
+
 ## Order
 
 ```
