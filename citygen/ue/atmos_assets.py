@@ -35,8 +35,8 @@ import unreal
 
 JOB = json.load(open(os.environ["CITYGEN_UE_JOB"], encoding="utf-8"))
 FOLDER = "/Game/CityGen/Core/Atmos"
-VERSION = "4"   # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air);
-                # 3 (AT2): M_CgBeacon and M_CgBeam; 4 (AT3): M_CgSky
+VERSION = "5"   # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air);
+                # 3 (AT2): M_CgBeacon and M_CgBeam; 4, 5 (AT3): M_CgSky
 EAL = unreal.EditorAssetLibrary
 AT = unreal.AssetToolsHelpers.get_asset_tools()
 MEL = unreal.MaterialEditingLibrary
@@ -378,7 +378,7 @@ if (DeckCm > 0.0 && d.z > 0.003 && CamPos.z < DeckCm) {
   nsum /= 0.95;
   float cov = smoothstep(1.0 - Cover - 0.13, 1.0 - Cover + 0.13, nsum);
   float dens = cov * saturate(1.0 - t / 4.0e6);
-  float2 uv = (CamPos.xy + d.xy * t - GlowB.xy) / max(GlowB.zw - GlowB.xy, 1.0);
+  float2 uv = (CamPos.xy + d.xy * t - GlowLo.xy) / max(GlowHi.xy - GlowLo.xy, 1.0);
   float3 gl = Texture2DSampleLevel(Glow, GlowSampler, saturate(uv), 0).rgb;
   float inside = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
   gl = gl * gl * GlowMax * GlowScale * inside;
@@ -395,7 +395,10 @@ SKY_SCALARS = (("DeckCm", 42000.0), ("Cover", 0.8), ("Stars", 0.0), ("StarLum", 
                ("MoonLum", 0.5), ("MoonRad", 0.0046), ("MoonVis", 0.0), ("SunDiskOn", 1.0),
                ("GlowMax", 1.0), ("GlowScale", 0.0), ("CloudLit", 0.03), ("Wind", 2.0))
 SKY_VECTORS = (("SunDir", (0.0, 0.0, 1.0, 0.0)), ("MoonDir", (0.0, 0.5, 0.5, 0.0)),
-               ("MoonTint", (0.8, 0.86, 1.0, 1.0)), ("GlowB", (-1.0e6, -1.0e6, 1.0e6, 1.0e6)))
+               ("MoonTint", (0.8, 0.86, 1.0, 1.0)),
+               # (a vector parameter reaches a custom node as its RGB: the glow's corners as
+               # two, each its X and Y)
+               ("GlowLo", (-1.0e6, -1.0e6, 0.0, 0.0)), ("GlowHi", (1.0e6, 1.0e6, 0.0, 0.0)))
 
 
 def sky_material():

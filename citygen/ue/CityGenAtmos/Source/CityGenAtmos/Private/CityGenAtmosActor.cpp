@@ -1284,7 +1284,8 @@ void ACityGenAtmos::EnsureDome()
 	}
 	if (GlowBounds.Num() >= 4)
 	{
-		SkyMID->SetVectorParameterValue(TEXT("GlowB"), FLinearColor(GlowBounds[0], GlowBounds[1], GlowBounds[2], GlowBounds[3]));
+		SkyMID->SetVectorParameterValue(TEXT("GlowLo"), FLinearColor(GlowBounds[0], GlowBounds[1], 0.f, 0.f));
+		SkyMID->SetVectorParameterValue(TEXT("GlowHi"), FLinearColor(GlowBounds[2], GlowBounds[3], 0.f, 0.f));
 	}
 	Dome = NewObject<UStaticMeshComponent>(this);
 	Dome->SetupAttachment(RootComponent);
