@@ -1,4 +1,4 @@
-# atmosgen: light, sky, air and weather (scope, v2: decided 2026-11-10, AT0 to AT3 done)
+# atmosgen: light, sky, air and weather (scope, v2: decided 2026-11-10, AT0 to AT4 done)
 
 Stage 3 (atmosgen) of CyberGen's five stages. It takes a built city with its assets and
 makes the city's light and air: every light source that casts light, the sky, fog, smog,
@@ -154,7 +154,9 @@ ask, the fixtures of its own lights (`roof`, `beacon`, `mast`, `ground`: assetge
   from code that holds up. AT0 found none: UE 5.8 exposes no API to author a Niagara
   emitter from code (only an engine template could be duplicated and fed user parameters),
   so effects are C++ components and code-made materials (AT0's rain cards and wet decal,
-  `docs/progress/AT0/`).
+  `docs/progress/AT0/`). AT4 settled it for the air: the fog volumes are the engine's local
+  fog volume components, pooled by the controller, and the steam and smoke plumes instanced
+  cards in a code-made material (`M_CgSteam`) rising by world position offset; no Niagara.
 
 ### 4.3 The line with assetgen
 
@@ -245,6 +247,19 @@ stages have); never required to edit. Fields, all with defaults:
   industry and the port, haze under decks (M14), haze in tunnels, thicker where danger is.
 - Emitters: steam from manholes and drains (AG7), roof vents and exhausts (AG4), food
   stalls (M6), tunnel ventilation buildings (M9); smoke from chimneys.
+- AT4 built it (`atmosgen/air.py`, `docs/progress/AT4/`): the plan's `air` (the height and
+  volumetric fog of the look and weather by the hour, thicker by night; each light kind's
+  volumetric scattering, the light shafts: the street lights, high masts and floods, none from
+  the many small neon and shop lights; the live sets; the engine settings the night's budget
+  needs), `volumes` (ellipsoids: mist along the canals, basins and rivers after dusk, smog over
+  the industrial and spaceport districts and their megasites, haze under the decks and in the
+  road tunnels and underpasses, each times its district's haze and danger) and `emitters`
+  (steam from AG7's manholes and drains read from the street packs, M9's vents, exhaust from
+  M3's roof mechanical units, cooking from M6's food stalls and kiosks, smoke from chimneys on
+  industrial roofs and stove pipes on shanty stacks, a fixture asked of stage 2; the share
+  that steams by the district's grit), and the air check (scope 8). In Unreal the nearest
+  volumes are local fog volumes, the plumes rising cards in `M_CgSteam`; the searchlights keep
+  AT2's beams (brighter in fog), their spot lights scattering none.
 
 ### 6.4 Weather
 

@@ -724,6 +724,12 @@ def play_features(world, man, slug):
     if JOB.get("shots"):
         yield from ui_shot(world, "play_menu")
     a.set_dev_menu_open(False)
+    # (AT4: art direction: console commands for this check's views, `;` between them, from
+    # $CITYGEN_UE_ATMOS_CMDS, e.g. "CityGenAtmos.VolumeGain 2;CityGenAtmos.FogSet 0.03 0.08 2")
+    for c in (os.environ.get("CITYGEN_UE_ATMOS_CMDS") or "").split(";"):
+        if c.strip():
+            unreal.SystemLibrary.execute_console_command(world, c.strip())
+            log(f"atmos command: {c.strip()}")
     a.set_night(True)
     yield from wait(2.0)
     got["night"] = status(a)
@@ -811,6 +817,12 @@ def play_features(world, man, slug):
                   and 0.01 < ak["night_now"] < 0.99 and ak["sun_elev"] < 0.0
                   and ad["ev100"] > ak["ev100"] > an["ev100"])
         lit = lit and sky_ok
+    # AT4: with the plan's air, its fog on by night, fog volumes registered and live near the
+    # player where the plan has some, and its plumes' cards made
+    air_ok = True
+    if an is not None and an.get("air") is not None and (man.get("atmos") or {}).get("volumes"):
+        air_ok = bool(an["fog"]) and an["air"] and an["volumes"] > 0 and an["plume_cards"] >= 0
+        lit = lit and air_ok
     ok = (got["start"]["ready"] and got["start"]["overlay"] and got["start"]["map_texture"]
           and got["map"] and got["menu"] and got["night"]["night"] and lit
           and got["free_cam"]["free_cam"] and got["free_cam"]["pawn"].startswith("CityGenFreeCam")
@@ -834,6 +846,13 @@ def play_features(world, man, slug):
             f"{s['ev100']:.2f} EV100, {s['live']} lights live"
             for n, s in (("night", an), ("dusk", ak), ("day", ad)) if s)
             + (" (ok)" if sky_ok else " (FAIL)"))
+    if an is not None and an.get("air") is not None:
+        RES["lines"].append(
+            f"air (AT4): fog {an.get('fog')} (its share {an.get('fog_share', 0):.2f}, volumetric "
+            f"to {an.get('fog_view_m', 0):.0f} m), {an.get('volumes', 0)} fog volumes registered, "
+            f"{an.get('volumes_live', 0)} live, {an.get('emitters', 0)} plumes "
+            f"({an.get('plume_cards', 0)} cards), engine settings tuned {an.get('tuned')} "
+            + ("(ok)" if air_ok else "(FAIL)"))
     RES["lines"].append(
         f"play features: map, menu, night ({night}, "
         f"{got['night'].get('light_pools', 0)} light pools), free camera "
@@ -878,6 +897,13 @@ def play_views(world, a, slug, prefix):
         if clear:
             cover = (atmos_status(world) or {}).get("cover", 0.8)
             unreal.SystemLibrary.execute_console_command(world, "CityGenAtmos.Cover 0.2")
+        # (AT4: a view named `*_noair` without the fog, the fog volumes and the plumes, the
+        # same view's before for AT4's pairs; the level's air again after it)
+        noair = v["name"].endswith("_noair")
+        if noair:
+            st0 = atmos_status(world) or {}
+            for c in ("CityGenAtmos.Fog 0", "CityGenAtmos.Air 0"):
+                unreal.SystemLibrary.execute_console_command(world, c)
         eye, tg = ue(*v["eye"]), ue(*v["target"])
         cam.set_actor_location(eye, False, True)
         pc.set_control_rotation(unreal.MathLibrary.find_look_at_rotation(eye, tg))
@@ -892,8 +918,15 @@ def play_views(world, a, slug, prefix):
         at = atmos_status(world)
         if clear:
             unreal.SystemLibrary.execute_console_command(world, f"CityGenAtmos.Cover {cover:g}")
+        if noair:
+            for c in (f"CityGenAtmos.Fog {int(bool(st0.get('fog')))}",
+                      f"CityGenAtmos.Air {int(bool(st0.get('air')))}"):
+                unreal.SystemLibrary.execute_console_command(world, c)
         log(f"play view {v['name']}" + (f": atmos {at['live']} live ({at['live_kinds']}), "
                                          f"{at['shadowed']} shadowed, {at.get('high', 0)} high"
+                                         + (f", fog {at.get('fog')}, {at.get('volumes_live', 0)} "
+                                            f"fog volumes live, {at.get('plume_cards', 0)} plume "
+                                            f"cards" if "air" in at else "")
                                          if at else ""))
     try:
         pc.player_camera_manager.unlock_fov()

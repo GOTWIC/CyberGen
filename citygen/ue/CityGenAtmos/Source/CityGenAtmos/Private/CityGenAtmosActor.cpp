@@ -8,6 +8,7 @@
 #include "Components/SkyLightComponent.h"
 #include "Components/ExponentialHeightFogComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Components/LocalFogVolumeComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/RectLightComponent.h"
 #include "Components/SceneComponent.h"
@@ -62,6 +63,13 @@ namespace
 	const FName SunKey(TEXT("cg.key=lighting.sun"));
 	const FName SkyKey(TEXT("cg.key=lighting.sky"));
 	constexpr double TimeEvery = 1.0 / 15.0; // s between moving the sun while the hour runs
+	// AT4: the plumes' cards (M_CgSteam on the engine's plane, rising by world position offset)
+	const TCHAR* SteamMaterialPath = TEXT("/Game/CityGen/Core/Atmos/M_CgSteam.M_CgSteam");
+	constexpr int32 PlumeData = 11;          // a card's custom data: foot xyz, phase, period,
+	                                         // rise, width, opacity, albedo rgb
+	constexpr float VolumeFalloff = 250.f;   // a volume's height fog falloff (Unreal's units)
+	constexpr float PlumeSpeedCm = 120.f;    // steam rises about 1.2 m/s ...
+	constexpr float SmokeSpeedCm = 200.f;    // ... smoke 2 m/s
 
 	uint32 Hash(uint32 A, uint32 B)
 	{
@@ -104,6 +112,9 @@ void ACityGenAtmos::BeginPlay()
 	CityCollection = LoadObject<UMaterialParameterCollection>(nullptr, CityMPC);
 	BeaconMaterial = LoadObject<UMaterialInterface>(nullptr, BeaconMaterialPath);
 	BeamMaterial = LoadObject<UMaterialInterface>(nullptr, BeamMaterialPath);
+	SteamMaterial = LoadObject<UMaterialInterface>(nullptr, SteamMaterialPath);
+	// AT4: the engine settings the air's budget needs, while the controller runs
+	ApplyCVars(bTuned);
 	// (the cells streamed in before it began play: each later one registers itself)
 	for (TActorIterator<ACityGenAtmosCell> It(GetWorld()); It; ++It)
 	{
@@ -120,6 +131,7 @@ void ACityGenAtmos::BeginPlay()
 	EnsureDome();
 	ApplyTime();
 	SetFog(bFog);
+	SetAir(bAir);
 	SetRain(bRain);
 	SetWet(bWet);
 	SetMegaLights(bMegaLights);
@@ -130,6 +142,8 @@ void ACityGenAtmos::EndPlay(const EEndPlayReason::Type Reason)
 {
 	SetPlayLamps(true);
 	ReleaseAll();
+	ReleaseVolumes();
+	ApplyCVars(false);
 	Super::EndPlay(Reason);
 }
 
@@ -147,8 +161,23 @@ void ACityGenAtmos::RegisterCell(ACityGenAtmosCell* Cell)
 	{
 		return;
 	}
-	const int32 N = Cell->LightInts.Num() / CityGenAtmosPack::Ints;
-	if (N <= 0 || Cell->LightFloats.Num() < N * CityGenAtmosPack::Floats)
+	int32 N = Cell->LightInts.Num() / CityGenAtmosPack::Ints;
+	if (Cell->LightFloats.Num() < N * CityGenAtmosPack::Floats)
+	{
+		N = 0;
+	}
+	// AT4: a cell may hold only fog volumes or plumes
+	int32 NV = Cell->VolumeInts.Num() / CityGenAtmosPack::VolInts;
+	if (Cell->VolumeFloats.Num() < NV * CityGenAtmosPack::VolFloats)
+	{
+		NV = 0;
+	}
+	int32 NE = Cell->EmitterInts.Num() / CityGenAtmosPack::EmitInts;
+	if (Cell->EmitterFloats.Num() < NE * CityGenAtmosPack::EmitFloats)
+	{
+		NE = 0;
+	}
+	if (N <= 0 && NV <= 0 && NE <= 0)
 	{
 		return;
 	}
@@ -196,9 +225,32 @@ void ACityGenAtmos::RegisterCell(ACityGenAtmosCell* Cell)
 		}
 		S.Lights.Add(L);
 	}
+	S.Volumes.Reset(NV);
+	for (int32 k = 0; k < NV; ++k)
+	{
+		const float* f = Cell->VolumeFloats.GetData() + k * CityGenAtmosPack::VolFloats;
+		const uint32 Flags = uint32(Cell->VolumeInts[k * CityGenAtmosPack::VolInts]);
+		FCityGenAtmosVolume V;
+		V.Pos = FVector(f[0], f[1], f[2]);
+		V.Yaw = f[3];
+		V.Ext = FVector(FMath::Max(100.f, f[4]), FMath::Max(100.f, f[5]), FMath::Max(100.f, f[6]));
+		V.Density = f[7];
+		V.Floor = f[8];
+		V.PhaseG = f[9];
+		V.Albedo = FLinearColor(f[10], f[11], f[12]);
+		V.Glow = f[13];
+		V.Schedule = uint8(Flags & 0xffu);
+		V.Kind = uint8((Flags >> 8) & 0xffu);
+		S.Volumes.Add(V);
+	}
+	S.Emitters = NE;
 	MakeFixtures(Slot);
+	MakePlumes(Slot);
 	SlotsAt.FindOrAdd(S.Key).Add(Slot);
 	SlotOfActor.Add(Cell, Slot);
+	RegisteredVolumes += NV;
+	RegisteredEmitters += NE;
+	VolumesAt = -1.0;
 	RegisteredLights += N;
 	++Registrations;
 	LiveAt = -1.0;
@@ -232,6 +284,27 @@ void ACityGenAtmos::UnregisterCell(ACityGenAtmosCell* Cell)
 	}
 	RegisteredLights -= S.Lights.Num();
 	DropFixtures(Slot);
+	// AT4: its live fog volumes back to the pool, its plumes gone
+	TArray<int64> VKeys;
+	LiveVolumes.GetKeys(VKeys);
+	for (int64 K : VKeys)
+	{
+		if (int32(K >> 24) == Slot)
+		{
+			TObjectPtr<USceneComponent> C;
+			if (LiveVolumes.RemoveAndCopyValue(K, C) && C)
+			{
+				C->SetVisibility(false);
+				FreeVolumes.Add(C);
+			}
+		}
+	}
+	DropPlumes(Slot);
+	RegisteredVolumes -= S.Volumes.Num();
+	RegisteredEmitters -= S.Emitters;
+	S.Volumes.Reset();
+	S.Emitters = 0;
+	VolumesAt = -1.0;
 	S.Lights.Reset();
 	S.High.Reset();
 	S.Actor.Reset();
@@ -363,7 +436,8 @@ void ACityGenAtmos::ApplyLight(ULocalLightComponent* C, const FCityGenAtmosLight
 	C->SetWorldLocationAndRotation(L.Pos, L.Rot);
 	C->SetLightColor(L.Color);
 	C->SetAttenuationRadius(L.ReachCm);
-	C->SetVolumetricScatteringIntensity(VolumetricScattering);
+	// (AT4: light shafts by kind: the strong lights scatter in the haze, the small many none)
+	C->SetVolumetricScatteringIntensity(VolumetricScattering * ScatterOf(L.Kind));
 	// (a sign's or shopfront's stand-in leaves glossy surfaces to reflect the face itself)
 	C->SetSpecularScale(L.bNoSpecular ? 0.f : 1.f);
 	if (L.Shape == 2)
@@ -664,6 +738,13 @@ void ACityGenAtmos::SetHour(float InHour)
 	ApplyTime();
 	PushParameters();
 	LiveAt = -1.0;
+	// AT4: the fog by the hour, the volumes' and plumes' schedules
+	if (bFog)
+	{
+		SetFog(true);
+	}
+	VolumesAt = -1.0;
+	UpdatePlumeRates();
 }
 
 // -- AT2: animation, the high tier's settings, the fixtures' stand-ins --
@@ -801,7 +882,8 @@ void ACityGenAtmos::MakeFixtures(int32 Slot)
 				B->SetCustomPrimitiveDataFloat(0, L.Color.R);
 				B->SetCustomPrimitiveDataFloat(1, L.Color.G);
 				B->SetCustomPrimitiveDataFloat(2, L.Color.B);
-				B->SetCustomPrimitiveDataFloat(3, BeamBase * BeamGlow);
+				// (AT4: brighter in fog: the beam is the haze the light scatters in)
+				B->SetCustomPrimitiveDataFloat(3, BeamBase * BeamGlow * (1.f + BeamFogGain * FogShare()));
 				B->SetCustomPrimitiveDataFloat(4, BeamCm * 0.5f);
 				B->SetVisibility(bFixturesShown);
 				B->RegisterComponent();
@@ -941,21 +1023,422 @@ void ACityGenAtmos::SetFog(bool bOn)
 	}
 	UExponentialHeightFogComponent* F = Fog->GetComponent();
 	F->SetVisibility(bOn);
+	UpdateBeamGlow();
 	if (!bOn)
+	{
+		PushParameters();
+		return;
+	}
+	// AT4: the plan's fog by the hour (thicker in the cool night), its start, its reach and
+	// its scattering (forward: halos round the lamps, shafts along the beams)
+	F->SetFogDensity(FogDensity * FogShare());
+	F->SetFogHeightFalloff(FogFalloff);
+	F->SetStartDistance(FogStartM * 100.f);
+	// (the inscattering is the sky's: a dark haze by night, the overcast's grey by day, between
+	// at dusk in log space; the lights' own colors come from the volumetric fog they light)
+	const FLinearColor NightIn(0.004f, 0.005f, 0.008f), DayIn(0.16f, 0.18f, 0.21f);
+	const float D = FMath::Clamp(1.f - NightNow, 0.f, 1.f);
+	F->SetFogInscatteringColor(FLinearColor(
+		FMath::Exp(FMath::Lerp(FMath::Loge(NightIn.R), FMath::Loge(DayIn.R), D)),
+		FMath::Exp(FMath::Lerp(FMath::Loge(NightIn.G), FMath::Loge(DayIn.G), D)),
+		FMath::Exp(FMath::Lerp(FMath::Loge(NightIn.B), FMath::Loge(DayIn.B), D))));
+	F->SetVolumetricFog(bVolumetricFog);
+	F->SetVolumetricFogScatteringDistribution(FogPhaseG);
+	F->SetVolumetricFogExtinctionScale(FogVolumetric);
+	F->SetVolumetricFogAlbedo(FogAlbedo.ToFColor(true));
+	F->SetVolumetricFogDistance(FogViewM * 100.f);
+	PushParameters();
+}
+
+// -- AT4: the air: fog volumes, plumes, light shafts, the engine settings --
+
+float ACityGenAtmos::FogShare() const
+{
+	if (!bFog)
+	{
+		return 0.f;
+	}
+	if (FogHours.Num() < 24)
+	{
+		return 1.f;
+	}
+	const float Hr = FMath::Fmod(Hour + 24.f, 24.f);
+	const int32 H = FMath::Clamp(FMath::FloorToInt32(Hr), 0, 23);
+	return FMath::Lerp(FogHours[H], FogHours[(H + 1) % 24], FMath::Clamp(Hr - float(H), 0.f, 1.f));
+}
+
+float ACityGenAtmos::ScatterOf(uint8 Kind) const
+{
+	return KindScatter.IsValidIndex(Kind) ? KindScatter[Kind] : 1.f;
+}
+
+void ACityGenAtmos::UpdateBeamGlow()
+{
+	const float G = BeamBase * BeamGlow * (1.f + BeamFogGain * FogShare());
+	for (const FSlot& S : Slots)
+	{
+		for (const TPair<int32, TWeakObjectPtr<UStaticMeshComponent>>& B : S.Beams)
+		{
+			if (UStaticMeshComponent* C = B.Value.Get())
+			{
+				C->SetCustomPrimitiveDataFloat(3, G);
+			}
+		}
+	}
+}
+
+void ACityGenAtmos::ApplyCVars(bool bOn)
+{
+	// (the tuned settings while the controller runs; each one's value before the first time,
+	// the project's, kept to put back)
+	if (bOn && !bCVarsApplied)
+	{
+		for (const FString& Line : RenderCVars)
+		{
+			FString Name, Value;
+			if (!Line.Split(TEXT("="), &Name, &Value))
+			{
+				continue;
+			}
+			if (IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(*Name))
+			{
+				if (!SavedCVars.Contains(Name))
+				{
+					SavedCVars.Add(Name, V->GetString());
+				}
+				V->Set(*Value, ECVF_SetByCode);
+			}
+		}
+		bCVarsApplied = true;
+	}
+	else if (!bOn && bCVarsApplied)
+	{
+		for (const TPair<FString, FString>& KV : SavedCVars)
+		{
+			if (IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(*KV.Key))
+			{
+				V->Set(*KV.Value, ECVF_SetByCode);
+			}
+		}
+		bCVarsApplied = false;
+	}
+}
+
+void ACityGenAtmos::SetTuned(bool bOn)
+{
+	bTuned = bOn;
+	ApplyCVars(bOn);
+}
+
+void ACityGenAtmos::SetAir(bool bOn)
+{
+	bAir = bOn;
+	if (!bOn)
+	{
+		ReleaseVolumes();
+	}
+	ShowPlumes(bOn);
+	VolumesAt = -1.0;
+}
+
+void ACityGenAtmos::ReleaseVolumes()
+{
+	for (const TPair<int64, TObjectPtr<USceneComponent>>& KV : LiveVolumes)
+	{
+		if (KV.Value)
+		{
+			KV.Value->SetVisibility(false);
+			FreeVolumes.Add(KV.Value);
+		}
+	}
+	LiveVolumes.Reset();
+}
+
+void ACityGenAtmos::UpdateVolumes()
+{
+	// the nearest MaxVolumes fog volumes within VolumeRangeM of the view (by the distance to
+	// their bound), each at its schedule's share, the farthest fifth fading
+	const FVector View = ViewLocation();
+	const double RangeCm = double(VolumeRangeM) * 100.0;
+	const double CellCm = FMath::Max(1.0, double(CellM) * 100.0);
+	// (a volume belongs to the cell of its middle; a smog puff reaches 2 cells past it)
+	const int32 Reach = FMath::CeilToInt32(RangeCm / CellCm) + 2;
+	const FIntPoint VC = CellOf(View);
+	TArray<TPair<double, int64>> Near;
+	for (int32 dx = -Reach; dx <= Reach; ++dx)
+	{
+		for (int32 dy = -Reach; dy <= Reach; ++dy)
+		{
+			const TArray<int32>* At = SlotsAt.Find(FIntPoint(VC.X + dx, VC.Y + dy));
+			if (!At)
+			{
+				continue;
+			}
+			for (int32 Slot : *At)
+			{
+				const TArray<FCityGenAtmosVolume>& Vs = Slots[Slot].Volumes;
+				for (int32 i = 0; i < Vs.Num(); ++i)
+				{
+					const FCityGenAtmosVolume& V = Vs[i];
+					if (ScheduleAt(V.Schedule) < 0.02f)
+					{
+						continue;
+					}
+					const double D = FMath::Max(0.0, FVector::Dist(V.Pos, View) - double(V.Ext.GetMax()));
+					if (D <= RangeCm)
+					{
+						Near.Add(TPair<double, int64>(D, LiveKey(Slot, i)));
+					}
+				}
+			}
+		}
+	}
+	CandidatesVolumes = Near.Num();
+	Near.Sort([](const TPair<double, int64>& A, const TPair<double, int64>& B)
+	{
+		return A.Key < B.Key || (A.Key == B.Key && A.Value < B.Value);
+	});
+	Near.SetNum(FMath::Min(Near.Num(), FMath::Max(0, MaxVolumes)));
+	TSet<int64> Want;
+	for (const TPair<double, int64>& N : Near)
+	{
+		Want.Add(N.Value);
+	}
+	TArray<int64> Keys;
+	LiveVolumes.GetKeys(Keys);
+	for (int64 K : Keys)
+	{
+		if (!Want.Contains(K))
+		{
+			TObjectPtr<USceneComponent> C;
+			LiveVolumes.RemoveAndCopyValue(K, C);
+			if (C)
+			{
+				C->SetVisibility(false);
+				FreeVolumes.Add(C);
+			}
+		}
+	}
+	for (const TPair<double, int64>& N : Near)
+	{
+		const int32 Slot = int32(N.Value >> 24);
+		const FCityGenAtmosVolume& V = Slots[Slot].Volumes[int32(N.Value & 0xffffff)];
+		TObjectPtr<USceneComponent>* Have = LiveVolumes.Find(N.Value);
+		ULocalFogVolumeComponent* C = Have ? Cast<ULocalFogVolumeComponent>(Have->Get()) : nullptr;
+		if (!C)
+		{
+			C = FreeVolumes.Num() ? Cast<ULocalFogVolumeComponent>(FreeVolumes.Pop(EAllowShrinking::No).Get()) : nullptr;
+			if (!C)
+			{
+				C = NewObject<ULocalFogVolumeComponent>(this);
+				C->SetupAttachment(RootComponent);
+				C->SetUsingAbsoluteLocation(true);
+				C->SetUsingAbsoluteRotation(true);
+				C->SetUsingAbsoluteScale(true);
+				C->SetVisibility(false);
+				C->RegisterComponent();
+				AllVolumes.Add(C);
+			}
+			LiveVolumes.Add(N.Value, C);
+		}
+		const float Fade = float(FMath::Clamp((RangeCm - N.Key) / (FadeShare * RangeCm), 0.0, 1.0));
+		const float K = ScheduleAt(V.Schedule) * VolumeGain * Fade;
+		const FTransform Xf(FRotator(0.f, V.Yaw, 0.f), V.Pos, V.Ext / ULocalFogVolumeComponent::GetBaseVolumeSize());
+		if (!C->GetComponentTransform().Equals(Xf, 0.5))
+		{
+			C->SetWorldTransform(Xf);
+		}
+		C->SetRadialFogExtinction(V.Density * (1.f - V.Floor) * K);
+		C->SetHeightFogExtinction(V.Density * V.Floor * K);
+		C->SetHeightFogFalloff(VolumeFalloff);
+		C->SetFogPhaseG(V.PhaseG);
+		C->SetFogAlbedo(V.Albedo);
+		// (mist and smog glow with the lit city by night; haze under a deck and in a tunnel,
+		// kinds 2 and 3, always: their own lights)
+		const float Lit = V.Kind >= 2 ? 1.f : NightNow;
+		C->SetFogEmissive(V.Albedo * (VolumeGlow * V.Glow * Lit * Fade));
+		if (!C->IsVisible())
+		{
+			C->SetVisibility(true);
+		}
+	}
+}
+
+void ACityGenAtmos::MakePlumes(int32 Slot)
+{
+	// a cell's plumes: one instanced component of cards, Puffs[kind] a plume, each card a puff
+	// rising from its foot by world position offset (M_CgSteam), its life a phase of the
+	// plume's period, shown within EmitterRangeM
+	if (!Slots.IsValidIndex(Slot) || !GetWorld())
 	{
 		return;
 	}
-	F->SetFogDensity(FogDensity);
-	F->SetFogHeightFalloff(FogFalloff);
-	// (a dark night haze: the inscattering is the sky's, very low; the lights' own color
-	// comes from the volumetric fog they light)
-	F->SetFogInscatteringColor(FLinearColor(0.004f, 0.005f, 0.008f));
-	F->SetVolumetricFog(bVolumetricFog);
-	F->SetVolumetricFogScatteringDistribution(0.6f);
-	F->SetVolumetricFogExtinctionScale(FogVolumetric);
-	F->SetVolumetricFogAlbedo(FogAlbedo.ToFColor(true));
-	F->SetVolumetricFogDistance(20000.f);
-	PushParameters();
+	FSlot& S = Slots[Slot];
+	ACityGenAtmosCell* Cell = S.Actor.Get();
+	if (!Cell || S.Emitters <= 0)
+	{
+		return;
+	}
+	if (!SteamMaterial)
+	{
+		SteamMaterial = LoadObject<UMaterialInterface>(nullptr, SteamMaterialPath);
+	}
+	UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, RainMesh);
+	if (!Mesh || !SteamMaterial)
+	{
+		return;
+	}
+	UInstancedStaticMeshComponent* I = NewObject<UInstancedStaticMeshComponent>(this);
+	I->SetupAttachment(RootComponent);
+	I->SetUsingAbsoluteLocation(true);
+	I->SetUsingAbsoluteRotation(true);
+	I->SetUsingAbsoluteScale(true);
+	I->SetStaticMesh(Mesh);
+	I->SetMaterial(0, SteamMaterial);
+	I->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	I->SetCastShadow(false);
+	I->SetMobility(EComponentMobility::Movable);
+	I->bAffectDistanceFieldLighting = false;
+	I->bAffectDynamicIndirectLighting = false;
+	I->bVisibleInRayTracing = false;
+	I->NumCustomDataFloats = PlumeData;
+	I->SetCullDistances(0, int32(EmitterRangeM * 100.f));
+	S.PlumeSchedule.Reset();
+	S.PlumeRate.Reset();
+	const float* F = Cell->EmitterFloats.GetData();
+	const int32* N = Cell->EmitterInts.GetData();
+	for (int32 e = 0; e < S.Emitters; ++e)
+	{
+		const float* f = F + e * CityGenAtmosPack::EmitFloats;
+		const uint32 Flags = uint32(N[e * CityGenAtmosPack::EmitInts]);
+		const uint32 Seed = uint32(N[e * CityGenAtmosPack::EmitInts + 1]);
+		const uint8 Kind = uint8((Flags >> 8) & 0xffu);
+		const int32 K = FMath::Clamp(Puffs.IsValidIndex(Kind) ? Puffs[Kind] : 4, 1, 12);
+		const FVector Foot(f[0], f[1], f[2]);
+		const float Width = FMath::Max(10.f, f[3]);
+		const float Rise = FMath::Max(50.f, f[4]);
+		const bool bSmoke = EmitterKinds.IsValidIndex(Kind) && EmitterKinds[Kind] == TEXT("smoke");
+		const float Period = Rise / (bSmoke ? SmokeSpeedCm : PlumeSpeedCm);
+		// (the card's bounds hold its plume: a stood-up plane round its middle, scaled to it)
+		const float Sc = 1.3f * FMath::Max(Rise, 4.f * Width) / 100.f;
+		const float Ph0 = float(Hash(Seed, 7u) & 0xffff) / 65536.f;
+		for (int32 k = 0; k < K; ++k)
+		{
+			const int32 Idx = I->AddInstance(FTransform(FRotator(-90.f, 0.f, 0.f),
+				Foot + FVector(0.0, 0.0, 0.5 * Rise), FVector(Sc)), true);
+			const float D[PlumeData] = {float(Foot.X), float(Foot.Y), float(Foot.Z),
+				FMath::Frac(Ph0 + float(k) / float(K)), Period, Rise, Width, f[5], f[6], f[7], f[8]};
+			for (int32 c = 0; c < PlumeData; ++c)
+			{
+				I->SetCustomDataValue(Idx, c, D[c], false);
+			}
+			S.PlumeSchedule.Add(uint8(Flags & 0xffu));
+			S.PlumeRate.Add(f[5]);
+		}
+		PlumeCards += K;
+	}
+	I->SetVisibility(bPlumesShown);
+	I->RegisterComponent();
+	PlumeComps.Add(I);
+	S.Plumes = I;
+	PlumeHour = -100.f;
+	UpdatePlumeRates();
+}
+
+void ACityGenAtmos::DropPlumes(int32 Slot)
+{
+	if (!Slots.IsValidIndex(Slot))
+	{
+		return;
+	}
+	FSlot& S = Slots[Slot];
+	if (UInstancedStaticMeshComponent* I = S.Plumes.Get())
+	{
+		PlumeCards -= I->GetInstanceCount();
+		PlumeComps.Remove(I);
+		I->DestroyComponent();
+	}
+	S.Plumes.Reset();
+	S.PlumeSchedule.Reset();
+	S.PlumeRate.Reset();
+}
+
+void ACityGenAtmos::ShowPlumes(bool bOn)
+{
+	bPlumesShown = bOn;
+	for (UPrimitiveComponent* C : PlumeComps)
+	{
+		if (C)
+		{
+			C->SetVisibility(bOn);
+		}
+	}
+}
+
+FString ACityGenAtmos::PlumeDebug(const FString& Material)
+{
+	UMaterialInterface* Test = Material.IsEmpty() ? nullptr : LoadObject<UMaterialInterface>(nullptr, *Material);
+	const FVector View = ViewLocation();
+	FString Out;
+	TArray<TPair<double, UInstancedStaticMeshComponent*>> Near;
+	for (UPrimitiveComponent* C : PlumeComps)
+	{
+		if (UInstancedStaticMeshComponent* I = Cast<UInstancedStaticMeshComponent>(C))
+		{
+			if (Test)
+			{
+				I->SetMaterial(0, Test);
+			}
+			Near.Add(TPair<double, UInstancedStaticMeshComponent*>(FVector::Dist(I->Bounds.Origin, View), I));
+		}
+	}
+	Near.Sort([](const auto& A, const auto& B) { return A.Key < B.Key; });
+	for (int32 k = 0; k < FMath::Min(3, Near.Num()); ++k)
+	{
+		UInstancedStaticMeshComponent* I = Near[k].Value;
+		FTransform X;
+		if (I->GetInstanceCount() > 0)
+		{
+			I->GetInstanceTransform(0, X, true);
+		}
+		const UMaterialInterface* M = I->GetMaterial(0);
+		Out += FString::Printf(TEXT("%s{\"dist_m\": %.0f, \"instances\": %d, \"visible\": %s, \"registered\": %s, "
+			"\"proxy\": %s, \"bounds_r_m\": %.1f, \"cull\": [%d, %d], \"custom\": %d, \"data\": %d, "
+			"\"first\": [%.0f, %.0f, %.0f], \"scale\": %.2f, \"material\": \"%s\"}"),
+			Out.IsEmpty() ? TEXT("") : TEXT(", "), Near[k].Key / 100.0, I->GetInstanceCount(),
+			I->IsVisible() ? TEXT("true") : TEXT("false"), I->IsRegistered() ? TEXT("true") : TEXT("false"),
+			I->SceneProxy ? TEXT("true") : TEXT("false"), I->Bounds.SphereRadius / 100.0,
+			I->InstanceStartCullDistance, I->InstanceEndCullDistance, I->NumCustomDataFloats,
+			I->PerInstanceSMCustomData.Num(), X.GetLocation().X, X.GetLocation().Y, X.GetLocation().Z,
+			X.GetScale3D().X, M ? *M->GetPathName() : TEXT("none"));
+	}
+	return FString::Printf(TEXT("{\"components\": %d, \"shown\": %s, \"near\": [%s]}"), PlumeComps.Num(),
+		bPlumesShown ? TEXT("true") : TEXT("false"), *Out);
+}
+
+void ACityGenAtmos::UpdatePlumeRates()
+{
+	// each card's opacity: its plume's at its schedule's share of the hour (again only when
+	// the hour has moved a tenth)
+	if (FMath::Abs(Hour - PlumeHour) < 0.1f)
+	{
+		return;
+	}
+	PlumeHour = Hour;
+	for (FSlot& S : Slots)
+	{
+		UInstancedStaticMeshComponent* I = S.Plumes.Get();
+		if (!S.bUsed || !I)
+		{
+			continue;
+		}
+		const int32 N = FMath::Min(I->GetInstanceCount(), S.PlumeRate.Num());
+		for (int32 k = 0; k < N; ++k)
+		{
+			I->SetCustomDataValue(k, 7, S.PlumeRate[k] * ScheduleAt(S.PlumeSchedule[k]), false);
+		}
+		I->MarkRenderStateDirty();
+	}
 }
 
 void ACityGenAtmos::EnsureRain()
@@ -1062,6 +1545,7 @@ void ACityGenAtmos::PushParameters()
 		UKismetMaterialLibrary::SetScalarParameterValue(this, AtmosCollection, TEXT("Wetness"), bWet ? 1.f : 0.f);
 		UKismetMaterialLibrary::SetScalarParameterValue(this, AtmosCollection, TEXT("FogDensity"), bFog ? FogDensity : 0.f);
 		UKismetMaterialLibrary::SetScalarParameterValue(this, AtmosCollection, TEXT("WindMS"), WindMS);
+		UKismetMaterialLibrary::SetScalarParameterValue(this, AtmosCollection, TEXT("SteamGain"), SteamGain);
 	}
 	if (CityCollection && ((bLights && HasPlan()) || (bSky && HasSky())))
 	{
@@ -1085,7 +1569,19 @@ void ACityGenAtmos::Tick(float DeltaSeconds)
 		{
 			ApplyTime();
 			PushParameters();
+			// (AT4: the fog by the hour, the plumes' schedules)
+			if (bFog)
+			{
+				SetFog(true);
+			}
+			UpdatePlumeRates();
 		}
+	}
+	// AT4: the live fog volumes near the view, by day and by night
+	if (bAir && (VolumesAt < 0.0 || Now - VolumesAt > LiveEvery))
+	{
+		VolumesAt = Now;
+		UpdateVolumes();
 	}
 	// (the dome stays where it is, round the city: its material meets the deck along the view
 	// ray from the camera's own position, so only a camera DomeRecenterCm from its middle moves
@@ -1179,7 +1675,10 @@ FString ACityGenAtmos::GetStatus() const
 		"\"high_m\": %.0f, \"candidates_high\": %d, \"animated\": %d, \"beacons\": %d, \"beams\": %d, "
 		"\"fixtures\": %s, \"sky\": %s, \"night_now\": %.3f, \"ev100\": %.2f, \"sun_elev\": %.2f, "
 		"\"moon_elev\": %.2f, \"moon_lux\": %.4f, \"time_speed\": %.3f, \"dome\": %s, \"deck_m\": %.0f, "
-		"\"cover\": %.2f, \"glow\": %s, \"day_hour\": %.2f, \"dusk_hour\": %.2f, \"night_hour\": %.2f}"),
+		"\"cover\": %.2f, \"glow\": %s, \"day_hour\": %.2f, \"dusk_hour\": %.2f, \"night_hour\": %.2f, "
+		"\"air\": %s, \"volumes\": %d, \"volumes_live\": %d, \"candidates_volumes\": %d, \"emitters\": %d, "
+		"\"plume_cards\": %d, \"plumes_shown\": %s, \"fog_share\": %.3f, \"fog_view_m\": %.0f, \"tuned\": %s, "
+		"\"cvars\": %d}"),
 		HasPlan() ? TEXT("true") : TEXT("false"), *City, *PlanHash, RegisteredLights, SlotOfActor.Num(),
 		Registrations, bLights ? TEXT("true") : TEXT("false"), Live.Num(), Spots, Points, Rects, *Kinds,
 		Shadowed.Num(), Candidates, MaxLive, MidRangeM, MaxShadowed, UpdateMs, UpdateMsMax, Scale(), Hour,
@@ -1190,7 +1689,10 @@ FString ACityGenAtmos::GetStatus() const
 		bFixturesShown ? TEXT("true") : TEXT("false"),
 		(bSky && HasSky()) ? TEXT("true") : TEXT("false"), NightNow, EVNow, SunElev, MoonElev, MoonLux,
 		TimeSpeed, Dome ? TEXT("true") : TEXT("false"), CloudDeckM, CoverNow,
-		SkyGlow ? TEXT("true") : TEXT("false"), DayHour, DuskHour, NightHour);
+		SkyGlow ? TEXT("true") : TEXT("false"), DayHour, DuskHour, NightHour,
+		bAir ? TEXT("true") : TEXT("false"), RegisteredVolumes, LiveVolumes.Num(), CandidatesVolumes,
+		RegisteredEmitters, PlumeCards, bPlumesShown ? TEXT("true") : TEXT("false"), FogShare(), FogViewM,
+		bCVarsApplied ? TEXT("true") : TEXT("false"), SavedCVars.Num());
 }
 
 // -- AT3: the sky and time --

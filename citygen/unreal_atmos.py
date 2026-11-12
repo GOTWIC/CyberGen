@@ -22,6 +22,11 @@
   the named hours), and the deck's glow raster copied beside the manifest
   (`BUILD/unreal/atmos_sky_glow.png`, `GLOW`), which the import makes a texture the
   controller's sky reads; both in the controller's hash.
+- AT4: the packing's version 3: a cell also holds its fog volumes (`pack_volume`) and steam
+  and smoke emitters (`pack_emitter`), a cell made where any of the three lie; the
+  controller's air (`air_settings`: the height and volumetric fog by the hour, each light
+  kind's volumetric scattering, the live sets of volumes and plumes, the engine settings it
+  runs with); a plan whose air check failed is not delivered.
 """
 
 from __future__ import annotations
@@ -39,9 +44,17 @@ DATA = "atmos.json"                         # BUILD/unreal/atmos.json
 GLOW = "atmos_sky_glow.png"                 # BUILD/unreal/atmos_sky_glow.png (AT3)
 CONTROLLER_KEY = "atmos"
 CELL_M = 128.0                              # World Partition's main cells (unreal.MAIN_CELL_M)
-PACK_VERSION = 2                            # 2 (AT2): the high tier, a blink or a sweep
+PACK_VERSION = 3                            # 2 (AT2): the high tier, a blink or a sweep;
+                                            # 3 (AT4): a cell's fog volumes and emitters
 FLOATS = 19                                 # CityGenAtmosCell.h, CityGenAtmosPack
 INTS = 2
+VFLOATS = 14                                # AT4: a fog volume (CityGenAtmosPack::VolFloats)
+VINTS = 1
+EFLOATS = 9                                 # AT4: an emitter (CityGenAtmosPack::EmitFloats)
+EINTS = 2
+VOLUME_KINDS = ("mist", "smog", "haze", "tunnel_haze", "steam_bank")
+EMITTER_KINDS = ("steam", "smoke", "exhaust", "cooking")
+EMITTER_MOUNTS = ("manhole", "drain", "vent", "roof", "stall", "chimney", "stove")
 SHAPES = {"spot": 0, "point": 1, "rect": 2}
 ANIMS = {"blink": 1, "sweep": 2}
 QUARTERS = {(0, 0): "sw", (1, 0): "se", (0, 1): "nw", (1, 1): "ne"}
@@ -136,6 +149,63 @@ def pack(L: dict, schedules: list[str], kinds: list[str], mounts: list[str]):
     return f, [flags, seed]
 
 
+def pack_volume(V: dict, schedules: list[str]):
+    """AT4: a fog volume as the cell actor holds it (CityGenAtmosCell.h): VFLOATS floats in
+    Unreal's frame (its middle in cm, its yaw, its half sizes in cm, density (1/m), floor
+    share, phase g, albedo r, g, b, glow) and VINTS ints (flags: schedule index, kind index << 8)."""
+    x, y, z = V["center"]
+    ex, ey, ez = V["extent"]
+    a = V["albedo"]
+    f = [_r(x * 100.0, 1), _r(-y * 100.0, 1), _r(z * 100.0, 1), _r(-V.get("yaw_deg", 0.0)),
+         _r(ex * 100.0, 1), _r(ey * 100.0, 1), _r(ez * 100.0, 1), _r(V["density"], 5),
+         _r(V.get("floor", 0.0)), _r(V.get("phase_g", 0.4)), _r(a[0], 4), _r(a[1], 4),
+         _r(a[2], 4), _r(V.get("glow", 0.0))]
+    return f, [schedules.index(V["schedule"]) | (VOLUME_KINDS.index(V["kind"]) << 8)]
+
+
+def pack_emitter(E: dict, schedules: list[str]):
+    """AT4: a steam or smoke plume as the cell actor holds it: EFLOATS floats (its foot in
+    cm, its width and rise in cm, its opacity, its albedo r, g, b) and EINTS ints (flags:
+    schedule index, kind index << 8, mount index << 16; a seed from its record's hash)."""
+    x, y, z = E["pos"]
+    c = E.get("color") or [0.8, 0.8, 0.8]
+    f = [_r(x * 100.0, 1), _r(-y * 100.0, 1), _r(z * 100.0, 1),
+         _r(float(E.get("width_m", 1.0)) * 100.0, 1), _r(float(E.get("rise_m", 5.0)) * 100.0, 1),
+         _r(E["rate"]), _r(c[0], 4), _r(c[1], 4), _r(c[2], 4)]
+    flags = (schedules.index(E["schedule"]) | (EMITTER_KINDS.index(E["kind"]) << 8)
+             | (EMITTER_MOUNTS.index(E.get("mount", "manhole")) << 16))
+    seed = int(E["hash"][:8], 16)
+    if seed >= 2 ** 31:
+        seed -= 2 ** 32
+    return f, [flags, seed]
+
+
+def air_settings(plan: dict) -> dict:
+    """AT4: the controller's air from the plan's `air` (an AT3 plan has none: {}): the height
+    and volumetric fog of the look and weather (over the weather's own), the fog by the hour,
+    each light kind's volumetric scattering (light shafts), the searchlight beams' fog gain,
+    the live sets, the engine settings it runs with."""
+    a = plan.get("air")
+    if not a:
+        return {}
+    kinds = _kinds()
+    return {"air": True, "fog_density": float(a["fog_density"]),
+            "fog_falloff": float(a["fog_falloff"]), "fog_start_m": float(a["fog_start_m"]),
+            "fog_albedo_linear": [float(v) for v in a["fog_albedo"]],
+            "fog_volumetric": float(a["fog_extinction"]), "fog_view_m": float(a["fog_view_m"]),
+            "fog_phase_g": float(a["phase_g"]),
+            "fog_hours": [float(v) for v in a["fog_hours"]],
+            "kind_scatter": [float(a["scatter"].get(k, 1.0)) for k in kinds],
+            "beam_fog_gain": float(a["beam_fog_gain"]),
+            "max_volumes": int(a["max_volumes"]), "volume_range_m": float(a["volume_range_m"]),
+            "emitter_range_m": float(a["emitter_range_m"]),
+            "emitter_kinds": list(EMITTER_KINDS),
+            "puffs": [int(a["puffs"].get(k, 4)) for k in EMITTER_KINDS],
+            "cvars": [f"{k}={v}" for k, v in sorted(a.get("cvars", {}).items())],
+            "volumes": len(plan.get("volumes") or []),
+            "emitters": len(plan.get("emitters") or [])}
+
+
 def cell_of(x: float, y: float) -> tuple[int, int]:
     return int(math.floor(x / CELL_M)), int(math.floor(y / CELL_M))
 
@@ -200,26 +270,54 @@ def atmos_data(pdir: Path) -> tuple[dict | None, str]:
     faces = (plan.get("checks") or {}).get("faces")
     if faces is not None and not faces.get("ok"):
         return None, "the plan's faces check failed (AT2: a lit face floods its wall)"
+    air = (plan.get("checks") or {}).get("air")
+    if air is not None and not air.get("ok"):
+        return None, "the plan's air check failed (AT4: an emitter off its source, a volume " \
+                     "off its water or district, or a tile over its budget)"
     schedules = sorted(plan["schedules"])
     kinds, mounts = _kinds(), _mounts()
     cells: dict[tuple[int, int], list[dict]] = {}
+    vols: dict[tuple[int, int], list[dict]] = {}
+    emits: dict[tuple[int, int], list[dict]] = {}
     for t in plan["tiles"]:
         for L in json.loads((pdir / t["file"]).read_text(encoding="utf-8"))["lights"]:
             cells.setdefault(cell_of(L["pos"][0], L["pos"][1]), []).append(L)
+    # AT4: a cell's fog volumes (by their middle) and emitters (by their foot)
+    for V in plan.get("volumes") or []:
+        vols.setdefault(cell_of(V["center"][0], V["center"][1]), []).append(V)
+    for E in plan.get("emitters") or []:
+        emits.setdefault(cell_of(E["pos"][0], E["pos"][1]), []).append(E)
     out = []
-    for (ix, iy) in sorted(cells):
-        ls = sorted(cells[(ix, iy)], key=lambda r: r["id"])
+    for (ix, iy) in sorted(set(cells) | set(vols) | set(emits)):
+        ls = sorted(cells.get((ix, iy), []), key=lambda r: r["id"])
+        vs = sorted(vols.get((ix, iy), []), key=lambda r: r["id"])
+        es = sorted(emits.get((ix, iy), []), key=lambda r: r["id"])
         fl, it = [], []
         for L in ls:
             f, i = pack(L, schedules, kinds, mounts)
             fl += f
             it += i
+        vf, vi, ef, ei = [], [], [], []
+        for V in vs:
+            f, i = pack_volume(V, schedules)
+            vf += f
+            vi += i
+        for E in es:
+            f, i = pack_emitter(E, schedules)
+            ef += f
+            ei += i
         tile, name = cell_name(ix, iy)
-        out.append({"key": f"atmos.lights.{name}", "cell": name, "tile": tile,
-                    "center": [(ix + 0.5) * CELL_M, (iy + 0.5) * CELL_M, 0.0],
-                    "count": len(ls),
-                    "hash": _sha16([PACK_VERSION, [L["hash"] for L in ls]]),
-                    "floats": fl, "ints": it})
+        rec = {"key": f"atmos.lights.{name}", "cell": name, "tile": tile,
+               "center": [(ix + 0.5) * CELL_M, (iy + 0.5) * CELL_M, 0.0],
+               "count": len(ls),
+               "hash": _sha16([PACK_VERSION, [L["hash"] for L in ls]] +
+                              ([[V["hash"] for V in vs], [E["hash"] for E in es]]
+                               if vs or es else [])),
+               "floats": fl, "ints": it}
+        if vs or es:
+            rec.update({"volumes": len(vs), "emitters": len(es), "volume_floats": vf,
+                        "volume_ints": vi, "emitter_floats": ef, "emitter_ints": ei})
+        out.append(rec)
     ws = plan.get("weather_state") or {}
     tiers = plan.get("tiers") or {}
     ctl = {"city": plan["city"], "plan_hash": hashlib.sha256(text.encode("utf-8"))
@@ -239,6 +337,7 @@ def atmos_data(pdir: Path) -> tuple[dict | None, str]:
            "max_high": int(tiers.get("high_max", 0)),
            "high_range_m": float(tiers.get("high_m", 750.0)), "cell_m": CELL_M}
     ctl.update(sky_settings(plan))
+    ctl.update(air_settings(plan))
     return {"version": PACK_VERSION, "controller": ctl, "cells": out}, ""
 
 
@@ -274,6 +373,8 @@ def write_atmos(build: str | Path, given: str | Path | None = None) -> dict | No
     return {"file": f"unreal/{DATA}", "plan": str(pdir), "plan_hash": ctl["plan_hash"],
             "key": CONTROLLER_KEY, "hash": _sha16([PACK_VERSION, ctl]), "glow": glow,
             "lights": sum(c["count"] for c in data["cells"]),
+            "volumes": sum(c.get("volumes", 0) for c in data["cells"]),
+            "emitters": sum(c.get("emitters", 0) for c in data["cells"]),
             "cells": [{k: c[k] for k in ("key", "cell", "tile", "center", "count", "hash")}
                       for c in data["cells"]]}
 

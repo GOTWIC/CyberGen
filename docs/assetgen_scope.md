@@ -238,6 +238,13 @@ also reads the second ask wherever `signs.json` meets it (a slot record that is 
 with `cell` and `face`, or a top-level `faces` map by slot id; a cell's `emit`), and derives
 the luminance too until then: the page cell's mean brightness.
 
+AT4 adds a fifth, **flues for its smoke** (AG4, AG5): a chimney on an industrial roof
+(warehouses, sheds, yards and labs in industrial, spaceport, megablock and old-town districts)
+and a stove pipe on a shanty stack, under each plume of mount `chimney` or `stove` (the plan's
+`emitters`, the plume's foot over the flue's top). AT4's steam needs nothing more: it reads
+AG7's manholes and drains from the street packs (materials `manhole` and `grate`), M3's roof
+mechanical units (AG4's roof equipment), M6's stalls and M9's vents as drawn.
+
 ## 5. Feature catalog
 
 ### 5.1 Buildings

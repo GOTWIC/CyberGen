@@ -1,14 +1,156 @@
 {
  "$defs": {
+  "Air": {
+   "additionalProperties": false,
+   "description": "AT4: the air (scope 6.3): the height and volumetric fog of the look and weather, the\nlight shafts (each light kind's share in the volumetric fog), the live sets and the\nengine settings the controller runs with.",
+   "properties": {
+    "beam_fog_gain": {
+     "description": "A searchlight beam's glow grows by this times the fog's share (AT2's beams kept).",
+     "title": "Beam Fog Gain",
+     "type": "number"
+    },
+    "counts": {
+     "additionalProperties": {
+      "type": "integer"
+     },
+     "title": "Counts",
+     "type": "object"
+    },
+    "cvars": {
+     "additionalProperties": {
+      "type": "string"
+     },
+     "description": "Engine settings the controller applies while it runs (the budget's room, AT4).",
+     "title": "Cvars",
+     "type": "object"
+    },
+    "emitter_range_m": {
+     "title": "Emitter Range M",
+     "type": "number"
+    },
+    "fog_albedo": {
+     "description": "The volumetric fog's albedo (linear).",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 3,
+     "minItems": 3,
+     "title": "Fog Albedo",
+     "type": "array"
+    },
+    "fog_density": {
+     "description": "The height fog's density (Unreal's).",
+     "title": "Fog Density",
+     "type": "number"
+    },
+    "fog_extinction": {
+     "description": "The volumetric fog's extinction scale.",
+     "title": "Fog Extinction",
+     "type": "number"
+    },
+    "fog_falloff": {
+     "title": "Fog Falloff",
+     "type": "number"
+    },
+    "fog_hours": {
+     "description": "The fog's density by hour, a share of `fog_density` (mist forms after dusk).",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 24,
+     "minItems": 24,
+     "title": "Fog Hours",
+     "type": "array"
+    },
+    "fog_start_m": {
+     "title": "Fog Start M",
+     "type": "number"
+    },
+    "fog_view_m": {
+     "description": "The volumetric fog's reach.",
+     "title": "Fog View M",
+     "type": "number"
+    },
+    "max_volumes": {
+     "title": "Max Volumes",
+     "type": "integer"
+    },
+    "phase_g": {
+     "title": "Phase G",
+     "type": "number"
+    },
+    "puffs": {
+     "additionalProperties": {
+      "type": "integer"
+     },
+     "description": "Cards per plume by emitter kind.",
+     "title": "Puffs",
+     "type": "object"
+    },
+    "scatter": {
+     "additionalProperties": {
+      "type": "number"
+     },
+     "description": "Volumetric scattering by light kind (light shafts; 0 none).",
+     "title": "Scatter",
+     "type": "object"
+    },
+    "volume_range_m": {
+     "title": "Volume Range M",
+     "type": "number"
+    }
+   },
+   "required": [
+    "fog_density",
+    "fog_falloff",
+    "fog_start_m",
+    "fog_albedo",
+    "fog_extinction",
+    "fog_view_m",
+    "phase_g",
+    "fog_hours",
+    "scatter",
+    "beam_fog_gain",
+    "max_volumes",
+    "volume_range_m",
+    "emitter_range_m",
+    "puffs"
+   ],
+   "title": "Air",
+   "type": "object"
+  },
   "Emitter": {
    "additionalProperties": false,
-   "description": "AT4: a steam or smoke emitter on its manhole, drain, vent, stall or chimney.",
+   "description": "AT4: a steam or smoke plume on its manhole, drain, vent, roof unit, stall or chimney\n(the runtime draws it as rising cards, scope 4.2).",
    "properties": {
+    "color": {
+     "description": "Its albedo (linear).",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 3,
+     "minItems": 3,
+     "title": "Color",
+     "type": "array"
+    },
+    "district_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "District Id"
+    },
     "hash": {
      "title": "Hash",
      "type": "string"
     },
     "id": {
+     "description": "`<owner id>.<mount>` (a fixture's k-th: `.<mount><k>`).",
      "title": "Id",
      "type": "string"
     },
@@ -22,11 +164,27 @@
      "title": "Kind",
      "type": "string"
     },
+    "mount": {
+     "default": "manhole",
+     "enum": [
+      "manhole",
+      "drain",
+      "vent",
+      "roof",
+      "stall",
+      "chimney",
+      "stove"
+     ],
+     "title": "Mount",
+     "type": "string"
+    },
     "owner_id": {
+     "description": "What it rises from: an AG7 road piece, an M3 building, an M6 prop, an M9 vent.",
      "title": "Owner Id",
      "type": "string"
     },
     "pos": {
+     "description": "Where it leaves its source (m, absolute z).",
      "items": {
       "type": "number"
      },
@@ -36,16 +194,39 @@
      "type": "array"
     },
     "rate": {
+     "description": "Its opacity, 0 to 1.",
      "title": "Rate",
+     "type": "number"
+    },
+    "rise_m": {
+     "default": 5.0,
+     "description": "How high it rises before it fades.",
+     "title": "Rise M",
      "type": "number"
     },
     "schedule": {
      "title": "Schedule",
      "type": "string"
     },
+    "source": {
+     "default": "derived",
+     "description": "assetgen: read from what stage 2 drew (AG7's manholes and drains); derived: from citygen (a fixture asked of stage 2 where it draws none: a chimney).",
+     "enum": [
+      "derived",
+      "assetgen"
+     ],
+     "title": "Source",
+     "type": "string"
+    },
     "tile": {
      "title": "Tile",
      "type": "string"
+    },
+    "width_m": {
+     "default": 1.0,
+     "description": "The plume's width at its source.",
+     "title": "Width M",
+     "type": "number"
     }
    },
    "required": [
@@ -63,7 +244,7 @@
   },
   "FogVolume": {
    "additionalProperties": false,
-   "description": "AT4: a fog or smog volume (mist over water, smog over industry, haze under decks).",
+   "description": "AT4: a fog or smog volume (mist over water, smog over industry, haze under decks and\nin tunnels): an ellipsoid (Unreal's local fog volume), its half sizes along its yaw.",
    "properties": {
     "albedo": {
      "description": "Linear RGB, 0 to 1.",
@@ -76,6 +257,7 @@
      "type": "array"
     },
     "center": {
+     "description": "Its middle (m, absolute z).",
      "items": {
       "type": "number"
      },
@@ -85,11 +267,24 @@
      "type": "array"
     },
     "density": {
+     "description": "Extinction at its middle (1/m, along its long axis).",
      "title": "Density",
      "type": "number"
     },
+    "district_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "District Id"
+    },
     "extent": {
-     "description": "Half sizes (m) of its box, along its yaw.",
+     "description": "Half sizes (m) of its ellipsoid: along its yaw, across, up.",
      "items": {
       "type": "number"
      },
@@ -98,11 +293,20 @@
      "title": "Extent",
      "type": "array"
     },
+    "floor": {
+     "default": 0.0,
+     "description": "The share of it that is height fog, dense at its foot.",
+     "maximum": 1.0,
+     "minimum": 0.0,
+     "title": "Floor",
+     "type": "number"
+    },
     "hash": {
      "title": "Hash",
      "type": "string"
     },
     "id": {
+     "description": "`<owner id>.<kind><k>`.",
      "title": "Id",
      "type": "string"
     },
@@ -118,8 +322,17 @@
      "type": "string"
     },
     "owner_id": {
+     "description": "Its water body, district, megasite, deck or tunnel.",
      "title": "Owner Id",
      "type": "string"
+    },
+    "phase_g": {
+     "default": 0.4,
+     "description": "Its scattering's direction.",
+     "exclusiveMaximum": 1.0,
+     "minimum": 0.0,
+     "title": "Phase G",
+     "type": "number"
     },
     "schedule": {
      "title": "Schedule",
@@ -597,6 +810,18 @@
    ],
    "default": null,
    "title": "$Schema"
+  },
+  "air": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/Air"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "description": "AT4: the fog, light shafts and live sets."
   },
   "budgets": {
    "additionalProperties": true,

@@ -10,7 +10,7 @@ elevation, `SUN_CURVE`; the lights keep that scale at every hour, so they read d
 
 from __future__ import annotations
 
-PRESET_VERSION = 3
+PRESET_VERSION = 4
 
 # --- looks and weather ------------------------------------------------------------------------
 
@@ -495,3 +495,131 @@ USE_SCHEDULE = {"food": "food", "bar": "bar", "club": "late", "arcade": "late",
                 "bank": "office"}
 
 DEFAULTS = {"preset": "neon_rain", "tile_m": 256.0}
+
+# --- air (AT4, scope 6.3) -----------------------------------------------------------------------
+
+# The height fog and volumetric fog per look, over the weather's density, falloff, albedo and
+# volumetric extinction (WEATHER): the volumetric fog's reach (m: the froxel grid's depth; past
+# it the height fog alone), its scattering's phase g (forward: halos round the lamps and shafts
+# along a light's beam), the fog's start (m from the eye), and the night's fog over the day's
+# (cooler air holds more). The fog by the hour is this times the `mist` schedule's share.
+# `density` and `extinction` scale the weather's height fog density and volumetric extinction
+# for the look (AT4's art direction on Delta: neon rain's haze reads at street scale, a halo
+# round every lamp and sign, the towers 300 m off fading into it); `falloff` is the height
+# fog's own (neon rain's haze keeps to the street canyons: from the air at 150 m the city
+# still reads under it).
+AIR_LOOK = {
+    "neon_rain":    {"view_m": 160.0, "phase_g": 0.72, "start_m": 2.0, "night_gain": 1.25,
+                     "day_gain": 0.8, "density": 4.4, "extinction": 3.0,
+                     "falloff": 0.4},
+    "clear_night":  {"view_m": 140.0, "phase_g": 0.65, "start_m": 5.0, "night_gain": 1.2,
+                     "day_gain": 0.7, "density": 3.0, "extinction": 2.0,
+                     "falloff": 0.3},
+    "smog_dusk":    {"view_m": 180.0, "phase_g": 0.6, "start_m": 2.0, "night_gain": 1.1,
+                     "day_gain": 1.0, "density": 1.6, "extinction": 2.0,
+                     "falloff": 0.15},
+    "overcast_day": {"view_m": 180.0, "phase_g": 0.55, "start_m": 2.0, "night_gain": 1.1,
+                     "day_gain": 1.0, "density": 1.2, "extinction": 1.5,
+                     "falloff": 0.12},
+}
+# light shafts (scope 6.3): each live light's volumetric scattering by kind (Unreal's
+# `VolumetricScatteringIntensity`: its share in the volumetric fog, 0 none). Strong lights
+# throw shafts and halos through the haze (high masts, crown floods, the street's cobra heads);
+# small and many ones (neon spill, shop signs, a shopfront's spill) none: AT0 measured 0.9 ms
+# for volumetric fog with every live light scattering, and these are most of the live set. A
+# searchlight scatters none: its beam is AT2's mesh (decision AT4: a beam reaches 400 m into
+# the sky, the volumetric fog `view_m`; a froxel is metres wide there, a 2 degree cone a
+# flicker of blocks), brighter where the fog is thicker.
+SCATTER = {"street_light": 1.0, "wall_light": 0.6, "signal": 1.0, "corner": 1.0, "road": 1.0,
+           "alley": 0.5, "soffit": 0.6, "tunnel": 0.4, "underpass": 0.4, "station": 0.6,
+           "high_mast": 2.0, "flood": 1.5, "searchlight": 0.0, "aviation": 0.6, "sign": 0.35,
+           "shop_sign": 0.0, "spill": 0.0, "neon": 0.0, "runway": 0.0}
+BEAM_FOG_GAIN = 0.6               # a searchlight beam's glow grows by this times the fog's share
+
+# Fog and smog volumes (local fog volumes in Unreal: an ellipsoid each, the nearest
+# AIR_LIVE["volumes"] live). `density` is the extinction at the middle (1/m, along its long
+# axis), `floor` the share of it that is height fog (dense at its foot, thinning up: mist on
+# the water), `phase_g` its scattering, `albedo` its color, all times the district's haze and
+# danger (HAZE_DANGER) and the schedule's share at the hour.
+#   mist: over canals, basins and rivers at night (M16's water), pieces `step_m` along the
+#         water's line as wide as it there (wider water in pieces across), `height_m` thick;
+#   smog: over industry and the port (industrial and spaceport districts, their megasites),
+#         a grid of `cell_m` puffs `height_m` thick, by day and night;
+#   haze: under M14's decks, a grid of `cell_m` puffs from the ground to the soffit;
+#   tunnel_haze: in road tunnels and underpasses, pieces `step_m` along the covered stretch.
+# `glow` is how much of the city's light a volume shows where no live light reaches it (its
+# emissive, of its albedo, the runtime's `VolumeGlow` times Night: mist and smog glow over the
+# lit city; haze under a deck and in a tunnel always)
+VOLUMES = {
+    "mist":        {"step_m": 90.0, "height_m": 7.0, "max_w_m": 180.0, "density": 0.18,
+                    "floor": 0.7, "phase_g": 0.45, "albedo": "#a9b6c8", "schedule": "mist",
+                    "min_w_m": 6.0, "glow": 0.6},
+    "smog":        {"cell_m": 340.0, "height_m": 80.0, "density": 0.012, "floor": 0.5,
+                    "phase_g": 0.35, "albedo": "#b0946a", "schedule": "smog", "glow": 1.5},
+    "haze":        {"cell_m": 120.0, "density": 0.06, "floor": 0.3, "phase_g": 0.4,
+                    "albedo": "#b6c2ae", "schedule": "always", "glow": 0.8},
+    "tunnel_haze": {"step_m": 80.0, "density": 0.045, "floor": 0.2, "phase_g": 0.4,
+                    "albedo": "#bdb39c", "schedule": "always", "glow": 0.6},
+}
+MIST_KINDS = ("canal", "basin", "inlet", "creek", "marina")     # waterways that mist
+MIST_MIN_AREA_M2 = 1500.0         # a water body smaller mists none
+SMOG_ARCHETYPES = ("industrial_port", "spaceport")
+SMOG_SITES = ("freight_terminal", "spaceport", "power_plant", "refinery")
+HAZE_DANGER = (0.7, 0.6)          # a volume's density times a + b * the district's danger,
+                                  # times its mood's haze (decision 12.5: thicker where danger is)
+
+# Steam and smoke emitters (scope 6.3): the share of each source that steams, from its
+# district's grit (a + b * grit: a clean corporate core's manholes now and then, an old town's
+# many), the plume's source width, rise and opacity (`rate`), its color (albedo), its schedule:
+#   steam:   AG7's manholes and drains (read from the street packs), M9's tunnel ventilation
+#            buildings;
+#   exhaust: M3's roof mechanical units (AG4 draws them as roof equipment);
+#   cooking: M6's food stalls and kiosks;
+#   smoke:   chimneys on industrial roofs (warehouses, sheds, yards, labs in industrial
+#            districts) and shanty stacks' stove pipes, a fixture asked of stage 2.
+EMITTERS = {
+    "manhole": {"kind": "steam", "share": (0.03, 0.22), "width_m": 0.8, "rise_m": 4.5,
+                "rate": 0.9, "albedo": "#d6dbe0", "schedule": "steam"},
+    "drain":   {"kind": "steam", "share": (0.0, 0.08), "width_m": 0.9, "rise_m": 2.5,
+                "rate": 0.6, "albedo": "#d6dbe0", "schedule": "steam"},
+    "vent":    {"kind": "steam", "share": (1.0, 0.0), "width_m": 3.0, "rise_m": 14.0,
+                "rate": 0.8, "albedo": "#d0d4d8", "schedule": "always"},
+    "roof":    {"kind": "exhaust", "share": (0.2, 0.4), "width_m": 1.6, "rise_m": 12.0,
+                "rate": 0.7, "albedo": "#c8ccd0", "schedule": "steam"},
+    "stall":   {"kind": "cooking", "share": (0.7, 0.3), "width_m": 1.2, "rise_m": 5.0,
+                "rate": 0.7, "albedo": "#d8d4cc", "schedule": "food"},
+    "chimney": {"kind": "smoke", "share": (0.25, 0.5), "width_m": 1.4, "rise_m": 30.0,
+                "rate": 0.8, "albedo": "#6f6a64", "schedule": "always"},
+    "stove":   {"kind": "smoke", "share": (0.0, 0.12), "width_m": 0.5, "rise_m": 6.0,
+                "rate": 0.6, "albedo": "#8a847c", "schedule": "late"},
+}
+CHIMNEY_TYPES = ("warehouse", "shed", "yard", "lab")
+CHIMNEY_ARCHETYPES = ("industrial_port", "spaceport", "megablock_residential", "old_town")
+CHIMNEY_M = (1.2, 5.0)            # a chimney's flue: its width, how far over the roof
+STOVE_TYPES = ("shanty_stack",)
+# the runtime's live sets (the controller's `MaxVolumes` within `VolumeRangeM`: Unreal draws
+# at most 32 local fog volumes a view, `r.LocalFogVolume.TileMaxInstanceCount`; emitters
+# within `EmitterRangeM`) and budgets per 256 m tile (the check)
+AIR_LIVE = {"volumes": 24, "volume_m": 900.0, "emitter_m": 220.0}
+AIR_BUDGETS = {"volumes_per_tile": 24, "emitters_per_tile": 400}
+PUFFS = {"steam": 4, "exhaust": 4, "cooking": 3, "smoke": 6}      # cards per plume
+# what the fog's mist and smog keep to (24 values: 0 to 23 h); `steam` is stronger in the
+# cool night air, `mist` forms after dusk and lies thickest before dawn
+AIR_SCHEDULES = {
+    "mist": (0.95, 1.0, 1.0, 1.0, 1.0, 1.0, 0.9, 0.55, 0.15, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+             0.0, 0.0, 0.0, 0.0, 0.1, 0.35, 0.6, 0.8, 0.9),
+    "smog": (1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.95, 0.85, 0.75, 0.7, 0.7, 0.7, 0.7, 0.7,
+             0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.0, 1.0),
+    "steam": (1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.9, 0.75, 0.6, 0.55, 0.5, 0.5, 0.5, 0.5, 0.5,
+              0.5, 0.55, 0.6, 0.7, 0.8, 0.9, 1.0, 1.0, 1.0),
+}
+# the placement check (scope 8): an emitter within this of its source (a manhole's middle, a
+# roof item's footprint, a stall), a volume's middle over its water or in its district
+EMITTER_ON_M = 0.6
+# the tuned engine settings that make room for the air within the night's budget (decision
+# 12.6), applied by the controller while it runs (`cvars`); measured in docs/progress/AT4
+AIR_CVARS = {"r.VolumetricFog.GridPixelSize": "12", "r.VolumetricFog.GridSizeZ": "96",
+             "r.Lumen.Reflections.DownsampleFactor": "2",
+             # (the engine clamps a local fog volume's density in the volumetric fog to 0.01,
+             # against its temporal reprojection's leaks: a canal's mist reads at 0.05)
+             "r.LocalFogVolume.MaxDensityIntoVolumetricFog": "0.05"}

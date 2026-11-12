@@ -55,26 +55,50 @@ PASSES = (("day_native", False, 100.0), ("day_tsr67", False, TSR_PERCENT),
 # MegaLights (with `--bench-rt`). A pass without commands of its own switches all of it off,
 # so passes do not leak into each other.
 ATMOS_OFF = ("CityGenAtmos.Lights 0", "CityGenAtmos.Fog 0", "CityGenAtmos.Rain 0",
-             "CityGenAtmos.Wet 0", "CityGenAtmos.MegaLights 0", "CityGenAtmos.Sky 1")
+             "CityGenAtmos.Wet 0", "CityGenAtmos.MegaLights 0", "CityGenAtmos.Sky 1",
+             "CityGenAtmos.Air 0", "CityGenAtmos.Tuned 0")
+# AT4: the engine settings the exploring passes (`x_*`) set themselves, each pass all of them
+# (so none leaks into the next): the volumetric fog's froxels (pixels a side, slices deep),
+# Lumen's reflections' resolution, the non-Nanite meshes' LOD distances (the parked cars)
+TUNABLE = ("r.VolumetricFog.GridPixelSize", "r.VolumetricFog.GridSizeZ",
+           "r.Lumen.Reflections.DownsampleFactor", "r.StaticMeshLODDistanceScale")
+UNTUNED = ("8", "128", "1", "1")
 
 
 def _atmos(lights: bool = True, fog: bool = False, rain: bool = False, wet: bool = False,
            mega: bool = False, live: int = 512, range_m: float = 300.0,
-           shadowed: int = 16, hour: str = "23", sky: bool = True) -> tuple[str, ...]:
+           shadowed: int = 16, hour: str = "23", sky: bool = True, air: bool = False,
+           tuned: bool = True, cvars: tuple | None = None) -> tuple[str, ...]:
     """AT3: `hour` a number or the plan's named hour (day, dusk, night); `sky` the sky and
-    time (a game with an earlier plugin warns of the unknown command and runs the same)."""
-    return (f"CityGenAtmos.Tiers {live} {range_m:g} {shadowed}",
-            f"CityGenAtmos.Lights {int(lights)}", f"CityGenAtmos.Fog {int(fog)}",
-            f"CityGenAtmos.Rain {int(rain)}", f"CityGenAtmos.Wet {int(wet)}",
-            f"CityGenAtmos.MegaLights {int(mega)}", f"CityGenAtmos.Sky {int(sky)}",
-            f"CityGenAtmos.Hour {hour}")
+    time (a game with an earlier plugin warns of the unknown command and runs the same).
+    AT4: `air` the fog volumes and plumes; `tuned` the plan's engine settings (the
+    controller's `RenderCVars`); `cvars` the TUNABLE values set by hand (an exploring pass:
+    the plan's settings off first)."""
+    out = (f"CityGenAtmos.Tiers {live} {range_m:g} {shadowed}",
+           f"CityGenAtmos.Lights {int(lights)}", f"CityGenAtmos.Fog {int(fog)}",
+           f"CityGenAtmos.Rain {int(rain)}", f"CityGenAtmos.Wet {int(wet)}",
+           f"CityGenAtmos.MegaLights {int(mega)}", f"CityGenAtmos.Sky {int(sky)}",
+           f"CityGenAtmos.Air {int(air)}",
+           f"CityGenAtmos.Tuned {int(tuned and cvars is None)}")
+    if cvars is not None:
+        out += tuple(f"{k} {v}" for k, v in zip(TUNABLE, cvars))
+    return out + (f"CityGenAtmos.Hour {hour}",)
+
+
+def _x(grid: int = 8, z: int = 128, refl: int = 1, lod: float = 1.0, **kw) -> tuple[str, ...]:
+    """AT4: an exploring pass: the night with the air, rain and wet streets on and the
+    TUNABLE settings set by hand."""
+    a = dict(fog=True, air=True, rain=True, wet=True)
+    a.update(kw)
+    return _atmos(cvars=(str(grid), str(z), str(refl), f"{lod:g}"), **a)
 
 
 ATMOS_PASSES = (
     ("night_plan", True, 100.0, _atmos()),
     ("night_plan_fog", True, 100.0, _atmos(fog=True)),
-    ("night_plan_all", True, 100.0, _atmos(fog=True, rain=True, wet=True)),
-    ("night_plan_all_tsr67", True, TSR_PERCENT, _atmos(fog=True, rain=True, wet=True)),
+    ("night_plan_all", True, 100.0, _atmos(fog=True, air=True, rain=True, wet=True)),
+    ("night_plan_all_tsr67", True, TSR_PERCENT, _atmos(fog=True, air=True, rain=True,
+                                                       wet=True)),
     ("night_plan_1024", True, 100.0, _atmos(fog=True, rain=True, wet=True, live=1024,
                                             range_m=400.0)),
     ("night_plan_256", True, 100.0, _atmos(fog=True, rain=True, wet=True, live=256,
@@ -91,6 +115,23 @@ ATMOS_PASSES = (
     ("day_plan", False, 100.0, _atmos(hour="day")),
     ("day_plan_all", False, 100.0, _atmos(fog=True, rain=True, wet=True, hour="day")),
     ("night_plan_nosky", True, 100.0, _atmos(sky=False)),
+    # AT4: the night as delivered (the plan's lights, the height and volumetric fog, the fog
+    # volumes and plumes, the plan's engine settings), with AT0's rain and wet streets too
+    # (`night_plan_all` above has the air on since AT4), and by dusk and day; the night with
+    # AT0's prototypes as AT3 ran it (no air, not tuned) and the night untuned
+    ("night_plan_air", True, 100.0, _atmos(fog=True, air=True)),
+    ("dusk_plan_air", True, 100.0, _atmos(fog=True, air=True, hour="dusk")),
+    ("day_plan_air", False, 100.0, _atmos(fog=True, air=True, hour="day")),
+    ("night_plan_proto", True, 100.0, _atmos(fog=True, rain=True, wet=True, tuned=False)),
+    ("night_plan_all_untuned", True, 100.0, _atmos(fog=True, air=True, rain=True, wet=True,
+                                                   tuned=False)),
+    # AT4's exploring passes: what each engine setting gives back (TUNABLE, by hand)
+    ("x_base", True, 100.0, _x()),
+    ("x_grid12", True, 100.0, _x(grid=12, z=96)),
+    ("x_grid16", True, 100.0, _x(grid=16, z=64)),
+    ("x_refl2", True, 100.0, _x(refl=2)),
+    ("x_lod2", True, 100.0, _x(lod=2.0)),
+    ("x_all", True, 100.0, _x(grid=12, z=96, refl=2)),
 )
 # what a game with hardware ray tracing needs at startup (MegaLights traces its shadows; UE
 # 5.8 marks MegaLights experimental), in the game's -ini override of the project's settings
@@ -322,8 +363,8 @@ def job(route_: dict, out_dir: Path, passes=PASSES, warm: bool = True,
             # (the night's warm-up with all of atmosgen's spike on: its materials' and
             # lights' shaders compiled before a measured pass meets them)
             for w in ps[:len(nights)]:
-                w["commands"] = (list(_atmos(fog=True, rain=True, wet=True)) if w["night"]
-                                 else list(ATMOS_OFF))
+                w["commands"] = (list(_atmos(fog=True, air=True, rain=True, wet=True))
+                                 if w["night"] else list(ATMOS_OFF))
     return {"out_dir": str(out_dir).replace("\\", "/"), "csv_name": csv_name,
             # (windowed fullscreen at the resolution: a window of that size with its
             # borders would not fit a screen of that size)

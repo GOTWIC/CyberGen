@@ -1638,6 +1638,70 @@ which the play features did with their night switch (decision 12.2):
 - **A plan without a sky** (an AT2 plan): the controller keeps the level's lighting and reads
   `MPC_CityGen`'s `Night` as before, the play features keep their switch.
 
+### From AT4: air
+
+The plan's air (`docs/atmosgen_scope.md` 6.3, `atmosgen/air.py`: the plan's `air`, `volumes`
+and `emitters`) comes with the cells and the controller:
+
+- **Packing version 3** (`unreal_atmos.PACK_VERSION`, `CityGenAtmosPack::VolFloats`,
+  `EmitFloats`): a cell also holds the fog volumes whose middle lies in it (13 floats: the
+  middle in cm, the yaw, the half sizes along it, across and up in cm, the density, the floor
+  share, the phase g, the albedo; an int: schedule and kind) and the plumes whose foot lies in
+  it (9 floats: the foot, the width and rise in cm, the opacity, the albedo; two ints: schedule,
+  kind and mount, a seed), as the cell actor's `VolumeFloats`, `VolumeInts`, `EmitterFloats`
+  and `EmitterInts`; a cell is made wherever any of the three lie (its key still
+  `atmos.lights.<tile>.<quarter>`, its hash over all three). The manifest's `atmos` counts
+  `volumes` and `emitters`. `ATMOS_VERSION` is `atmos4`: an import over an AT3 level re-packs
+  the cells and sets the controller, and touches nothing else.
+- **The controller's air** (`unreal_atmos.air_settings`, in its hash): the height fog's
+  density, falloff and start, the volumetric fog's albedo, extinction, reach (`FogViewM`) and
+  phase g (`FogPhaseG`), the fog by the hour (`FogHours`, 24 shares: thicker by night), each
+  light kind's volumetric scattering (`KindScatter`, by `KindNames`: light shafts from the
+  street lights, high masts and floods; none from the neon spill, shop signs and shopfronts),
+  the searchlight beams' fog gain (`BeamFogGain`), the live sets (`MaxVolumes` within
+  `VolumeRangeM`, plumes within `EmitterRangeM`), cards per plume by kind (`Puffs`,
+  `EmitterKinds`) and the engine settings it runs with (`RenderCVars`, "name=value"). With an
+  air the import turns the fog and the air on (`bFog`, `bAir`); a plan without one (AT3's)
+  keeps the fog off, as before.
+- **The runtime** (`ACityGenAtmos`): the height fog follows the hour (its density times
+  `FogHours`, its inscattering the night's dark haze or the overcast's grey by the controller's
+  `Night`), its volumetric fog to `FogViewM`; every live light scatters in it by its kind's
+  share. **Fog volumes:** every 0.2 s the nearest `MaxVolumes` (24; Unreal draws at most 32
+  local fog volumes a view, `r.LocalFogVolume.TileMaxInstanceCount`) within `VolumeRangeM` (by
+  the distance to their bound) are local fog volume components from a pool: an ellipsoid
+  (the component's 5 m unit sphere scaled by the half sizes), radial fog for the volume's
+  density less its floor share, height fog for the floor share (mist dense on the water,
+  thinning up), its phase g and albedo, each times its schedule's share at the hour (mist
+  only after dusk), the farthest fifth fading; by day and by night. **Plumes:** per cell an
+  instanced component of cards (`/Engine/BasicShapes/Plane` in `M_CgSteam`), `Puffs` a plume,
+  each card's custom data its plume's foot, phase, period (its rise over 1.2 m/s, smoke 2
+  m/s), rise, width, opacity (times its schedule at the hour, again when the hour moves a
+  tenth) and albedo; the material turns each card to the eye and lifts it along its life
+  (rising, slowing, widening, drifting with `MPC_CityGenAtmos`'s `WindMS`), soft and faded in
+  and out, lit by the translucency volume (the street's and the neon's colors); culled past
+  `EmitterRangeM`. **Searchlights** keep AT2's beams (decision: a beam reaches 400 m into the
+  sky, the volumetric fog `FogViewM`; its spot light scatters none), their glow times
+  1 + `BeamFogGain` times the fog's share. **Engine settings:** `RenderCVars` applied at begin
+  play (each one's value before kept and put back at its end, `CityGenAtmos.Tuned 0`).
+- **Assets** (`atmos_assets.py` version 9): `M_CgSteam` beside AT0 to AT3's (under
+  `/Game/CityGen/Core/Atmos`, cooked always). The fog volumes are the engine's local fog
+  volumes, no asset.
+- **Console commands:** `CityGenAtmos.Air [0|1]` (the fog volumes and plumes),
+  `.Tuned [0|1]` (the plan's engine settings or the project's), `.VolumeGain G`,
+  `.FogView M`; `.Fog` is the height and volumetric fog. `.Status` adds `air`, `volumes`,
+  `volumes_live`, `candidates_volumes`, `emitters`, `plume_cards`, `plumes_shown`,
+  `fog_share`, `fog_view_m`, `tuned`, `cvars`.
+- **The check:** by night the controller's air (the fog on, volumes registered, plumes made)
+  is part of the play features' check where the plan has volumes; a `--view` named
+  `*_noair` renders with the fog and the air off (a before for a pair), the level's after it;
+  the night views log the live fog volumes and plume cards.
+- **The benchmark** (`bench.ATMOS_PASSES`): `night_plan_air` (the night as delivered: the
+  plan's lights, the fog, the air, the plan's engine settings), `dusk_plan_air`,
+  `day_plan_air`, `night_plan_all` (with AT0's rain and wet streets too, since AT4 with the
+  air), `night_plan_proto` (AT3's `night_plan_all`: AT0's prototypes, no air, untuned),
+  `night_plan_all_untuned`, and the exploring passes `x_*` (`bench._x`: the settings in
+  `bench.TUNABLE` set by hand); `ATMOS_OFF` switches the air and the engine settings off too.
+
 ### A packaged game
 
 A project a city was imported into packages as any Unreal project (UAT's `BuildCookRun`,

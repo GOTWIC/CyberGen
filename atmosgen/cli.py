@@ -6,8 +6,10 @@
     atmosgen plan BUILD [--spec S] [--out DIR]      the atmos plan (BUILD/atmos) and its lux
                                                     check (exit 1 when it fails: the plan is
                                                     not delivered)
-    atmosgen lux BUILD [--plan DIR]                 the lux map of the core (preview_lux.png)
-                                                    and the plan's map (preview_plan.png)
+    atmosgen lux BUILD [--plan DIR]                 the lux map of the core (preview_lux.png),
+                                                    the plan's map (preview_plan.png), the sky
+                                                    (preview_sky.png) and the air (AT4,
+                                                    preview_air.png)
     atmosgen preview BUILD [--plan DIR] ...         a Blender night preview from the plan
 """
 
@@ -58,8 +60,8 @@ def cmd_plan(args) -> int:
     sys.stdout.write(report_text(rep))
     print(f"{len(rep['wrote'])} files written to {rep['out']} in {rep['seconds']} s")
     if not rep["ok"]:
-        print("FAIL: the lux check failed; the plan is not delivered (the exporter leaves it "
-              "out)", file=sys.stderr)
+        print("FAIL: a check failed (lux, faces or air); the plan is not delivered (the "
+              "exporter leaves it out)", file=sys.stderr)
         return 1
     return 0
 
@@ -77,6 +79,9 @@ def cmd_lux(args) -> int:
     rep["sky"] = sky_preview(json.loads((pdir / "atmos_plan.json").read_text(encoding="utf-8")),
                              pdir, json.loads((Path(args.build) / "city_model.json")
                                               .read_text(encoding="utf-8")))["image"]
+    # AT4: the air's volumes and emitters over the city
+    from .air import air_map
+    rep["air"] = air_map(args.build, args.plan)["image"]
     print(json.dumps({k: v for k, v in rep.items() if k != "grid"}, indent=1))
     return 0
 

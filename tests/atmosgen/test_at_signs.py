@@ -343,4 +343,4 @@ def test_high_tier_in_the_plan(plan):
     rep, L = plan
     assert rep["tiers"]["high"] == sum(1 for v in L.values() if v["tier"] == "high")
     assert all(v["kind"] in P.HIGH_KINDS for v in L.values() if v["tier"] == "high")
-    assert rep["code"].startswith("at3.")
+    assert rep["code"].startswith("at4.")

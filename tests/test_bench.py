@@ -229,6 +229,26 @@ def test_sky_and_time_passes():
     assert "CityGenAtmos.Sky 1" in B.ATMOS_OFF
 
 
+def test_air_passes():
+    """AT4: the night as delivered has the air and the plan's engine settings; the night
+    without atmosgen neither; an exploring pass sets every tunable setting itself (none leaks
+    into the next) with the plan's off."""
+    by = {p[0]: p for p in B.ATMOS_PASSES}
+    air = by["night_plan_air"][3]
+    assert "CityGenAtmos.Air 1" in air and "CityGenAtmos.Fog 1" in air
+    assert "CityGenAtmos.Tuned 1" in air and "CityGenAtmos.Rain 0" in air
+    assert "CityGenAtmos.Air 1" in by["night_plan_all"][3]
+    assert "CityGenAtmos.Air 0" in by["night_plan_proto"][3]
+    assert "CityGenAtmos.Tuned 0" in by["night_plan_proto"][3]
+    assert {"CityGenAtmos.Air 0", "CityGenAtmos.Tuned 0"} <= set(B.ATMOS_OFF)
+    for name, p in by.items():
+        if name.startswith("x_"):
+            assert "CityGenAtmos.Tuned 0" in p[3]
+            assert [c.split()[0] for c in p[3] if c.startswith(("r.",))] == list(B.TUNABLE)
+            assert p[3][-1] == "CityGenAtmos.Hour 23"
+    assert "r.VolumetricFog.GridPixelSize 16" in by["x_grid16"][3]
+
+
 def test_others_summary_names_who_took_the_foreground():
     """AT3: the samples say which processes took the game's foreground and how often it was
     taken back; the summary adds them up."""

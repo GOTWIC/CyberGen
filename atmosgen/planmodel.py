@@ -133,30 +133,78 @@ class TileIndex(_Model):
 
 
 class FogVolume(_Model):
-    """AT4: a fog or smog volume (mist over water, smog over industry, haze under decks)."""
-    id: str
-    owner_id: str
+    """AT4: a fog or smog volume (mist over water, smog over industry, haze under decks and
+    in tunnels): an ellipsoid (Unreal's local fog volume), its half sizes along its yaw."""
+    id: str = Field(description="`<owner id>.<kind><k>`.")
+    owner_id: str = Field(description="Its water body, district, megasite, deck or tunnel.")
     kind: Literal["mist", "smog", "haze", "tunnel_haze", "steam_bank"]
+    district_id: str | None = None
     tile: str
-    center: Vec3
-    extent: Vec3 = Field(description="Half sizes (m) of its box, along its yaw.")
+    center: Vec3 = Field(description="Its middle (m, absolute z).")
+    extent: Vec3 = Field(description="Half sizes (m) of its ellipsoid: along its yaw, across, "
+                                     "up.")
     yaw_deg: float = 0.0
-    density: float
+    density: float = Field(description="Extinction at its middle (1/m, along its long axis).")
+    floor: float = Field(0.0, ge=0.0, le=1.0, description="The share of it that is height "
+                                                          "fog, dense at its foot.")
+    phase_g: float = Field(0.4, ge=0.0, lt=1.0, description="Its scattering's direction.")
+    glow: float = Field(0.0, ge=0.0, description="How much of the city's light it shows "
+                                                 "where no live light reaches it (its "
+                                                 "emissive, of its albedo).")
     albedo: RGB
     schedule: str
     hash: str
 
 
 class Emitter(_Model):
-    """AT4: a steam or smoke emitter on its manhole, drain, vent, stall or chimney."""
-    id: str
-    owner_id: str
+    """AT4: a steam or smoke plume on its manhole, drain, vent, roof unit, stall or chimney
+    (the runtime draws it as rising cards, scope 4.2)."""
+    id: str = Field(description="`<owner id>.<mount>` (a fixture's k-th: `.<mount><k>`).")
+    owner_id: str = Field(description="What it rises from: an AG7 road piece, an M3 "
+                                      "building, an M6 prop, an M9 vent.")
     kind: Literal["steam", "smoke", "exhaust", "cooking"]
+    mount: Literal["manhole", "drain", "vent", "roof", "stall", "chimney", "stove"] = "manhole"
+    district_id: str | None = None
     tile: str
-    pos: Vec3
-    rate: float
+    pos: Vec3 = Field(description="Where it leaves its source (m, absolute z).")
+    width_m: float = Field(1.0, description="The plume's width at its source.")
+    rise_m: float = Field(5.0, description="How high it rises before it fades.")
+    rate: float = Field(description="Its opacity, 0 to 1.")
+    color: RGB = Field(default_factory=lambda: [0.8, 0.8, 0.8],
+                       description="Its albedo (linear).")
     schedule: str
+    source: Literal["derived", "assetgen"] = Field(
+        "derived", description="assetgen: read from what stage 2 drew (AG7's manholes and "
+                               "drains); derived: from citygen (a fixture asked of stage 2 "
+                               "where it draws none: a chimney).")
     hash: str
+
+
+class Air(_Model):
+    """AT4: the air (scope 6.3): the height and volumetric fog of the look and weather, the
+    light shafts (each light kind's share in the volumetric fog), the live sets and the
+    engine settings the controller runs with."""
+    fog_density: float = Field(description="The height fog's density (Unreal's).")
+    fog_falloff: float
+    fog_start_m: float
+    fog_albedo: RGB = Field(description="The volumetric fog's albedo (linear).")
+    fog_extinction: float = Field(description="The volumetric fog's extinction scale.")
+    fog_view_m: float = Field(description="The volumetric fog's reach.")
+    phase_g: float
+    fog_hours: Hours = Field(description="The fog's density by hour, a share of "
+                                         "`fog_density` (mist forms after dusk).")
+    scatter: dict[str, float] = Field(description="Volumetric scattering by light kind "
+                                                  "(light shafts; 0 none).")
+    beam_fog_gain: float = Field(description="A searchlight beam's glow grows by this times "
+                                             "the fog's share (AT2's beams kept).")
+    max_volumes: int
+    volume_range_m: float
+    emitter_range_m: float
+    puffs: dict[str, int] = Field(description="Cards per plume by emitter kind.")
+    cvars: dict[str, str] = Field(default_factory=dict,
+                                  description="Engine settings the controller applies while "
+                                              "it runs (the budget's room, AT4).")
+    counts: dict[str, int] = Field(default_factory=dict)
 
 
 class Mask(_Model):
@@ -270,6 +318,7 @@ class AtmosPlan(_Model):
     tiers: Tiers
     budgets: dict
     tiles: list[TileIndex]
+    air: Air | None = Field(None, description="AT4: the fog, light shafts and live sets.")
     volumes: list[FogVolume] = Field(default_factory=list)
     emitters: list[Emitter] = Field(default_factory=list)
     masks: list[Mask] = Field(default_factory=list)
