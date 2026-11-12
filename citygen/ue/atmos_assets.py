@@ -253,7 +253,7 @@ def beacon():
     names = ["Time"]
     for k, n in enumerate(("Phase", "Period", "Duty", "Glow")):
         ins.append(expr(m, unreal.MaterialExpressionPerInstanceCustomData, -900, 120 + 110 * k,
-                        data_index=k, default_value=(0.0, 2.0, 0.3, 20.0)[k]))
+                        data_index=k, const_default_value=(0.0, 2.0, 0.3, 20.0)[k]))
         names.append(n)
     em = custom(m, -500, 100, BEACON, names, "CMOT_FLOAT3", "CgBeacon")
     for a, n in zip(ins, names):
