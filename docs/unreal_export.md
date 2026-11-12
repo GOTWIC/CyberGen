@@ -1599,7 +1599,7 @@ which the play features did with their night switch (decision 12.2):
   over 0.02 and keep the night's scale, $2^{EV_{night} - EV_{plan}}$, at every hour (at dusk,
   under a brighter exposure, they read dimmer); each light's schedule is interpolated between
   the hours, so the street lights (`dusk_dawn`, set by the sun) come on as it sets.
-- **The sky dome** (`M_CgSky`, `atmos_assets.py` version 4: unlit, `is_sky`, on the engine's
+- **The sky dome** (`M_CgSky`, `atmos_assets.py` version 8: unlit, `is_sky`, on the engine's
   sphere scaled to 50 km round the view, no shadow, collision, distance fields or ray
   tracing): the sky atmosphere in the view direction (`SkyAtmosphereViewLuminance`) with the
   sun's disk while the light is the sun, the stars (a hashed lattice on the view direction,

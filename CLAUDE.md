@@ -2440,7 +2440,7 @@ AT3 (sky and time) is in place:
   (`Atmos/T_<City>_SkyGlow`), `ATMOS_VERSION` atmos3; `ACityGenAtmos::ApplyTime` drives the
   importer's sun (the sun, then the moon), sky light, the exposure (held per hour), Night and
   Hour, every light's schedule interpolated between the hours; a sky dome (`M_CgSky`, atmos
-  assets version 4: the sky atmosphere, the sun's disk, stars, the moon with its phase, the
+  assets version 8: the sky atmosphere, the sun's disk, stars, the moon with its phase, the
   cloud deck at its height lit by the sun or moon and by the city's glow); `TimeSpeed`;
   console `CityGenAtmos.Hour day|dusk|night`, `.Sky`, `.Exposure`, `.TimeSpeed`, `.Cover`.
 - **Play features:** `SetNight` sets the controller's day or night hour, the Tab menu's time
@@ -2451,6 +2451,11 @@ AT3 (sky and time) is in place:
 - **Blender:** `atmosgen preview --hour H` at a twilight hour renders a dusk sky
   (`ag6_preview.dusk_world`), the windows at the plan's Night, the lights dimmed by the
   exposure's step.
+- **Benchmark harness:** `bench.busy` counts a game or a screen recorder (`GAMES`: javaw,
+  ow-obs, obs); each sample names the process holding the foreground when the game does not
+  (`front_owner`, `lost_to`) and the driver takes it back every 2 s (`take_front`, `retaken`).
+Results (Delta's night 14.4 ms p95, dusk 14.3, day 11.1; with AT0's prototypes 16.4, 16.8
+walking): `docs/progress/AT3/`.
 
 ## Life generator (lifegen)
 

@@ -564,6 +564,11 @@ def take_front(pid: int) -> bool:
     finally:
         if joined:
             u.AttachThreadInput(me, fg_thread, False)
+    if in_front(pid) is not True:
+        # (Windows may still refuse a background process; SwitchToThisWindow, the shell's own
+        # Alt+Tab call, is not refused: the first after_sky runs lost the game to the Claude
+        # app's window and took it back 0 times without it)
+        u.SwitchToThisWindow(hwnd, True)
     return in_front(pid) is True
 
 

@@ -102,7 +102,7 @@ Built on the Windows PC (2026-11-12), on main after AT2 (#203). Report, measurem
   `lighting.sun` as the sun, then the moon (faded in from the sun at -12 degrees to -16), the
   sky light, the exposure held by the controller's volume (no adaptation pumping), MPC_CityGen's
   `Night` and `Hour`, every light's schedule interpolated between the hours, `TimeSpeed`; the sky
-  dome `M_CgSky` (atmos assets version 7): the sky atmosphere and the sun's disk, stars, the moon
+  dome `M_CgSky` (atmos assets version 8): the sky atmosphere and the sun's disk, stars, the moon
   with its phase, maria and halo, the cloud deck met along the view ray at its height, lit by the
   atmosphere's light at the deck and from below by the glow texture, fading into the haze. Console
   `CityGenAtmos.Hour day|dusk|night`, `.Sky`, `.Exposure`, `.TimeSpeed`, `.Cover`.
@@ -115,6 +115,18 @@ Built on the Windows PC (2026-11-12), on main after AT2 (#203). Report, measurem
 - **Blender**: `atmosgen preview --hour H` at a twilight hour renders a dusk sky
   (`ag6_preview.dusk_world`), the windows at the plan's Night, the lights dimmed by the
   exposure's step.
+- **Unreal** (Delta in CityAG16): the import updates the controller and the cells (3 min 14 s);
+  the check passes with the sky by night (Night 1, -3 EV100), dusk (19:28, Night 0.81, -1.80
+  EV100) and day (16:00, 0.80 EV100, no light live), and night, dusk, blue hour, day and
+  clear-sky shots. Found by it: a vector parameter reaches a custom node as its RGB (the sky
+  material did not compile: the glow's corners are two parameters), and the first glow washed
+  the night out (`ESCAPE` 0.5 and 0.35 to 0.04 and 0.07).
+- **The night's frame time** (native 1440p, 3 runs, the median; before: AT2's after benchmark):
+  night_native 11.7 to 11.2 ms p95, night_plan 14.3 to 14.4, night_plan_all 16.4 to 16.4 (16.7
+  to 16.8 walking, 0.1 over the budget on that route: the sky dome's base pass, about 0.1 ms; an
+  open item for AT4), dusk_plan 14.3, day_plan 11.1. The first after benchmark lost the game's
+  foreground in two runs with nobody at the desktop; the bench now names the window taking it
+  (`lost_to`: the Claude app's) and takes it back (`take_front`).
 
 ## AT2: neon and signs as light
 
