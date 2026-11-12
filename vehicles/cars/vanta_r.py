@@ -14,8 +14,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import carkit as K                                                  # noqa: E402
-from carkit import (Geo, Matrix, V3, band_point, cos, hypot, my, on_body, pi, rad,    # noqa: E402
-                    ribbon, shr, sin, stud, text_flat, text_on_body)
+from carkit import (Geo, Matrix, V3, hypot, my, on_body, pi, rad, ribbon, shr,    # noqa: E402
+                    stud, text_flat, text_on_body)
 
 # ---------------------------------------------------------------------------------------
 # dimensions
@@ -90,7 +90,7 @@ PMAT = dict(hood="carbon", bumper_f="paint", fender_f="paint", door="paint", qua
             glass_side="glass", glass_rear="glass", trim="frit", sill="cladding",
             floor="underbody", mouth="void", mouth_frame="cladding",
             lightband="gloss_black", tail="void", tail_frame="cladding", scoop="void",
-            vent="void", well="well", lamp_f="lamp_housing", lens_f="lens_clear",
+            vent="void", well="well", wstrim="gloss_black", lamp_f="lamp_housing", lens_f="lens_clear",
             lamp_r="lamp_housing", lens_r="lens_red", cut="void", slit="void")
 GAP = 0.00175                       # 3.5 mm shut lines
 LAMP_F_W, LAMP_F_D = 0.038, 0.055   # the front light channel: width, depth
@@ -185,7 +185,7 @@ def cutters():
     hp = [mid[4].lerp(mid[5], 0.8)] + mid[4:0:-1]
     path = hp + [mid[0]] + [my(p) for p in hp[::-1]]
     rear = Geo()
-    LAMP["rear"] = K.groove(rear, path, width=LAMP_R_W, depth=LAMP_R_D)
+    LAMP["rear"] = K.groove(rear, path, width=LAMP_R_W, depth=LAMP_R_D, round=3)
     # shut lines: a flush handle in each door, the charge flap on each quarter
     cut = Geo()
     K.groove(cut, K.rounded(-0.44, 0.708, 0.17, 0.026), 'y', closed=True, mirror=True)
@@ -211,7 +211,7 @@ def build_hull():
         recesses=[(3, 0, 0.085, 0.03),      # hood extractor
                   (4, 4, 0.035, 0.03),      # vent behind the front wheel
                   (9, 0, 0.09, 0.025)],     # deck vents
-        glass=[("glass_ws", 0.035, "trim", "frit"), ("glass_side", 0.028, "trim", "frit"),
+        glass=[("glass_ws", 0.035, "wstrim", "frame"), ("glass_side", 0.028, "trim", "frit"),
                ("glass_rear", 0.04, "trim", "frit")],
         cutters=cutters, subdiv=SUBDIV, gap=GAP)
     CAPS["mouth"], CAPS["tail"] = body.caps["front"], body.caps["rear"]

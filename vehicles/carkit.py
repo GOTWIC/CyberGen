@@ -1103,6 +1103,11 @@ def build_body(stations, panel_of, pmat, line_crease=0.0, station_crease=0.0, na
         if mat.startswith(("glass", "lens", "frit")):
             md.thickness = lens_thick if mat.startswith("lens") else glass_thick
             pme.shade_smooth()
+            if pn in group:
+                # a pane with a frit border, and its border: smooth shading bends the
+                # normals at the pane's edge toward its rim, and the reflections there
+                # break into shards where no trim covers them
+                pme.set_sharp_from_angle(angle=rad(30))
             continue
         md.thickness = thick
         md.use_rim_only = True
@@ -1549,8 +1554,26 @@ def _both(P, mirror):
     return [(1, P)] + ([(-1, [V3((p.x, -p.y, p.z)) for p in P])] if mirror else [])
 
 
+def chaikin(pts, rounds=3, closed=False):
+    """A polyline with its corners cut round rounds times (each corner's two neighbors at
+    a quarter and three quarters along its edges), its ends kept when open."""
+    P = [V3((q[0], q[1], q[2] if len(q) > 2 else 0.0)) for q in pts]
+    for _ in range(rounds):
+        Q = [] if closed else [P[0]]
+        segs = list(zip(P, P[1:] + P[:1])) if closed else list(zip(P, P[1:]))
+        for k, (a, b) in enumerate(segs):
+            if closed or k > 0:
+                Q.append(a.lerp(b, 0.25))
+            if closed or k < len(segs) - 1:
+                Q.append(a.lerp(b, 0.75))
+        if not closed:
+            Q.append(P[-1])
+        P = Q
+    return P if len(pts[0]) > 2 else [(q.x, q.y) for q in P]
+
+
 def groove(g, pts, proj=None, width=0.0006, depth=0.006, proud=0.006, closed=False,
-           step=0.008, mirror=False, objs=None, out=None, up=None):
+           step=0.008, mirror=False, objs=None, out=None, up=None, round=0):
     """A cut line's cutter in g: a thin blade through the skin along a path (as trace()),
     for build_body's cutters function. Passed as (g, panel, "drop") the panels it cuts get
     the body's gap on both sides of it, so the line is width + 2 gap wide, a shut line like
@@ -1559,7 +1582,10 @@ def groove(g, pts, proj=None, width=0.0006, depth=0.006, proud=0.006, closed=Fal
     a light channel under a lens: width and depth may then be functions of the share of
     the path run (0 to 1), and up the one way out of the channel where it should not be
     the skin's normal (a channel cut level into a nose that leans). mirror: the right side
-    too. Returns the path [(point, way out)]."""
+    too. round: the path's corners cut round that many times first (chaikin()), so a wide
+    channel turns a corner without folding. Returns the path [(point, way out)]."""
+    if round:
+        pts = chaikin(pts, round, closed)
     tr = trace(pts, proj, closed, step, objs, out)
     if len(tr) < (3 if closed else 2):
         log("groove(): the path misses the body")
