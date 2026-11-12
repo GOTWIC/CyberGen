@@ -41,9 +41,15 @@ every car; your own assignment (brand, model, type) comes with your task.
   four ideas that make it this car. Then the body's lines and stations in numbers.
 - Look at a `--preview` after every change of substance and really look at it: proportions
   and stance first, then surfaces, then details. Check all four views, not only the hero.
-- Car-specific helpers go in your own script. Do NOT edit `carkit.py`, `post.py`,
-  `blender.sh` or any other shared file: other sessions are working beside you. If the kit
-  lacks something, work around it in your script and list it under "Kit wishes".
+- Judge the form without its paint: `--clay` for the volumes and `--zebra` for the surfaces
+  (stripes that wobble, pinch or break show a cage too coarse or a crease that dies badly),
+  before the details and again before the sheet. Run `--check` before you call it done and
+  put right what it finds, or say in your script that it is meant (`K.meant(...)`).
+- Car-specific helpers go in your own script; your brand's shared helpers are in
+  `vehicles/brands/<brand>.py` (`from brands import <brand>`). Do NOT edit `carkit.py`,
+  `carcheck.py`, `post.py`, `blender.sh`, a brand module or any other shared file: other
+  sessions are working beside you. If the kit lacks something, work around it in your script
+  and list it under "Kit wishes".
 - When it is good, run `--sheet` once (twice at most) into your car's folder.
 
 ## This Mac is shared

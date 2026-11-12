@@ -1,0 +1,199 @@
+{
+ "car": "kestrel_dart",
+ "size": [
+  4.657,
+  1.99,
+  1.202
+ ],
+ "top_z": 1.519,
+ "objects": 92,
+ "palette": {
+  "paint": [
+   0.64,
+   0.67,
+   0.7
+  ],
+  "paint_finish": "pearl",
+  "paint2": [
+   0.03,
+   0.034,
+   0.042
+  ],
+  "paint2_finish": "satin"
+ },
+ "tires": {
+  "verdict": "ok",
+  "note": "no wheels on the ground (a hover car)",
+  "wheels": []
+ },
+ "ground": {
+  "verdict": "ok",
+  "clearance_mm": 317.0,
+  "lowest": "led.keel",
+  "under_floor": [],
+  "note": "floats 317 mm over the ground"
+ },
+ "symmetry": {
+  "verdict": "look",
+  "center_off_mm": 0.0,
+  "objects": 5,
+  "asymmetric": [
+   {
+    "object": "interior.yoke",
+    "off_mm": 278.2,
+    "at": [
+     0.201,
+     0.167,
+     0.934
+    ]
+   },
+   {
+    "object": "interior.screens",
+    "off_mm": 83.7,
+    "at": [
+     0.558,
+     0.45,
+     0.977
+    ]
+   },
+   {
+    "object": "interior.tub",
+    "off_mm": 56.8,
+    "at": [
+     0.507,
+     -0.619,
+     0.856
+    ]
+   },
+   {
+    "object": "led.name",
+    "off_mm": 5.6,
+    "at": [
+     -2.208,
+     0.065,
+     1.007
+    ]
+   },
+   {
+    "object": "fin.code",
+    "off_mm": 3.2,
+    "at": [
+     -1.692,
+     -0.746,
+     1.223
+    ]
+   }
+  ]
+ },
+ "panels": {
+  "verdict": "ok",
+  "open_edges": [],
+  "open_mm": 0,
+  "cutter_holes": [],
+  "pieces": {
+   "body": {
+    "closed": true,
+    "panels": 19
+   },
+   "pod.f": {
+    "closed": true,
+    "panels": 9
+   },
+   "pod.r": {
+    "closed": true,
+    "panels": 9
+   }
+  }
+ },
+ "through": {
+  "verdict": "look",
+  "parts": [
+   {
+    "object": "interior.tub",
+    "out_mm": 48.2,
+    "share": 0.08,
+    "at": [
+     0.994,
+     -0.559,
+     0.552
+    ],
+    "meant": false
+   }
+  ],
+  "count": 1
+ },
+ "triangles": {
+  "verdict": "ok",
+  "total": 72340,
+  "budget": 400000,
+  "top": [
+   [
+    "body.trim",
+    6132
+   ],
+   [
+    "hull.ribs",
+    6104
+   ],
+   [
+    "pod.ribs",
+    4560
+   ],
+   [
+    "pod.skid.f",
+    2664
+   ],
+   [
+    "pod.skid.r",
+    2664
+   ],
+   [
+    "interior.seats",
+    2632
+   ],
+   [
+    "pod.vanes.f",
+    2160
+   ],
+   [
+    "pod.vanes.r",
+    2160
+   ]
+  ],
+  "groups": [
+   [
+    "pod",
+    31542
+   ],
+   [
+    "body",
+    17278
+   ],
+   [
+    "hull",
+    6104
+   ],
+   [
+    "interior",
+    3888
+   ],
+   [
+    "thrusters",
+    1984
+   ],
+   [
+    "fin",
+    1808
+   ],
+   [
+    "deck",
+    1440
+   ],
+   [
+    "lettering",
+    1196
+   ]
+  ]
+ },
+ "verdict": "look"
+}

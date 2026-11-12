@@ -1,0 +1,147 @@
+{
+ "car": "aurel_zenith",
+ "size": [
+  5.423,
+  2.105,
+  1.215
+ ],
+ "top_z": 1.485,
+ "objects": 71,
+ "palette": {
+  "paint": [
+   0.0075,
+   0.007,
+   0.0068
+  ],
+  "paint_finish": [
+   0.1,
+   0.08,
+   1.0
+  ],
+  "paint2": [
+   0.45,
+   0.05,
+   0.03
+  ],
+  "paint2_finish": "gloss"
+ },
+ "tires": {
+  "verdict": "ok",
+  "note": "no wheels on the ground (a hover car)",
+  "wheels": []
+ },
+ "ground": {
+  "verdict": "ok",
+  "clearance_mm": 270.3,
+  "lowest": "emitter.crest",
+  "under_floor": [],
+  "note": "floats 270 mm over the ground"
+ },
+ "symmetry": {
+  "verdict": "look",
+  "center_off_mm": 0.0,
+  "objects": 1,
+  "asymmetric": [
+   {
+    "object": "interior.wheel",
+    "off_mm": 187.4,
+    "at": [
+     0.469,
+     0.383,
+     0.83
+    ]
+   }
+  ]
+ },
+ "panels": {
+  "verdict": "ok",
+  "open_edges": [],
+  "open_mm": 0,
+  "cutter_holes": [],
+  "pieces": {
+   "body": {
+    "closed": true,
+    "panels": 10
+   }
+  }
+ },
+ "through": {
+  "verdict": "ok",
+  "parts": [],
+  "count": 0
+ },
+ "triangles": {
+  "verdict": "ok",
+  "total": 129135,
+  "budget": 400000,
+  "top": [
+   [
+    "emitter.ring",
+    17664
+   ],
+   [
+    "plinth.flutes",
+    7620
+   ],
+   [
+    "body.quarter",
+    7120
+   ],
+   [
+    "body.floor",
+    7112
+   ],
+   [
+    "body.trim_b",
+    6308
+   ],
+   [
+    "lozenge.flutes.f",
+    6292
+   ],
+   [
+    "emitter.disc",
+    6144
+   ],
+   [
+    "interior.seats",
+    5264
+   ]
+  ],
+  "groups": [
+   [
+    "body",
+    43576
+   ],
+   [
+    "emitter",
+    30352
+   ],
+   [
+    "lozenge",
+    20490
+   ],
+   [
+    "plinth",
+    13088
+   ],
+   [
+    "interior",
+    6432
+   ],
+   [
+    "sill",
+    3504
+   ],
+   [
+    "foot",
+    2096
+   ],
+   [
+    "plate",
+    2061
+   ]
+  ]
+ },
+ "verdict": "look"
+}

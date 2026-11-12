@@ -2675,7 +2675,7 @@ the Unreal tests updated); results `docs/progress/AG16/`.
 
 ## AG18: hero vehicles (in progress)
 
-**Phase 1 built, waiting for review; phase 3 (game packs) built for 18 vehicles.** Scope 14.19 (Swagnik, 2026-11-10): vehicles designed one by one, not
+**Phase 1 built, waiting for review; phase 3 (game packs) built for 18 vehicles; step A (the kit) done.** Scope 14.19 (Swagnik, 2026-11-10): vehicles designed one by one, not
 generated. Everything is in `vehicles/` (the kit `carkit.py`, a script per car in `cars/`,
 the brand book `BRANDS.md`, the design brief `BRIEF.md`, `post.py`, the render queue
 `blender.sh`); a car's sheet and notes are in `docs/progress/AG18/<car>/`. The concept
@@ -2892,7 +2892,85 @@ distinct Nanite meshes (AG8's variants; the vehicles' 104 meshes are not Nanite)
 triangles at LOD0 (5.1 million at LOD3); every city and tile budget kept. Proof in Blender and
 Unreal: [`docs/progress/AG18/city`](progress/AG18/city/README.md).
 
-Next: the design improvements A to E.
+**Step A, the kit** (2026-11-12; scope 14.19's improvements 3, 13 and 14). Nothing here
+changes a car: every script builds what it built before (below).
+
+- **Looks** (`carkit.py`: `wear`, `clay_material`, `zebra_material`, `render_turntable`):
+  `--clay` renders the preview's four views with every part in one matte clay; `--zebra` the
+  same views with an emission material that is black or white by the angle of the reflected
+  view about the car's long axis (60 pairs round the turn; about the cross axis for views
+  along the car), so stripes flow over a fair surface and wobble, pinch or break over a
+  coarse cage; `--turntable [N]` N views round the car at one distance as one image and a
+  looping GIF, in either look. Light linking a car set up is lifted while a look is worn.
+- **Checks** (`vehicles/carcheck.py`, `--check`, `K.check()`; `check.json`): on the car as
+  built, each `ok`, `look` or `fail`.
+  - `tires`: each tire's nearest point of anything that is not its own wheel (`fail` under
+    4 mm, `look` under 25 mm), the front pair turned about its upright axis in 5 degree
+    steps until it touches (`look` under 20 degrees), each tire's foot on the ground;
+  - `ground`: the lowest point of everything that is not a wheel;
+  - `symmetry`: every object's mirror image in y = 0 against the car (3 mm; tires 20 mm);
+  - `panels`: edges of `build_body`'s panels with nothing within two gaps and 5 mm (open;
+    `fail` on a closed hull), and holes a cutter leaves inside one panel;
+  - `through`: cabin parts with points that see the open air in a quarter of 40 directions
+    with everything that is not cabin in the way (a first version by the nearest panel's
+    normal was fooled by panels built inside out and by open liners);
+  - `triangles`: 400,000 for a design mesh.
+  `K.meant(check, *names)` in a script marks a finding as meant.
+- **What the design sessions asked** (all opt-in, the defaults as before): palette keys for
+  a coated glass (`glass_ior`), light strengths, the carbon's coat and the floor; finishes
+  `lacquer` and `skin` and a fourth number for the specular level; `glass()`; studio hooks
+  (`unlit` by light linking, `cabin_light`, `after_studio`, the table `LIGHTS`); view hooks
+  (`on_view`) and `Group` for opening parts with a pose per view; `center` and `ortho`
+  views; several small tiles on a sheet; a nearest-point projector (`snap`) with `strip`,
+  `spline`, `rib`, `plate`, `chine`, `walk`, `flutes`, `bolt_row`; `Geo.ring`, `cyl`, `pipe`,
+  `prism_on`, `lathe` about any axis and `honeycomb` on any plane; fonts by name, a
+  baseline, lettering on the nose and tail, a log line when a word is not laid; a tolerance
+  for rays that slip through a panel gap; tread styles and a car's own rim builder;
+  cutters that drop their faces; `built_at` and `solve_stations` for where subdivision
+  builds an edge; `arch_bolts` sizes. A module per brand in `vehicles/brands/` holds the
+  helpers its three scripts each carry; the cars keep their own copies until a step edits
+  them.
+- **Not done** of improvement 14: a blend (fillet) between body pieces, a ring (hubless)
+  wheel (the Vex Halo's, to be redesigned), a flat cap that holds a glass panel or steps
+  back, pole closure as a cap kind, glass frames on one-quad panes, rims that follow a
+  cutter's wall, an `under` view lit by the floor.
+- **Tools**: `vehicles/survey.py` (checks and renders on every non-Vex car, `--docs` into
+  `docs/progress/AG18/`, `--sign` and `--compare`), `vehicles/signature.py` (a fingerprint
+  of what a script builds: every object's vertices to 0.01 mm and polygons, every
+  material's node tree, the studio's lights and light linking, the sheet's cameras).
+- **The cars are as they were**: all 21 scripts (the Vex too) signed on main and on this
+  branch give the same fingerprints, so no sheet and no pack moves. `packs.json` still names
+  the old `carkit.py` hash for every pack (`packs.py status` says so).
+
+What the survey found on the 18 cars ([`checks.md`](progress/AG18/checks.md) has every row):
+
+- **Tires.** No wheel well has room to steer: the front wheels of every car with wells
+  touch them within 5 degrees (the Aurels at 5 to 10); only the Bastion and the Mule, with
+  exposed wheels, reach 20. Tires in the body: Orrin Aria (front tire in `body.front`),
+  Pebble and Lumen (0 to 2.8 mm to their wells), the three Tanagers (0 to 1.4 mm to the
+  bumper guards or the cabin's tub), the Prelate's and Regent's rear tires 0.1 mm from the
+  cabin's tub, the Sable 4.8 mm. The Tanagers' and the Pebble's tires stand 7 mm into the
+  floor (their flat contact patch).
+- **Ground.** Nothing under the floor; the lowest are the Vanta-R (95 mm) and the Sable
+  (100 mm); hover cars float 270 to 374 mm.
+- **Symmetry.** Beyond what is meant (steering wheels, wipers, masts, cargo, lettering, the
+  taxi's and the van's open doors), `build_body`'s glass trim frames are not mirrored at
+  their corners by 4 to 14 mm (Vanta-R, Sable, Ridge, Prelate, Regent), and their faces
+  point into the car: a kit fault for step B's glass.
+- **Panels.** No torn panel. The only open edges on closed hulls are the Cab's and the
+  Porter's doorways (their doors are slid open). Cutter holes inside a panel are the Orrins'
+  lids (meant).
+- **Cabin parts in the open.** The cabin's tub shows in the wheel wells or under the floor
+  on 10 cars (most of it on the Hauler, 41%, and the Atlas, 35%), door cards by the Cab's
+  and the Porter's open doorways, the Porter's liner past its brow.
+- **Triangles.** The Aria is over (501,460); the others 72,340 to 364,552.
+- **Zebra and clay.** The smooth cars are fair where they should be: the Lumen and the
+  Pebble flow evenly, with bull's-eyes at the Lumen's nose and tail corners and poles at the
+  Pebble's ends; the Aurels' flanks are even while their hoods and decks pinch toward the
+  nose and tail; the Halcyons break cleanly at their creases and are busy over the front
+  fenders where soft creases die; the Kestrels, Brakks and Tanagers are plates, and read so.
+
+Next: the design improvements B to E.
 
 The roster with sizes and sheets: [`docs/progress/AG18/README.md`](progress/AG18/README.md).
 

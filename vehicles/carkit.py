@@ -48,6 +48,15 @@ def _args():
     ap.add_argument("--glb", action="store_true")
     ap.add_argument("--blend", action="store_true")
     ap.add_argument("--extra", default="", help="a fifth small tile on the sheet: a view name")
+    ap.add_argument("--clay", action="store_true",
+                    help="clay.jpg: the preview's views in one matte clay, to judge the form")
+    ap.add_argument("--zebra", action="store_true",
+                    help="zebra.jpg: the preview's views mirroring stripes, to judge surfaces")
+    ap.add_argument("--turntable", type=int, nargs="?", const=12, default=0, metavar="N",
+                    help="turntable.jpg (and .gif): N views round the car (12), in clay or "
+                         "zebra with those flags")
+    ap.add_argument("--check", action="store_true",
+                    help="the kit's checks: a table, and check.json")
     a = ap.parse_args(argv)
     a.out = os.path.abspath(a.out)      # Blender's file writer breaks on a relative path
     return a
@@ -71,9 +80,13 @@ def log(msg):
 # materials
 # ---------------------------------------------------------------------------------------
 MAT = {}
+USED = {}           # the palette materials() was last called with (the checks record it)
 # paint finishes: (metallic, roughness, clear coat)
+# (a fourth number is the specular level, 0.5 when left out)
 FINISH = {"metallic": (0.85, 0.34, 1.0), "pearl": (0.45, 0.30, 1.0), "gloss": (0.0, 0.28, 1.0),
-          "satin": (0.6, 0.48, 0.3), "matte": (0.15, 0.7, 0.0), "chrome": (1.0, 0.12, 1.0)}
+          "satin": (0.6, 0.48, 0.3), "matte": (0.15, 0.7, 0.0), "chrome": (1.0, 0.12, 1.0),
+          "lacquer": (0.0, 0.22, 0.45),         # a thin coat: black stays black under the box
+          "skin": (0.0, 0.78, 0.0, 0.12)}       # matte with little specular: no pale sheen
 PALETTE = dict(
     paint=(0.15, 0.16, 0.185), paint_finish="metallic",        # the body color
     paint2=(0.45, 0.05, 0.03), paint2_finish="gloss",          # a second color: spine, panels
@@ -86,6 +99,12 @@ PALETTE = dict(
     caliper=(0.95, 0.24, 0.02), seat=(0.06, 0.028, 0.02), interior=(0.018, 0.018, 0.020),
     screen=(0.15, 0.6, 0.8), rim=(0.075, 0.078, 0.085), rim_bright=(0.50, 0.51, 0.53),
     decal=(0.55, 0.56, 0.58), ember=(1.0, 0.22, 0.03),
+    # what the design sessions asked for; the defaults are what the kit always did
+    glass_ior=1.5,                                             # 1.1 to 1.2: a coated glass
+    floor=(0.11, 0.11, 0.12),                                  # the studio's floor
+    carbon_coat=1.0,                                           # 0: a dry weave
+    led_front_strength=60.0, led_rear_strength=40.0, led_accent_strength=30.0,
+    led_wheel_strength=30.0, screen_strength=2.0, lamp_strength=25.0, ember_strength=1.6,
 )
 
 
@@ -134,8 +153,11 @@ def paint(name, color, finish="metallic", dust=(0.20, 0.18, 0.15), dust_amount=0
     """Car paint: fine flake under the coat, road dust low down (all of it at dust_z[0] and
     below, none from dust_z[1] up: raise both for a truck or a hover car), grime in the
     creases."""
-    metallic, rough, coat = FINISH[finish] if isinstance(finish, str) else finish
+    fin = FINISH[finish] if isinstance(finish, str) else tuple(finish)
+    metallic, rough, coat = fin[:3]
     m, b = pbr(name, color, metallic, rough, **{"Coat Weight": coat, "Coat Roughness": 0.06})
+    if len(fin) > 3:
+        b.inputs["Specular IOR Level"].default_value = fin[3]
     nt = m.node_tree
     tc = nt.nodes.new('ShaderNodeTexCoord')
     nz = nt.nodes.new('ShaderNodeTexNoise')
@@ -202,10 +224,11 @@ def paint(name, color, finish="metallic", dust=(0.20, 0.18, 0.15), dust_amount=0
     return m, b
 
 
-def carbon(name="carbon", dark=(0.012, 0.012, 0.014), light=(0.045, 0.046, 0.05)):
-    """Twill weave: fine diagonal bands in color and roughness under a clear coat."""
+def carbon(name="carbon", dark=(0.012, 0.012, 0.014), light=(0.045, 0.046, 0.05), coat=1.0):
+    """Twill weave: fine diagonal bands in color and roughness under a clear coat (coat=0:
+    a dry weave, which does not mirror the top light on faces that look up)."""
     mid = tuple((a + c) / 2 * 0.72 for a, c in zip(dark, light))
-    m, b = pbr(name, mid, 0.6, 0.34, **{"Coat Weight": 1.0, "Coat Roughness": 0.08})
+    m, b = pbr(name, mid, 0.6, 0.34, **{"Coat Weight": coat, "Coat Roughness": 0.08})
     nt = m.node_tree
     tc = nt.nodes.new('ShaderNodeTexCoord')
     wv = nt.nodes.new('ShaderNodeTexWave')
@@ -234,6 +257,13 @@ def carbon(name="carbon", dark=(0.012, 0.012, 0.014), light=(0.045, 0.046, 0.05)
     return m, b
 
 
+def glass(name="glass", color=(0.30, 0.33, 0.36), ior=1.5, rough=0.0):
+    """Glass, MAT[name]. ior 1.5 is plain glass, which mirrors the studio's lights where it
+    leans or looks at the sky; 1.1 to 1.2 is a coated glass that does not. A dark color is
+    a smoked glass. Name it glass... and build_body makes its panels thin glass."""
+    return pbr(name, color, 0.0, rough, **{"Transmission Weight": 1.0, "IOR": ior})
+
+
 def materials(**palette):
     """The library, MAT[name], with the car's palette over PALETTE's defaults.
 
@@ -253,12 +283,12 @@ def materials(**palette):
           dust_z=p["dust_z"])
     pbr("gloss_black", (0.010, 0.010, 0.012), 0.0, 0.10, **{"Coat Weight": 1.0})
     pbr("cladding", p["cladding"], 0.3, 0.48)
-    carbon()
+    carbon(coat=p["carbon_coat"])
     pbr("underbody", (0.02, 0.02, 0.02), 0.0, 0.85)
     void()
     pbr("well", (0.010, 0.010, 0.010), 0.0, 0.9, **{"Specular IOR Level": 0.1})
     pbr("grille", (0.03, 0.03, 0.032), 0.8, 0.38)
-    pbr("glass", p["glass"], 0.0, 0.0, **{"Transmission Weight": 1.0, "IOR": 1.5})
+    glass("glass", p["glass"], p["glass_ior"])
     pbr("rubber", (0.014, 0.014, 0.015), 0.0, 0.72)
     pbr("rim", p["rim"], 1.0, 0.30)
     pbr("rim_bright", p["rim_bright"], 1.0, 0.22)
@@ -266,15 +296,17 @@ def materials(**palette):
     pbr("caliper", p["caliper"], 0.0, 0.32, **{"Coat Weight": 1.0})
     pbr("interior", p["interior"], 0.0, 0.6)
     pbr("seat", p["seat"], 0.0, 0.5)
-    emit("led_front", p["led_front"], 60.0)
-    emit("led_rear", p["led_rear"], 40.0)
-    emit("led_accent", p["led_accent"], 30.0)
-    emit("led_wheel", p["led_wheel"] or p["led_front"], 30.0)
-    emit("screen", p["screen"], 2.0)
+    emit("led_front", p["led_front"], p["led_front_strength"])
+    emit("led_rear", p["led_rear"], p["led_rear_strength"])
+    emit("led_accent", p["led_accent"], p["led_accent_strength"])
+    emit("led_wheel", p["led_wheel"] or p["led_front"], p["led_wheel_strength"])
+    emit("screen", p["screen"], p["screen_strength"])
     pbr("decal", p["decal"], 0.0, 0.5)
-    emit("lamp", (0.85, 0.95, 1.0), 25.0)
-    emit("ember", p["ember"], 1.6)
-    pbr("floor", (0.11, 0.11, 0.12), 0.0, 0.30)
+    emit("lamp", (0.85, 0.95, 1.0), p["lamp_strength"])
+    emit("ember", p["ember"], p["ember_strength"])
+    pbr("floor", p["floor"], 0.0, 0.30)
+    USED.clear()
+    USED.update(p)
     return MAT
 
 
@@ -284,6 +316,19 @@ def materials(**palette):
 def my(p):
     """p mirrored to the right side."""
     return V3((p[0], -p[1], p[2]))
+
+
+def _axis_vec(axis):
+    return V3({'x': (1, 0, 0), 'y': (0, 1, 0), 'z': (0, 0, 1)}[axis]) if isinstance(axis, str) \
+        else V3(axis).normalized()
+
+
+def _axis_frame(axis, at=None):
+    """The matrix that turns the y axis onto axis and moves the origin to at."""
+    m = V3((0, 1, 0)).rotation_difference(_axis_vec(axis)).to_matrix().to_4x4()
+    if at is not None:
+        m.translation = V3(at)
+    return m
 
 
 class Geo:
@@ -322,8 +367,11 @@ class Geo:
         faces += [(i, (i + 1) % n, n + (i + 1) % n, n + i) for i in range(n)]
         self.add(pts, faces, xf)
 
-    def lathe(self, prof, n, a0=0.0, a1=2 * pi, xf=None, closed=True):
-        """prof: (axial y, radius) points, turned about the y axis in n steps."""
+    def lathe(self, prof, n, a0=0.0, a1=2 * pi, xf=None, closed=True, axis='y', at=None):
+        """prof: (axial, radius) points, turned in n steps about the y axis through the
+        origin, or about axis ('x', 'y', 'z' or a vector) through the point at."""
+        if axis != 'y' or at is not None:
+            xf = (xf if xf is not None else Matrix.Identity(4)) @ _axis_frame(axis, at)
         full = abs((a1 - a0) - 2 * pi) < 1e-6
         m = len(prof)
         cols = n if full else n + 1
@@ -380,6 +428,39 @@ class Geo:
             faces += [tuple(range(m)), tuple((n - 1) * m + j for j in range(m))]
         self.add(pts, faces, xf)
 
+    def ring(self, center, axis, R, r=None, sec=None, n=48, m=10):
+        """A ring of radius R about axis ('x', 'y', 'z' or a vector) through center: a round
+        bar of radius r (m sides), or a band with sec = (width along the axis, thickness)."""
+        if sec is not None:
+            w, t = sec[0] / 2, sec[1] / 2
+            prof = [(-w, R - t), (-w, R + t), (w, R + t), (w, R - t)]
+        else:
+            prof = [(r * sin(2 * pi * k / m), R - r * cos(2 * pi * k / m)) for k in range(m)]
+        self.lathe(prof, n, axis=axis, at=center)
+
+    def cyl(self, base, h, r, n=24, axis='z'):
+        """A closed cylinder of radius r standing h along axis on the point base."""
+        base = V3(base)
+        self.tube(base, base + _axis_vec(axis) * h, r, n)
+
+    def pipe(self, path, r, n=10, closed=False, up=(0, 0, 1)):
+        """A round bar of radius r along a path of points, mitred at its bends."""
+        self.sweep(path, [(r * cos(2 * pi * k / n), r * sin(2 * pi * k / n)) for k in range(n)],
+                   up=up, closed=closed)
+
+    def prism_on(self, plane, poly, at, depth):
+        """A polygon drawn in a named plane ('xy', 'xz' or 'yz': its 2D points in that
+        order) at the coordinate at of the third axis, pushed depth along that axis."""
+        i, j = "xyz".index(plane[0]), "xyz".index(plane[1])
+        k = 3 - i - j
+        pts, vec = [], [0.0, 0.0, 0.0]
+        for a, b in poly:
+            q = [0.0, 0.0, 0.0]
+            q[i], q[j], q[k] = a, b, at
+            pts.append(q)
+        vec[k] = depth
+        self.prism(pts, vec)
+
     def tube(self, a, b, r, n=12, xf=None):
         """A straight round bar of radius r from a to b, n sides, its ends closed."""
         a, b = V3(a), V3(b)
@@ -409,8 +490,16 @@ class Geo:
                    for (p, sw) in ((p0, -1), (p1, -1), (p1, 1), (p0, 1))]
             self.hexa(pts)
 
-    def honeycomb(self, poly, x, R, wall, depth, sgn, keep=None):
-        """Hexagonal mesh over a (y, z) polygon on the plane x, standing sgn * depth off it."""
+    def honeycomb(self, poly, x, R, wall, depth, sgn, keep=None, frame=None):
+        """Hexagonal mesh over a (y, z) polygon on the plane x, standing sgn * depth off it.
+        frame=(origin, u, v) puts it on any plane instead: the polygon is then (a, b) along
+        u and v from the origin, and the mesh stands along u x v (x is an offset along it)."""
+        F = None
+        if frame is not None:
+            o, u, v = V3(frame[0]), V3(frame[1]).normalized(), V3(frame[2]).normalized()
+            w = u.cross(v).normalized()
+            F = Matrix((w, u, v)).transposed().to_4x4()
+            F.translation = o
         def inside(y, z):
             c = False
             for (y0, z0), (y1, z1) in zip(poly, poly[1:] + poly[:1]):
@@ -427,7 +516,8 @@ class Geo:
                 if not inside(y, z) or (keep is not None and not keep(y, z)):
                     continue
                 prof = [(0, R - wall), (0, R), (depth, R), (depth, R - wall)]
-                self.lathe(prof, 6, xf=Matrix.Translation((x + (0 if sgn < 0 else depth), y, z)) @ rot)
+                xf = Matrix.Translation((x + (0 if sgn < 0 else depth), y, z)) @ rot
+                self.lathe(prof, 6, xf=xf if F is None else F @ xf)
 
     def mesh(self, name, flip_y=False):
         vs = [((p.x, -p.y, p.z) if flip_y else tuple(p)) for p in self.v]
@@ -505,6 +595,7 @@ def band_point(p, center, w, out=0.0):
 # body: character lines over stations, a creased subdivision cage
 # ---------------------------------------------------------------------------------------
 BODY = []           # the body parts the projector sees
+PIECES = {}         # every body piece built, by name (the checks read it)
 _BVH = [None]
 
 
@@ -557,6 +648,9 @@ class Body:
         self.name = name
         self.parts = {}
         self.caps = {}
+        self.raw = set()            # the cutters' panels
+        self.closed = True          # a closed hull (both caps given, mirrored or wrapped)
+        self.gap = 0.0              # the gap its panels were built with
 
 
 def shrink(bm, d):
@@ -606,6 +700,8 @@ def build_body(stations, panel_of, pmat, line_crease=0.0, station_crease=0.0, na
                     sharp corners ("trim" by default).
     cutters         (Geo, panel) solids cut out of the hull, the cut faces becoming that
                     panel, which is kept as it is (no gap, rim or bevel): wheel wells.
+                    (Geo, panel, "drop") drops the cut faces instead: a hole (a window, an
+                    open locker). A cutter on one side only cuts that side.
     mirror, wrap    mirror=False builds the cage as given; wrap=True joins the last line
                     to the first (a tube about the x axis).
     project         whether on_body(), ribbon() and text_on_body() see this piece.
@@ -732,10 +828,16 @@ def build_body(stations, panel_of, pmat, line_crease=0.0, station_crease=0.0, na
                 d2 = (es[1].other_vert(v).co - v.co).normalized()
                 if d1.angle(d2) < rad(150):
                     v[vc] = 1.0
-    raw = set()
-    for _, pn in cutters:
-        pidx(pn)
-        raw.add(pn)
+    raw, dropped = set(), set()
+    for ct in cutters:
+        pidx(ct[1])
+        raw.add(ct[1])
+        if len(ct) > 2 and ct[2] == "drop":
+            dropped.add(ct[1])
+    res.raw = raw
+    res.closed = bool(front is not None and rear is not None and (mirror or wrap))
+    res.gap = gap
+    PIECES[name] = res
 
     me = bpy.data.meshes.new(name + ".hull")
     bm.to_mesh(me)
@@ -752,7 +854,8 @@ def build_body(stations, panel_of, pmat, line_crease=0.0, station_crease=0.0, na
     md.render_levels = subdiv
     md.subdivision_type = 'CATMULL_CLARK'
     cuts = []
-    for k, (g, pn) in enumerate(cutters):
+    for k, ct in enumerate(cutters):
+        g, pn = ct[0], ct[1]
         cme = g.mesh("cut")
         cme.materials.append(pm[pn])
         cut = bpy.data.objects.new("cut", cme)
@@ -778,7 +881,7 @@ def build_body(stations, panel_of, pmat, line_crease=0.0, station_crease=0.0, na
         pb = bmesh.new()
         pb.from_mesh(out)
         dele = [f for f in pb.faces if f.material_index != idx]
-        if len(dele) == len(pb.faces):
+        if len(dele) == len(pb.faces) or pn in dropped:
             pb.free()
             continue
         bmesh.ops.delete(pb, geom=dele, context='FACES')
@@ -845,15 +948,18 @@ def arch_trim(g, cx, cz, r, y_in, y_out, angles, inset=0.005, width=0.04):
     g.add(ring, faces)
 
 
-def arch_bolts(g, cx, cz, r, y, angles, inset=0.005, width=0.04, at=(0.25, 0.75)):
-    """Bolt heads on the outer face of an arch_trim, on the middle of each facet."""
+def arch_bolts(g, cx, cz, r, y, angles, inset=0.005, width=0.04, at=(0.25, 0.75),
+               bolt=(0.0065, 0.0035)):
+    """Bolt heads (bolt: radius, height) on the outer face of an arch_trim, on the middle
+    of each facet."""
+    br, bh = bolt
     mid = r + (width - inset) / 2
     for k in range(len(angles) - 1):
         da = angles[k + 1] - angles[k]
         for t in at:
             a = rad(angles[k] + da * t)
             rr = mid * cos(rad(da / 2)) / cos(rad(da * (t - 0.5)))
-            g.lathe([(-0.002, 0.0015), (-0.002, 0.0065), (0.0035, 0.0065), (0.0035, 0.0015)],
+            g.lathe([(-0.002, 0.0015), (-0.002, br), (bh, br), (bh, 0.0015)],
                     6, xf=Matrix.Translation((cx + rr * cos(a), y, cz + rr * sin(a))))
 
 
@@ -902,17 +1008,24 @@ _RAYS = {'y': ((1, 0, 2), 30.0, (0, -1, 0)), 'Y': ((1, 0, 2), -30.0, (0, 1, 0)),
          'z': ((2, 0, 1), 30.0, (0, 0, -1))}
 
 
-def on_body(u, v, proj, objs=None):
+def on_body(u, v, proj, objs=None, tol=0.0):
     """The body's surface point and normal under (u, v), or (None, None): proj 'y' (x, z)
     seen from the left, 'Y' from the right, 'x' (y, z) from the front, 'X' from the back,
     'z' (x, y) from above. objs: an object or a list of objects to project on instead of
-    the body pieces (as they are at the first call with that list)."""
+    the body pieces (as they are at the first call with that list). tol: a ray that slips
+    through a panel gap looks again this far to each side (0.003 covers every gap)."""
     tree = _tree(objs)
     (axis, a, b), far, d = _RAYS[proj]
     o = V3()
     o[axis], o[a], o[b] = far, u, v
     d = V3(d)
     loc, n, _, _ = tree.ray_cast(o, d)
+    if loc is None and tol:
+        for du, dv in ((tol, 0), (-tol, 0), (0, tol), (0, -tol)):
+            o[a], o[b] = u + du, v + dv
+            loc, n, _, _ = tree.ray_cast(o, d)
+            if loc is not None:
+                break
     if loc is None:
         return None, None
     if n.dot(d) > 0:
@@ -947,6 +1060,228 @@ def ribbon(g, pts, proj, w, lift=0.0008, closed=False, step=0.012, objs=None):
     g.add(vs, [(2 * i, 2 * i + 1, 2 * i + 3, 2 * i + 2) for i in range(len(P) - 1)])
 
 
+def snap(p, objs=None, out=None):
+    """The nearest point of the body as built (or of objs) to p, and its normal there. The
+    normal looks toward p when p is off the surface (give points a little outside it), else
+    along out (a direction) when given. For what a projection along an axis cannot reach:
+    round a nose, over a shoulder, on a dome."""
+    p = V3(p)
+    loc, n, _, _ = _tree(objs).find_nearest(p)
+    if loc is None:
+        return None, None
+    if out is not None:
+        if n.dot(V3(out)) < 0:
+            n = -n
+    elif (p - loc).length > 5e-4 and n.dot(p - loc) < 0:
+        n = -n
+    return loc, n
+
+
+def spline(ctrl, n=12):
+    """A smooth curve through the control points (Catmull-Rom), n points a span."""
+    P = [V3(p) for p in ctrl]
+    out = []
+    for i in range(len(P) - 1):
+        p0, p1, p2, p3 = P[max(i - 1, 0)], P[i], P[i + 1], P[min(i + 2, len(P) - 1)]
+        for k in range(n):
+            t = k / n
+            out.append(0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t
+                              + (3 * p1 - p0 - 3 * p2 + p3) * t ** 3))
+    out.append(P[-1])
+    return out
+
+
+def strip(g, ctrl, w, lift=0.0026, sink=-0.0003, taper=(0.0, 0.0), n=12, objs=None, out=None):
+    """A band of width w lying on the surface along a smooth 3D curve through ctrl (points
+    near the surface, snapped onto it): a closed solid from sink under the skin to lift over
+    it, its ends drawn out to points over the taper lengths. Light strips, trims and seams
+    that run round a nose or over a shoulder. The default sink is negative, a hair over the
+    skin: panels have no thickness, and a light under the skin shines into the shell."""
+    P, N = [], []
+    for q in spline(ctrl, n):
+        loc, nn = snap(q, objs, out)
+        if loc is not None and (not P or (loc - P[-1]).length > 1e-4):
+            P.append(loc)
+            N.append(nn)
+    if len(P) < 2:
+        return
+    s = [0.0]
+    for a, b in zip(P, P[1:]):
+        s.append(s[-1] + (b - a).length)
+    vs = []
+    for i in range(len(P)):
+        t = (P[min(i + 1, len(P) - 1)] - P[max(i - 1, 0)]).normalized()
+        sd = N[i].cross(t).normalized()
+        k = 1.0
+        if taper[0]:
+            k = min(k, (s[i] / taper[0]) ** 0.6)
+        if taper[1]:
+            k = min(k, ((s[-1] - s[i]) / taper[1]) ** 0.6)
+        h = w * max(k, 0.06) / 2
+        vs += [P[i] - N[i] * sink + sd * h, P[i] + N[i] * lift + sd * h,
+               P[i] + N[i] * lift - sd * h, P[i] - N[i] * sink - sd * h]
+    m = len(P)
+    faces = [(4 * i + j, 4 * i + (j + 1) % 4, 4 * i + 4 + (j + 1) % 4, 4 * i + 4 + j)
+             for i in range(m - 1) for j in range(4)]
+    faces += [(0, 1, 2, 3), tuple(4 * (m - 1) + j for j in range(4))]
+    g.add(vs, faces)
+
+
+def rib(g, pts, proj, w, h, objs=None, sink=0.003, top=0.56):
+    """A raised rib on the body (or on objs) along a path given in projection: w wide at
+    its foot, top x w at its crest, h proud, a closed solid."""
+    P, N = [], []
+    for q in pts:
+        loc, n = on_body(q[0], q[1], proj, objs)
+        if loc is not None:
+            P.append(loc)
+            N.append(n)
+    if len(P) < 2:
+        return
+    vs = []
+    for i in range(len(P)):
+        t = (P[min(i + 1, len(P) - 1)] - P[max(i - 1, 0)]).normalized()
+        sd = N[i].cross(t).normalized()
+        b = P[i] - N[i] * sink
+        vs += [b + sd * w / 2, b - sd * w / 2, P[i] + N[i] * h - sd * w * top / 2,
+               P[i] + N[i] * h + sd * w * top / 2]
+    k = len(P) - 1
+    faces = [(0, 1, 2, 3), tuple(4 * k + j for j in range(4))]
+    for i in range(k):
+        faces += [(4 * i + j, 4 * i + (j + 1) % 4, 4 * i + 4 + (j + 1) % 4, 4 * i + 4 + j)
+                  for j in range(4)]
+    g.add(vs, faces)
+
+
+def plate(g, base, along, up, poly, th0, th1=None, tmax=1.0):
+    """A flat blade: poly as (a, t) in the plane through base spanned by along and up, th0
+    thick at t = 0 and th1 at t = tmax. Returns the plane's normal."""
+    base, along, up = V3(base), V3(along).normalized(), V3(up).normalized()
+    n = along.cross(up).normalized()
+    th1 = th0 if th1 is None else th1
+    lo, hi = [], []
+    for (a, t) in poly:
+        q = base + along * a + up * t
+        th = th0 + (th1 - th0) * min(1.0, max(0.0, t / tmax))
+        lo.append(q - n * th / 2)
+        hi.append(q + n * th / 2)
+    m = len(poly)
+    g.add(lo + hi, [tuple(range(m)), tuple(range(m, 2 * m))]
+          + [(i, (i + 1) % m, m + (i + 1) % m, m + i) for i in range(m)])
+    return n
+
+
+def chine(x, objs=None, reach=1.6):
+    """The widest point of the body as built at x, seen from above (None off the body)."""
+    lo, hi = 0.0, reach
+    if on_body(x, lo, 'z', objs)[0] is None:
+        return None
+    for _ in range(18):
+        mid = (lo + hi) / 2
+        if on_body(x, mid, 'z', objs)[0] is not None:
+            lo = mid
+        else:
+            hi = mid
+    loc = on_body(x, lo - 0.0015, 'z', objs)[0]
+    return V3((x, lo, loc.z)) if loc is not None else None
+
+
+def walk(path, step, closed=True):
+    """Points every step along a path of (x, y) or 3D points (the step fitted to its
+    length; a closed path by default): [(point, tangent, normal)], the normal in plan, to
+    the right of the way round (outward on a counterclockwise outline)."""
+    pts = [V3((q[0], q[1], q[2] if len(q) > 2 else 0.0)) for q in path]
+    segs = list(zip(pts, pts[1:] + pts[:1])) if closed else list(zip(pts, pts[1:]))
+    total = sum((b - a).length for a, b in segs)
+    n = max(1, int(round(total / step)))
+    out, k, s0 = [], 0, 0.0
+    for a, b in segs:
+        ln = (b - a).length
+        if ln < 1e-9:
+            continue
+        t = (b - a) / ln
+        while k < n and (k + 0.5) * total / n <= s0 + ln + 1e-9:
+            nr = V3((t.y, -t.x, 0))
+            out.append((a + t * ((k + 0.5) * total / n - s0), t,
+                        nr.normalized() if nr.length > 1e-6 else V3((0, 1, 0))))
+            k += 1
+        s0 += ln
+    return out
+
+
+def flutes(g, run, lo, hi, pitch, proj='y', a=0.008, b=0.0035, h=0.006, sink=0.002,
+           objs=None, keep=None):
+    """A row of flutes on the body: bars from the surface at v = lo to the surface at
+    v = hi, every pitch along u over run = (u0, u1), seen along proj (as on_body: on a flank
+    u is x and v is z). Each is 2a wide at its foot, 2b at its crest and h proud; keep(p_lo,
+    p_hi) may refuse one. Returns how many were laid."""
+    u0, u1 = run
+    span = abs(u1 - u0)
+    n = int(span / pitch)
+    off = (span - n * pitch) / 2
+    sg = 1.0 if u1 >= u0 else -1.0
+    laid = 0
+    for k in range(n + 1):
+        u = u0 + sg * (off + k * pitch)
+        p0, n0 = on_body(u, lo, proj, objs)
+        p1, n1 = on_body(u, hi, proj, objs)
+        if p0 is None or p1 is None or (keep is not None and not keep(p0, p1)):
+            continue
+        ax = (p1 - p0).normalized()
+        ring = []
+        for q, nn in ((p0, n0), (p1, n1)):
+            sd = ax.cross(nn).normalized()
+            ring += [q - nn * sink - sd * a, q - nn * sink + sd * a, q + nn * h + sd * b,
+                     q + nn * h - sd * b]
+        g.hexa(ring)
+        laid += 1
+    return laid
+
+
+BOLT = [(-0.002, 0.0015), (-0.002, 0.0065), (0.0035, 0.0065), (0.0035, 0.0015)]
+
+
+def bolt_row(g, pts, pitch, proj=None, objs=None, prof=None, seg=6, ends=True):
+    """Bolt heads every pitch (fitted) along a path on the body: pts in projection with
+    proj (as on_body), else 3D points near the surface (snapped onto it). prof: the head's
+    lathe profile (BOLT: a 13 mm hexagon 3.5 mm proud). ends: one at each end of the path
+    too. Returns how many were laid."""
+    P = [V3((q[0], q[1], q[2] if len(q) > 2 else 0.0)) for q in pts]
+    total = sum((b - a).length for a, b in zip(P, P[1:]))
+    n = max(1, int(round(total / pitch)))
+    want = [total * k / n for k in range(n + 1)] if ends else \
+        [total * (k + 0.5) / n for k in range(n)]
+    laid, s0, i = 0, 0.0, 0
+    for (a, b) in zip(P, P[1:]):
+        ln = (b - a).length
+        while i < len(want) and want[i] <= s0 + ln + 1e-9:
+            q = a.lerp(b, (want[i] - s0) / ln if ln > 1e-9 else 0.0)
+            loc, nn = on_body(q.x, q.y, proj, objs) if proj else snap(q, objs)
+            if loc is not None:
+                stud(g, loc, nn, prof or BOLT, seg)
+                laid += 1
+            i += 1
+        s0 += ln
+    return laid
+
+
+def built_at(xs, i):
+    """Where station i's edge is built along an uncreased line whose stations stand at xs:
+    subdivision draws it toward its neighbors, (previous + 4 x + next) / 6."""
+    return (xs[i - 1] + 4 * xs[i] + xs[i + 1]) / 6.0
+
+
+def solve_stations(xs, want):
+    """xs with the stations in want = {index: where its edge should be built} moved so
+    that their edges are built there (a door's shut lines, a hatch's edge); the others stay.
+    For a line that is not creased across those stations; use it on x, y or z alike."""
+    x = list(xs)
+    for _ in range(60):
+        for i, w in want.items():
+            x[i] = (6.0 * w - x[i - 1] - x[i + 1]) / 4.0
+    return x
+
+
 def stud(g, loc, n, prof, seg):
     """A lathe profile standing on the surface point loc along its normal n."""
     xf = Matrix.Translation(loc) @ V3((0, 1, 0)).rotation_difference(n).to_matrix().to_4x4()
@@ -956,24 +1291,52 @@ def stud(g, loc, n, prof, seg):
 _FONT = [None]
 FONTS = ("/System/Library/Fonts/Supplemental/DIN Alternate Bold.ttf",
          "C:/Windows/Fonts/bahnschrift.ttf")
+# the faces a car may ask for by name with font= (the first file found; else the default)
+FONT_SETS = {
+    "din": FONTS,
+    "condensed": ("/System/Library/Fonts/Supplemental/DIN Condensed Bold.ttf",
+                  "C:/Windows/Fonts/bahnschrift.ttf"),
+    "serif": ("/System/Library/Fonts/Supplemental/Didot.ttc",
+              "/System/Library/Fonts/Supplemental/Bodoni 72.ttc",
+              "/System/Library/Fonts/Supplemental/Times New Roman Bold.ttf",
+              "C:/Windows/Fonts/timesbd.ttf"),
+    "mono": ("/System/Library/Fonts/Menlo.ttc",
+             "/System/Library/Fonts/Supplemental/Courier New Bold.ttf",
+             "C:/Windows/Fonts/consolab.ttf"),
+}
+_FONTS = {}
 
 
-def text_mesh(txt, size, spacing=1.0):
-    """Flat outline text as (verts, faces), centered on its origin."""
+def load_font(name):
+    """A loaded font: a name of FONT_SETS or a file's path (None when nothing is found)."""
+    if name not in _FONTS:
+        _FONTS[name] = None
+        for p in FONT_SETS.get(name, (name,)):
+            if os.path.exists(p):
+                _FONTS[name] = bpy.data.fonts.load(p)
+                break
+    return _FONTS[name]
+
+
+def text_mesh(txt, size, spacing=1.0, font=None, align=None):
+    """Flat outline text as (verts, faces), centered on its origin. font: a name of
+    FONT_SETS ("din", "condensed", "serif", "mono") or a font file; align: "baseline" puts
+    the origin on the baseline (the middle of the text's height otherwise)."""
     cu = bpy.data.curves.new("txt", 'FONT')
     cu.body = txt
     cu.size = size
     cu.space_character = spacing
     cu.align_x = 'CENTER'
-    cu.align_y = 'CENTER'
+    cu.align_y = 'BOTTOM_BASELINE' if align == "baseline" else 'CENTER'
     if _FONT[0] is None:
         _FONT[0] = False
         for p in FONTS:
             if os.path.exists(p):
                 _FONT[0] = bpy.data.fonts.load(p)
                 break
-    if _FONT[0]:
-        cu.font = _FONT[0]
+    own = load_font(font) if font else None
+    if own or _FONT[0]:
+        cu.font = own or _FONT[0]
     ob = bpy.data.objects.new("txt", cu)
     SCN.collection.objects.link(ob)
     me = evaluated_mesh(ob)
@@ -985,16 +1348,19 @@ def text_mesh(txt, size, spacing=1.0):
 
 
 def text_on_body(g, txt, size, x0, z0, side, lift=0.0012, spacing=1.0, proj=None, turn=0.0,
-                 objs=None):
+                 objs=None, font=None, align=None, tol=0.0):
     """Text on the body's flank, reading left to right for someone looking at that side
     (side 1 left, -1 right), its middle at (x0, z0).
 
     proj='z' lays it on a roof, hood or deck instead, seen from above: its middle at
     x = x0, y = z0, reading left to right for someone standing at the car's left (side 1)
     or right (side -1); turn (degrees, counterclockwise seen from above) turns it from
-    there (side 1, turn 90: read from behind the car). objs as on_body()'s. Nothing is
-    added when any of its points misses the surface."""
-    vs, fs = text_mesh(txt, size, spacing)
+    there (side 1, turn 90: read from behind the car). proj='x' writes on the nose and
+    proj='X' on the tail, read by someone facing it: its middle at y = x0, z = z0 (side is
+    not used). objs and tol as on_body()'s, font and align as text_mesh()'s. Nothing is
+    added when any of its points misses the surface (the log says so); returns whether it
+    was laid."""
+    vs, fs = text_mesh(txt, size, spacing, font, align)
     out = []
     if proj == 'z':
         c, s = cos(rad(turn)), sin(rad(turn))
@@ -1002,18 +1368,23 @@ def text_on_body(g, txt, size, x0, z0, side, lift=0.0012, spacing=1.0, proj=None
         ux, uy = side * s, -side * c                # up its letters
     for p in vs:
         if proj == 'z':
-            loc, n = on_body(x0 + rx * p.x + ux * p.y, z0 + ry * p.x + uy * p.y, 'z', objs)
+            loc, n = on_body(x0 + rx * p.x + ux * p.y, z0 + ry * p.x + uy * p.y, 'z', objs,
+                             tol)
+        elif proj in ('x', 'X'):
+            loc, n = on_body(x0 + (p.x if proj == 'x' else -p.x), z0 + p.y, proj, objs, tol)
         else:
-            loc, n = on_body(x0 - side * p.x, z0 + p.y, 'y' if side > 0 else 'Y', objs)
+            loc, n = on_body(x0 - side * p.x, z0 + p.y, 'y' if side > 0 else 'Y', objs, tol)
         if loc is None:
-            return
+            log("text_on_body: %r is not laid, one of its points misses the surface" % txt)
+            return False
         out.append(loc + n * lift)
     g.add(out, fs)
+    return True
 
 
-def text_flat(g, txt, size, origin, right, up, spacing=1.0):
+def text_flat(g, txt, size, origin, right, up, spacing=1.0, font=None, align=None):
     """Text on a plane: its middle at origin, reading along right."""
-    vs, fs = text_mesh(txt, size, spacing)
+    vs, fs = text_mesh(txt, size, spacing, font, align)
     o, r, u = V3(origin), V3(right), V3(up)
     g.add([o + r * p.x + u * p.y for p in vs], fs)
 
@@ -1021,9 +1392,20 @@ def text_flat(g, txt, size, origin, right, up, spacing=1.0):
 # ---------------------------------------------------------------------------------------
 # wheels
 # ---------------------------------------------------------------------------------------
+TREADS = {      # grooves (shares of the width), their half widths (top, bottom) and depth,
+                # every which block sunk and its shift a land, the blocks' inset and depth
+    "road": dict(grooves=(-0.24, 0.0, 0.24), gw=(0.012, 0.007), gd=0.009, mod=4, shift=2,
+                 inset=(0.002, 0.007), seg=144),
+    "all_terrain": dict(grooves=(-0.2, 0.2), gw=(0.016, 0.009), gd=0.013, mod=2, shift=1,
+                        inset=(0.004, 0.011), seg=96),
+    "lug": dict(grooves=(0.0,), gw=(0.022, 0.012), gd=0.018, mod=2, shift=1,
+                inset=(0.006, 0.016), seg=72),
+}
+
+
 def build_wheel(tag, cx, R, w, Rr, out_y, side, cz=None, spokes=7, style="twin",
                 ring="led_wheel", caliper="caliper", rim="rim", bright="rim_bright",
-                tire="rubber", loc=None, rot=None):
+                tire="rubber", loc=None, rot=None, tread="road"):
     """A wheel on its axle, as objects tire.<tag>, rim.<tag>, hub.<tag>, ring.<tag>,
     disc.<tag>, caliper.<tag>, drum.<tag>, all at the wheel's middle (they can turn).
 
@@ -1032,17 +1414,23 @@ def build_wheel(tag, cx, R, w, Rr, out_y, side, cz=None, spokes=7, style="twin",
     ("twin" pairs of blades, "blade" single swept blades, "disc" a closed dish). ring,
     caliper: material names, None for no light ring, no brake. tire=None leaves the tire
     out and rim=None the rim and its hub (bright=None the hub alone), for a car that brings
-    its own under the same names. loc puts the wheel's middle somewhere else and rot (an
-    Euler, three angles or a matrix) turns it there: a spare. Nothing here needs a wheel
-    well: an exposed wheel is the same call.
+    its own under the same names. rim may also be the car's own rim builder, called as
+    rim(tag, w, Rr, flip, loc, rot) to make rim.<tag> at loc (the kit's hub, ring and
+    brake still come unless switched off). tread: a name of TREADS ("road", "all_terrain",
+    "lug") or such a dict. loc puts the wheel's middle somewhere else and rot (an Euler,
+    three angles or a matrix) turns it there: a spare. Nothing here needs a wheel well: an
+    exposed wheel is the same call.
     """
     hw = w / 2
     flip = side < 0
     loc = (cx, side * (out_y - hw), R if cz is None else cz) if loc is None else tuple(loc)
-    N = 144
+    td = TREADS[tread] if isinstance(tread, str) else tread
+    N = td["seg"]
     if tire:
-        _tire(tag, R, w, Rr, N, tire, flip, loc, rot)
-    if rim:
+        _tire(tag, R, w, Rr, N, tire, flip, loc, rot, td)
+    if callable(rim):
+        rim(tag, w, Rr, flip, loc, rot)
+    elif rim:
         _rim(tag, w, Rr, spokes, style, rim, flip, loc, rot)
     if rim and bright:
         g = Geo()
@@ -1077,11 +1465,14 @@ def build_wheel(tag, cx, R, w, Rr, out_y, side, cz=None, spokes=7, style="twin",
     g.obj("drum." + tag, "well", flip_y=flip, loc=loc, rot=rot)
 
 
-def _tire(tag, R, w, Rr, N, tire, flip, loc, rot):
+def _tire(tag, R, w, Rr, N, tire, flip, loc, rot, td=None):
     """The tire: grooves, tread blocks, sidewall lettering."""
+    td = td or TREADS["road"]
     hw = w / 2
     g = Geo()
-    grooves = [-w * 0.24, 0.0, w * 0.24]
+    grooves = [w * k for k in td["grooves"]]
+    g0, g1 = td["gw"]
+    gd = td["gd"]
 
     def wall(sg):
         return [(sg * (hw - 0.048), R), (sg * (hw - 0.030), R - 0.006),
@@ -1094,7 +1485,7 @@ def _tire(tag, R, w, Rr, N, tire, flip, loc, rot):
                 (sg * (hw - 0.022), Rr - 0.004)]
     prof = wall(-1)[::-1]
     for c in grooves:
-        prof += [(c - 0.012, R), (c - 0.007, R - 0.009), (c + 0.007, R - 0.009), (c + 0.012, R)]
+        prof += [(c - g0, R), (c - g1, R - gd), (c + g1, R - gd), (c + g0, R)]
     prof += wall(1)
     g.lathe(prof, N)
     tob = g.obj("tire." + tag, tire, flip_y=flip, loc=loc, rot=rot)
@@ -1108,9 +1499,9 @@ def _tire(tag, R, w, Rr, N, tire, flip, loc, rot):
             continue
         k = int((atan2(c.z, c.x) % (2 * pi)) / (2 * pi / N))
         land = sum(1 for e in edges if abs(c.y) * (1 if c.y > 0 else -1) > e)
-        if (k + 2 * land) % 4 == 0:
+        if (k + td["shift"] * land) % td["mod"] == 0:
             sel.append(f)
-    bmesh.ops.inset_individual(bm, faces=sel, thickness=0.002, depth=-0.007)
+    bmesh.ops.inset_individual(bm, faces=sel, thickness=td["inset"][0], depth=-td["inset"][1])
     word = "1110110111011001111011011100000000001011101101110110011110000000000000"
     bm.faces.ensure_lookup_table()
     let = []
@@ -1170,6 +1561,126 @@ def aim(ob, target):
 
 
 STUDIO_R, COVE_R = 16.0, 9.0        # the floor is flat to STUDIO_R, the cove's radius beyond
+# The day studio's lights (name: where it stands, what it aims at, its size, watts). The top
+# box is long ACROSS the car (7.5 m along y, 2.8 m along x), so glass that looks at the sky
+# or leans in more than about 25 degrees mirrors it; unlit() keeps a light off such glass.
+LIGHTS = {"top": ((0.2, 0, 5.5), (0, 0, 0), (7.5, 2.8), 900),
+          "key": ((5.0, 5.5, 3.2), (0.5, 0, 0.5), (4.0, 2.5), 620),
+          "rim": ((-6.0, -5.0, 5.0), (0, 0, 0.6), (5.0, 1.2), 800),
+          "fill": ((5.5, -4.5, 1.6), (0.5, 0, 0.5), (3.0, 2.0), 200),
+          "strip": ((0.0, 6.5, 1.3), (0, 0, 0.6), (9.0, 0.45), 300),
+          "strip2": ((0.0, -6.5, 1.3), (0, 0, 0.6), (9.0, 0.45), 300)}
+UNLIT = {}          # light name -> names of the objects it does not light (unlit())
+CABIN_LIGHTS = []   # cabin_light()'s lamps
+STUDIO_HOOKS = []   # after_studio()'s functions
+VIEW_HOOKS = []     # on_view()'s functions
+
+
+def unlit(lights, *objs):
+    """Keeps studio lights off some objects (light linking): lights is a name of LIGHTS or
+    several, objs are objects, names, or names ending in * for every object that starts so.
+    unlit("top", "body.canopy") stops the top box from being mirrored whole in a raked
+    windshield; the paint and everything else still take it. Call it before shoot()."""
+    for name in ([lights] if isinstance(lights, str) else lights):
+        UNLIT.setdefault(name, []).extend(o if isinstance(o, str) else o.name for o in objs)
+
+
+def cabin_light(loc, power=8.0, size=0.5, color=(1.0, 0.95, 0.88), target=None):
+    """A soft lamp inside the cabin (a dome light), so the cabin reads through the glass.
+    It belongs to the studio, not the car: loc where it hangs, target what it aims at
+    (straight down when not given). Call it before shoot()."""
+    CABIN_LIGHTS.append((tuple(loc), power, size, tuple(color),
+                         tuple(target) if target is not None else None))
+
+
+def after_studio(fn):
+    """fn() is called once the studio is built: a car's own change to its lights."""
+    STUDIO_HOOKS.append(fn)
+
+
+def on_view(fn):
+    """fn(view name, True) is called before a view renders and fn(view name, False) after:
+    a state of the car's own for some views (a lifted canopy, an open door)."""
+    VIEW_HOOKS.append(fn)
+
+
+def _studio_extras():
+    for k, (loc, power, size, color, target) in enumerate(CABIN_LIGHTS):
+        L = bpy.data.lights.new("cabin%d" % k, 'AREA')
+        L.shape = 'SQUARE'
+        L.size = size
+        L.energy = power
+        L.color = color
+        o = bpy.data.objects.new("cabin%d" % k, L)
+        STUDIO.objects.link(o)
+        o.location = loc
+        aim(o, target if target is not None else (loc[0], loc[1], loc[2] - 1.0))
+        o.visible_camera = False
+    for name, skip in UNLIT.items():
+        light = STUDIO.objects.get(name)
+        if light is None:
+            continue
+        exact = {n for n in skip if not n.endswith("*")}
+        heads = tuple(n[:-1] for n in skip if n.endswith("*"))
+        rec = bpy.data.collections.new(name + ".receivers")
+        for ob in list(CAR.objects) + list(STUDIO.objects):
+            if ob.type == 'MESH' and ob.name not in exact and not (heads and
+                                                                   ob.name.startswith(heads)):
+                rec.objects.link(ob)
+        try:
+            light.light_linking.receiver_collection = rec
+        except Exception as e:
+            print("light linking:", e)
+    for fn in STUDIO_HOOKS:
+        fn()
+
+
+class Group:
+    """Parts that move as one: a door, a hatch, a hood, a canopy. The objects hang on an
+    empty at the pivot (outside the car's collection, so nothing counts it); pose() moves
+    them from where they were built and rest() puts them back.
+
+        door = K.Group("door", [panel, glass, handle], pivot=(0.6, 0.95, 0.4))
+        door.pose_for(("hero", "side"), loc=(-0.9, 0.06, 0))       # slid open in those views
+        lid = K.Group("canopy", parts, pivot=hinge)
+        lid.pose(rot=(0, rad(-40), 0))                             # swung about its pivot
+    """
+
+    def __init__(self, name, objs, pivot=(0, 0, 0)):
+        rig = bpy.data.collections.get("RIG")
+        if rig is None:
+            rig = bpy.data.collections.new("RIG")
+            SCN.collection.children.link(rig)
+        self.ob = bpy.data.objects.new(name, None)
+        rig.objects.link(self.ob)
+        self.ob.location = pivot
+        self.pivot = V3(pivot)
+        bpy.context.view_layer.update()
+        inv = self.ob.matrix_world.inverted()
+        self.objs = list(objs)
+        for o in self.objs:
+            o.parent = self.ob
+            o.matrix_parent_inverse = inv
+        _PTS.clear()
+
+    def pose(self, loc=(0, 0, 0), rot=(0, 0, 0)):
+        """Moved by loc and turned by rot (an Euler, three angles) about the pivot."""
+        self.ob.location = self.pivot + V3(loc)
+        self.ob.rotation_euler = rot
+        bpy.context.view_layer.update()
+        _PTS.clear()
+
+    def rest(self):
+        self.pose()
+
+    def pose_for(self, views, loc=(0, 0, 0), rot=(0, 0, 0)):
+        """The pose in those views (names) and at rest in every other."""
+        views = (views,) if isinstance(views, str) else tuple(views)
+
+        def hook(name, before):
+            if name in views:
+                self.pose(loc, rot) if before else self.rest()
+        on_view(hook)
 
 
 def build_studio():
@@ -1255,6 +1766,7 @@ def build_studio():
             o = area(name, (0.0, y, 1.3), (0, 0, 0.6), 9.0, 0.45, 300)
             o.visible_camera = False
             o.visible_transmission = False
+    _studio_extras()
 
 
 _PTS = {}
@@ -1309,6 +1821,9 @@ def car_points(prefixes=None):
     return pts
 
 
+# center=True moves a fitted view's target until the silhouette sits in the middle of the
+# frame (a tall car's hero); ortho=True makes it an orthographic drawing (a long vehicle's
+# side with no perspective, whatever the studio's depth).
 # A view: dir (from the target toward the camera), lens, and either dist or a fit of the
 # whole car (fit=(name prefixes) for some objects) with a margin; focus and fstop give
 # depth of field. target is optional: without one a view aims at the middle of what it
@@ -1365,6 +1880,33 @@ def _reach(tgt, d, v):
     return t
 
 
+def _fit(tgt, d, quat, v):
+    """The distance from tgt along d at which a fitted view's silhouette fills its frame."""
+    rm = quat.to_matrix()
+    right, up = rm.col[0], rm.col[1]
+    rx, ry = SCN.render.resolution_x, SCN.render.resolution_y
+    ax, ay = (1.0, rx / ry) if rx >= ry else (ry / rx, 1.0)
+    k = max(0.05, 1 - 2 * v.get('margin', 0.05))
+    rel = [(max(abs(q.dot(right)) * ax, abs(q.dot(up)) * ay), q.dot(d))
+           for q in (p - tgt for p in car_points(v.get("fit")))]
+    half = 18.0 / v["lens"] * k
+    return max(max(e / half + c for e, c in rel), max(c for _, c in rel) + 0.2)
+
+
+def _centered(tgt, d, quat, v):
+    """tgt moved in the view's plane until the silhouette is as far from the frame's left
+    edge as from its right, and from its top as from its bottom (center=True on a view)."""
+    rm = quat.to_matrix()
+    right, up = rm.col[0], rm.col[1]
+    pts = car_points(v.get("fit"))
+    for _ in range(4):
+        t = _fit(tgt, d, quat, v)
+        sx = [(q - tgt).dot(right) / (t - (q - tgt).dot(d)) for q in pts]
+        sy = [(q - tgt).dot(up) / (t - (q - tgt).dot(d)) for q in pts]
+        tgt = tgt + right * ((min(sx) + max(sx)) / 2 * t) + up * ((min(sy) + max(sy)) / 2 * t)
+    return tgt
+
+
 def add_camera(name, v):
     """A camera for the view at the scene's current resolution (set that first). A fitted
     view stands where the car's silhouette (car_points) just fills the frame less its
@@ -1384,6 +1926,20 @@ def add_camera(name, v):
         cd.dof.use_dof = True
         cd.dof.aperture_fstop = v.get("fstop", 4.0)
         FOCUS[ob.name] = V3(v["focus"])
+    if v.get("center") and not v.get("dist"):
+        tgt = _centered(tgt, d, quat, v)
+    if v.get("ortho"):
+        rm = quat.to_matrix()
+        rx, ry = SCN.render.resolution_x, SCN.render.resolution_y
+        k = max(0.05, 1 - 2 * v.get('margin', 0.05))
+        qs = [q - tgt for q in car_points(v.get("fit"))]
+        ex = max(abs(q.dot(rm.col[0])) for q in qs)
+        ey = max(abs(q.dot(rm.col[1])) for q in qs)
+        cd.type = 'ORTHO'
+        cd.ortho_scale = 2 * max(ex, ey * rx / ry) / k if rx >= ry else \
+            2 * max(ey, ex * ry / rx) / k
+        ob.location = tgt + d * min(_reach(tgt, d, v), 14.0)
+        return ob
     far = _reach(tgt, d, v)
     if v.get("dist"):
         if v["dist"] > far:
@@ -1441,6 +1997,10 @@ def render_view(name, path, res, samples, margin=None):
     SCN.render.resolution_x, SCN.render.resolution_y = res
     SCN.cycles.samples = samples
     v = VIEWS[name]
+    for fn in VIEW_HOOKS:
+        fn(name, True)
+    if LOOK[0] == "zebra":
+        _zebra_axis(v)
     cam = add_camera(name, v if margin is None else dict({"margin": margin}, **v))
     SCN.camera = cam
     if cam.name in FOCUS:
@@ -1452,7 +2012,149 @@ def render_view(name, path, res, samples, margin=None):
     bpy.ops.render.render(write_still=True)
     if cyc is not None:
         cyc.hide_render = False
+    for fn in VIEW_HOOKS:
+        fn(name, False)
     log("rendered %s %d x %d, %d samples" % (name, res[0], res[1], samples))
+
+
+# ---------------------------------------------------------------------------------------
+# looks for judging the form: clay and zebra stripes
+# ---------------------------------------------------------------------------------------
+LOOK = [None]               # the look the car wears now: None, "clay" or "zebra"
+ZEBRA_PAIRS = 60            # black and white pairs round the turn (6 degrees a pair)
+_WORN = {}
+_LINKS = {}
+
+
+def clay_material():
+    """One matte clay for every part: the form with no paint, glass or light to flatter it."""
+    m = bpy.data.materials.get("look.clay")
+    if m is None:
+        m, b = new_mat("look.clay")
+        b.inputs["Base Color"].default_value = (0.30, 0.265, 0.235, 1.0)
+        b.inputs["Roughness"].default_value = 0.5
+        b.inputs["Specular IOR Level"].default_value = 0.35
+    return m
+
+
+def zebra_material():
+    """Zebra stripes: every point shows black or white by the direction its mirror image
+    of the view comes from, as if the car stood in a tunnel of light tubes running along
+    it. Stripes flow smoothly over a fair surface, kink at a crease, and wobble, pinch or
+    break where the surface is not fair. The tubes run along x, or along y for views that
+    look along the car (front, back)."""
+    m = bpy.data.materials.get("look.zebra")
+    if m is not None:
+        return m
+    m = bpy.data.materials.new("look.zebra")
+    try:
+        m.use_nodes = True
+    except Exception:
+        pass
+    nt = m.node_tree
+    nt.nodes.clear()
+    tc = nt.nodes.new('ShaderNodeTexCoord')
+    sep = nt.nodes.new('ShaderNodeSeparateXYZ')
+    nt.links.new(tc.outputs["Reflection"], sep.inputs[0])
+    ax = nt.nodes.new('ShaderNodeValue')            # 0: tubes along x, 1: along y
+    ax.name = "axis"
+    mixu = nt.nodes.new('ShaderNodeMix')            # the coordinate across the tubes
+    mixu.data_type = 'FLOAT'
+    nt.links.new(ax.outputs[0], mixu.inputs[0])
+    nt.links.new(sep.outputs["Y"], mixu.inputs[2])
+    nt.links.new(sep.outputs["X"], mixu.inputs[3])
+    at = nt.nodes.new('ShaderNodeMath')
+    at.operation = 'ARCTAN2'
+    nt.links.new(sep.outputs["Z"], at.inputs[0])
+    nt.links.new(mixu.outputs[0], at.inputs[1])
+    mul = nt.nodes.new('ShaderNodeMath')
+    mul.operation = 'MULTIPLY'
+    mul.inputs[1].default_value = ZEBRA_PAIRS / (2 * pi)
+    nt.links.new(at.outputs[0], mul.inputs[0])
+    fr = nt.nodes.new('ShaderNodeMath')
+    fr.operation = 'FRACT'
+    nt.links.new(mul.outputs[0], fr.inputs[0])
+    gt = nt.nodes.new('ShaderNodeMath')
+    gt.operation = 'GREATER_THAN'
+    gt.inputs[1].default_value = 0.5
+    nt.links.new(fr.outputs[0], gt.inputs[0])
+    mix = nt.nodes.new('ShaderNodeMix')
+    mix.data_type = 'RGBA'
+    mix.inputs[6].default_value = (0.012, 0.012, 0.014, 1.0)
+    mix.inputs[7].default_value = (0.92, 0.92, 0.90, 1.0)
+    nt.links.new(gt.outputs[0], mix.inputs[0])
+    em = nt.nodes.new('ShaderNodeEmission')
+    nt.links.new(mix.outputs[2], em.inputs["Color"])
+    out = nt.nodes.new('ShaderNodeOutputMaterial')
+    nt.links.new(em.outputs[0], out.inputs[0])
+    return m
+
+
+def _zebra_axis(v):
+    d = V3(v["dir"]).normalized()
+    m = bpy.data.materials.get("look.zebra")
+    if m is not None:
+        m.node_tree.nodes["axis"].outputs[0].default_value = 1.0 if abs(d.x) > 0.93 else 0.0
+
+
+def wear(look):
+    """Dresses every part of the car in a look ("clay", "zebra") or, with None, in its own
+    materials again."""
+    for data, (mats, added) in _WORN.items():
+        if added:
+            data.materials.clear()
+        for i, m in enumerate(mats):
+            data.materials[i] = m
+    _WORN.clear()
+    for ob, rec in _LINKS.items():
+        ob.light_linking.receiver_collection = rec
+    _LINKS.clear()
+    LOOK[0] = look
+    if look is None:
+        return
+    # every light on every part: a canopy the car keeps the top box off would be dark clay
+    for ob in STUDIO.objects:
+        if ob.type == 'LIGHT' and ob.light_linking.receiver_collection is not None:
+            _LINKS[ob] = ob.light_linking.receiver_collection
+            ob.light_linking.receiver_collection = None
+    m = clay_material() if look == "clay" else zebra_material()
+    for ob in CAR.objects:
+        mats = getattr(ob.data, "materials", None)
+        if mats is None or ob.data in _WORN:
+            continue
+        _WORN[ob.data] = (list(mats), not len(mats))
+        if not len(mats):
+            mats.append(m)
+        for i in range(len(mats)):
+            mats[i] = m
+
+
+def render_turntable(n=12, samples=24, size=(640, 360), name="turntable"):
+    """<name>.jpg: n views round the car from the hero's height, all at one distance, in
+    rows of four (and <name>.gif, the same frames in turn). The first looks at the nose,
+    the next ones walk round by the car's left."""
+    hero = V3(VIEWS["hero"]["dir"]).normalized()
+    el = atan2(hero.z, hypot(hero.x, hero.y))
+    SCN.render.resolution_x, SCN.render.resolution_y = size
+    dirs = [(cos(2 * pi * k / n) * cos(el), sin(2 * pi * k / n) * cos(el), sin(el))
+            for k in range(n)]
+    base = dict(lens=70, margin=0.06)
+    tgt = view_target(base)
+    dist = max(_fit(tgt, V3(d), V3(d).to_track_quat('Z', 'Y'), base) for d in dirs)
+    tmp = os.path.join(ARGS.out, ".tiles")
+    os.makedirs(tmp, exist_ok=True)
+    files = []
+    for k, d in enumerate(dirs):
+        VIEWS["_turn"] = dict(dir=d, lens=70, dist=dist, target=tuple(tgt))
+        files.append(os.path.join(tmp, "t_%02d.jpg" % k))
+        render_view("_turn", files[-1], size, samples)
+    del VIEWS["_turn"]
+    rows = [files[i:i + 4] for i in range(0, n, 4)]
+    py = _python()
+    if compose(os.path.join(ARGS.out, name + ".jpg"), rows) and py:
+        subprocess.run([py, os.path.join(HERE, "post.py"), "gif",
+                        os.path.join(ARGS.out, name + ".gif")] + files, check=True)
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def tri_count():
@@ -1484,6 +2186,8 @@ def stats():
             print("UNDER THE FLOOR: %s reaches z = %.3f" % (ob.name, z))
     log("CAR size %.3f x %.3f x %.3f m, triangles %d, objects %d" % (
         hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2], tri_count(), len(CAR.objects)))
+    if abs(lo[2]) > 0.01:
+        log("CAR lowest point at z = %.3f, top at z = %.3f over the ground" % (lo[2], hi[2]))
 
 
 def _python():
@@ -1500,13 +2204,14 @@ def _python():
 
 def compose(dst, rows, bloom=None, inset=None):
     """post.py puts the tiles (rows of files) together into dst; inset=(file, corner) lays
-    a small tile into a corner ("tl", "tr", "bl", "br") of the first tile."""
+    a small tile into a corner ("tl", "tr", "bl", "br") of the first tile (a list of such
+    pairs lays several)."""
     py = _python()
     cmd = [py or "python", os.path.join(HERE, "post.py"), "compose", dst]
     if bloom:
         cmd += ["--bloom", str(bloom[0]), str(bloom[1])]
-    if inset:
-        cmd += ["--inset", inset[0], inset[1]]
+    for one in ([inset] if inset and isinstance(inset[0], str) else inset or []):
+        cmd += ["--inset", one[0], one[1]]
     for row in rows:
         cmd += ["--row"] + row
     if py is None:
@@ -1530,7 +2235,8 @@ def render_sheet(views=("hero", "front", "side", "back"), samples=160, extra=Non
     or dict(view=, size=(w, h), corner="tl"|"tr"|"bl"|"br", margin=), laid as a small tile
     into a corner of the first, over it (SHEET_EXTRA's defaults: top left, the empty wall
     over the nose of a hero seen from the front left; pick the corner your hero leaves
-    free)."""
+    free). A list of them lays several, each in its own corner (top left, then top right,
+    bottom right, bottom left when not said)."""
     lo, hi = car_size()
     L, W = hi[0] - lo[0], hi[1] - lo[1]
     room = SHEET_W - 2 * SHEET_GAP
@@ -1543,7 +2249,15 @@ def render_sheet(views=("hero", "front", "side", "back"), samples=160, extra=Non
         files.append(os.path.join(tmp, "%s.jpg" % name))
         render_view(name, files[-1], size, samples, 0.025 if not files[1:] else 0.04)
     inset = None
-    if extra:
+    if extra and isinstance(extra, (list, tuple)):
+        inset = []
+        for k, one in enumerate(extra):
+            e = dict(SHEET_EXTRA, corner=("tl", "tr", "br", "bl")[k % 4],
+                     **({} if isinstance(one, dict) else {"view": one}))
+            e.update(one if isinstance(one, dict) else {})
+            inset.append((os.path.join(tmp, "x%d_%s.jpg" % (k, e["view"])), e["corner"]))
+            render_view(e["view"], inset[-1][0], tuple(e["size"]), samples, e["margin"])
+    elif extra:
         e = dict(SHEET_EXTRA, **(extra if isinstance(extra, dict) else {"view": extra}))
         inset = (os.path.join(tmp, "x_%s.jpg" % e["view"]), e["corner"])
         render_view(e["view"], inset[0], tuple(e["size"]), samples, e["margin"])
@@ -1552,15 +2266,16 @@ def render_sheet(views=("hero", "front", "side", "back"), samples=160, extra=Non
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-def render_preview(views=("hero", "rear", "side", "top"), samples=24):
-    """preview.jpg: four small views in a 2 x 2 grid, 1920 wide, for design iteration."""
+def render_preview(views=("hero", "rear", "side", "top"), samples=24, name="preview"):
+    """preview.jpg: four small views in a 2 x 2 grid, 1920 wide, for design iteration
+    (clay.jpg and zebra.jpg are the same grid in those looks)."""
     tmp = os.path.join(ARGS.out, ".tiles")
     os.makedirs(tmp, exist_ok=True)
     files = []
-    for name in views:
-        files.append(os.path.join(tmp, "p_%s.jpg" % name))
-        render_view(name, files[-1], (958, 538), samples)
-    if compose(os.path.join(ARGS.out, "preview.jpg"), [files[:2], files[2:]]):
+    for view in views:
+        files.append(os.path.join(tmp, "p_%s.jpg" % view))
+        render_view(view, files[-1], (958, 538), samples)
+    if compose(os.path.join(ARGS.out, name + ".jpg"), [files[:2], files[2:]]):
         shutil.rmtree(tmp, ignore_errors=True)
 
 
@@ -1587,24 +2302,60 @@ def shoot(sheet=("hero", "front", "side", "back"), preview=("hero", "rear", "sid
           extra=None):
     """The end of every car script: stats, studio, then what the arguments ask for:
     --preview (preview.jpg), --sheet (sheet.jpg), --views (car_<view>.jpg at --res),
-    --blend (car.blend), --glb (car.glb). With none of them it only builds and counts.
-    extra: the sheet's optional fifth tile, as render_sheet()'s."""
+    --blend (car.blend), --glb (car.glb), --clay and --zebra (clay.jpg, zebra.jpg: the
+    preview's views in those looks), --turntable (turntable.jpg), --check (the checks).
+    With none of them it only builds and counts. extra: the sheet's optional small tiles,
+    as render_sheet()'s."""
     stats()
     build_studio()
     setup_render()
     os.makedirs(ARGS.out, exist_ok=True)
     views = [v for v in ARGS.views.split(",") if v]
+    looks = [k for k in ("clay", "zebra") if getattr(ARGS, k)]
+    if ARGS.check:
+        check()
     if ARGS.preview:
         render_preview(preview, ARGS.samples or 24)
     if ARGS.sheet:
         render_sheet(sheet, ARGS.samples or 160, ARGS.extra or extra)
-    for name in views:
-        render_view(name, os.path.join(ARGS.out, "car_%s%s.jpg" % (
-            name, "_night" if ARGS.night else "")), ARGS.res, ARGS.samples or 64)
+    night = "_night" if ARGS.night else ""
+    for look in looks or [None]:
+        # with a look, --views and --turntable are rendered in it (and not in the paint)
+        wear(look)
+        tag = "_" + look if look else ""
+        few = ARGS.samples or (16 if look == "zebra" else 24)
+        if look:
+            render_preview(preview, few, look)
+        for name in views:
+            render_view(name, os.path.join(ARGS.out, "car_%s%s%s.jpg" % (name, tag, night)),
+                        ARGS.res, ARGS.samples or (few if look else 64))
+        if ARGS.turntable:
+            render_turntable(ARGS.turntable, few, name="turntable" + tag)
+    wear(None)
     if ARGS.blend:
         bpy.ops.wm.save_as_mainfile(filepath=os.path.join(ARGS.out, "car.blend"))
     if ARGS.glb:
         export_glb(os.path.join(ARGS.out, "car.glb"))
-    if not (ARGS.preview or ARGS.sheet or views or ARGS.blend or ARGS.glb):
+    if not (ARGS.preview or ARGS.sheet or views or ARGS.blend or ARGS.glb or looks
+            or ARGS.turntable or ARGS.check):
         print("built only: pass --preview, --sheet or --views NAME,... to render")
     log("done, output in " + ARGS.out)
+
+
+MEANT = {}          # check name -> name patterns a car says are meant (meant())
+
+
+def meant(check, *names):
+    """Tells the checks that a finding is meant: check is "tires" (wheel tags), "ground",
+    "symmetry", "through" (object names) or "panels" (panel objects such as "body.roof");
+    names may end in * . The finding is still listed, marked meant, and no longer counts
+    in the verdict: a taxi's open doorway, a mast on one side, a driver's wheel."""
+    MEANT.setdefault(check, []).extend(names)
+
+
+def check(write=True):
+    """The kit's checks on the car as built (carcheck.py): tire and ground clearances,
+    symmetry, open edges and holes in the panels, parts through the skin, triangles. Prints
+    a table and, with write, check.json in the output folder; returns the findings."""
+    import carcheck
+    return carcheck.run(sys.modules[__name__], write)

@@ -1,0 +1,207 @@
+{
+ "car": "halcyon_sable",
+ "size": [
+  5.111,
+  2.058,
+  1.341
+ ],
+ "top_z": 1.341,
+ "objects": 97,
+ "palette": {
+  "paint": [
+   0.008,
+   0.045,
+   0.3
+  ],
+  "paint_finish": [
+   0.6,
+   0.3,
+   1.0
+  ],
+  "paint2": [
+   0.45,
+   0.05,
+   0.03
+  ],
+  "paint2_finish": "gloss"
+ },
+ "tires": {
+  "verdict": "look",
+  "wheels": [
+   {
+    "tag": "fl",
+    "clearance_mm": 4.8,
+    "nearest": "body.well",
+    "at": [
+     1.893,
+     0.68,
+     0.371
+    ],
+    "foot_mm": 0.0,
+    "steer_hits": "body.floor",
+    "steer_deg": 0,
+    "verdict": "look"
+   },
+   {
+    "tag": "rl",
+    "clearance_mm": 11.8,
+    "nearest": "interior.seats",
+    "at": [
+     -1.147,
+     0.635,
+     0.383
+    ],
+    "foot_mm": 0.0,
+    "verdict": "look"
+   },
+   {
+    "tag": "fr",
+    "clearance_mm": 4.8,
+    "nearest": "body.well",
+    "at": [
+     1.893,
+     -0.68,
+     0.371
+    ],
+    "foot_mm": 0.0,
+    "steer_hits": "body.well",
+    "steer_deg": 0,
+    "verdict": "look"
+   },
+   {
+    "tag": "rr",
+    "clearance_mm": 11.8,
+    "nearest": "interior.seats",
+    "at": [
+     -1.147,
+     -0.635,
+     0.383
+    ],
+    "foot_mm": 0.0,
+    "verdict": "look"
+   }
+  ]
+ },
+ "ground": {
+  "verdict": "ok",
+  "clearance_mm": 100.0,
+  "lowest": "splitter",
+  "under_floor": []
+ },
+ "symmetry": {
+  "verdict": "look",
+  "center_off_mm": 0.0,
+  "objects": 2,
+  "asymmetric": [
+   {
+    "object": "interior.wheel",
+    "off_mm": 139.3,
+    "at": [
+     0.406,
+     0.385,
+     0.658
+    ]
+   },
+   {
+    "object": "body.trim",
+    "off_mm": 8.7,
+    "at": [
+     -0.672,
+     0.725,
+     1.277
+    ]
+   }
+  ]
+ },
+ "panels": {
+  "verdict": "ok",
+  "open_edges": [],
+  "open_mm": 0,
+  "cutter_holes": [],
+  "pieces": {
+   "body": {
+    "closed": true,
+    "panels": 25
+   }
+  }
+ },
+ "through": {
+  "verdict": "ok",
+  "parts": [],
+  "count": 0
+ },
+ "triangles": {
+  "verdict": "ok",
+  "total": 250465,
+  "budget": 400000,
+  "top": [
+   [
+    "tail.mesh",
+    20544
+   ],
+   [
+    "mouth.mesh",
+    19488
+   ],
+   [
+    "body.trim",
+    14926
+   ],
+   [
+    "tire.fl",
+    14384
+   ],
+   [
+    "tire.rl",
+    14384
+   ],
+   [
+    "tire.fr",
+    14384
+   ],
+   [
+    "tire.rr",
+    14384
+   ],
+   [
+    "body.floor",
+    7782
+   ]
+  ],
+  "groups": [
+   [
+    "body",
+    84816
+   ],
+   [
+    "tire",
+    57536
+   ],
+   [
+    "tail",
+    20708
+   ],
+   [
+    "rim",
+    19824
+   ],
+   [
+    "mouth",
+    19812
+   ],
+   [
+    "hub",
+    14976
+   ],
+   [
+    "interior",
+    6412
+   ],
+   [
+    "arch",
+    4464
+   ]
+  ]
+ },
+ "verdict": "look"
+}

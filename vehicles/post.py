@@ -1,7 +1,8 @@
 """Finishing passes on the vehicle renders (PIL and numpy only).
 
     python post.py bloom IN.jpg OUT.jpg [strength] [threshold]
-    python post.py compose OUT.jpg [--bloom K TH] [--gap N] [--inset E.jpg tr]
+    python post.py gif OUT.gif FRAME.jpg ...        frames in turn, looping (the turntable)
+    python post.py compose OUT.jpg [--bloom K TH] [--gap N] [--inset E.jpg tr] ...
                            --row A.jpg B.jpg --row C.jpg ...
                                            tiles as rendered, row under row (carkit's
                                            --sheet and --preview call this)
@@ -35,15 +36,16 @@ def bloom(src, dst, k=1.0, th=0.80):
 def compose(dst, rows, gap=4, glow=None, inset=None):
     """Rows of tiles at their own sizes, left to right, row under row, gap between.
     inset: (file, corner) lays a small tile into a corner ("tl", "tr", "bl", "br") of the
-    first tile, a gap round its inner sides."""
+    first tile, a gap round its inner sides; a list of such pairs lays several."""
     ims = [[Image.open(p).convert("RGB") for p in row] for row in rows]
     if glow:
         ims = [[bloomed(im, *glow) for im in row] for row in ims]
-    if inset:
-        small = Image.open(inset[0]).convert("RGB")
+    for one in ([inset] if inset and isinstance(inset[0], str) else inset or []):
+        small = Image.open(one[0]).convert("RGB")
         if glow:
             small = bloomed(small, *glow)
         big = ims[0][0]
+        inset = one
         x = 0 if inset[1][1] == "l" else big.width - small.width
         y = 0 if inset[1][0] == "t" else big.height - small.height
         big.paste((14, 14, 16), (max(x - gap, 0), max(y - gap, 0),
@@ -67,7 +69,7 @@ if __name__ == "__main__":
     if sys.argv[1] == "bloom":
         bloom(sys.argv[2], sys.argv[3], *[float(v) for v in sys.argv[4:6]])
     elif sys.argv[1] == "compose":
-        a, rows, gap, glow, inset = sys.argv[3:], [], 4, None, None
+        a, rows, gap, glow, inset = sys.argv[3:], [], 4, None, []
         while a:
             if a[0] == "--row":
                 rows.append([])
@@ -76,10 +78,14 @@ if __name__ == "__main__":
             elif a[0] == "--bloom":
                 glow = (float(a.pop(1)), float(a.pop(1)))
             elif a[0] == "--inset":
-                inset = (a.pop(1), a.pop(1))
+                inset.append((a.pop(1), a.pop(1)))
             else:
                 rows[-1].append(a[0])
             a.pop(0)
         compose(sys.argv[2], rows, gap, glow, inset)
+    elif sys.argv[1] == "gif":
+        frames = [Image.open(f).convert("RGB") for f in sys.argv[3:]]
+        frames[0].save(sys.argv[2], save_all=True, append_images=frames[1:], duration=110,
+                       loop=0)
     else:
         sys.exit(__doc__)
