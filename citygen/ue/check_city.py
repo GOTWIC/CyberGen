@@ -33,6 +33,7 @@ the job's result file and quits the editor.
 import json
 import math
 import os
+import re
 import time
 import traceback
 
@@ -734,10 +735,30 @@ def play_features(world, man, slug):
     a.set_free_cam(True)
     yield from wait(1.0)
     got["free_cam"] = status(a)
+    # AT3: atmosgen's sky and time by day and at dusk (the controller's status)
+    if at is not None and at.get("sky"):
+        a.set_night(False)
+        yield from wait(2.0)
+        got["atmos_day"] = atmos_status(world)
+        a.click_menu_row("hour=dusk")
+        yield from wait(2.0)
+        got["atmos_dusk"] = atmos_status(world)
+        a.set_night(True)
+        yield from wait(2.0)
     if JOB.get("shots"):
-        # the `--view`s named `pday_*` from the free camera by day, `night_*` by night
+        # the `--view`s named `pday_*` from the free camera by day, `night_*` by night; AT3:
+        # `dusk_*` at the plan's dusk, `t<HHMM>_*` at that hour (atmosgen's time of day)
         a.set_night(False)
         yield from play_views(world, a, slug, "pday_")
+        if at is not None and at.get("sky"):
+            a.click_menu_row("hour=dusk")
+            yield from wait(2.0)
+            yield from play_views(world, a, slug, "dusk_")
+            for hh in sorted({v["name"][1:5] for v in JOB.get("views", [])
+                              if re.match(r"^t\d{4}_", v["name"])}):
+                a.click_menu_row(f"hour={int(hh[:2]) + int(hh[2:]) / 60.0:g}")
+                yield from wait(2.0)
+                yield from play_views(world, a, slug, f"t{hh}_")
         a.set_night(True)
         yield from wait(2.0)
         # the free camera 120 m over the player, looking at the city's middle by night
@@ -780,6 +801,16 @@ def play_features(world, man, slug):
     lit = (an["showing"] and an["cells"] > 0 and an["live"] > 0) if an is not None and \
         man.get("atmos", {}).get("cells") else \
         (got["night"].get("light_pools", 0) > 0 or got["night"]["lamp_points"] == 0)
+    # AT3: the night held dark (Night 1, the night's exposure), the day lit by the sun with no
+    # light live, dusk between them with its lights coming on
+    ad, ak = got.get("atmos_day"), got.get("atmos_dusk")
+    sky_ok = True
+    if an is not None and an.get("sky"):
+        sky_ok = (an["night_now"] > 0.99 and an["dome"] and ad is not None and ak is not None
+                  and ad["night_now"] < 0.01 and not ad["showing"] and ad["sun_elev"] > 5.0
+                  and 0.01 < ak["night_now"] < 0.99 and ak["sun_elev"] < 0.0
+                  and ad["ev100"] > ak["ev100"] > an["ev100"])
+        lit = lit and sky_ok
     ok = (got["start"]["ready"] and got["start"]["overlay"] and got["start"]["map_texture"]
           and got["map"] and got["menu"] and got["night"]["night"] and lit
           and got["free_cam"]["free_cam"] and got["free_cam"]["pawn"].startswith("CityGenFreeCam")
@@ -790,17 +821,32 @@ def play_features(world, man, slug):
         "lamp_points": got["start"]["lamp_points"],
         # (AT1: atmosgen's live set by night, the play features' light pools past it)
         "atmos_night": an, "light_pools": got["night"].get("light_pools"),
+        "sky": {"ok": sky_ok, "night": _sky(an), "dusk": _sky(ak), "day": _sky(ad)},
         "teleport_to": [round(tx, 1), round(ty, 1)],
         "teleported_m": round(moved, 1), "landed": down is not None, "states": got}
     # (AT2: of them in the high tier, and the aviation beacons and searchlight beams loaded)
     night = (f"{an['live']} atmos lights live of {an['lights']} in {an['cells']} cells, "
              f"{an['shadowed']} shadowed, {an.get('high', 0)} high, {an.get('beacons', 0)} "
              f"beacons, {an.get('beams', 0)} beams" if an else "no atmos controller")
+    if an is not None and an.get("sky"):
+        RES["lines"].append("sky and time (AT3): " + "; ".join(
+            f"{n} {s['hour']:g} h, sun {s['sun_elev']:.1f} deg, Night {s['night_now']:.2f}, "
+            f"{s['ev100']:.2f} EV100, {s['live']} lights live"
+            for n, s in (("night", an), ("dusk", ak), ("day", ad)) if s)
+            + (" (ok)" if sky_ok else " (FAIL)"))
     RES["lines"].append(
         f"play features: map, menu, night ({night}, "
         f"{got['night'].get('light_pools', 0)} light pools), free camera "
         f"and back, teleport {moved:.0f} m "
         + ("onto the ground" if down is not None else "with nothing under the player"))
+
+
+def _sky(st):
+    """AT3: a status's sky and time (or None)."""
+    if not st or not st.get("sky"):
+        return None
+    return {k: st.get(k) for k in ("hour", "night_now", "ev100", "sun_elev", "moon_elev",
+                                     "moon_lux", "showing", "live", "dome", "cover", "glow")}
 
 
 def atmos_status(world):

@@ -215,6 +215,20 @@ def test_job_with_atmosgens_passes(tmp_path):
     assert all("commands" not in p for p in jb["passes"])
 
 
+def test_sky_and_time_passes():
+    """AT3: the dusk and day passes run the plan's named hours under the sky and time; the
+    nosky pass switches it off; every atmos pass names its hour last (after the sky)."""
+    by = {p[0]: p for p in B.ATMOS_PASSES}
+    for name, night, hour in (("dusk_plan", True, "dusk"), ("dusk_plan_all", True, "dusk"),
+                              ("day_plan", False, "day"), ("day_plan_all", False, "day"),
+                              ("night_plan", True, "23")):
+        p = by[name]
+        assert p[1] is night and p[3][-1] == f"CityGenAtmos.Hour {hour}"
+        assert "CityGenAtmos.Sky 1" in p[3]
+    assert "CityGenAtmos.Sky 0" in by["night_plan_nosky"][3]
+    assert "CityGenAtmos.Sky 1" in B.ATMOS_OFF
+
+
 def test_atmos_assets_version():
     from citygen import unreal_atmos as UA
     assert UA.assets_version().isdigit()

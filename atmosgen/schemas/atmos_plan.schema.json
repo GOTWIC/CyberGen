@@ -150,6 +150,83 @@
    "title": "FogVolume",
    "type": "object"
   },
+  "Glow": {
+   "additionalProperties": false,
+   "description": "AT3: the cloud deck's underside lit by the city (`sky.glow`): a raster of its\nluminance, linear RGB, square-root encoded in an 8-bit PNG (row 0 the north edge).",
+   "properties": {
+    "bounds": {
+     "description": "[x0, y0, x1, y1], citygen m.",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 4,
+     "minItems": 4,
+     "title": "Bounds",
+     "type": "array"
+    },
+    "cell_m": {
+     "title": "Cell M",
+     "type": "number"
+    },
+    "file": {
+     "description": "`sky_glow.png`, relative to the plan.",
+     "title": "File",
+     "type": "string"
+    },
+    "max_luma_nits": {
+     "description": "The brightest cell's luminance (cd/m2).",
+     "title": "Max Luma Nits",
+     "type": "number"
+    },
+    "max_nits": {
+     "description": "A channel's value at 255 (cd/m2, physical): the runtime squares the texel and scales by it.",
+     "title": "Max Nits",
+     "type": "number"
+    },
+    "mean_nits": {
+     "description": "The mean over the city's extent (cd/m2).",
+     "title": "Mean Nits",
+     "type": "number"
+    },
+    "peak_at": {
+     "description": "Where the deck glows brightest (citygen m).",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 2,
+     "minItems": 2,
+     "title": "Peak At",
+     "type": "array"
+    },
+    "px": {
+     "description": "[width, height].",
+     "items": {
+      "type": "integer"
+     },
+     "maxItems": 2,
+     "minItems": 2,
+     "title": "Px",
+     "type": "array"
+    },
+    "sha256": {
+     "title": "Sha256",
+     "type": "string"
+    }
+   },
+   "required": [
+    "file",
+    "bounds",
+    "cell_m",
+    "px",
+    "max_nits",
+    "max_luma_nits",
+    "mean_nits",
+    "peak_at",
+    "sha256"
+   ],
+   "title": "Glow",
+   "type": "object"
+  },
   "Mask": {
    "additionalProperties": false,
    "description": "AT5: a tile's rain shadow, wetness and puddle mask (0.5 m texels).",
@@ -180,42 +257,244 @@
    "title": "Mask",
    "type": "object"
   },
+  "Moon": {
+   "additionalProperties": false,
+   "description": "AT3: the moon (`sky.moon_at`): it trails the sun by `lag_h`, its declination mirrored\nby its phase.",
+   "properties": {
+    "cloud": {
+     "description": "The share of its light the deck's cover takes.",
+     "title": "Cloud",
+     "type": "number"
+    },
+    "color": {
+     "description": "Its light's color (#rrggbb).",
+     "title": "Color",
+     "type": "string"
+    },
+    "declination_deg": {
+     "title": "Declination Deg",
+     "type": "number"
+    },
+    "disk_deg": {
+     "description": "Its disk's angular diameter.",
+     "title": "Disk Deg",
+     "type": "number"
+    },
+    "disk_nits": {
+     "description": "Its disk's luminance in the scene's frame (cd/m2 at the night's exposure).",
+     "title": "Disk Nits",
+     "type": "number"
+    },
+    "lag_h": {
+     "description": "How far it trails the sun (hours): 24 times the phase.",
+     "title": "Lag H",
+     "type": "number"
+    },
+    "lit": {
+     "description": "Its lit fraction (its light scales by it).",
+     "title": "Lit",
+     "type": "number"
+    },
+    "phase": {
+     "description": "0 new, 0.5 full.",
+     "title": "Phase",
+     "type": "number"
+    },
+    "rise": {
+     "description": "Its light fades in between these elevations (degrees).",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 2,
+     "minItems": 2,
+     "title": "Rise",
+     "type": "array"
+    },
+    "share": {
+     "description": "A full moon's light as a share of the sun's (the look's).",
+     "title": "Share",
+     "type": "number"
+    }
+   },
+   "required": [
+    "phase",
+    "lag_h",
+    "declination_deg",
+    "lit",
+    "share",
+    "color",
+    "disk_nits",
+    "disk_deg",
+    "rise",
+    "cloud"
+   ],
+   "title": "Moon",
+   "type": "object"
+  },
   "Sky": {
    "additionalProperties": false,
+   "description": "AT3: the sky and the time of day (scope 6.2, `sky.make`).",
    "properties": {
+    "by_hour": {
+     "items": {
+      "$ref": "#/$defs/SkyHour"
+     },
+     "title": "By Hour",
+     "type": "array"
+    },
+    "cloud_cover": {
+     "description": "The share of the sky the deck hides.",
+     "title": "Cloud Cover",
+     "type": "number"
+    },
     "cloud_deck_m": {
      "description": "The cloud deck's height (0: none).",
      "title": "Cloud Deck M",
      "type": "number"
     },
     "cloud_glow": {
-     "description": "How much of the city's upward light the deck shows.",
+     "description": "A gain on the city's light the deck shows.",
      "title": "Cloud Glow",
      "type": "number"
     },
-    "moon": {
-     "description": "The moon's share of the sun's intensity.",
-     "title": "Moon",
+    "curve": {
+     "additionalProperties": {
+      "items": {
+       "type": "number"
+      },
+      "type": "array"
+     },
+     "description": "Curves over the sun's elevation (`elev`): ev (night 0 to day 1), night, sun, sky, stars (`presets.SUN_CURVE`).",
+     "title": "Curve",
+     "type": "object"
+    },
+    "day_of_year": {
+     "title": "Day Of Year",
+     "type": "integer"
+    },
+    "declination_deg": {
+     "description": "The sun's, that day.",
+     "title": "Declination Deg",
      "type": "number"
     },
+    "ev_day": {
+     "description": "The day's exposure (EV100), darker under a closed deck.",
+     "title": "Ev Day",
+     "type": "number"
+    },
+    "ev_night": {
+     "description": "The night's exposure in the scene's frame (EV100), held: the plan's lights are shown at 2^(ev_night - night_ev100) at every hour.",
+     "title": "Ev Night",
+     "type": "number"
+    },
+    "glow": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Glow"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    },
+    "hours": {
+     "additionalProperties": {
+      "type": "number"
+     },
+     "description": "The named hours: day, dusk (the sun at `presets.SKY` dusk elevation), night.",
+     "title": "Hours",
+     "type": "object"
+    },
+    "latitude_deg": {
+     "title": "Latitude Deg",
+     "type": "number"
+    },
+    "moon": {
+     "$ref": "#/$defs/Moon"
+    },
     "stars": {
+     "description": "How many stars the clear dark sky shows (0 to 1).",
      "title": "Stars",
+     "type": "number"
+    },
+    "sun_lux": {
+     "description": "The sun's light by day in the scene's frame (lux; the importer's sun).",
+     "title": "Sun Lux",
      "type": "number"
     },
     "upward_lm": {
      "default": 0.0,
-     "description": "The plan's upward luminous flux (lm), for the deck's glow (AT3).",
+     "description": "The plan's upward luminous flux (lm) at the glow's hour, the deck's glow.",
      "title": "Upward Lm",
      "type": "number"
     }
    },
    "required": [
+    "latitude_deg",
+    "day_of_year",
+    "declination_deg",
     "moon",
+    "sun_lux",
+    "ev_night",
+    "ev_day",
+    "curve",
     "stars",
     "cloud_deck_m",
-    "cloud_glow"
+    "cloud_cover",
+    "cloud_glow",
+    "hours",
+    "by_hour"
    ],
    "title": "Sky",
+   "type": "object"
+  },
+  "SkyHour": {
+   "additionalProperties": false,
+   "description": "AT3: a row of the plan's day (the report; the runtime computes any hour itself).",
+   "properties": {
+    "ev100": {
+     "description": "The scene's exposure (EV100, Unreal's frame).",
+     "title": "Ev100",
+     "type": "number"
+    },
+    "hour": {
+     "title": "Hour",
+     "type": "integer"
+    },
+    "moon_az": {
+     "title": "Moon Az",
+     "type": "number"
+    },
+    "moon_elev": {
+     "title": "Moon Elev",
+     "type": "number"
+    },
+    "night": {
+     "description": "MPC_CityGen's Night.",
+     "title": "Night",
+     "type": "number"
+    },
+    "sun_az": {
+     "description": "Clockwise from north (degrees).",
+     "title": "Sun Az",
+     "type": "number"
+    },
+    "sun_elev": {
+     "title": "Sun Elev",
+     "type": "number"
+    }
+   },
+   "required": [
+    "hour",
+    "sun_elev",
+    "sun_az",
+    "moon_elev",
+    "moon_az",
+    "ev100",
+    "night"
+   ],
+   "title": "SkyHour",
    "type": "object"
   },
   "Tiers": {

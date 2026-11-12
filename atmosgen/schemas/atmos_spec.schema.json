@@ -474,6 +474,149 @@
    },
    "title": "Palette",
    "type": "object"
+  },
+  "SkySpec": {
+   "additionalProperties": false,
+   "description": "AT3: the sky and the time of day (scope 6.2). Every field left out is the look's or\n`presets.SKY`'s.",
+   "properties": {
+    "cloud_cover": {
+     "anyOf": [
+      {
+       "maximum": 1.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The share of the sky it hides.",
+     "title": "Cloud Cover"
+    },
+    "cloud_deck_m": {
+     "anyOf": [
+      {
+       "maximum": 6000.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The cloud deck's height (0: none).",
+     "title": "Cloud Deck M"
+    },
+    "cloud_glow": {
+     "anyOf": [
+      {
+       "maximum": 4.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A gain on the city's light it shows from below.",
+     "title": "Cloud Glow"
+    },
+    "day_hour": {
+     "anyOf": [
+      {
+       "exclusiveMaximum": 24.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The hour the play features' day goes to (default 16).",
+     "title": "Day Hour"
+    },
+    "day_of_year": {
+     "anyOf": [
+      {
+       "maximum": 365,
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The day the sun and the moon stand for (default 172, midsummer in the north).",
+     "title": "Day Of Year"
+    },
+    "latitude_deg": {
+     "anyOf": [
+      {
+       "maximum": 66.0,
+       "minimum": -66.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The city's latitude (default 35).",
+     "title": "Latitude Deg"
+    },
+    "moon": {
+     "anyOf": [
+      {
+       "maximum": 0.2,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A full moon's light as a share of the sun's (default the look's).",
+     "title": "Moon"
+    },
+    "moon_phase": {
+     "anyOf": [
+      {
+       "maximum": 1.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "0 new, 0.5 full (default 0.62).",
+     "title": "Moon Phase"
+    },
+    "stars": {
+     "anyOf": [
+      {
+       "maximum": 1.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "How many stars a clear dark sky shows.",
+     "title": "Stars"
+    }
+   },
+   "title": "SkySpec",
+   "type": "object"
   }
  },
  "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -566,6 +709,10 @@
    ],
    "title": "Preset",
    "type": "string"
+  },
+  "sky": {
+   "$ref": "#/$defs/SkySpec",
+   "description": "AT3: the sky and the time of day."
   },
   "version": {
    "const": 1,

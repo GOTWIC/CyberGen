@@ -222,21 +222,21 @@ version's Interchange misbehaves with concurrent imports; it needs a little less
 ## Play features
 
 Every import gives the level a minimap, a map you can teleport with, a free camera and a
-developer menu with day and night, unless `--no-play`:
+developer menu with the time of day, unless `--no-play`:
 
 | Key | What it does |
 |---|---|
-| (always) | the minimap, top left: the city around you, north up, your heading as an arrow, the city's name, day or night, the keys |
+| (always) | the minimap, top left: the city around you, north up, your heading as an arrow, the city's name, the time of day (day or night without an atmos plan), the keys |
 | M | the map, full screen: the whole city with district names; the wheel zooms about the cursor, the right button drags it, the left button teleports you there (a walking player onto the nearest walkway, held until the city has streamed in around it; a flying one at its height, at least 30 m over the walkway there); M or Esc closes it |
 | . | the free camera: in the game (not the editor's eject), a spectator pawn with no collision, flown with W A S D, E or Space up, Q or C down, the mouse; the wheel sets its speed (2 to 500 m/s); `.` again goes back to the player, who waited where they were |
-| Tab | the developer menu: time of day (day or night), the free camera, the minimap, the engine's on-screen messages, and with an atmos plan atmosgen's weather prototypes (fog, rain, wet streets) and the hour its lights' schedules read (`<` and `>` step it, a click on the row steps on); click a row to change it; Tab or Esc closes it |
+| Tab | the developer menu: the time of day (AT3, with an atmos plan: the hour, `<` and `>` step it an hour, a click on the row swaps day and night, and a slider under it, dragged, sets any hour to the quarter; without one a day or night switch), the free camera, the minimap, the engine's on-screen messages, and with an atmos plan atmosgen's weather prototypes (fog, rain, wet streets); click a row to change it; Tab or Esc closes it |
 
 By night (`MPC_CityGen`'s `Night` 1) the windows' rooms light up (AG6's night interiors,
 lit by each building's own night since AG15: its schedule at `MPC_CityGen`'s `Hour`, its
 light's color temperature; see "From AG15"), neon, LED strips, logos and signs glow
-brighter, the sun becomes a dim blue moon high in the sky, the sky light dims, the exposure
-is held (a fixed EV100, or the eye would adapt until the night looked like the day), and the
-streets are lit:
+brighter, and the sky, the sun and the moon, the sky light and the exposure follow the hour
+(AT3, "From AT3" below: atmosgen's sky and time; the exposure held per hour, or the eye would
+adapt until the night looked like the day), and the streets are lit:
 
 - **by atmosgen** (AT1, "From AT1" below) when the city was imported with its atmos plan:
   the street and wall lights, the junctions' mast arms and corner poles, the highways, the
@@ -251,11 +251,13 @@ AG15's spot lights under the 192 nearest lamps and its sign washes (a point ligh
 each of the 32 nearest large signs) are gone since AT1 (decision 12.2 of atmosgen's scope:
 the lamps, washes, moon and night exposure move to atmosgen); a city imported without an atmos
 plan has the light pools alone by night (run `atmosgen plan` before `citygen unreal`).
-Setting night sets `MPC_CityGen`'s `Hour` to the actor's `NightHour` (21 by default; the
-atmos controller sets the plan's hour over it). The console variable `CityGen.PlayLamps` (1 by
-default) places the pools from the view out, 2 only past `CityGen.PlayPoolsFromM` (atmosgen's
-controller sets 2 while its lights show), 0 none. The menu's day and night switch is a
-developer's until AT3's time of day.
+With an atmos plan (AT3) day and night are the plan's day and night hours on atmosgen's
+controller, which drives the sun, the moon, the sky and `MPC_CityGen`'s `Night` and `Hour`;
+the play features' own night switch (the sun turned into a dim blue moon high in the sky, the
+sky light dimmed, `NightHour` 21, the exposure held at `NightExposureEV100` -3) serves only a
+level imported without one. The console variable `CityGen.PlayLamps` (1 by default) places
+the pools from the view out, 2 only past `CityGen.PlayPoolsFromM` (atmosgen's controller sets
+2 while its lights show), 0 none; the pools show while `Night` is over 0.02.
 
 **How it is built.** The play features are game logic (input, a drawn overlay, possession,
 teleporting), which Unreal's Python cannot write into a Blueprint's graph, so they are a
@@ -301,10 +303,12 @@ imports without the play features.
   `city_model.json`, else the gameplay layer's zones).
 - **Console commands** (in the play window): `CityGen.Map [0|1]`, `CityGen.FreeCam
   [0|1]`, `CityGen.Menu [0|1]`, `CityGen.Night [0|1]` (each toggles without an argument),
-  `CityGen.MenuRow ROW` (a click on a developer menu row, "A packaged game" below),
+  `CityGen.MenuRow ROW` (a click on a developer menu row, "A packaged game" below; AT3's
+  `hour=H`, a number of hours or `day`, `dusk`, `night`, is the time slider),
   `CityGen.Teleport X Y` (citygen meters), `CityGen.Status` (the state as one JSON line).
   The actor's functions are callable from Python too (`set_night`, `set_map_open`,
-  `set_free_cam`, `teleport_player_to_citygen`, `get_status`).
+  `set_free_cam`, `teleport_player_to_citygen`, `get_status`; AT3 `set_time_of_day`,
+  `click_menu_row`).
 - **The check** (`--check`): with the walking pawn, the overlay up, the map and the menu
   open and close, night lights lamps near the player, the free camera there and back to the
   same pawn, a teleport across the city that waits for streaming and lands on the ground;
@@ -314,8 +318,8 @@ imports without the play features.
 **Plan for more** (each in the actor and the overlay, the data from the venv side):
 markers on the map from the gameplay layer (points of interest, fast travel and taxi
 points, transit stations, faction turfs as a toggle), a waypoint set by a click with its
-route along the walkway or lane graph, a time-of-day slider and weather once stage 3 has
-them, a speed and field-of-view slider for the free camera, a photo mode (UI hidden, a
+route along the walkway or lane graph, weather states once stage 3 has them (the time-of-day
+slider came with AT3), a speed and field-of-view slider for the free camera, a photo mode (UI hidden, a
 high resolution shot), and showing the lane and walkway graphs over the city for stage 4.
 
 ## Contract for every stage
@@ -1559,6 +1563,80 @@ lights) come through the same cells; what changed in the exporter and the runtim
   and its night views log them.
 - **The lit faces' stand-ins** (billboards, banners, holo-boards, neon bands, shop signs) keep
   AT1's rule: no specular highlight.
+
+### From AT3: sky and time
+
+The plan's `sky` (`docs/atmosgen_scope.md` 6.2, `atmosgen/sky.py`) comes with the
+controller; atmosgen now drives the level's sun, sky light, exposure and sky by the hour,
+which the play features did with their night switch (decision 12.2):
+
+- **The controller's sky and time** (`unreal_atmos.sky_settings`, in `atmos.json`'s
+  `controller` and so in its hash): the city's latitude and the sun's declination that day,
+  the moon (how far it trails the sun, its declination, lit fraction, its light's share of the
+  sun's and color, its disk's luminance and size, where its light fades in, how much the deck
+  takes), the sun's light by day (`SunLux` 10, the importer's sun), the night's and the day's
+  exposure (`SceneEV100` -3, `DayEV100`), the curves over the sun's elevation (`CurveElev`
+  with `CurveEV`, `CurveNight`, `CurveSun`, `CurveSky`, `CurveStars`), the stars, the cloud
+  deck (`CloudDeckM`, `CloudCover`), the named hours (`DayHour`, `DuskHour`, `NightHour`) and
+  the deck's glow (`GlowBounds` in Unreal's frame, `GlowMaxNits`). `ATMOS_VERSION` is
+  `atmos3`: an import over an AT2 level sets the controller and re-packs its cells (their
+  records unchanged) and touches nothing else.
+- **The glow texture** (`Importer.atmos_glow`): the plan's `sky_glow.png`, copied beside the
+  manifest (`unreal/atmos_sky_glow.png`, the manifest's `atmos.glow` with its sha256), imported
+  as `/Game/CityGen/<City>/Atmos/T_<City>_SkyGlow` (linear, clamped, never streamed; again only
+  when its bytes change) and set as the controller's `SkyGlow`.
+- **Time of day** (`ACityGenAtmos::ApplyTime`, on every `SetHour` and 15 times a second while
+  `TimeSpeed` runs the hour): the sun's and the moon's places from the latitude, declination
+  and hour as `atmosgen/sky.py` computes them; the importer's `lighting.sun` is the sun while
+  `CurveSun` gives it light (its intensity `SunLux` times the curve; from under the horizon it
+  still lights the sky atmosphere's twilight, not the ground), then the moon (its light faded in
+  from the sun at -12 degrees to -16, by its rise, phase and the deck's cover, in its blue);
+  `lighting.sky` at its intensity times `CurveSky` (its real-time capture takes the sky dome,
+  so a glowing deck tints the city's ambient); the exposure held at the hour's (the
+  controller's post-process volume: min and max brightness both the exposure, no bias,
+  adaptation 20 a second: no pumping) from the night's -3 EV100 to the day's by `CurveEV`;
+  `MPC_CityGen`'s `Night` (`CurveNight`) and `Hour`. The plan's lights show while `Night` is
+  over 0.02 and keep the night's scale, $2^{EV_{night} - EV_{plan}}$, at every hour (at dusk,
+  under a brighter exposure, they read dimmer); each light's schedule is interpolated between
+  the hours, so the street lights (`dusk_dawn`, set by the sun) come on as it sets.
+- **The sky dome** (`M_CgSky`, `atmos_assets.py` version 4: unlit, `is_sky`, on the engine's
+  sphere scaled to 50 km round the view, no shadow, collision, distance fields or ray
+  tracing): the sky atmosphere in the view direction (`SkyAtmosphereViewLuminance`) with the
+  sun's disk while the light is the sun, the stars (a hashed lattice on the view direction,
+  twinkling, by `Stars` times `CurveStars` and the gaps in the deck), the moon (a disk at its
+  place lit from the sun's: its phase, mottled maria, a halo), and the cloud deck: a plane
+  `CloudDeckM` up met along the view ray (parallax as the camera moves), its cover a
+  value-noise fbm drifting with the wind, lit by the atmosphere's light at the deck
+  (`SkyAtmosphereLightIlluminance`: the sun by day, the moon by night) and the sky under it,
+  and from below by the city's glow (the texture by world X and Y, squared, times
+  `GlowMaxNits` and the lights' scale and `Night`), fading into the haze with distance. A
+  dynamic instance per controller; the controller sets its parameters with the hour.
+- **The play features** (CityGenPlay): `SetNight` sets the controller's day or night hour
+  (`SetNamedHour`) when the level has one, else their own night switch as before; `IsNight`
+  is the controller's `Night` over a half (`GetNight`), and the light pools show while it is
+  over 0.02. The Tab menu's time row shows the hour, its arrows step it, a click swaps day and
+  night, and a slider under it sets any hour to the quarter (`SetTimeOfDay`; `ClickMenuRow`
+  and `CityGen.MenuRow` take `hour=H`, a number or `day`, `dusk`, `night`); the minimap's
+  line shows the time.
+- **Console commands:** `CityGenAtmos.Hour` also takes `day`, `dusk` and `night`;
+  `CityGenAtmos.Sky [0|1]` (the sky and time: off hides the dome and leaves the level's
+  lighting and exposure as the last hour set them), `.Exposure [0|1]` (the exposure held, or the engine's),
+  `.TimeSpeed H` (game hours a real second), `.Cover C` (the deck's cover for the session).
+  `.Status` adds `sky`, `night_now`, `ev100`, `sun_elev`, `moon_elev`, `moon_lux`,
+  `time_speed`, `dome`, `deck_m`, `cover`, `glow` and the named hours.
+- **The check:** by day, at dusk and by night the controller's status (the sun's elevation,
+  `Night`, the exposure, the lights live); the play features' check needs the night held dark
+  (`Night` 1, the night's exposure), the day lit with no light live and dusk between them,
+  the exposure rising night to dusk to day. With `--shots` the `--view`s named `dusk_*` render
+  at the plan's dusk and `t<HHMM>_*` at that hour, beside `pday_*` by day and `night_*` by
+  night.
+- **The benchmark** (`bench.ATMOS_PASSES`): `dusk_plan`, `dusk_plan_all` (the plan's dusk),
+  `day_plan`, `day_plan_all` (its day hour) and `night_plan_nosky` (the night without the
+  sky dome: what it costs); every other atmos pass, and `ATMOS_OFF`, sets
+  `CityGenAtmos.Sky 1`, and each its hour last (a game with an earlier plugin warns of the
+  unknown command).
+- **A plan without a sky** (an AT2 plan): the controller keeps the level's lighting and reads
+  `MPC_CityGen`'s `Night` as before, the play features keep their switch.
 
 ### A packaged game
 

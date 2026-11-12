@@ -106,6 +106,27 @@ class Budgets(_Model):
     lights_per_cell: Annotated[int, Field(ge=0)] = P.BUDGETS["lights_per_cell"]
 
 
+class SkySpec(_Model):
+    """AT3: the sky and the time of day (scope 6.2). Every field left out is the look's or
+    `presets.SKY`'s."""
+    latitude_deg: Annotated[float, Field(ge=-66.0, le=66.0)] | None = Field(
+        None, description="The city's latitude (default 35).")
+    day_of_year: Annotated[int, Field(ge=1, le=365)] | None = Field(
+        None, description="The day the sun and the moon stand for (default 172, midsummer "
+                          "in the north).")
+    moon_phase: Share | None = Field(None, description="0 new, 0.5 full (default 0.62).")
+    day_hour: Annotated[float, Field(ge=0.0, lt=24.0)] | None = Field(
+        None, description="The hour the play features' day goes to (default 16).")
+    moon: Annotated[float, Field(ge=0.0, le=0.2)] | None = Field(
+        None, description="A full moon's light as a share of the sun's (default the look's).")
+    stars: Share | None = Field(None, description="How many stars a clear dark sky shows.")
+    cloud_deck_m: Annotated[float, Field(ge=0.0, le=6000.0)] | None = Field(
+        None, description="The cloud deck's height (0: none).")
+    cloud_cover: Share | None = Field(None, description="The share of the sky it hides.")
+    cloud_glow: Annotated[float, Field(ge=0.0, le=4.0)] | None = Field(
+        None, description="A gain on the city's light it shows from below.")
+
+
 class AtmosSpec(_Model):
     schema_ref: str | None = Field(None, alias="$schema")
     version: Literal[1] = SPEC_VERSION
@@ -121,6 +142,8 @@ class AtmosSpec(_Model):
     light_levels: LightLevels = Field(default_factory=LightLevels)
     landmarks: dict[str, LandmarkLights] = Field(default_factory=dict)
     budgets: Budgets = Field(default_factory=Budgets)
+    sky: SkySpec = Field(default_factory=SkySpec, description="AT3: the sky and the time "
+                                                              "of day.")
     notes: str | None = Field(None, description="What the session inferred from the prompt.")
 
 
@@ -178,6 +201,11 @@ def fill(spec: AtmosSpec, districts: list[dict]) -> dict:
     """The spec resolved for a city: the look and weather, every district's mood by id
     (`districts`: the model's district rows), the palette's neon list."""
     look = dict(P.LOOK[spec.preset])
+    # (AT3: the spec's sky over the look's: the moon, the stars, the cloud deck)
+    for k in ("moon", "stars", "cloud_deck_m", "cloud_cover", "cloud_glow"):
+        v = getattr(spec.sky, k)
+        if v is not None:
+            look[k] = float(v)
     hour = spec.hour if spec.hour is not None else look["hour"]
     weather = spec.weather or look["weather"]
     neon = spec.palette.neon or {c: 1.0 for c in P.NEON}
@@ -198,7 +226,9 @@ def fill(spec: AtmosSpec, districts: list[dict]) -> dict:
             "neon": {k: float(v) for k, v in sorted(neon.items())},
             "moods": moods, "budgets": spec.budgets.model_dump(),
             "light_levels": spec.light_levels.model_dump(exclude={"night_ev100"}),
-            "landmarks": {k: v.model_dump() for k, v in sorted(spec.landmarks.items())}}
+            "landmarks": {k: v.model_dump() for k, v in sorted(spec.landmarks.items())},
+            "sky": {k: getattr(spec.sky, k) for k in ("latitude_deg", "day_of_year",
+                                                       "moon_phase", "day_hour")}}
 
 
 # ---------------------------------------------------------------------------

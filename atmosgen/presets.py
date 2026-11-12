@@ -3,14 +3,14 @@ photometric classes, district moods by archetype, light levels, tiers and budget
 
 Every value here is a default the atmos spec can override (`spec.py`). Light is in physical
 units (candela, nits, kelvin, lux); a look's `reference_ev100` is the exposure its values are
-set for, and the runtime scales every light by 2^(EV_scene - EV_ref) when the scene is shown
-at another exposure (the play features' night is held at -3 EV100 today, decision 12.2 hands
-that to AT3).
+set for, and the runtime shows every light at 2^(SCENE_NIGHT_EV100 - EV_ref) in Unreal's frame
+(AT3: the night held at -3 EV100, the day at DAY_EV100, dusk between them by the sun's
+elevation, `SUN_CURVE`; the lights keep that scale at every hour, so they read dimmer at dusk).
 """
 
 from __future__ import annotations
 
-PRESET_VERSION = 2
+PRESET_VERSION = 3
 
 # --- looks and weather ------------------------------------------------------------------------
 
@@ -41,24 +41,95 @@ WEATHER = {
 # EV100 = log2(8 L); AT0 set 3 for its 52 lx streets, AT1's streets average 15 to 18 lx: 1.5
 # (the runtime shows the scene at the play features' -3 and scales every light by
 # 2^(-3 - reference) until AT3 moves the exposure)
+# AT3: the sky's part of a look: the moon's light as a share of the sun's (a full moon's; its
+# phase scales it), how many stars show where the sky is clear and dark, the cloud deck (its
+# height, 0 none; `cloud_cover` the share of the sky it hides; `cloud_glow` a gain on the
+# city's light it shows from below). neon_rain's deck is low and nearly closed, glowing over
+# the city, with the moon and a few stars in its gaps; clear_night a few high wisps.
+# (smog_dusk's 19.5 h is dusk at the default latitude and day of the year, `SKY`.)
 LOOK = {
     "neon_rain": {"hour": 23.0, "weather": "rain", "reference_ev100": 1.5, "bloom": 0.9,
                   "grade_shadows": "#163a52", "grade_highlights": "#ff4fb4",
                   "saturation": 1.1, "contrast": 1.08, "grain": 0.15, "chromatic": 0.15,
-                  "moon": 0.0, "stars": 0.0, "cloud_deck_m": 420.0, "cloud_glow": 1.0},
+                  "moon": 0.03, "stars": 0.25, "cloud_deck_m": 420.0, "cloud_glow": 1.0,
+                  "cloud_cover": 0.8},
     "clear_night": {"hour": 22.0, "weather": "clear", "reference_ev100": 1.0, "bloom": 0.6,
                     "grade_shadows": "#101c33", "grade_highlights": "#ffd9a8",
                     "saturation": 1.0, "contrast": 1.05, "grain": 0.08, "chromatic": 0.05,
-                    "moon": 0.03, "stars": 0.4, "cloud_deck_m": 0.0, "cloud_glow": 0.0},
+                    "moon": 0.03, "stars": 0.6, "cloud_deck_m": 2400.0, "cloud_glow": 0.5,
+                    "cloud_cover": 0.12},
     "smog_dusk": {"hour": 19.5, "weather": "smog", "reference_ev100": 7.0, "bloom": 0.7,
                   "grade_shadows": "#2a2035", "grade_highlights": "#ffb066",
                   "saturation": 0.95, "contrast": 1.0, "grain": 0.1, "chromatic": 0.08,
-                  "moon": 0.0, "stars": 0.0, "cloud_deck_m": 600.0, "cloud_glow": 0.6},
+                  "moon": 0.02, "stars": 0.05, "cloud_deck_m": 600.0, "cloud_glow": 0.6,
+                  "cloud_cover": 0.55},
     "overcast_day": {"hour": 13.0, "weather": "fog", "reference_ev100": 12.0, "bloom": 0.3,
                      "grade_shadows": "#2d3640", "grade_highlights": "#e8ecf0",
                      "saturation": 0.9, "contrast": 0.98, "grain": 0.04, "chromatic": 0.0,
-                     "moon": 0.0, "stars": 0.0, "cloud_deck_m": 900.0, "cloud_glow": 0.0},
+                     "moon": 0.02, "stars": 0.0, "cloud_deck_m": 900.0, "cloud_glow": 0.3,
+                     "cloud_cover": 0.95},
 }
+
+# --- sky and time (AT3) -----------------------------------------------------------------------
+
+# Where and when the sun and the moon stand: the city's latitude, the day of the year, the
+# moon's phase (0 new, 0.5 full; a waning gibbous by default, up in the east-southeast by the
+# night's hour) and the hours the play features' day and night buttons go to (the night's is
+# the look's own hour when that is night). Solar time: the sun culminates at 12.
+SKY = {"latitude_deg": 35.0, "day_of_year": 172, "moon_phase": 0.62, "day_hour": 16.0,
+       "night_hour": 23.0, "dusk_elevation_deg": -3.0}
+
+# The scene's frame (Unreal's, where the plan's light is shown): the importer's sun gives 10 lux
+# by day, the night is held at -3 EV100 (the play features' night, AT0 to AT2), the day at
+# DAY_EV100 (what Unreal's eye adaptation reached on Delta by day, AG16's look, now locked).
+# The plan's lights are in physical units and shown at 2^(SCENE_NIGHT_EV100 - reference_ev100)
+# at every hour, so at dusk, under a brighter exposure, they read dimmer as real lamps do.
+SUN_LUX = 10.0
+SCENE_NIGHT_EV100 = -3.0
+DAY_EV100 = 1.6
+OVERCAST_EV = 1.0                 # a closed deck darkens the day's exposure by this much
+# Curves over the sun's elevation (degrees), piecewise linear between their keys, the same in
+# the plan's report, the runtime and the Blender preview:
+#   ev:    the exposure, as a blend from the night's (0) to the day's (1);
+#   night: MPC_CityGen's Night (the windows, neon, signs and the plan's lights by night);
+#   sun:   the sun's light as a share of SUN_LUX (the sky atmosphere reddens and dims it at
+#          the horizon itself; under it, it still lights the twilight sky, not the ground);
+#   sky:   the sky light's intensity (its real-time capture of the sky follows the sun);
+#   stars: how many of the look's stars show.
+SUN_CURVE = {
+    "elev":  [-90.0, -18.0, -12.0, -8.0, -5.0, -3.0, -1.0, 0.0, 2.0, 5.0, 10.0, 20.0, 90.0],
+    "ev":    [0.0, 0.0, 0.0, 0.08, 0.2, 0.32, 0.48, 0.56, 0.68, 0.8, 0.92, 1.0, 1.0],
+    "night": [1.0, 1.0, 1.0, 1.0, 0.95, 0.8, 0.55, 0.42, 0.22, 0.05, 0.0, 0.0, 0.0],
+    "sun":   [0.0, 0.0, 0.0, 0.2, 0.55, 0.8, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+    "sky":   [0.8, 0.8, 0.8, 0.85, 0.9, 0.95, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+    "stars": [1.0, 1.0, 1.0, 0.6, 0.15, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+}
+# the moon: its light the look's `moon` share of SUN_LUX times its lit fraction, faded in as
+# it clears the horizon (MOON_RISE degrees) and as the sun's light goes, and dimmed by the
+# cloud deck (MOON_CLOUD of its cover); its color; its disk's luminance in the scene
+# (cd/m2 at the night's exposure: some 30 times middle grey, its maria still reading)
+MOON_RISE = (-1.0, 6.0)
+MOON_CLOUD = 0.75
+MOON_COLOR = "#8fa8ff"
+MOON_DISK_NITS = 0.5
+MOON_DEG = 0.53                   # its disk's angular diameter
+# the sky glow (scope 6.2): the plan's upward light flux, lit onto the cloud deck's underside.
+# A light's flux (lm) from its intensity and cone; the share going up: a spot's cone above
+# the horizontal, half a point's or a vertical face's; the rest lands and GROUND_REFLECT of
+# it bounces; of either, ESCAPE leaves the street canyons (direct, reflected: most of the
+# upward light is crown floods and the upper halves of sign faces, and most of it lands on the
+# facades they are aimed at or face). The deck's illuminance is the flux convolved with a
+# Lambertian emitter's footprint at its height,
+#   E(r) = Phi h^2 / (pi (h^2 + r^2)^2),
+# and its underside shows CLOUD_ALBEDO E / pi (cd/m2, a rain deck's dark base), times the
+# look's cloud_glow. Delta's core then glows at about 1.9 cd/m2, a heavily lit city's overcast
+# sky (some 12 mag/arcsec2), 0.36 on average over the city.
+GROUND_REFLECT = 0.12
+ESCAPE = (0.12, 0.2)
+CLOUD_ALBEDO = 0.45
+GLOW_CELL_M = 64.0
+GLOW_REACH = 3.0                  # the footprint summed out to this times the deck's height
+GLOW_HOUR = 23.0                  # the glow is the city's at this hour (scaled by Night)
 
 # --- light color ------------------------------------------------------------------------------
 
@@ -404,6 +475,8 @@ def _hours(on: float, off: float, level: float = 1.0, rest: float = 0.0) -> tupl
     return tuple(out)
 
 
+# (AT3: the plan derives `dusk_dawn` and `tunnel` from the sun, `sky.schedules`: on from the
+# sun at +3 degrees in the evening to +3 in the morning; these are their defaults)
 SCHEDULES = {
     "dusk_dawn": _hours(18, 7),                    # street lights: on from dusk to dawn
     "tunnel": _hours(18, 7, 1.0, 0.6),             # tunnels: always, brighter by night

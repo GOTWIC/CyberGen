@@ -55,16 +55,19 @@ PASSES = (("day_native", False, 100.0), ("day_tsr67", False, TSR_PERCENT),
 # MegaLights (with `--bench-rt`). A pass without commands of its own switches all of it off,
 # so passes do not leak into each other.
 ATMOS_OFF = ("CityGenAtmos.Lights 0", "CityGenAtmos.Fog 0", "CityGenAtmos.Rain 0",
-             "CityGenAtmos.Wet 0", "CityGenAtmos.MegaLights 0")
+             "CityGenAtmos.Wet 0", "CityGenAtmos.MegaLights 0", "CityGenAtmos.Sky 1")
 
 
 def _atmos(lights: bool = True, fog: bool = False, rain: bool = False, wet: bool = False,
            mega: bool = False, live: int = 512, range_m: float = 300.0,
-           shadowed: int = 16) -> tuple[str, ...]:
+           shadowed: int = 16, hour: str = "23", sky: bool = True) -> tuple[str, ...]:
+    """AT3: `hour` a number or the plan's named hour (day, dusk, night); `sky` the sky and
+    time (a game with an earlier plugin warns of the unknown command and runs the same)."""
     return (f"CityGenAtmos.Tiers {live} {range_m:g} {shadowed}",
             f"CityGenAtmos.Lights {int(lights)}", f"CityGenAtmos.Fog {int(fog)}",
             f"CityGenAtmos.Rain {int(rain)}", f"CityGenAtmos.Wet {int(wet)}",
-            f"CityGenAtmos.MegaLights {int(mega)}", "CityGenAtmos.Hour 23")
+            f"CityGenAtmos.MegaLights {int(mega)}", f"CityGenAtmos.Sky {int(sky)}",
+            f"CityGenAtmos.Hour {hour}")
 
 
 ATMOS_PASSES = (
@@ -80,6 +83,14 @@ ATMOS_PASSES = (
     ("night_plan_mega", True, 100.0, _atmos(fog=True, rain=True, wet=True, mega=True)),
     ("night_plan_mega_2048", True, 100.0, _atmos(fog=True, rain=True, wet=True, mega=True,
                                                  live=2048, range_m=500.0, shadowed=0)),
+    # AT3: the plan's lights at dusk (the sun just set: the plan's `dusk` hour) and by day
+    # (its `day` hour: no light live), under the sky and time; and the night with the sky dome
+    # hidden (what it costs)
+    ("dusk_plan", True, 100.0, _atmos(hour="dusk")),
+    ("dusk_plan_all", True, 100.0, _atmos(fog=True, rain=True, wet=True, hour="dusk")),
+    ("day_plan", False, 100.0, _atmos(hour="day")),
+    ("day_plan_all", False, 100.0, _atmos(fog=True, rain=True, wet=True, hour="day")),
+    ("night_plan_nosky", True, 100.0, _atmos(sky=False)),
 )
 # what a game with hardware ray tracing needs at startup (MegaLights traces its shadows; UE
 # 5.8 marks MegaLights experimental), in the game's -ini override of the project's settings

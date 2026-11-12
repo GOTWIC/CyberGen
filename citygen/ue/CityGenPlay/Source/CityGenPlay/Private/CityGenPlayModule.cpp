@@ -147,7 +147,7 @@ namespace
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs MenuRowCommand(TEXT("CityGen.MenuRow"),
-		TEXT("CityGen.MenuRow ROW: what a click on a developer menu row does (night, freecam, minimap, messages, fog, rain, wet, hour+, hour-)"),
+		TEXT("CityGen.MenuRow ROW: what a click on a developer menu row does (night, freecam, minimap, messages, fog, rain, wet, hour+, hour-, and AT3's hour=H: a number of hours, or day, dusk or night)"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 		{
 			ACityGenPlay* P = PlayIn(World);

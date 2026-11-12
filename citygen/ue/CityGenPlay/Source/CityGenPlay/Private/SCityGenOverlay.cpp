@@ -22,7 +22,9 @@ namespace
 	constexpr double MinScale = 8.0;        // cm per Slate unit, zoomed in all the way
 	enum EMenuRow : int32 { RowNight = 1, RowFreeCam = 2, RowMinimap = 3, RowMessages = 4,
 		// atmosgen's weather prototypes, shown when the level has its controller
-		RowFog = 5, RowRain = 6, RowWet = 7, RowHour = 8, RowHourDown = 9, RowHourUp = 10 };
+		RowFog = 5, RowRain = 6, RowWet = 7, RowHour = 8, RowHourDown = 9, RowHourUp = 10,
+		// AT3: the time-of-day slider under the time row (its own drag, not a click row)
+		RowTimeBar = 11 };
 
 	/** A row's name for ACityGenPlay::ClickMenuRow (the console's CityGen.MenuRow). */
 	const TCHAR* RowName(int32 Row)
@@ -36,6 +38,7 @@ namespace
 		case RowFog: return TEXT("fog");
 		case RowRain: return TEXT("rain");
 		case RowWet: return TEXT("wet");
+		case RowHour: return TEXT("night");     // (AT3: the time row itself swaps day and night)
 		case RowHourDown: return TEXT("hour-");
 		default: return TEXT("hour+");    // the hour row and its > arrow
 		}
@@ -228,7 +231,17 @@ int32 SCityGenOverlay::PaintMinimap(FSlateWindowElementList& Out, int32 Layer, c
 	DrawArrow(Out, Layer + 4, Geometry, (Min + Max) * 0.5, P->ViewYaw(), 11.f);
 	// what the player is in, and the keys
 	FString Line = P->City.IsEmpty() ? FString(TEXT("CityGen")) : P->City;
-	Line += P->IsNight() ? TEXT("  |  night") : TEXT("  |  day");
+	if (P->GetAtmos())
+	{
+		// (AT3: the time of day, atmosgen's)
+		const float H = P->GetAtmosHour();
+		Line += FString::Printf(TEXT("  |  %02d:%02d"), FMath::FloorToInt32(H) % 24,
+			FMath::FloorToInt32(FMath::Frac(H) * 60.f));
+	}
+	else
+	{
+		Line += P->IsNight() ? TEXT("  |  night") : TEXT("  |  day");
+	}
 	if (P->IsFreeCam())
 	{
 		Line += FString::Printf(TEXT("  |  free camera %.0f m/s"), P->GetFreeCamSpeed() / 100.f);
@@ -278,8 +291,14 @@ int32 SCityGenOverlay::PaintMenu(FSlateWindowElementList& Out, int32 Layer, cons
 	constexpr double W = 320.0, RowH = 34.0;
 	const FVector2D Min(LastSize.X - W - Margin, Margin);
 	struct FRow { int32 Id; FString Label; FString Value; };
+	const bool bAtmos = P->GetAtmos() != nullptr;
+	const float Hr = bAtmos ? P->GetAtmosHour() : 0.f;
+	// (AT3: with atmosgen's controller the time row shows its hour, steps it an hour with its
+	// arrows, swaps day and night on a click, and a slider under it sets any hour)
 	TArray<FRow> Rows = {
-		{RowNight, TEXT("Time of day"), P->IsNight() ? TEXT("Night") : TEXT("Day")},
+		{bAtmos ? RowHour : RowNight, TEXT("Time of day"), bAtmos
+			? FString::Printf(TEXT("%02d:%02d"), FMath::FloorToInt32(Hr) % 24, FMath::FloorToInt32(FMath::Frac(Hr) * 60.f))
+			: FString(P->IsNight() ? TEXT("Night") : TEXT("Day"))},
 		{RowFreeCam, TEXT("Free camera  ( . )"), P->IsFreeCam() ? TEXT("On") : TEXT("Off")},
 		{RowMinimap, TEXT("Minimap"), P->bShowMinimap ? TEXT("On") : TEXT("Off")},
 		{RowMessages, TEXT("Engine messages"), EngineMessages() ? TEXT("On") : TEXT("Off")}};
@@ -289,17 +308,20 @@ int32 SCityGenOverlay::PaintMenu(FSlateWindowElementList& Out, int32 Layer, cons
 		Rows.Add({RowFog, TEXT("Fog"), OnOff(TEXT("bFog"))});
 		Rows.Add({RowRain, TEXT("Rain"), OnOff(TEXT("bRain"))});
 		Rows.Add({RowWet, TEXT("Wet streets"), OnOff(TEXT("bWet"))});
-		Rows.Add({RowHour, TEXT("Hour (lights by night)"),
-			FString::Printf(TEXT("%02d:00"), FMath::FloorToInt32(P->GetAtmosHour()) % 24)});
 	}
-	const FVector2D Max(Min.X + W, Min.Y + 56.0 + Rows.Num() * RowH + 34.0);
+	constexpr double BarH = 30.0;
+	const double Extra = bAtmos ? BarH : 0.0;
+	const FVector2D Max(Min.X + W, Min.Y + 56.0 + Rows.Num() * RowH + Extra + 34.0);
 	DrawRect(Out, Layer, Geometry, Min, Max, Panel);
 	DrawFrame(Out, Layer + 1, Geometry, Min, Max, FLinearColor(Accent.R, Accent.G, Accent.B, 0.5f), 1.5f);
 	DrawText(Out, Layer + 1, Geometry, TEXT("Developer options"), Min + FVector2D(16.0, 14.0), 15, Ink, true);
 	MenuRows.Reset();
+	bTimeBar = false;
 	for (int32 i = 0; i < Rows.Num(); ++i)
 	{
-		const FVector2D R0(Min.X + 8.0, Min.Y + 52.0 + i * RowH), R1(Max.X - 8.0, R0.Y + RowH - 4.0);
+		// (the rows after the time row sit under its slider)
+		const double Y0 = Min.Y + 52.0 + i * RowH + (i > 0 ? Extra : 0.0);
+		const FVector2D R0(Min.X + 8.0, Y0), R1(Max.X - 8.0, R0.Y + RowH - 4.0);
 		const FSlateRect Rect(F(R0), F(R1));
 		const bool bHour = Rows[i].Id == RowHour;
 		if (bHour)
@@ -320,9 +342,31 @@ int32 SCityGenOverlay::PaintMenu(FSlateWindowElementList& Out, int32 Layer, cons
 		{
 			DrawText(Out, Layer + 2, Geometry, TEXT("<"), FVector2D(R1.X - 92.0, R0.Y + 15.0), 12, Accent, true, true);
 			DrawText(Out, Layer + 2, Geometry, TEXT(">"), FVector2D(R1.X - 13.0, R0.Y + 15.0), 12, Accent, true, true);
+			// AT3: the slider: 24 hours, night dark blue to day pale, the hour marked
+			const FVector2D B0(R0.X + 10.0, R1.Y + 8.0), B1(R1.X - 10.0, R1.Y + BarH - 10.0);
+			TimeBar = FSlateRect(F(B0), F(B1));
+			bTimeBar = true;
+			constexpr int32 Steps = 48;
+			for (int32 s = 0; s < Steps; ++s)
+			{
+				const double X0 = FMath::Lerp(B0.X, B1.X, double(s) / Steps);
+				const double X1 = FMath::Lerp(B0.X, B1.X, double(s + 1) / Steps);
+				const float Day = FMath::Clamp(0.5f - 0.5f * FMath::Cos(2.f * UE_PI * (float(s) + 0.5f) / float(Steps)), 0.f, 1.f);
+				const FLinearColor C = FMath::Lerp(FLinearColor(0.03f, 0.05f, 0.14f, 0.95f),
+					FLinearColor(0.55f, 0.72f, 0.9f, 0.95f), Day * Day);
+				DrawRect(Out, Layer + 1, Geometry, FVector2D(X0, B0.Y), FVector2D(X1, B1.Y), C);
+			}
+			for (int32 h = 0; h <= 24; h += 6)
+			{
+				const double X = FMath::Lerp(B0.X, B1.X, h / 24.0);
+				DrawRect(Out, Layer + 2, Geometry, FVector2D(X - 0.5, B1.Y - 4.0), FVector2D(X + 0.5, B1.Y), Dim);
+			}
+			const double HX = FMath::Lerp(B0.X, B1.X, double(Hr) / 24.0);
+			DrawRect(Out, Layer + 3, Geometry, FVector2D(HX - 2.0, B0.Y - 3.0), FVector2D(HX + 2.0, B1.Y + 3.0), Accent);
 		}
 	}
-	DrawText(Out, Layer + 2, Geometry, TEXT("Click a row to change it.  Tab or Esc closes."),
+	DrawText(Out, Layer + 2, Geometry, bAtmos ? TEXT("Click a row to change it, drag the time.  Tab or Esc closes.")
+		: TEXT("Click a row to change it.  Tab or Esc closes."),
 		FVector2D(Min.X + 16.0, Max.Y - 26.0), 10, Dim);
 	return Layer + 4;
 }
@@ -369,6 +413,13 @@ FReply SCityGenOverlay::OnMouseButtonDown(const FGeometry& Geometry, const FPoin
 	bHover = true;
 	if (P->IsDevMenuOpen() && Event.GetEffectingButton() == EKeys::LeftMouseButton)
 	{
+		// AT3: the time slider, dragged
+		if (bTimeBar && TimeBar.ExtendBy(FMargin(0.f, 6.f)).ContainsPoint(F(Local)))
+		{
+			bDragTime = true;
+			SetTimeFrom(Local);
+			return FReply::Handled().CaptureMouse(SharedThis(this));
+		}
 		for (const TPair<FSlateRect, int32>& Row : MenuRows)
 		{
 			if (!Row.Key.ContainsPoint(F(Local)))
@@ -402,8 +453,26 @@ FReply SCityGenOverlay::OnMouseButtonDown(const FGeometry& Geometry, const FPoin
 	return FReply::Handled();
 }
 
+void SCityGenOverlay::SetTimeFrom(const FVector2D& Local)
+{
+	ACityGenPlay* P = Play.Get();
+	const float W = TimeBar.Right - TimeBar.Left;
+	if (!P || W <= 1.f)
+	{
+		return;
+	}
+	// (to the quarter hour)
+	const float H = FMath::Clamp(float(Local.X - TimeBar.Left) / W, 0.f, 1.f) * 24.f;
+	P->SetTimeOfDay(FMath::RoundToFloat(H * 4.f) / 4.f);
+}
+
 FReply SCityGenOverlay::OnMouseButtonUp(const FGeometry& Geometry, const FPointerEvent& Event)
 {
+	if (bDragTime && Event.GetEffectingButton() == EKeys::LeftMouseButton)
+	{
+		bDragTime = false;
+		return FReply::Handled().ReleaseMouseCapture();
+	}
 	if (bPanning && Event.GetEffectingButton() == EKeys::RightMouseButton)
 	{
 		bPanning = false;
@@ -415,6 +484,10 @@ FReply SCityGenOverlay::OnMouseButtonUp(const FGeometry& Geometry, const FPointe
 FReply SCityGenOverlay::OnMouseMove(const FGeometry& Geometry, const FPointerEvent& Event)
 {
 	const FVector2D Local = Geometry.AbsoluteToLocal(Event.GetScreenSpacePosition());
+	if (bDragTime)
+	{
+		SetTimeFrom(Local);
+	}
 	if (bPanning)
 	{
 		Center -= (Local - PanFrom) * Scale;
