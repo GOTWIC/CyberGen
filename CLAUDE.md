@@ -2354,6 +2354,13 @@ AT1 (streets at night) is in place:
   efficiency cores, its threads twice as slow), each sample records the foreground (`front`).
 - Results (Delta's night 16.4 ms p95 over the route with everything on, 14.4 with AT1's lights
   alone), the check's night views: `docs/progress/AT1/README.md`.
+- **Packaged games** (a fix after AT1; `docs/unreal_export.md`, "A packaged game"): every
+  import lists the folders the runtimes load assets from by path (`unreal.ALWAYS_COOK`:
+  `/Game/CityGen/Core/Atmos`, `/Engine/BasicShapes`) as `+DirectoriesToAlwaysCook` in the
+  project's DefaultGame.ini, so a cook takes them (keep anything loaded by path in one of
+  them); the play module opens a game with no saved resolution windowed fullscreen at the
+  monitor's native resolution; the Tab menu has Fog, Rain, Wet streets and hour rows driving
+  the atmos controller (found by class name, no link between the plugins).
 
 ## Life generator (lifegen)
 
