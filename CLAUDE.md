@@ -2244,8 +2244,24 @@ waits for Swagnik's review.
   and halcyon_ridge (`uv_overlap`) fail one check each by a hair, recorded.
 - **Vex** (vex_wraith, vex_halo, vex_strix) is to be redesigned (Swagnik, 2026-11-10): no
   packs, out of every later step until redone.
-- **Next:** step H (the vehicles into the cities: AG8's parked vehicles as placement
-  entries), then the design improvements (steps A to E).
+- **In the cities** (step H, 2026-11-11; `assetgen/parked/`, tests
+  `tests/assetgen/test_ag_vehicles.py`): `assetgen vehicles BUILD` (also in `assetgen build`
+  after the props, `--no-vehicles`) makes every M6 parked car AG8 draws a pack vehicle: a model
+  by its district's weights (`parked/table.py`: a row per archetype scaled by wealth and danger
+  through the model's class; the spec's `vehicles.weights`), the first in that hashed order
+  whose plan box lies on its own road's carriageway faces of M22's map, off the crosswalks,
+  0.5 m from its neighbors and not the fourth of one model in a row, else left out with a
+  reason; paint per placement from its role's palette and the district's colors; hover cars
+  set down on their lowest point. `unreal_contribution.vehicles.json` (a placement entry per
+  tile replacing `prop.parked_vehicle.<tile>`; the exporter drops what a placement replaces
+  from stage 2, `unreal_vehicles.without_replaced`), `vehicles_report.txt` (checks
+  `vehicles_coverage`, `_clear`, `_variety`, `_replaces`, `_library`); AG16's scene count and
+  the textured previews (`assetgen materials preview`) take them. The library: the spec's
+  `vehicles.library`, `$ASSETGEN_VEHICLES` (`off` for none; `tests/conftest.py` sets it off),
+  `$CITYGEN_VEHICLES`, the packs' cache; without one, or with `vehicles.parked: variants`,
+  nothing is written and AG8's variants stay (the props package and its goldens untouched).
+  Proof on Vesper Bay: `docs/progress/AG18/city/`.
+- **Next:** the design improvements (steps A to E).
 - The other phases (improvements, AG8's parked vehicles and
   stage 4's fleet drawing on them) are listed in the scope with their plan.
 

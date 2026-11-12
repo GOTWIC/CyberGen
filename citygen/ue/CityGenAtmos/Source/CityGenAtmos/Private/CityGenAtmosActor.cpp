@@ -64,11 +64,10 @@ ACityGenAtmos* ACityGenAtmos::Find(const UWorld* World)
 	{
 		return nullptr;
 	}
-	for (TActorIterator<ACityGenAtmos> It(const_cast<UWorld*>(World)); It; ++It)
-	{
-		return *It;
-	}
-	return nullptr;
+	// (the first; a loop that returns at once fails Clang's -Wunreachable-code-loop-increment,
+	// an error on the Mac's build)
+	TActorIterator<ACityGenAtmos> It(const_cast<UWorld*>(World));
+	return It ? *It : nullptr;
 }
 
 void ACityGenAtmos::BeginPlay()
@@ -555,7 +554,8 @@ void ACityGenAtmos::EnsureFog()
 	{
 		return;
 	}
-	for (TActorIterator<AExponentialHeightFog> It(GetWorld()); It; ++It)
+	TActorIterator<AExponentialHeightFog> It(GetWorld());
+	if (It)
 	{
 		Fog = *It;
 		return;

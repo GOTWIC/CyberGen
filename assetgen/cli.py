@@ -194,7 +194,8 @@ def cmd_build(args: argparse.Namespace) -> int:
         rep = BD.build(src, args.spec, args.overrides, args.workers,
                        streets=not args.no_streets, textures=not args.no_textures,
                        props=not args.no_props, ground=not args.no_ground,
-                       water=not args.no_water, fit=not args.no_fit, progress=prog)
+                       water=not args.no_water, fit=not args.no_fit, progress=prog,
+                       vehicles=not args.no_vehicles)
     except ValueError as e:
         print(f"error: {e}", file=sys.stderr)
         return EXIT_INVALID
@@ -320,6 +321,46 @@ def cmd_library(args: argparse.Namespace) -> int:
 def cmd_materials(args: argparse.Namespace) -> int:
     from .materials import preview as MV
     return MV.main(args)
+
+
+def cmd_vehicles(args: argparse.Namespace) -> int:
+    from . import brief as B
+    from . import spec as S
+    from .parked.build import build as veh_build
+    src = Path(args.build)
+    if not (src / "city_model.json").is_file() and not src.is_file():
+        print(f"error: {args.build}: no city_model.json", file=sys.stderr)
+        return EXIT_USAGE
+    prog = _progress(args)
+    with prog.stage("load"):
+        model, sha, bdir = B.load_model(src)
+    spec = None
+    if args.spec:
+        res = S.load_spec(args.spec, model)
+        for issue in res.issues:
+            print(issue, file=sys.stderr)
+        if not res.ok:
+            return EXIT_INVALID
+        spec = res.spec
+    doc = S.dump(S.fill(spec or S.AssetSpec()))
+    out = Path(args.out) if args.out else bdir / "assets"
+    with prog.stage("vehicles"):
+        rep = veh_build(model, sha, out, doc)
+    prog.summary()
+    if not rep["on"]:
+        print(f"{rep['city']}: vehicles off: {rep['why_off']}; AG8's parked car variants stay"
+              + (f" (removed {', '.join(rep['files']['removed'])})"
+                 if rep["files"]["removed"] else ""))
+        return EXIT_OK
+    st = rep["stats"]
+    print(f"{rep['city']}: {st['parked']} parked cars, {st['placed']} placed as "
+          f"{len(st['by_model'])} models, {st['left_out']} left out; "
+          f"{len(rep['files']['written'])} files written in {rep['seconds']['total']} s")
+    for c in rep["checks"]:
+        if not c["ok"]:
+            print(f"check failed: {c['id']}: {c['detail']}", file=sys.stderr)
+    print(f"{'PASS' if rep['ok'] else 'FAIL'}: see {out / 'vehicles_report.txt'}")
+    return EXIT_OK if rep["ok"] else EXIT_INVALID
 
 
 def cmd_props(args: argparse.Namespace) -> int:
@@ -527,6 +568,10 @@ def build_parser() -> argparse.ArgumentParser:
                          "`assetgen ground`)")
     bu.add_argument("--no-water", action="store_true",
                     help="no water (default: after the streets, as `assetgen water`)")
+    bu.add_argument("--no-vehicles", action="store_true",
+                    help="AG8's own parked car variants, not AG18's hero vehicles (default: "
+                         "after the props, as `assetgen vehicles`, where the vehicle library "
+                         "is on this machine)")
     bu.add_argument("--no-fit", action="store_true",
                     help="no fit checks on the packs (default: last, as `assetgen fit`)")
     _quiet(bu)
@@ -651,6 +696,15 @@ def build_parser() -> argparse.ArgumentParser:
                          "the plants) in Blender into DIR")
     _quiet(pr)
     pr.set_defaults(func=cmd_props)
+
+    vh = sub.add_parser("vehicles", help="AG18: the parked cars as the vehicle library's hero "
+                                         "vehicles (after `assetgen props`)")
+    vh.add_argument("build", help="a citygen build directory (or its city_model.json)")
+    vh.add_argument("--spec", help="asset_spec.json (its `vehicles`; default: the library's "
+                                   "vehicles where it is on this machine)")
+    vh.add_argument("--out", help="output directory (default BUILD/assets)")
+    _quiet(vh)
+    vh.set_defaults(func=cmd_vehicles)
 
     gd = sub.add_parser("ground", help="AG13: ground cover of the open land and its grass")
     gd.add_argument("build", help="a citygen build directory (or its city_model.json)")

@@ -28,7 +28,7 @@ as it lands, as in [`citygen_milestones.md`](citygen_milestones.md).
 | Sky tube fixes | Fixes between milestones (issues #94, #97): sky tubes on plain pylons drawn as before M19 (masts an option), ribs at citygen's rings along the whole line, an LED band in the line's color on each lit one (neon, brighter by night) | Done | [`docs/progress/sky_tubes`](progress/sky_tubes) |
 | AG16 | Performance (scope 14.17, issue #96): a benchmark in a standalone game process, frame time, VRAM, RAM and import targets for Delta on the Windows PC, structural fixes from what it shows, budgets in the build; upscaling measured, DLSS later | Planned | |
 | AG17 | Road surfaces by construction (scope 14.18), with stage 1's M22: AG7's road, junction, sidewalk, median and corner pieces meshed from M22's pavement map, their boundaries the map's stored vertices never split, interiors by constrained triangulation, barriers along stored edges, decals on the face that holds them; a `street_watertight` check (every interior map edge in exactly two pieces at the same positions); AG14's step and strip checks reading 0 | Done | [`docs/progress/AG17`](progress/AG17) |
-| AG18 | Hero vehicles (scope 14.19): hand-designed cars, trucks and hover vehicles as Blender scripts on a shared kit, seven made-up brands, one multi-view sheet a car; not a generator; game packs (LODs, baked textures, collision) for 18 of them | In progress | [`docs/progress/AG18`](progress/AG18) |
+| AG18 | Hero vehicles (scope 14.19): hand-designed cars, trucks and hover vehicles as Blender scripts on a shared kit, seven made-up brands, one multi-view sheet a car; not a generator; game packs (LODs, baked textures, collision) for 18 of them, parked in the generated cities (step H) | In progress | [`docs/progress/AG18`](progress/AG18) |
 
 ## AG0: contract and spike
 
@@ -2810,9 +2810,89 @@ LOD3's hull stand-ins without a material (fixed in `game.py`; the two Aurels rem
 Open: the three marginal failures above (recorded, not fixed); LOD3 details still crude up
 close (a winch drum, small rims and grilles); bake faults on kestrel_meridian's louvre and
 aurel_zenith's grille. The three Vex vehicles are to be
-redesigned (Swagnik, 2026-11-10) and have no packs. Next: step H (the vehicles into the
-generated cities: AG8's parked vehicles as placement entries), then the design improvements
-A to E.
+redesigned (Swagnik, 2026-11-10) and have no packs.
+
+### Step H: parked in the cities (2026-11-11)
+
+A stage of its own, `assetgen/parked/` (`assetgen vehicles BUILD [--spec S]`, and in
+`assetgen build` after the props, `--no-vehicles`; tests `tests/assetgen/test_ag_vehicles.py`),
+outside the props package so that AG8's code hash, its packs, contributions and goldens stay
+as they were:
+
+- **Which model** (`parked/table.py`): a row of relative weights per district archetype, each
+  scaled by the district's wealth $w$ and danger $d$ (M11's) through the model's class:
+  luxury (the Aurels, Halcyon Sable and Vanta-R, Orrin Aria) $(0.2 + 1.6w)(1.25 - d)$,
+  upscale (Halcyon Ridge, Orrin Lumen and Pebble) $(0.5 + w)(1.2 - 0.5d)$, everyday (the
+  Tanagers) $1.5 - 0.8w$, work (the Brakks) $0.7 + 0.6d$, hover (the Kestrels)
+  $(0.3 + w)(1.1 - 0.5d)$. Aurel and Halcyon where it is wealthy and safe, Tanager everywhere,
+  Brakk in the port (its Bastion where it is dangerous), Orrin in the clean modern districts,
+  Kestrel a few percent (most at the spaceport). The rows:
+
+  | Archetype | Aurel P/R/Z | Halcyon V/S/R | Orrin L/P/A | Tanager M/C/P | Brakk H/B/M | Kestrel D/M/A |
+  |---|---|---|---|---|---|---|
+  | corporate_core | 5 6 3 | 2 5 4 | 9 5 2 | 6 10 3 | 1 2 1 | 1 1.5 0 |
+  | midtown_mixed | 2 2 1 | 1 3 4 | 7 6 1 | 12 9 6 | 2 1 1 | 0.5 1 0.5 |
+  | transit_hub | 1 2 1 | 1 2 2 | 6 5 1 | 10 14 7 | 2 1 2 | 0.5 1 0.5 |
+  | residential_heights | 3 2 1 | 1 4 6 | 8 7 1 | 11 3 3 | 2 1 0 | 0.5 1 0 |
+  | research_campus | 2 1 1 | 1 3 5 | 10 9 2 | 8 3 4 | 2 1 1 | 1 1 0.5 |
+  | entertainment_market | 1 2 1 | 3 3 2 | 3 3 2 | 12 10 6 | 2 2 1 | 1 0.5 0 |
+  | old_town | 1 1 0 | 0.5 1 1 | 2 4 0 | 16 6 8 | 4 2 2 | 0 0 0 |
+  | megablock_residential | 0.5 0.5 0 | 0.5 1 1 | 2 4 0 | 16 7 7 | 4 3 2 | 0 0.5 0 |
+  | industrial_port | 0 0 0 | 0 0.5 2 | 1 1 0 | 8 2 10 | 12 4 12 | 0 0 1.5 |
+  | spaceport | 1 1 2 | 1 1 3 | 3 2 1 | 6 6 6 | 6 3 5 | 3 3 4 |
+
+  The asset spec's `vehicles.weights` multiplies a model everywhere (0 leaves it out). The
+  district's weights put the models in a weighted order by a hash of the car's id
+  (Efraimidis and Spirakis' keys $u^{1/w}$); the car takes the first that fits.
+- **What fits** (`parked/place.py`), curb by curb in order along the road: the pack's plan box
+  (`dimensions`, mirrors included) on its own road's carriageway and bend faces of M22's
+  pavement map (so off the curbs, sidewalks, medians and every junction) but for 0.1 m, on no
+  crosswalk, 0.5 m from every car placed before it, and not the fourth of one model in a row;
+  none fits: left out, with the reason its smallest candidate failed on. AG14's rules
+  (`asset_clash`) leave parked vehicles' footprints to this stage (they stand on a
+  carriageway by design); the stage's own check measures them.
+- **Paint** (`table.paint`): color is never a brand's, so the palette is the car's role's
+  (luxury, sport, private, fleet, work) with the district's colors added (neon in the
+  entertainment market, faded tones in the old town, deep blues, wines and teals in the corporate core);
+  primary by hash, secondary the primary, a dark trim or a second color, accent from a short
+  list; drawn again while the car before it on the curb is the same model in the same color.
+- **Hover cars parked** are set down: the pack's lowest point (pods or skids) on the asphalt,
+  not left out of curb parking. Cars on wheels stand 5 cm over the model's height, on AG7's
+  asphalt.
+- **Outputs**: `unreal_contribution.vehicles.json` (a placement entry per tile,
+  `vehicles.parked.<tile>`, replacing `prop.parked_vehicle.<tile>`; its `library` and `cars`),
+  `vehicles_report.json/.txt` (checks `vehicles_coverage`, `vehicles_clear` measured again
+  from scratch, `vehicles_variety` (a run of one model along a curb at most 3, no neighbors of
+  one model in one color, four models or more in a city of 40 parked cars), `vehicles_replaces`,
+  `vehicles_library`).
+- **The library** (`parked/library.py`): the spec's `vehicles.library`, `$ASSETGEN_VEHICLES`
+  (`off` for none), `$CITYGEN_VEHICLES`, the packs' cache; a pack whose four LOD files are
+  there, never the Vex. Without one, or with `vehicles.parked: variants`, the stage writes
+  nothing and takes away what an earlier run left: AG8's variants, exactly as before.
+  `tests/conftest.py` turns the library off for every test, so no test reads the machine's
+  packs; the spec's new `vehicles` is left out of its dump while unset (`exclude_if`), so no
+  spec hash moves. No golden moved.
+- **Exporter**: the stage 2 entries a placement replaces are left out of stage 2
+  (`unreal_vehicles.without_replaced`), and the placements' own library is used when neither
+  `--vehicles` nor `$CITYGEN_VEHICLES` names one (`named_library`). **AG16's scene count**
+  takes a placement's actor, components and instances (`scene.count`, the city's
+  `vehicles`). **Previews**: `assetgen materials preview` draws the vehicles from their packs
+  (LOD2 near, LOD3 from above) through the paint mask, recolored per car, in place of AG8's
+  variants.
+
+Vesper Bay (its parked cars are all on the Corporate Core's streets): 912 parked cars, all 912
+placed as 17 models (Orrin Lumen 136, Aurel Regent 109, Orrin Pebble 101, Halcyon Sable 94,
+Aurel Prelate 83, Tanager Cab 76, Halcyon Ridge 66, Aurel Zenith 60, Tanager Mino 48, Vanta-R
+36, Orrin Aria 22, Tanager Porter 22, Brakk Bastion 16, Kestrel Meridian 16, Kestrel Dart 10,
+Brakk Mule 9, Brakk Hauler 8; the Kestrel Atlas has no weight there), 86 hover cars set down,
+54 primary colors, the longest run of one model along a curb 3. In the scene: the 22 placement
+actors replace AG8's 22 parked car actors (13,943 actors as before), 1,528 instanced
+components (AG8's 211 go: 71,567 to 72,884), 5,930 part instances (AG8's 912 go), 12 fewer
+distinct Nanite meshes (AG8's variants; the vehicles' 104 meshes are not Nanite), 114.8 million
+triangles at LOD0 (5.1 million at LOD3); every city and tile budget kept. Proof in Blender and
+Unreal: [`docs/progress/AG18/city`](progress/AG18/city/README.md).
+
+Next: the design improvements A to E.
 
 The roster with sizes and sheets: [`docs/progress/AG18/README.md`](progress/AG18/README.md).
 

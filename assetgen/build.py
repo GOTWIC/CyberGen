@@ -31,7 +31,10 @@ and signs, then its ground cover.
    stage (AG8's `assetgen props`, `assetgen/props/build.py`, the same bytes): the variant
    families, exact props and signs (their faces showing those pages),
    `unreal_contribution.props.json` and `.signs.json`, `props_report.json` and `.txt`
-   (likewise); then AG13's ground stage (`assetgen ground`, `assetgen/ground/build.py`):
+   (likewise); then AG18's parked vehicles (`assetgen vehicles`, `assetgen/parked/`: the
+   parked cars as the vehicle library's hero vehicles, `unreal_contribution.vehicles.json`,
+   `vehicles_report.json` and `.txt`; nothing without the library, `--no-vehicles`); then
+   AG13's ground stage (`assetgen ground`, `assetgen/ground/build.py`):
    the ground of every piece of open land and its grass per tile,
    `unreal_contribution.ground.json`, `ground_report.json` and `.txt` (likewise); then AG6's
    materials and checks over every contribution and pack (`materials/build.stage`).
@@ -557,8 +560,10 @@ def build(build_dir: str | Path, spec_path: str | None = None,
           overrides_path: str | None = None, workers: int | None = None,
           log=print, streets: bool = True, textures: bool = True,
           props: bool = True, ground: bool = True, progress: Progress | None = None,
-          water: bool = True, fit: bool = True) -> dict:
-    """`progress`: stage lines and bars on stderr (`assetgen/progress.py`); the log lines go
+          water: bool = True, fit: bool = True, vehicles: bool = True) -> dict:
+    """`vehicles` (AG18 step H): the parked cars as the vehicle library's hero vehicles after
+    the props (`assetgen/parked/`; nothing where the library is not on this machine).
+    `progress`: stage lines and bars on stderr (`assetgen/progress.py`); the log lines go
     to its notes then, else to `log`."""
     t0 = time.perf_counter()
     P = progress if progress is not None else Progress(quiet=True)
@@ -778,6 +783,24 @@ def build(build_dir: str | Path, spec_path: str | None = None,
         if progress is None:
             log(f"props: {st['variants']} variants, {st['instances']} instances, "
                 f"{st['signs']} signs, {f['tiles_made']} tiles made, {n} files written")
+    if props and vehicles:
+        from .parked.build import build as veh_build
+        with P.stage("vehicles") as vst:
+            vrep = veh_build(model, sha, out, spec_doc, report_always=False)
+            vst.note(f"{vrep['stats']['placed']} placed" if vrep["on"] else
+                     f"off: {vrep['why_off']}")
+        f = vrep["files"]
+        wrote += len(f["written"]) + len(f["removed"])
+        if vrep["on"]:
+            st = vrep["stats"]
+            rep["vehicles"] = {"ok": vrep["ok"], "parked": st["parked"], "placed": st["placed"],
+                               "left_out": st["left_out"], "models": len(st["by_model"]),
+                               "failed": [c["id"] for c in vrep["checks"] if not c["ok"]],
+                               "seconds": vrep["seconds"]["total"]}
+            rep["ok"] = rep["ok"] and vrep["ok"]
+            if progress is None:
+                log(f"vehicles: {st['placed']} of {st['parked']} parked cars placed as "
+                    f"{len(st['by_model'])} models")
     if ground:
         from .ground.build import build as ground_build, default_workers as ground_workers
         grep = ground_build(model, sha, out, spec_doc, workers=workers or ground_workers(),
@@ -1011,6 +1034,12 @@ def report_text(rep: dict) -> str:
                      f"{pr['disk_bytes'] / 1e6:.1f} MB; "
                      f"{'all checks pass' if pr['ok'] else 'FAIL ' + ', '.join(pr['failed'])}"
                      f" ({pr['tiles_made']} tiles made, {pr['seconds']} s; props_report.txt)")
+    vr = rep.get("vehicles")
+    if vr:
+        lines.append(f"vehicles: {vr['placed']:,} of {vr['parked']:,} parked cars placed as "
+                     f"{vr['models']} hero models, {vr['left_out']} left out"
+                     + (f"; FAILED {', '.join(vr['failed'])}" if vr["failed"] else "")
+                     + f" ({vr['seconds']} s; vehicles_report.txt)")
     gr = rep.get("ground")
     if gr:
         lines.append(f"ground: {gr['pieces']} pieces in {gr['tiles']} tiles, "

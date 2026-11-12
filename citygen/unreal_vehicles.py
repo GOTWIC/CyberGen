@@ -243,6 +243,33 @@ def split(contribs: list) -> tuple[list, list]:
     return rest, placements
 
 
+def named_library(contribs: list) -> Path | None:
+    """The library a placements' contribution names (`library`, AG18 step H's), when
+    $CITYGEN_VEHICLES names none and that folder is there; else None (the default)."""
+    if os.environ.get(LIBRARY_ENV):
+        return None
+    for _, c, _ in contribs:
+        lib = c.get("library")
+        if lib and any(is_placement(e) for e in c.get("entries", [])) and Path(lib).is_dir():
+            return Path(lib)
+    return None
+
+
+def without_replaced(contribs: list, placements: list) -> list:
+    """Stage 2's contributions without the entries a placement replaces (AG8's parked car
+    variants of a tile, `prop.parked_vehicle.<tile>`), so they go with the blockout's
+    prototype of that key; as they were when no placement replaces any."""
+    gone = {k for _, e in placements for k in e.get("replaces", [])}
+    if not gone:
+        return contribs
+    out = []
+    for rel, c, sha in contribs:
+        es = [e for e in c.get("entries", []) if e.get("key") not in gone]
+        out.append((rel, c if len(es) == len(c.get("entries", [])) else {**c, "entries": es},
+                    sha))
+    return out
+
+
 def _paint(e: dict, car: dict) -> list[float]:
     cols = e.get("paint") or [car["colors"].get(c, [0.5, 0.5, 0.5]) for c in CHANNELS]
     if len(cols) != 3 or any(len(c) != 3 for c in cols):
