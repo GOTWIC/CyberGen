@@ -1,0 +1,263 @@
+{
+ "car": "brakk_hauler",
+ "size": [
+  5.688,
+  2.198,
+  2.08
+ ],
+ "top_z": 2.08,
+ "objects": 123,
+ "palette": {
+  "paint": [
+   0.78,
+   0.33,
+   0.006
+  ],
+  "paint_finish": [
+   0.0,
+   0.4,
+   0.5
+  ],
+  "paint2": [
+   0.035,
+   0.038,
+   0.042
+  ],
+  "paint2_finish": [
+   0.35,
+   0.52,
+   0.0
+  ]
+ },
+ "tires": {
+  "verdict": "look",
+  "wheels": [
+   {
+    "tag": "fl",
+    "clearance_mm": 7.1,
+    "nearest": "chassis",
+    "at": [
+     1.83,
+     0.746,
+     0.687
+    ],
+    "foot_mm": 0.0,
+    "steer_hits": "chassis",
+    "steer_deg": 0,
+    "verdict": "look"
+   },
+   {
+    "tag": "rl",
+    "clearance_mm": 13.5,
+    "nearest": "springs",
+    "at": [
+     -1.558,
+     0.718,
+     0.814
+    ],
+    "foot_mm": 0.0,
+    "verdict": "look"
+   },
+   {
+    "tag": "fr",
+    "clearance_mm": 7.1,
+    "nearest": "chassis",
+    "at": [
+     1.83,
+     -0.746,
+     0.687
+    ],
+    "foot_mm": 0.0,
+    "steer_hits": "chassis",
+    "steer_deg": 0,
+    "verdict": "look"
+   },
+   {
+    "tag": "rr",
+    "clearance_mm": 13.5,
+    "nearest": "springs",
+    "at": [
+     -1.558,
+     -0.718,
+     0.814
+    ],
+    "foot_mm": 0.0,
+    "verdict": "look"
+   }
+  ]
+ },
+ "ground": {
+  "verdict": "ok",
+  "clearance_mm": 290.0,
+  "lowest": "chassis",
+  "under_floor": []
+ },
+ "symmetry": {
+  "verdict": "look",
+  "center_off_mm": 0.0,
+  "objects": 6,
+  "asymmetric": [
+   {
+    "object": "wipers",
+    "off_mm": 200.5,
+    "at": [
+     -0.758,
+     0.499,
+     2.08
+    ]
+   },
+   {
+    "object": "interior.wheel",
+    "off_mm": 170.5,
+    "at": [
+     0.517,
+     0.339,
+     1.06
+    ]
+   },
+   {
+    "object": "interior.screens",
+    "off_mm": 96.3,
+    "at": [
+     0.728,
+     0.31,
+     1.331
+    ]
+   },
+   {
+    "object": "hooks",
+    "off_mm": 37.6,
+    "at": [
+     2.828,
+     0.055,
+     0.537
+    ]
+   },
+   {
+    "object": "winch.rollers",
+    "off_mm": 12.2,
+    "at": [
+     2.82,
+     0.018,
+     0.59
+    ]
+   },
+   {
+    "object": "bed.tread",
+    "off_mm": 4.0,
+    "at": [
+     -1.154,
+     -0.532,
+     0.744
+    ]
+   }
+  ]
+ },
+ "panels": {
+  "verdict": "ok",
+  "open_edges": [],
+  "open_mm": 0,
+  "cutter_holes": [],
+  "pieces": {
+   "hull": {
+    "closed": true,
+    "panels": 23
+   },
+   "bed": {
+    "closed": true,
+    "panels": 9
+   }
+  }
+ },
+ "through": {
+  "verdict": "look",
+  "parts": [
+   {
+    "object": "interior.tub",
+    "out_mm": 33.4,
+    "share": 0.41,
+    "at": [
+     -0.969,
+     0.798,
+     0.542
+    ],
+    "meant": false
+   }
+  ],
+  "count": 1
+ },
+ "triangles": {
+  "verdict": "ok",
+  "total": 230460,
+  "budget": 400000,
+  "top": [
+   [
+    "bed.tread",
+    10368
+   ],
+   [
+    "hub.fl",
+    9904
+   ],
+   [
+    "hub.rl",
+    9904
+   ],
+   [
+    "hub.fr",
+    9904
+   ],
+   [
+    "hub.rr",
+    9904
+   ],
+   [
+    "hub.spare",
+    9904
+   ],
+   [
+    "bolts",
+    9024
+   ],
+   [
+    "lettering",
+    8210
+   ]
+  ],
+  "groups": [
+   [
+    "hub",
+    49520
+   ],
+   [
+    "bed",
+    26684
+   ],
+   [
+    "tiretext",
+    25170
+   ],
+   [
+    "tire",
+    22000
+   ],
+   [
+    "hull",
+    16226
+   ],
+   [
+    "rim",
+    15840
+   ],
+   [
+    "bolts",
+    9024
+   ],
+   [
+    "lettering",
+    8210
+   ]
+  ]
+ },
+ "verdict": "look"
+}

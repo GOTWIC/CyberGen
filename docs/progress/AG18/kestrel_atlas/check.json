@@ -1,0 +1,329 @@
+{
+ "car": "kestrel_atlas",
+ "size": [
+  5.907,
+  2.291,
+  1.739
+ ],
+ "top_z": 2.114,
+ "objects": 155,
+ "palette": {
+  "paint": [
+   0.165,
+   0.215,
+   0.06
+  ],
+  "paint_finish": "pearl",
+  "paint2": [
+   0.03,
+   0.034,
+   0.042
+  ],
+  "paint2_finish": "satin"
+ },
+ "tires": {
+  "verdict": "ok",
+  "note": "no wheels on the ground (a hover car)",
+  "wheels": []
+ },
+ "ground": {
+  "verdict": "ok",
+  "clearance_mm": 374.4,
+  "lowest": "pod.skid.r",
+  "under_floor": [],
+  "note": "floats 374 mm over the ground"
+ },
+ "symmetry": {
+  "verdict": "look",
+  "center_off_mm": 0.0,
+  "objects": 19,
+  "asymmetric": [
+   {
+    "object": "interior.yoke",
+    "off_mm": 242.0,
+    "at": [
+     1.561,
+     0.236,
+     1.197
+    ]
+   },
+   {
+    "object": "case.bands",
+    "off_mm": 209.8,
+    "at": [
+     -0.244,
+     -0.608,
+     1.635
+    ]
+   },
+   {
+    "object": "cases",
+    "off_mm": 199.0,
+    "at": [
+     -0.228,
+     -0.614,
+     1.632
+    ]
+   },
+   {
+    "object": "straps",
+    "off_mm": 180.0,
+    "at": [
+     0.146,
+     -0.628,
+     1.64
+    ]
+   },
+   {
+    "object": "case.stencil",
+    "off_mm": 175.5,
+    "at": [
+     0.16,
+     -0.353,
+     1.635
+    ]
+   },
+   {
+    "object": "case.latches",
+    "off_mm": 114.0,
+    "at": [
+     -0.244,
+     -0.458,
+     1.365
+    ]
+   },
+   {
+    "object": "led.beacon",
+    "off_mm": 110.6,
+    "at": [
+     1.011,
+     0.358,
+     2.114
+    ]
+   },
+   {
+    "object": "strap.ratchets",
+    "off_mm": 43.4,
+    "at": [
+     0.142,
+     0.682,
+     1.444
+    ]
+   },
+   {
+    "object": "roof.gear",
+    "off_mm": 29.8,
+    "at": [
+     1.04,
+     0.374,
+     2.031
+    ]
+   },
+   {
+    "object": "pod.f.pod_side",
+    "off_mm": 11.9,
+    "at": [
+     1.986,
+     1.076,
+     0.628
+    ]
+   },
+   {
+    "object": "pod.m.pod_top",
+    "off_mm": 11.8,
+    "at": [
+     0.265,
+     1.113,
+     0.636
+    ]
+   },
+   {
+    "object": "pod.m.pod_low",
+    "off_mm": 11.4,
+    "at": [
+     0.265,
+     -0.782,
+     0.437
+    ]
+   },
+   {
+    "object": "pod.f.pod_low",
+    "off_mm": 10.3,
+    "at": [
+     1.995,
+     -0.775,
+     0.469
+    ]
+   },
+   {
+    "object": "pod.m.pod_side",
+    "off_mm": 10.1,
+    "at": [
+     0.271,
+     0.714,
+     0.63
+    ]
+   },
+   {
+    "object": "drum.stencil",
+    "off_mm": 9.9,
+    "at": [
+     -1.212,
+     0.417,
+     1.205
+    ]
+   },
+   {
+    "object": "pod.r.pod_low",
+    "off_mm": 7.4,
+    "at": [
+     -1.295,
+     0.758,
+     0.45
+    ]
+   },
+   {
+    "object": "fin.code",
+    "off_mm": 3.4,
+    "at": [
+     -2.237,
+     0.898,
+     1.659
+    ]
+   },
+   {
+    "object": "led.rear.beam",
+    "off_mm": 3.1,
+    "at": [
+     -2.487,
+     0.063,
+     1.884
+    ]
+   },
+   {
+    "object": "pod.f.pod_top",
+    "off_mm": 3.0,
+    "at": [
+     1.983,
+     1.055,
+     0.64
+    ]
+   }
+  ]
+ },
+ "panels": {
+  "verdict": "ok",
+  "open_edges": [],
+  "open_mm": 0,
+  "cutter_holes": [],
+  "pieces": {
+   "body": {
+    "closed": true,
+    "panels": 25
+   },
+   "pod.f": {
+    "closed": true,
+    "panels": 9
+   },
+   "pod.m": {
+    "closed": true,
+    "panels": 9
+   },
+   "pod.r": {
+    "closed": true,
+    "panels": 9
+   }
+  }
+ },
+ "through": {
+  "verdict": "look",
+  "parts": [
+   {
+    "object": "interior.tub",
+    "out_mm": 125.3,
+    "share": 0.35,
+    "at": [
+     2.24,
+     -0.734,
+     0.606
+    ],
+    "meant": false
+   }
+  ],
+  "count": 1
+ },
+ "triangles": {
+  "verdict": "ok",
+  "total": 151203,
+  "budget": 400000,
+  "top": [
+   [
+    "lettering",
+    14380
+   ],
+   [
+    "hull.ribs",
+    7896
+   ],
+   [
+    "fin.code",
+    7174
+   ],
+   [
+    "drum.cable",
+    5440
+   ],
+   [
+    "belly.conduits",
+    4608
+   ],
+   [
+    "rail.cleats",
+    4592
+   ],
+   [
+    "pod.ribs",
+    4200
+   ],
+   [
+    "body.trim",
+    4120
+   ]
+  ],
+  "groups": [
+   [
+    "pod",
+    49842
+   ],
+   [
+    "body",
+    20222
+   ],
+   [
+    "lettering",
+    14380
+   ],
+   [
+    "drum",
+    10834
+   ],
+   [
+    "hull",
+    7896
+   ],
+   [
+    "fin",
+    7438
+   ],
+   [
+    "hoist",
+    6076
+   ],
+   [
+    "rail",
+    5504
+   ]
+  ]
+ },
+ "verdict": "look"
+}

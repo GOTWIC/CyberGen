@@ -42,6 +42,11 @@ district's archetype, wealth and danger, painted per placement, wherever its foo
 its parking lane (`assetgen/parked/`). Vesper Bay, its 912 parked cars as 17 models, in
 Blender and Unreal: [`city/`](city/README.md).
 
+**What the kit's checks find** (step A): [`checks.md`](checks.md), a table of every car's
+tire and ground clearances, symmetry, panel edges, cabin parts in the open and triangles,
+and each car's `clay.jpg` and `zebra.jpg` beside its sheet (`python vehicles/survey.py
+--docs`).
+
 Each car's own README lists its size, its design, its brand's cues, what its designer would
 improve and what the kit lacked for it. The packs' numbers per car (triangles per LOD, size
 class, pack size, checks): `docs/assetgen_milestones.md`, AG18, phase 3.

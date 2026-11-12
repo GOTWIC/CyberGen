@@ -1,0 +1,241 @@
+{
+ "car": "halcyon_ridge",
+ "size": [
+  4.885,
+  2.094,
+  1.587
+ ],
+ "top_z": 1.587,
+ "objects": 114,
+ "palette": {
+  "paint": [
+   0.5,
+   0.085,
+   0.006
+  ],
+  "paint_finish": [
+   0.62,
+   0.3,
+   1.0
+  ],
+  "paint2": [
+   0.42,
+   0.072,
+   0.006
+  ],
+  "paint2_finish": [
+   0.55,
+   0.55,
+   0.0
+  ]
+ },
+ "tires": {
+  "verdict": "look",
+  "wheels": [
+   {
+    "tag": "fl",
+    "clearance_mm": 14.5,
+    "nearest": "body.well",
+    "at": [
+     1.831,
+     0.66,
+     0.476
+    ],
+    "foot_mm": 0.0,
+    "steer_hits": "body.well",
+    "steer_deg": 0,
+    "verdict": "look"
+   },
+   {
+    "tag": "rl",
+    "clearance_mm": 14.5,
+    "nearest": "body.well",
+    "at": [
+     -1.119,
+     0.66,
+     0.476
+    ],
+    "foot_mm": 0.0,
+    "verdict": "look"
+   },
+   {
+    "tag": "fr",
+    "clearance_mm": 14.5,
+    "nearest": "body.well",
+    "at": [
+     1.831,
+     -0.66,
+     0.476
+    ],
+    "foot_mm": 0.0,
+    "steer_hits": "body.well",
+    "steer_deg": 0,
+    "verdict": "look"
+   },
+   {
+    "tag": "rr",
+    "clearance_mm": 14.5,
+    "nearest": "body.well",
+    "at": [
+     -1.119,
+     -0.66,
+     0.476
+    ],
+    "foot_mm": 0.0,
+    "verdict": "look"
+   }
+  ]
+ },
+ "ground": {
+  "verdict": "ok",
+  "clearance_mm": 237.8,
+  "lowest": "skid.front",
+  "under_floor": []
+ },
+ "symmetry": {
+  "verdict": "look",
+  "center_off_mm": 0.0,
+  "objects": 4,
+  "asymmetric": [
+   {
+    "object": "interior.wheel",
+    "off_mm": 149.2,
+    "at": [
+     0.226,
+     0.385,
+     0.858
+    ]
+   },
+   {
+    "object": "body.trim",
+    "off_mm": 13.8,
+    "at": [
+     0.0,
+     0.217,
+     1.512
+    ]
+   },
+   {
+    "object": "keel.glyphs",
+    "off_mm": 5.5,
+    "at": [
+     2.373,
+     0.013,
+     0.608
+    ]
+   },
+   {
+    "object": "body.spine",
+    "off_mm": 3.6,
+    "at": [
+     0.869,
+     -0.669,
+     1.068
+    ]
+   }
+  ]
+ },
+ "panels": {
+  "verdict": "ok",
+  "open_edges": [],
+  "open_mm": 0,
+  "cutter_holes": [],
+  "pieces": {
+   "body": {
+    "closed": true,
+    "panels": 24
+   }
+  }
+ },
+ "through": {
+  "verdict": "look",
+  "parts": [
+   {
+    "object": "interior.tub",
+    "out_mm": 40.0,
+    "share": 0.05,
+    "at": [
+     -1.994,
+     -0.62,
+     0.271
+    ],
+    "meant": false
+   }
+  ],
+  "count": 1
+ },
+ "triangles": {
+  "verdict": "ok",
+  "total": 223779,
+  "budget": 400000,
+  "top": [
+   [
+    "mouth.mesh",
+    12480
+   ],
+   [
+    "body.trim",
+    10904
+   ],
+   [
+    "tail.mesh",
+    10800
+   ],
+   [
+    "scoop.mesh",
+    7872
+   ],
+   [
+    "body.lightband",
+    7384
+   ],
+   [
+    "body.floor",
+    5826
+   ],
+   [
+    "tire.fl",
+    5808
+   ],
+   [
+    "tire.rl",
+    5808
+   ]
+  ],
+  "groups": [
+   [
+    "body",
+    76156
+   ],
+   [
+    "tire",
+    23232
+   ],
+   [
+    "tiretext",
+    20168
+   ],
+   [
+    "rim",
+    18096
+   ],
+   [
+    "hub",
+    14976
+   ],
+   [
+    "mouth",
+    12804
+   ],
+   [
+    "tail",
+    10964
+   ],
+   [
+    "scoop",
+    8088
+   ]
+  ]
+ },
+ "verdict": "look"
+}

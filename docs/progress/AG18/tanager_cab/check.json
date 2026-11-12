@@ -1,0 +1,589 @@
+{
+ "car": "tanager_cab",
+ "size": [
+  4.547,
+  2.15,
+  1.948
+ ],
+ "top_z": 1.941,
+ "objects": 165,
+ "palette": {
+  "paint": [
+   0.37,
+   0.003,
+   0.16
+  ],
+  "paint_finish": "gloss",
+  "paint2": [
+   0.8,
+   0.78,
+   0.72
+  ],
+  "paint2_finish": "gloss"
+ },
+ "tires": {
+  "verdict": "fail",
+  "wheels": [
+   {
+    "tag": "fl",
+    "clearance_mm": 1.4,
+    "nearest": "bumper.guards.rear",
+    "at": [
+     1.181,
+     0.712,
+     0.386
+    ],
+    "foot_mm": -7.0,
+    "steer_hits": "bumper.guards.rear",
+    "steer_deg": 0,
+    "verdict": "fail"
+   },
+   {
+    "tag": "rl",
+    "clearance_mm": 0.3,
+    "nearest": "bumper.guards.rear",
+    "at": [
+     -1.292,
+     0.705,
+     0.406
+    ],
+    "foot_mm": -7.0,
+    "verdict": "fail"
+   },
+   {
+    "tag": "fr",
+    "clearance_mm": 1.4,
+    "nearest": "bumper.guards.rear",
+    "at": [
+     1.181,
+     -0.712,
+     0.386
+    ],
+    "foot_mm": -7.0,
+    "steer_hits": "bumper.guards.rear",
+    "steer_deg": 0,
+    "verdict": "fail"
+   },
+   {
+    "tag": "rr",
+    "clearance_mm": 0.0,
+    "nearest": "bumper.guards.rear",
+    "at": [
+     -1.287,
+     -0.705,
+     0.387
+    ],
+    "foot_mm": -7.0,
+    "verdict": "fail"
+   }
+  ]
+ },
+ "ground": {
+  "verdict": "ok",
+  "clearance_mm": 120.0,
+  "lowest": "mudflaps",
+  "under_floor": []
+ },
+ "symmetry": {
+  "verdict": "look",
+  "center_off_mm": 78.0,
+  "objects": 39,
+  "asymmetric": [
+   {
+    "object": "body.slider",
+    "off_mm": 500.0,
+    "at": [
+     0.011,
+     -0.894,
+     1.016
+    ]
+   },
+   {
+    "object": "glass.door.r",
+    "off_mm": 500.0,
+    "at": [
+     -0.05,
+     -0.882,
+     1.044
+    ]
+   },
+   {
+    "object": "seal.door.r",
+    "off_mm": 500.0,
+    "at": [
+     -0.05,
+     -0.889,
+     1.039
+    ]
+   },
+   {
+    "object": "checker.band.door.r",
+    "off_mm": 500.0,
+    "at": [
+     0.085,
+     -0.901,
+     0.889
+    ]
+   },
+   {
+    "object": "roundel.r",
+    "off_mm": 458.2,
+    "at": [
+     0.125,
+     -0.902,
+     0.814
+    ]
+   },
+   {
+    "object": "roundel.number.r",
+    "off_mm": 392.9,
+    "at": [
+     0.144,
+     -0.904,
+     0.74
+    ]
+   },
+   {
+    "object": "lettering.door.r",
+    "off_mm": 353.0,
+    "at": [
+     -0.228,
+     -0.901,
+     0.724
+    ]
+   },
+   {
+    "object": "step.light",
+    "off_mm": 286.4,
+    "at": [
+     -0.49,
+     1.153,
+     0.16
+    ]
+   },
+   {
+    "object": "step",
+    "off_mm": 285.1,
+    "at": [
+     -0.516,
+     1.149,
+     0.155
+    ]
+   },
+   {
+    "object": "step.ribs",
+    "off_mm": 257.8,
+    "at": [
+     -0.49,
+     1.129,
+     0.176
+    ]
+   },
+   {
+    "object": "body.sclad",
+    "off_mm": 230.8,
+    "at": [
+     0.011,
+     -0.901,
+     0.544
+    ]
+   },
+   {
+    "object": "checker.molded.door.r",
+    "off_mm": 188.9,
+    "at": [
+     0.451,
+     -0.912,
+     0.501
+    ]
+   },
+   {
+    "object": "handle.pocket.r",
+    "off_mm": 150.2,
+    "at": [
+     0.491,
+     -0.901,
+     0.683
+    ]
+   },
+   {
+    "object": "handle.pull.r",
+    "off_mm": 128.1,
+    "at": [
+     0.513,
+     -0.91,
+     0.781
+    ]
+   },
+   {
+    "object": "bump.strip.door.r",
+    "off_mm": 123.9,
+    "at": [
+     -0.33,
+     -0.917,
+     0.435
+    ]
+   },
+   {
+    "object": "bump.lines.door.l",
+    "off_mm": 121.5,
+    "at": [
+     -1.698,
+     1.012,
+     0.416
+    ]
+   },
+   {
+    "object": "bump.strip.door.l",
+    "off_mm": 119.6,
+    "at": [
+     -1.2,
+     1.011,
+     0.431
+    ]
+   },
+   {
+    "object": "checker.molded.door.l",
+    "off_mm": 117.9,
+    "at": [
+     -1.214,
+     1.005,
+     0.501
+    ]
+   },
+   {
+    "object": "lettering.door.l",
+    "off_mm": 114.1,
+    "at": [
+     -1.238,
+     0.991,
+     0.567
+    ]
+   },
+   {
+    "object": "body.sclad.l",
+    "off_mm": 113.3,
+    "at": [
+     -1.424,
+     1.003,
+     0.529
+    ]
+   },
+   {
+    "object": "bump.lines.door.r",
+    "off_mm": 110.2,
+    "at": [
+     0.488,
+     -0.922,
+     0.42
+    ]
+   },
+   {
+    "object": "seal.door.l",
+    "off_mm": 109.7,
+    "at": [
+     -1.753,
+     0.95,
+     1.341
+    ]
+   },
+   {
+    "object": "body.slider.l",
+    "off_mm": 107.8,
+    "at": [
+     -1.258,
+     0.99,
+     0.602
+    ]
+   },
+   {
+    "object": "track.arm.l",
+    "off_mm": 100.4,
+    "at": [
+     -1.962,
+     0.993,
+     0.974
+    ]
+   },
+   {
+    "object": "handle.pull.l",
+    "off_mm": 100.0,
+    "at": [
+     -0.739,
+     1.0,
+     0.715
+    ]
+   },
+   {
+    "object": "glass.door.l",
+    "off_mm": 98.6,
+    "at": [
+     -1.77,
+     0.918,
+     1.504
+    ]
+   },
+   {
+    "object": "roundel.number.l",
+    "off_mm": 93.6,
+    "at": [
+     -1.087,
+     0.994,
+     0.736
+    ]
+   },
+   {
+    "object": "checker.band.door.l",
+    "off_mm": 93.0,
+    "at": [
+     -1.845,
+     0.99,
+     0.919
+    ]
+   },
+   {
+    "object": "roundel.l",
+    "off_mm": 92.6,
+    "at": [
+     -1.159,
+     0.992,
+     0.807
+    ]
+   },
+   {
+    "object": "handle.pocket.l",
+    "off_mm": 90.8,
+    "at": [
+     -0.779,
+     0.991,
+     0.715
+    ]
+   },
+   {
+    "object": "interior.card.l",
+    "off_mm": 75.5,
+    "at": [
+     -1.864,
+     0.972,
+     0.984
+    ]
+   },
+   {
+    "object": "antenna",
+    "off_mm": 56.6,
+    "at": [
+     -1.788,
+     -0.304,
+     1.825
+    ]
+   },
+   {
+    "object": "track.arm.r",
+    "off_mm": 56.3,
+    "at": [
+     -0.565,
+     -0.9,
+     0.974
+    ]
+   },
+   {
+    "object": "tow.eye",
+    "off_mm": 55.2,
+    "at": [
+     2.25,
+     -0.4,
+     0.249
+    ]
+   },
+   {
+    "object": "interior.tub",
+    "off_mm": 28.8,
+    "at": [
+     0.614,
+     -0.868,
+     0.99
+    ]
+   },
+   {
+    "object": "wipers",
+    "off_mm": 25.8,
+    "at": [
+     -2.177,
+     0.205,
+     1.156
+    ]
+   },
+   {
+    "object": "permit",
+    "off_mm": 14.0,
+    "at": [
+     2.005,
+     -0.455,
+     1.202
+    ]
+   },
+   {
+    "object": "permit.text",
+    "off_mm": 11.2,
+    "at": [
+     2.035,
+     -0.483,
+     1.161
+    ]
+   },
+   {
+    "object": "permit.mark",
+    "off_mm": 11.2,
+    "at": [
+     2.027,
+     -0.462,
+     1.173
+    ]
+   }
+  ]
+ },
+ "panels": {
+  "verdict": "fail",
+  "open_edges": [
+   {
+    "panel": "body.clad",
+    "length_mm": 1759,
+    "at": [
+     0.01,
+     0.907,
+     0.42
+    ],
+    "meant": false
+   },
+   {
+    "panel": "body.roof",
+    "length_mm": 1260,
+    "at": [
+     0.011,
+     0.814,
+     1.653
+    ],
+    "meant": false
+   },
+   {
+    "panel": "body.fender",
+    "length_mm": 1110,
+    "at": [
+     0.641,
+     0.878,
+     1.055
+    ],
+    "meant": false
+   },
+   {
+    "panel": "body.quarter",
+    "length_mm": 1110,
+    "at": [
+     -0.621,
+     0.878,
+     1.055
+    ],
+    "meant": false
+   }
+  ],
+  "open_mm": 5239,
+  "cutter_holes": [],
+  "pieces": {
+   "body": {
+    "closed": true,
+    "panels": 11
+   }
+  }
+ },
+ "through": {
+  "verdict": "look",
+  "parts": [
+   {
+    "object": "interior.card.l",
+    "out_mm": 37.0,
+    "share": 0.21,
+    "at": [
+     -0.656,
+     0.952,
+     0.326
+    ],
+    "meant": false
+   }
+  ],
+  "count": 1
+ },
+ "triangles": {
+  "verdict": "ok",
+  "total": 285996,
+  "budget": 400000,
+  "top": [
+   [
+    "tire.fl",
+    14384
+   ],
+   [
+    "tire.rl",
+    14384
+   ],
+   [
+    "tire.fr",
+    14384
+   ],
+   [
+    "tire.rr",
+    14384
+   ],
+   [
+    "body.clad",
+    10252
+   ],
+   [
+    "seal.side",
+    8208
+   ],
+   [
+    "checker.molded",
+    7560
+   ],
+   [
+    "body.roof",
+    7104
+   ]
+  ],
+  "groups": [
+   [
+    "tire",
+    57536
+   ],
+   [
+    "body",
+    53709
+   ],
+   [
+    "lettering",
+    26474
+   ],
+   [
+    "checker",
+    19716
+   ],
+   [
+    "seal",
+    16536
+   ],
+   [
+    "bumper",
+    13300
+   ],
+   [
+    "cover",
+    10272
+   ],
+   [
+    "led",
+    8332
+   ]
+  ]
+ },
+ "verdict": "fail"
+}

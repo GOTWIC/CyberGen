@@ -1,0 +1,319 @@
+{
+ "car": "orrin_lumen",
+ "size": [
+  5.031,
+  1.997,
+  1.373
+ ],
+ "top_z": 1.373,
+ "objects": 47,
+ "palette": {
+  "paint": [
+   0.011,
+   0.088,
+   0.094
+  ],
+  "paint_finish": [
+   0.72,
+   0.36,
+   0.7
+  ],
+  "paint2": [
+   0.45,
+   0.05,
+   0.03
+  ],
+  "paint2_finish": "gloss"
+ },
+ "tires": {
+  "verdict": "fail",
+  "wheels": [
+   {
+    "tag": "fl",
+    "clearance_mm": 2.8,
+    "nearest": "body.well",
+    "at": [
+     1.753,
+     0.953,
+     0.643
+    ],
+    "foot_mm": 0.0,
+    "steer_hits": "body.well",
+    "steer_deg": 0,
+    "verdict": "fail"
+   },
+   {
+    "tag": "rl",
+    "clearance_mm": 2.8,
+    "nearest": "body.well",
+    "at": [
+     -1.241,
+     0.888,
+     0.532
+    ],
+    "foot_mm": 0.0,
+    "verdict": "fail"
+   },
+   {
+    "tag": "fr",
+    "clearance_mm": 2.8,
+    "nearest": "body.well",
+    "at": [
+     1.753,
+     -0.953,
+     0.643
+    ],
+    "foot_mm": 0.0,
+    "steer_hits": "body.well",
+    "steer_deg": 0,
+    "verdict": "fail"
+   },
+   {
+    "tag": "rr",
+    "clearance_mm": 2.8,
+    "nearest": "body.well",
+    "at": [
+     -1.241,
+     -0.888,
+     0.532
+    ],
+    "foot_mm": 0.0,
+    "verdict": "fail"
+   }
+  ]
+ },
+ "ground": {
+  "verdict": "ok",
+  "clearance_mm": 130.0,
+  "lowest": "body.floor",
+  "under_floor": []
+ },
+ "symmetry": {
+  "verdict": "look",
+  "center_off_mm": 0.0,
+  "objects": 2,
+  "asymmetric": [
+   {
+    "object": "interior.wheel",
+    "off_mm": 161.6,
+    "at": [
+     0.634,
+     0.385,
+     0.645
+    ]
+   },
+   {
+    "object": "led.cabin",
+    "off_mm": 8.3,
+    "at": [
+     2.107,
+     0.026,
+     0.71
+    ]
+   }
+  ]
+ },
+ "panels": {
+  "verdict": "look",
+  "open_edges": [
+   {
+    "panel": "deck.front.deck",
+    "length_mm": 5484,
+    "at": [
+     1.685,
+     0.0,
+     0.641
+    ],
+    "meant": true
+   },
+   {
+    "panel": "deck.rear.deck",
+    "length_mm": 3741,
+    "at": [
+     -2.037,
+     -0.0,
+     0.745
+    ],
+    "meant": true
+   },
+   {
+    "panel": "deck.rear.deck",
+    "length_mm": 1254,
+    "at": [
+     -1.091,
+     -0.0,
+     0.605
+    ],
+    "meant": true
+   }
+  ],
+  "open_mm": 0,
+  "cutter_holes": [
+   {
+    "panel": "body.front",
+    "length_mm": 801,
+    "at": [
+     1.111,
+     0.984,
+     0.473
+    ],
+    "meant": false
+   },
+   {
+    "panel": "body.front",
+    "length_mm": 1169,
+    "at": [
+     2.316,
+     -0.63,
+     0.362
+    ],
+    "meant": false
+   },
+   {
+    "panel": "body.front",
+    "length_mm": 801,
+    "at": [
+     1.111,
+     -0.984,
+     0.473
+    ],
+    "meant": false
+   },
+   {
+    "panel": "body.front",
+    "length_mm": 1169,
+    "at": [
+     2.316,
+     0.63,
+     0.362
+    ],
+    "meant": false
+   },
+   {
+    "panel": "body.rear",
+    "length_mm": 987,
+    "at": [
+     -2.293,
+     -0.562,
+     0.502
+    ],
+    "meant": false
+   },
+   {
+    "panel": "body.rear",
+    "length_mm": 987,
+    "at": [
+     -2.293,
+     0.562,
+     0.502
+    ],
+    "meant": false
+   }
+  ],
+  "pieces": {
+   "body": {
+    "closed": true,
+    "panels": 9
+   },
+   "deck.front": {
+    "closed": false,
+    "panels": 1
+   },
+   "deck.rear": {
+    "closed": false,
+    "panels": 1
+   }
+  }
+ },
+ "through": {
+  "verdict": "look",
+  "parts": [
+   {
+    "object": "interior.tub",
+    "out_mm": 10.0,
+    "share": 0.09,
+    "at": [
+     -1.06,
+     0.73,
+     0.16
+    ],
+    "meant": false
+   }
+  ],
+  "count": 1
+ },
+ "triangles": {
+  "verdict": "ok",
+  "total": 293582,
+  "budget": 400000,
+  "top": [
+   [
+    "body.glass",
+    62656
+   ],
+   [
+    "body.front",
+    40692
+   ],
+   [
+    "body.rear",
+    34812
+   ],
+   [
+    "tire.fl",
+    14384
+   ],
+   [
+    "tire.rl",
+    14384
+   ],
+   [
+    "tire.fr",
+    14384
+   ],
+   [
+    "tire.rr",
+    14384
+   ],
+   [
+    "body.floor",
+    11532
+   ]
+  ],
+  "groups": [
+   [
+    "body",
+    179612
+   ],
+   [
+    "tire",
+    57536
+   ],
+   [
+    "deck",
+    11124
+   ],
+   [
+    "vanes",
+    10784
+   ],
+   [
+    "rim",
+    9984
+   ],
+   [
+    "led",
+    6201
+   ],
+   [
+    "ring",
+    5120
+   ],
+   [
+    "interior",
+    4392
+   ]
+  ]
+ },
+ "verdict": "fail"
+}
