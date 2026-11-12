@@ -66,6 +66,8 @@ of this build.
 - Keel blade: its foot is a channel 24 mm high along 2.44 m with dark walls, a light guide
   in a frosted sleeve over a bright reflector strip and a clear lens flush with the foot.
 - Thruster slots: a cross of vanes set back in each of the eight slots.
+- The maker's name over the stern bar is laid on the band (`text_on_body`, `'X'`); it
+  floated 8 mm off it and the gloss band mirrored a second, offset copy of it.
 - Cut lines: the styling groove under the side glass (7 mm), the flush door release and the
   six-sided charge flap are cut through the skin (they were strips lying on it); 3.5 mm shut
   lines everywhere (2.4 mm before). The sensor slits at the side glass's foot stay printed

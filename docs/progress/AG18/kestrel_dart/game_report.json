@@ -5,13 +5,13 @@
  "triangles": {
   "original": 112558,
   "lods": [
-   74755,
-   44852,
-   19949,
-   5099
+   74391,
+   44633,
+   19921,
+   5101
   ],
   "lod0_parts": {
-   "body": 73299,
+   "body": 72935,
    "glass": 1456
   }
  },
@@ -37,28 +37,29 @@
  "textures": {
   "body": 4096
  },
- "pack_bytes": 30535497,
- "seconds": 654.9,
+ "pack_bytes": 30498532,
+ "seconds": 592.6,
  "stage_seconds": {
-  "build": 2.4,
-  "render_original": 86.1,
-  "parts": 18.0,
+  "build": 2.3,
+  "render_original": 73.6,
+  "parts": 17.7,
   "nodes": 0.0,
-  "uv": 259.2,
-  "bake": 157.7,
-  "lods_export": 13.9,
-  "textures": 6.596809148788452,
-  "proof": 110.61360788345337
+  "uv": 201.6,
+  "bake": 133.2,
+  "lods_export": 12.8,
+  "textures": 6.733061075210571,
+  "proof": 144.30262398719788
  },
  "baked_down": {
   "relief": {
-   "pieces": 9,
-   "triangles": 2742,
+   "pieces": 10,
+   "triangles": 3106,
    "names": [
     "decals",
     "lamp.chine_r.chrome",
     "lamp.keel.chrome",
     "led.marker",
+    "led.name",
     "led.visor",
     "lettering",
     "pod.stencils",
@@ -71,23 +72,23 @@
   "body": {
    "exterior": {
     "area_m2": 29.282,
-    "p5": 374.5,
-    "median": 393.1
+    "p5": 372.3,
+    "median": 390.8
    },
    "lamp_in_gaps": {
     "area_m2": 1.446,
-    "p5": 137.5,
-    "median": 388.9
+    "p5": 136.7,
+    "median": 388.5
    },
    "cabin": {
     "area_m2": 11.396,
-    "p5": 149.5,
-    "median": 158.8
+    "p5": 148.7,
+    "median": 157.8
    },
    "underside": {
     "area_m2": 4.136,
-    "p5": 136.9,
-    "median": 378.7
+    "p5": 136.0,
+    "median": 375.7
    }
   }
  },
@@ -95,7 +96,7 @@
  "collision_hulls": 9,
  "source": {
   "script": "vehicles/cars/kestrel_dart.py",
-  "script_sha256": "23f0844d660b8e60165cc571ff4ae4f33d78a22c3e337dafaf5973c3b514753a",
+  "script_sha256": "de811485917b8b032849aafd839c5482ef526d4b7818df8cc80b897210368f99",
   "carkit_sha256": "80020b974b190e7b6db524668c8c6d0164b3484f712ec8a6420c6e9961b53ea5",
   "game_sha256": "32271c5b2195e75c93509022799b7dd770add377d59cc906b924e040e27ff1db",
   "original_triangles": 112558,
@@ -118,25 +119,25 @@
    "detail": [
     {
      "lod": 0,
-     "triangles": 74755,
+     "triangles": 74391,
      "budget": 150000,
      "ok": true
     },
     {
      "lod": 1,
-     "triangles": 44852,
+     "triangles": 44633,
      "budget": 60000,
      "ok": true
     },
     {
      "lod": 2,
-     "triangles": 19949,
+     "triangles": 19921,
      "budget": 20000,
      "ok": true
     },
     {
      "lod": 3,
-     "triangles": 5099,
+     "triangles": 5101,
      "budget": 5000,
      "ok": true
     }
@@ -149,8 +150,8 @@
     "limit": 0.005,
     "slots": {
      "body": {
-      "overlap": 0.0009,
-      "coverage": 0.4082,
+      "overlap": 0.00099,
+      "coverage": 0.4078,
       "outside_unit": 0.0
      }
     }
@@ -161,8 +162,8 @@
    "ok": true,
    "detail": {
     "body": {
-     "p5": 374.5,
-     "median": 393.1,
+     "p5": 372.3,
+     "median": 390.8,
      "floor": 300.0,
      "ok": true
     }
@@ -226,10 +227,10 @@
    "ok": true,
    "detail": [
     {
-     "normal_p95_deg": 0.46,
-     "bent_share": 0.0028,
+     "normal_p95_deg": 0.45,
+     "bent_share": 0.0027,
      "texture_share": 0.0007,
-     "miss_share": 0.001,
+     "miss_share": 0.0012,
      "lod": 1,
      "limits": {
       "p95": 12.0,
@@ -239,10 +240,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 10.16,
-     "bent_share": 0.0102,
+     "normal_p95_deg": 10.0,
+     "bent_share": 0.0097,
      "texture_share": 0.0065,
-     "miss_share": 0.0048,
+     "miss_share": 0.0039,
      "lod": 2,
      "limits": {
       "p95": 25.0,
@@ -252,10 +253,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 32.66,
-     "bent_share": 0.0739,
-     "texture_share": 0.0396,
-     "miss_share": 0.0525,
+     "normal_p95_deg": 32.57,
+     "bent_share": 0.0722,
+     "texture_share": 0.0386,
+     "miss_share": 0.0518,
      "lod": 3,
      "limits": {
       "p95": 40.0,

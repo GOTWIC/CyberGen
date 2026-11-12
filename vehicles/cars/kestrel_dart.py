@@ -308,7 +308,11 @@ def build_details():
     gg.obj("thruster.glow", "thrust", mirror=True)
     gv.obj("thruster.vanes", "grille", mirror=True)
     g = Geo()
-    text_flat(g, "K E S T R E L", 0.026, (-2.2085, 0, 1.0), (0, -1, 0), (0, 0, 1), spacing=1.2)
+    band = [ob for ob in K.CAR.objects if ob.name == "body.lightband"]
+    if not text_on_body(g, "K E S T R E L", 0.026, 0.0, 1.0, 1, proj='X', spacing=1.2,
+                        objs=band):                 # seated on the band, not floating off it
+        text_flat(g, "K E S T R E L", 0.026, (-2.2085, 0, 1.0), (0, -1, 0), (0, 0, 1),
+                  spacing=1.2)
     g.obj("led.name", "led_rear")
 
     build_surface_details()

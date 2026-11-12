@@ -36,7 +36,7 @@
  "symmetry": {
   "verdict": "look",
   "center_off_mm": 0.0,
-  "objects": 4,
+  "objects": 3,
   "asymmetric": [
    {
     "object": "interior.yoke",
@@ -54,15 +54,6 @@
      0.558,
      0.45,
      0.977
-    ]
-   },
-   {
-    "object": "led.name",
-    "off_mm": 5.6,
-    "at": [
-     -2.208,
-     0.065,
-     1.007
     ]
    },
    {

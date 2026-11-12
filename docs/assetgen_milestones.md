@@ -3136,10 +3136,11 @@ Vanta-R the same).
   lens; vanes set back in the thruster slots; the shoulder groove, door release and charge
   flap cut; 3.5 mm shut lines; frit on every pane; the cabin tub off the nose (48 mm out to
   4.5). 112,558 triangles (72,340). Checks as before or better: panels ok, symmetry `look`
-  (the cabin's yoke and screens, the tail lettering), the floor's front 4.5 mm in the open.
-  Pack rebuilt, every check passing: 74,755, 44,852, 19,949, 5,099 triangles, standard
-  class, texels 375 px/m (5th percentile), LOD3 32.7 of 40 degrees, 0.074 of 0.10 bent,
-  0.040 of 0.04 texture. Not published.
+  (the cabin's yoke and screens, the fin code), the floor's front 4.5 mm in the open; the
+  maker's name on the stern laid on its band (it floated, the band mirrored a ghost of it).
+  Pack rebuilt, every check passing: 74,391, 44,633, 19,921, 5,101 triangles, standard
+  class, texels 372 px/m (5th percentile), LOD3 32.6 of 40 degrees, 0.072 of 0.10 bent,
+  0.039 of 0.04 texture. Not published.
 - **Next**: a pilot car of each of the other five brands (lamps by `BRANDS.md`, each
   switching to its `vehicles/brands/` module), shown to Swagnik before the other twelve;
   step A's street-distance findings (tires in the body, cabin tubs in the wells) on each car
