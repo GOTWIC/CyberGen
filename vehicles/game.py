@@ -1279,8 +1279,8 @@ def fine_relief(relief, floor):
 
 def part_sizes(p):
     """A piece's loose parts by their boxes: the median of their middle size (a flute's or
-    a slot's width, a letter's) and of their largest (a flute's length, a letter's
-    height), in meters."""
+    a slot's width, a letter's), and the largest of their largest (a flute's length, the
+    tallest letter's height), in meters."""
     bm = bmesh.new()
     bm.from_mesh(p.me)
     bm.faces.ensure_lookup_table()
@@ -1292,8 +1292,7 @@ def part_sizes(p):
         big.append(d[2])
     bm.free()
     mid.sort()
-    big.sort()
-    return (mid[len(mid) // 2], big[len(big) // 2]) if mid else (1e9, 1e9)
+    return (mid[len(mid) // 2], max(big)) if mid else (1e9, 1e9)
 
 
 def under_tree(me):
@@ -3733,9 +3732,11 @@ def main_build(A):
                     p.over = True
                     room -= p.tris
                     if part_sizes(p)[1] * floor_px < OVER_ONLY_PX:
-                        # too small for any image of it (letters a few texels tall,
-                        # screw heads): at LOD0 as it is, and nothing baked under it
-                        # (its image was dots, and showed round the letters)
+                        # every part of it too small for any image (letters a few
+                        # texels tall, screw heads): at LOD0 as it is, and nothing baked
+                        # under it (its image was dots, and showed round the letters). A
+                        # piece with one larger part keeps its image: a hull number among
+                        # small print must still be there from LOD1 on
                         p.op = "keep"
             kept = [p for p in cand if p.over]
             if kept:

@@ -162,9 +162,10 @@ less, small lettering: no atlas draws them as lines and letters, they come out a
 pattern or as dots) is also kept as it is in LOD0, over its baked image (`kept_at_lod0` in
 `baked_down`), the smallest pieces first while that fits the budget and takes no more than
 20% of it; lamps never. Its faces are left out from LOD1 on, where the baked image alone
-draws it. Relief too small for any image (its parts under 8 texels long: letters 12 mm
-tall, screw heads) is kept at LOD0 the same way with nothing baked under it (`lod0_only`):
-its image was dots, and showed round the letters. What lies under relief (the faces the image is baked on, the islands given more
+draws it. Relief too small for any image (every part of it under 8 texels long: letters
+12 mm tall, screw heads) is kept at LOD0 the same way with nothing baked under it
+(`lod0_only`): its image was dots, and showed round the letters. A piece with one larger
+part (a hull number among small print) keeps its image. What lies under relief (the faces the image is baked on, the islands given more
 texels) is the panel, never the relief's own copy.
 
 Before the bakes every part's quads and larger faces are cut into triangles, so the bake,
