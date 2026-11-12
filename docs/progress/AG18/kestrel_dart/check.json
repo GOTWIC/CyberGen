@@ -3,10 +3,10 @@
  "size": [
   4.657,
   1.99,
-  1.202
+  1.194
  ],
  "top_z": 1.519,
- "objects": 92,
+ "objects": 108,
  "palette": {
   "paint": [
    0.64,
@@ -28,15 +28,15 @@
  },
  "ground": {
   "verdict": "ok",
-  "clearance_mm": 317.0,
-  "lowest": "led.keel",
+  "clearance_mm": 325.0,
+  "lowest": "keel",
   "under_floor": [],
-  "note": "floats 317 mm over the ground"
+  "note": "floats 325 mm over the ground"
  },
  "symmetry": {
   "verdict": "look",
   "center_off_mm": 0.0,
-  "objects": 5,
+  "objects": 4,
   "asymmetric": [
    {
     "object": "interior.yoke",
@@ -54,15 +54,6 @@
      0.558,
      0.45,
      0.977
-    ]
-   },
-   {
-    "object": "interior.tub",
-    "off_mm": 56.8,
-    "at": [
-     0.507,
-     -0.619,
-     0.856
     ]
    },
    {
@@ -90,10 +81,11 @@
   "open_edges": [],
   "open_mm": 0,
   "cutter_holes": [],
+  "cut_loops": 17,
   "pieces": {
    "body": {
     "closed": true,
-    "panels": 19
+    "panels": 27
    },
    "pod.f": {
     "closed": true,
@@ -110,12 +102,12 @@
   "parts": [
    {
     "object": "interior.tub",
-    "out_mm": 48.2,
-    "share": 0.08,
+    "out_mm": 4.5,
+    "share": 0.02,
     "at": [
-     0.994,
-     -0.559,
-     0.552
+     0.799,
+     -0.394,
+     0.475
     ],
     "meant": false
    }
@@ -124,50 +116,54 @@
  },
  "triangles": {
   "verdict": "ok",
-  "total": 72340,
+  "total": 112558,
   "budget": 400000,
   "top": [
    [
-    "body.trim",
-    6132
+    "body.door",
+    7576
+   ],
+   [
+    "body.fender",
+    6426
    ],
    [
     "hull.ribs",
     6104
    ],
    [
+    "body.quarter",
+    5339
+   ],
+   [
     "pod.ribs",
     4560
    ],
    [
-    "pod.skid.f",
-    2664
+    "body.lower",
+    4500
    ],
    [
-    "pod.skid.r",
-    2664
+    "body.lightband",
+    3372
    ],
    [
-    "interior.seats",
-    2632
-   ],
-   [
-    "pod.vanes.f",
-    2160
-   ],
-   [
-    "pod.vanes.r",
-    2160
+    "lamp.chine_f.lit",
+    2808
    ]
   ],
   "groups": [
+   [
+    "body",
+    49628
+   ],
    [
     "pod",
     31542
    ],
    [
-    "body",
-    17278
+    "lamp",
+    8980
    ],
    [
     "hull",
@@ -188,10 +184,6 @@
    [
     "deck",
     1440
-   ],
-   [
-    "lettering",
-    1196
    ]
   ]
  },

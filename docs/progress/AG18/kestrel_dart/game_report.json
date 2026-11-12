@@ -3,25 +3,25 @@
  "title": "Kestrel Aerodyne Dart",
  "ok": true,
  "triangles": {
-  "original": 72340,
+  "original": 112558,
   "lods": [
-   52746,
-   31644,
-   19549,
-   5420
+   74755,
+   44852,
+   19949,
+   5099
   ],
   "lod0_parts": {
-   "body": 51290,
+   "body": 73299,
    "glass": 1456
   }
  },
  "objects": {
-  "original": 92,
+  "original": 108,
   "parts": 2
  },
  "size_class": {
   "name": "standard",
-  "exterior_m2": 33.36,
+  "exterior_m2": 29.28,
   "rule": "large when the body's exterior is 55 m2 or more",
   "lod_budgets": [
    150000,
@@ -37,31 +37,30 @@
  "textures": {
   "body": 4096
  },
- "pack_bytes": 26169505,
- "seconds": 41.2,
+ "pack_bytes": 30535497,
+ "seconds": 654.9,
  "stage_seconds": {
-  "build": 0.1,
-  "render_original": 24.4,
-  "parts": 5.6,
+  "build": 2.4,
+  "render_original": 86.1,
+  "parts": 18.0,
   "nodes": 0.0,
-  "uv": 145.4,
-  "bake": 131.9,
-  "lods_export": 12.7,
-  "lods_only": 11.3,
-  "textures": 0.0,
-  "proof": 29.93529772758484
+  "uv": 259.2,
+  "bake": 157.7,
+  "lods_export": 13.9,
+  "textures": 6.596809148788452,
+  "proof": 110.61360788345337
  },
  "baked_down": {
   "relief": {
    "pieces": 9,
-   "triangles": 2594,
+   "triangles": 2742,
    "names": [
     "decals",
+    "lamp.chine_r.chrome",
+    "lamp.keel.chrome",
     "led.marker",
     "led.visor",
     "lettering",
-    "nose.lamps",
-    "nose.slot",
     "pod.stencils",
     "sensors",
     "visor.slits"
@@ -71,24 +70,24 @@
  "texel_px_per_m": {
   "body": {
    "exterior": {
-    "area_m2": 33.355,
-    "p5": 379.7,
-    "median": 393.6
-   },
-   "cabin": {
-    "area_m2": 9.626,
-    "p5": 153.1,
-    "median": 157.6
-   },
-   "underside": {
-    "area_m2": 0.77,
-    "p5": 137.7,
-    "median": 390.9
+    "area_m2": 29.282,
+    "p5": 374.5,
+    "median": 393.1
    },
    "lamp_in_gaps": {
-    "area_m2": 0.543,
-    "p5": 137.7,
-    "median": 137.7
+    "area_m2": 1.446,
+    "p5": 137.5,
+    "median": 388.9
+   },
+   "cabin": {
+    "area_m2": 11.396,
+    "p5": 149.5,
+    "median": 158.8
+   },
+   "underside": {
+    "area_m2": 4.136,
+    "p5": 136.9,
+    "median": 378.7
    }
   }
  },
@@ -96,11 +95,11 @@
  "collision_hulls": 9,
  "source": {
   "script": "vehicles/cars/kestrel_dart.py",
-  "script_sha256": "cadcff0182ea368d1f78b8f37cd5d315f990137e67a57c3ebea112040e28ad1f",
-  "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
-  "game_sha256": "9e6108a54d1f801bd18195adc59470f9bd92b6d763a2afc8f84531218c054eab",
-  "original_triangles": 72340,
-  "original_objects": 92
+  "script_sha256": "23f0844d660b8e60165cc571ff4ae4f33d78a22c3e337dafaf5973c3b514753a",
+  "carkit_sha256": "80020b974b190e7b6db524668c8c6d0164b3484f712ec8a6420c6e9961b53ea5",
+  "game_sha256": "32271c5b2195e75c93509022799b7dd770add377d59cc906b924e040e27ff1db",
+  "original_triangles": 112558,
+  "original_objects": 108
  },
  "test": false,
  "checks": [
@@ -119,25 +118,25 @@
    "detail": [
     {
      "lod": 0,
-     "triangles": 52746,
+     "triangles": 74755,
      "budget": 150000,
      "ok": true
     },
     {
      "lod": 1,
-     "triangles": 31644,
+     "triangles": 44852,
      "budget": 60000,
      "ok": true
     },
     {
      "lod": 2,
-     "triangles": 19549,
+     "triangles": 19949,
      "budget": 20000,
      "ok": true
     },
     {
      "lod": 3,
-     "triangles": 5420,
+     "triangles": 5099,
      "budget": 5000,
      "ok": true
     }
@@ -150,8 +149,8 @@
     "limit": 0.005,
     "slots": {
      "body": {
-      "overlap": 0.00386,
-      "coverage": 0.4108,
+      "overlap": 0.0009,
+      "coverage": 0.4082,
       "outside_unit": 0.0
      }
     }
@@ -162,8 +161,8 @@
    "ok": true,
    "detail": {
     "body": {
-     "p5": 379.7,
-     "median": 393.6,
+     "p5": 374.5,
+     "median": 393.1,
      "floor": 300.0,
      "ok": true
     }
@@ -196,7 +195,7 @@
      "lod": 2,
      "deviation_m": [
       0.0,
-      0.0,
+      0.0007,
       0.0002
      ],
      "tolerance_m": [
@@ -227,10 +226,10 @@
    "ok": true,
    "detail": [
     {
-     "normal_p95_deg": 0.69,
-     "bent_share": 0.0026,
-     "texture_share": 0.0023,
-     "miss_share": 0.0017,
+     "normal_p95_deg": 0.46,
+     "bent_share": 0.0028,
+     "texture_share": 0.0007,
+     "miss_share": 0.001,
      "lod": 1,
      "limits": {
       "p95": 12.0,
@@ -240,10 +239,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 3.05,
-     "bent_share": 0.0038,
-     "texture_share": 0.0041,
-     "miss_share": 0.0022,
+     "normal_p95_deg": 10.16,
+     "bent_share": 0.0102,
+     "texture_share": 0.0065,
+     "miss_share": 0.0048,
      "lod": 2,
      "limits": {
       "p95": 25.0,
@@ -253,10 +252,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 36.05,
-     "bent_share": 0.0698,
-     "texture_share": 0.0328,
-     "miss_share": 0.079,
+     "normal_p95_deg": 32.66,
+     "bent_share": 0.0739,
+     "texture_share": 0.0396,
+     "miss_share": 0.0525,
      "lod": 3,
      "limits": {
       "p95": 40.0,
@@ -273,15 +272,15 @@
    "detail": {
     "hulls": 9,
     "vertices": [
-     334,
-     234,
-     160,
-     210,
-     114,
+     356,
+     260,
+     162,
+     218,
+     104,
      364,
-     120,
+     166,
      330,
-     110
+     116
     ]
    }
   }

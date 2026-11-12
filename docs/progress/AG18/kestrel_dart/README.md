@@ -46,6 +46,42 @@
 8. **Lettering:** tail number `KD-217`, registration `KA 2-217` by the nose, model name on
    the door, all in dark stencil grey.
 
+## Step B: lamps, cut lines, glass (2026-11-12)
+
+The first Kestrel on step B's kit (`docs/assetgen_milestones.md`, AG18, step B), and the
+first car on `vehicles/brands/kestrel.py` (the chine, the fin plane, the pods and their
+ribs; it builds exactly as before on the module). The sheet, clay, zebra and check above are
+of this build.
+
+- Nose lamps: the four lit cells in the flank facet over the chine are now a slot cut 42 mm
+  into the hull under a clear lens set flush in the facet, the cells set back 9 mm with
+  bright dividers between them running to the slot's floor.
+- The chine's light: the knife edge itself is cut away for its first 0.76 m from the prow
+  and its last 0.27 m, a channel 18 mm up the edge and 22 mm deep under a clear (front) or
+  red (rear) lens that keeps the edge's shape, a lit core and a bright liner inside; the
+  bright blade runs between them.
+- Stern bar: a channel 16 mm wide and 26 mm deep in the band round the top of the mouth
+  under a red lens, narrowing to 9 mm where the band narrows past the mouth's middle; a red
+  core and bright ribs behind it.
+- Keel blade: its foot is a channel 24 mm high along 2.44 m with dark walls, a light guide
+  in a frosted sleeve over a bright reflector strip and a clear lens flush with the foot.
+- Thruster slots: a cross of vanes set back in each of the eight slots.
+- Cut lines: the styling groove under the side glass (7 mm), the flush door release and the
+  six-sided charge flap are cut through the skin (they were strips lying on it); 3.5 mm shut
+  lines everywhere (2.4 mm before). The sensor slits at the side glass's foot stay printed
+  on the glass.
+- Glass: every pane (windshield, roof, side, rear) with a black frit border as part of the
+  glass; the flat facets take it without shards.
+- Cabin tub: the dash made symmetric and narrower at its foot and the floor shortened, so
+  the tub no longer shows under the nose (48 mm out before, 4.5 mm now).
+- About 112,600 triangles (72,340 before; the lamps 9,000 of them, the cut hull most of the
+  rest).
+
+Left: the pods' tip lamps are flat faces of the pod (the pods are wrapped pieces built
+without the uncut-hull cutters); the emitters' layered glow is step C's; the stern bar is
+thin where the band narrows past the mouth's middle (an even band would widen it, a change
+to the stern's look).
+
 ## What I would improve
 
 - The flat windshield mirrors the fins and the studio's top light at the hero's angle; a

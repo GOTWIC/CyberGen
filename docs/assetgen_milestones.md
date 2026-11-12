@@ -3126,6 +3126,20 @@ Vanta-R the same).
   breaks the boolean (the whole hull came out empty); the groove now drops such sections,
   and `round` avoids them. A rounded path snapped onto the hull can jump to a mouth's inner
   frame: the Vanta-R's front channel is not rounded.
+- **Kestrel Dart** (`docs/progress/AG18/kestrel_dart/`, the Kestrel pilot, now on
+  `vehicles/brands/kestrel.py`): the nose's four lit cells in a slot cut 42 mm in under a
+  clear lens flush in the facet, set back between bright dividers; the chine's knife edge cut
+  away at the prow (0.76 m) and the stern (0.27 m) into channels under clear and red lenses
+  that keep the edge's shape, lit cores and bright liners inside; the stern bar a channel
+  under a red lens with a red core and ribs, narrowing with the band past the mouth's middle;
+  the keel blade's foot a lamp channel with a guide in a sleeve over a reflector under a clear
+  lens; vanes set back in the thruster slots; the shoulder groove, door release and charge
+  flap cut; 3.5 mm shut lines; frit on every pane; the cabin tub off the nose (48 mm out to
+  4.5). 112,558 triangles (72,340). Checks as before or better: panels ok, symmetry `look`
+  (the cabin's yoke and screens, the tail lettering), the floor's front 4.5 mm in the open.
+  Pack rebuilt, every check passing: 74,755, 44,852, 19,949, 5,099 triangles, standard
+  class, texels 375 px/m (5th percentile), LOD3 32.7 of 40 degrees, 0.074 of 0.10 bent,
+  0.040 of 0.04 texture. Not published.
 - **Next**: a pilot car of each of the other five brands (lamps by `BRANDS.md`, each
   switching to its `vehicles/brands/` module), shown to Swagnik before the other twelve;
   step A's street-distance findings (tires in the body, cabin tubs in the wells) on each car
