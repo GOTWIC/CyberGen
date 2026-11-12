@@ -5,13 +5,13 @@
  "triangles": {
   "original": 215832,
   "lods": [
-   104384,
-   59991,
-   20246,
-   5103
+   104482,
+   59990,
+   20274,
+   4855
   ],
   "lod0_parts": {
-   "body": 53088,
+   "body": 53186,
    "glass": 4576,
    "wheel_fl": 11680,
    "wheel_fr": 11680,
@@ -42,19 +42,18 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 28908071,
- "seconds": 41.4,
+ "pack_bytes": 28823350,
+ "seconds": 634.9,
  "stage_seconds": {
   "build": 0.4,
-  "render_original": 24.8,
-  "parts": 7.9,
+  "render_original": 25.6,
+  "parts": 14.7,
   "nodes": 0.0,
-  "uv": 39.9,
-  "bake": 416.7,
-  "lods_export": 10.4,
-  "lods_only": 9.7,
-  "textures": 0.0,
-  "proof": 31.69472575187683
+  "uv": 109.8,
+  "bake": 406.1,
+  "lods_export": 10.0,
+  "textures": 7.826909065246582,
+  "proof": 59.867563009262085
  },
  "baked_down": {
   "relief": {
@@ -108,23 +107,23 @@
   "body": {
    "exterior": {
     "area_m2": 32.869,
-    "p5": 469.3,
-    "median": 471.8
+    "p5": 432.9,
+    "median": 435.2
    },
    "cabin": {
-    "area_m2": 15.395,
-    "p5": 185.5,
-    "median": 188.8
+    "area_m2": 20.609,
+    "p5": 171.1,
+    "median": 174.9
    },
    "underside": {
     "area_m2": 0.087,
-    "p5": 158.8,
-    "median": 174.7
+    "p5": 146.5,
+    "median": 169.8
    },
    "lamp_in_gaps": {
-    "area_m2": 0.052,
-    "p5": 165.0,
-    "median": 165.0
+    "area_m2": 2.273,
+    "p5": 426.3,
+    "median": 435.0
    }
   },
   "wheels": {
@@ -145,8 +144,8 @@
  "source": {
   "script": "vehicles/cars/aurel_prelate.py",
   "script_sha256": "da28fc97971457c323a5fac8ae363ae2cf15bfd00fa50c470c97d666c126d4d5",
-  "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
-  "game_sha256": "d465cc36c23ee311f11607a1d6df3c589e936e5c61db3dee4b3568780c548a2e",
+  "carkit_sha256": "86fc2281f799baae0c26b3ac0a61705bd4f58e4eb5e5443afa1c08342131b5e3",
+  "game_sha256": "d8192c2e3407940f8e3a1c108b78d7b7e67191689876739b080f7afe5c25b38b",
   "original_triangles": 215832,
   "original_objects": 95
  },
@@ -167,25 +166,25 @@
    "detail": [
     {
      "lod": 0,
-     "triangles": 104384,
+     "triangles": 104482,
      "budget": 150000,
      "ok": true
     },
     {
      "lod": 1,
-     "triangles": 59991,
+     "triangles": 59990,
      "budget": 60000,
      "ok": true
     },
     {
      "lod": 2,
-     "triangles": 20246,
+     "triangles": 20274,
      "budget": 20000,
      "ok": true
     },
     {
      "lod": 3,
-     "triangles": 5103,
+     "triangles": 4855,
      "budget": 5000,
      "ok": true
     }
@@ -198,8 +197,8 @@
     "limit": 0.005,
     "slots": {
      "body": {
-      "overlap": 0.00145,
-      "coverage": 0.5985,
+      "overlap": 0.00081,
+      "coverage": 0.5894,
       "outside_unit": 0.0
      },
      "wheels": {
@@ -215,8 +214,8 @@
    "ok": true,
    "detail": {
     "body": {
-     "p5": 469.3,
-     "median": 471.8,
+     "p5": 432.9,
+     "median": 435.2,
      "floor": 300.0,
      "ok": true
     },
@@ -354,8 +353,8 @@
      "lod": 3,
      "deviation_m": [
       0.0058,
-      0.0065,
-      0.0007
+      0.001,
+      0.0076
      ],
      "tolerance_m": [
       0.0779,
@@ -371,10 +370,10 @@
    "ok": true,
    "detail": [
     {
-     "normal_p95_deg": 0.66,
-     "bent_share": 0.0002,
-     "texture_share": 0.0012,
-     "miss_share": 0.0003,
+     "normal_p95_deg": 0.79,
+     "bent_share": 0.001,
+     "texture_share": 0.0055,
+     "miss_share": 0.0011,
      "lod": 1,
      "limits": {
       "p95": 12.0,
@@ -384,10 +383,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 2.48,
-     "bent_share": 0.0067,
-     "texture_share": 0.0023,
-     "miss_share": 0.001,
+     "normal_p95_deg": 2.46,
+     "bent_share": 0.0063,
+     "texture_share": 0.0037,
+     "miss_share": 0.0031,
      "lod": 2,
      "limits": {
       "p95": 25.0,
@@ -397,10 +396,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 17.34,
-     "bent_share": 0.0371,
-     "texture_share": 0.0244,
-     "miss_share": 0.0853,
+     "normal_p95_deg": 9.53,
+     "bent_share": 0.0216,
+     "texture_share": 0.0129,
+     "miss_share": 0.0384,
      "lod": 3,
      "limits": {
       "p95": 40.0,

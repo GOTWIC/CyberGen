@@ -1313,10 +1313,12 @@ target is a current AAA open-world game's hero vehicles.
   a mask, four LODs by size class, convex collision, lights as data, a proof image and a
   report of checks); the format is the contract in `vehicles/GAME.md`. Packs live outside
   git (`~/.cache/cybergen/vehicles/game/<car>/`); proofs and reports are in
-  `docs/progress/AG18/<car>/`. Open: three cars fail one check each by a hair
-  (`kestrel_meridian` and `brakk_hauler` `lod_fidelity`, `halcyon_ridge` `uv_overlap`),
-  recorded, not fixed; LOD3 details still crude up close (a winch drum, small rims and
-  grilles); bake faults on `kestrel_meridian`'s louvre and `aurel_zenith`'s grille.
+  `docs/progress/AG18/<car>/`. The small faults that first run left (three checks failing
+  by a hair, crumpled and shard-like far LOD details, three bake faults, the taxi parked
+  with its door open, the glass missing from inside the cabin in Unreal) were put right in
+  `game.py` and the importer (2026-11-12) and nine packs rebuilt; every pack passes every
+  check. Open: the other nine packs are as first built, and take the same fixes when they
+  are next rebuilt.
 - **Phase 3 in Unreal** (2026-11-11): the exporter takes the packs as a library imported
   once a project (`/Game/CityGen/Vehicles/<car>`: a mesh a part with the pack's LODs, no
   Nanite; `M_CgVehicle` recoloring per instance; thin translucent glass) and places them by

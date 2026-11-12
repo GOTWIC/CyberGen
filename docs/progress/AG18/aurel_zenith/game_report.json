@@ -5,13 +5,13 @@
  "triangles": {
   "original": 129135,
   "lods": [
-   72511,
-   43503,
-   20290,
-   5116
+   80187,
+   48110,
+   20296,
+   4751
   ],
   "lod0_parts": {
-   "body": 67935,
+   "body": 75611,
    "glass": 4576
   }
  },
@@ -21,7 +21,7 @@
  },
  "size_class": {
   "name": "standard",
-  "exterior_m2": 39.26,
+  "exterior_m2": 24.02,
   "rule": "large when the body's exterior is 55 m2 or more",
   "lod_budgets": [
    150000,
@@ -37,19 +37,18 @@
  "textures": {
   "body": 4096
  },
- "pack_bytes": 20180827,
- "seconds": 53.4,
+ "pack_bytes": 22709088,
+ "seconds": 772.8,
  "stage_seconds": {
   "build": 0.2,
-  "render_original": 61.7,
-  "parts": 8.6,
+  "render_original": 85.2,
+  "parts": 59.4,
   "nodes": 0.0,
-  "uv": 49.3,
-  "bake": 264.9,
-  "lods_export": 8.6,
-  "lods_only": 27.7,
-  "textures": 0.0,
-  "proof": 25.648559093475342
+  "uv": 179.1,
+  "bake": 315.3,
+  "lods_export": 10.8,
+  "textures": 6.4159626960754395,
+  "proof": 115.97685694694519
  },
  "baked_down": {
   "relief": {
@@ -88,24 +87,24 @@
  "texel_px_per_m": {
   "body": {
    "exterior": {
-    "area_m2": 39.257,
-    "p5": 307.2,
-    "median": 308.9
+    "area_m2": 24.017,
+    "p5": 327.4,
+    "median": 335.5
    },
    "cabin": {
-    "area_m2": 29.78,
-    "p5": 123.5,
-    "median": 124.7
+    "area_m2": 30.045,
+    "p5": 134.0,
+    "median": 135.2
    },
    "underside": {
-    "area_m2": 0.053,
-    "p5": 108.1,
-    "median": 307.5
+    "area_m2": 15.479,
+    "p5": 117.2,
+    "median": 335.0
    },
    "lamp_in_gaps": {
-    "area_m2": 4.107,
-    "p5": 108.1,
-    "median": 108.3
+    "area_m2": 6.635,
+    "p5": 117.3,
+    "median": 117.3
    }
   }
  },
@@ -114,8 +113,8 @@
  "source": {
   "script": "vehicles/cars/aurel_zenith.py",
   "script_sha256": "30ea49802a5979572e442f84275842f7e22f927fac1f5db535f0f283b94bf98f",
-  "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
-  "game_sha256": "9e6108a54d1f801bd18195adc59470f9bd92b6d763a2afc8f84531218c054eab",
+  "carkit_sha256": "86fc2281f799baae0c26b3ac0a61705bd4f58e4eb5e5443afa1c08342131b5e3",
+  "game_sha256": "8ff0f0b62ee4a544b91be5bd6a7bb61a4c83f75e900751d9fc18fbb0e0cfe49e",
   "original_triangles": 129135,
   "original_objects": 71
  },
@@ -136,25 +135,25 @@
    "detail": [
     {
      "lod": 0,
-     "triangles": 72511,
+     "triangles": 80187,
      "budget": 150000,
      "ok": true
     },
     {
      "lod": 1,
-     "triangles": 43503,
+     "triangles": 48110,
      "budget": 60000,
      "ok": true
     },
     {
      "lod": 2,
-     "triangles": 20290,
+     "triangles": 20296,
      "budget": 20000,
      "ok": true
     },
     {
      "lod": 3,
-     "triangles": 5116,
+     "triangles": 4751,
      "budget": 5000,
      "ok": true
     }
@@ -167,8 +166,8 @@
     "limit": 0.005,
     "slots": {
      "body": {
-      "overlap": 0.00169,
-      "coverage": 0.3215,
+      "overlap": 0.00114,
+      "coverage": 0.3579,
       "outside_unit": 0.0
      }
     }
@@ -179,8 +178,8 @@
    "ok": true,
    "detail": {
     "body": {
-     "p5": 307.2,
-     "median": 308.9,
+     "p5": 327.4,
+     "median": 335.5,
      "floor": 300.0,
      "ok": true
     }
@@ -214,7 +213,7 @@
      "deviation_m": [
       0.0,
       0.001,
-      0.0008
+      0.0
      ],
      "tolerance_m": [
       0.0814,
@@ -226,9 +225,9 @@
     {
      "lod": 3,
      "deviation_m": [
-      0.0085,
-      0.0065,
-      0.0
+      0.0046,
+      0.001,
+      0.009
      ],
      "tolerance_m": [
       0.0814,
@@ -244,10 +243,10 @@
    "ok": true,
    "detail": [
     {
-     "normal_p95_deg": 0.86,
-     "bent_share": 0.0002,
-     "texture_share": 0.0048,
-     "miss_share": 0.0003,
+     "normal_p95_deg": 0.64,
+     "bent_share": 0.0001,
+     "texture_share": 0.0029,
+     "miss_share": 0.001,
      "lod": 1,
      "limits": {
       "p95": 12.0,
@@ -257,10 +256,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 8.89,
-     "bent_share": 0.0073,
-     "texture_share": 0.0085,
-     "miss_share": 0.0006,
+     "normal_p95_deg": 5.51,
+     "bent_share": 0.0067,
+     "texture_share": 0.0025,
+     "miss_share": 0.0008,
      "lod": 2,
      "limits": {
       "p95": 25.0,
@@ -270,10 +269,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 23.6,
-     "bent_share": 0.0468,
-     "texture_share": 0.035,
-     "miss_share": 0.0289,
+     "normal_p95_deg": 19.43,
+     "bent_share": 0.0426,
+     "texture_share": 0.0075,
+     "miss_share": 0.0021,
      "lod": 3,
      "limits": {
       "p95": 40.0,
@@ -297,8 +296,8 @@
      90,
      236,
      224,
-     216,
-     394
+     228,
+     408
     ]
    }
   }

@@ -5,56 +5,55 @@
  "triangles": {
   "original": 285996,
   "lods": [
-   140079,
-   59989,
-   20172,
-   8191
+   144473,
+   59991,
+   20411,
+   4764
   ],
   "lod0_parts": {
-   "body": 109067,
+   "body": 112485,
    "glass": 2724,
-   "wheel_fl": 7072,
-   "wheel_fr": 7072,
-   "wheel_rl": 7072,
-   "wheel_rr": 7072
+   "wheel_fl": 7316,
+   "wheel_fr": 7316,
+   "wheel_rl": 7316,
+   "wheel_rr": 7316
   }
  },
  "objects": {
-  "original": 165,
+  "original": 163,
   "parts": 6
  },
  "size_class": {
-  "name": "large",
-  "exterior_m2": 56.78,
+  "name": "standard",
+  "exterior_m2": 36.15,
   "rule": "large when the body's exterior is 55 m2 or more",
   "lod_budgets": [
    150000,
    60000,
    20000,
-   8000
+   5000
   ],
   "texel_floor_px_per_m": {
-   "body": 240.0,
-   "wheels": 240.0
+   "body": 300.0,
+   "wheels": 300.0
   }
  },
  "textures": {
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 33548914,
- "seconds": 53.5,
+ "pack_bytes": 34116982,
+ "seconds": 1015.1,
  "stage_seconds": {
   "build": 0.7,
-  "render_original": 26.0,
-  "parts": 13.6,
+  "render_original": 46.9,
+  "parts": 30.6,
   "nodes": 0.0,
-  "uv": 143.5,
-  "bake": 657.7,
-  "lods_export": 18.9,
-  "lods_only": 23.8,
-  "textures": 0.0,
-  "proof": 29.623038053512573
+  "uv": 119.5,
+  "bake": 682.2,
+  "lods_export": 34.6,
+  "textures": 8.107542037963867,
+  "proof": 91.79415512084961
  },
  "baked_down": {
   "relief": {
@@ -137,48 +136,53 @@
  "texel_px_per_m": {
   "body": {
    "exterior": {
-    "area_m2": 56.778,
-    "p5": 385.5,
-    "median": 402.1
-   },
-   "cabin": {
-    "area_m2": 9.58,
-    "p5": 159.9,
-    "median": 392.2
-   },
-   "underside": {
-    "area_m2": 0.697,
-    "p5": 140.5,
-    "median": 374.4
+    "area_m2": 36.15,
+    "p5": 439.6,
+    "median": 470.4
    },
    "lamp_in_gaps": {
-    "area_m2": 0.698,
-    "p5": 140.5,
-    "median": 140.5
+    "area_m2": 2.328,
+    "p5": 164.2,
+    "median": 187.8
+   },
+   "cabin": {
+    "area_m2": 32.074,
+    "p5": 184.9,
+    "median": 187.8
+   },
+   "underside": {
+    "area_m2": 0.384,
+    "p5": 164.2,
+    "median": 164.2
    }
   },
   "wheels": {
+   "lamp_in_gaps": {
+    "area_m2": 0.941,
+    "p5": 173.7,
+    "median": 504.3
+   },
    "exterior": {
     "area_m2": 2.991,
-    "p5": 471.6,
-    "median": 518.3
+    "p5": 482.6,
+    "median": 532.7
    },
    "underside": {
     "area_m2": 0.03,
-    "p5": 181.4,
-    "median": 181.4
+    "p5": 186.4,
+    "median": 186.4
    }
   }
  },
  "lights": 62,
- "collision_hulls": 10,
+ "collision_hulls": 9,
  "source": {
   "script": "vehicles/cars/tanager_cab.py",
   "script_sha256": "1fa3528cbdb137052351d937d51e91bb86120c88614a9292760fbb2fda6a92c1",
-  "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
-  "game_sha256": "9e6108a54d1f801bd18195adc59470f9bd92b6d763a2afc8f84531218c054eab",
+  "carkit_sha256": "86fc2281f799baae0c26b3ac0a61705bd4f58e4eb5e5443afa1c08342131b5e3",
+  "game_sha256": "4b9afb7f702e2ef576b17202979ad046831ef1f4a3aa238c3255ddbf465f616e",
   "original_triangles": 285996,
-  "original_objects": 165
+  "original_objects": 163
  },
  "test": false,
  "checks": [
@@ -197,26 +201,26 @@
    "detail": [
     {
      "lod": 0,
-     "triangles": 140079,
+     "triangles": 144473,
      "budget": 150000,
      "ok": true
     },
     {
      "lod": 1,
-     "triangles": 59989,
+     "triangles": 59991,
      "budget": 60000,
      "ok": true
     },
     {
      "lod": 2,
-     "triangles": 20172,
+     "triangles": 20411,
      "budget": 20000,
      "ok": true
     },
     {
      "lod": 3,
-     "triangles": 8191,
-     "budget": 8000,
+     "triangles": 4764,
+     "budget": 5000,
      "ok": true
     }
    ]
@@ -228,13 +232,13 @@
     "limit": 0.005,
     "slots": {
      "body": {
-      "overlap": 0.00024,
-      "coverage": 0.6078,
+      "overlap": 0.00019,
+      "coverage": 0.5714,
       "outside_unit": 0.0
      },
      "wheels": {
       "overlap": 0.0,
-      "coverage": 0.1922,
+      "coverage": 0.2441,
       "outside_unit": 0.0
      }
     }
@@ -245,15 +249,15 @@
    "ok": true,
    "detail": {
     "body": {
-     "p5": 385.5,
-     "median": 402.1,
-     "floor": 240.0,
+     "p5": 439.6,
+     "median": 470.4,
+     "floor": 300.0,
      "ok": true
     },
     "wheels": {
-     "p5": 471.6,
-     "median": 518.3,
-     "floor": 240.0,
+     "p5": 482.6,
+     "median": 532.7,
+     "floor": 300.0,
      "ok": true
     }
    }
@@ -355,7 +359,7 @@
     {
      "lod": 1,
      "deviation_m": [
-      0.0088,
+      0.0094,
       0.0,
       0.0001
      ],
@@ -369,7 +373,7 @@
     {
      "lod": 2,
      "deviation_m": [
-      0.0094,
+      0.0194,
       0.0014,
       0.002
      ],
@@ -383,9 +387,9 @@
     {
      "lod": 3,
      "deviation_m": [
-      0.0107,
-      0.0019,
-      0.0008
+      0.0038,
+      0.0009,
+      0.0012
      ],
      "tolerance_m": [
       0.0682,
@@ -401,10 +405,10 @@
    "ok": true,
    "detail": [
     {
-     "normal_p95_deg": 0.4,
-     "bent_share": 0.0006,
-     "texture_share": 0.0004,
-     "miss_share": 0.0004,
+     "normal_p95_deg": 0.48,
+     "bent_share": 0.0008,
+     "texture_share": 0.0,
+     "miss_share": 0.0011,
      "lod": 1,
      "limits": {
       "p95": 12.0,
@@ -414,10 +418,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 12.27,
-     "bent_share": 0.016,
-     "texture_share": 0.0019,
-     "miss_share": 0.0012,
+     "normal_p95_deg": 14.82,
+     "bent_share": 0.0186,
+     "texture_share": 0.0013,
+     "miss_share": 0.0038,
      "lod": 2,
      "limits": {
       "p95": 25.0,
@@ -427,10 +431,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 16.39,
-     "bent_share": 0.0325,
-     "texture_share": 0.0142,
-     "miss_share": 0.0122,
+     "normal_p95_deg": 17.82,
+     "bent_share": 0.034,
+     "texture_share": 0.0151,
+     "miss_share": 0.1168,
      "lod": 3,
      "limits": {
       "p95": 40.0,
@@ -445,16 +449,15 @@
    "check": "collision",
    "ok": true,
    "detail": {
-    "hulls": 10,
+    "hulls": 9,
     "vertices": [
-     404,
-     246,
-     230,
-     304,
-     196,
-     188,
+     438,
+     98,
+     330,
+     250,
+     166,
      154,
-     312,
+     310,
      408,
      356
     ]

@@ -2970,6 +2970,66 @@ What the survey found on the 18 cars ([`checks.md`](progress/AG18/checks.md) has
   nose and tail; the Halcyons break cleanly at their creases and are busy over the front
   fenders where soft creases die; the Kestrels, Brakks and Tanagers are plates, and read so.
 
+**The packs' small faults** (2026-11-12): what phase 3's first run left, fixed in
+`vehicles/game.py` and the importer, never in a car's script.
+
+- **Far LODs.**
+  - A small closed solid the collapse leaves open (a flute or a bolt folded into a sliver
+    showing its dark inside, though every point of it is near the solid) is a wreck:
+    a hull or gone (the Prelate's shards along the sill, the Meridian's nose).
+  - The small wrecked parts of one piece fare alike: hulls for all when the budget has
+    room for all, else none.
+  - A piece of six loose parts or more, half of them wrecked, that is one convex shape as a
+    whole and whose parts fill 35% of that hull becomes one hull of 96 corners (the Atlas's
+    winch cable is 22 separate rings, each collapsed to a crumpled ring: now a cylinder). A
+    first version without the fill rule made one dark wedge of six panels round the Cab's
+    nose.
+  - A large wreck's hull is tried with 96 corners after 26.
+  - A stand-in hull's face keeps its own normal where LOD0's under its corner is more than
+    30 degrees off it (a rib's flank under a hull laid over a row of ribs shaded the whole
+    face askew).
+  - Far opaque glass that cannot stay whole is merged at 4, 7, 11, then 16 degrees whatever
+    its shading, every kept corner where LOD0 had it; unsubdivided it came out wavy and off
+    its frame (the Aurels' canopies).
+  - A LOD short of its fidelity limits is made again with the pieces that carry most of
+    the area off LOD0's normals given 2.5 times their triangles (the Hauler's LOD1: its
+    springs, axles and chassis rails, 12.39 to about 9 degrees). Giving the wheels'
+    triangles to the body, tried first, changed nothing.
+- **Bakes.**
+  - Every part is cut into triangles before the bakes, and a collapsed part's shading
+    normals are weighted by face area: the Mule's white streak was a collapsed flat panel
+    whose corner normals leaned toward its neighbors, bent back by the normal map, its
+    triangles showing as a glossy zigzag (triangulating alone moved the zigzag; the
+    weighted normals removed it).
+  - A face over 20 cm2 that no ray left is looked at again from 13 points along 600
+    directions before it is removed, and kept in the gaps class (weight 0.35): the back of
+    the Meridian's pod vent, seen only between its louvres, had been removed, and the vent
+    showed black and the pod's inside. At full exterior weight the faces kept took the
+    Mule's texel density under its floor.
+  - On a vehicle with no wheels a face under 0.5 m that only rays going down leave is
+    underside: the Zenith's belly (15.5 m2) had full exterior density.
+  - Fine relief (parts under 4 texels wide at the texel floor) stays as geometry at LOD0,
+    over its baked image, when LOD0 is under budget with nothing shed, and is left out
+    from LOD1; relief too small for any image (under 8 texels long) is LOD0 geometry only.
+    The Zenith's nose flutes came out as a beat pattern and its 12 mm lettering as dots at
+    any density its atlas could give (the texel boost for relief is spread over the whole
+    panels the relief lies on, 23 m2; sending it to the islands under fine relief alone,
+    also added, still left 6.6 m2).
+  - The unwrap's retry for islands lying over themselves has a third and a fourth, smaller
+    angle (the Ridge's overlap: 0.52% of the texels against a limit of 0.5%).
+- **Parked and shut.** A pack is built with `CYBERGEN_SHUT=1` (and the Cab's own
+  `CAB_SHUT`, `SHUT_ENV`): the taxi's sliding door is closed. Its fold-out step is still
+  out (the script draws it either way).
+- **Unreal: glass from inside the cabin.** The glass master left out the inner sheet (from
+  outside it is the far side's glass, drawn in triangle order over the near one), and from
+  the seats the outer sheets face away, so there was no glass. The inner sheet is now drawn
+  while the eye is inside the glass's box taken down to the car's floor (`glass_box` in a
+  car's record, read from the pack's LOD0; `CabinCenter`, `CabinHalf`; `VEHICLE_VERSION`
+  7); `--check-vehicles` shoots each car from inside its cabin (`cabin_<car>`).
+- `CYBERGEN_GAME_DEBUG=1` logs every far LOD wreck and what became of it.
+
+RESULTS_TABLE
+
 Next: the design improvements B to E.
 
 The roster with sizes and sheets: [`docs/progress/AG18/README.md`](progress/AG18/README.md).

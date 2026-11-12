@@ -156,6 +156,17 @@ So that LOD0 is near 150,000 triangles without decimating the silhouette:
 
 `baked_down` in `pack.json` lists every piece and what became of it.
 
+**Fine relief stays at LOD0.** When LOD0 is under its budget with nothing shed, relief
+whose loose parts are under 4 texels wide at the texel floor (flutes and slots 13 mm wide or
+less, small lettering: no atlas draws them as lines and letters, they come out as a beat
+pattern or as dots) is also kept as it is in LOD0, over its baked image (`kept_at_lod0` in
+`baked_down`), the smallest pieces first while that fits the budget and takes no more than
+20% of it; lamps never. Its faces are left out from LOD1 on, where the baked image alone
+draws it. Relief too small for any image (its parts under 8 texels long: letters 12 mm
+tall, screw heads) is kept at LOD0 the same way with nothing baked under it (`lod0_only`):
+its image was dots, and showed round the letters. What lies under relief (the faces the image is baked on, the islands given more
+texels) is the panel, never the relief's own copy.
+
 Before the bakes every part's quads and larger faces are cut into triangles, so the bake,
 the file and an engine all work on the same ones: a tangent space normal map is only right
 on the triangles it was baked with, and where a flat panel carries slanted shading normals
@@ -171,7 +182,7 @@ door; a script written before the convention by its own variable, `SHUT_ENV` in 
 
 Smart projection per slot (66 degrees; the islands that end up covering texels another
 island covers, over 0.1% of the atlas, as a lip curling under its frame does, are projected
-again at 34 degrees, those still lying over themselves once more at 20, then at 11), each island scaled to one texel density times its class's
+again at 34 degrees, those still lying over themselves once more at 20, then at 11, then at 6), each island scaled to one texel density times its class's
 weight (exterior 1, cabin 0.4, underside 0.35, a lamp or a large face seen only in gaps 0.35, a rim face
 0.5; on a vehicle with no wheels, which floats and sets down when parked, a face under 0.5 m
 that only rays going down leave is underside: no eye gets under it, and its belly's texels
@@ -260,8 +271,10 @@ budget still steps down), and share LOD0's textures. Per part, in this order:
    becomes its hull where that is within 3 cm of it (26 corners, then 96), else, as a
    lamp, is collapsed again alone at twice its triangles. Before that, a piece of six
    loose parts or more, half of them wrecked, that is one convex shape as a whole becomes
-   one hull of 96 corners where that keeps within 3 cm of it both ways (a cable's turns on a
-   drum are a cylinder; each turn alone collapsed to a crumpled ring). Any other small wreck, or one past
+   one hull of 96 corners where that keeps within 3 cm of it both ways and the parts' own
+   hulls fill 35% of its volume (a cable's turns on a drum stack into a cylinder; each turn
+   alone collapsed to a crumpled ring; six panels round a nose do not fill their common
+   hull, and keep their own). Any other small wreck, or one past
    the budget, goes, unless it is on the edge of the box (it stays as the collapse left it).
    The small wrecked parts of one piece (a row of flutes, a bolt circle) fare alike: hulls
    for all of them when the budget has room for them all, else none (a row with gaps reads
