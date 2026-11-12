@@ -69,6 +69,14 @@ def cmd_lux(args) -> int:
     rep = lux_preview(args.build, args.plan, args.out, size_m=args.size, cell_m=args.cell,
                       hour=args.hour)
     rep["plan_map"] = plan_map(args.build, args.plan)["image"]
+    # AT3: the deck's glow over the city and the sun, the moon and the exposure by the hour
+    from pathlib import Path
+
+    from .sky import preview as sky_preview
+    pdir = Path(args.plan) if args.plan else Path(args.build) / "atmos"
+    rep["sky"] = sky_preview(json.loads((pdir / "atmos_plan.json").read_text(encoding="utf-8")),
+                             pdir, json.loads((Path(args.build) / "city_model.json")
+                                              .read_text(encoding="utf-8")))["image"]
     print(json.dumps({k: v for k, v in rep.items() if k != "grid"}, indent=1))
     return 0
 

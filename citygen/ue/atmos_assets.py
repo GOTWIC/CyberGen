@@ -15,6 +15,11 @@ run headless by `citygen.unreal_atmos.make_assets`, the job in $CITYGEN_UE_JOB):
   `M_CgBeam`, a searchlight's beam (additive and unlit on a cone along its aim, its color,
   glow and half length in the component's custom primitive data), fading along it, soft at
   its silhouette and where it meets a surface.
+- AT3: `M_CgSky`, the sky dome's material (`is_sky`, unlit): the sky atmosphere in the view
+  direction with the sun's disk, the stars, the moon with its phase, and the cloud deck at
+  its height lit by the sun or the moon and from below by the city's glow (the plan's
+  raster, a texture per city the controller hands its dynamic instance); the sky light's
+  real-time capture takes it too, so the city under a glowing deck takes its color.
 
 Niagara is not used: UE 5.8 exposes no API to author a Niagara emitter from code (its
 editor library builds nothing; only an engine template could be duplicated and fed user
@@ -30,8 +35,8 @@ import unreal
 
 JOB = json.load(open(os.environ["CITYGEN_UE_JOB"], encoding="utf-8"))
 FOLDER = "/Game/CityGen/Core/Atmos"
-VERSION = "3"   # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air);
-                # 3 (AT2): M_CgBeacon and M_CgBeam
+VERSION = "8"   # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air);
+                # 3 (AT2): M_CgBeacon and M_CgBeam; 4 to 8 (AT3): M_CgSky
 EAL = unreal.EditorAssetLibrary
 AT = unreal.AssetToolsHelpers.get_asset_tools()
 MEL = unreal.MaterialEditingLibrary
@@ -302,6 +307,156 @@ def beam():
     return m, True
 
 
+# AT3: the sky dome's material. The engine's sky atmosphere in the view direction (its sky,
+# and the sun's disk while the light is the sun), the stars (a hashed lattice on the view
+# direction, a point per lit cell, twinkling), the moon (a disk at MoonDir lit from SunDir:
+# its phase, a little mottling for its maria, a halo), and the cloud deck: a plane DeckCm up,
+# met along the view ray (so it has parallax as the camera moves), its cover a value-noise
+# fbm drifting with the wind, lit by the atmosphere's light at the deck (the sun by day, the
+# moon by night), the sky under it, and from below by the city's glow (the plan's raster in
+# world X and Y, squared, times GlowMax and GlowScale), fading into the sky's haze with
+# distance. Luminance in the scene's frame; the controller sets the parameters each hour.
+SKY = """
+float3 d = normalize(-CV);
+float3 col = SkyLum + SunDisk * SunDiskOn;
+float above = saturate(d.z * 12.0 + 0.05);
+// the cloud deck (worked out first: the stars only where it leaves the sky open)
+float dens = 0.0;
+float3 cl = 0.0;
+if (DeckCm > 0.0 && d.z > 0.003 && CamPos.z < DeckCm) {
+  float t = (DeckCm - CamPos.z) / d.z;
+  float2 p = (CamPos.xy + d.xy * t) * 0.01;
+  float2 w = p + float2(1.0, 0.35) * Time * Wind;
+  float nsum = 0.0;
+  float amp = 0.55;
+  float2 sc = w / 1600.0;
+  for (int k = 0; k < 4; k++) {
+    float2 i0 = floor(sc);
+    float2 f0 = frac(sc);
+    f0 = f0 * f0 * (3.0 - 2.0 * f0);
+    float a0 = frac(sin(dot(i0, float2(127.1, 311.7))) * 43758.5453);
+    float b0 = frac(sin(dot(i0 + float2(1, 0), float2(127.1, 311.7))) * 43758.5453);
+    float c0 = frac(sin(dot(i0 + float2(0, 1), float2(127.1, 311.7))) * 43758.5453);
+    float e0 = frac(sin(dot(i0 + float2(1, 1), float2(127.1, 311.7))) * 43758.5453);
+    nsum += amp * lerp(lerp(a0, b0, f0.x), lerp(c0, e0, f0.x), f0.y);
+    amp *= 0.5;
+    sc = sc * 2.03 + float2(17.3, 5.1);
+  }
+  nsum /= 0.92;
+  float cov = smoothstep(1.0 - Cover - 0.2, 1.0 - Cover + 0.2, nsum);
+  // (the deck's own texture: thicker and thinner, so a closed deck is not one flat sheet)
+  float tex = saturate(0.35 + 1.3 * (nsum - 0.5) + 0.4 * cov);
+  dens = cov * saturate(1.0 - t / 4.0e6);
+  float2 uv = (CamPos.xy + d.xy * t - GlowLo.xy) / max(GlowHi.xy - GlowLo.xy, 1.0);
+  float3 gl = Texture2DSampleLevel(Glow, GlowSampler, saturate(uv), 0).rgb;
+  float inside = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
+  gl = gl * gl * GlowMax * GlowScale * inside;
+  float thin = 1.0 - cov;
+  cl = (LightIllum * CloudLit * (0.5 + 0.9 * thin) + SkyLum * 0.45) * (0.55 + 0.7 * tex)
+    + gl * (0.25 + 0.75 * tex);
+  float haze = 1.0 - exp(-t / 1.4e6);
+  cl = lerp(cl, SkyLum + gl * 0.3, haze * 0.85);
+}
+// stars (none where the deck is closed or none show)
+if (Stars > 0.0 && dens < 0.98) {
+float3 sd = d * 620.0;
+float3 cell = floor(sd);
+float hs = frac(sin(dot(cell, float3(12.9898, 78.233, 37.719))) * 43758.5453);
+float3 off = frac(sin(cell * float3(127.1, 311.7, 74.7) + hs) * 43758.5453);
+float dist = length(sd - (cell + 0.25 + 0.5 * off));
+float star = hs > 1.0 - 0.012 * Stars ? saturate(1.0 - dist * 3.0) : 0.0;
+float tw = 0.7 + 0.3 * sin(Time * (1.5 + 5.0 * hs) + hs * 91.0);
+col += star * star * tw * StarLum * (0.3 + 2.5 * pow(frac(hs * 977.0), 4.0)) * above;
+}
+// the moon
+float3 m = normalize(MoonDir);
+float md = dot(d, m);
+float rad = MoonRad;
+if (MoonVis > 0.0 && md > 0.85) {           // (its disk and halo: within 32 degrees of it)
+  float3 u = normalize(cross(m, float3(0.0, 0.0, 1.0)) + float3(1e-5, 0.0, 0.0));
+  float3 v = cross(u, m);
+  float2 q = float2(dot(d, u), dot(d, v)) / sin(rad);
+  float rr = dot(q, q);
+  float disk = saturate((1.0 - sqrt(rr)) * 30.0) * step(0.0, md);
+  float3 n = q.x * u + q.y * v - sqrt(saturate(1.0 - rr)) * m;
+  float lit = saturate(dot(n, normalize(SunDir)) * 8.0 + 0.015);
+  float2 g = q * 2.3 + 7.0;
+  float2 gi = floor(g);
+  float2 gf = frac(g);
+  gf = gf * gf * (3.0 - 2.0 * gf);
+  float a = frac(sin(dot(gi, float2(127.1, 311.7))) * 43758.5453);
+  float b = frac(sin(dot(gi + float2(1, 0), float2(127.1, 311.7))) * 43758.5453);
+  float c = frac(sin(dot(gi + float2(0, 1), float2(127.1, 311.7))) * 43758.5453);
+  float e = frac(sin(dot(gi + float2(1, 1), float2(127.1, 311.7))) * 43758.5453);
+  float mar = 0.72 + 0.28 * lerp(lerp(a, b, gf.x), lerp(c, e, gf.x), gf.y);
+  float limb = 0.75 + 0.25 * sqrt(saturate(1.0 - rr));
+  col += MoonTint * MoonLum * disk * lit * mar * limb * MoonVis * above;
+  float ang = acos(clamp(md, -1.0, 1.0));
+  col += MoonTint * MoonLum * MoonVis * above * 0.004 * exp(-ang * 14.0);
+}
+col = lerp(col, cl, dens);
+return col;
+"""
+
+SKY_SCALARS = (("DeckCm", 42000.0), ("Cover", 0.8), ("Stars", 0.0), ("StarLum", 0.6),
+               ("MoonLum", 0.5), ("MoonRad", 0.0046), ("MoonVis", 0.0), ("SunDiskOn", 1.0),
+               ("GlowMax", 1.0), ("GlowScale", 0.0), ("CloudLit", 0.03), ("Wind", 2.0))
+SKY_VECTORS = (("SunDir", (0.0, 0.0, 1.0, 0.0)), ("MoonDir", (0.0, 0.5, 0.5, 0.0)),
+               ("MoonTint", (0.8, 0.86, 1.0, 1.0)),
+               # (a vector parameter reaches a custom node as its RGB: the glow's corners as
+               # two, each its X and Y)
+               ("GlowLo", (-1.0e6, -1.0e6, 0.0, 0.0)), ("GlowHi", (1.0e6, 1.0e6, 0.0, 0.0)))
+
+
+def sky_material():
+    m, made = material("M_CgSky")
+    if not made:
+        return m, False
+    m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
+    m.set_editor_property("is_sky", True)
+    m.set_editor_property("two_sided", True)
+    names, ins = [], []
+    for cls, n in ((unreal.MaterialExpressionCameraVectorWS, "CV"),
+                   (unreal.MaterialExpressionCameraPositionWS, "CamPos"),
+                   (unreal.MaterialExpressionSkyAtmosphereViewLuminance, "SkyLum"),
+                   (unreal.MaterialExpressionTime, "Time")):
+        ins.append(expr(m, cls, -1400, 100 * len(names)))
+        names.append(n)
+    disk = expr(m, unreal.MaterialExpressionSkyAtmosphereLightDiskLuminance, -1400, 500)
+    ins.append(disk)
+    names.append("SunDisk")
+    for k, (n, v) in enumerate(SKY_SCALARS):
+        ins.append(expr(m, unreal.MaterialExpressionScalarParameter, -1400, 700 + 80 * k,
+                        parameter_name=n, default_value=v))
+        names.append(n)
+    for k, (n, v) in enumerate(SKY_VECTORS):
+        ins.append(expr(m, unreal.MaterialExpressionVectorParameter, -1400, 1800 + 120 * k,
+                        parameter_name=n, default_value=unreal.LinearColor(*v)))
+        names.append(n)
+    # the atmosphere's light (the sun, else the moon) at the deck over the camera
+    deckpos = custom(m, -1700, 2400, "return CamPos + float3(0.0, 0.0, max(DeckCm, 100.0));",
+                     ["CamPos", "DeckCm"], "CMOT_FLOAT3", "CgDeckPos")
+    link(ins[names.index("CamPos")], "", deckpos, "CamPos")
+    link(ins[names.index("DeckCm")], "", deckpos, "DeckCm")
+    illum = expr(m, unreal.MaterialExpressionSkyAtmosphereLightIlluminance, -1400, 2500)
+    link(deckpos, "", illum, "WorldPosition")
+    ins.append(illum)
+    names.append("LightIllum")
+    black = unreal.load_asset("/Engine/EngineResources/Black.Black")
+    glow = expr(m, unreal.MaterialExpressionTextureObjectParameter, -1400, 2650,
+                parameter_name="Glow", texture=black)
+    ins.append(glow)
+    names.append("Glow")
+    sk = custom(m, -600, 600, SKY, names, "CMOT_FLOAT3", "CgSky")
+    for a, n in zip(ins, names):
+        link(a, "", sk, n)
+    MEL.connect_material_property(sk, "", MP.MP_EMISSIVE_COLOR)
+    MEL.recompile_material(m)
+    EAL.set_metadata_tag(m, "cg.atmos", VERSION)
+    EAL.save_loaded_asset(m, only_if_is_dirty=False)
+    return m, True
+
+
 def main():
     res = {"ok": False, "version": VERSION}
     try:
@@ -312,6 +467,7 @@ def main():
         _, res["wet_made"] = wet(c)
         _, res["beacon_made"] = beacon()
         _, res["beam_made"] = beam()
+        _, res["sky_made"] = sky_material()
         res["ok"] = True
     except Exception:
         res["error"] = traceback.format_exc()

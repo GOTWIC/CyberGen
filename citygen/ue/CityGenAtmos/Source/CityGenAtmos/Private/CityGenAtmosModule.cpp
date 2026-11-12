@@ -2,7 +2,9 @@
 // CityGenAtmos.Lights, .Fog, .Rain, .Wet, .MegaLights, .FarPools, .Fixtures [0|1] (toggling without an
 // argument), CityGenAtmos.Tiers LIVE RANGE_M SHADOWED, .High LIVE RANGE_M (AT2), .Hour H, .Gain G,
 // .Scattering S,
-// .Status (the state as one JSON line). AT1: the plan comes with the level (the importer's
+// .Status (the state as one JSON line). AT3: .Hour also takes day, dusk or night; .Sky and
+// .Exposure [0|1] (the sky and time; the exposure held at the hour's), .TimeSpeed H (hours a
+// second), .Cover C (the cloud deck's cover for the session). AT1: the plan comes with the level (the importer's
 // controller and its cells' data actors), no longer from a folder (AT0's .Load and
 // -CityGenAtmosPlan are gone).
 
@@ -40,6 +42,8 @@ namespace
 	CG_ATMOS_TOGGLE(WetCmd, "CityGenAtmos.Wet", "CityGenAtmos.Wet [0|1]: wet streets (a deferred decal round the view)", bWet, SetWet)
 	CG_ATMOS_TOGGLE(PoolsCmd, "CityGenAtmos.FarPools", "CityGenAtmos.FarPools [0|1]: the play features' light pools past the live range (the far tier)", bFarPools, SetFarPools)
 	CG_ATMOS_TOGGLE(MegaCmd, "CityGenAtmos.MegaLights", "CityGenAtmos.MegaLights [0|1]: MegaLights by the actor's post-process volume", bMegaLights, SetMegaLights)
+	CG_ATMOS_TOGGLE(SkyCmd, "CityGenAtmos.Sky", "CityGenAtmos.Sky [0|1]: AT3's sky and time (the sun, the moon, the sky dome, the exposure by the hour)", bSky, SetSky)
+	CG_ATMOS_TOGGLE(ExposureCmd, "CityGenAtmos.Exposure", "CityGenAtmos.Exposure [0|1]: the exposure held at the hour's (0: the engine's eye adaptation)", bLockExposure, SetLockExposure)
 	CG_ATMOS_TOGGLE(FixturesCmd, "CityGenAtmos.Fixtures", "CityGenAtmos.Fixtures [0|1]: AT2's aviation beacons and searchlight beams", bFixtures, SetFixtures)
 #undef CG_ATMOS_TOGGLE
 
@@ -66,11 +70,27 @@ namespace
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs HourCmd(TEXT("CityGenAtmos.Hour"),
-		TEXT("CityGenAtmos.Hour H: the hour (every light's schedule, MPC_CityGen's Hour)"),
+		TEXT("CityGenAtmos.Hour H|day|dusk|night: the hour (the sun and the moon, the exposure, every light's schedule, MPC_CityGen's Night and Hour)"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 		{
 			ACityGenAtmos* A = AtmosIn(World);
-			if (A && Args.Num()) { A->SetHour(FCString::Atof(*Args[0])); }
+			if (A && Args.Num() && !A->SetNamedHour(Args[0])) { A->SetHour(FCString::Atof(*Args[0])); }
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs TimeSpeedCmd(TEXT("CityGenAtmos.TimeSpeed"),
+		TEXT("CityGenAtmos.TimeSpeed H: how fast the hour runs (game hours a second; 0 holds it)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenAtmos* A = AtmosIn(World);
+			if (A && Args.Num()) { A->SetTimeSpeed(FCString::Atof(*Args[0])); }
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs CoverCmd(TEXT("CityGenAtmos.Cover"),
+		TEXT("CityGenAtmos.Cover C: the cloud deck's cover, 0 to 1 (this session)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenAtmos* A = AtmosIn(World);
+			if (A && Args.Num()) { A->SetCloudCover(FCString::Atof(*Args[0])); }
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs GainCmd(TEXT("CityGenAtmos.Gain"),

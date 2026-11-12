@@ -17,7 +17,7 @@
      "type": "string"
     },
     "key": {
-     "description": "`atmos` (the controller), `atmos.lights.<tile>` (a tile's light spawner); AT3 adds entries that replace `lighting.sun`, `lighting.sky` and `lighting.atmosphere`.",
+     "description": "`atmos` (the controller, which AT3 has drive the importer's `lighting.sun`, `lighting.sky` and the sky by the hour), `atmos.lights.<tile>` (a tile's lights).",
      "title": "Key",
      "type": "string"
     },

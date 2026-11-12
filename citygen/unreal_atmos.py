@@ -17,6 +17,11 @@
   period, amount and phase after AT1's 16), the flags' bit 6 the high tier and bits 28-29 the
   animation; the controller's `max_high` and `high_range_m` (the plan's high tier); a plan
   whose faces check failed is not delivered either.
+- AT3: the controller's sky and time (`sky_settings`: where the sun and the moon stand, the
+  exposure, Night, sun, sky light and stars curves over the sun's elevation, the cloud deck,
+  the named hours), and the deck's glow raster copied beside the manifest
+  (`BUILD/unreal/atmos_sky_glow.png`, `GLOW`), which the import makes a texture the
+  controller's sky reads; both in the controller's hash.
 """
 
 from __future__ import annotations
@@ -31,6 +36,7 @@ SCRIPT = Path(__file__).parent / "ue" / "atmos_assets.py"
 STAMP = "citygen_atmos_assets.txt"          # in PROJECT/Saved
 PLAN_DIR = "atmos"                          # BUILD/atmos: `atmosgen plan`'s default
 DATA = "atmos.json"                         # BUILD/unreal/atmos.json
+GLOW = "atmos_sky_glow.png"                 # BUILD/unreal/atmos_sky_glow.png (AT3)
 CONTROLLER_KEY = "atmos"
 CELL_M = 128.0                              # World Partition's main cells (unreal.MAIN_CELL_M)
 PACK_VERSION = 2                            # 2 (AT2): the high tier, a blink or a sweep
@@ -141,6 +147,47 @@ def cell_name(ix: int, iy: int) -> tuple[str, str]:
     return tile, f"{tile}.{QUARTERS[(ix - 2 * tx, iy - 2 * ty)]}"
 
 
+def _linear(h: str) -> list[float]:
+    out = []
+    for k in range(3):
+        c = int(h[1 + 2 * k:3 + 2 * k], 16) / 255.0
+        out.append(_r(c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4, 4))
+    return out
+
+
+def sky_settings(plan: dict) -> dict:
+    """AT3: the controller's sky and time from the plan's `sky` (an AT2 plan has none: {}).
+    The glow's bounds in Unreal's frame (cm: [min X, min Y, max X, max Y], Y south)."""
+    s = plan.get("sky") or {}
+    if "curve" not in s:
+        return {}
+    m, cv, g = s["moon"], s["curve"], s.get("glow") or {}
+    out = {"latitude_deg": float(s["latitude_deg"]),
+           "declination_deg": float(s["declination_deg"]),
+           "moon_lag_h": float(m["lag_h"]), "moon_declination_deg": float(m["declination_deg"]),
+           "moon_lit": float(m["lit"]), "moon_share": float(m["share"]),
+           "moon_color": _linear(m["color"]), "moon_disk_nits": float(m["disk_nits"]),
+           "moon_disk_deg": float(m["disk_deg"]), "moon_rise": [float(v) for v in m["rise"]],
+           "moon_cloud": float(m["cloud"]), "sun_lux": float(s["sun_lux"]),
+           "scene_ev100": float(s["ev_night"]), "day_ev100": float(s["ev_day"]),
+           "curve_elev": [float(v) for v in cv["elev"]],
+           "curve_ev": [float(v) for v in cv["ev"]],
+           "curve_night": [float(v) for v in cv["night"]],
+           "curve_sun": [float(v) for v in cv["sun"]],
+           "curve_sky": [float(v) for v in cv["sky"]],
+           "curve_stars": [float(v) for v in cv["stars"]],
+           "stars": float(s["stars"]), "cloud_deck_m": float(s["cloud_deck_m"]),
+           "cloud_cover": float(s["cloud_cover"]),
+           "day_hour": float(s["hours"]["day"]), "dusk_hour": float(s["hours"]["dusk"]),
+           "night_hour": float(s["hours"]["night"])}
+    if g:
+        x0, y0, x1, y1 = g["bounds"]
+        out.update({"glow_bounds": [_r(x0 * 100.0, 1), _r(-y1 * 100.0, 1),
+                                    _r(x1 * 100.0, 1), _r(-y0 * 100.0, 1)],
+                    "glow_max_nits": float(g["max_nits"]), "glow_sha256": g["sha256"]})
+    return out
+
+
 def atmos_data(pdir: Path) -> tuple[dict | None, str]:
     """The plan in the importer's form ({controller, cells}), or (None, why not)."""
     text = (pdir / "atmos_plan.json").read_text(encoding="utf-8")
@@ -191,6 +238,7 @@ def atmos_data(pdir: Path) -> tuple[dict | None, str]:
            "near_range_m": float(tiers.get("near_m", 60.0)),
            "max_high": int(tiers.get("high_max", 0)),
            "high_range_m": float(tiers.get("high_m", 750.0)), "cell_m": CELL_M}
+    ctl.update(sky_settings(plan))
     return {"version": PACK_VERSION, "controller": ctl, "cells": out}, ""
 
 
@@ -211,8 +259,20 @@ def write_atmos(build: str | Path, given: str | Path | None = None) -> dict | No
     if not dest.is_file() or dest.read_text(encoding="utf-8") != text:
         dest.write_text(text, encoding="utf-8", newline="\n")
     ctl = data["controller"]
+    # AT3: the deck's glow beside the manifest (the import makes it a texture)
+    glow = None
+    plan_sky = json.loads((pdir / "atmos_plan.json").read_text(encoding="utf-8")).get("sky") or {}
+    g = plan_sky.get("glow")
+    gdest = Path(build) / "unreal" / GLOW
+    if g and (pdir / g["file"]).is_file():
+        b = (pdir / g["file"]).read_bytes()
+        if not gdest.is_file() or gdest.read_bytes() != b:
+            gdest.write_bytes(b)
+        glow = {"file": f"unreal/{GLOW}", "sha256": hashlib.sha256(b).hexdigest()}
+    elif gdest.is_file():
+        gdest.unlink()
     return {"file": f"unreal/{DATA}", "plan": str(pdir), "plan_hash": ctl["plan_hash"],
-            "key": CONTROLLER_KEY, "hash": _sha16([PACK_VERSION, ctl]),
+            "key": CONTROLLER_KEY, "hash": _sha16([PACK_VERSION, ctl]), "glow": glow,
             "lights": sum(c["count"] for c in data["cells"]),
             "cells": [{k: c[k] for k in ("key", "cell", "tile", "center", "count", "hash")}
                       for c in data["cells"]]}

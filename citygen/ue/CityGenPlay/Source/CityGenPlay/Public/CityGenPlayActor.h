@@ -1,7 +1,11 @@
 // citygen's play features in a level `citygen unreal` imported (docs/unreal_export.md, "Play
 // features"): a minimap, the map (M: zoom, pan, click to teleport), a free camera (.), and a
-// developer menu (Tab) with day and night. One actor per city level, always loaded; the
-// importer (citygen/ue/import_city.py) sets its data. Frames: Unreal cm, X east, Y south.
+// developer menu (Tab) with the time of day. One actor per city level, always loaded; the
+// importer (citygen/ue/import_city.py) sets its data. AT3: the sky, the moon, the hour and the
+// exposure are atmosgen's (its CityGenAtmos controller, found by its class name): the day and
+// night button and the menu's time-of-day slider drive it; the night switch here (the sun as
+// a dim moon, NightHour, the held night exposure) is kept only for a level without it.
+// Frames: Unreal cm, X east, Y south.
 
 #pragma once
 
@@ -93,6 +97,9 @@ public:
 	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
 	float PoolRadiusM = 7.f;
 
+	// (AT3: NightHour, NightExposureEV100 and MoonFraction serve only a level without
+	// atmosgen's controller, whose sky and time replace them)
+
 	/** The night's hour (MPC_CityGen's Hour: each building's rooms lit by its schedule). */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
 	float NightHour = 21.f;
@@ -122,8 +129,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "CityGen")
 	void SetDevMenuOpen(bool bOpen);
 
+	/** Day or night: with atmosgen's controller its day or night hour (AT3), else the night
+	 *  switch of a level without it. */
 	UFUNCTION(BlueprintCallable, Category = "CityGen")
 	void SetNight(bool bOn);
+
+	/** AT3: the time of day (0 to 24) on atmosgen's controller (the menu's slider). False
+	 *  without one. */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	bool SetTimeOfDay(float InHour);
 
 	/** Teleport the player to an Unreal location (cm; Z ignored): a walking pawn onto the
 	 *  nearest walkway, held there until the city has streamed in around it; a flying one
@@ -144,9 +158,9 @@ public:
 	// UFUNCTIONs and properties, so the play features build and run without that plugin. --
 
 	/** What a click on a developer menu row does, by the row's name: night, freecam,
-	 *  minimap, messages, and with an atmos controller fog, rain, wet, hour+ and hour- (the
-	 *  overlay's clicks and the console's CityGen.MenuRow). False for a row the menu does not
-	 *  show. */
+	 *  minimap, messages, and with an atmos controller fog, rain, wet, hour+ and hour-, and
+	 *  AT3's time slider as hour=H (a number, or day, dusk or night) (the overlay's clicks
+	 *  and the console's CityGen.MenuRow). False for a row the menu does not show. */
 	UFUNCTION(BlueprintCallable, Category = "CityGen")
 	bool ClickMenuRow(const FString& Row);
 
@@ -166,7 +180,11 @@ public:
 	bool IsMapOpen() const { return bMapOpen; }
 	bool IsDevMenuOpen() const { return bDevOpen; }
 	bool IsFreeCam() const;
-	bool IsNight() const { return bNight; }
+	/** Night: atmosgen's Night over a half (AT3), else the night switch. */
+	bool IsNight() const;
+
+	/** AT3: atmosgen's Night (0 by day, 1 by night), else the switch's 0 or 1. */
+	float NightShare() const;
 	bool IsWaitingForStreaming() const { return bWaiting; }
 	float GetFreeCamSpeed() const;
 	FString GetToast() const;

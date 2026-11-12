@@ -29,6 +29,12 @@ washes; the job's `engine` "cycles" renders in Cycles on the GPU (its light tree
 thousands of lights), `fog` a haze of that density as a volume box round the view, `wet` the
 streets and ground glossier and darker where they face up. A job without them renders as
 before.
+
+AT3: a job's `dusk` (atmosgen's preview at an hour the sun is still near the horizon) lights
+its night pass as twilight: a sky graded from the glow at the horizon under the sun to a deep
+blue zenith (`dusk_world`), as bright as the sun's depression leaves it, the sun lamp warm and
+low while it is up, the windows, neon and signs at the plan's Night for that elevation; the
+plan's lights come in dimmed by the exposure's step from the night (`atmosgen/preview.py`).
 """
 
 import json
@@ -270,8 +276,72 @@ def wet(objs, amount):
                     nt.links.new(mul.outputs["Result"], inp)
 
 
+def dusk_world(sc, sun, d):
+    """AT3: the twilight sky (a world built once): a gradient on the view direction, warm at
+    the horizon under the sun's azimuth, cooler round it, deep blue overhead, scaled by how
+    far the sun is under the horizon; the sun lamp warm and low while it is up."""
+    nt = sc.world.node_tree
+    bg = nt.nodes.get("Background")
+    e, az = float(d["sun_elev"]), math.radians(float(d["sun_az"]))
+    ce = math.cos(math.radians(e))
+    sd = Vector((math.sin(az) * ce, math.cos(az) * ce, math.sin(math.radians(e))))
+    if not nt.nodes.get("cg_dusk"):
+        tc = nt.nodes.new("ShaderNodeTexCoord")
+        tc.name = "cg_dusk"
+        sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+        nt.links.new(tc.outputs["Generated"], sep.inputs[0])
+        dot = nt.nodes.new("ShaderNodeVectorMath")
+        dot.operation = "DOT_PRODUCT"
+        dot.name = "cg_dusk_dot"
+        nt.links.new(tc.outputs["Generated"], dot.inputs[0])
+        # toward the sun: (dot + 1) / 2, to the 3rd power
+        half = nt.nodes.new("ShaderNodeMath")
+        half.operation = "MULTIPLY_ADD"
+        half.inputs[1].default_value = 0.5
+        half.inputs[2].default_value = 0.5
+        nt.links.new(dot.outputs["Value"], half.inputs[0])
+        pw = nt.nodes.new("ShaderNodeMath")
+        pw.operation = "POWER"
+        pw.inputs[1].default_value = 3.0
+        nt.links.new(half.outputs[0], pw.inputs[0])
+        # near the horizon: 1 at it, 0 from z 0.4 up
+        hz = nt.nodes.new("ShaderNodeMapRange")
+        hz.inputs["From Min"].default_value = 0.0
+        hz.inputs["From Max"].default_value = 0.4
+        hz.inputs["To Min"].default_value = 1.0
+        hz.inputs["To Max"].default_value = 0.0
+        nt.links.new(sep.outputs["Z"], hz.inputs["Value"])
+        warm = nt.nodes.new("ShaderNodeMix")
+        warm.data_type = "RGBA"
+        warm.inputs[6].default_value = (0.16, 0.09, 0.2, 1.0)       # the horizon away from it
+        warm.inputs[7].default_value = (1.0, 0.36, 0.1, 1.0)        # under the sun
+        nt.links.new(pw.outputs[0], warm.inputs[0])
+        sky = nt.nodes.new("ShaderNodeMix")
+        sky.data_type = "RGBA"
+        sky.inputs[6].default_value = (0.02, 0.035, 0.11, 1.0)      # the zenith
+        nt.links.new(hz.outputs["Result"], sky.inputs[0])
+        nt.links.new(warm.outputs[2], sky.inputs[7])
+        nt.links.new(sky.outputs[2], bg.inputs["Color"])
+    nt.nodes["cg_dusk_dot"].inputs[1].default_value = tuple(sd)
+    # the twilight's brightness: a tenth for every 6 degrees the sun is under the horizon
+    bg.inputs["Strength"].default_value = \
+        float(d.get("sky", 1.0)) * 0.35 * 10.0 ** (min(e, 0.0) / 6.0)
+    if e > -1.0:
+        sun.rotation_euler = sd.to_track_quat("Z", "Y").to_euler()
+        sun.data.energy = 1.2 * max(0.0, math.sin(math.radians(e + 1.0)))
+        sun.data.color = (1.0, 0.55, 0.3)
+    else:
+        sun.data.energy = 0.0
+    AM.set_night(float(d["night"]))
+    sc.view_settings.exposure = float(JOB.get("exposure", 0.0))
+
+
 def lighting(sc, sun, mode):
     bg = sc.world.node_tree.nodes.get("Background")
+    if mode == "night" and JOB.get("dusk"):
+        dusk_world(sc, sun, JOB["dusk"])
+        glare(sc, True)
+        return
     if mode == "day":
         bg.inputs["Color"].default_value = (0.42, 0.5, 0.62, 1.0)
         bg.inputs["Strength"].default_value = 0.8
@@ -965,7 +1035,8 @@ def main():
                     lobjs = lamps(v.get("lights", []), v.get("washes", []))
             for o in lobjs:
                 o.hide_render = mode != "night"
-            name = v["name"] if mode == "day" else f"{v['name']}_night"
+            name = v["name"] if mode == "day" else \
+                f"{v['name']}_{'dusk' if JOB.get('dusk') else 'night'}"
             sc.render.filepath = f"{JOB['out']}/{name}.jpg"
             bpy.ops.render.render(write_still=True)
             rep["files"].append(f"{name}.jpg")

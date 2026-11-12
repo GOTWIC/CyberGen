@@ -167,14 +167,76 @@ class Mask(_Model):
     sha256: str
 
 
+class Moon(_Model):
+    """AT3: the moon (`sky.moon_at`): it trails the sun by `lag_h`, its declination mirrored
+    by its phase."""
+    phase: float = Field(description="0 new, 0.5 full.")
+    lag_h: float = Field(description="How far it trails the sun (hours): 24 times the phase.")
+    declination_deg: float
+    lit: float = Field(description="Its lit fraction (its light scales by it).")
+    share: float = Field(description="A full moon's light as a share of the sun's (the look's).")
+    color: str = Field(description="Its light's color (#rrggbb).")
+    disk_nits: float = Field(description="Its disk's luminance in the scene's frame (cd/m2 at "
+                                         "the night's exposure).")
+    disk_deg: float = Field(description="Its disk's angular diameter.")
+    rise: Vec2 = Field(description="Its light fades in between these elevations (degrees).")
+    cloud: float = Field(description="The share of its light the deck's cover takes.")
+
+
+class Glow(_Model):
+    """AT3: the cloud deck's underside lit by the city (`sky.glow`): a raster of its
+    luminance, linear RGB, square-root encoded in an 8-bit PNG (row 0 the north edge)."""
+    file: str = Field(description="`sky_glow.png`, relative to the plan.")
+    bounds: Annotated[list[float], Field(min_length=4, max_length=4,
+                                         description="[x0, y0, x1, y1], citygen m.")]
+    cell_m: float
+    px: Annotated[list[int], Field(min_length=2, max_length=2, description="[width, height].")]
+    max_nits: float = Field(description="A channel's value at 255 (cd/m2, physical): the "
+                                        "runtime squares the texel and scales by it.")
+    max_luma_nits: float = Field(description="The brightest cell's luminance (cd/m2).")
+    mean_nits: float = Field(description="The mean over the city's extent (cd/m2).")
+    peak_at: Vec2 = Field(description="Where the deck glows brightest (citygen m).")
+    sha256: str
+
+
+class SkyHour(_Model):
+    """AT3: a row of the plan's day (the report; the runtime computes any hour itself)."""
+    hour: int
+    sun_elev: float
+    sun_az: float = Field(description="Clockwise from north (degrees).")
+    moon_elev: float
+    moon_az: float
+    ev100: float = Field(description="The scene's exposure (EV100, Unreal's frame).")
+    night: float = Field(description="MPC_CityGen's Night.")
+
+
 class Sky(_Model):
-    moon: float = Field(description="The moon's share of the sun's intensity.")
-    stars: float
+    """AT3: the sky and the time of day (scope 6.2, `sky.make`)."""
+    latitude_deg: float
+    day_of_year: int
+    declination_deg: float = Field(description="The sun's, that day.")
+    moon: Moon
+    sun_lux: float = Field(description="The sun's light by day in the scene's frame (lux; "
+                                       "the importer's sun).")
+    ev_night: float = Field(description="The night's exposure in the scene's frame (EV100), "
+                                        "held: the plan's lights are shown at "
+                                        "2^(ev_night - night_ev100) at every hour.")
+    ev_day: float = Field(description="The day's exposure (EV100), darker under a closed "
+                                      "deck.")
+    curve: dict[str, list[float]] = Field(description="Curves over the sun's elevation "
+                                                      "(`elev`): ev (night 0 to day 1), "
+                                                      "night, sun, sky, stars "
+                                                      "(`presets.SUN_CURVE`).")
+    stars: float = Field(description="How many stars the clear dark sky shows (0 to 1).")
     cloud_deck_m: float = Field(description="The cloud deck's height (0: none).")
-    cloud_glow: float = Field(description="How much of the city's upward light the deck "
-                                          "shows.")
-    upward_lm: float = Field(0.0, description="The plan's upward luminous flux (lm), for the "
-                                              "deck's glow (AT3).")
+    cloud_cover: float = Field(description="The share of the sky the deck hides.")
+    cloud_glow: float = Field(description="A gain on the city's light the deck shows.")
+    upward_lm: float = Field(0.0, description="The plan's upward luminous flux (lm) at the "
+                                              "glow's hour, the deck's glow.")
+    glow: Glow | None = None
+    hours: dict[str, float] = Field(description="The named hours: day, dusk (the sun at "
+                                                "`presets.SKY` dusk elevation), night.")
+    by_hour: list[SkyHour]
 
 
 class Tiers(_Model):
@@ -223,9 +285,9 @@ class AtmosPlan(_Model):
 
 
 class ContributionEntry(_Model):
-    key: str = Field(description="`atmos` (the controller), `atmos.lights.<tile>` (a tile's "
-                                 "light spawner); AT3 adds entries that replace "
-                                 "`lighting.sun`, `lighting.sky` and `lighting.atmosphere`.")
+    key: str = Field(description="`atmos` (the controller, which AT3 has drive the "
+                                 "importer's `lighting.sun`, `lighting.sky` and the sky by "
+                                 "the hour), `atmos.lights.<tile>` (a tile's lights).")
     kind: Literal["controller", "tile_lights", "volume", "emitter"]
     tile: str | None = None
     file: str

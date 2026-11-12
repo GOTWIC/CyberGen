@@ -436,6 +436,25 @@ void ACityGenPlay::SetNight(bool bOn)
 		return;
 	}
 	bNight = bOn;
+	// AT3: atmosgen's sky and time drive the sun, the moon, the sky light, the exposure and
+	// MPC_CityGen's Night and Hour: day or night is its day or night hour
+	if (AActor* A = GetAtmos())
+	{
+		if (UFunction* F = A->FindFunction(TEXT("SetNamedHour")))
+		{
+			struct { FString Name; bool Ret = false; } Parms{bOn ? FString(TEXT("night")) : FString(TEXT("day"))};
+			A->ProcessEvent(F, &Parms);
+			if (NightVolume)
+			{
+				NightVolume->bEnabled = false;
+			}
+			LampsAt = -1.0;
+			Toast(bOn ? TEXT("Night") : TEXT("Day"), 1.5f);
+			UE_LOG(LogCityGenPlay, Log, TEXT("CityGen play: %s (atmosgen's hour %.2f)"),
+				bOn ? TEXT("night") : TEXT("day"), GetAtmosHour());
+			return;
+		}
+	}
 	if (NightCollection)
 	{
 		UKismetMaterialLibrary::SetScalarParameterValue(this, NightCollection, TEXT("Night"), bOn ? 1.f : 0.f);
@@ -599,7 +618,7 @@ void ACityGenPlay::Tick(float DeltaSeconds)
 			}
 		}
 	}
-	if (bNight && (LampsAt < 0.0 || Now - LampsAt > LampEvery))
+	if (NightShare() > 0.02f && (LampsAt < 0.0 || Now - LampsAt > LampEvery))
 	{
 		LampsAt = Now;
 		UpdateLamps();
@@ -647,6 +666,26 @@ bool ACityGenPlay::ClickMenuRow(const FString& Row)
 	if (R == TEXT("night"))
 	{
 		SetNight(!IsNight());
+	}
+	else if (R.StartsWith(TEXT("hour=")))
+	{
+		// AT3: the time-of-day slider (a number of hours, or day, dusk or night)
+		const FString V = R.Mid(5);
+		AActor* A = GetAtmos();
+		if (!A)
+		{
+			return false;
+		}
+		UFunction* F = A->FindFunction(TEXT("SetNamedHour"));
+		struct { FString Name; bool Ret = false; } Parms{V};
+		if (F)
+		{
+			A->ProcessEvent(F, &Parms);
+		}
+		if (!Parms.Ret)
+		{
+			SetTimeOfDay(FCString::Atof(*V));
+		}
 	}
 	else if (R == TEXT("freecam"))
 	{
@@ -761,6 +800,36 @@ void ACityGenPlay::SetAtmosHour(float InHour)
 	CallOne(GetAtmos(), TEXT("SetHour"), false, InHour);
 }
 
+bool ACityGenPlay::SetTimeOfDay(float InHour)
+{
+	if (!GetAtmos())
+	{
+		return false;
+	}
+	SetAtmosHour(FMath::Fmod(FMath::Fmod(InHour, 24.f) + 24.f, 24.f));
+	LampsAt = -1.0;
+	return true;
+}
+
+float ACityGenPlay::NightShare() const
+{
+	// AT3: atmosgen's Night, from its sun (its UFUNCTION GetNight)
+	AActor* A = GetAtmos();
+	UFunction* F = A ? A->FindFunction(TEXT("GetNight")) : nullptr;
+	if (F)
+	{
+		struct { float Ret = 0.f; } Parms;
+		A->ProcessEvent(F, &Parms);
+		return Parms.Ret;
+	}
+	return bNight ? 1.f : 0.f;
+}
+
+bool ACityGenPlay::IsNight() const
+{
+	return NightShare() > 0.5f;
+}
+
 FString ACityGenPlay::GetStatus() const
 {
 	const APawn* Pawn = PC ? PC->GetPawn() : nullptr;
@@ -775,7 +844,7 @@ FString ACityGenPlay::GetStatus() const
 		"\"light_pools\": %d, "
 		"\"lamp_points\": %d, \"walk_points\": %d, \"map_texture\": %s, "
 		"\"overlay\": %s, \"atmos\": %s, \"fog\": %s, \"rain\": %s, \"wet\": %s, \"hour\": %.2f}"),
-		bReady ? TEXT("true") : TEXT("false"), bNight ? TEXT("true") : TEXT("false"),
+		bReady ? TEXT("true") : TEXT("false"), IsNight() ? TEXT("true") : TEXT("false"),
 		bMapOpen ? TEXT("true") : TEXT("false"), bDevOpen ? TEXT("true") : TEXT("false"),
 		IsFreeCam() ? TEXT("true") : TEXT("false"), bWaiting ? TEXT("true") : TEXT("false"),
 		Pawn ? *Pawn->GetClass()->GetName() : TEXT(""), At.X / 100.0, -At.Y / 100.0, At.Z / 100.0,

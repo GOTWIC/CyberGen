@@ -45,9 +45,11 @@ import numpy as np
 from . import emitters as EM
 from . import planmodel as PM
 from . import presets as P
+from . import sky as SK
 from . import spec as S
 
-CODE_FILES = ("presets.py", "spec.py", "planmodel.py", "emitters.py", "plan.py", "lux.py")
+CODE_FILES = ("presets.py", "spec.py", "planmodel.py", "emitters.py", "plan.py", "lux.py",
+              "sky.py")
 OUT = "atmos"
 TILE_M = 256.0
 
@@ -68,7 +70,7 @@ def code_hash() -> str:
     here = Path(__file__).parent
     for name in CODE_FILES:
         h.update(name.encode() + b"\0" + (here / name).read_bytes().replace(b"\r\n", b"\n"))
-    return f"at2.{h.hexdigest()[:12]}"
+    return f"at3.{h.hexdigest()[:12]}"
 
 
 def u(*key) -> float:
@@ -412,6 +414,8 @@ class Plan:
         self.corner_report: dict = {}
         self.fill_report: dict = {}
         self._jc = None
+        # (AT3: the schedules, `dusk_dawn` and `tunnel` set by the sun, `sky.schedules`)
+        self.schedules = {k: list(v) for k, v in P.SCHEDULES.items()}
 
     def mood(self, did: str | None) -> dict:
         return self.moods.get(did or "", None) or S.mood(None, None, None)
@@ -1526,7 +1530,7 @@ class Plan:
                                     z=self.c.ground(x, y) + nz + P.CORNER_POLE_Z_M,
                                     yaw=math.degrees(math.atan2(dy, dx)), mount="pole",
                                     commit=False)
-                    e = LX.light_at(rec, xyz, occ, P.SCHEDULES)
+                    e = LX.light_at(rec, xyz, occ, self.schedules)
                     left = int((cur + e < lim).sum())
                     if best is None or left < best[0]:
                         best = (left, si, rec, e)
@@ -1536,7 +1540,7 @@ class Plan:
                 used.append(si)
                 self.lights.append(rec)
                 cur += e
-                ii, ee = LX.light_on(rec, S.points, occ, P.SCHEDULES)
+                ii, ee = LX.light_on(rec, S.points, occ, self.schedules)
                 if ii.size:
                     np.add.at(E, ii, ee)
                 rep["poles"] += 1
@@ -1584,7 +1588,7 @@ class Plan:
                     rec = self._fill_light(S, k, c, rnd)
                     if rec is None:
                         continue
-                    ii, ee = LX.light_on(rec, S.points, occ, P.SCHEDULES)
+                    ii, ee = LX.light_on(rec, S.points, occ, self.schedules)
                     if ii.size:
                         np.add.at(E, ii, ee)
                     rep[c] = rep.get(c, 0) + 1
@@ -1668,6 +1672,9 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     spec_text = dumps(S.dump(res.spec))
     filled = S.fill(res.spec, list(city.districts.values()))
     pl = Plan(city, filled)
+    # AT3: the sun and the moon, the curves, the named hours; the schedules the sun sets
+    sky = SK.make(filled, filled.get("sky"))
+    pl.schedules.update(SK.schedules(sky))
     tm = {}
 
     def timed(name, fn, *a):
@@ -1684,7 +1691,7 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     levels = {k: tuple(v) for k, v in filled["light_levels"].items()}
     smp = timed("samples", LX.Samples, city)
     occ = timed("occluders", city.occluders)
-    E = timed("lux", LX.illuminance_points, pl.lights, smp.points, occ, P.SCHEDULES)
+    E = timed("lux", LX.illuminance_points, pl.lights, smp.points, occ, pl.schedules)
     E = timed("corners", pl.corners, smp, E, levels)
     E = timed("fill", pl.fill, smp, E, levels)
     lux = timed("check", LX.check, smp, E, levels)
@@ -1693,6 +1700,17 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     # AT2: the lit faces against their own walls, and what they throw across the street
     faces = timed("faces", LX.face_check, pl.face_walls, occ)
     faces["dimmed_for_opposite"] = pl.dimmed
+    # AT3: the cloud deck lit from below by the plan's upward light
+    ext = city.m.get("bounds") or (
+        [min(L["pos"][0] for L in pl.lights), min(L["pos"][1] for L in pl.lights),
+         max(L["pos"][0] for L in pl.lights), max(L["pos"][1] for L in pl.lights)]
+        if pl.lights else [0.0, 0.0, 0.0, 0.0])
+    g = timed("glow", SK.glow, sky, pl.lights, pl.schedules, ext)
+    if g is not None:
+        sky["glow"] = SK.write_glow(g, od)
+        sky["upward_lm"] = round(g["upward_lm"])
+    elif (od / SK.GLOW_FILE).is_file():
+        (od / SK.GLOW_FILE).unlink()
     by_tile: dict[str, list[dict]] = {}
     for L in sorted(pl.lights, key=lambda r: r["id"]):
         by_tile.setdefault(L["tile"], []).append(L)
@@ -1733,9 +1751,8 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
         code=code_hash(), preset=filled["preset"], hour=filled["hour"],
         weather=filled["weather"], night_ev100=filled["night_ev100"], look=look,
         weather_state=filled["weather_state"],
-        sky=PM.Sky(moon=look["moon"], stars=look["stars"], cloud_deck_m=look["cloud_deck_m"],
-                   cloud_glow=look["cloud_glow"]),
-        schedules={k: list(v) for k, v in sorted(P.SCHEDULES.items())},
+        sky=PM.Sky(**sky),
+        schedules={k: list(v) for k, v in sorted(pl.schedules.items())},
         districts=filled["moods"],
         tiers=PM.Tiers(near_m=tiers["near"]["radius_m"],
                        near_max=min(tiers["near"]["max"], filled["budgets"]["shadowed"]),
@@ -1778,6 +1795,12 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
            "tiers": {k: sum(1 for L in pl.lights if L["tier"] == k)
                      for k in ("near", "mid", "high")},
            "timings": tm,
+           "sky": {"hours": sky["hours"], "ev_day": sky["ev_day"], "ev_night": sky["ev_night"],
+                   "moon": {k: sky["moon"][k] for k in ("phase", "lit", "share")},
+                   "cloud_deck_m": sky["cloud_deck_m"], "cloud_cover": sky["cloud_cover"],
+                   "upward_lm": sky["upward_lm"],
+                   "glow": {k: v for k, v in (sky["glow"] or {}).items()
+                            if k in ("max_luma_nits", "mean_nits", "peak_at", "px")}},
            "sign_colors_from_pages": city.signs.from_pages,
            "districts": {k: {x: v[x] for x in ("name", "archetype", "lamp", "temp", "grit",
                                                 "flicker", "broken", "neon", "flood",
@@ -1839,6 +1862,16 @@ def report_text(rep: dict) -> str:
         lines.append("megasites: " + ", ".join(f"{k} {v}" for k, v in rep["megasites"].items()))
     if rep.get("tiers"):
         lines.append("tiers: " + ", ".join(f"{k} {v}" for k, v in rep["tiers"].items()))
+    if rep.get("sky"):
+        s = rep["sky"]
+        g = s.get("glow") or {}
+        lines.append(f"sky: day {s['hours']['day']:g} h, dusk {s['hours']['dusk']:g} h, night "
+                     f"{s['hours']['night']:g} h; exposure {s['ev_day']:g} EV100 by day, "
+                     f"{s['ev_night']:g} by night; moon phase {s['moon']['phase']:g} "
+                     f"({s['moon']['lit']:g} lit); deck {s['cloud_deck_m']:g} m, cover "
+                     f"{s['cloud_cover']:g}" + (
+                         f", its glow up to {g['max_luma_nits']:g} cd/m2 ({g['mean_nits']:g} "
+                         f"over the city) from {s['upward_lm'] / 1e6:.2f} Mlm up" if g else ""))
     lines.append("district moods:")
     for did, m in sorted(rep["districts"].items()):
         lines.append(f"  {did} {m['name']} ({m['archetype']}): {m['lamp']}, {m['temp']}, "

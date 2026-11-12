@@ -1899,7 +1899,7 @@ def play_features_summary(res: dict) -> str:
         built = (f"plugin built in {pl['seconds']:g} s" if pl.get("built")
                  else "plugin up to date")
         return ("Play features: minimap, M map (wheel zoom, right drag pan, left click "
-                "teleport), . free camera, Tab developer menu (day and night); "
+                "teleport), . free camera, Tab developer menu (the time of day); "
                 f"{pf.get('walk_points', 0)} walkway points, {pf.get('lamps', 0)} lamps; {built}")
     why = pl.get("error") or pf.get("reason") or "not made"
     return f"Play features: left out ({why})"

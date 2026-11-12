@@ -74,4 +74,10 @@ private:
 
 	// the menu's rows, where they were drawn (local rectangles), and what each does
 	mutable TArray<TPair<FSlateRect, int32>> MenuRows;
+
+	// AT3: the time-of-day slider's track (local), and whether it is being dragged
+	mutable FSlateRect TimeBar = FSlateRect(0.f, 0.f, 0.f, 0.f);
+	mutable bool bTimeBar = false;
+	bool bDragTime = false;
+	void SetTimeFrom(const FVector2D& Local);
 };

@@ -45,7 +45,10 @@ def _lights_near(plan_dir: Path, plan: dict, center, r: float, eye, hour: float)
         for L in doc["lights"]:
             if not L["on"]:
                 continue
-            k = sched.get(L["schedule"], [1.0] * 24)[h]
+            # (AT3: between one hour's value and the next, as the runtime)
+            s = sched.get(L["schedule"], [1.0] * 24)
+            f = hour % 24.0 - h
+            k = s[h] + (s[(h + 1) % 24] - s[h]) * f
             if k < 0.05:
                 continue
             p = L["pos"]
@@ -84,10 +87,26 @@ def run(args) -> dict:
     job["fog_color"] = w["fog_albedo"]
     job["wet"] = w["wetness"] if args.wet is None else args.wet
     job["exposure"] = 0.0
+    # AT3: at an hour the sun is near the horizon, a twilight sky (`dusk` in the job, drawn by
+    # ag6_preview's `dusk_world`), the windows and signs at the plan's Night there and the
+    # plan's lights dimmed by the exposure's step up from the night's (as in the game: the
+    # lights keep their physical output, the scene is exposed brighter)
+    dim = 1.0
+    sky = plan.get("sky") or {}
+    if "curve" in sky:
+        from . import sky as SK
+        e, az, _ = SK.sun_at(sky, hour)
+        if e > -12.0:
+            dim = 2.0 ** -(SK.exposure(sky, e) - sky["ev_night"])
+            job["dusk"] = {"sun_elev": round(e, 3), "sun_az": round(az, 3),
+                           "night": round(SK.curve("night", e, sky["curve"]), 3),
+                           "sky": round(SK.curve("sky", e, sky["curve"]), 3)}
     total = 0
     for v in job["views"]:
         center = v["target"] if v.get("far") else v["eye"]
         v["atmos_lights"] = _lights_near(plan_dir, plan, center, args.radius, v["eye"], hour)
+        for L in v["atmos_lights"]:
+            L["watts"] = round(L["watts"] * dim, 3)
         v["lights"], v["washes"] = [], []
         total += len(v["atmos_lights"])
     rep = _blender(job, "ag6_preview.py", args.blender, od, None, n)
@@ -95,7 +114,7 @@ def run(args) -> dict:
     rep["atmos_lights"] = total
     (od / "atmos_preview.json").write_text(json.dumps(
         {"plan": str(plan_dir), "hour": hour, "engine": args.engine, "fog": job["fog"],
-         "wet": job["wet"], "gain": GAIN,
+         "wet": job["wet"], "gain": GAIN, "dusk": job.get("dusk"), "dim": round(dim, 4),
          "views": [{"name": v["name"], "lights": len(v["atmos_lights"])}
                    for v in job["views"]]}, indent=1) + "\n", encoding="utf-8")
     return rep

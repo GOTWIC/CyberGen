@@ -215,6 +215,33 @@ def test_job_with_atmosgens_passes(tmp_path):
     assert all("commands" not in p for p in jb["passes"])
 
 
+def test_sky_and_time_passes():
+    """AT3: the dusk and day passes run the plan's named hours under the sky and time; the
+    nosky pass switches it off; every atmos pass names its hour last (after the sky)."""
+    by = {p[0]: p for p in B.ATMOS_PASSES}
+    for name, night, hour in (("dusk_plan", True, "dusk"), ("dusk_plan_all", True, "dusk"),
+                              ("day_plan", False, "day"), ("day_plan_all", False, "day"),
+                              ("night_plan", True, "23")):
+        p = by[name]
+        assert p[1] is night and p[3][-1] == f"CityGenAtmos.Hour {hour}"
+        assert "CityGenAtmos.Sky 1" in p[3]
+    assert "CityGenAtmos.Sky 0" in by["night_plan_nosky"][3]
+    assert "CityGenAtmos.Sky 1" in B.ATMOS_OFF
+
+
+def test_others_summary_names_who_took_the_foreground():
+    """AT3: the samples say which processes took the game's foreground and how often it was
+    taken back; the summary adds them up."""
+    s = [{"t": 0.0, "cores": 0.0, "top": [], "unthrottle": {"above_normal": True}},
+         {"t": 30.0, "in_front": True, "lost_to": ["Overwolf.exe"], "retaken": 1,
+          "cores": 0.5, "top": [["Overwolf", 0.3]]},
+         {"t": 60.0, "in_front": False, "lost_to": ["Overwolf.exe", ""], "retaken": 0,
+          "cores": 0.2, "top": [["claude", 0.1]]}]
+    o = B.others_summary(s)
+    assert o["front"] == 0.5 and o["retaken"] == 1
+    assert o["lost_to"] == {"Overwolf.exe": 2, "(none)": 1}
+
+
 def test_atmos_assets_version():
     from citygen import unreal_atmos as UA
     assert UA.assets_version().isdigit()
@@ -240,3 +267,9 @@ def test_busy_sees_any_benchmark():
     # (from the packaged run's side, this benchmark and its game are busy)
     assert B._busy(procs, 102) == ["python.exe 11", "python.exe 12", "UnrealEditor.exe 13",
                                    "CityAG16.exe 101", "UnrealEditor.exe 105"]
+    # AT3: a game and a screen recorder share the GPU: busy too
+    procs.update({106: (1, "javaw.exe", "javaw.exe -cp minecraft.jar"),
+                  107: (1, "ow-obs.exe", "ow-obs.exe --capture"),
+                  108: (1, "Overwolf.exe", "Overwolf.exe")})
+    assert B._busy(procs, 12) == ["CityAG16.exe 101", "python.exe 102", "UnrealEditor.exe 105",
+                                  "javaw.exe 106", "ow-obs.exe 107"]

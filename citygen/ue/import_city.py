@@ -72,8 +72,8 @@ HASH_TAG = "cg.hash"
 # unchanged build applies the change (stored hashes are "<version>.<content hash>")
 MESH_VERSION = "3"
 ACTOR_VERSION = "1"
-ATMOS_VERSION = "atmos2"  # the atmos controller's and cells' actors (2, AT2: the high tier,
-                          # blinks and sweeps in the packed lights)
+ATMOS_VERSION = "atmos3"  # the atmos controller's and cells' actors (2, AT2: the high tier,
+                          # blinks and sweeps in the packed lights; 3, AT3: the sky and time)
 SWIM_BRUSH_CM = 200.0   # the cube brush a volume spawned from its class gets (CubeBuilder)
 SWIM_FRICTION = 0.3
 GRAPH_VARS = [("City", "string"), ("Graph", "name"), ("Hash", "string"), ("Ids", "[name"),
@@ -3775,14 +3775,54 @@ class Importer:
         self.stats["atmos"] = {"made": True, "cells": len(self.man["atmos"]["cells"]),
                                "lights": self.man["atmos"]["lights"]}
 
+    def atmos_glow(self, info):
+        """AT3: Atmos/T_<City>_SkyGlow, the cloud deck's glow (unreal/atmos_sky_glow.png:
+        linear data, square-root encoded), imported again only when its bytes change; clamped
+        at its edges (black past the city), never streamed. None without one."""
+        g = info.get("glow")
+        if not g:
+            return None
+        folder = f"{self.root}/Atmos"
+        name = f"T_{self.man['folder']}_SkyGlow"
+        path = f"{folder}/{name}"
+        h = f"{TEXTURE_VERSION}.{g['sha256'][:16]}"
+        if EAL.does_asset_exist(path):
+            tex = unreal.load_asset(path)
+            if meta(tex, HASH_TAG) == h:
+                return tex
+        task = unreal.AssetImportTask()
+        for k, v in (("filename", os.path.join(self.build, g["file"])),
+                     ("destination_path", folder), ("destination_name", name),
+                     ("automated", True), ("replace_existing", True), ("save", False)):
+            task.set_editor_property(k, v)
+        AT.import_asset_tasks([task])
+        tex = unreal.load_asset(path)
+        if tex is None:
+            raise RuntimeError(f"sky glow: import of {g['file']} failed")
+        tex.set_editor_property("srgb", False)
+        tex.set_editor_property("compression_settings",
+                                unreal.TextureCompressionSettings.TC_DEFAULT)
+        tex.set_editor_property("compression_no_alpha", True)
+        tex.set_editor_property("lod_group", unreal.TextureGroup.TEXTUREGROUP_WORLD)
+        tex.set_editor_property("never_stream", True)
+        tex.set_editor_property("address_x", unreal.TextureAddress.TA_CLAMP)
+        tex.set_editor_property("address_y", unreal.TextureAddress.TA_CLAMP)
+        tex.set_editor_property("filter", unreal.TextureFilter.TF_BILINEAR)
+        EAL.set_metadata_tag(tex, HASH_TAG, h)
+        EAL.save_loaded_asset(tex, only_if_is_dirty=False)
+        return tex
+
     def atmos_controller(self, have):
         """The controller (CityGenAtmos), always loaded, with the plan's settings: its
-        schedules, light kinds, exposure, hour, weather and tiers."""
+        schedules, light kinds, exposure, hour, weather and tiers; AT3: the sky and time (the
+        sun's and moon's places, the curves over the sun's elevation, the cloud deck and its
+        glow texture, the named hours)."""
         if not self.atmos_ok():
             return
         cls = unreal.CityGenAtmos
         info = self.man["atmos"]
         ctl = self.atmos_data()["controller"]
+        glow = self.atmos_glow(info)
 
         def make():
             return self.eas.spawn_actor_from_class(cls, unreal.Vector(0.0, 0.0, 0.0))
@@ -3809,6 +3849,27 @@ class Importer:
                          ("high_range_m", float(ctl.get("high_range_m", 750.0))),
                          ("lights", True)):
                 a.set_editor_property(k, v)
+            # AT3: the sky and time (a plugin before AT3 has none of them)
+            sky = []
+            for k in ("latitude_deg", "declination_deg", "moon_lag_h", "moon_declination_deg",
+                      "moon_lit", "moon_share", "moon_disk_nits", "moon_disk_deg", "moon_cloud",
+                      "sun_lux", "scene_ev100", "day_ev100", "stars", "cloud_deck_m",
+                      "cloud_cover", "day_hour", "dusk_hour", "night_hour", "glow_max_nits"):
+                if k in ctl:
+                    sky.append((k, float(ctl[k])))
+            for k in ("curve_elev", "curve_ev", "curve_night", "curve_sun", "curve_sky",
+                      "curve_stars", "moon_rise", "glow_bounds"):
+                if k in ctl:
+                    sky.append((k, [float(x) for x in ctl[k]]))
+            if "moon_color" in ctl:
+                c = ctl["moon_color"]
+                sky.append(("moon_color", unreal.LinearColor(c[0], c[1], c[2], 1.0)))
+            sky.append(("sky_glow", glow))
+            for k, v in sky:
+                try:
+                    a.set_editor_property(k, v)
+                except Exception as e:
+                    log(f"atmos: no {k} ({e})")
             a.tags = self.tags(info["key"], hv, [], "atmos", "atmos", "", "")
 
         self.place(have, info["key"], info["hash"], cls.static_class(), make, update,

@@ -4,6 +4,8 @@
 
 #include "Camera/PlayerCameraManager.h"
 #include "Components/DecalComponent.h"
+#include "Components/DirectionalLightComponent.h"
+#include "Components/SkyLightComponent.h"
 #include "Components/ExponentialHeightFogComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
@@ -11,7 +13,10 @@
 #include "Components/SceneComponent.h"
 #include "Components/SpotLightComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Engine/DirectionalLight.h"
 #include "Engine/ExponentialHeightFog.h"
+#include "Engine/SkyLight.h"
+#include "Engine/Texture2D.h"
 #include "Engine/PostProcessVolume.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
@@ -19,6 +24,7 @@
 #include "GameFramework/PlayerController.h"
 #include "HAL/IConsoleManager.h"
 #include "Kismet/KismetMaterialLibrary.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialParameterCollection.h"
 #include "Math/RandomStream.h"
@@ -48,6 +54,14 @@ namespace
 	constexpr float BeamSpread = 1.6f;       // ... this times its cone wide, as the haze shows it
 	constexpr float BeaconOn = 24.f;         // the glow's emissive on ...
 	constexpr float BeamBase = 0.08f;        // ... and a beam's
+	// AT3: the sky dome (M_CgSky on the engine's sphere, 50 cm across: 50 km round the view)
+	const TCHAR* SkyMaterialPath = TEXT("/Game/CityGen/Core/Atmos/M_CgSky.M_CgSky");
+	const TCHAR* DomeMesh = TEXT("/Engine/BasicShapes/Sphere.Sphere");
+	constexpr float DomeScale = 100000.f;
+	constexpr double DomeRecenterCm = 2000000.0; // (20 km: the dome is 50 km round)
+	const FName SunKey(TEXT("cg.key=lighting.sun"));
+	const FName SkyKey(TEXT("cg.key=lighting.sky"));
+	constexpr double TimeEvery = 1.0 / 15.0; // s between moving the sun while the hour runs
 
 	uint32 Hash(uint32 A, uint32 B)
 	{
@@ -85,6 +99,7 @@ void ACityGenAtmos::BeginPlay()
 {
 	Super::BeginPlay();
 	bBegun = true;
+	CoverNow = CloudCover;
 	AtmosCollection = LoadObject<UMaterialParameterCollection>(nullptr, AtmosMPC);
 	CityCollection = LoadObject<UMaterialParameterCollection>(nullptr, CityMPC);
 	BeaconMaterial = LoadObject<UMaterialInterface>(nullptr, BeaconMaterialPath);
@@ -100,6 +115,10 @@ void ACityGenAtmos::BeginPlay()
 	UE_LOG(LogCityGenAtmos, Display, TEXT("CityGen atmos: %s, %d schedules, %d cells with %d lights in at begin play"),
 		*City, ScheduleNames.Num(), SlotOfActor.Num(), RegisteredLights);
 	EnsureVolume();
+	// AT3: the sky and time (the importer's sun, sky light and a sky dome)
+	FindLighting();
+	EnsureDome();
+	ApplyTime();
 	SetFog(bFog);
 	SetRain(bRain);
 	SetWet(bWet);
@@ -239,8 +258,11 @@ float ACityGenAtmos::ScheduleAt(uint8 Schedule) const
 	{
 		return 1.f;
 	}
-	const int32 H = FMath::Clamp(FMath::FloorToInt32(FMath::Fmod(Hour + 24.f, 24.f)), 0, 23);
-	return ScheduleHours[Base + H];
+	// (AT3: between one hour's value and the next, so lights come on as the hour runs)
+	const float Hr = FMath::Fmod(Hour + 24.f, 24.f);
+	const int32 H = FMath::Clamp(FMath::FloorToInt32(Hr), 0, 23);
+	const float F = FMath::Clamp(Hr - float(H), 0.f, 1.f);
+	return FMath::Lerp(ScheduleHours[Base + H], ScheduleHours[Base + (H + 1) % 24], F);
 }
 
 float ACityGenAtmos::Scale() const
@@ -639,6 +661,7 @@ void ACityGenAtmos::SetTiers(int32 InLive, float RangeM, int32 InShadowed)
 void ACityGenAtmos::SetHour(float InHour)
 {
 	Hour = FMath::Fmod(InHour + 24.f, 24.f);
+	ApplyTime();
 	PushParameters();
 	LiveAt = -1.0;
 }
@@ -1040,7 +1063,7 @@ void ACityGenAtmos::PushParameters()
 		UKismetMaterialLibrary::SetScalarParameterValue(this, AtmosCollection, TEXT("FogDensity"), bFog ? FogDensity : 0.f);
 		UKismetMaterialLibrary::SetScalarParameterValue(this, AtmosCollection, TEXT("WindMS"), WindMS);
 	}
-	if (CityCollection && bLights && HasPlan())
+	if (CityCollection && ((bLights && HasPlan()) || (bSky && HasSky())))
 	{
 		UKismetMaterialLibrary::SetScalarParameterValue(this, CityCollection, TEXT("Hour"), Hour);
 	}
@@ -1054,10 +1077,29 @@ void ACityGenAtmos::Tick(float DeltaSeconds)
 	const double Now = FPlatformTime::Seconds();
 	FRotator ViewRot;
 	const FVector View = ViewLocation(&ViewRot);
-	// the plan's lights show by night (MPC_CityGen's Night, which the play features' day and
-	// night switch sets until AT3 drives the time): by day they cost nothing
-	const bool bWant = bLights && HasPlan() &&
+	// AT3: the hour runs (TimeSpeed hours a second), the sun moved 15 times a second
+	if (TimeSpeed != 0.f)
+	{
+		Hour = FMath::Fmod(Hour + DeltaSeconds * TimeSpeed + 24.f, 24.f);
+		if (TimeAppliedAt < 0.0 || Now - TimeAppliedAt > TimeEvery)
+		{
+			ApplyTime();
+			PushParameters();
+		}
+	}
+	// (the dome stays where it is, round the city: its material meets the deck along the view
+	// ray from the camera's own position, so only a camera DomeRecenterCm from its middle moves
+	// it: no render state sent for it frame after frame)
+	if (Dome && FVector::Dist(Dome->GetComponentLocation(), View) > DomeRecenterCm)
+	{
+		Dome->SetWorldLocation(View);
+	}
+	// the plan's lights show by night (AT3: the controller's own Night, from the sun; a plan
+	// without a sky, MPC_CityGen's, which the play features' switch sets): by day they cost
+	// nothing
+	const bool bNightNow = (bSky && HasSky()) ? NightNow > 0.02f :
 		(!CityCollection || UKismetMaterialLibrary::GetScalarParameterValue(this, CityCollection, TEXT("Night")) > 0.5f);
+	const bool bWant = bLights && HasPlan() && bNightNow;
 	if (bWant != bShowing)
 	{
 		bShowing = bWant;
@@ -1135,7 +1177,9 @@ FString ACityGenAtmos::GetStatus() const
 		"\"scale\": %.5f, \"hour\": %.2f, \"fog\": %s, \"rain\": %s, \"wet\": %s, \"megalights\": %s, "
 		"\"ray_tracing\": %d, \"components\": %d, \"showing\": %s, \"high\": %d, \"max_high\": %d, "
 		"\"high_m\": %.0f, \"candidates_high\": %d, \"animated\": %d, \"beacons\": %d, \"beams\": %d, "
-		"\"fixtures\": %s}"),
+		"\"fixtures\": %s, \"sky\": %s, \"night_now\": %.3f, \"ev100\": %.2f, \"sun_elev\": %.2f, "
+		"\"moon_elev\": %.2f, \"moon_lux\": %.4f, \"time_speed\": %.3f, \"dome\": %s, \"deck_m\": %.0f, "
+		"\"cover\": %.2f, \"glow\": %s, \"day_hour\": %.2f, \"dusk_hour\": %.2f, \"night_hour\": %.2f}"),
 		HasPlan() ? TEXT("true") : TEXT("false"), *City, *PlanHash, RegisteredLights, SlotOfActor.Num(),
 		Registrations, bLights ? TEXT("true") : TEXT("false"), Live.Num(), Spots, Points, Rects, *Kinds,
 		Shadowed.Num(), Candidates, MaxLive, MidRangeM, MaxShadowed, UpdateMs, UpdateMsMax, Scale(), Hour,
@@ -1143,5 +1187,247 @@ FString ACityGenAtmos::GetStatus() const
 		bWet ? TEXT("true") : TEXT("false"), bMegaLights ? TEXT("true") : TEXT("false"),
 		RT ? RT->GetInt() : -1, AllLights.Num(), bShowing ? TEXT("true") : TEXT("false"), LiveHigh, MaxHigh,
 		HighRangeM, CandidatesHigh, Flickering.Num(), BeaconCount, BeamCount,
-		bFixturesShown ? TEXT("true") : TEXT("false"));
+		bFixturesShown ? TEXT("true") : TEXT("false"),
+		(bSky && HasSky()) ? TEXT("true") : TEXT("false"), NightNow, EVNow, SunElev, MoonElev, MoonLux,
+		TimeSpeed, Dome ? TEXT("true") : TEXT("false"), CloudDeckM, CoverNow,
+		SkyGlow ? TEXT("true") : TEXT("false"), DayHour, DuskHour, NightHour);
+}
+
+// -- AT3: the sky and time --
+
+FVector ACityGenAtmos::Body(float LatDeg, float DecDeg, float HourAngleDeg, float& OutElevDeg)
+{
+	// (atmosgen/sky.py's `body`): elevation and azimuth from north, clockwise; the direction
+	// toward the body in Unreal's frame (X east, Y south, Z up)
+	const double La = FMath::DegreesToRadians(double(LatDeg));
+	const double De = FMath::DegreesToRadians(double(DecDeg));
+	const double Ha = FMath::DegreesToRadians(double(HourAngleDeg));
+	const double Se = FMath::Sin(La) * FMath::Sin(De) + FMath::Cos(La) * FMath::Cos(De) * FMath::Cos(Ha);
+	const double E = FMath::Asin(FMath::Clamp(Se, -1.0, 1.0));
+	const double Az = FMath::Atan2(-FMath::Sin(Ha) * FMath::Cos(De),
+		FMath::Cos(La) * FMath::Sin(De) - FMath::Sin(La) * FMath::Cos(De) * FMath::Cos(Ha));
+	OutElevDeg = float(FMath::RadiansToDegrees(E));
+	const double Ce = FMath::Cos(E);
+	return FVector(Ce * FMath::Sin(Az), -Ce * FMath::Cos(Az), FMath::Sin(E));
+}
+
+float ACityGenAtmos::CurveAt(const TArray<float>& Values, float Elev) const
+{
+	const int32 N = FMath::Min(CurveElev.Num(), Values.Num());
+	if (N == 0)
+	{
+		return 0.f;
+	}
+	if (Elev <= CurveElev[0])
+	{
+		return Values[0];
+	}
+	for (int32 k = 1; k < N; ++k)
+	{
+		if (Elev <= CurveElev[k])
+		{
+			const float T = (Elev - CurveElev[k - 1]) / FMath::Max(1e-4f, CurveElev[k] - CurveElev[k - 1]);
+			return FMath::Lerp(Values[k - 1], Values[k], T);
+		}
+	}
+	return Values[N - 1];
+}
+
+void ACityGenAtmos::FindLighting()
+{
+	UWorld* World = GetWorld();
+	if (bLightingFound || !World)
+	{
+		return;
+	}
+	// the importer's sun and sky light (by their keys), else the first of each
+	for (TActorIterator<ADirectionalLight> It(World); It; ++It)
+	{
+		if (!Sun || It->Tags.Contains(SunKey))
+		{
+			Sun = *It;
+		}
+	}
+	for (TActorIterator<ASkyLight> It(World); It; ++It)
+	{
+		if (!SkyLightActor || It->Tags.Contains(SkyKey))
+		{
+			SkyLightActor = *It;
+		}
+	}
+	if (UDirectionalLightComponent* L = Sun ? Cast<UDirectionalLightComponent>(Sun->GetLightComponent()) : nullptr)
+	{
+		DaySunColor = L->GetLightColor();
+		L->SetMobility(EComponentMobility::Movable);
+	}
+	if (USkyLightComponent* S = SkyLightActor ? SkyLightActor->GetLightComponent() : nullptr)
+	{
+		DaySkyIntensity = S->Intensity;
+	}
+	bLightingFound = true;
+}
+
+void ACityGenAtmos::EnsureDome()
+{
+	if (Dome || !bSky || !HasSky() || !GetWorld())
+	{
+		return;
+	}
+	UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, DomeMesh);
+	UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, SkyMaterialPath);
+	if (!Mesh || !Mat)
+	{
+		UE_LOG(LogCityGenAtmos, Warning, TEXT("CityGen atmos: no sky dome (%s or %s missing: run the atmos assets)"),
+			DomeMesh, SkyMaterialPath);
+		return;
+	}
+	SkyMID = UMaterialInstanceDynamic::Create(Mat, this);
+	if (SkyGlow)
+	{
+		SkyMID->SetTextureParameterValue(TEXT("Glow"), SkyGlow);
+	}
+	if (GlowBounds.Num() >= 4)
+	{
+		SkyMID->SetVectorParameterValue(TEXT("GlowLo"), FLinearColor(GlowBounds[0], GlowBounds[1], 0.f, 0.f));
+		SkyMID->SetVectorParameterValue(TEXT("GlowHi"), FLinearColor(GlowBounds[2], GlowBounds[3], 0.f, 0.f));
+	}
+	Dome = NewObject<UStaticMeshComponent>(this);
+	Dome->SetupAttachment(RootComponent);
+	Dome->SetUsingAbsoluteLocation(true);
+	Dome->SetUsingAbsoluteRotation(true);
+	Dome->SetUsingAbsoluteScale(true);
+	Dome->SetStaticMesh(Mesh);
+	Dome->SetMaterial(0, SkyMID);
+	Dome->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Dome->SetCastShadow(false);
+	Dome->bAffectDistanceFieldLighting = false;
+	Dome->bAffectDynamicIndirectLighting = false;
+	Dome->bVisibleInRayTracing = false;
+	Dome->SetMobility(EComponentMobility::Movable);
+	Dome->SetWorldScale3D(FVector(DomeScale));
+	// (round the glow's middle, the city's, else the view)
+	Dome->SetWorldLocation(GlowBounds.Num() >= 4
+		? FVector(0.5 * (GlowBounds[0] + GlowBounds[2]), 0.5 * (GlowBounds[1] + GlowBounds[3]), 0.0)
+		: ViewLocation());
+	Dome->RegisterComponent();
+}
+
+void ACityGenAtmos::ApplyTime()
+{
+	TimeAppliedAt = FPlatformTime::Seconds();
+	if (!bSky || !HasSky())
+	{
+		return;
+	}
+	FindLighting();
+	float E = 0.f, ME = 0.f;
+	const FVector S = Body(LatitudeDeg, DeclinationDeg, 15.f * (Hour - 12.f), E);
+	const FVector M = Body(LatitudeDeg, MoonDeclinationDeg, 15.f * (Hour - 12.f - MoonLagH), ME);
+	SunElev = E;
+	MoonElev = ME;
+	NightNow = FMath::Clamp(CurveAt(CurveNight, E), 0.f, 1.f);
+	SunWeight = FMath::Clamp(CurveAt(CurveSun, E), 0.f, 1.f);
+	EVNow = SceneEV100 + (DayEV100 - SceneEV100) * CurveAt(CurveEV, E);
+	const float R0 = MoonRise.Num() >= 2 ? MoonRise[0] : -1.f;
+	const float R1 = MoonRise.Num() >= 2 ? MoonRise[1] : 6.f;
+	const float MoonUp = FMath::SmoothStep(R0, R1, ME);
+	// the one directional light: the sun while its light lasts (it still lights the twilight
+	// sky from under the horizon), then the moon, faded in from the sun at -12 degrees to -16
+	const float MoonIn = FMath::Clamp((-12.f - E) / 4.f, 0.f, 1.f);
+	MoonLux = SunLux * MoonShare * MoonLit * MoonUp * MoonIn * (1.f - MoonCloud * CoverNow);
+	if (UDirectionalLightComponent* L = Sun ? Cast<UDirectionalLightComponent>(Sun->GetLightComponent()) : nullptr)
+	{
+		const bool bSunLight = SunWeight > 0.f;
+		const FVector To = bSunLight ? S : M;
+		Sun->SetActorRotation((-To).Rotation());
+		L->SetIntensity(bSunLight ? SunLux * SunWeight : MoonLux);
+		L->SetLightColor(bSunLight ? DaySunColor : MoonColor);
+	}
+	if (USkyLightComponent* SL = SkyLightActor ? SkyLightActor->GetLightComponent() : nullptr)
+	{
+		SL->SetIntensity(DaySkyIntensity * CurveAt(CurveSky, E));
+	}
+	// the exposure held at the hour's (no eye adaptation at night: it would pump)
+	EnsureVolume();
+	if (Volume)
+	{
+		FPostProcessSettings& P = Volume->Settings;
+		P.bOverride_AutoExposureMinBrightness = bLockExposure;
+		P.bOverride_AutoExposureMaxBrightness = bLockExposure;
+		P.bOverride_AutoExposureBias = bLockExposure;
+		P.bOverride_AutoExposureSpeedUp = bLockExposure;
+		P.bOverride_AutoExposureSpeedDown = bLockExposure;
+		P.AutoExposureMinBrightness = EVNow;
+		P.AutoExposureMaxBrightness = EVNow;
+		P.AutoExposureBias = 0.f;
+		P.AutoExposureSpeedUp = 20.f;
+		P.AutoExposureSpeedDown = 20.f;
+	}
+	if (CityCollection)
+	{
+		UKismetMaterialLibrary::SetScalarParameterValue(this, CityCollection, TEXT("Night"), NightNow);
+		UKismetMaterialLibrary::SetScalarParameterValue(this, CityCollection, TEXT("Hour"), Hour);
+	}
+	if (SkyMID)
+	{
+		SkyMID->SetVectorParameterValue(TEXT("SunDir"), FLinearColor(S.X, S.Y, S.Z, 0.f));
+		SkyMID->SetVectorParameterValue(TEXT("MoonDir"), FLinearColor(M.X, M.Y, M.Z, 0.f));
+		SkyMID->SetVectorParameterValue(TEXT("MoonTint"), FMath::Lerp(FLinearColor::White, MoonColor, 0.25f));
+		SkyMID->SetScalarParameterValue(TEXT("MoonVis"), MoonShare > 0.f ? MoonUp : 0.f);
+		SkyMID->SetScalarParameterValue(TEXT("MoonLum"), MoonDiskNits);
+		SkyMID->SetScalarParameterValue(TEXT("MoonRad"), FMath::DegreesToRadians(0.5f * MoonDiskDeg));
+		SkyMID->SetScalarParameterValue(TEXT("SunDiskOn"), SunWeight > 0.f ? 1.f : 0.f);
+		SkyMID->SetScalarParameterValue(TEXT("Stars"), Stars * FMath::Clamp(CurveAt(CurveStars, E), 0.f, 1.f));
+		SkyMID->SetScalarParameterValue(TEXT("DeckCm"), CloudDeckM * 100.f);
+		SkyMID->SetScalarParameterValue(TEXT("Cover"), CloudDeckM > 0.f ? CoverNow : 0.f);
+		SkyMID->SetScalarParameterValue(TEXT("GlowMax"), GlowMaxNits);
+		// (the glow in physical units, shown as the plan's lights are, by night)
+		SkyMID->SetScalarParameterValue(TEXT("GlowScale"), Scale() * NightNow * GlowGain);
+		SkyMID->SetScalarParameterValue(TEXT("CloudLit"), CloudLit);
+		SkyMID->SetScalarParameterValue(TEXT("Wind"), 0.4f * WindMS);
+	}
+}
+
+void ACityGenAtmos::SetSky(bool bOn)
+{
+	bSky = bOn;
+	if (bOn)
+	{
+		EnsureDome();
+		ApplyTime();
+	}
+	// (off: the dome hidden, the level's lighting and the exposure left as the last hour set
+	// them, so the night without the sky costs what the sky costs)
+	if (Dome)
+	{
+		Dome->SetVisibility(bOn);
+	}
+	LiveAt = -1.0;
+}
+
+void ACityGenAtmos::SetTimeSpeed(float HoursPerSecond)
+{
+	TimeSpeed = HoursPerSecond;
+}
+
+void ACityGenAtmos::SetLockExposure(bool bOn)
+{
+	bLockExposure = bOn;
+	ApplyTime();
+}
+
+void ACityGenAtmos::SetCloudCover(float Cover)
+{
+	CoverNow = FMath::Clamp(Cover, 0.f, 1.f);
+	ApplyTime();
+}
+
+bool ACityGenAtmos::SetNamedHour(const FString& Name)
+{
+	const FString N = Name.ToLower();
+	if (N == TEXT("day")) { SetHour(DayHour); }
+	else if (N == TEXT("dusk")) { SetHour(DuskHour); }
+	else if (N == TEXT("night")) { SetHour(NightHour); }
+	else { return false; }
+	return true;
 }

@@ -1,0 +1,25 @@
+{
+ "plan": "C:\\Users\\swagn\\CityGen\\builds\\at3\\delta_megacity_atmos",
+ "hour": 19.4,
+ "engine": "cycles",
+ "fog": 0.0021599999999999996,
+ "wet": 1.0,
+ "gain": 8.0,
+ "dusk": {
+  "sun_elev": -2.36,
+  "sun_az": 300.988,
+  "night": 0.72,
+  "sky": 0.966
+ },
+ "dim": 0.3762,
+ "views": [
+  {
+   "name": "core",
+   "lights": 2582
+  },
+  {
+   "name": "core_street",
+   "lights": 2662
+  }
+ ]
+}

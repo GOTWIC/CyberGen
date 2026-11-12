@@ -2440,6 +2440,43 @@ AT2 (neon and signs as light) is in place:
   `beacon`, `mast`, `ground` mounts).
 Results: `docs/progress/AT2/`.
 
+AT3 (sky and time) is in place:
+- **The plan's sky** (`atmosgen/sky.py`, `planmodel.Sky`, spec `sky`: latitude, day of the
+  year, moon phase, day hour, the look's moon, stars and cloud deck overridden): the sun's
+  and the moon's places by the hour (solar time; the moon trails the sun by its phase),
+  curves over the sun's elevation (`presets.SUN_CURVE`: the exposure from the night's held
+  -3 EV100 to the day's `DAY_EV100`, darker under a closed deck, MPC_CityGen's Night, the
+  sun's light, the sky light, the stars), the named hours (day, dusk where the sun stands at
+  -3 degrees, night), a row per hour; `dusk_dawn` and `tunnel` schedules set by the sun
+  (`sky.schedules`; the lux check reads the plan's schedules).
+- **The sky glow** (`sky.glow`): every light's upward flux (direct, and bounced off the
+  ground, each the share that leaves the street canyons, `ESCAPE`) on a 64 m raster, lit
+  onto the cloud deck's underside by a Lambertian footprint, CLOUD_ALBEDO E / pi times the
+  look's `cloud_glow`; `BUILD/atmos/sky_glow.png` (square-root encoded linear RGB, row 0 the
+  north) and the plan's `sky.glow` (bounds, `max_nits`, peak, mean); Delta's core glows at
+  0.6 cd/m2, 0.12 over the city. `atmosgen lux` adds `preview_sky.png`.
+- **Exporter and runtime** (`docs/unreal_export.md`, "From AT3"): the controller's sky
+  settings (`unreal_atmos.sky_settings`) and the glow as a texture per city
+  (`Atmos/T_<City>_SkyGlow`), `ATMOS_VERSION` atmos3; `ACityGenAtmos::ApplyTime` drives the
+  importer's sun (the sun, then the moon), sky light, the exposure (held per hour), Night and
+  Hour, every light's schedule interpolated between the hours; a sky dome (`M_CgSky`, atmos
+  assets version 8: the sky atmosphere, the sun's disk, stars, the moon with its phase, the
+  cloud deck at its height lit by the sun or moon and by the city's glow); `TimeSpeed`;
+  console `CityGenAtmos.Hour day|dusk|night`, `.Sky`, `.Exposure`, `.TimeSpeed`, `.Cover`.
+- **Play features:** `SetNight` sets the controller's day or night hour, the Tab menu's time
+  row a slider (`SetTimeOfDay`, `ClickMenuRow("hour=H")`); their own night switch serves only
+  a level without atmosgen's controller.
+- **Benchmark and check:** passes `dusk_plan(_all)`, `day_plan(_all)`, `night_plan_nosky`;
+  the check reads the sky by night, dusk and day and renders `dusk_*` and `t<HHMM>_*` views.
+- **Blender:** `atmosgen preview --hour H` at a twilight hour renders a dusk sky
+  (`ag6_preview.dusk_world`), the windows at the plan's Night, the lights dimmed by the
+  exposure's step.
+- **Benchmark harness:** `bench.busy` counts a game or a screen recorder (`GAMES`: javaw,
+  ow-obs, obs); each sample names the process holding the foreground when the game does not
+  (`front_owner`, `lost_to`) and the driver takes it back every 2 s (`take_front`, `retaken`).
+Results (Delta's night 14.4 ms p95, dusk 14.3, day 11.1; with AT0's prototypes 16.4, 16.8
+walking): `docs/progress/AT3/`.
+
 ## Life generator (lifegen)
 
 `docs/lifegen_scope.md` (draft v0, its decisions in section 12 still open) is the plan for

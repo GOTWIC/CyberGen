@@ -14,7 +14,13 @@
 // searchlights (each animated from the world's time), and the stand-ins for their fixtures
 // until stage 2 draws them: a red beacon per aviation light (an instanced glow per cell,
 // blinking with its light in M_CgBeacon) and a beam per searchlight (a cone in M_CgBeam,
-// additive, fading along it), shown by night. Frames: Unreal cm, X east, Y south.
+// additive, fading along it), shown by night. AT3 (sky and time): the hour drives the sun and
+// the moon (the importer's `lighting.sun` is the sun by day and the moon by night), the sky
+// light, the exposure (held per look and hour: no eye adaptation pumping), MPC_CityGen's Night
+// and Hour, every light's schedule (interpolated between the hours) and a sky dome (M_CgSky:
+// the sky atmosphere, the stars, the moon, the cloud deck lit by the city's glow); the play
+// features' day and night button and their menu's time-of-day slider drive it. Frames:
+// Unreal cm, X east, Y south.
 
 #pragma once
 
@@ -23,6 +29,10 @@
 #include "CityGenAtmosActor.generated.h"
 
 class ACityGenAtmosCell;
+class ADirectionalLight;
+class ASkyLight;
+class UMaterialInstanceDynamic;
+class UTexture2D;
 class AExponentialHeightFog;
 class APostProcessVolume;
 class UDecalComponent;
@@ -158,8 +168,9 @@ public:
 	UPROPERTY(EditAnywhere, Category = "CityGen|Lights")
 	bool bFixtures = true;
 
-	/** The exposure the scene is shown at (EV100): the play features hold the night at -3. The
-	 *  plan's lights are set for its own night exposure; each is scaled by 2^(this - that). */
+	/** The night's exposure in the scene (EV100, held at -3 as the play features held it). The
+	 *  plan's lights are set for its own night exposure; each is scaled by 2^(this - that) at
+	 *  every hour (AT3: so at dusk, under a brighter exposure, they read dimmer). */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Lights")
 	float SceneEV100 = -3.f;
 
@@ -200,6 +211,156 @@ public:
 	/** How many rain streak cards fall round the view. */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
 	int32 RainCards = 4000;
+
+	// -- AT3: the sky and time (the plan's `sky`; atmosgen/sky.py computes the same) --
+
+	/** Where and when: the city's latitude, the sun's declination that day (degrees). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	float LatitudeDeg = 35.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	float DeclinationDeg = 23.44f;
+
+	/** The moon: how far it trails the sun (hours), its declination, lit fraction, a full
+	 *  moon's light as a share of the sun's, its light's color. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	float MoonLagH = 14.88f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	float MoonDeclinationDeg = -17.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	float MoonLit = 0.86f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	float MoonShare = 0.03f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	FLinearColor MoonColor = FLinearColor(0.27f, 0.39f, 1.f);
+
+	/** Its disk: luminance in the scene's frame (cd/m2) and angular diameter (degrees). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	float MoonDiskNits = 0.5f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	float MoonDiskDeg = 0.53f;
+
+	/** Its light fades in between these elevations (degrees). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	TArray<float> MoonRise;
+
+	/** The share of its light the cloud deck's cover takes. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	float MoonCloud = 0.75f;
+
+	/** The sun's light by day in the scene's frame (lux). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	float SunLux = 10.f;
+
+	/** The day's exposure (EV100; SceneEV100 is the night's). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	float DayEV100 = 1.6f;
+
+	/** Curves over the sun's elevation (CurveElev, degrees), piecewise linear: the exposure
+	 *  (0 the night's, 1 the day's), MPC_CityGen's Night, the sun's light (of SunLux), the sky
+	 *  light (of its own), the stars (of Stars). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	TArray<float> CurveElev;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	TArray<float> CurveEV;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	TArray<float> CurveNight;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	TArray<float> CurveSun;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	TArray<float> CurveSky;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	TArray<float> CurveStars;
+
+	/** How many stars a clear dark sky shows (0 to 1). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	float Stars = 0.25f;
+
+	/** The cloud deck: its height (m, 0 none) and the share of the sky it hides. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	float CloudDeckM = 420.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	float CloudCover = 0.8f;
+
+	/** The deck's underside lit by the city (the plan's raster: linear, square-root encoded),
+	 *  its bounds in Unreal's frame (cm: min X, min Y, max X, max Y) and a channel's value at
+	 *  255 (cd/m2, physical). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	TObjectPtr<UTexture2D> SkyGlow;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	TArray<float> GlowBounds;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	float GlowMaxNits = 1.f;
+
+	/** Art direction: a gain on the deck's glow, and how bright the sun or moon lights it. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	float GlowGain = 1.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	float CloudLit = 0.1f;
+
+	/** The named hours: the play features' day and night, and dusk (the sun just set). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Time")
+	float DayHour = 16.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Time")
+	float DuskHour = 19.5f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Time")
+	float NightHour = 23.f;
+
+	/** How fast the hour runs (game hours per real second; 0 holds it). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Time")
+	float TimeSpeed = 0.f;
+
+	/** The sky and time drive the level's sun, sky light, exposure and the sky dome (off:
+	 *  the level's own, as before AT3). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	bool bSky = true;
+
+	/** The exposure held at the hour's (no eye adaptation pumping); off: the engine's own. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
+	bool bLockExposure = true;
+
+	/** AT3: the sky and time on or off. */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	void SetSky(bool bOn);
+
+	/** AT3: how fast the hour runs (hours per second). */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	void SetTimeSpeed(float HoursPerSecond);
+
+	/** AT3: the exposure held at the hour's, or the engine's eye adaptation. */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	void SetLockExposure(bool bOn);
+
+	/** AT3: the cloud deck's cover (0 to 1) for this session (art direction, shots). */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	void SetCloudCover(float Cover);
+
+	/** AT3: the hour by its name: day, dusk or night (else false). */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	bool SetNamedHour(const FString& Name);
+
+	/** AT3: MPC_CityGen's Night now (0 by day, 1 by night, between at dusk and dawn). */
+	UFUNCTION(BlueprintPure, Category = "CityGen")
+	float GetNight() const { return NightNow; }
+
+	/** AT3: whether the plan gave a sky (an AT2 plan did not). */
+	bool HasSky() const { return CurveElev.Num() >= 2; }
 
 	// -- the cells --
 
@@ -350,4 +511,30 @@ private:
 	FVector WetAt = FVector(1e12);
 	bool bBegun = false;
 	bool bShowing = false;                  // the lights live now (on, a plan, by night)
+
+	// AT3: the sky and time
+	void FindLighting();
+	void EnsureDome();
+	void ApplyTime();
+	float CurveAt(const TArray<float>& Values, float Elev) const;
+	static FVector Body(float LatDeg, float DecDeg, float HourAngleDeg, float& OutElevDeg);
+	UPROPERTY(Transient)
+	TObjectPtr<ADirectionalLight> Sun;
+	UPROPERTY(Transient)
+	TObjectPtr<ASkyLight> SkyLightActor;
+	UPROPERTY(Transient)
+	TObjectPtr<UStaticMeshComponent> Dome;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> SkyMID;
+	float DaySkyIntensity = 1.f;
+	FLinearColor DaySunColor = FLinearColor::White;
+	bool bLightingFound = false;
+	float NightNow = 1.f;
+	float EVNow = -3.f;
+	float SunElev = -30.f;
+	float MoonElev = 0.f;
+	float SunWeight = 0.f;
+	float MoonLux = 0.f;
+	float CoverNow = 0.8f;
+	double TimeAppliedAt = -1.0;
 };
