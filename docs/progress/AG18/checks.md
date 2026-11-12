@@ -16,7 +16,7 @@
 | [kestrel_dart](kestrel_dart/check.json) | ok: none (hover) | ok: 325.0 mm (keel) | look: 3 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 112558 |
 | [kestrel_meridian](kestrel_meridian/check.json) | ok: none (hover) | ok: 327.0 mm (led.keel) | look: 9 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 90334 |
 | [orrin_aria](orrin_aria/check.json) | FAIL: 0.0 mm to body.front, steers 0 deg | ok: 131.8 mm (body.floor) | look: 2 objects | look: 0 open runs, 12 cutter holes | ok: 0 parts | look: 501460 |
-| [orrin_lumen](orrin_lumen/check.json) | FAIL: 2.8 mm to body.well, steers 0 deg | ok: 130.0 mm (body.floor) | look: 2 objects | look: 0 open runs, 6 cutter holes | look: 1 parts | ok: 293582 |
+| [orrin_lumen](orrin_lumen/check.json) | look: 14.6 mm to body.well, steers 0 deg | ok: 130.0 mm (body.floor) | look: 2 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 356940 |
 | [orrin_pebble](orrin_pebble/check.json) | FAIL: 0.0 mm to body.well, steers 0 deg | ok: 143.3 mm (body.floor) | look: 5 objects | look: 0 open runs, 10 cutter holes | ok: 0 parts | ok: 266030 |
 | [tanager_cab](tanager_cab/check.json) | FAIL: 0.0 mm to bumper.guards.rear, steers 0 deg | ok: 120.0 mm (mudflaps) | look: 39 objects | FAIL: 4 open runs, 0 cutter holes | look: 1 parts | ok: 285996 |
 | [tanager_mino](tanager_mino/check.json) | FAIL: 0.0 mm to interior.tub, steers 0 deg | ok: 110.0 mm (mudflaps) | look: 9 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 223689 |
@@ -127,21 +127,14 @@
 - a cutter's hole inside `hip.hip`: 284 mm round, at (-1.293, -0.631, 0.777)
 - triangles: 501460 over the 400000 budget; most in `body` 139854, `hip` 105902, `pod` 103052, `tire` 57536
 
-**orrin_lumen** (FAIL)
+**orrin_lumen** (look)
 
-- tire `fl`: 2.8 mm to `body.well`, turns 0 degrees before it touches `body.well`
-- tire `rl`: 2.8 mm to `body.well`
-- tire `fr`: 2.8 mm to `body.well`, turns 0 degrees before it touches `body.well`
-- tire `rr`: 2.8 mm to `body.well`
+- tire `fl`: 14.6 mm to `body.well`, turns 0 degrees before it touches `body.well`
+- tire `rl`: 23.7 mm to `body.well`
+- tire `fr`: 14.6 mm to `body.well`, turns 0 degrees before it touches `body.well`
+- tire `rr`: 23.7 mm to `body.well`
 - not mirrored: `interior.wheel` 161.6 mm, `led.cabin` 8.3 mm
 - open ends of open pieces (meant): `deck.front.deck`, `deck.rear.deck`
-- a cutter's hole inside `body.front`: 801 mm round, at (1.111, 0.984, 0.473)
-- a cutter's hole inside `body.front`: 1169 mm round, at (2.316, -0.63, 0.362)
-- a cutter's hole inside `body.front`: 801 mm round, at (1.111, -0.984, 0.473)
-- a cutter's hole inside `body.front`: 1169 mm round, at (2.316, 0.63, 0.362)
-- a cutter's hole inside `body.rear`: 987 mm round, at (-2.293, -0.562, 0.502)
-- a cutter's hole inside `body.rear`: 987 mm round, at (-2.293, 0.562, 0.502)
-- cabin part in the open: `interior.tub`, 9% of it, up to 10.0 mm from what would hide it, at (-1.06, 0.73, 0.16)
 
 **orrin_pebble** (FAIL)
 

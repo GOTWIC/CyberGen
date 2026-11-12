@@ -3141,6 +3141,20 @@ Vanta-R the same).
   Pack rebuilt, every check passing: 74,391, 44,633, 19,921, 5,101 triangles, standard
   class, texels 372 px/m (5th percentile), LOD3 32.6 of 40 degrees, 0.072 of 0.10 bent,
   0.039 of 0.04 texture. Not published.
+- **Orrin Lumen** (`docs/progress/AG18/orrin_lumen/`, the Orrin pilot, now on
+  `vehicles/brands/orrin.py`): each light ribbon a channel cut along the widest line round
+  its end, 17 mm wide and drawn out to its tips, 10 to 16 mm deep, a light guide's lit face
+  under a flush lens of its own (clear in front; red behind over 24 mm cells), the pebbles
+  kept on the poles; the door pulls crescent recesses, round charge flaps cut inside the
+  port rings, 3.5 mm shut lines; the crescent slots' outlines told to the checks (six cutter
+  holes before, none now); the canopy keeps its frameless glass (the brand's); room cut
+  beside and over the tires inside the skin (2.8 mm to the well before, 14.6 front and 23.7
+  rear; the front still cannot steer under its lids) and the cabin tub out of the rear wells.
+  356,940 triangles (293,582). For the pack the lit face sits right under the lens and the
+  channels' walls are a 1 mm sheet (bare, they were baked down onto the lit face). Pack
+  rebuilt, every check passing: 144,693, 59,996, 20,358, 5,057 triangles, standard class,
+  texels 404 px/m (5th percentile), LOD3 12.7 of 40 degrees, 0.016 of 0.10 bent, 0.014 of
+  0.04 texture. Not published.
 - **Next**: a pilot car of each of the other five brands (lamps by `BRANDS.md`, each
   switching to its `vehicles/brands/` module), shown to Swagnik before the other twelve;
   step A's street-distance findings (tires in the body, cabin tubs in the wells) on each car
