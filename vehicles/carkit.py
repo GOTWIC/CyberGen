@@ -2533,8 +2533,16 @@ def setup_render():
     r.engine = 'CYCLES'
     try:
         prefs = bpy.context.preferences.addons['cycles'].preferences
-        prefs.compute_device_type = 'METAL'
-        prefs.get_devices()
+        # Metal on the Mac; OptiX, else CUDA, else HIP on a Windows or Linux PC (the first
+        # backend this Blender offers with a GPU on it)
+        kinds = [k.identifier for k in prefs.bl_rna.properties['compute_device_type'].enum_items]
+        for kind in ('METAL', 'OPTIX', 'CUDA', 'HIP', 'ONEAPI'):
+            if kind not in kinds:
+                continue
+            prefs.compute_device_type = kind
+            prefs.get_devices()
+            if any(dv.type != 'CPU' for dv in prefs.devices):
+                break
         for dv in prefs.devices:
             dv.use = True
         SCN.cycles.device = 'GPU'
