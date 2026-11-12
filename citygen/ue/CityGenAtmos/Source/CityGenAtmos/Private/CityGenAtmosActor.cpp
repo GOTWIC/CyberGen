@@ -463,7 +463,8 @@ void ACityGenAtmos::UpdateLive()
 						const double D = FVector::Dist(L.Pos, View);
 						if (D <= HighCm)
 						{
-							High.Add(TPair<double, int64>(D, LiveKey(Slot, i)));
+							// (a searchlight before the floods: its beam reads from afar)
+							High.Add(TPair<double, int64>(L.Anim == 2 ? 0.25 * D : D, LiveKey(Slot, i)));
 						}
 					}
 				}

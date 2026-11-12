@@ -236,7 +236,8 @@ def test_aviation_lights_blink_on_tall_things(plan):
     a = top[0]["anim"]
     assert a["mode"] == "blink" and (a["period_s"], a["amount"]) == P.AVIATION_BLINK
     assert top[0]["color"][0] == 1.0 and top[0]["color"][1] < 0.1
-    assert all(v["mount"] == "beacon" and v["on"] and not v["flicker"] for v in t)
+    assert all(v["mount"] == "beacon" and v["on"] and not v["flicker"] and v["tier"] == "near"
+               for v in t)
     assert any(not v.get("anim") for v in t)
     # a 12 m building none; a 55 m launch tower in a spaceport, and its 45 m control tower
     assert not any(k.startswith("d02.lot.e300n0.bld.aviation") for k in L)

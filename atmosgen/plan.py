@@ -424,7 +424,8 @@ class Plan:
         md = self.mood(did)
         lid = f"{owner}.{suffix}"
         if tier is None:
-            tier = "high" if kind in P.HIGH_KINDS else "mid"
+            tier = "high" if kind in P.HIGH_KINDS else (
+                "near" if kind in P.NEAR_KINDS else "mid")
         # flicker and broken lights by the mood and the kind (AT2: neon fails more than an LED
         # billboard or a lamp; a shopfront's tube now and then; tunnels, stations, deck
         # soffits, safety lights and the check's corner poles and fill lights are kept)

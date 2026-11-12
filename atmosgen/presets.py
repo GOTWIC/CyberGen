@@ -383,6 +383,9 @@ TIERS = {"near": {"radius_m": 60.0, "max": 16},
          "high": {"radius_m": 750.0, "max": 48},
          "far": {"radius_m": 1500.0, "max": 0}}
 HIGH_KINDS = ("flood", "searchlight", "high_mast")
+# an aviation light is live only near the view (its red glow, the runtime's beacon, is what
+# shows from afar): from the air, 228 of the 512 mid lights were aviation lights at first
+NEAR_KINDS = ("aviation",)
 
 # budgets: lights per 256 m cell in the plan, live and shadowed near the view, the night's
 # frame time at p95, native 1440p on the PC by AG16's benchmark (decision 12.6)
