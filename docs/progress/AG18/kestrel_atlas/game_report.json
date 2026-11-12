@@ -1,0 +1,299 @@
+{
+ "car": "kestrel_atlas",
+ "title": "Kestrel Aerodyne Atlas",
+ "ok": true,
+ "triangles": {
+  "original": 151203,
+  "lods": [
+   87139,
+   52282,
+   20080,
+   8215
+  ],
+  "lod0_parts": {
+   "body": 86403,
+   "glass": 736
+  }
+ },
+ "objects": {
+  "original": 155,
+  "parts": 2
+ },
+ "size_class": {
+  "name": "large",
+  "exterior_m2": 76.05,
+  "rule": "large when the body's exterior is 55 m2 or more",
+  "lod_budgets": [
+   150000,
+   60000,
+   20000,
+   8000
+  ],
+  "texel_floor_px_per_m": {
+   "body": 240.0,
+   "wheels": 240.0
+  }
+ },
+ "textures": {
+  "body": 4096
+ },
+ "pack_bytes": 34888721,
+ "seconds": 56.8,
+ "stage_seconds": {
+  "build": 0.3,
+  "render_original": 24.4,
+  "parts": 10.1,
+  "nodes": 0.0,
+  "uv": 164.0,
+  "bake": 182.0,
+  "lods_export": 31.2,
+  "lods_only": 27.1,
+  "textures": 0.0,
+  "proof": 29.638833045959473
+ },
+ "baked_down": {
+  "relief": {
+   "pieces": 10,
+   "triangles": 20915,
+   "names": [
+    "case.stencil",
+    "fasteners",
+    "gate.hazard",
+    "gate.name",
+    "hazard.stripes",
+    "led.visor",
+    "lettering",
+    "lines",
+    "pod.stencils",
+    "visor.slits"
+   ]
+  },
+  "card_src": {
+   "pieces": 1,
+   "triangles": 4020,
+   "names": [
+    "hoist.stencil"
+   ]
+  }
+ },
+ "texel_px_per_m": {
+  "body": {
+   "exterior": {
+    "area_m2": 76.048,
+    "p5": 310.1,
+    "median": 320.5
+   },
+   "cabin": {
+    "area_m2": 11.105,
+    "p5": 128.1,
+    "median": 314.7
+   },
+   "underside": {
+    "area_m2": 1.414,
+    "p5": 112.1,
+    "median": 320.2
+   },
+   "lamp_in_gaps": {
+    "area_m2": 1.033,
+    "p5": 112.1,
+    "median": 112.1
+   }
+  }
+ },
+ "lights": 73,
+ "collision_hulls": 11,
+ "source": {
+  "script": "vehicles/cars/kestrel_atlas.py",
+  "script_sha256": "7233b4fec97c51f6005241ffd298f5cf884b3e91b7fa31da5207297cea6c4ae4",
+  "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
+  "game_sha256": "9e6108a54d1f801bd18195adc59470f9bd92b6d763a2afc8f84531218c054eab",
+  "original_triangles": 151203,
+  "original_objects": 155
+ },
+ "test": false,
+ "checks": [
+  {
+   "check": "files",
+   "ok": true,
+   "detail": {
+    "files": 10,
+    "missing": [],
+    "unreadable": []
+   }
+  },
+  {
+   "check": "budgets",
+   "ok": true,
+   "detail": [
+    {
+     "lod": 0,
+     "triangles": 87139,
+     "budget": 150000,
+     "ok": true
+    },
+    {
+     "lod": 1,
+     "triangles": 52282,
+     "budget": 60000,
+     "ok": true
+    },
+    {
+     "lod": 2,
+     "triangles": 20080,
+     "budget": 20000,
+     "ok": true
+    },
+    {
+     "lod": 3,
+     "triangles": 8215,
+     "budget": 8000,
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "uv_overlap",
+   "ok": true,
+   "detail": {
+    "limit": 0.005,
+    "slots": {
+     "body": {
+      "overlap": 0.00341,
+      "coverage": 0.5147,
+      "outside_unit": 0.0
+     }
+    }
+   }
+  },
+  {
+   "check": "texel_density",
+   "ok": true,
+   "detail": {
+    "body": {
+     "p5": 310.1,
+     "median": 320.5,
+     "floor": 240.0,
+     "ok": true
+    }
+   }
+  },
+  {
+   "check": "wheel_pivots",
+   "ok": true,
+   "detail": []
+  },
+  {
+   "check": "lod_bounds",
+   "ok": true,
+   "detail": [
+    {
+     "lod": 1,
+     "deviation_m": [
+      0.0,
+      0.0,
+      0.0001
+     ],
+     "tolerance_m": [
+      0.0886,
+      0.0344,
+      0.0261
+     ],
+     "ok": true
+    },
+    {
+     "lod": 2,
+     "deviation_m": [
+      0.0,
+      0.0,
+      0.0002
+     ],
+     "tolerance_m": [
+      0.0886,
+      0.0344,
+      0.0261
+     ],
+     "ok": true
+    },
+    {
+     "lod": 3,
+     "deviation_m": [
+      0.0,
+      0.0,
+      0.0003
+     ],
+     "tolerance_m": [
+      0.0886,
+      0.0344,
+      0.0261
+     ],
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "lod_fidelity",
+   "ok": true,
+   "detail": [
+    {
+     "normal_p95_deg": 2.0,
+     "bent_share": 0.0063,
+     "texture_share": 0.0031,
+     "miss_share": 0.0101,
+     "lod": 1,
+     "limits": {
+      "p95": 12.0,
+      "bent": 0.02,
+      "tex": 0.01
+     },
+     "ok": true
+    },
+    {
+     "normal_p95_deg": 22.27,
+     "bent_share": 0.0369,
+     "texture_share": 0.0111,
+     "miss_share": 0.0071,
+     "lod": 2,
+     "limits": {
+      "p95": 25.0,
+      "bent": 0.05,
+      "tex": 0.025
+     },
+     "ok": true
+    },
+    {
+     "normal_p95_deg": 35.07,
+     "bent_share": 0.0845,
+     "texture_share": 0.0288,
+     "miss_share": 0.0716,
+     "lod": 3,
+     "limits": {
+      "p95": 40.0,
+      "bent": 0.1,
+      "tex": 0.04
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "collision",
+   "ok": true,
+   "detail": {
+    "hulls": 11,
+    "vertices": [
+     314,
+     366,
+     194,
+     228,
+     212,
+     268,
+     218,
+     314,
+     198,
+     232,
+     108
+    ]
+   }
+  }
+ ]
+}

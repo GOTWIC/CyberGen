@@ -1,0 +1,410 @@
+{
+ "car": "brakk_bastion",
+ "title": "Brakk Bastion",
+ "ok": true,
+ "triangles": {
+  "original": 269389,
+  "lods": [
+   145477,
+   59997,
+   20168,
+   8078
+  ],
+  "lod0_parts": {
+   "body": 82957,
+   "glass": 1056,
+   "wheel_fl": 15096,
+   "wheel_fr": 15456,
+   "wheel_rl": 15456,
+   "wheel_rr": 15456
+  }
+ },
+ "objects": {
+  "original": 153,
+  "parts": 6
+ },
+ "size_class": {
+  "name": "large",
+  "exterior_m2": 60.77,
+  "rule": "large when the body's exterior is 55 m2 or more",
+  "lod_budgets": [
+   150000,
+   60000,
+   20000,
+   8000
+  ],
+  "texel_floor_px_per_m": {
+   "body": 240.0,
+   "wheels": 240.0
+  }
+ },
+ "textures": {
+  "body": 4096,
+  "wheels": 2048
+ },
+ "pack_bytes": 41258566,
+ "seconds": 41.3,
+ "stage_seconds": {
+  "build": 0.9,
+  "render_original": 19.9,
+  "parts": 18.3,
+  "nodes": 0.0,
+  "uv": 190.4,
+  "bake": 390.5,
+  "lods_export": 17.4,
+  "lods_only": 15.9,
+  "textures": 0.0,
+  "proof": 25.41908288002014
+ },
+ "baked_down": {
+  "relief": {
+   "pieces": 16,
+   "triangles": 52997,
+   "names": [
+    "bolts",
+    "chevrons",
+    "fender.bolts",
+    "hood.louvres",
+    "led.pad",
+    "lettering",
+    "markings",
+    "motorbolts.fl",
+    "sensor.eye",
+    "step.pads",
+    "tiretext.fl",
+    "tiretext.fr",
+    "tiretext.rl",
+    "tiretext.rr",
+    "tiretext.spare",
+    "winch.slot"
+   ]
+  }
+ },
+ "texel_px_per_m": {
+  "body": {
+   "exterior": {
+    "area_m2": 60.773,
+    "p5": 306.8,
+    "median": 318.5
+   },
+   "underside": {
+    "area_m2": 3.484,
+    "p5": 111.1,
+    "median": 317.9
+   },
+   "cabin": {
+    "area_m2": 6.831,
+    "p5": 127.0,
+    "median": 317.8
+   },
+   "lamp_in_gaps": {
+    "area_m2": 0.19,
+    "p5": 111.1,
+    "median": 111.1
+   }
+  },
+  "wheels": {
+   "exterior": {
+    "area_m2": 13.517,
+    "p5": 346.0,
+    "median": 374.1
+   },
+   "underside": {
+    "area_m2": 0.388,
+    "p5": 130.9,
+    "median": 380.1
+   }
+  }
+ },
+ "lights": 31,
+ "collision_hulls": 10,
+ "source": {
+  "script": "vehicles/cars/brakk_bastion.py",
+  "script_sha256": "9cae1c68db6b30a9c35bce7874869d4709826cda9f9957f3b17f5fc53e673318",
+  "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
+  "game_sha256": "9e6108a54d1f801bd18195adc59470f9bd92b6d763a2afc8f84531218c054eab",
+  "original_triangles": 269389,
+  "original_objects": 153
+ },
+ "test": false,
+ "checks": [
+  {
+   "check": "files",
+   "ok": true,
+   "detail": {
+    "files": 15,
+    "missing": [],
+    "unreadable": []
+   }
+  },
+  {
+   "check": "budgets",
+   "ok": true,
+   "detail": [
+    {
+     "lod": 0,
+     "triangles": 145477,
+     "budget": 150000,
+     "ok": true
+    },
+    {
+     "lod": 1,
+     "triangles": 59997,
+     "budget": 60000,
+     "ok": true
+    },
+    {
+     "lod": 2,
+     "triangles": 20168,
+     "budget": 20000,
+     "ok": true
+    },
+    {
+     "lod": 3,
+     "triangles": 8078,
+     "budget": 8000,
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "uv_overlap",
+   "ok": true,
+   "detail": {
+    "limit": 0.005,
+    "slots": {
+     "body": {
+      "overlap": 0.00147,
+      "coverage": 0.4942,
+      "outside_unit": 0.0
+     },
+     "wheels": {
+      "overlap": 0.0,
+      "coverage": 0.4621,
+      "outside_unit": 0.0
+     }
+    }
+   }
+  },
+  {
+   "check": "texel_density",
+   "ok": true,
+   "detail": {
+    "body": {
+     "p5": 306.8,
+     "median": 318.5,
+     "floor": 240.0,
+     "ok": true
+    },
+    "wheels": {
+     "p5": 346.0,
+     "median": 374.1,
+     "floor": 240.0,
+     "ok": true
+    }
+   }
+  },
+  {
+   "check": "wheel_pivots",
+   "ok": true,
+   "detail": [
+    {
+     "part": "wheel_fl",
+     "pivot": [
+      1.58,
+      0.93,
+      0.475
+     ],
+     "center_offset_mm": [
+      0.0,
+      -0.0,
+      0.0
+     ],
+     "radius": 0.475,
+     "radius_pack": 0.475,
+     "json_pivot": [
+      1.58,
+      0.93,
+      0.475
+     ],
+     "ok": true
+    },
+    {
+     "part": "wheel_fr",
+     "pivot": [
+      1.58,
+      -0.93,
+      0.475
+     ],
+     "center_offset_mm": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "radius": 0.475,
+     "radius_pack": 0.475,
+     "json_pivot": [
+      1.58,
+      -0.93,
+      0.475
+     ],
+     "ok": true
+    },
+    {
+     "part": "wheel_rl",
+     "pivot": [
+      -1.52,
+      0.93,
+      0.475
+     ],
+     "center_offset_mm": [
+      0.0,
+      -0.0,
+      0.0
+     ],
+     "radius": 0.475,
+     "radius_pack": 0.475,
+     "json_pivot": [
+      -1.52,
+      0.93,
+      0.475
+     ],
+     "ok": true
+    },
+    {
+     "part": "wheel_rr",
+     "pivot": [
+      -1.52,
+      -0.93,
+      0.475
+     ],
+     "center_offset_mm": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "radius": 0.475,
+     "radius_pack": 0.475,
+     "json_pivot": [
+      -1.52,
+      -0.93,
+      0.475
+     ],
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "lod_bounds",
+   "ok": true,
+   "detail": [
+    {
+     "lod": 1,
+     "deviation_m": [
+      0.0,
+      0.0,
+      0.0003
+     ],
+     "tolerance_m": [
+      0.0775,
+      0.0337,
+      0.0346
+     ],
+     "ok": true
+    },
+    {
+     "lod": 2,
+     "deviation_m": [
+      0.0036,
+      0.0029,
+      0.0022
+     ],
+     "tolerance_m": [
+      0.0775,
+      0.0337,
+      0.0346
+     ],
+     "ok": true
+    },
+    {
+     "lod": 3,
+     "deviation_m": [
+      0.0006,
+      0.0,
+      0.0021
+     ],
+     "tolerance_m": [
+      0.0775,
+      0.0337,
+      0.0346
+     ],
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "lod_fidelity",
+   "ok": true,
+   "detail": [
+    {
+     "normal_p95_deg": 8.93,
+     "bent_share": 0.0052,
+     "texture_share": 0.0022,
+     "miss_share": 0.0057,
+     "lod": 1,
+     "limits": {
+      "p95": 12.0,
+      "bent": 0.02,
+      "tex": 0.01
+     },
+     "ok": true
+    },
+    {
+     "normal_p95_deg": 20.14,
+     "bent_share": 0.0337,
+     "texture_share": 0.0069,
+     "miss_share": 0.0105,
+     "lod": 2,
+     "limits": {
+      "p95": 25.0,
+      "bent": 0.05,
+      "tex": 0.025
+     },
+     "ok": true
+    },
+    {
+     "normal_p95_deg": 16.91,
+     "bent_share": 0.0213,
+     "texture_share": 0.0056,
+     "miss_share": 0.0084,
+     "lod": 3,
+     "limits": {
+      "p95": 40.0,
+      "bent": 0.1,
+      "tex": 0.04
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "collision",
+   "ok": true,
+   "detail": {
+    "hulls": 10,
+    "vertices": [
+     328,
+     208,
+     174,
+     270,
+     82,
+     284,
+     310,
+     142,
+     338,
+     194
+    ]
+   }
+  }
+ ]
+}

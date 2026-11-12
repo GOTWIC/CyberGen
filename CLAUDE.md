@@ -2227,7 +2227,26 @@ waits for Swagnik's review.
 - The owner's concept images are in `reference/car_concepts/` (gitignored, inspiration
   only, never copied); `.blend` and `.glb` files of vehicles are not committed.
 - No tests and no goldens: a car is checked by building it and looking at its sheet.
-- Phases after the designs (improvements, game-ready meshes, AG8's parked vehicles and
+- **In Unreal** (2026-11-11, `citygen/unreal_vehicles.py`; `docs/unreal_export.md`, "AG18's
+  vehicles"): the packs as a library under `/Game/CityGen/Vehicles/<car>` (a mesh a part
+  with the pack's four LODs, no Nanite, `M_CgVehicle` recoloring by per-instance custom
+  data, thin translucent glass), placed by contribution entries of kind `vehicles` (one
+  instanced component per model and part); `--check-vehicles`; shots in
+  `docs/progress/AG18/unreal/`.
+- **Game packs** (phase 3, scope steps F and G, PRs #194 to #199): `vehicles/game.py`, its
+  contract `vehicles/GAME.md`; `vehicles/blender.sh vehicles/game.py --car NAME [--docs]
+  [--test]` turns a car's script, unchanged, into a pack in
+  `~/.cache/cybergen/vehicles/game/<car>/` (never committed: four LOD glTFs, baked atlases
+  with the paint as a mask, collision hulls, `pack.json`); `--docs` writes its proof
+  `game.jpg` and `game_report.json` into `docs/progress/AG18/<car>/`. Size classes standard
+  and large (55 m2 of exterior or more: LOD3 8,000 triangles, texel floor 240 px/m against
+  5,000 and 300). Built for 18 vehicles; kestrel_meridian and brakk_hauler (`lod_fidelity`)
+  and halcyon_ridge (`uv_overlap`) fail one check each by a hair, recorded.
+- **Vex** (vex_wraith, vex_halo, vex_strix) is to be redesigned (Swagnik, 2026-11-10): no
+  packs, out of every later step until redone.
+- **Next:** step H (the vehicles into the cities: AG8's parked vehicles as placement
+  entries), then the design improvements (steps A to E).
+- The other phases (improvements, AG8's parked vehicles and
   stage 4's fleet drawing on them) are listed in the scope with their plan.
 
 Progress output: `assetgen build`, `preview`, `materials preview|board`, `library`, `streets`,

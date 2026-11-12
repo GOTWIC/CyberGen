@@ -1041,16 +1041,23 @@ def share_meshes(packs: dict, placed: list[dict]) -> int:
 
 def build_manifest(build_dir: str | Path, name: str | None = None,
                    assets: bool = True, play: bool = False,
-                   atmos: str | Path | bool | None = None) -> dict:
+                   atmos: str | Path | bool | None = None,
+                   vehicles: str | Path | None = None, all_vehicles: bool = False) -> dict:
     """The manifest of a blockout output (see the module docstring), with the prototypes'
     meshes and the flat graphs beside it: (manifest, prototype meshes, flat graphs). With
     `assets` (the default), stage 2's contributions in BUILD_DIR/assets are layered over the
     blockout (`stage2`); a build without them gives the blockout's manifest alone. With
     `play`, the play features' map and data are written to BUILD_DIR/unreal (`unreal_play`)
     and the manifest's `play` names them. `atmos` (AT1): the atmos plan's folder (None:
-    BUILD/atmos when it has one, False: none), the manifest's `atmos` (`unreal_atmos`)."""
+    BUILD/atmos when it has one, False: none), the manifest's `atmos` (`unreal_atmos`).
+    `vehicles` (AG18): the vehicle library (None: $CITYGEN_VEHICLES, else the packs'
+    cache) the contributions' placement entries draw on, the manifest's `vehicles`
+    (`unreal_vehicles`); `all_vehicles` takes every car of the library, placed or not."""
+    from . import unreal_vehicles as UV
     build = Path(build_dir)
     contribs = contributions(build) if assets else []
+    # (AG18: the vehicle placements apart; without them the contributions are as they were)
+    contribs, placed = UV.split(contribs)
     plan = json.loads((build / "blockout_plan.json").read_text(encoding="utf-8"))
     city = name or plan["city"]
     mats = {k: material_params(k, v) for k, v in sorted(plan["materials"].items())}
@@ -1141,6 +1148,16 @@ def build_manifest(build_dir: str | Path, name: str | None = None,
     if contribs:
         man["stage2"] = stage2(man, build, contribs)
         man["counts"]["actors"] = len(actor_hashes(man))
+    veh = UV.section(placed, vehicles, all_vehicles)
+    if veh is not None:
+        # AG18: the vehicle library's cars the placements name, imported once a project under
+        # /Game/CityGen/Vehicles, and an actor per placement entry
+        clash = sorted(set(UV.actor_hashes(veh)) & set(actor_hashes(man)))
+        if clash:
+            raise ValueError(f"vehicles: keys {clash[:5]} are other actors' too")
+        man["vehicles"] = veh
+        man["counts"]["vehicles"] = veh["counts"]["vehicles"]
+        man["counts"]["actors"] = len(actor_hashes(man))
     if atmos is not False:
         from . import unreal_atmos
         at = unreal_atmos.write_atmos(build, atmos or None)
@@ -1183,6 +1200,12 @@ def actor_hashes(man: dict) -> dict[str, str]:
     if (man.get("atmos") or {}).get("cells"):
         from .unreal_atmos import actor_hashes as atmos_hashes
         out.update(atmos_hashes(man["atmos"]))   # (AT1: the controller and its cells)
+    if man.get("vehicles"):
+        # AG18: a group actor per placement entry, over the keys it replaces
+        from .unreal_vehicles import actor_hashes as vehicle_hashes
+        for k in man["vehicles"]["replaced"]:
+            out.pop(k, None)
+        out.update(vehicle_hashes(man["vehicles"]))
     return out
 
 
@@ -1208,6 +1231,11 @@ def actor_kinds(man: dict) -> dict[str, str]:
     if at.get("cells"):
         out[at["key"]] = "atmos"
         out.update({c["key"]: "atmos_cell" for c in at["cells"]})
+    if man.get("vehicles"):
+        from .unreal_vehicles import actor_kinds as vehicle_kinds
+        for k in man["vehicles"]["replaced"]:
+            out.pop(k, None)
+        out.update(vehicle_kinds(man["vehicles"]))
     return out
 
 
@@ -1226,16 +1254,18 @@ def manifest_changes(old: dict, new: dict) -> dict[str, list[str]]:
 
 def write_manifest(build_dir: str | Path, name: str | None = None,
                    assets: bool = True, play: bool = True,
-                   atmos: str | Path | bool | None = None) -> Path:
+                   atmos: str | Path | bool | None = None,
+                   vehicles: str | Path | None = None, all_vehicles: bool = False) -> Path:
     """BUILD_DIR/unreal/manifest.json, prototypes.glb and graphs.json (and with `play` the
     play features' map.png and play.json); the manifest's path. `assets` False: the blockout
-    alone, stage 2's contributions left out."""
+    alone, stage 2's contributions left out (their vehicle placements too)."""
     build = Path(build_dir)
     for f in ("blockout_plan.json", "tiles.json"):
         if not (build / f).is_file():
             raise FileNotFoundError(f"{build / f}: not a blockout output (run citygen build "
                                     f"--blockout or citygen blockout)")
-    man, meshes, graphs = build_manifest(build, name, assets, play, atmos)
+    man, meshes, graphs = build_manifest(build, name, assets, play, atmos, vehicles,
+                                         all_vehicles)
     out = build / OUT_DIR
     out.mkdir(parents=True, exist_ok=True)
     write_glb(meshes, man["materials"], out / "prototypes.glb")
@@ -1491,6 +1521,7 @@ def new_project(dest: str | Path, root: Path | None = None,
 # what the stages the editor scripts report are called on the progress line
 STAGE_LABELS = {"start": "editor start", "materials": "materials and textures",
                 "meshes": "blockout meshes", "meshes2": "stage 2 packs and meshes",
+                "vehicles": "vehicles (AG18's packs)",
                 "level": "level", "actors": "actors", "settings": "play, streaming and graphs",
                 "save": "saving", "prune": "pruning unused meshes", "digests": "digests",
                 "shutdown": "editor shutdown", "check_start": "check: editor start",
@@ -1507,6 +1538,7 @@ FIRST_IMPORT_S = {
     "materials": lambda c: 3.0 + 0.15 * c.get("textures", 0),
     "meshes": lambda c: 0.004 * c.get("objects", 0),
     "meshes2": lambda c: 0.018 * c.get("meshes2", 0),
+    "vehicles": lambda c: 60.0 * c.get("cars", 0),
     "level": lambda c: 0.0009 * c.get("actors", 0),
     "actors": lambda c: 0.0025 * c.get("actors", 0) + 2e-7 * c.get("actors", 0) ** 2,
     "settings": lambda c: 5.0,
@@ -1695,7 +1727,8 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
                 name: str | None = None, timeout: float = 7200.0,
                 assets: bool = True, play: str = "fly", fly_speed: float = FLY_SPEED_M_S,
                 startup: bool = True, view_m: float = VIEW_M,
-                play_features: bool = True, atmos: str | Path | bool | None = None) -> dict:
+                play_features: bool = True, atmos: str | Path | bool | None = None,
+                vehicles: str | Path | None = None, all_vehicles: bool = False) -> dict:
     """`citygen unreal`: the manifest, then the headless import; the importer's result
     (created, updated, deleted and unchanged actors and assets, timings). `assets` False
     imports the blockout alone (stage 2's actors, if imported before, go; its meshes
@@ -1707,7 +1740,9 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
     the plugin cannot be built, the city imports without them (`play_plugin` says why).
     `atmos` (AT1): the atmos plan's folder (None: BUILD/atmos when there is one, False:
     none); its controller and cells come with the plugin (CityGenAtmos, built with the play
-    features) and atmosgen's assets (made first, `unreal_atmos.make_assets`)."""
+    features) and atmosgen's assets (made first, `unreal_atmos.make_assets`). `vehicles`
+    (AG18): the vehicle library the contributions' placements draw on (`unreal_vehicles`;
+    `all_vehicles` imports every car of it, placed or not)."""
     if play not in PLAY_MODES:
         raise ValueError(f"play: {play!r} is not one of {', '.join(PLAY_MODES)}")
     from . import unreal_play
@@ -1722,7 +1757,8 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
               if play_features else {"ok": False, "built": False, "error": "--no-play"})
     t = time.time()
     man_path = write_manifest(build, name, assets, play=plugin["ok"],
-                              atmos=atmos if plugin["ok"] else False)
+                              atmos=atmos if plugin["ok"] else False, vehicles=vehicles,
+                              all_vehicles=all_vehicles)
     manifest_s = round(time.time() - t, 1)
     atmos_res = None
     man_at = json.loads(man_path.read_text(encoding="utf-8")).get("atmos") or {}

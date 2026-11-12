@@ -1291,7 +1291,29 @@ target is a current AAA open-world game's hero vehicles.
   `docs/progress/AG18/<car>/`, and a line-up of all 21 (`docs/progress/AG18/lineup.jpg`).
   Not game-ready, and not meant to be yet.
 - **Phase 2, improvements** (planned, the list and its order below).
-- **Phase 3, game-ready**: UVs, baked texture sets, LODs, collision, pivots.
+- **Phase 3, game-ready** (steps F and G; built 2026-11-11 for the 18 vehicles other than
+  Vex, PRs #194, #196, #198, #199): `vehicles/game.py` turns a car's script, unchanged,
+  into a game pack (named parts with wheel and brake pivots, baked atlases with the paint as
+  a mask, four LODs by size class, convex collision, lights as data, a proof image and a
+  report of checks); the format is the contract in `vehicles/GAME.md`. Packs live outside
+  git (`~/.cache/cybergen/vehicles/game/<car>/`); proofs and reports are in
+  `docs/progress/AG18/<car>/`. Open: three cars fail one check each by a hair
+  (`kestrel_meridian` and `brakk_hauler` `lod_fidelity`, `halcyon_ridge` `uv_overlap`),
+  recorded, not fixed; LOD3 details still crude up close (a winch drum, small rims and
+  grilles); bake faults on `kestrel_meridian`'s louvre and `aurel_zenith`'s grille.
+- **Phase 3 in Unreal** (2026-11-11): the exporter takes the packs as a library imported
+  once a project (`/Game/CityGen/Vehicles/<car>`: a mesh a part with the pack's LODs, no
+  Nanite; `M_CgVehicle` recoloring per instance; thin translucent glass) and places them by
+  layer 2 entries of kind `vehicles` (car, transform, three paint colors, steer, citygen id;
+  one instanced component per model and part); `citygen unreal --check-vehicles`. What the
+  engine taught the contract is in `vehicles/GAME.md`, "In an engine" (tangents, UV
+  precision, thick glass, a hull's material, fixed in `game.py`). Results:
+  `docs/progress/AG18/unreal/`. For step H: AG8 writes a placement entry per tile (key, tile,
+  pivot, `replaces` the parked car prototype or its variants' entry) with a vehicle per parked
+  car; the exporter does the rest.
+- **Vex** (Swagnik, 2026-11-10): the three Vex vehicles (`vex_wraith`, `vex_halo`,
+  `vex_strix`) are to be redesigned; they have no packs and are out of every later step
+  until redone.
 - **Phase 4, into the city**: AG8's `parked_vehicle` families draw the hero models by
   district style and in many colors; stage 4's fleet (lifegen) drives them.
 - **Unreal:** nothing in phases 1 and 2. From phase 3: static meshes with LOD chains (or
@@ -1351,7 +1373,9 @@ target is a current AAA open-world game's hero vehicles.
     edges given where they should end up; opening parts (a door, hatch or canopy as a group
     with a pose per view); more than one small tile on a sheet; a table of show colors.
 
-**Plan** (each step a session or two, in this order, after Swagnik's review of phase 1):
+**Plan** (each step a session or two, after Swagnik's review of phase 1). F and G are done
+(phase 3), and the packs are in the exporter and tested in Unreal (2026-11-11). Next, in
+this order: H (the vehicles into the generated cities), then the design improvements A to E.
 
 | Step | Work | Covers |
 |---|---|---|

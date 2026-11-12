@@ -285,7 +285,8 @@ def cmd_unreal(args: argparse.Namespace) -> int:
         return EXIT_USAGE
     if args.manifest_only:
         path = U.write_manifest(build, args.name, not args.blockout_only, not args.no_play,
-                                atmos=False if args.no_atmos else args.atmos)
+                                atmos=False if args.no_atmos else args.atmos,
+                                vehicles=args.vehicles, all_vehicles=args.all_vehicles)
         print(f"wrote {path}")
         return EXIT_OK
     if args.uproject and args.new_project and not Path(args.uproject).is_file():
@@ -307,7 +308,8 @@ def cmd_unreal(args: argparse.Namespace) -> int:
                             play=args.play, fly_speed=args.fly_speed,
                             startup=not args.no_startup, view_m=args.view_range,
                             play_features=not args.no_play,
-                            atmos=False if args.no_atmos else args.atmos) \
+                            atmos=False if args.no_atmos else args.atmos,
+                            vehicles=args.vehicles, all_vehicles=args.all_vehicles) \
             if not (args.check_only or args.bench_only) else None
         if res is not None:
             print(U.import_summary(res))
@@ -322,7 +324,8 @@ def cmd_unreal(args: argparse.Namespace) -> int:
             print(U.hlod_summary(hl))
             if not hl.get("ok"):
                 return EXIT_INVALID
-        if args.check or args.check_only:
+        # (--check-only with --check-vehicles alone: the vehicle check, not the city's)
+        if args.check or (args.check_only and not args.check_vehicles):
             if any(len(v) not in (7, 8) for v in args.view):
                 print("error: --view NAME EX EY EZ TX TY TZ [LENS]", file=sys.stderr)
                 return EXIT_USAGE
@@ -332,6 +335,14 @@ def cmd_unreal(args: argparse.Namespace) -> int:
             chk = U.check_city(build, args.uproject, engine=args.engine, shots=args.shots,
                                timeout=args.timeout, width=args.shot_width, views=views)
             print(U.check_summary(chk))
+            if not chk.get("ok"):
+                print(chk.get("error", ""), file=sys.stderr)
+                return EXIT_INVALID
+        if args.check_vehicles:
+            from . import unreal_vehicles as UV
+            chk = UV.check(build, args.uproject, engine=args.engine, shots=args.shots,
+                           timeout=args.timeout, width=args.shot_width)
+            print(UV.check_summary(chk))
             if not chk.get("ok"):
                 print(chk.get("error", ""), file=sys.stderr)
                 return EXIT_INVALID
@@ -673,6 +684,18 @@ def build_parser() -> argparse.ArgumentParser:
                          "left out)")
     ue.add_argument("--no-atmos", action="store_true",
                     help="leave out the atmos plan (its actors from an earlier import go)")
+    ue.add_argument("--vehicles", metavar="LIBRARY_DIR",
+                    help="AG18: the vehicle library (game packs, vehicles/GAME.md) that the "
+                         "contributions' vehicle placements draw on (default "
+                         "$CITYGEN_VEHICLES, else ~/.cache/cybergen/vehicles/game); its cars "
+                         "imported once a project under /Game/CityGen/Vehicles")
+    ue.add_argument("--all-vehicles", action="store_true",
+                    help="import every car of the vehicle library, placed or not")
+    ue.add_argument("--check-vehicles", action="store_true",
+                    help="AG18: after the import (or with --check-only alone), check the "
+                         "level's vehicles in the editor (LODs, glass, hulls, placements, "
+                         "wheel pivots, traces onto the bodies) and with --shots render "
+                         "them by day and night (unreal_vehicles.check)")
     ue.add_argument("--check", action="store_true",
                     help="after the import, play the level in the editor: streaming, "
                          "ground traces, a walk along a sidewalk (always the walking "
