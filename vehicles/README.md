@@ -261,11 +261,15 @@ allowed (`Geo.add(verts, faces)`, or bmesh and bpy directly, linked into `K.CAR`
 | Name | What |
 |---|---|
 | `materials(**palette)` | the library in `K.MAT`. Palette keys: `paint`, `paint_finish` (`metallic`, `pearl`, `gloss`, `satin`, `matte`, `chrome`, `lacquer` (a thin coat: black stays black under the top box), `skin` (matte with little specular), or `(metallic, roughness, coat[, specular])`), `paint2`, `paint2_finish`, `dust`, `dust_amount`, `dust_z` (`(0.12, 0.55)`: the paint is all dust at the first height and below, clean from the second up; raise both for a truck or a hover car), `cladding`, `glass`, `glass_ior` (1.5; 1.1 to 1.2 is a coated glass that does not mirror the lights), `carbon_coat` (1; 0 is a dry weave), `led_front`, `led_rear`, `led_accent`, `led_wheel`, their strengths `led_front_strength` (60), `led_rear_strength` (40), `led_accent_strength` (30), `led_wheel_strength` (30), `screen_strength` (2), `lamp_strength` (25), `ember_strength` (1.6) (fine slots of light clip to white at the defaults, and the red goes pale: lower them), `caliper`, `seat`, `interior`, `screen`, `rim`, `rim_bright`, `decal`, `ember`, `floor` (the studio's floor; darker for very dark gloss paint). Names: `paint`, `paint2` (flake, dust, crease grime), `carbon` (weave), `gloss_black`, `cladding`, `underbody`, `void`, `well`, `grille`, `glass`, `rubber`, `rim`, `rim_bright`, `disc`, `caliper`, `interior`, `seat`, `screen`, `decal`, `led_*`, `lamp`, `ember` |
-| `pbr(name, color, metallic, rough, **inputs)`, `emit(name, color, strength)`, `paint(name, color, finish, dust, dust_amount, flake, dust_z)`, `carbon(name, dark, light, coat)`, `glass(name, color, ior, rough)` (a smoked or coated glass of the car's own; name it `glass...`), `void(name)` | a car's own materials |
+| `pbr(name, color, metallic, rough, **inputs)`, `emit(name, color, strength)`, `paint(name, color, finish, dust, dust_amount, flake, dust_z)`, `carbon(name, dark, light, coat)`, `glass(name, color, ior, rough)` (a smoked or coated glass of the car's own; name it `glass...`), `lens(name, color, ior, rough)` (a lamp's lens: a shadow passes through it tinted, so what is behind it is lit; name it `lens...`), `void(name)` | a car's own materials |
+| `need(*names)` | the kit's later materials, made the first time a car names one (in `pmat`, in `Geo.obj` or here), so a car that uses none builds exactly as before: `lamp_housing` (dark plastic), `chrome`, `lens_clear`, `lens_smoke`, `lens_red`, `lens_amber`, `optic` (a frosted light guide sleeve), `frit` (the black border printed on glass), `mirror`, `seal` (rubber seals) |
 | `Geo()` | collects closed solids: `box(center, size, rot)`, `hexa(8 points)`, `prism(polygon, vector)`, `prism_on(plane, polygon, at, depth)` (a polygon drawn in `'xy'`, `'xz'` or `'yz'`), `lathe(profile, n, a0, a1, xf, axis=, at=)` about y, or about any axis (`'x'`, `'z'`, a vector) through a point, `ring(center, axis, R, r=, sec=)` a round or flat ring about any axis, `cyl(base, h, r, axis=)` an upright cylinder, `sweep(path, section, up, closed)`, `pipe(path, r)` a round bar along a path, `tube(a, b, r, n)` a straight round bar between two points, `louvers(a, b, c, d, n, w, th, tilt, out)`, `honeycomb(polygon, x, R, wall, depth, sgn, keep, frame=)` (`frame=(origin, u, v)`: on any plane), `add(verts, faces)`; then `obj(name, mat, bevel, segs, angle, mirror, sharp, flip_y, loc, rot)` (`rot`: an Euler, three angles or a matrix, about the object's origin at `loc`) |
 | `finish(ob, bevel, segs, angle, mirror, wn, sharp)` | mirror, bevel and shading on any mesh object |
 | `fill(stations)`, `table(names, lines, S)` | `None` points interpolated; `PT[station][line]` |
-| `build_body(stations, panel_of, pmat, line_crease, station_crease, name, front, rear, recesses, glass, cutters, subdiv, mirror, wrap, gap, thick, glass_thick, project, bevel, bevel_segs)` | one body piece (below); returns `.parts[panel]` objects and `.caps["front"/"rear"]` inner rings |
+| `build_body(stations, panel_of, pmat, line_crease, station_crease, name, front, rear, recesses, glass, cutters, subdiv, mirror, wrap, gap, thick, glass_thick, project, bevel, bevel_segs, lens_thick)` | one body piece (below); returns `.parts[panel]` objects and `.caps["front"/"rear"]` inner rings |
+| `groove(g, pts, proj, width, depth, proud, closed, step, mirror, up=, round=)`, `pocket(g, pts, proj, depth, proud, dir, back, step, mirror)`, `trace(pts, proj, closed, step)`, `chaikin(pts, rounds, closed)`, `rounded(cx, cy, w, h, r)`, `ngon(cx, cy, r, n, rot)` | cutters laid on the uncut hull, inside a `cutters` function (below): a cut line (a shut line, a flush handle's outline; wider, a light channel), a pocket (a lamp housing, a handle recess, a slot) returning a `Pocket` (`on(a, b)`, `at(a, b)`, `deep(a, b)`: where the skin and the floor are); the path on the surface they follow, a polyline's corners cut round, outlines to draw them with |
+| `Lamp(name, lit, housing, chrome, glass, optic)` | the inside of a lamp, by material: `projector(at, dir, r, depth)`, `reflector(at, dir, r, depth)`, `leds(a, b, n, dir)`, `guide(path, r, sleeve)`, `bar(path, w, h)`, `fins(a, b, c, d, n, w, th, tilt, out)`, the Geos `housing`, `chrome`, `glass`, `optic`, `emit(lit)`; `obj(mirror)` makes `<name>.housing`, `.chrome`, `.glass`, `.optic`, `.lit` |
+| `wiper(arm, blade, pivot, a, b)` | a wiper at rest on the glass: a boss, a tapered arm, a yoke, the blade's spine and rubber from a to b |
 | `well_cutter(g, cx, cz, r, y0, angles)` | a wheel well solid for `cutters` |
 | `arch_trim(g, cx, cz, r, y_in, y_out, angles)`, `arch_bolts(g, cx, cz, r, y, angles)` | faceted arch trim and its bolts |
 | `on_body(u, v, proj, objs, tol=)` | surface point and normal of the body as built, seen along `'y'` (left side, u = x, v = z), `'Y'` (right), `'x'` (front, u = y, v = z), `'X'` (back), `'z'` (top, u = x, v = y); over all body pieces, or over `objs` (an object or a list: pods, a wing, one panel), with nothing to set or reset. `tol=0.003`: a ray that slips through a panel gap looks again beside it |
@@ -305,11 +309,39 @@ bevelled edges.
   band_lines=N)` is a recessed mouth with a band round its lip. `body.caps["front"]` gives
   the inner ring, for a grille polygon.
 - **`recesses`** `(i, j, thickness, depth[, inner, wall])`: a sunk vent in quad (i, j).
-  **`glass`** `(panel, inset[, trim])`: a trim frame with sharp corners.
+  **`glass`** `(panel, inset[, trim])`: a trim frame with sharp corners. Two later forms,
+  both made on the left half before the mirror, so the frame is the same on both sides and
+  faces out (the first form's frames are mirrored 4 to 14 mm off at their corners and face
+  into the car, step A's finding; the cars that use it keep it until they are redone):
+  `(panel, inset, trim, "frame")` a trim frame with the body's gap round it, and
+  `(panel, inset, trim, "frit")` the frame as part of the glass, no gap between them, the
+  glass's thickness, for a trim panel in `frit`: the black border printed on real glass.
+  A frit pane and its border are drawn sharp at their rims (smooth, the reflections at the
+  pane's edge break into shards).
 - **`cutters`** `(Geo, panel)`: solids cut out (wheel wells, a tunnel through the body).
   None for a hover car or an open-wheel car. `(Geo, panel, "drop")` drops the cut faces: a
-  hole with no walls (a window, an open locker). A cutter that stands on one side only cuts
-  that side (`well_cutter(..., sides=(1,))`).
+  hole with no walls (a window, an open locker), or with `groove()` a shut line. A cutter
+  that stands on one side only cuts that side (`well_cutter(..., sides=(1,))`).
+  `(Geo, housing, "skin", P)` keeps the cut faces as `housing` and makes the skin the
+  cutter took away a panel `P` of its own, with the gap all round: a lamp's lens over its
+  housing (a `lens...` material makes it a thin lens, `lens_thick` 3 mm), a flap over its
+  recess. `(Geo, P, "cover")` makes the skin `P` and drops the cut faces.
+- **Cut lines and lamps** (step B). `cutters` may be a function: `build_body` calls it once
+  the cage stands, uncut and subdivided, and `on_body()`, `snap()` and `trace()` then see
+  that hull, so `groove()` and `pocket()` lay their cutters on the surface as it will be
+  built; it returns the list. A shut line is `groove()` with its defaults (0.6 mm, 6 mm deep:
+  with a gap of 1.75 mm it is 4 mm wide, the scope's 3 to 4 mm); a closed outline is a
+  flush handle or a flap. A light channel is a groove 25 to 40 mm wide and deep, cut as
+  `"skin"` with a lens: the lamp stands in it, built along the path the groove returns
+  (`[(point, way out)]`) with a `Lamp`. A wide channel that turns a corner tighter than it
+  is wide would fold: `round=3` rounds the path's corners first (the groove also drops
+  sections that would fold, at a cost in symmetry). A rounded path is snapped onto the
+  hull, so keep it away from a mouth's inner frame: the Vanta-R's front channel could not
+  be rounded. The checks know these cuts (`Body.cuts`): their edges are not open edges.
+- **Even bands.** A cap's band is drawn toward the cap's center, so it is narrow where the
+  lip runs past the center; `even=True` makes it `band` wide all round, square to the lip:
+  room for a lamp channel along it (`_even_band`). `caps[key + ".band"]` holds its pairs of
+  points.
 - **Bevels**: `bevel=None` gives paint panels 4.5 mm and the rest 3 mm; a number is for
   every panel, a dict `{panel: width}` for some (0 for none); `bevel_segs` (2) its segments.
 - **More pieces**: call it again with another `name` (a cab and a bed, a canopy, pods).

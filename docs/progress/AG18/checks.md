@@ -21,7 +21,7 @@
 | [tanager_cab](tanager_cab/check.json) | FAIL: 0.0 mm to bumper.guards.rear, steers 0 deg | ok: 120.0 mm (mudflaps) | look: 39 objects | FAIL: 4 open runs, 0 cutter holes | look: 1 parts | ok: 285996 |
 | [tanager_mino](tanager_mino/check.json) | FAIL: 0.0 mm to interior.tub, steers 0 deg | ok: 110.0 mm (mudflaps) | look: 9 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 223689 |
 | [tanager_porter](tanager_porter/check.json) | FAIL: 0.0 mm to interior.tub, steers 0 deg | ok: 120.0 mm (mudflaps) | look: 87 objects | FAIL: 5 open runs, 0 cutter holes | look: 5 parts | ok: 314760 |
-| [vanta_r](vanta_r/check.json) | look: 12.8 mm to body.well, steers 0 deg | ok: 95.0 mm (splitter) | look: 4 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 240286 |
+| [vanta_r](vanta_r/check.json) | look: 12.8 mm to body.well, steers 0 deg | ok: 95.0 mm (splitter) | look: 5 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 304992 |
 
 ## Findings by car
 
@@ -207,7 +207,7 @@
 - tire `rl`: 17.8 mm to `body.well`
 - tire `fr`: 12.8 mm to `body.well`, turns 0 degrees before it touches `body.well`
 - tire `rr`: 17.8 mm to `body.well`
-- not mirrored: `interior.wheel` 149.6 mm, `interior.screens` 68.8 mm, `wiper` 30.1 mm, `body.trim` 8.0 mm
+- not mirrored: `interior.wheel` 149.6 mm, `interior.screens` 68.8 mm, `wiper` 19.7 mm, `wiper.blade` 9.5 mm, `body.lightband` 4.5 mm
 
 
 ## Show colors

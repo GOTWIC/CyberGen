@@ -2,7 +2,7 @@
  "format": "cybergen.vehicle_packs",
  "version": 1,
  "repo": "GOTWIC/CyberGen",
- "tag": "vehicle-packs-2026-11-12b",
+ "tag": "vehicle-packs-2026-11-12c",
  "cars": {
   "aurel_prelate": {
    "asset": "aurel_prelate.zip",
@@ -496,32 +496,32 @@
   },
   "vanta_r": {
    "asset": "vanta_r.zip",
-   "sha256": "459dbafc09ceb1e3e6538d1fa7a8cd531cedef3948a4167e3c1c13238c6b8219",
-   "bytes": 21610075,
+   "sha256": "070886ce47bda6461ee78d56fc2e13c67010a5127ee715e43cd2b7e307928d1e",
+   "bytes": 23849503,
    "files": {
-    "body_base_color.png": "5fd8842d6f9728da06e3035fdb46abdc5848e27c878a0730868477adfdd34c33",
-    "body_emissive.png": "6320cb2b224cc8251b464bbb1261035de499fa94f93b840c6fee6b0ac51c0a45",
-    "body_mask.png": "25565cacf9857cb62b5fd74c23c270a59df9a51bec9b554bb3215d87f4ed28dd",
-    "body_normal.png": "4638a7914b632c30457267ade21e4760308f0d6043dad0f746da9f602339152d",
-    "body_orm.png": "178513b31dcf9004acb993962d82f290bf30d8426a42dbd7da5abca4513cc3be",
-    "collision.glb": "eccd47894d0e32d18d6a3bf4bb714a0a218980bd70e1713a243340cb7ff97de0",
-    "game_report.json": "969dea7184c941e0ea0cf54c17ba81104a8d34f706be7d0a8bcdb6c09e388604",
-    "lod0.glb": "43d5d0dc2f24b2ddcdd92a7fadee6f516acf2fb4594475d70ec2266ae42fcd97",
-    "lod1.glb": "548709707ce218b0c10742ab001af48fe6e42dbb7415bbf699f498b915120280",
-    "lod2.glb": "c2d6adec69096af18f409a7bc06f7f4f9f53a755fc4084e5b9a7c3751c862f82",
-    "lod3.glb": "a4a518b4a89dc16b4743d79d183d50dd463e442f43ec5c9b80b449b1a1e9ee7f",
-    "pack.json": "6a0d210e2aca09faee89799acb1fb2122724083ea5e908a34d411207f15aaf78",
-    "wheels_base_color.png": "bfa44bae69d28be4eb4776252a58f760808d6e38d24ece01a36bb572de697c12",
-    "wheels_emissive.png": "372064befca017ff242d00118dc55d341c63ece88ed3975ed1ec4c4da5e2e2c8",
-    "wheels_mask.png": "ed8bff4a6330081e835852889c3c4d2e67ec78936f9fdcbb91a5b04dde85a4d5",
-    "wheels_normal.png": "b57e8adc1ea107cef726e957cbb5a871c3f1f8ef83c37242e0d7af6fdf9bb889",
-    "wheels_orm.png": "3c0d90451e645b46b686f5ee1196db95681d838d214f957e2d735f68666da11d"
+    "body_base_color.png": "cddf96c06bd61958db7c7b04d42d360596259568404daeb9a03df75176487bdb",
+    "body_emissive.png": "d3cef75145ea70ef65d910fe7f5d4c16709e2523b6a5acf280807feb5b410d6b",
+    "body_mask.png": "80fa89b7f53e31a6655a97f5f7a71a68ae856456ad6eff84707149af01e75c99",
+    "body_normal.png": "58d5411f485652e617bac2dd09bdd52af78219c398edabb9a52ee48f40241b1b",
+    "body_orm.png": "554fb55003a540aeaa524c06a448cde64e8f4d24a91a4a6714ea34a4e1141c18",
+    "collision.glb": "d9c896e42233b96ece35732410f0d54289d8977096a2ec892a863823d0e71354",
+    "game_report.json": "f7c671e906fe811583c11f8c671a09f0b16de39708a00453bf9496cda5aec5be",
+    "lod0.glb": "5a109b545bd32b17b92b147454c8662ba1717a4b9560acb9c637d107894908aa",
+    "lod1.glb": "7a9c95735000de26e15e3ad327a1feecef4c3a931abed40b59f55ee0c6f0b9f9",
+    "lod2.glb": "97b62070a8c2748cd3943261a1f090efc7265062bab414e09a100e0b9baa6ac3",
+    "lod3.glb": "699fa09b3b35ebbbf9fc3a95a6fc74eca54d8d629fa974e3c9e67d4f8df8a660",
+    "pack.json": "1e45f570ed16ba4264aead6e7c2bccc4a14b3e6da28a3fb5794b38290452bca1",
+    "wheels_base_color.png": "5c6cb3b7743c1e50095547b62a0ca1d1f9a667b58943ba9c373f32b92dc664cb",
+    "wheels_emissive.png": "2414310ad9bab956733378dbb50adaca97a9f98f1ee49c6286b630dedc5adb6d",
+    "wheels_mask.png": "070d7aba5f83624fd7b91868d89ad51ebca7b29d46b2ad476e0d7f0eb2b2ad72",
+    "wheels_normal.png": "572bbe540f06a61de60b1a3b147aec7bd7a404f67a199d5e2062e8fb4b0c1422",
+    "wheels_orm.png": "78a321ab6c6b60302a9e6dac773496d5b13cdfeb7c4261aa5fc79d24fccc4cfd"
    },
    "source": {
     "script": "vehicles/cars/vanta_r.py",
-    "script_sha256": "5af82e8775bac6f88aa1e842b7e6aa0f88a1e721750ca746a4c3b1cc1b9aa9ae",
-    "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
-    "game_sha256": "9e6108a54d1f801bd18195adc59470f9bd92b6d763a2afc8f84531218c054eab"
+    "script_sha256": "ae102d317113650449a3c8b6662e1dea7665dd8848524bc48e99f2e8766c5be6",
+    "carkit_sha256": "80020b974b190e7b6db524668c8c6d0164b3484f712ec8a6420c6e9961b53ea5",
+    "game_sha256": "32271c5b2195e75c93509022799b7dd770add377d59cc906b924e040e27ff1db"
    }
   }
  }
