@@ -554,7 +554,8 @@ void ACityGenAtmos::EnsureFog()
 	{
 		return;
 	}
-	for (TActorIterator<AExponentialHeightFog> It(GetWorld()); It; ++It)
+	TActorIterator<AExponentialHeightFog> It(GetWorld());
+	if (It)
 	{
 		Fog = *It;
 		return;
