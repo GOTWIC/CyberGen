@@ -828,6 +828,7 @@ class Plan:
         sidewalk (a blade sign a point at its middle), near tier only. Each lit face's wall is
         kept for the faces check (`face_walls`)."""
         self.face_walls: list[dict] = []
+        self.dimmed = 0
         for s in self.c.m.get("sign_slots", []):
             kind, mount = s.get("kind"), s.get("mount")
             cls = P.SIGN_CLASS.get((kind, mount)) or P.SIGN_CLASS.get(kind)
@@ -870,9 +871,19 @@ class Plan:
                     cx = face["c"][0] + ph["out_m"] * math.cos(a)
                     cy = face["c"][1] + ph["out_m"] * math.sin(a)
                     cz = face["c"][2] + base
+                    cd = nits * w * h
+                    # (a big face close across a narrow street: no more than OPPOSITE_MAX_LX on
+                    # the facade it faces, as a face's light falls off over the street)
+                    from .lux import opposite
+                    e = opposite({"pos": [cx, cy, cz], "aim": [face["yaw"], 0.0],
+                                  "shape": "rect", "cd": cd, "barn_deg": ph["barn_deg"],
+                                  "reach_m": ph["reach_m"]}, face["yaw"], self.c.occluders())
+                    if e is not None and e > P.OPPOSITE_MAX_LX:
+                        cd *= max(P.OPPOSITE_MIN_SCALE, P.OPPOSITE_MAX_LX / e)
+                        self.dimmed += 1
                     rec = self.add(owner=s["id"], suffix=f"light{k}" if k else "light",
                                    kind=lkind, cls=cls, did=did, pos=(cx, cy, cz),
-                                   aim=(face["yaw"], 0.0), color=color, cd=nits * w * h,
+                                   aim=(face["yaw"], 0.0), color=color, cd=cd,
                                    schedule=sched, size=(w, h), tier=near, mount="sign",
                                    source=source)
                     if mount in ("facade", "front") and not face.get("back"):
@@ -1197,7 +1208,7 @@ class Plan:
             cands = sorted(by_d.get(did, []), key=lambda r: (-r[1].top, r[0]["id"]))
             if not cands:
                 tall = [b for b in self.c.buildings.values() if b.get("district_id") == did
-                        and float(b.get("height_m") or 0.0) >= 30.0
+                        and float(b.get("height_m") or 0.0) >= 30.0 and not b.get("landmark")
                         and not (self.c.ag15().get(b["id"]) or {}).get("vacant")]
                 cands = sorted(((b, Shape(b, self.c.ground_at_base(b))) for b in tall),
                                key=lambda r: (-r[1].top, r[0]["id"]))
@@ -1680,6 +1691,7 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     lux["fill"] = pl.fill_report
     # AT2: the lit faces against their own walls, and what they throw across the street
     faces = timed("faces", LX.face_check, pl.face_walls, occ)
+    faces["dimmed_for_opposite"] = pl.dimmed
     by_tile: dict[str, list[dict]] = {}
     for L in sorted(pl.lights, key=lambda r: r["id"]):
         by_tile.setdefault(L["tile"], []).append(L)

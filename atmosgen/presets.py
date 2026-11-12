@@ -202,6 +202,11 @@ SIGN_LUMA_SCALE = (0.4, 1.4)
 FACE_WALL_OUT_M = 0.9
 FACE_WALL_RING_M = 1.0
 FACE_WALL_MAX_LX = 1.0
+# a big face close across a narrow street is dimmed so the facade it faces gets at most
+# OPPOSITE_MAX_LX (about three stops over the streets' 15 to 25 lx), never under
+# OPPOSITE_MIN_SCALE of its light (the plan's first Delta run: 90th percentile 1,700 lx)
+OPPOSITE_MAX_LX = 150.0
+OPPOSITE_MIN_SCALE = 0.15
 
 # --- flicker and broken lights by kind (AT2) ---------------------------------------------------
 

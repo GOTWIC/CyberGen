@@ -227,6 +227,24 @@ def on_surface(L: dict, pts: np.ndarray, normal) -> np.ndarray:
     return _intensity(L, g[:, 0], g[:, 1], g[:, 2], d) * cos_in / np.maximum(d2, 0.01)
 
 
+def opposite(L: dict, yaw: float, occ: "Occluders") -> float | None:
+    """A lit face's light on the facade it faces: the first building cell straight out from
+    the light at its height within its reach, lit on a wall facing back (lux), else None."""
+    a = math.radians(yaw)
+    n = np.array([math.cos(a), math.sin(a), 0.0])
+    lx, ly, lz = (float(v) for v in L["pos"])
+    s = np.arange(1.0, float(L["reach_m"]), 1.0)
+    if not s.size:
+        return None
+    bx, by = lx + n[0] * s, ly + n[1] * s
+    hit = np.flatnonzero(occ.blocked(bx, by, np.full(s.shape, lz)))
+    if not hit.size:
+        return None
+    k = int(hit[0])
+    p = np.array([[bx[k] - n[0] * 0.6, by[k] - n[1] * 0.6, lz]])
+    return float(on_surface(L, p, -n)[0])
+
+
 def face_check(walls: list[dict], occ: "Occluders | None") -> dict:
     """AT2's faces check: each lit face's light (a billboard's, banner's or holo-board's rect)
     on its own wall, probed `presets.FACE_WALL_OUT_M` out of it (what stands out of a
@@ -262,14 +280,9 @@ def face_check(walls: list[dict], occ: "Occluders | None") -> dict:
         if occ is None:
             continue
         # straight out from the light, every meter, to the first building cell at its height
-        lx, ly, lz = (float(v) for v in L["pos"])
-        s = np.arange(1.0, float(L["reach_m"]), 1.0)
-        bx, by = lx + n[0] * s, ly + n[1] * s
-        hit = np.flatnonzero(occ.blocked(bx, by, np.full(s.shape, lz)))
-        if hit.size:
-            k = int(hit[0])
-            p = np.array([[bx[k] - n[0] * 0.6, by[k] - n[1] * 0.6, lz]])
-            opp.append(float(on_surface(L, p, -n)[0]))
+        e_opp = opposite(f["light"], f["yaw"], occ)
+        if e_opp is not None:
+            opp.append(e_opp)
             reached += 1
     o = np.array(opp) if opp else np.zeros(0)
     return {"ok": over == 0, "faces": len(walls), "own_wall_max_lx": round(worst, 3),
@@ -286,7 +299,9 @@ def face_text(res: dict) -> str:
             f"(limit {res['own_wall_limit_lx']}): {'PASS' if res['ok'] else 'FAIL'}"
             + (f" ({res['over']} over: {', '.join(res['first_over'])})" if res["over"] else "")
             + f"\n  the facade opposite reached by {o['reached']} ({100 * o['share']:.0f}%), "
-              f"median {o['median_lx']} lx, 90th percentile {o['p90_lx']} lx\n")
+              f"median {o['median_lx']} lx, 90th percentile {o['p90_lx']} lx"
+            + (f"; {res['dimmed_for_opposite']} dimmed for it" if res.get("dimmed_for_opposite")
+               else "") + "\n")
 
 
 def share(L: dict, schedules: dict, hour: float = CHECK_HOUR) -> float:

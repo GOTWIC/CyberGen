@@ -1,0 +1,49 @@
+atmos plan: Vesper Bay (neon_rain, at2.06c06b2bc539)
+lights: 46794 in 143 tiles (at most 1271 in a tile; budget 6000)
+  alley: 1271
+  aviation: 1759
+  broken: 2065
+  corner: 796
+  flicker: 9854
+  flood: 768
+  high_mast: 45
+  neon: 660
+  road: 2488
+  runway: 233
+  searchlight: 10
+  shop_sign: 12298
+  sign: 5114
+  signal: 574
+  spill: 15566
+  station: 697
+  street_light: 3645
+  underpass: 5
+  wall_light: 865
+sources: assetgen 0, derived 46794 (derived until assetgen records lamp lenses and sign faces, section 4.1)
+without a light: flood: inside another building 43; sign: a front holo-board's back (its wall) 20; sign: neon density 366
+mounted on: beacon 1759, canopy 697, facade 15566, ground 233, mast 57, mast_arm 574, pole 3284, prop 4510, roof 766, sign 18072, tunnel 5, wall 1271 (8641 on fixtures asked of stage 2: scope 4.1)
+junctions: 574 of 1348 dark before their corner poles, 796 poles, 38 still dark
+filled dark stretches: alley 126, carriageway 117, sidewalk 988
+lux check at 23:00: PASS
+  sidewalk: 103515 points, average 24.72 lx (target 10.0), 1.2% under 2.0 lx
+  crosswalk: 60332 points, average 23.77 lx (target 10.0), 1.1% under 2.0 lx
+  carriageway: 221287 points, average 15.21 lx (target 7.0), 0.3% under 1.0 lx
+  alley: 29168 points, average 11.97 lx (target 2.0), 0.4% under 0.5 lx
+  path: 25858 points, average 7.18 lx (target 0.0), 0.0% under 0.0 lx (reported)
+  junction lanes: average 13.55 lx, 0.4% under 1.0 lx
+  junction crosswalks: average 23.77 lx, 1.1% under 2.0 lx
+lit faces: 2554, their own walls at most 0.0 lx (limit 1.0): PASS
+  the facade opposite reached by 1331 (52%), median 80.88 lx, 90th percentile 150.0 lx; 546 dimmed for it
+towers and landmarks: 167, crowns flooded 140 (87 in their crown LEDs' accent, AG15), uplit 50, vacant 5
+aviation lights: 931 flashing, 828 steady, on 292 structures
+megasites: boom_flood 12, high_mast 45, pad_flood 4, runway 233
+tiers: near 12958, mid 33013, high 823
+district moods:
+  d01 Corporate Core (corporate_core): cobra_head, cool, grit 0.0, flicker 0.0, broken 0.0, neon 0.6, floods led_cool 0.91, searchlights 0, palette #05d9e8 #f2f6ff #b967ff #4d7cff
+  d02 The Stacks (megablock_residential): cobra_head, sodium, grit 0.835, flicker 0.368, broken 0.126, neon 0.7, floods sodium 0.014, searchlights 0, palette #ffb000 #ff2a6d #39ff8a #ff5a1f
+  d03 Highcrest (residential_heights): post_top, warm, grit 0.0, flicker 0.0, broken 0.0, neon 0.3, floods warm 0.42, searchlights 0, palette #ffb000 #f2f6ff #ff7a5c #05d9e8
+  d04 Old Town (old_town): wall_pack, sodium, grit 0.955, flicker 0.345, broken 0.115, neon 1.1, floods sodium 0.0, searchlights 0, palette #ff3b30 #ffb000 #39ff8a #ff2a6d
+  d05 Neon Strand (entertainment_market): cobra_head, warm, grit 0.77, flicker 0.275, broken 0.088, neon 1.3, floods warm 0.509, searchlights 4, palette #ff2a6d #b967ff #ffb000 #05d9e8 #39ff8a
+  d06 Vess Docks (industrial_port): high_mast, sodium, grit 1.0, flicker 0.24, broken 0.12, neon 0.3, floods sodium 0.0, searchlights 0, palette #ffb000 #ff5a1f #39ff8a
+  d07 Launch Key (spaceport): high_mast, neutral, grit 0.135, flicker 0.0, broken 0.0, neon 0.4, floods neutral 0.34, searchlights 2, palette #f2f6ff #05d9e8 #ff3b30
+  d08 Scholar Isle (research_campus): post_top, neutral, grit 0.0, flicker 0.0, broken 0.0, neon 0.3, floods neutral 0.45, searchlights 0, palette #05d9e8 #f2f6ff #39ff8a
