@@ -1301,17 +1301,24 @@ target is a current AAA open-world game's hero vehicles.
   roster to the standard of the first (Halcyon Vanta-R): one 4K multi-view sheet each in
   `docs/progress/AG18/<car>/`, and a line-up of all 21 (`docs/progress/AG18/lineup.jpg`).
   Not game-ready, and not meant to be yet.
-- **Phase 2, improvements** (planned, the list and its order below).
+- **Phase 2, improvements** (the list and its order below). Step A, the kit, is done
+  (2026-11-12): clay and zebra renders and a turntable for judging the form, checks of the
+  car as built (`carcheck.py`), what the design sessions asked of the kit, a survey of every
+  car (`survey.py`, `docs/progress/AG18/checks.md`) and a fingerprint of what each script
+  builds (`signature.py`), with which the kit was changed without moving any car. Steps B to
+  E change the cars.
 - **Phase 3, game-ready** (steps F and G; built 2026-11-11 for the 18 vehicles other than
   Vex, PRs #194, #196, #198, #199): `vehicles/game.py` turns a car's script, unchanged,
   into a game pack (named parts with wheel and brake pivots, baked atlases with the paint as
   a mask, four LODs by size class, convex collision, lights as data, a proof image and a
   report of checks); the format is the contract in `vehicles/GAME.md`. Packs live outside
   git (`~/.cache/cybergen/vehicles/game/<car>/`); proofs and reports are in
-  `docs/progress/AG18/<car>/`. Open: three cars fail one check each by a hair
-  (`kestrel_meridian` and `brakk_hauler` `lod_fidelity`, `halcyon_ridge` `uv_overlap`),
-  recorded, not fixed; LOD3 details still crude up close (a winch drum, small rims and
-  grilles); bake faults on `kestrel_meridian`'s louvre and `aurel_zenith`'s grille.
+  `docs/progress/AG18/<car>/`. The small faults that first run left (three checks failing
+  by a hair, crumpled and shard-like far LOD details, three bake faults, the taxi parked
+  with its door open, the glass missing from inside the cabin in Unreal) were put right in
+  `game.py` and the importer (2026-11-12) and nine packs rebuilt; every pack passes every
+  check. Open: the other nine packs are as first built, and take the same fixes when they
+  are next rebuilt.
 - **Phase 3 in Unreal** (2026-11-11): the exporter takes the packs as a library imported
   once a project (`/Game/CityGen/Vehicles/<car>`: a mesh a part with the pack's LODs, no
   Nanite; `M_CgVehicle` recoloring per instance; thin translucent glass) and places them by
@@ -1395,12 +1402,12 @@ target is a current AAA open-world game's hero vehicles.
 
 **Plan** (each step a session or two, after Swagnik's review of phase 1). F and G are done
 (phase 3), and the packs are in the exporter and tested in Unreal (2026-11-11); H is done
-(2026-11-11: the vehicles parked in the generated cities). Next: the design improvements A to
-E.
+(2026-11-11: the vehicles parked in the generated cities); A is done (2026-11-12: the kit).
+Next: the design improvements B to E, B first.
 
 | Step | Work | Covers |
 |---|---|---|
-| A | Kit: clay and zebra renders, the checks, the designers' wishes (the line-up render is done) | 3, 13, 14 |
+| A | Kit: clay and zebra renders, the checks, the designers' wishes (the line-up render is done). Done | 3, 13, 14 |
 | B | What shows at street distance: lamps, cut lines, glass, on the kept cars | 1, 2, 6 (glass) |
 | C | Wheels, running gear, hover gear, undersides | 4, 5, 7 |
 | D | Cabins | 6 (cabin) |

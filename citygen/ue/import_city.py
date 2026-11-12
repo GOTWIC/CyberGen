@@ -1535,7 +1535,7 @@ def stage2_master(master, defaults=None):
 
 # --- AG18's vehicles (citygen/unreal_vehicles.py; the packs' contract: vehicles/GAME.md) ------
 
-VEHICLE_VERSION = "6"        # of the vehicle masters (`cg.vehicle` metadata)
+VEHICLE_VERSION = "7"        # of the vehicle masters (`cg.vehicle` metadata)
 VEHICLE_MESH_VERSION = "3"   # of what the importer makes of a car (with its manifest hash)
 VEHICLE_ACTOR_VERSION = "2"  # of the placement actors (2: the glass casts no shadow)
 # the paint per placement: Custom Primitive Data, or per-instance custom data on an
@@ -1703,7 +1703,10 @@ def vehicle_glass_master(opaque):
         # glass behind the near one, drawn in the same mesh in triangle order, not by depth:
         # it composited over the near glass in black and bright patches (the Aurels' glass
         # roofs). Left out, the near outer sheet shows the cabin and the far outer sheet,
-        # facing away, is culled, as a single sheet of glass draws
+        # facing away, is culled, as a single sheet of glass draws. From inside the cabin it
+        # is the other way round: the outer sheets face away and are culled, so the inner
+        # sheet is the glass, and it is drawn while the eye is inside the glass's box
+        # (CabinCenter, CabinHalf: mesh space cm); the glass was not there from the seats
         lp = expr(m, unreal.MaterialExpressionLocalPosition, -900, 500)
         nw = expr(m, unreal.MaterialExpressionVertexNormalWS, -900, 600)
         nl = expr(m, unreal.MaterialExpressionTransform, -750, 600,
@@ -1712,11 +1715,36 @@ def vehicle_glass_master(opaque):
                   transform_type=unreal.MaterialVectorCoordTransform.TRANSFORM_LOCAL)
         link(nw, "", nl, "Input")
         ctr = vparam(m, "GlassCenter", -900, 700, (0.0, 0.0, 100.0))
-        inner = custom(m, -450, 520, "return dot(N, P - C) < 0.0 ? 1.0 : 0.0;",
-                       ["N", "P", "C"], cmot(F1), "CgGlassInner")
-        link(nl, "", inner, "N")
+        faces_in = custom(m, -600, 520, "return dot(N, P - C) < 0.0 ? 1.0 : 0.0;",
+                          ["N", "P", "C"], cmot(F1), "CgGlassInner")
+        link(nl, "", faces_in, "N")
+        link(lp, "", faces_in, "P")
+        link(ctr, "", faces_in, "C")
+        # the eye in the mesh's own space: this point plus the way to the camera, turned as
+        # the normal is (the same frames as the inner sheet's test)
+        wp = expr(m, unreal.MaterialExpressionWorldPosition, -1200, 800)
+        cam = expr(m, unreal.MaterialExpressionCameraPositionWS, -1200, 900)
+        to_eye = expr(m, unreal.MaterialExpressionSubtract, -1050, 850)
+        link(cam, "", to_eye, "A")
+        link(wp, "", to_eye, "B")
+        eye_l = expr(m, unreal.MaterialExpressionTransform, -900, 850,
+                     transform_source_type=unreal.MaterialVectorCoordTransformSource
+                     .TRANSFORMSOURCE_WORLD,
+                     transform_type=unreal.MaterialVectorCoordTransform.TRANSFORM_LOCAL)
+        link(to_eye, "", eye_l, "Input")
+        cab_c = vparam(m, "CabinCenter", -900, 960, (0.0, 0.0, 100.0))
+        cab_h = vparam(m, "CabinHalf", -900, 1080, (0.0, 0.0, 0.0))
+        # 1 for the faces left out: the inner sheet while the eye is outside the cabin
+        inner = custom(m, -450, 520,
+                       "float3 d = abs(P + V - C); "
+                       "float eye_in = (d.x < H.x && d.y < H.y && d.z < H.z) ? 1.0 : 0.0; "
+                       "return In * (1.0 - eye_in);",
+                       ["In", "P", "V", "C", "H"], cmot(F1), "CgGlassHidden")
+        link(faces_in, "", inner, "In")
         link(lp, "", inner, "P")
-        link(ctr, "", inner, "C")
+        link(eye_l, "", inner, "V")
+        link(cab_c, "", inner, "C")
+        link(cab_h, "", inner, "H")
         # the surface: black, a coverage that is the reflection's share only where the glass
         # does not transmit; what shows through is tinted by the glass color
         op = custom(m, -450, 360, "return (saturate(1.0 - T) * 0.9 + 0.04) * (1.0 - In);",
@@ -2741,6 +2769,21 @@ class Importer:
                     mi, "GlassCenter", unreal.LinearColor(
                         50.0 * (lo[0] + hi[0]), -50.0 * (lo[1] + hi[1]),
                         50.0 * (lo[2] + hi[2]), 1.0))
+                # (the glass's own box, taken down to the car's floor: an eye inside it is
+                # in the cabin, seated or standing, and sees the inner sheet; a record
+                # without one leaves the box empty, the inner sheet never drawn, as before)
+                gb = rec.get("glass_box") or {}
+                glo, ghi = gb.get("min"), gb.get("max")
+                if glo and ghi:
+                    glo = [glo[0], glo[1], min(glo[2], lo[2])]
+                    MEL.set_material_instance_vector_parameter_value(
+                        mi, "CabinCenter", unreal.LinearColor(
+                            50.0 * (glo[0] + ghi[0]), -50.0 * (glo[1] + ghi[1]),
+                            50.0 * (glo[2] + ghi[2]), 1.0))
+                    MEL.set_material_instance_vector_parameter_value(
+                        mi, "CabinHalf", unreal.LinearColor(
+                            50.0 * (ghi[0] - glo[0]), 50.0 * (ghi[1] - glo[1]),
+                            50.0 * (ghi[2] - glo[2]), 1.0))
             EAL.save_loaded_asset(mi, only_if_is_dirty=False)
             out[name] = mi
         return out

@@ -85,3 +85,19 @@ inner sheet is left out).
 | ![](lods_aurel_prelate.jpg) | the Prelate at LOD0 to LOD3 |
 | ![](wheel_spin_steer.jpg) | a front wheel at rest and spun 40 degrees about its axle and steered 25 degrees by script: it turns about its pivot, the caliper steers with it and does not spin |
 | ![](hulls_brakk_mule.jpg) | the Mule and its collision hulls, drawn from the pack's `collision.glb` in place of its body |
+
+## Glass from inside the cabin (2026-11-12)
+
+The glass master left the inner sheet out (above), and from the seats the outer sheets face
+away and are culled: there was no glass from inside. The inner sheet is now drawn while the
+eye is inside the glass's box taken down to the car's floor (`docs/unreal_export.md`,
+"AG18's vehicles"). The same line-up imported again in the same throwaway project (the
+masters made anew, the seven cars' instances with them: 12 placements updated, 100 s) and
+checked again (meshes, placements, collision, wheels: all pass; the heroes from outside as
+before, no patches), with a new shot from inside each car's cabin (`cabin_<car>`):
+
+![the glass from the seats of the Mino, the Prelate and the Mule](cabin_glass.jpg)
+
+The Mino's side windows, the Prelate's dark glass roof and the Mule's windshield, tinted and
+reflecting, from the seats. Three of the seven packs in that import were rebuilt ones (the
+Prelate, the Mule, the Ridge).

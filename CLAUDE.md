@@ -2238,10 +2238,15 @@ waits for Swagnik's review.
   [--test]` turns a car's script, unchanged, into a pack in
   `~/.cache/cybergen/vehicles/game/<car>/` (never committed: four LOD glTFs, baked atlases
   with the paint as a mask, collision hulls, `pack.json`); `--docs` writes its proof
-  `game.jpg` and `game_report.json` into `docs/progress/AG18/<car>/`. Size classes standard
+  `game.jpg` and `game_report.json` into `docs/progress/AG18/<car>/`. The built packs are a
+  GitHub release of this repo (`vehicles/packs.py`: `fetch` on a machine without them, every
+  file checked against the committed `vehicles/packs.json`; `publish` after rebuilding
+  packs, committing `packs.json` in the same PR; `status`). Size classes standard
   and large (55 m2 of exterior or more: LOD3 8,000 triangles, texel floor 240 px/m against
-  5,000 and 300). Built for 18 vehicles; kestrel_meridian and brakk_hauler (`lod_fidelity`)
-  and halcyon_ridge (`uv_overlap`) fail one check each by a hair, recorded.
+  5,000 and 300). Built for 18 vehicles, every check passing (the faults of the first run
+  fixed in `game.py` and nine packs rebuilt, 2026-11-12; the other nine are as first built).
+  A pack is the car parked and shut (`CYBERGEN_SHUT`, `SHUT_ENV` in `game.py`).
+  `CYBERGEN_GAME_DEBUG=1` logs each far LOD wreck.
 - **Vex** (vex_wraith, vex_halo, vex_strix) is to be redesigned (Swagnik, 2026-11-10): no
   packs, out of every later step until redone.
 - **In the cities** (step H, 2026-11-11; `assetgen/parked/`, tests
@@ -2261,7 +2266,22 @@ waits for Swagnik's review.
   `$CITYGEN_VEHICLES`, the packs' cache; without one, or with `vehicles.parked: variants`,
   nothing is written and AG8's variants stay (the props package and its goldens untouched).
   Proof on Vesper Bay: `docs/progress/AG18/city/`.
-- **Next:** the design improvements (steps A to E).
+- **The kit's tools** (step A, 2026-11-12; `vehicles/README.md`): `--clay`, `--zebra` and
+  `--turntable` on any car script (the form without paint, surfaces by their stripes, the
+  car from all round); `--check` (`vehicles/carcheck.py`: tire clearances and steering
+  room, ground clearance, symmetry, open panel edges and cutter holes, cabin parts in the
+  open, a 400,000 triangle budget; `ok`, `look` or `fail`, `K.meant(...)` in a script for
+  what is meant); `python vehicles/survey.py [--docs]` runs checks and renders on every
+  non-Vex car (`docs/progress/AG18/checks.md`, each car's `check.json`, `clay.jpg`,
+  `zebra.jpg`). Brand helpers are in `vehicles/brands/<brand>.py` (the cars keep their own
+  copies until a step edits them).
+- **Changing `carkit.py`:** `python vehicles/survey.py --sign DIR` before and after, then
+  `--compare A B` (`vehicles/signature.py`: every object's geometry, the materials, the
+  studio and the cameras of every car, Vex included). The same fingerprints mean the same
+  sheets and packs; a car that moves is named in the PR and its sheet and pack left to the
+  step that changes it.
+- **Next:** the design improvements (steps B to E), B first (lamps, cut lines and glass on
+  the kept cars), once Swagnik agrees to its plan.
 - The other phases (improvements, AG8's parked vehicles and
   stage 4's fleet drawing on them) are listed in the scope with their plan.
 

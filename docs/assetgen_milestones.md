@@ -2675,7 +2675,7 @@ the Unreal tests updated); results `docs/progress/AG16/`.
 
 ## AG18: hero vehicles (in progress)
 
-**Phase 1 built, waiting for review; phase 3 (game packs) built for 18 vehicles.** Scope 14.19 (Swagnik, 2026-11-10): vehicles designed one by one, not
+**Phase 1 built, waiting for review; phase 3 (game packs) built for 18 vehicles; step A (the kit) done.** Scope 14.19 (Swagnik, 2026-11-10): vehicles designed one by one, not
 generated. Everything is in `vehicles/` (the kit `carkit.py`, a script per car in `cars/`,
 the brand book `BRANDS.md`, the design brief `BRIEF.md`, `post.py`, the render queue
 `blender.sh`); a car's sheet and notes are in `docs/progress/AG18/<car>/`. The concept
@@ -2892,7 +2892,184 @@ distinct Nanite meshes (AG8's variants; the vehicles' 104 meshes are not Nanite)
 triangles at LOD0 (5.1 million at LOD3); every city and tile budget kept. Proof in Blender and
 Unreal: [`docs/progress/AG18/city`](progress/AG18/city/README.md).
 
-Next: the design improvements A to E.
+**Step A, the kit** (2026-11-12; scope 14.19's improvements 3, 13 and 14). Nothing here
+changes a car: every script builds what it built before (below).
+
+- **Looks** (`carkit.py`: `wear`, `clay_material`, `zebra_material`, `render_turntable`):
+  `--clay` renders the preview's four views with every part in one matte clay; `--zebra` the
+  same views with an emission material that is black or white by the angle of the reflected
+  view about the car's long axis (60 pairs round the turn; about the cross axis for views
+  along the car), so stripes flow over a fair surface and wobble, pinch or break over a
+  coarse cage; `--turntable [N]` N views round the car at one distance as one image and a
+  looping GIF, in either look. Light linking a car set up is lifted while a look is worn.
+- **Checks** (`vehicles/carcheck.py`, `--check`, `K.check()`; `check.json`): on the car as
+  built, each `ok`, `look` or `fail`.
+  - `tires`: each tire's nearest point of anything that is not its own wheel (`fail` under
+    4 mm, `look` under 25 mm), the front pair turned about its upright axis in 5 degree
+    steps until it touches (`look` under 20 degrees), each tire's foot on the ground;
+  - `ground`: the lowest point of everything that is not a wheel;
+  - `symmetry`: every object's mirror image in y = 0 against the car (3 mm; tires 20 mm);
+  - `panels`: edges of `build_body`'s panels with nothing within two gaps and 5 mm (open;
+    `fail` on a closed hull), and holes a cutter leaves inside one panel;
+  - `through`: cabin parts with points that see the open air in a quarter of 40 directions
+    with everything that is not cabin in the way (a first version by the nearest panel's
+    normal was fooled by panels built inside out and by open liners);
+  - `triangles`: 400,000 for a design mesh.
+  `K.meant(check, *names)` in a script marks a finding as meant.
+- **What the design sessions asked** (all opt-in, the defaults as before): palette keys for
+  a coated glass (`glass_ior`), light strengths, the carbon's coat and the floor; finishes
+  `lacquer` and `skin` and a fourth number for the specular level; `glass()`; studio hooks
+  (`unlit` by light linking, `cabin_light`, `after_studio`, the table `LIGHTS`); view hooks
+  (`on_view`) and `Group` for opening parts with a pose per view; `center` and `ortho`
+  views; several small tiles on a sheet; a nearest-point projector (`snap`) with `strip`,
+  `spline`, `rib`, `plate`, `chine`, `walk`, `flutes`, `bolt_row`; `Geo.ring`, `cyl`, `pipe`,
+  `prism_on`, `lathe` about any axis and `honeycomb` on any plane; fonts by name, a
+  baseline, lettering on the nose and tail, a log line when a word is not laid; a tolerance
+  for rays that slip through a panel gap; tread styles and a car's own rim builder;
+  cutters that drop their faces; `built_at` and `solve_stations` for where subdivision
+  builds an edge; `arch_bolts` sizes. A module per brand in `vehicles/brands/` holds the
+  helpers its three scripts each carry; the cars keep their own copies until a step edits
+  them.
+- **Not done** of improvement 14: a blend (fillet) between body pieces, a ring (hubless)
+  wheel (the Vex Halo's, to be redesigned), a flat cap that holds a glass panel or steps
+  back, pole closure as a cap kind, glass frames on one-quad panes, rims that follow a
+  cutter's wall, an `under` view lit by the floor.
+- **Tools**: `vehicles/survey.py` (checks and renders on every non-Vex car, `--docs` into
+  `docs/progress/AG18/`, `--sign` and `--compare`), `vehicles/signature.py` (a fingerprint
+  of what a script builds: every object's vertices to 0.01 mm and polygons, every
+  material's node tree, the studio's lights and light linking, the sheet's cameras).
+- **The cars are as they were**: all 21 scripts (the Vex too) signed on main and on this
+  branch give the same fingerprints, so no sheet and no pack moves. `packs.json` still names
+  the old `carkit.py` hash for every pack (`packs.py status` says so).
+
+What the survey found on the 18 cars ([`checks.md`](progress/AG18/checks.md) has every row):
+
+- **Tires.** No wheel well has room to steer: the front wheels of every car with wells
+  touch them within 5 degrees (the Aurels at 5 to 10); only the Bastion and the Mule, with
+  exposed wheels, reach 20. Tires in the body: Orrin Aria (front tire in `body.front`),
+  Pebble and Lumen (0 to 2.8 mm to their wells), the three Tanagers (0 to 1.4 mm to the
+  bumper guards or the cabin's tub), the Prelate's and Regent's rear tires 0.1 mm from the
+  cabin's tub, the Sable 4.8 mm. The Tanagers' and the Pebble's tires stand 7 mm into the
+  floor (their flat contact patch).
+- **Ground.** Nothing under the floor; the lowest are the Vanta-R (95 mm) and the Sable
+  (100 mm); hover cars float 270 to 374 mm.
+- **Symmetry.** Beyond what is meant (steering wheels, wipers, masts, cargo, lettering, the
+  taxi's and the van's open doors), `build_body`'s glass trim frames are not mirrored at
+  their corners by 4 to 14 mm (Vanta-R, Sable, Ridge, Prelate, Regent), and their faces
+  point into the car: a kit fault for step B's glass.
+- **Panels.** No torn panel. The only open edges on closed hulls are the Cab's and the
+  Porter's doorways (their doors are slid open). Cutter holes inside a panel are the Orrins'
+  lids (meant).
+- **Cabin parts in the open.** The cabin's tub shows in the wheel wells or under the floor
+  on 10 cars (most of it on the Hauler, 41%, and the Atlas, 35%), door cards by the Cab's
+  and the Porter's open doorways, the Porter's liner past its brow.
+- **Triangles.** The Aria is over (501,460); the others 72,340 to 364,552.
+- **Zebra and clay.** The smooth cars are fair where they should be: the Lumen and the
+  Pebble flow evenly, with bull's-eyes at the Lumen's nose and tail corners and poles at the
+  Pebble's ends; the Aurels' flanks are even while their hoods and decks pinch toward the
+  nose and tail; the Halcyons break cleanly at their creases and are busy over the front
+  fenders where soft creases die; the Kestrels, Brakks and Tanagers are plates, and read so.
+
+**The packs' small faults** (2026-11-12): what phase 3's first run left, fixed in
+`vehicles/game.py` and the importer, never in a car's script.
+
+- **Far LODs.**
+  - A small closed solid the collapse leaves open (a flute or a bolt folded into a sliver
+    showing its dark inside, though every point of it is near the solid) is a wreck:
+    a hull or gone (the Prelate's shards along the sill, the Meridian's nose).
+  - The small wrecked parts of one piece fare alike: hulls for all when the budget has
+    room for all, else none.
+  - A piece of six loose parts or more, half of them wrecked, that is one convex shape as a
+    whole and whose parts fill 35% of that hull becomes one hull of 96 corners (the Atlas's
+    winch cable is 22 separate rings, each collapsed to a crumpled ring: now a cylinder). A
+    first version without the fill rule made one dark wedge of six panels round the Cab's
+    nose.
+  - A large wreck's hull is tried with 96 corners after 26.
+  - A stand-in hull's face keeps its own normal where LOD0's under its corner is more than
+    30 degrees off it (a rib's flank under a hull laid over a row of ribs shaded the whole
+    face askew).
+  - Far opaque glass that cannot stay whole is merged at 4, 7, 11, then 16 degrees whatever
+    its shading, every kept corner where LOD0 had it; unsubdivided it came out wavy and off
+    its frame (the Aurels' canopies).
+  - A LOD short of its fidelity limits is made again with the pieces that carry most of
+    the area off LOD0's normals given 2.5 times their triangles (the Hauler's LOD1: its
+    springs, axles and chassis rails, 12.39 to about 9 degrees). Giving the wheels'
+    triangles to the body, tried first, changed nothing.
+  - A far LOD collapsed at a ratio under 3% is starved, and is prepared again with larger
+    small parts left out (the Cab, below).
+- **Bakes.**
+  - Every part is cut into triangles before the bakes, and a collapsed part's shading
+    normals are weighted by face area: the Mule's white streak was a collapsed flat panel
+    whose corner normals leaned toward its neighbors, bent back by the normal map, its
+    triangles showing as a glossy zigzag (triangulating alone moved the zigzag; the
+    weighted normals removed it).
+  - A face over 20 cm2 that no ray left is looked at again from 13 points along 600
+    directions before it is removed, and kept in the gaps class (weight 0.35): the back of
+    the Meridian's pod vent, seen only between its louvres, had been removed, and the vent
+    showed black and the pod's inside. At full exterior weight the faces kept took the
+    Mule's texel density under its floor.
+  - On a vehicle with no wheels a face under 0.5 m that only rays going down leave is
+    underside: the Zenith's belly (15.5 m2) had full exterior density.
+  - Fine relief (parts under 4 texels wide at the texel floor) stays as geometry at LOD0,
+    over its baked image, when LOD0 is under budget with nothing shed, and is left out
+    from LOD1; relief too small for any image (under 8 texels long) is LOD0 geometry only.
+    The Zenith's nose flutes came out as a beat pattern and its 12 mm lettering as dots at
+    any density its atlas could give (the texel boost for relief is spread over the whole
+    panels the relief lies on, 23 m2; sending it to the islands under fine relief alone,
+    also added, still left 6.6 m2).
+  - The unwrap's retry for islands lying over themselves has a third and a fourth, smaller
+    angle, and what still lies over itself then is laid flat face by face (the Ridge's
+    overlap, 0.52% of the texels against a limit of 0.5%, is at the rear of its roof:
+    layers that face one way and meet at a vertex, which no smaller angle parted: 0.49%
+    after the third, 0.50% after the fourth).
+- **Parked and shut.** A pack is built with `CYBERGEN_SHUT=1` (and the Cab's own
+  `CAB_SHUT`, `SHUT_ENV`): the taxi's sliding door is closed. Its fold-out step is still
+  out (the script draws it either way).
+- **Unreal: glass from inside the cabin.** The glass master left out the inner sheet (from
+  outside it is the far side's glass, drawn in triangle order over the near one), and from
+  the seats the outer sheets face away, so there was no glass. The inner sheet is now drawn
+  while the eye is inside the glass's box taken down to the car's floor (`glass_box` in a
+  car's record, read from the pack's LOD0; `CabinCenter`, `CabinHalf`; `VEHICLE_VERSION`
+  7); `--check-vehicles` shoots each car from inside its cabin (`cabin_<car>`).
+- `CYBERGEN_GAME_DEBUG=1` logs every far LOD wreck and what became of it.
+
+Nine packs rebuilt, every check passing on each (the proofs and reports in each car's
+folder):
+
+| Pack | Triangles LOD0 to LOD3 | Class | Texels px/m (5th percentile) | LOD3 against its limits (normal, bent, texture) | What was wrong |
+|---|---|---|---|---|---|
+| aurel_prelate | 114,891, 59,994, 20,261, 4,823 | standard | 428 | 9.5 of 40 degrees, 0.022 of 0.10, 0.0144 of 0.04 | dark shards along the sill and wavy glass at LOD3 |
+| aurel_regent | 121,393, 59,994, 20,012, 5,137 | standard | 342 | 12.5 of 40 degrees, 0.027 of 0.10, 0.0104 of 0.04 | the Prelate's far LOD faults (not listed; rebuilt with it) |
+| aurel_zenith | 80,187, 48,112, 20,300, 4,760 | standard | 329 | 19.4 of 40 degrees, 0.043 of 0.10, 0.0098 of 0.04 | grille as a beat pattern, 12 mm lettering as dots |
+| brakk_hauler | 124,699, 58,271, 20,052, 8,226 | large | 320 | 15.3 of 40 degrees, 0.015 of 0.10, 0.0026 of 0.04 | `lod_fidelity`: LOD1 12.39 degrees against 12 (now 8.9) |
+| brakk_mule | 146,089, 59,994, 20,521, 8,116 | large | 243 | 13.4 of 40 degrees, 0.015 of 0.10, 0.0069 of 0.04 | a white streak on the cab's front quarter |
+| halcyon_ridge | 133,443, 59,992, 20,172, 5,099 | standard | 371 | 24.5 of 40 degrees, 0.048 of 0.10, 0.0073 of 0.04 | `uv_overlap` 0.52% against 0.5% (now 0.005%) |
+| kestrel_atlas | 101,852, 59,999, 20,122, 8,120 | large | 317 | 37.3 of 40 degrees, 0.080 of 0.10, 0.0298 of 0.04 | winch drum crumpled at LOD3 |
+| kestrel_meridian | 63,539, 38,119, 19,997, 5,079 | standard | 360 | 31.0 of 40 degrees, 0.065 of 0.10, 0.0397 of 0.04 | `lod_fidelity`: LOD3 41.7 degrees against 40; pod vent baked black |
+| tanager_cab | 144,473, 59,991, 20,411, 4,982 | standard | 440 | 16.5 of 40 degrees, 0.030 of 0.10, 0.0165 of 0.04 | parked with its sliding door open |
+
+- The Cab shut is no longer a large vehicle (its cabin, seen through the open doorway, had
+  counted as exterior: 36 m2 now, under the 55 m2 of the large class), so its LOD3 is 5,000
+  triangles, not 8,000. At that budget the collapse was starved (a ratio of 1.8%) and tore
+  the panels apart at the front door's shut line; a starved far LOD is now prepared again
+  with the small parts left out up to three times the size. Welding the panels across their
+  gaps (3 mm for 1.5), tried first, took the LOD over its budget.
+- By a hair, on the passing side: the Meridian's LOD3 texture share (0.0397 of 0.04), the
+  Atlas's LOD3 normals (37.3 of 40 degrees), the Mule's texel density (243 px/m over a
+  floor of 240).
+- The Zenith's far LOD shows its skirt as a plain band of light: its flutes go as a row at
+  LOD3 (the budget has no room for a hull each).
+- The Cab's fold-out step is still out (its script draws it either way).
+- The other nine packs (Vanta-R, Sable, Dart, Lumen, Pebble, Aria, Bastion, Mino, Porter)
+  are as first built; they pass their checks and take these rules when they are next
+  rebuilt (a hover car's belly then counts as underside, fine relief stays as geometry at
+  LOD0). One of them, the Dart, was built with the new rules into a scratch folder to see:
+  every check passes (its LOD3 texture share 0.0388 of 0.04).
+- All 18 packs are published again as the release `vehicle-packs-2026-11-12b`
+  (`vehicles/packs.json`; the release of the first run is left as it was, for older
+  commits).
+
+Next: the design improvements B to E.
 
 The roster with sizes and sheets: [`docs/progress/AG18/README.md`](progress/AG18/README.md).
 

@@ -1,32 +1,32 @@
 {
  "device": "mac",
  "label": "Mac",
- "updated": "2026-11-12T01:31:37Z",
- "sessions": 35,
- "worktree_sessions": 33,
- "subagents": 31,
+ "updated": "2026-11-12T14:38:21Z",
+ "sessions": 36,
+ "worktree_sessions": 34,
+ "subagents": 32,
  "totals": {
-  "total": 8361097976,
-  "input": 47820,
-  "output": 21161693,
-  "cache_write_5m": 65337479,
-  "cache_write_1h": 65504940,
-  "cache_read": 8209046044
+  "total": 8597277982,
+  "input": 48680,
+  "output": 21683446,
+  "cache_write_5m": 65717957,
+  "cache_write_1h": 66972587,
+  "cache_read": 8442855312
  },
  "models": {
   "claude-opus-5-5": {
-   "input": 45474,
-   "output": 18626117,
-   "cache_write_5m": 55956141,
-   "cache_write_1h": 62429135,
-   "cache_read": 7933291595
+   "input": 45706,
+   "output": 18748862,
+   "cache_write_5m": 56336619,
+   "cache_write_1h": 62726179,
+   "cache_read": 7965874873
   },
   "claude-fable-5-2": {
-   "input": 2214,
-   "output": 2487924,
+   "input": 2842,
+   "output": 2886932,
    "cache_write_5m": 9381338,
-   "cache_write_1h": 2905758,
-   "cache_read": 265556061
+   "cache_write_1h": 4076361,
+   "cache_read": 466782051
   },
   "claude-sonnet-5-5": {
    "input": 132,
@@ -108,34 +108,39 @@
    "sessions": 2
   },
   "2026-11-11": {
-   "total": 379374169,
-   "output": 678287,
+   "total": 382522910,
+   "output": 683558,
    "sessions": 1
+  },
+  "2026-11-12": {
+   "total": 233031265,
+   "output": 516482,
+   "sessions": 2
   }
  },
  "stats": {
   "totals": {
-   "total": 19934949159,
-   "input": 111898,
-   "output": 59082233,
-   "cache_write_5m": 121272263,
-   "cache_write_1h": 188205672,
-   "cache_read": 19566277093
+   "total": 20449560291,
+   "input": 113744,
+   "output": 60249635,
+   "cache_write_5m": 122009683,
+   "cache_write_1h": 192074588,
+   "cache_read": 20075112641
   },
   "models": {
    "claude-opus-5-5": {
-    "input": 106428,
-    "output": 52709809,
-    "cache_write_5m": 97657826,
-    "cache_write_1h": 178576534,
-    "cache_read": 18948738267
+    "input": 106870,
+    "output": 52958110,
+    "cache_write_5m": 98395246,
+    "cache_write_1h": 179182722,
+    "cache_read": 19009907242
    },
    "claude-fable-5-2": {
-    "input": 5164,
-    "output": 6251259,
+    "input": 6568,
+    "output": 7170360,
     "cache_write_5m": 23614437,
-    "cache_write_1h": 9177255,
-    "cache_read": 593749302
+    "cache_write_1h": 12439983,
+    "cache_read": 1041415875
    },
    "claude-sonnet-5-5": {
     "input": 306,
@@ -217,9 +222,14 @@
     "sessions": 2
    },
    "2026-11-11": {
-    "total": 694368101,
-    "output": 1522449,
+    "total": 699923194,
+    "output": 1531207,
     "sessions": 1
+   },
+   "2026-11-12": {
+    "total": 509056039,
+    "output": 1158644,
+    "sessions": 2
    }
   },
   "complete": true,
