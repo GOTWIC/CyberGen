@@ -395,6 +395,16 @@ def passes(world, actors, by_key, cars, lineup, when):
             cam = hero_camera(rec, r["pivot"], xf)
             if cam:
                 yield from shot(f"hero_{car}_{when}", cam[0], cam[1], cam[2], 1600)
+            gb = rec.get("glass_box")
+            if gb and when == "day":
+                # from inside the cabin, toward the windshield's left corner: the glass is
+                # there from the seats (its inner sheet, drawn while the eye is in the cabin)
+                lo, hi = gb["min"], gb["max"]
+                eye = (lo[0] + 0.4 * (hi[0] - lo[0]), 0.25 * hi[1],
+                       lo[2] + 0.45 * (hi[2] - lo[2]))
+                tgt = (hi[0], 0.9 * hi[1], lo[2] + 0.35 * (hi[2] - lo[2]))
+                yield from shot(f"cabin_{car}", ue(*car_frame(r["pivot"], xf, eye)),
+                                ue(*car_frame(r["pivot"], xf, tgt)), 95.0, 1280)
 
 
 def details(world, actors, by_key, cars):
