@@ -36,6 +36,12 @@ The whole roster at one scale (`vehicles/blender.sh vehicles/lineup.py`).
 | Tanager | Cab | driverless taxi with a sliding door | 4 | 4.55 m | [tanager_cab](tanager_cab/sheet.jpg) | [proof](tanager_cab/game.jpg) |
 | Tanager | Porter | parcel-locker delivery van | 2 | 5.30 m | [tanager_porter](tanager_porter/sheet.jpg) | [proof](tanager_porter/game.jpg) |
 
+**In the cities** (step H): `assetgen vehicles BUILD` (also part of `assetgen build`) parks
+the packs in a generated city in place of AG8's parked car variants: a model by its
+district's archetype, wealth and danger, painted per placement, wherever its footprint fits
+its parking lane (`assetgen/parked/`). Vesper Bay, its 912 parked cars as 17 models, in
+Blender and Unreal: [`city/`](city/README.md).
+
 Each car's own README lists its size, its design, its brand's cues, what its designer would
 improve and what the kit lacked for it. The packs' numbers per car (triangles per LOD, size
 class, pack size, checks): `docs/assetgen_milestones.md`, AG18, phase 3.

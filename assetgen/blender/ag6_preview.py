@@ -17,6 +17,12 @@ quads from the decal atlas) come with the shells; AG2's instanced parts (`parts/
 are put on points by geometry nodes, one instancer per pack, their materials reading the
 building's tints from the instance.
 
+AG18 step H: a view's parked hero vehicles (`vehicles`: per car its instances with their
+paints) drawn from their packs' LOD files (LOD2 in a street view, LOD3 from above), one
+point cloud per car instancing the car's LOD as a collection, its slots through the paint
+mask with the paints read from the instance (`_veh_material`), in place of AG8's parked car
+variants.
+
 AT0 (atmosgen's night preview, `atmosgen preview`): a view's `atmos_lights` (the atmos
 plan's spot, point and rect lights near it) light it in place of the stopgap lamps and
 washes; the job's `engine` "cycles" renders in Cycles on the GPU (its light tree takes the
@@ -620,6 +626,171 @@ def ag8(v, protos):
     return objs
 
 
+VEH_PROTOS = {}          # (car, lod) -> collection
+VEH_EMISSION = 0.15      # a parked car's lamps dimmed: its pack's emission is the lit day value
+
+
+def _veh_material(car, slot, pdir, pk):
+    """AG18: a pack's slot through its paint mask (`vehicles/GAME.md`, "Color as a parameter"),
+    the three paints read from the instance (`cg_p1` to `cg_p3`, the point's attributes):
+    base (1 - w) + (R P1 + G P2 + B P3) A, w = R + G + B; ORM, normal and emission as baked.
+    Glass dark and glossy (the LODs a preview draws are past `opaque_from_lod`)."""
+    m = bpy.data.materials.new(f"veh_{car}_{slot}")
+    m.use_nodes = True
+    N, L = m.node_tree.nodes, m.node_tree.links
+    b = next(n for n in N if n.type == "BSDF_PRINCIPLED")
+    if slot == "glass":
+        gp = pk["materials"]["glass"]["params"]
+        b.inputs["Base Color"].default_value = (*[c * 0.06 for c in gp["color"]], 1.0)
+        b.inputs["Roughness"].default_value = max(0.05, gp["roughness"])
+        return m
+    spec = pk["materials"][slot]
+
+    def tex(key, srgb):
+        n = N.new("ShaderNodeTexImage")
+        n.image = bpy.data.images.load(os.path.join(pdir, spec["textures"][key]["file"]),
+                                       check_existing=True)
+        n.image.colorspace_settings.name = "sRGB" if srgb else "Non-Color"
+        n.image.alpha_mode = "CHANNEL_PACKED"
+        return n
+
+    def math_(op, a, c=None, clamp=False):
+        n = N.new("ShaderNodeMath")
+        n.operation = op
+        n.use_clamp = clamp
+        for i, x in enumerate((a, c)):
+            if x is None:
+                continue
+            if isinstance(x, float):
+                n.inputs[i].default_value = x
+            else:
+                L.new(x, n.inputs[i])
+        return n.outputs[0]
+
+    def vmath(op, a, c):
+        n = N.new("ShaderNodeVectorMath")
+        n.operation = op
+        L.new(a, n.inputs[0])
+        L.new(c, n.inputs[1])
+        return n.outputs[0]
+
+    def scale(vec, f):
+        n = N.new("ShaderNodeVectorMath")
+        n.operation = "SCALE"
+        L.new(vec, n.inputs[0])
+        L.new(f, n.inputs["Scale"])
+        return n.outputs[0]
+
+    bc, nm, orm, mk, em = (tex("base_color", True), tex("normal", False), tex("orm", False),
+                           tex("mask", False), tex("emissive", True))
+    sep = N.new("ShaderNodeSeparateColor")
+    L.new(mk.outputs["Color"], sep.inputs[0])
+    tint = None
+    for ch in range(3):
+        at = N.new("ShaderNodeAttribute")
+        at.attribute_type = "INSTANCER"
+        at.attribute_name = f"cg_p{ch + 1}"
+        t_ = scale(at.outputs["Vector"], sep.outputs[ch])
+        tint = t_ if tint is None else vmath("ADD", tint, t_)
+    w = math_("ADD", math_("ADD", sep.outputs[0], sep.outputs[1]), sep.outputs[2])
+    inv = math_("SUBTRACT", 1.0, w, clamp=True)
+    alb = vmath("ADD", scale(bc.outputs["Color"], inv), scale(tint, mk.outputs["Alpha"]))
+    L.new(alb, b.inputs["Base Color"])
+    so = N.new("ShaderNodeSeparateColor")
+    L.new(orm.outputs["Color"], so.inputs[0])
+    L.new(so.outputs[1], b.inputs["Roughness"])
+    L.new(so.outputs[2], b.inputs["Metallic"])
+    L.new(orm.outputs["Alpha"], b.inputs["Coat Weight"])
+    b.inputs["Coat Roughness"].default_value = spec["params"].get("coat_roughness", 0.05)
+    nmap = N.new("ShaderNodeNormalMap")
+    L.new(nm.outputs["Color"], nmap.inputs["Color"])
+    L.new(nmap.outputs["Normal"], b.inputs["Normal"])
+    L.new(em.outputs["Color"], b.inputs["Emission Color"])
+    b.inputs["Emission Strength"].default_value = \
+        spec["params"].get("emissive_strength", 1.0) * VEH_EMISSION
+    return m
+
+
+def _veh_proto(car, lod):
+    """A car's LOD file as a collection of its own (not in the scene), its slots on the
+    paint-mask materials; made once."""
+    key = (car, lod)
+    if key in VEH_PROTOS:
+        return VEH_PROTOS[key]
+    pdir = JOB["vehicles"][car]
+    with open(os.path.join(pdir, "pack.json")) as f:
+        pk = json.load(f)
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=os.path.join(pdir, pk["lods"][lod]["file"]))
+    if GLTF_TMP:
+        bpy.data.batch_remove(GLTF_TMP)
+        GLTF_TMP.clear()
+    new = [o for o in bpy.data.objects if o not in before]
+    coll = bpy.data.collections.new(f"veh.{car}.lod{lod}")
+    mats = {}
+    old = set()
+    for o in new:
+        for c in list(o.users_collection):
+            c.objects.unlink(o)
+        coll.objects.link(o)
+        if o.type != "MESH":
+            continue
+        for ms in o.material_slots:
+            nm = ms.material.name if ms.material else ""
+            slot = "glass" if "glass" in nm else ("wheels" if "wheels" in nm else "body")
+            if slot not in mats:
+                mats[slot] = _veh_material(car, slot, pdir, pk)
+            if ms.material is not None:
+                old.add(ms.material)
+            ms.material = mats[slot]
+    bpy.data.batch_remove([m for m in old if m.users == 0])
+    VEH_PROTOS[key] = coll
+    return coll
+
+
+def _veh_group(name, coll):
+    """Geometry nodes: the whole collection as one instance on every point, turned by `rot`
+    (the points' attributes go on with the instances, for the materials to read)."""
+    ng = bpy.data.node_groups.new(name, "GeometryNodeTree")
+    ng.interface.new_socket(name="Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+    ng.interface.new_socket(name="Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+    N, L = ng.nodes, ng.links
+    gi, go = N.new("NodeGroupInput"), N.new("NodeGroupOutput")
+    iop = N.new("GeometryNodeInstanceOnPoints")
+    ci = N.new("GeometryNodeCollectionInfo")
+    ci.transform_space = "ORIGINAL"
+    ci.inputs["Collection"].default_value = coll
+    ci.inputs["Separate Children"].default_value = False
+    rot = N.new("GeometryNodeInputNamedAttribute")
+    rot.data_type = "FLOAT_VECTOR"
+    rot.inputs["Name"].default_value = "rot"
+    L.new(gi.outputs["Geometry"], iop.inputs["Points"])
+    L.new(ci.outputs["Instances"], iop.inputs["Instance"])
+    L.new(rot.outputs["Attribute"], iop.inputs["Rotation"])
+    L.new(iop.outputs["Instances"], go.inputs["Geometry"])
+    return ng
+
+
+def vehicles(v):
+    """AG18 step H: the view's parked hero vehicles, one point cloud per car (its paints as
+    point attributes) instancing the car's LOD collection; the objects made."""
+    vv = v.get("vehicles") or {}
+    objs = []
+    for car, pts in sorted((vv.get("cars") or {}).items()):
+        if car not in JOB.get("vehicles", {}):
+            continue
+        coll = _veh_proto(car, vv["lod"])
+        attrs = {f"cg_p{k + 1}": ("FLOAT_VECTOR", [c for p in pts for c in p[4 + 3 * k:7 + 3 * k]])
+                 for k in range(3)}
+        ob = _points(f"veh.{car}", [p[:3] + [math.radians(p[3])] for p in pts], attrs)
+        ob.modifiers.new("vehicles", "NODES").node_group = _veh_group(f"veh.{car}", coll)
+        objs.append(ob)
+    if objs:
+        log(f"vehicles: {sum(len(p) for p in (vv.get('cars') or {}).values())} parked cars, "
+            f"{len(objs)} models")
+    return objs
+
+
 def lamps(points, washes=()):
     """AG15: a spot light under each lamp head pointing down (0.45 m under it, outside the
     lamp's own shadow; shadows from the nearest few), as the play features light the lamps
@@ -766,7 +937,7 @@ def main():
                 o.hide_render = True
             if ".water." in o.name and ".lod" in o.name and not o.name.endswith(".lod0"):
                 o.hide_render = True                    # (a water surface's LOD chain)
-        sobjs = signs(v.get("signs", [])) + ag8(v, protos)
+        sobjs = signs(v.get("signs", [])) + ag8(v, protos) + vehicles(v)
         if v.get("water_points"):
             sobjs += ag8({"ag8": {"points": v["water_points"]}}, wprotos)
         cam = camera(sc, v)

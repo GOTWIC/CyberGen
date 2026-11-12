@@ -8,7 +8,9 @@ textured Blender renders.
   far proxies; AG3's street fronts and decals with the shells, AG2's instanced parts on
   them; AG8's props and plants near a street view as instances of their variant
   families and its signs (their faces showing the sign pages), with AG6's materials (where
-  AG8 has not run, the sign slots as quads showing their atlas cells); by night
+  AG8 has not run, the sign slots as quads showing their atlas cells); AG18's parked hero
+  vehicles (`unreal_contribution.vehicles.json`) in place of AG8's parked car variants,
+  recolored per car, near a street view's eye and in a view from above; by night
   (`--night`) the windows lit by each building's lit ratio, the signs and neon, a point
   light at every street light near the camera. Views: the districts (`iso_<id>`), the
   street cameras (`street_<n>`), the city (from the proxies; `city_full`, AG4: every shell,
@@ -119,18 +121,26 @@ def _ag8(adir: Path, views: list) -> dict | None:
         return None
     cp = json.loads(pp.read_text(encoding="utf-8"))
     cs = json.loads(sp.read_text(encoding="utf-8"))
+    # AG18 step H: the parked cars as hero vehicles in place of AG8's variants
+    vp = adir / "unreal_contribution.vehicles.json"
+    cv = json.loads(vp.read_text(encoding="utf-8")) if vp.is_file() else {"entries": []}
+    vgone = {k for e in cv["entries"] for k in e.get("replaces", [])}
+    lib = {c: str(Path(cv["library"]) / c) for c in cv.get("cars", {})}
     fams = sorted({str((adir / q["glb"]).resolve()) for e in cp["entries"]
-                   for q in e.get("parts", [])})
+                   if e["key"] not in vgone for q in e.get("parts", [])})
     removed = sorted({k for c in (cp, cs) for e in c["entries"]
                       for k in [e["key"]] + list(e.get("replaces", []))})
     for v in views:
         v["ag8"] = {"points": {}, "exact": [], "signs": []}
+        v["vehicles"] = _vehicles(cv, v)
         if v["ortho"]:
             continue
         eye = v["eye"]
         pts: dict[str, list] = {}
         exact = set()
         for e in cp["entries"]:
+            if e["key"] in vgone:
+                continue
             px, py, pz = e["pivot"]
             if e.get("glb") and _near(e["pivot"], eye, PROPS_R):
                 exact.add(str((adir / e["glb"]).resolve()))
@@ -148,7 +158,35 @@ def _ag8(adir: Path, views: list) -> dict | None:
                               "yaw": e["yaw_deg"], "slots": e.get("slots", [])}
                              for e in cs["entries"] if _near(e["pivot"], eye, SIGN_R)]
         v["signs"] = []                    # (AG8's signs show the cells: no quads)
-    return {"families": fams, "removed": removed}
+    return {"families": fams, "removed": removed, "vehicles": lib}
+
+
+VEHICLE_LOD_NEAR = 2     # AG18: the packs' LOD a street view draws parked cars with
+VEHICLE_LOD_FAR = 3      # ... and a view from above
+
+
+def _vehicles(cv: dict, v: dict) -> dict:
+    """AG18 step H: a view's parked hero vehicles (`unreal_contribution.vehicles.json`): the
+    LOD it draws them with and per car its instances [x, y, z, yaw, primary, secondary,
+    accent], within PROPS_R of a street view's eye, in a view from above those of its tiles
+    (every one in a view of the whole city)."""
+    if not cv["entries"]:
+        return {}
+    tiles = None if v.get("whole") or not v["ortho"] else set(v.get("shell_tiles") or [])
+    out: dict[str, list] = {}
+    for e in cv["entries"]:
+        if tiles is not None and e["tile"] not in tiles:
+            continue
+        px, py, pz = e["pivot"]
+        for q in e["vehicles"]:
+            x, y = q["xform"][0] + px, q["xform"][1] + py
+            if not v["ortho"] and not _near((x, y), v["eye"], PROPS_R):
+                continue
+            out.setdefault(q["car"], []).append(
+                [x, y, q["xform"][2] + pz, q["xform"][3]] + [c for col in q["paint"]
+                                                             for c in col])
+    return {"lod": VEHICLE_LOD_FAR if v["ortho"] else VEHICLE_LOD_NEAR,
+            "cars": dict(sorted(out.items()))} if out else {}
 
 
 GRASS_R = 140.0         # AG13: clumps this near the eye (Unreal fades them out at 60 to 100 m)
@@ -379,6 +417,7 @@ def make_job(args, progress=None) -> tuple[dict, Path, int]:
                              | set((gr or {}).get("removed", []))),
            "water_parts": (wat or {}).get("parts"),
            "ag8_families": (ag8 or {}).get("families", []),
+           "vehicles": (ag8 or {}).get("vehicles", {}),
            "ground": {"clumps": gr["clumps"]} if gr is not None else {},
            "proxy_tiles": sorted(man["tiles"]), "samples": args.samples,
            "hour": float(getattr(args, "hour", 21.0) or 21.0),

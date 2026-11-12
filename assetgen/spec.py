@@ -99,6 +99,20 @@ class LandmarkStyle(_Model):
     crown: Crown | None = None
 
 
+class VehicleStyle(_Model):
+    """AG18 step H: AG8's parked cars as the hero vehicles of the vehicle library
+    (`assetgen/parked/`)."""
+    parked: Literal["packs", "variants"] = Field(
+        "packs", description="packs: the library's vehicles where it is on this machine; "
+                             "variants: AG8's own parked car variants, as before AG18.")
+    library: str | None = Field(None, description="The vehicle library's folder (default "
+                                                  "$ASSETGEN_VEHICLES, $CITYGEN_VEHICLES, else "
+                                                  "~/.cache/cybergen/vehicles/game).")
+    weights: dict[str, Annotated[float, Field(ge=0.0, le=10.0)]] = Field(
+        default_factory=dict, description="A multiplier per model (a pack's car name) on its "
+                                          "district weights; 0 leaves it out.")
+
+
 class AssetSpec(_Model):
     schema_ref: str | None = Field(None, alias="$schema")
     version: Literal[1] = SPEC_VERSION
@@ -121,6 +135,10 @@ class AssetSpec(_Model):
     districts: dict[str, DistrictStyle] = Field(default_factory=dict)
     owners: dict[str, OwnerStyle] = Field(default_factory=dict)
     landmarks: dict[str, LandmarkStyle] = Field(default_factory=dict)
+    vehicles: VehicleStyle | None = Field(
+        None, exclude_if=lambda v: v is None,
+        description="AG18: the parked cars as hero vehicles (left out: the library's, where "
+                    "it is on this machine).")
     notes: str | None = Field(None, description="What the session inferred from the prompt.")
 
 
