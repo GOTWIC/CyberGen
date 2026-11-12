@@ -8,7 +8,7 @@
    144473,
    59991,
    20411,
-   4764
+   4982
   ],
   "lod0_parts": {
    "body": 112485,
@@ -42,31 +42,30 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 34116982,
- "seconds": 1015.1,
+ "pack_bytes": 35643661,
+ "seconds": 64.3,
  "stage_seconds": {
   "build": 0.7,
-  "render_original": 46.9,
-  "parts": 30.6,
+  "render_original": 59.7,
+  "parts": 30.3,
   "nodes": 0.0,
-  "uv": 119.5,
-  "bake": 682.2,
-  "lods_export": 34.6,
-  "textures": 8.107542037963867,
-  "proof": 91.79415512084961
+  "uv": 120.2,
+  "bake": 638.7,
+  "lods_export": 25.6,
+  "lods_only": 37.2,
+  "textures": 0.0,
+  "proof": 27.026826858520508
  },
  "baked_down": {
   "relief": {
-   "pieces": 51,
-   "triangles": 48747,
+   "pieces": 46,
+   "triangles": 44824,
    "names": [
     "badge.disc.X",
     "badge.disc.z",
-    "badge.t.X",
     "badge.t.z",
     "charge.bolt",
     "charge.door",
-    "charge.label",
     "checker.band",
     "checker.band.door.l",
     "checker.band.door.r",
@@ -86,7 +85,6 @@
     "lamp.cores.rear",
     "lettering.door.l",
     "lettering.door.r",
-    "lettering.front",
     "lettering.rear",
     "lettering.side.l",
     "lettering.side.r",
@@ -96,8 +94,6 @@
     "permit.text",
     "pixels.front",
     "pixels.rear",
-    "plate.glyphs.X",
-    "plate.glyphs.x",
     "roof.number",
     "roundel.l",
     "roundel.number.l",
@@ -111,6 +107,17 @@
     "threshold.slot",
     "tow.cover",
     "track"
+   ]
+  },
+  "lod0_only": {
+   "pieces": 5,
+   "triangles": 3923,
+   "names": [
+    "badge.t.X",
+    "charge.label",
+    "lettering.front",
+    "plate.glyphs.X",
+    "plate.glyphs.x"
    ]
   },
   "card_src": {
@@ -180,7 +187,7 @@
   "script": "vehicles/cars/tanager_cab.py",
   "script_sha256": "1fa3528cbdb137052351d937d51e91bb86120c88614a9292760fbb2fda6a92c1",
   "carkit_sha256": "86fc2281f799baae0c26b3ac0a61705bd4f58e4eb5e5443afa1c08342131b5e3",
-  "game_sha256": "4b9afb7f702e2ef576b17202979ad046831ef1f4a3aa238c3255ddbf465f616e",
+  "game_sha256": "ac27f7dab3eb8522bd38e910dcf6fb19a322ef1ddc91ecb329ca4dd13073d991",
   "original_triangles": 285996,
   "original_objects": 163
  },
@@ -219,7 +226,7 @@
     },
     {
      "lod": 3,
-     "triangles": 4764,
+     "triangles": 4982,
      "budget": 5000,
      "ok": true
     }
@@ -387,8 +394,8 @@
     {
      "lod": 3,
      "deviation_m": [
-      0.0038,
-      0.0009,
+      0.0002,
+      0.0019,
       0.0012
      ],
      "tolerance_m": [
@@ -431,10 +438,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 17.82,
-     "bent_share": 0.034,
-     "texture_share": 0.0151,
-     "miss_share": 0.1168,
+     "normal_p95_deg": 16.54,
+     "bent_share": 0.0298,
+     "texture_share": 0.0165,
+     "miss_share": 0.0869,
      "lod": 3,
      "limits": {
       "p95": 40.0,

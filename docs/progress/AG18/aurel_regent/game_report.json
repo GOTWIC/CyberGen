@@ -42,23 +42,23 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 30361650,
- "seconds": 750.6,
+ "pack_bytes": 30361427,
+ "seconds": 752.9,
  "stage_seconds": {
   "build": 0.4,
-  "render_original": 21.7,
-  "parts": 33.1,
+  "render_original": 22.7,
+  "parts": 33.2,
   "nodes": 0.0,
-  "uv": 97.0,
-  "bake": 505.3,
-  "lods_export": 12.4,
-  "textures": 7.864833116531372,
-  "proof": 72.21774888038635
+  "uv": 97.4,
+  "bake": 510.2,
+  "lods_export": 12.5,
+  "textures": 7.92553186416626,
+  "proof": 68.10969805717468
  },
  "baked_down": {
   "relief": {
-   "pieces": 39,
-   "triangles": 27792,
+   "pieces": 38,
+   "triangles": 24582,
    "names": [
     "blade.light.f",
     "blade.light.r",
@@ -84,7 +84,6 @@
     "division.slot",
     "flap",
     "led.stop",
-    "lettering",
     "lozenge.flutes.f",
     "lozenge.flutes.r",
     "lozenge.light.f",
@@ -99,6 +98,13 @@
     "spear",
     "vault.flutes",
     "wordmark"
+   ]
+  },
+  "lod0_only": {
+   "pieces": 1,
+   "triangles": 3210,
+   "names": [
+    "lettering"
    ]
   },
   "lathe": {
@@ -154,7 +160,7 @@
   "script": "vehicles/cars/aurel_regent.py",
   "script_sha256": "37fa661e27d95c6c49cc100b00188b1a8ad2c773df195f4a4f7b43862c713e87",
   "carkit_sha256": "86fc2281f799baae0c26b3ac0a61705bd4f58e4eb5e5443afa1c08342131b5e3",
-  "game_sha256": "8ff0f0b62ee4a544b91be5bd6a7bb61a4c83f75e900751d9fc18fbb0e0cfe49e",
+  "game_sha256": "9f14193bfa1a5692614bd58ee2196f52e11cb24b8159b4eb325b1ab704877169",
   "original_triangles": 228554,
   "original_objects": 114
  },

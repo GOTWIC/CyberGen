@@ -302,6 +302,11 @@ A LOD whose box falls short of LOD0's (or passes it) by more than `lod_bounds` a
 glass crown collapsed away) has the parts that reach that side collapsed again at twice
 their ratio, the others a little more to hold the budget.
 
+A far LOD whose collapse is starved (a ratio under 3%: the hulls, the floors, the wheels
+and the lamps take the budget, and what is left tears the panels apart at their gaps) is
+prepared again with the small parts left out up to twice, then three times the size (24 cm,
+then 36 cm, at LOD3).
+
 A LOD short of its fidelity limits (below) is made again, twice at most: the body's pieces
 that carry 70% of the area drawn more than the limit off LOD0's normals (12 pieces at most:
 round bars, springs and axles collapsed to a few sides) are collapsed again alone at 2.5

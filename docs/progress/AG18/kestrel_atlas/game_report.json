@@ -37,23 +37,23 @@
  "textures": {
   "body": 4096
  },
- "pack_bytes": 40041912,
- "seconds": 871.7,
+ "pack_bytes": 40042384,
+ "seconds": 864.9,
  "stage_seconds": {
   "build": 0.3,
-  "render_original": 53.3,
-  "parts": 30.9,
+  "render_original": 55.7,
+  "parts": 31.1,
   "nodes": 0.0,
-  "uv": 491.6,
-  "bake": 158.6,
-  "lods_export": 26.1,
-  "textures": 6.563914060592651,
-  "proof": 103.78523993492126
+  "uv": 473.5,
+  "bake": 178.6,
+  "lods_export": 26.3,
+  "textures": 6.583182096481323,
+  "proof": 92.24397087097168
  },
  "baked_down": {
   "relief": {
-   "pieces": 9,
-   "triangles": 6535,
+   "pieces": 10,
+   "triangles": 20915,
    "names": [
     "case.stencil",
     "fasteners",
@@ -61,16 +61,10 @@
     "gate.name",
     "hazard.stripes",
     "led.visor",
+    "lettering",
     "lines",
     "pod.stencils",
     "visor.slits"
-   ]
-  },
-  "lod0_only": {
-   "pieces": 1,
-   "triangles": 14380,
-   "names": [
-    "lettering"
    ]
   },
   "card_src": {
@@ -111,7 +105,7 @@
   "script": "vehicles/cars/kestrel_atlas.py",
   "script_sha256": "7233b4fec97c51f6005241ffd298f5cf884b3e91b7fa31da5207297cea6c4ae4",
   "carkit_sha256": "86fc2281f799baae0c26b3ac0a61705bd4f58e4eb5e5443afa1c08342131b5e3",
-  "game_sha256": "491a8683e1b1a144b5485e955a88203cd7b64f4c5bd49495b211ef3f3d3e91ee",
+  "game_sha256": "ac27f7dab3eb8522bd38e910dcf6fb19a322ef1ddc91ecb329ca4dd13073d991",
   "original_triangles": 151203,
   "original_objects": 155
  },

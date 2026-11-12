@@ -2995,6 +2995,8 @@ What the survey found on the 18 cars ([`checks.md`](progress/AG18/checks.md) has
     the area off LOD0's normals given 2.5 times their triangles (the Hauler's LOD1: its
     springs, axles and chassis rails, 12.39 to about 9 degrees). Giving the wheels'
     triangles to the body, tried first, changed nothing.
+  - A far LOD collapsed at a ratio under 3% is starved, and is prepared again with larger
+    small parts left out (the Cab, below).
 - **Bakes.**
   - Every part is cut into triangles before the bakes, and a collapsed part's shading
     normals are weighted by face area: the Mule's white streak was a collapsed flat panel
@@ -3031,7 +3033,37 @@ What the survey found on the 18 cars ([`checks.md`](progress/AG18/checks.md) has
   7); `--check-vehicles` shoots each car from inside its cabin (`cabin_<car>`).
 - `CYBERGEN_GAME_DEBUG=1` logs every far LOD wreck and what became of it.
 
-RESULTS_TABLE
+Nine packs rebuilt, every check passing on each (the proofs and reports in each car's
+folder):
+
+| Pack | Triangles LOD0 to LOD3 | Class | Texels px/m (5th percentile) | LOD3 against its limits (normal, bent, texture) | What was wrong |
+|---|---|---|---|---|---|
+| aurel_prelate | 114,891, 59,994, 20,261, 4,823 | standard | 428 | 9.5 of 40 degrees, 0.022 of 0.10, 0.0144 of 0.04 | dark shards along the sill and wavy glass at LOD3 |
+| aurel_regent | 121,393, 59,994, 20,012, 5,137 | standard | 342 | 12.5 of 40 degrees, 0.027 of 0.10, 0.0104 of 0.04 | the Prelate's far LOD faults (not listed; rebuilt with it) |
+| aurel_zenith | 80,187, 48,112, 20,300, 4,760 | standard | 329 | 19.4 of 40 degrees, 0.043 of 0.10, 0.0098 of 0.04 | grille as a beat pattern, 12 mm lettering as dots |
+| brakk_hauler | 124,699, 58,271, 20,052, 8,226 | large | 320 | 15.3 of 40 degrees, 0.015 of 0.10, 0.0026 of 0.04 | `lod_fidelity`: LOD1 12.39 degrees against 12 (now 8.9) |
+| brakk_mule | 146,089, 59,994, 20,521, 8,116 | large | 243 | 13.4 of 40 degrees, 0.015 of 0.10, 0.0069 of 0.04 | a white streak on the cab's front quarter |
+| halcyon_ridge | 133,443, 59,992, 20,172, 5,099 | standard | 371 | 24.5 of 40 degrees, 0.048 of 0.10, 0.0073 of 0.04 | `uv_overlap` 0.52% against 0.5% (now 0.005%) |
+| kestrel_atlas | 101,852, 59,999, 20,122, 8,120 | large | 317 | 37.3 of 40 degrees, 0.080 of 0.10, 0.0298 of 0.04 | winch drum crumpled at LOD3 |
+| kestrel_meridian | 63,539, 38,119, 19,997, 5,079 | standard | 360 | 31.0 of 40 degrees, 0.065 of 0.10, 0.0397 of 0.04 | `lod_fidelity`: LOD3 41.7 degrees against 40; pod vent baked black |
+| tanager_cab | 144,473, 59,991, 20,411, 4,982 | standard | 440 | 16.5 of 40 degrees, 0.030 of 0.10, 0.0165 of 0.04 | parked with its sliding door open |
+
+- The Cab shut is no longer a large vehicle (its cabin, seen through the open doorway, had
+  counted as exterior: 36 m2 now, under the 55 m2 of the large class), so its LOD3 is 5,000
+  triangles, not 8,000. At that budget the collapse was starved (a ratio of 1.8%) and tore
+  the panels apart at the front door's shut line; a starved far LOD is now prepared again
+  with the small parts left out up to three times the size. Welding the panels across their
+  gaps (3 mm for 1.5), tried first, took the LOD over its budget.
+- By a hair, on the passing side: the Meridian's LOD3 texture share (0.0397 of 0.04), the
+  Atlas's LOD3 normals (37.3 of 40 degrees), the Mule's texel density (243 px/m over a
+  floor of 240).
+- The Zenith's far LOD shows its skirt as a plain band of light: its flutes go as a row at
+  LOD3 (the budget has no room for a hull each).
+- The Cab's fold-out step is still out (its script draws it either way).
+- The other nine packs (Vanta-R, Sable, Dart, Lumen, Pebble, Aria, Bastion, Mino, Porter)
+  are as first built and published; they pass their checks and take these rules when they
+  are next rebuilt (a hover car's belly then counts as underside, fine relief stays as
+  geometry at LOD0).
 
 Next: the design improvements B to E.
 

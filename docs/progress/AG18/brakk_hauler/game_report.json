@@ -42,18 +42,18 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 40885464,
- "seconds": 721.1,
+ "pack_bytes": 40881477,
+ "seconds": 701.4,
  "stage_seconds": {
   "build": 0.8,
-  "render_original": 22.8,
-  "parts": 17.7,
+  "render_original": 24.9,
+  "parts": 18.1,
   "nodes": 0.0,
-  "uv": 345.7,
-  "bake": 213.7,
+  "uv": 349.1,
+  "bake": 209.8,
   "lods_export": 22.4,
-  "textures": 8.610430240631104,
-  "proof": 88.91302800178528
+  "textures": 8.055537939071655,
+  "proof": 67.59967613220215
  },
  "baked_down": {
   "relief": {
@@ -118,7 +118,7 @@
   "script": "vehicles/cars/brakk_hauler.py",
   "script_sha256": "2a227531e2fc8422ff8576db925bc5fcf58970fc50eb6dbc38f6f14a755b87ac",
   "carkit_sha256": "86fc2281f799baae0c26b3ac0a61705bd4f58e4eb5e5443afa1c08342131b5e3",
-  "game_sha256": "59f968942ed882aeadcbd81b219d1c2141d6eb8de297320204c983b97dc30fef",
+  "game_sha256": "34e41ae8a9f23206b0f9a1a8a1ceacc883c53bb9a1fad19ee54fee8ef83d570f",
   "original_triangles": 230460,
   "original_objects": 123
  },
