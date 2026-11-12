@@ -1,25 +1,25 @@
 {
  "device": "windows",
  "label": "Windows PC",
- "updated": "2026-11-10T21:23:15Z",
- "sessions": 26,
- "worktree_sessions": 26,
+ "updated": "2026-11-12T00:49:54Z",
+ "sessions": 27,
+ "worktree_sessions": 27,
  "subagents": 11,
  "totals": {
-  "total": 8395008566,
-  "input": 36566,
-  "output": 13366887,
+  "total": 8459987808,
+  "input": 36958,
+  "output": 13459239,
   "cache_write_5m": 155362727,
-  "cache_write_1h": 50820806,
-  "cache_read": 8175421580
+  "cache_write_1h": 53975921,
+  "cache_read": 8237152963
  },
  "models": {
   "claude-opus-5-5": {
-   "input": 36566,
-   "output": 13366887,
+   "input": 36958,
+   "output": 13459239,
    "cache_write_5m": 155362727,
-   "cache_write_1h": 50820806,
-   "cache_read": 8175421580
+   "cache_write_1h": 53975921,
+   "cache_read": 8237152963
   }
  },
  "days": {
@@ -89,27 +89,32 @@
    "sessions": 3
   },
   "2026-11-10": {
-   "total": 473647859,
-   "output": 802471,
-   "sessions": 4
+   "total": 523591718,
+   "output": 884336,
+   "sessions": 5
+  },
+  "2026-11-11": {
+   "total": 15035383,
+   "output": 10487,
+   "sessions": 2
   }
  },
  "stats": {
   "totals": {
-   "total": 17750057290,
-   "input": 75814,
-   "output": 34049902,
+   "total": 17867595627,
+   "input": 76528,
+   "output": 34258235,
    "cache_write_5m": 208064847,
-   "cache_write_1h": 111548580,
-   "cache_read": 17396318147
+   "cache_write_1h": 118719029,
+   "cache_read": 17506476988
   },
   "models": {
    "claude-opus-5-5": {
-    "input": 75814,
-    "output": 34049902,
+    "input": 76528,
+    "output": 34258235,
     "cache_write_5m": 208064847,
-    "cache_write_1h": 111548580,
-    "cache_read": 17396318147
+    "cache_write_1h": 118719029,
+    "cache_read": 17506476988
    }
   },
   "days": {
@@ -179,9 +184,14 @@
     "sessions": 3
    },
    "2026-11-10": {
-    "total": 1020988990,
-    "output": 2008979,
-    "sessions": 4
+    "total": 1114221030,
+    "output": 2197975,
+    "sessions": 5
+   },
+   "2026-11-11": {
+    "total": 24306297,
+    "output": 19337,
+    "sessions": 2
    }
   },
   "complete": true,
