@@ -2238,7 +2238,10 @@ waits for Swagnik's review.
   [--test]` turns a car's script, unchanged, into a pack in
   `~/.cache/cybergen/vehicles/game/<car>/` (never committed: four LOD glTFs, baked atlases
   with the paint as a mask, collision hulls, `pack.json`); `--docs` writes its proof
-  `game.jpg` and `game_report.json` into `docs/progress/AG18/<car>/`. Size classes standard
+  `game.jpg` and `game_report.json` into `docs/progress/AG18/<car>/`. The built packs are a
+  GitHub release of this repo (`vehicles/packs.py`: `fetch` on a machine without them, every
+  file checked against the committed `vehicles/packs.json`; `publish` after rebuilding
+  packs, committing `packs.json` in the same PR; `status`). Size classes standard
   and large (55 m2 of exterior or more: LOD3 8,000 triangles, texel floor 240 px/m against
   5,000 and 300). Built for 18 vehicles; kestrel_meridian and brakk_hauler (`lod_fidelity`)
   and halcyon_ridge (`uv_overlap`) fail one check each by a hair, recorded.

@@ -37,6 +37,25 @@ Blender (the proof) and the repo's venv Python (textures, checks) as children.
 | `game.jpg` | the proof image |
 | `proof/` | its renders (original, baked, recolored, LODs) |
 
+### Sharing packs between machines
+
+Built packs go up as a GitHub release of this repo, one zip per car, and
+`vehicles/packs.json` (committed) records the release's tag, each zip's sha256 and the
+sha256 of every file in it (`vehicles/packs.py`, standard library only):
+
+```
+python vehicles/packs.py fetch                 # what is missing or differs, every hash checked
+python vehicles/packs.py fetch --from DIR      # zips downloaded by hand (a drive, a USB stick)
+python vehicles/packs.py status                # local packs against packs.json, and which
+                                               # were built before the current tool or kit
+python vehicles/packs.py publish [CAR ...]     # zip, upload (gh signed in), rewrite packs.json
+```
+
+A zip holds a pack's top-level files (not `work/`, `proof/` or `game.jpg`). `fetch` needs no
+token (the repo is public) and unpacks into `--dir`, `$CITYGEN_VEHICLES` or the cache above.
+Republish after rebuilding packs, and commit `packs.json` in the same PR, so every machine
+fetches the packs that match the code.
+
 ## Frame
 
 `pack.json` is in the designs' frame: x forward, y left, z up, meters, origin on the ground
