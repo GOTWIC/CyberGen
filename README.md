@@ -11,7 +11,7 @@ your machine.
 |---|---|---|---|
 | 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M22 done |
 | 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG8, AG10, AG12 to AG17 done, the rest to come |
-| 3 | [atmosgen](#stage-3-atmosgen) | Lighting, sky, weather and atmospherics | AT0 and AT1 done, the rest to come |
+| 3 | [atmosgen](#stage-3-atmosgen) | Lighting, sky, weather and atmospherics | AT0 to AT2 done, the rest to come |
 | 4 | [lifegen](#stage-4-lifegen) | Traffic, crowds, trains and aircraft, generated | Planned ([draft plan](docs/lifegen_scope.md)) |
 | 5 | [storygen](#stage-5-storygen) | Story, characters and cutscenes | Planned |
 
@@ -567,6 +567,19 @@ for now (AT0):
 | An Old Town alley | A highway through the port |
 | <img src="docs/progress/AT1/unreal/night_oldtown_alley.jpg" width="420"> | <img src="docs/progress/AT1/unreal/night_highway.jpg" width="420"> |
 
+Signs and neon light the city too: every billboard, banner and holo-board lights the street
+and the facade across from it in its own colors (never washing its own wall), neon bands and
+shop signs spill color onto the sidewalks, tower crowns are floodlit in the color of their LED
+trim, searchlights sweep the sky from the landmarks, red aviation lights blink on every tall
+roof, and the port's yards and the spaceport's apron have their high masts. Each district has
+its palette, clean or gritty by place: neon flickers and dies more where it is dangerous.
+
+| The Corporate Core: lit crowns, searchlights, aviation lights | Neon spill on an Old Town street |
+|---|---|
+| <img src="docs/progress/AT2/unreal/night_core_towers_air.jpg" width="420"> | <img src="docs/progress/AT2/unreal/night_signs_oldtown_a.jpg" width="420"> |
+| The megatower's searchlights | The port's yard under its high masts |
+| <img src="docs/progress/AT2/unreal/night_megatower_searchlights.jpg" width="420"> | <img src="docs/progress/AT2/unreal/night_port_yard.jpg" width="420"> |
+
 Its Blender preview renders the same night in Cycles, lit by the plan's lights:
 
 | The Corporate Core by night, Blender preview (8K) | A Corporate Core street in rain (8K) |
@@ -582,7 +595,7 @@ Plan: [`docs/atmosgen_scope.md`](docs/atmosgen_scope.md); what each milestone di
 |---|---|---|---|
 | AT0 | Groundwork | Look presets and art direction spec, the plan's format, lights for every lamp, sign and shopfront, the runtime plugin's start, a night test of Delta Megacity in Unreal (lights, haze, rain, wet streets), a Blender night preview | Done |
 | AT1 | Streets at night | Street and wall lights that light sidewalks and roads, lit junctions, highways and alleys, shop light spilling onto the street, deck, tunnel and station lights, a check that every street is lit, the lights in the Unreal level | Done |
-| AT2 | Neon and signs as light | Billboards, banners and holo-boards lighting the street and facades they face, neon spill, crown floods, aviation lights, searchlights, port and spaceport lights, flicker | Planned |
+| AT2 | Neon and signs as light | Billboards, banners and holo-boards lighting the street and facades they face, neon spill, crown floods, aviation lights, searchlights, port and spaceport lights, flicker, district palettes | Done |
 | AT3 | Sky and time | Night, dusk and day skies, a cloud deck lit by the city, the moon, time of day driving every light and window | Planned |
 | AT4 | Air | Fog, haze, smog and mist over the water, light shafts, steam from manholes and vents | Planned |
 | AT5 | Weather | Rain kept out from under decks and awnings, wet streets and puddles, drips and splashes, wind, changing weather | Planned |

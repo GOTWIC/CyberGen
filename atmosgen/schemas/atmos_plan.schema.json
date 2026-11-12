@@ -225,6 +225,18 @@
      "title": "Far M",
      "type": "number"
     },
+    "high_m": {
+     "default": 750.0,
+     "description": "AT2: the high tier's range (m) ...",
+     "title": "High M",
+     "type": "number"
+    },
+    "high_max": {
+     "default": 48,
+     "description": "... and how many of its lights live at most.",
+     "title": "High Max",
+     "type": "integer"
+    },
     "mid_m": {
      "title": "Mid M",
      "type": "number"

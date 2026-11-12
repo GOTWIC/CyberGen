@@ -82,6 +82,41 @@
      "description": "Share of lights that flicker.",
      "title": "Flicker"
     },
+    "flood": {
+     "anyOf": [
+      {
+       "enum": [
+        "sodium",
+        "warm",
+        "neutral",
+        "cool",
+        "led_cool"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "AT2: the white of its floods where a tower has no crown LEDs (AG15).",
+     "title": "Flood"
+    },
+    "floods": {
+     "anyOf": [
+      {
+       "maximum": 1.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "AT2: the share of its towers whose crowns are flooded.",
+     "title": "Floods"
+    },
     "grit": {
      "anyOf": [
       {
@@ -125,10 +160,18 @@
         "tunnel",
         "platform",
         "sign_face",
-        "neon_band",
+        "banner_face",
         "holo_face",
-        "shop_sign",
-        "shop_spill"
+        "neon_spill",
+        "shop_neon",
+        "blade_neon",
+        "shop_spill",
+        "crown_flood",
+        "facade_flood",
+        "aviation",
+        "searchlight",
+        "boom_flood",
+        "ground_light"
        ],
        "type": "string"
       },
@@ -164,6 +207,21 @@
      },
      "title": "Palette",
      "type": "array"
+    },
+    "searchlights": {
+     "anyOf": [
+      {
+       "maximum": 16,
+       "minimum": 0,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "AT2: searchlights on its tallest towers (two to a roof).",
+     "title": "Searchlights"
     },
     "spill": {
      "anyOf": [
@@ -225,10 +283,12 @@
       }
      ],
      "default": null,
+     "description": "Its floods' color (default its crown LEDs' accent, AG15).",
      "title": "Color"
     },
     "crown": {
      "default": true,
+     "description": "Crown floods.",
      "title": "Crown",
      "type": "boolean"
     },
@@ -239,15 +299,24 @@
     },
     "floods": {
      "default": true,
+     "description": "Uplights from its base up its shaft.",
      "title": "Floods",
      "type": "boolean"
     },
     "searchlights": {
-     "default": 0,
-     "maximum": 8,
-     "minimum": 0,
-     "title": "Searchlights",
-     "type": "integer"
+     "anyOf": [
+      {
+       "maximum": 8,
+       "minimum": 0,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Searchlights on its roof (default by its kind: `presets.LANDMARK_SEARCHLIGHTS`).",
+     "title": "Searchlights"
     }
    },
    "title": "LandmarkLights",

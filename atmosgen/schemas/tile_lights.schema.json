@@ -1,5 +1,43 @@
 {
  "$defs": {
+  "Anim": {
+   "additionalProperties": false,
+   "description": "AT2: how a light moves or blinks (the runtime animates it from the world's time).",
+   "properties": {
+    "amount": {
+     "title": "Amount",
+     "type": "number"
+    },
+    "mode": {
+     "description": "`blink` on for `amount` of each period (an aviation light); `sweep` its yaw swinging `amount` degrees either way (a searchlight).",
+     "enum": [
+      "blink",
+      "sweep"
+     ],
+     "title": "Mode",
+     "type": "string"
+    },
+    "period_s": {
+     "title": "Period S",
+     "type": "number"
+    },
+    "phase": {
+     "description": "Its share of a period at time 0 (a building's lights blink together).",
+     "exclusiveMaximum": 1.0,
+     "minimum": 0.0,
+     "title": "Phase",
+     "type": "number"
+    }
+   },
+   "required": [
+    "mode",
+    "period_s",
+    "amount",
+    "phase"
+   ],
+   "title": "Anim",
+   "type": "object"
+  },
   "Light": {
    "additionalProperties": false,
    "description": "One light that casts light (scope 6.1).",
@@ -13,6 +51,18 @@
      "minItems": 2,
      "title": "Aim",
      "type": "array"
+    },
+    "anim": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Anim"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "AT2: a blink or a sweep."
     },
     "barn_deg": {
      "anyOf": [
@@ -44,10 +94,18 @@
       "tunnel",
       "platform",
       "sign_face",
-      "neon_band",
+      "banner_face",
       "holo_face",
-      "shop_sign",
-      "shop_spill"
+      "neon_spill",
+      "shop_neon",
+      "blade_neon",
+      "shop_spill",
+      "crown_flood",
+      "facade_flood",
+      "aviation",
+      "searchlight",
+      "boom_flood",
+      "ground_light"
      ],
      "title": "Cls",
      "type": "string"
@@ -127,14 +185,16 @@
       "corner",
       "road",
       "alley",
-      "underpass"
+      "underpass",
+      "neon",
+      "runway"
      ],
      "title": "Kind",
      "type": "string"
     },
     "mount": {
      "default": "prop",
-     "description": "What it hangs on (AT1): the city's own fixture, or one the plan asks of stage 2 (pole, mast_arm, wall, canopy).",
+     "description": "What it hangs on (AT1): the city's own fixture, or one the plan asks of stage 2 (pole, mast_arm, wall, canopy; AT2 roof, beacon, mast, ground).",
      "enum": [
       "prop",
       "sign",
@@ -144,7 +204,11 @@
       "pole",
       "mast_arm",
       "wall",
-      "canopy"
+      "canopy",
+      "roof",
+      "beacon",
+      "mast",
+      "ground"
      ],
      "title": "Mount",
      "type": "string"
@@ -255,7 +319,8 @@
      "description": "The farthest tier it is live in: `near` lights only near the view (small, many), `mid` out to the mid radius.",
      "enum": [
       "near",
-      "mid"
+      "mid",
+      "high"
      ],
      "title": "Tier",
      "type": "string"

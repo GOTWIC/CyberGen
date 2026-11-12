@@ -2378,6 +2378,48 @@ AT1 (streets at night) is in place:
   monitor's native resolution; the Tab menu has Fog, Rain, Wet streets and hour rows driving
   the atmos controller (found by class name, no link between the plugins).
 
+AT2 (neon and signs as light) is in place:
+- **Lit faces** (`plan.signs`): billboards, banners and holo-boards as rect lights the size
+  of their face, stood off it (`out_m` 0.65 m past the 0.3 m frame: the light's plane in front
+  of everything stage 2 hangs on a facade, 0.91 m), a share of the face's luminance as light
+  (`light`) times its page cell's brightness (`emitters.SignColors.emit`: mean luminance
+  over `SIGN_LUMA_REF`), in its page's color scaled to full; a holo-board in front of a
+  facade lights only away from it. The faces check (`lux.face_check`, the plan's
+  `checks.faces`): each lit face's light on its own wall and what stands out of it at most
+  `FACE_WALL_MAX_LX` (the exporter leaves a failing plan out), and what it throws on the
+  facade opposite reported.
+- **Neon spill:** neon bands and facade shop signs a small colored spot stood off the sign,
+  aimed out and down (`neon_spill`, `shop_neon`), a blade sign a point at its middle
+  (`blade_neon`), near tier only; no specular for any sign light (AT1's rule).
+- **Buildings** (`floods`, `aviation`, `searchlights`, with `Shape`, `sides`, `corners`):
+  crown floods below a tower's crown (4 m off the facade or on the setback under it, aimed up
+  into it, cone, intensity and reach from the geometry) on every landmark, every tower AG15
+  gave crown LEDs (in their accent, read from assetgen's manifest: `City.ag15`) and a share
+  of the others by the mood (`floods`), never a vacant one; uplights on landmarks and some
+  towers; aviation lights on anything 60 m tall (40 m in a spaceport's district), red,
+  flashing at the top (a mast's tip, else the roof's corners) all of a building together,
+  steady every 90 m under it; searchlights on landmarks (by kind) and the mood's number on a
+  district's tallest towers, two to a roof, sweeping.
+- **Megasites** (`megasites`): a freight terminal's yard under 30 m high masts every 90 m,
+  its cranes' boom floods; a spaceport's apron with high masts along its long sides and blue
+  edge lights, its pads' rims green and white, each pad flooded from its launch tower.
+- **Moods** (`spec.mood`, `presets.PALETTES`, `FLOODS`): a palette per archetype (the city's
+  in the spec for districts without their own), floods' white and share, searchlights;
+  grit mixes a gritty district's lamp temperatures and dims some (`MIX_*`); flicker and
+  broken by kind (`FLICKER_BY_KIND`, neon most), a broken sign flickers deep instead of going
+  dark (its face stays lit), safety lights never fail.
+- **Tiers:** a `high` tier (floods, searchlights, high masts) of its own, 48 within 750 m.
+- **Exporter and runtime** (`docs/unreal_export.md`, "From AT2"): packing version 2 (19
+  floats: a blink's or sweep's period, amount and phase; flags: bit 6 high, bits 28-29 the
+  animation), `ATMOS_VERSION` atmos2; the controller's high pool (`MaxHigh`, `HighRangeM`,
+  `CityGenAtmos.High`), blinks and sweeps from the world's time, the fixtures' stand-ins
+  (`M_CgBeacon` red glows per aviation light, `M_CgBeam` cones per searchlight;
+  `CityGenAtmos.Fixtures`), atmos assets version 3.
+- **The emitter asks** (`emitters.py`): the second ask read where met (a slot record with
+  its `face`, a cell's `emit`; `Light.source` assetgen), a fourth for AT2's fixtures (`roof`,
+  `beacon`, `mast`, `ground` mounts).
+Results: `docs/progress/AT2/`.
+
 ## Life generator (lifegen)
 
 `docs/lifegen_scope.md` (draft v0, its decisions in section 12 still open) is the plan for

@@ -67,6 +67,12 @@ class DistrictMood(_Model):
     haze: Annotated[float, Field(ge=0.0, le=3.0)] | None = Field(
         None, description="A multiplier of the weather's fog here.")
     grit: Share | None = Field(None, description="0 clean, 1 gritty.")
+    flood: Temp | None = Field(None, description="AT2: the white of its floods where a tower "
+                                                 "has no crown LEDs (AG15).")
+    floods: Share | None = Field(None, description="AT2: the share of its towers whose crowns "
+                                                   "are flooded.")
+    searchlights: Annotated[int, Field(ge=0, le=16)] | None = Field(
+        None, description="AT2: searchlights on its tallest towers (two to a roof).")
 
 
 class LightLevels(_Model):
@@ -82,11 +88,14 @@ class LightLevels(_Model):
 
 class LandmarkLights(_Model):
     """A landmark by its name in the city model: floods, crown and edge lights, searchlights."""
-    floods: bool = True
-    crown: bool = True
+    floods: bool = Field(True, description="Uplights from its base up its shaft.")
+    crown: bool = Field(True, description="Crown floods.")
     edges: bool = True
-    searchlights: Annotated[int, Field(ge=0, le=8)] = 0
-    color: Color | None = None
+    searchlights: Annotated[int, Field(ge=0, le=8)] | None = Field(
+        None, description="Searchlights on its roof (default by its kind: "
+                          "`presets.LANDMARK_SEARCHLIGHTS`).")
+    color: Color | None = Field(None, description="Its floods' color (default its crown "
+                                                  "LEDs' accent, AG15).")
 
 
 class Budgets(_Model):
@@ -134,11 +143,15 @@ def _r(v: float) -> float:
 
 
 def mood(archetype: str | None, wealth: float | None, danger: float | None,
-         given: DistrictMood | None = None) -> dict:
+         given: DistrictMood | None = None, city_palette: list[str] | None = None) -> dict:
     """A district's resolved mood: its archetype's (`presets.MOOD`), grit, flicker, broken
     lights and alley darkness pulled up by danger and down by wealth (a wealthy safe district
-    is clean whatever its kind; a poor dangerous one gritty), the spec's fields over it."""
-    base = dict(P.MOOD.get(archetype or "", P.MOOD[P.MOOD_DEFAULT]))
+    is clean whatever its kind; a poor dangerous one gritty), the spec's fields over it.
+    AT2: its palette (the spec's district palette, else the city's, else its archetype's,
+    `presets.PALETTES`), its floods (their white, the share of its towers flooded: up with
+    wealth, down with grit) and its searchlights (`presets.FLOODS`)."""
+    arch = archetype if archetype in P.MOOD else P.MOOD_DEFAULT
+    base = dict(P.MOOD[arch])
     w = 0.5 if wealth is None else float(wealth)
     d = 0.5 if danger is None else float(danger)
     pull = 0.5 * (d - 0.5) - 0.4 * (w - 0.5)          # +0.45 poor and dangerous, -0.45 rich
@@ -147,7 +160,11 @@ def mood(archetype: str | None, wealth: float | None, danger: float | None,
     base["broken"] = _r(_clamp(base["broken"] * (0.5 + d)))
     base["alleys"] = _r(_clamp(base["alleys"] + 0.3 * pull))
     base["haze"] = _r(base["haze"] * (1.0 + 0.3 * pull))
-    base["palette"] = list(P.NEON)
+    base["palette"] = list(city_palette) if city_palette else list(P.PALETTES[arch])
+    fl = P.FLOODS[arch]
+    base["flood"] = fl["flood"]
+    base["floods"] = _r(_clamp(fl["floods"] + 0.4 * (w - 0.5) - 0.3 * max(0.0, pull)))
+    base["searchlights"] = int(fl["searchlights"])
     base["wealth"], base["danger"] = _r(w), _r(d)
     if given is not None:
         for k, v in given.model_dump(exclude_none=True).items():
@@ -164,12 +181,16 @@ def fill(spec: AtmosSpec, districts: list[dict]) -> dict:
     hour = spec.hour if spec.hour is not None else look["hour"]
     weather = spec.weather or look["weather"]
     neon = spec.palette.neon or {c: 1.0 for c in P.NEON}
+    # (the city's palette, when the spec gives one, for every district without its own: its
+    # colors by weight, heaviest first, those weighted 0 left out)
+    city_pal = [c for c, v in sorted(spec.palette.neon.items(), key=lambda kv: (-kv[1], kv[0]))
+                if v > 0] if spec.palette.neon else None
     moods = {}
     for d in sorted(districts, key=lambda d: d["id"]):
         prm = d.get("params") or {}
         moods[d["id"]] = {"name": d.get("name"), "archetype": d.get("archetype"),
                           **mood(d.get("archetype"), prm.get("wealth"), prm.get("danger"),
-                                 spec.districts.get(d.get("name") or ""))}
+                                 spec.districts.get(d.get("name") or ""), city_pal)}
     ev = spec.light_levels.night_ev100
     return {"preset": spec.preset, "hour": float(hour), "weather": weather,
             "look": look, "weather_state": dict(P.WEATHER[weather]),

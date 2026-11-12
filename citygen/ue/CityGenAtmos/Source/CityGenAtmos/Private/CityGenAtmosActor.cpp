@@ -10,6 +10,7 @@
 #include "Components/RectLightComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/SpotLightComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/ExponentialHeightFog.h"
 #include "Engine/PostProcessVolume.h"
 #include "Engine/StaticMesh.h"
@@ -37,6 +38,16 @@ namespace
 	const TCHAR* RainMaterial = TEXT("/Game/CityGen/Core/Atmos/M_CgRain.M_CgRain");
 	const TCHAR* WetMaterial = TEXT("/Game/CityGen/Core/Atmos/M_CgWet.M_CgWet");
 	const TCHAR* RainMesh = TEXT("/Engine/BasicShapes/Plane.Plane");
+	// AT2: the fixtures' stand-ins: a red glow per aviation light, a cone per searchlight's beam
+	const TCHAR* BeaconMaterialPath = TEXT("/Game/CityGen/Core/Atmos/M_CgBeacon.M_CgBeacon");
+	const TCHAR* BeamMaterialPath = TEXT("/Game/CityGen/Core/Atmos/M_CgBeam.M_CgBeam");
+	const TCHAR* BeaconMesh = TEXT("/Engine/BasicShapes/Sphere.Sphere");
+	const TCHAR* BeamMesh = TEXT("/Engine/BasicShapes/Cone.Cone");
+	constexpr float BeaconCm = 90.f;         // a beacon's glow: 0.9 m across
+	constexpr float BeamCm = 40000.f;        // a beam drawn 400 m long ...
+	constexpr float BeamSpread = 1.6f;       // ... this times its cone wide, as the haze shows it
+	constexpr float BeaconOn = 24.f;         // the glow's emissive on ...
+	constexpr float BeamBase = 0.08f;        // ... and a beam's
 
 	uint32 Hash(uint32 A, uint32 B)
 	{
@@ -76,6 +87,8 @@ void ACityGenAtmos::BeginPlay()
 	bBegun = true;
 	AtmosCollection = LoadObject<UMaterialParameterCollection>(nullptr, AtmosMPC);
 	CityCollection = LoadObject<UMaterialParameterCollection>(nullptr, CityMPC);
+	BeaconMaterial = LoadObject<UMaterialInterface>(nullptr, BeaconMaterialPath);
+	BeamMaterial = LoadObject<UMaterialInterface>(nullptr, BeamMaterialPath);
 	// (the cells streamed in before it began play: each later one registers itself)
 	for (TActorIterator<ACityGenAtmosCell> It(GetWorld()); It; ++It)
 	{
@@ -126,6 +139,7 @@ void ACityGenAtmos::RegisterCell(ACityGenAtmosCell* Cell)
 	S.Key = CellOf(Cell->GetActorLocation());
 	S.bUsed = true;
 	S.Lights.Reset(N);
+	S.High.Reset();
 	const float* F = Cell->LightFloats.GetData();
 	const int32* I = Cell->LightInts.GetData();
 	for (int32 k = 0; k < N; ++k)
@@ -143,17 +157,27 @@ void ACityGenAtmos::RegisterCell(ACityGenAtmosCell* Cell)
 		L.Inner = f[13];
 		L.Outer = f[14];
 		L.Flicker = f[15];
+		L.AnimPeriod = f[16];
+		L.AnimAmount = f[17];
+		L.AnimPhase = f[18];
 		const uint32 Flags = uint32(i[0]);
 		L.Shape = uint8(Flags & 3u);
 		L.bShadow = (Flags & 4u) != 0;
 		L.bNearOnly = (Flags & 8u) != 0;
 		L.bOn = (Flags & 16u) != 0;
 		L.bNoSpecular = (Flags & 32u) != 0;
+		L.bHigh = (Flags & 64u) != 0;
 		L.Schedule = uint8((Flags >> 8) & 0xffu);
 		L.Kind = uint8((Flags >> 16) & 0xffu);
+		L.Anim = uint8((Flags >> 28) & 3u);
 		L.Seed = uint32(i[1]);
+		if (L.bHigh)
+		{
+			S.High.Add(S.Lights.Num());
+		}
 		S.Lights.Add(L);
 	}
+	MakeFixtures(Slot);
 	SlotsAt.FindOrAdd(S.Key).Add(Slot);
 	SlotOfActor.Add(Cell, Slot);
 	RegisteredLights += N;
@@ -188,7 +212,9 @@ void ACityGenAtmos::UnregisterCell(ACityGenAtmosCell* Cell)
 		}
 	}
 	RegisteredLights -= S.Lights.Num();
+	DropFixtures(Slot);
 	S.Lights.Reset();
+	S.High.Reset();
 	S.Actor.Reset();
 	S.bUsed = false;
 	FreeSlots.Add(Slot);
@@ -306,6 +332,7 @@ void ACityGenAtmos::ReleaseAll()
 		Release(K);
 	}
 	Flickering.Reset();
+	FadeOf.Reset();
 }
 
 void ACityGenAtmos::ApplyLight(ULocalLightComponent* C, const FCityGenAtmosLight& L, float Fade, bool bShadowed)
@@ -334,7 +361,19 @@ void ACityGenAtmos::ApplyLight(ULocalLightComponent* C, const FCityGenAtmosLight
 		}
 		CastChecked<UPointLightComponent>(C)->SetSourceRadius(L.SourceCm);
 	}
-	C->SetIntensity(L.Intensity * K);
+	if (L.Anim != 0)
+	{
+		const double T = WorldTime();
+		if (L.Anim == 2)
+		{
+			C->SetWorldRotation(AnimRot(L, T));
+		}
+		C->SetIntensity(L.Intensity * K * AnimGain(L, T));
+	}
+	else
+	{
+		C->SetIntensity(L.Intensity * K);
+	}
 	if (bool(C->CastShadows) != bShadowed)
 	{
 		C->SetCastShadows(bShadowed);
@@ -366,7 +405,8 @@ void ACityGenAtmos::UpdateLive()
 				for (int32 i = 0; i < Ls.Num(); ++i)
 				{
 					const FCityGenAtmosLight& L = Ls[i];
-					if (!L.bOn || ScheduleAt(L.Schedule) < 0.05f)
+					// (AT2: the high tier's lights are the high pool's, below)
+					if (L.bHigh || !L.bOn || ScheduleAt(L.Schedule) < 0.05f)
 					{
 						continue;
 					}
@@ -381,16 +421,62 @@ void ACityGenAtmos::UpdateLive()
 		}
 	}
 	Candidates = Near.Num();
-	Near.Sort([](const TPair<double, int64>& A, const TPair<double, int64>& B)
+	auto ByDist = [](const TPair<double, int64>& A, const TPair<double, int64>& B)
 	{
 		return A.Key < B.Key || (A.Key == B.Key && A.Value < B.Value);
-	});
+	};
+	Near.Sort(ByDist);
 	const int32 N = FMath::Min(Near.Num(), MaxLive);
 	TSet<int64> Want;
-	Want.Reserve(N);
+	Want.Reserve(N + MaxHigh);
 	for (int32 k = 0; k < N; ++k)
 	{
 		Want.Add(Near[k].Value);
+	}
+	// AT2: the high tier, a pool of its own: the nearest MaxHigh within HighRangeM, from the
+	// cells' lists of their high lights
+	TArray<TPair<double, int64>> High;
+	const double HighCm = double(HighRangeM) * 100.0;
+	if (MaxHigh > 0)
+	{
+		const int32 HReach = FMath::CeilToInt32(HighCm / FMath::Max(1.0, double(CellM) * 100.0));
+		for (int32 dx = -HReach; dx <= HReach; ++dx)
+		{
+			for (int32 dy = -HReach; dy <= HReach; ++dy)
+			{
+				const TArray<int32>* At = SlotsAt.Find(FIntPoint(VC.X + dx, VC.Y + dy));
+				if (!At)
+				{
+					continue;
+				}
+				for (int32 Slot : *At)
+				{
+					const FSlot& S = Slots[Slot];
+					for (int32 i : S.High)
+					{
+						const FCityGenAtmosLight& L = S.Lights[i];
+						if (!L.bOn || ScheduleAt(L.Schedule) < 0.05f)
+						{
+							continue;
+						}
+						const double D = FVector::Dist(L.Pos, View);
+						if (D <= HighCm)
+						{
+							// (a searchlight before the floods: its beam reads from afar)
+							High.Add(TPair<double, int64>(L.Anim == 2 ? 0.25 * D : D, LiveKey(Slot, i)));
+						}
+					}
+				}
+			}
+		}
+	}
+	CandidatesHigh = High.Num();
+	High.Sort(ByDist);
+	High.SetNum(FMath::Min(High.Num(), FMath::Max(0, MaxHigh)));
+	LiveHigh = High.Num();
+	for (const TPair<double, int64>& H : High)
+	{
+		Want.Add(H.Value);
 	}
 	TArray<int64> Keys;
 	Live.GetKeys(Keys);
@@ -413,6 +499,7 @@ void ACityGenAtmos::UpdateLive()
 	}
 	const double FarCm = N > 0 ? FMath::Min(MidCm, Near[N - 1].Key) : MidCm;
 	Flickering.Reset();
+	FadeOf.Reset();
 	for (int32 k = 0; k < N; ++k)
 	{
 		const int64 Key = Near[k].Value;
@@ -433,9 +520,34 @@ void ACityGenAtmos::UpdateLive()
 		const bool bShadow = Shadow.Contains(Key);
 		ApplyLight(C, *L, Fade, bShadow);
 		if (bShadow) { Shadowed.Add(Key); } else { Shadowed.Remove(Key); }
-		if (L->Flicker > 0.f)
+		if (L->Flicker > 0.f || L->Anim != 0)
 		{
 			Flickering.Add(Key);
+			FadeOf.Add(Key, Fade);
+		}
+	}
+	// the high pool's: no shadows, the farthest fifth of its range fading
+	for (const TPair<double, int64>& H : High)
+	{
+		const FCityGenAtmosLight* L = LightOf(H.Value);
+		if (!L)
+		{
+			continue;
+		}
+		const float Fade = float(FMath::Clamp((HighCm - H.Key) / (FadeShare * HighCm), 0.0, 1.0));
+		TObjectPtr<ULocalLightComponent>* Have = Live.Find(H.Value);
+		ULocalLightComponent* C = Have ? Have->Get() : nullptr;
+		if (!C)
+		{
+			C = Take(L->Shape);
+			Live.Add(H.Value, C);
+		}
+		ApplyLight(C, *L, Fade, false);
+		Shadowed.Remove(H.Value);
+		if (L->Flicker > 0.f || L->Anim != 0)
+		{
+			Flickering.Add(H.Value);
+			FadeOf.Add(H.Value, Fade);
 		}
 	}
 	UpdateMs = (FPlatformTime::Seconds() - T) * 1000.0;
@@ -447,6 +559,7 @@ void ACityGenAtmos::UpdateFlicker(double Now)
 	// a flickering light drops for a moment now and then: a hash of its seed and the 1/12 s
 	// step (no state, the same at any frame rate)
 	const uint32 Step = uint32(Now * 12.0);
+	const double T = WorldTime();
 	for (int64 Key : Flickering)
 	{
 		TObjectPtr<ULocalLightComponent>* C = Live.Find(Key);
@@ -455,9 +568,21 @@ void ACityGenAtmos::UpdateFlicker(double Now)
 		{
 			continue;
 		}
-		const float R = float(Hash(L->Seed, Step) & 0xffff) / 65535.f;
-		const float Drop = R < 0.18f ? L->Flicker : (R < 0.3f ? 0.3f * L->Flicker : 0.f);
-		(*C)->SetIntensity(L->Intensity * Scale() * ScheduleAt(L->Schedule) * (1.f - Drop));
+		float Drop = 0.f;
+		if (L->Flicker > 0.f)
+		{
+			const float R = float(Hash(L->Seed, Step) & 0xffff) / 65535.f;
+			Drop = R < 0.18f ? L->Flicker : (R < 0.3f ? 0.3f * L->Flicker : 0.f);
+		}
+		// (AT2: a blink from the world's time, as the beacon's material blinks; a sweep turns
+		// the light; the live set's fade kept from its last choice)
+		if (L->Anim == 2)
+		{
+			(*C)->SetWorldRotation(AnimRot(*L, T));
+		}
+		const float* Fade = FadeOf.Find(Key);
+		(*C)->SetIntensity(L->Intensity * Scale() * ScheduleAt(L->Schedule) * (1.f - Drop) *
+			AnimGain(*L, T) * (Fade ? *Fade : 1.f));
 	}
 }
 
@@ -516,6 +641,221 @@ void ACityGenAtmos::SetHour(float InHour)
 	Hour = FMath::Fmod(InHour + 24.f, 24.f);
 	PushParameters();
 	LiveAt = -1.0;
+}
+
+// -- AT2: animation, the high tier's settings, the fixtures' stand-ins --
+
+double ACityGenAtmos::WorldTime() const
+{
+	const UWorld* World = GetWorld();
+	return World ? double(World->GetTimeSeconds()) : FPlatformTime::Seconds();
+}
+
+float ACityGenAtmos::AnimGain(const FCityGenAtmosLight& L, double T) const
+{
+	if (L.Anim != 1 || L.AnimPeriod <= 0.f)
+	{
+		return 1.f;
+	}
+	// (the beacon's material blinks by the same rule from the same time)
+	const double Ph = FMath::Frac(T / double(L.AnimPeriod) + double(L.AnimPhase));
+	return Ph < double(L.AnimAmount) ? 1.f : 0.f;
+}
+
+FRotator ACityGenAtmos::AnimRot(const FCityGenAtmosLight& L, double T) const
+{
+	if (L.Anim != 2 || L.AnimPeriod <= 0.f)
+	{
+		return L.Rot;
+	}
+	// a sweep: the yaw swings AnimAmount either way, the pitch a little, out of step
+	const double A = 2.0 * PI * (T / double(L.AnimPeriod) + double(L.AnimPhase));
+	FRotator R = L.Rot;
+	R.Yaw += L.AnimAmount * float(FMath::Sin(A));
+	R.Pitch = FMath::Clamp(R.Pitch + 0.15f * L.AnimAmount * float(FMath::Sin(0.71 * A + 1.3)), -89.f, 89.f);
+	return R;
+}
+
+void ACityGenAtmos::SetHigh(int32 InHigh, float RangeM)
+{
+	MaxHigh = FMath::Max(0, InHigh);
+	HighRangeM = FMath::Max(1.f, RangeM);
+	LiveAt = -1.0;
+}
+
+void ACityGenAtmos::SetFixtures(bool bOn)
+{
+	bFixtures = bOn;
+	ShowFixtures(bShowing && bFixtures);
+}
+
+void ACityGenAtmos::MakeFixtures(int32 Slot)
+{
+	if (!Slots.IsValidIndex(Slot) || !GetWorld())
+	{
+		return;
+	}
+	FSlot& S = Slots[Slot];
+	const int32 Aviation = KindNames.IndexOfByKey(FString(TEXT("aviation")));
+	TArray<int32> Beacons, Beams;
+	for (int32 i = 0; i < S.Lights.Num(); ++i)
+	{
+		const FCityGenAtmosLight& L = S.Lights[i];
+		if (!L.bOn)
+		{
+			continue;
+		}
+		if (Aviation >= 0 && L.Kind == uint8(Aviation))
+		{
+			Beacons.Add(i);
+		}
+		else if (L.Anim == 2)
+		{
+			Beams.Add(i);
+		}
+	}
+	if (Beacons.Num())
+	{
+		UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, BeaconMesh);
+		if (!BeaconMaterial)
+		{
+			BeaconMaterial = LoadObject<UMaterialInterface>(nullptr, BeaconMaterialPath);
+		}
+		if (Mesh && BeaconMaterial)
+		{
+			UInstancedStaticMeshComponent* I = NewObject<UInstancedStaticMeshComponent>(this);
+			I->SetupAttachment(RootComponent);
+			I->SetUsingAbsoluteLocation(true);
+			I->SetUsingAbsoluteRotation(true);
+			I->SetUsingAbsoluteScale(true);
+			I->SetStaticMesh(Mesh);
+			I->SetMaterial(0, BeaconMaterial);
+			I->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			I->SetCastShadow(false);
+			I->SetMobility(EComponentMobility::Movable);
+			I->NumCustomDataFloats = 4;
+			const float Sc = BeaconCm / 100.f;
+			for (int32 i : Beacons)
+			{
+				const FCityGenAtmosLight& L = S.Lights[i];
+				const int32 k = I->AddInstance(FTransform(FRotator::ZeroRotator, L.Pos, FVector(Sc)), true);
+				// (phase, period, on share, glow: a steady level's on share 1, its glow less)
+				const bool bBlink = L.Anim == 1 && L.AnimPeriod > 0.f;
+				I->SetCustomDataValue(k, 0, bBlink ? L.AnimPhase : 0.f, false);
+				I->SetCustomDataValue(k, 1, bBlink ? L.AnimPeriod : 1.f, false);
+				I->SetCustomDataValue(k, 2, bBlink ? L.AnimAmount : 1.f, false);
+				I->SetCustomDataValue(k, 3, BeaconOn * BeaconGlow * (bBlink ? 1.f : 0.5f), false);
+			}
+			I->SetVisibility(bFixturesShown);
+			I->RegisterComponent();
+			Fixtures.Add(I);
+			S.Beacons = I;
+			BeaconCount += Beacons.Num();
+		}
+	}
+	if (Beams.Num())
+	{
+		UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, BeamMesh);
+		if (!BeamMaterial)
+		{
+			BeamMaterial = LoadObject<UMaterialInterface>(nullptr, BeamMaterialPath);
+		}
+		if (Mesh && BeamMaterial)
+		{
+			for (int32 i : Beams)
+			{
+				const FCityGenAtmosLight& L = S.Lights[i];
+				UStaticMeshComponent* B = NewObject<UStaticMeshComponent>(this);
+				B->SetupAttachment(RootComponent);
+				B->SetUsingAbsoluteLocation(true);
+				B->SetUsingAbsoluteRotation(true);
+				B->SetUsingAbsoluteScale(true);
+				B->SetStaticMesh(Mesh);
+				B->SetMaterial(0, BeamMaterial);
+				B->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+				B->SetCastShadow(false);
+				B->SetMobility(EComponentMobility::Movable);
+				B->SetCustomPrimitiveDataFloat(0, L.Color.R);
+				B->SetCustomPrimitiveDataFloat(1, L.Color.G);
+				B->SetCustomPrimitiveDataFloat(2, L.Color.B);
+				B->SetCustomPrimitiveDataFloat(3, BeamBase * BeamGlow);
+				B->SetCustomPrimitiveDataFloat(4, BeamCm * 0.5f);
+				B->SetVisibility(bFixturesShown);
+				B->RegisterComponent();
+				Fixtures.Add(B);
+				S.Beams.Add(TPair<int32, TWeakObjectPtr<UStaticMeshComponent>>(i, B));
+				++BeamCount;
+			}
+		}
+	}
+	if (S.Beams.Num())
+	{
+		UpdateBeams(WorldTime());
+	}
+}
+
+void ACityGenAtmos::DropFixtures(int32 Slot)
+{
+	if (!Slots.IsValidIndex(Slot))
+	{
+		return;
+	}
+	FSlot& S = Slots[Slot];
+	if (UInstancedStaticMeshComponent* I = S.Beacons.Get())
+	{
+		BeaconCount -= I->GetInstanceCount();
+		Fixtures.Remove(I);
+		I->DestroyComponent();
+	}
+	S.Beacons.Reset();
+	for (const TPair<int32, TWeakObjectPtr<UStaticMeshComponent>>& B : S.Beams)
+	{
+		if (UStaticMeshComponent* C = B.Value.Get())
+		{
+			Fixtures.Remove(C);
+			C->DestroyComponent();
+		}
+		--BeamCount;
+	}
+	S.Beams.Reset();
+}
+
+void ACityGenAtmos::ShowFixtures(bool bOn)
+{
+	bFixturesShown = bOn;
+	for (UPrimitiveComponent* C : Fixtures)
+	{
+		if (C)
+		{
+			C->SetVisibility(bOn);
+		}
+	}
+}
+
+void ACityGenAtmos::UpdateBeams(double T)
+{
+	// each beam a cone from its searchlight along its aim (the mesh's apex at +Z, its pivot in
+	// the middle: +Z turned back to the light), as long as BeamCm, as wide as its cone spread
+	for (const FSlot& S : Slots)
+	{
+		if (!S.bUsed)
+		{
+			continue;
+		}
+		for (const TPair<int32, TWeakObjectPtr<UStaticMeshComponent>>& B : S.Beams)
+		{
+			UStaticMeshComponent* C = B.Value.Get();
+			if (!C || !S.Lights.IsValidIndex(B.Key))
+			{
+				continue;
+			}
+			const FCityGenAtmosLight& L = S.Lights[B.Key];
+			const FVector Dir = AnimRot(L, T).Vector();
+			const float R = BeamCm * FMath::Tan(FMath::DegreesToRadians(FMath::Max(0.5f, L.Outer) * BeamSpread));
+			C->SetWorldTransform(FTransform(FRotationMatrix::MakeFromZ(-Dir).Rotator(),
+				L.Pos + Dir * (BeamCm * 0.5), FVector(2.f * R / 100.f, 2.f * R / 100.f, BeamCm / 100.f)));
+		}
+	}
 }
 
 // -- air and weather --
@@ -728,6 +1068,10 @@ void ACityGenAtmos::Tick(float DeltaSeconds)
 		SetPlayLamps(!bWant);
 		LiveAt = -1.0;
 	}
+	if ((bShowing && bFixtures) != bFixturesShown)
+	{
+		ShowFixtures(bShowing && bFixtures);
+	}
 	if (bShowing)
 	{
 		if (LiveAt < 0.0 || Now - LiveAt > LiveEvery)
@@ -736,6 +1080,10 @@ void ACityGenAtmos::Tick(float DeltaSeconds)
 			UpdateLive();
 		}
 		UpdateFlicker(Now);
+		if (bFixturesShown && BeamCount > 0)
+		{
+			UpdateBeams(WorldTime());
+		}
 	}
 	if (bRain && Rain)
 	{
@@ -785,11 +1133,15 @@ FString ACityGenAtmos::GetStatus() const
 		"\"rect\": %d, \"live_kinds\": {%s}, \"shadowed\": %d, \"candidates\": %d, \"max_live\": %d, "
 		"\"mid_m\": %.0f, \"max_shadowed\": %d, \"update_ms\": %.3f, \"update_ms_max\": %.3f, "
 		"\"scale\": %.5f, \"hour\": %.2f, \"fog\": %s, \"rain\": %s, \"wet\": %s, \"megalights\": %s, "
-		"\"ray_tracing\": %d, \"components\": %d, \"showing\": %s}"),
+		"\"ray_tracing\": %d, \"components\": %d, \"showing\": %s, \"high\": %d, \"max_high\": %d, "
+		"\"high_m\": %.0f, \"candidates_high\": %d, \"animated\": %d, \"beacons\": %d, \"beams\": %d, "
+		"\"fixtures\": %s}"),
 		HasPlan() ? TEXT("true") : TEXT("false"), *City, *PlanHash, RegisteredLights, SlotOfActor.Num(),
 		Registrations, bLights ? TEXT("true") : TEXT("false"), Live.Num(), Spots, Points, Rects, *Kinds,
 		Shadowed.Num(), Candidates, MaxLive, MidRangeM, MaxShadowed, UpdateMs, UpdateMsMax, Scale(), Hour,
 		bFog ? TEXT("true") : TEXT("false"), bRain ? TEXT("true") : TEXT("false"),
 		bWet ? TEXT("true") : TEXT("false"), bMegaLights ? TEXT("true") : TEXT("false"),
-		RT ? RT->GetInt() : -1, AllLights.Num(), bShowing ? TEXT("true") : TEXT("false"));
+		RT ? RT->GetInt() : -1, AllLights.Num(), bShowing ? TEXT("true") : TEXT("false"), LiveHigh, MaxHigh,
+		HighRangeM, CandidatesHigh, Flickering.Num(), BeaconCount, BeamCount,
+		bFixturesShown ? TEXT("true") : TEXT("false"));
 }

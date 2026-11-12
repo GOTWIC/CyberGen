@@ -68,7 +68,7 @@ def code_hash() -> str:
     here = Path(__file__).parent
     for name in CODE_FILES:
         h.update(name.encode() + b"\0" + (here / name).read_bytes().replace(b"\r\n", b"\n"))
-    return f"at1.{h.hexdigest()[:12]}"
+    return f"at2.{h.hexdigest()[:12]}"
 
 
 def u(*key) -> float:
@@ -104,6 +104,15 @@ def srgb_linear(c: float) -> float:
 
 def hex_linear(h: str) -> list[float]:
     return [r3(srgb_linear(int(h[1 + 2 * k:3 + 2 * k], 16) / 255.0)) for k in range(3)]
+
+
+def unit(rgb) -> list[float]:
+    """A linear color scaled to its brightest channel at 1 (a light's color; its strength is
+    its intensity): black is white."""
+    top = max(rgb)
+    if top < 1e-3:
+        return [1.0, 1.0, 1.0]
+    return [r3(c / top) for c in rgb]
 
 
 def kelvin_linear(k: float) -> list[float]:
@@ -190,6 +199,34 @@ class City:
             self._model, _, _ = load_model(self.build)
         return self._model
 
+    def ag15(self) -> dict:
+        """AG15's night of every building from assetgen's manifest (`assets/manifest.json`):
+        {id: {accent: '#rrggbb', crown_light: none|edges|band|both, vacant: bool}}; {} without
+        assets (the plan then floods by the mood alone). Read once, keeping only these."""
+        if getattr(self, "_ag15", None) is None:
+            self._ag15 = {}
+            p = self.build / "assets" / "manifest.json"
+            if p.is_file():
+                man = json.loads(p.read_text(encoding="utf-8"))
+                for bid, r in (man.get("buildings") or {}).items():
+                    g = r.get("genes") or {}
+                    night = (r.get("ag15") or {}).get("night") or {}
+                    acc = g.get("accent")
+                    self._ag15[bid] = {
+                        "accent": f"#{acc}" if acc and not acc.startswith("#") else acc,
+                        "crown_light": g.get("crown_light") or "none",
+                        "vacant": night.get("schedule") == "vacant"}
+                del man
+        return self._ag15
+
+    def ground_at_base(self, b: dict) -> float:
+        """A building's base (M13's `base_m`, else the ground under its footprint's first
+        point)."""
+        if b["id"] in self.base:
+            return self.base[b["id"]]
+        fp = (b.get("footprint") or {}).get("exterior") or [[0.0, 0.0]]
+        return self.ground(fp[0][0], fp[0][1])
+
     def district_of(self, pid: str) -> str | None:
         """A record's district from its id's prefix (M10's ids start with the district's)."""
         d = pid.split(".", 1)[0]
@@ -262,6 +299,107 @@ def _center(ring) -> tuple[float, float]:
     return (min(xs) + max(xs)) / 2.0, (min(ys) + max(ys)) / 2.0
 
 
+def sides(g) -> list[tuple]:
+    """The four sides of a footprint's oriented box (M3's `massing.obb_angle`), each as
+    (outward normal, tangent, middle, extent along the normal from the middle, tangent
+    from, tangent to): a flood's side of any shape, round or odd."""
+    from citygen import massing as MS
+    try:
+        ang = float(MS.obb_angle(g))
+    except Exception:
+        ang = 0.0
+    c = g.centroid
+    pts = list(g.exterior.coords)
+    out = []
+    for k in range(4):
+        a = ang + k * math.pi / 2.0
+        n = (math.cos(a), math.sin(a))
+        t = (-n[1], n[0])
+        e_n = max((p[0] - c.x) * n[0] + (p[1] - c.y) * n[1] for p in pts)
+        ts = [(p[0] - c.x) * t[0] + (p[1] - c.y) * t[1] for p in pts]
+        out.append((n, t, (c.x, c.y), e_n, min(ts), max(ts)))
+    return out
+
+
+def corners(g, inset: float) -> list[tuple[float, float]]:
+    """The corners of a footprint's oriented box, `inset` in (counterclockwise from the long
+    axis' end)."""
+    sd = sides(g)
+    out = []
+    for k in range(4):
+        n, t, c, e_n, t0, t1 = sd[k]
+        m = sd[(k + 1) % 4]
+        e_m = m[3]
+        x = c[0] + n[0] * (e_n - inset) + m[0][0] * (e_m - inset)
+        y = c[1] + n[1] * (e_n - inset) + m[0][1] * (e_m - inset)
+        out.append((x, y))
+    return out
+
+
+class Shape:
+    """A building's (or a megasite structure's) masses for its night lights (AT2): their
+    footprints with their spans over its base, its body's top (M21's thin parts, masts,
+    spires, halos, left out), its top and its tip, its crown (the largest body mass at the
+    body's top)."""
+
+    def __init__(self, rec: dict, base: float):
+        from shapely.geometry import Polygon
+        self.base = float(base)
+        self.ms = []
+        for m in rec.get("masses") or []:
+            fp = m.get("footprint") or {}
+            ext = fp.get("exterior") or []
+            if len(ext) < 3:
+                continue
+            g = Polygon(ext, [h for h in fp.get("holes") or [] if len(h) >= 3])
+            if not g.is_valid:
+                g = g.buffer(0)
+            if g.is_empty or g.geom_type != "Polygon":
+                g = max(getattr(g, "geoms", []), key=lambda q: q.area, default=None)
+                if g is None or g.is_empty:
+                    continue
+            self.ms.append((g, float(m.get("z0_m", 0.0)), float(m.get("z1_m", 0.0)),
+                            m.get("role") or ""))
+        body = [x for x in self.ms if x[3] not in P.FLOOD_THIN_ROLES]
+        self.top = max((x[2] for x in self.ms), default=0.0)
+        self.body_top = max((x[2] for x in body), default=self.top)
+        crown = [x for x in body if x[2] >= self.body_top - 0.5]
+        self.crown = max(crown, key=lambda x: x[0].area) if crown else None
+        tips = [x for x in self.ms if x[2] >= self.top - 0.01]
+        self.tip = min(tips, key=lambda x: x[0].area) if tips else None
+
+    def at(self, z: float):
+        """The largest body mass spanning z (over the base)."""
+        ms = [x for x in self.ms if x[1] <= z <= x[2] and x[3] not in P.FLOOD_THIN_ROLES]
+        return max(ms, key=lambda x: x[0].area) if ms else None
+
+    def shaft(self):
+        """The body mass at half the body's height (the shaft a facade uplight lights)."""
+        return self.at(0.5 * self.body_top)
+
+    def inside(self, x: float, y: float, z: float, pad: float = 0.5):
+        """The mass a point (z absolute) stands in (within `pad` in plan), else None."""
+        from shapely import contains_xy
+        zr = z - self.base
+        for m in self.ms:
+            if m[1] - 0.05 < zr < m[2] + 0.05 and (contains_xy(m[0], x, y) or
+                                                  m[0].distance(_pt(x, y)) < pad):
+                return m
+        return None
+
+    def top_under(self, x: float, y: float, below: float) -> float | None:
+        """The highest top (over the base) under `below` of the masses over a point (a
+        podium's roof), else None."""
+        from shapely import contains_xy
+        tops = [m[2] for m in self.ms if m[2] < below and contains_xy(m[0], x, y)]
+        return max(tops) if tops else None
+
+
+def _pt(x, y):
+    from shapely.geometry import Point
+    return Point(x, y)
+
+
 # --- the lights -------------------------------------------------------------------------------
 
 class Plan:
@@ -280,42 +418,69 @@ class Plan:
 
     def add(self, *, owner: str, suffix: str, kind: str, cls: str, did: str | None,
             pos, aim, color, cd: float, schedule: str, temp_k: int | None = None,
-            size=None, tier: str = "mid", mount: str = "prop") -> dict:
+            size=None, tier: str | None = None, mount: str = "prop", reach: float | None = None,
+            cone=None, anim: dict | None = None, source: str = "derived") -> dict:
         ph = P.PHOTOMETRY[cls]
         md = self.mood(did)
         lid = f"{owner}.{suffix}"
-        # (a shopfront's light seldom flickers: a tube in its window now and then; tunnels,
-        # stations and deck soffits are kept)
-        flick = md["flicker"] * (0.3 if kind == "spill" else 1.0)
-        kept = kind in ("tunnel", "underpass", "station", "soffit")
+        if tier is None:
+            tier = "high" if kind in P.HIGH_KINDS else (
+                "near" if kind in P.NEAR_KINDS else "mid")
+        # flicker and broken lights by the mood and the kind (AT2: neon fails more than an LED
+        # billboard or a lamp; a shopfront's tube now and then; tunnels, stations, deck
+        # soffits, safety lights and the check's corner poles and fill lights are kept)
+        kept = kind in P.KEPT_KINDS or ".fill" in owner
+        flick = 0.0 if kept else md["flicker"] * P.FLICKER_BY_KIND.get(kind, 1.0)
+        broken = False if kept else \
+            u(lid, "broken") < md["broken"] * P.BROKEN_BY_KIND.get(kind, 1.0)
+        depth = r3(0.35 + 0.5 * u(lid, "depth")) if u(lid, "flicker") < flick else 0.0
+        if broken and kind in P.DYING_KINDS:
+            # (a sign's face stays lit as assetgen draws it: its light dies flickering)
+            lo, hi = P.DYING_DEPTH
+            depth, broken = r3(lo + (hi - lo) * u(lid, "dying")), False
+        # grit (decision 12.5): a gritty district's lamps of mixed temperatures and aged
+        # output; a clean one's uniform (AT2)
+        past = max(0.0, float(md.get("grit", 0.0)) - P.MIX_FROM)
+        if kind in P.MIX_KINDS and past > 0.0 and ".fill" not in owner:
+            cd *= 1.0 - P.MIX_DIM * past * u(lid, "age")
+            if u(lid, "mix") < P.MIX_SHARE * past:
+                names = sorted(P.MIX_COLORS)
+                color = hex_linear(P.MIX_COLORS[names[int(u(lid, "mixc") * len(names))
+                                                     % len(names)]])
+                temp_k = None
         rec = {"id": lid, "owner_id": owner, "kind": kind, "cls": cls, "shape": ph["shape"],
                "district_id": did, "tile": tile_of(pos[0], pos[1]),
                "pos": [mm(pos[0]), mm(pos[1]), mm(pos[2])], "aim": _aim(*aim),
-               "cd": round(cd, 1), "color": color, "reach_m": ph["reach_m"],
-               "shadow": bool(ph.get("shadow", False)), "tier": tier, "schedule": schedule,
-               "flicker": r3(0.35 + 0.5 * u(lid, "depth"))
-               if not kept and u(lid, "flicker") < flick else 0.0,
-               # (a corner pole or a fill light is the check's own answer: never broken)
-               "on": kept or kind == "corner" or ".fill" in owner or
-               not (u(lid, "broken") < md["broken"]),
-               "source": "derived",
+               "cd": round(cd, 1), "color": color,
+               "reach_m": r3(reach) if reach is not None else ph["reach_m"],
+               "shadow": bool(ph.get("shadow", False)) and tier != "high", "tier": tier,
+               "schedule": schedule, "flicker": depth, "on": not broken,
+               "source": source,
                "mount": mount,
                "specular": 0.0 if kind in P.NO_SPECULAR_KINDS else 1.0}
         if temp_k is not None:
             rec["temp_k"] = int(temp_k)
+        if anim is not None:
+            rec["anim"] = {k: (r3(v) if isinstance(v, float) else v) for k, v in anim.items()}
         if ph["shape"] == "rect":
             rec["size"] = [mm(size[0]), mm(size[1])]
             rec["barn_deg"] = ph["barn_deg"]
         else:
             rec["source_m"] = ph.get("source_m", 0.0)
         if ph["shape"] == "spot":
-            rec["cone"] = [ph["inner"], ph["outer"]]
+            rec["cone"] = [r3(c) for c in cone] if cone is not None else \
+                [ph["inner"], ph["outer"]]
         # (the hash of the record as the tile file writes it: the schema's defaults in)
         rec = json.loads(PM.Light(**rec, hash="").model_dump_json(exclude_none=True))
         rec.pop("hash")
         rec["hash"] = sha(dumps(rec))[:16]
         self.lights.append(rec)
         return rec
+
+    def mood_color(self, did: str | None, key: str, salt: str) -> list[float]:
+        """A color of the district's palette, drawn by `key` (AT2's district palettes)."""
+        pal = self.mood(did).get("palette") or list(P.NEON)
+        return unit(hex_linear(pal[int(u(key, salt) * len(pal)) % len(pal)]))
 
     def skip(self, why: str) -> None:
         self.skipped[why] = self.skipped.get(why, 0) + 1
@@ -614,9 +779,8 @@ class Plan:
         for st in sorted(self.c.m.get("stations", []) or [], key=lambda s: s["id"]):
             kind = st.get("kind")
             fp = (st.get("footprint") or {}).get("exterior") or []
-            if kind not in ("elevated", "underground") or len(fp) < 3:
-                if kind == "sky":
-                    self.skip("station: a sky station's platform is in its tower (AT2)")
+            # (AT2: a sky station's platform, in or beside its tower, lit as an elevated one's)
+            if kind not in ("elevated", "underground", "sky") or len(fp) < 3:
                 continue
             g = Polygon(fp)
             if not g.is_valid:
@@ -632,7 +796,7 @@ class Plan:
             width = b1 - b0
             rows = [0.0] if width < 10.0 else [-width / 4.0, width / 4.0]
             track = float((st.get("attrs") or {}).get("track_z_m", st["position"][2]))
-            levels = [track + 1.0] if kind == "elevated" else \
+            levels = [track + 1.0] if kind in ("elevated", "sky") else \
                 [float(st["position"][2]), track + 1.0]
             did = self.c.district_at(cx, cy)
             n = max(1, int(round((a1 - a0) / P.PLATFORM_STEP_M)))
@@ -656,9 +820,19 @@ class Plan:
     # -- signs as light (M11, M20; the second ask) --
 
     def signs(self) -> None:
+        """AT2: every lit sign slot as light (scope 6.1). Billboards, banners and holo-boards
+        are lit faces: a rect light the size of the face, stood off it (`out_m`) so its own
+        wall and what stands out of the wall stay behind the light's plane, a share of the
+        face's luminance as light (`light`), times its page cell's brightness, in the page's
+        color; a holo-board in front of a facade lights only away from it. Neon bands and shop
+        signs are neon spill: a small colored spot off the sign aimed out and down at the
+        sidewalk (a blade sign a point at its middle), near tier only. Each lit face's wall is
+        kept for the faces check (`face_walls`)."""
+        self.face_walls: list[dict] = []
+        self.dimmed = 0
         for s in self.c.m.get("sign_slots", []):
-            kind = s.get("kind")
-            cls = P.SIGN_CLASS.get(kind)
+            kind, mount = s.get("kind"), s.get("mount")
+            cls = P.SIGN_CLASS.get((kind, mount)) or P.SIGN_CLASS.get(kind)
             if cls is None or not s.get("emitter", True):
                 self.skip(f"sign {kind}: not lit")
                 continue
@@ -669,26 +843,72 @@ class Plan:
             if kind != "shop_sign" and u(s["id"], "neon") >= min(1.0, 0.4 + 0.6 * md["neon"]):
                 self.skip("sign: neon density")
                 continue
-            col = self.c.signs.color(s["id"])
-            if col is None:
-                pal = md.get("palette") or list(P.NEON)
-                col = pal[int(u(s["id"], "color") * len(pal)) % len(pal)]
+            col, luma, from_ag = self.c.signs.emit(s["id"])
+            color = unit(hex_linear(col)) if col else self.mood_color(did, s["id"], "color")
             ph = P.PHOTOMETRY[cls]
+            if from_ag and luma is not None:
+                nits = float(luma)                   # (the ask's own nits)
+            else:
+                lo, hi = P.SIGN_LUMA_SCALE
+                k = 1.0 if luma is None else min(hi, max(lo, luma / P.SIGN_LUMA_REF))
+                nits = ph["nits"] * k
+            nits *= ph.get("light", 1.0)
             base = self.c.base.get(s.get("building_id") or "", 0.0)
             near = "near" if kind in P.SIGN_NEAR_ONLY else "mid"
             sched = "late" if kind in ("neon", "banner") else (
                 "sign" if kind != "shop_sign" else "late")
-            for k, face in enumerate(EM.sign_face(s)):
-                w, h = face["size"]
-                a = math.radians(face["yaw"])
-                cx = face["c"][0] + ph["out_m"] * math.cos(a)
-                cy = face["c"][1] + ph["out_m"] * math.sin(a)
-                cz = face["c"][2] + base
-                self.add(owner=s["id"], suffix=f"light{k}" if k else "light",
-                         kind="shop_sign" if kind == "shop_sign" else "sign", cls=cls,
-                         did=did, pos=(cx, cy, cz), aim=(face["yaw"], 0.0),
-                         color=hex_linear(col), cd=ph["nits"] * w * h, schedule=sched,
-                         size=(w, h), tier=near, mount="sign")
+            drawn = self.c.signs.face(s["id"])
+            faces = EM.faces_of(drawn) if drawn else EM.sign_face(s)
+            source = "assetgen" if drawn and from_ag else "derived"
+            lkind = P.SIGN_KIND[kind]
+            if cls in P.LIT_FACES:
+                for k, face in enumerate(faces):
+                    if face.get("back") and mount == "front":
+                        # (a holo-board in front of a facade: its back looks at the wall)
+                        self.skip("sign: a front holo-board's back (its wall)")
+                        continue
+                    w, h = face["size"]
+                    a = math.radians(face["yaw"])
+                    cx = face["c"][0] + ph["out_m"] * math.cos(a)
+                    cy = face["c"][1] + ph["out_m"] * math.sin(a)
+                    cz = face["c"][2] + base
+                    cd = nits * w * h
+                    # (a big face close across a narrow street: no more than OPPOSITE_MAX_LX on
+                    # the facade it faces, as a face's light falls off over the street)
+                    from .lux import opposite
+                    e = opposite({"pos": [cx, cy, cz], "aim": [face["yaw"], 0.0],
+                                  "shape": "rect", "cd": cd, "barn_deg": ph["barn_deg"],
+                                  "reach_m": ph["reach_m"]}, face["yaw"], self.c.occluders())
+                    if e is not None and e > P.OPPOSITE_MAX_LX:
+                        cd *= max(P.OPPOSITE_MIN_SCALE, P.OPPOSITE_MAX_LX / e)
+                        self.dimmed += 1
+                    rec = self.add(owner=s["id"], suffix=f"light{k}" if k else "light",
+                                   kind=lkind, cls=cls, did=did, pos=(cx, cy, cz),
+                                   aim=(face["yaw"], 0.0), color=color, cd=cd,
+                                   schedule=sched, size=(w, h), tier=near, mount="sign",
+                                   source=source)
+                    if mount in ("facade", "front") and not face.get("back"):
+                        off = float((s.get("attrs") or {}).get("off_m", 3.0)) \
+                            if mount == "front" else 0.0
+                        x, y, z = (float(v) for v in s["position"])
+                        self.face_walls.append(
+                            {"light": rec, "yaw": face["yaw"], "size": [w, h],
+                             "wall": [x - off * math.cos(a), y - off * math.sin(a), z + base]})
+                continue
+            face = faces[0]
+            w, h = face["size"]
+            a = math.radians(face["yaw"])
+            if cls == "blade_neon":
+                # (a blade sign square off its wall, lit both ways: a point at its middle)
+                x, y, z = (float(v) for v in s["position"])
+                pos, aim = (x, y, z + base), (face["yaw"], -90.0)
+            else:
+                pos = (face["c"][0] + ph["out_m"] * math.cos(a),
+                       face["c"][1] + ph["out_m"] * math.sin(a), face["c"][2] + base)
+                aim = (face["yaw"], ph["pitch"])
+            self.add(owner=s["id"], suffix="light", kind=lkind, cls=cls, did=did, pos=pos,
+                     aim=aim, color=color, cd=nits * w * h, schedule=sched, tier=near,
+                     mount="sign", source=source)
 
     # -- shopfronts spilling onto the sidewalk (M3's units) --
 
@@ -738,6 +958,464 @@ class Plan:
                          temp_k=temp, cd=ph["nits"] * w * hh,
                          schedule=P.USE_SCHEDULE.get(use, "shop"), size=(w, hh),
                          mount="facade")
+
+    # -- AT2: buildings at night (floods, aviation lights, searchlights) --
+
+    def _towers(self) -> list[tuple[dict, Shape]]:
+        """Every tower (M21's `form.tower`) and landmark with its shape, by id."""
+        if getattr(self, "_tw", None) is None:
+            self._tw = []
+            for bid in sorted(self.c.buildings):
+                b = self.c.buildings[bid]
+                if not ((b.get("form") or {}).get("tower") or b.get("landmark")):
+                    continue
+                sh = Shape(b, self.c.ground_at_base(b))
+                if sh.crown is not None and sh.body_top >= 30.0:
+                    self._tw.append((b, sh))
+        return self._tw
+
+    def _landmark(self, b: dict) -> dict:
+        """The spec's lights of a landmark (`LandmarkLights`), by its name; defaults else."""
+        lm = (self.f.get("landmarks") or {}).get(b.get("name") or "") or {}
+        kind = ((b.get("attrs") or {}).get("landmark_kind") or
+                (b.get("type") or "").rsplit(".", 1)[-1])
+        n = lm.get("searchlights")
+        return {"floods": lm.get("floods", True), "crown": lm.get("crown", True),
+                "searchlights": P.LANDMARK_SEARCHLIGHTS.get(kind, 2) if n is None else int(n),
+                "color": lm.get("color")}
+
+    def _flood_color(self, b: dict, did: str | None) -> tuple[list[float], int | None, bool]:
+        """A tower's floods' color: the spec's for a landmark, else its crown LEDs' accent
+        (AG15: matching what they show), else its district's white. (rgb, kelvin, matched)."""
+        if b.get("landmark") and self._landmark(b)["color"]:
+            return unit(hex_linear(self._landmark(b)["color"])), None, False
+        ag = self.c.ag15().get(b["id"]) or {}
+        if ag.get("crown_light", "none") != "none" and ag.get("accent"):
+            return unit(hex_linear(ag["accent"])), None, True
+        k = P.TEMPS[self.mood(did).get("flood", "neutral")]
+        return kelvin_linear(k), k, False
+
+    def _flood(self, *, b, sh, did, owner, suffix, cls, g, side, tl, z_light, z0, z1, color,
+               temp_k, out: float) -> dict | None:
+        """One flood: a spot `out` off the side `side` of footprint `g` (at `tl` along it), at
+        `z_light`, aimed up into the facade's zone [z0, z1] (absolute); its cone covers the
+        zone's width, its intensity gives the class's `lux` at the zone's upper middle (a
+        grazing light: I = E d^3 / out), its reach the zone's top. Raised onto a setback's roof
+        or moved out where the building stands in the way; None where it cannot stand."""
+        ph = P.PHOTOMETRY[cls]
+        n, t, c, e_n, t0, t1 = side
+        width = (t1 - t0) if tl is None else (t1 - t0) / 2.0
+        tl = (t0 + t1) / 2.0 if tl is None else tl
+        o = out
+        x = y = 0.0
+        for _ in range(6):
+            x = c[0] + n[0] * (e_n + o) + t[0] * tl
+            y = c[1] + n[1] * (e_n + o) + t[1] * tl
+            hit = sh.inside(x, y, z_light)
+            if hit is None:
+                break
+            if hit[2] + sh.base < z0 - 3.0:
+                z_light = hit[2] + sh.base + 0.5          # (on the setback's roof)
+            else:
+                o += 3.0
+        else:
+            return None
+        if self.c.occluders().blocked(np.array([x]), np.array([y]), np.array([z_light]))[0]:
+            self.skip("flood: inside another building")
+            return None
+        fx = c[0] + n[0] * e_n + t[0] * tl
+        fy = c[1] + n[1] * e_n + t[1] * tl
+        zt = z0 + 0.6 * (z1 - z0)
+        dh = math.hypot(fx - x, fy - y)
+        dz = zt - z_light
+        d = math.hypot(dh, dz)
+        if d < 2.0 or dz <= 0.0:
+            return None
+        lat = math.degrees(math.atan2(0.55 * width, d))
+        vert = 0.5 * (math.degrees(math.atan2(z1 - z_light, max(dh, 0.5))) -
+                      math.degrees(math.atan2(max(0.5, z0 - z_light), max(dh, 0.5))))
+        outer = min(60.0, max(14.0, max(lat, vert) + 4.0))
+        cd = min(4.0e5, ph["lux"] * d ** 3 / max(dh, 0.5))
+        reach = 1.15 * math.hypot(dh + 1.0, z1 - z_light) + 2.0
+        return self.add(owner=owner, suffix=suffix, kind="flood", cls=cls, did=did,
+                        pos=(x, y, z_light), aim=(math.degrees(math.atan2(fy - y, fx - x)),
+                                                  math.degrees(math.atan2(dz, dh))),
+                        color=color, temp_k=temp_k, cd=cd, schedule="late", mount="roof",
+                        reach=reach, cone=(0.6 * outer, outer))
+
+    def floods(self) -> None:
+        """Crown floods on towers and landmarks, facade uplights on landmarks and some
+        towers (scope 6.1). A tower's crown is flooded where AG15 gave it crown LEDs (in their
+        accent: what they show), on every landmark, and on a share of its district's other
+        towers (`floods`, by the mood: clean and wealthy districts more); never a vacant one
+        (AG15). A flood per side of the crown's box (two on a wide one), below its lit zone
+        (`presets.CROWN_ZONE`), 4 m off the facade or on the setback under it."""
+        zs, zmin, zmax = P.CROWN_ZONE
+        self.flood_report = {"towers": 0, "crowns": 0, "matched_leds": 0, "uplit": 0,
+                             "vacant": 0}
+        for b, sh in self._towers():
+            did = b.get("district_id")
+            md = self.mood(did)
+            ag = self.c.ag15().get(b["id"]) or {}
+            self.flood_report["towers"] += 1
+            if ag.get("vacant") and not b.get("landmark"):
+                self.flood_report["vacant"] += 1
+                continue
+            lm = self._landmark(b) if b.get("landmark") else None
+            leds = ag.get("crown_light", "none") != "none"
+            crown = (lm["crown"] if lm else
+                     (leds or (md.get("crowns", True) and
+                               u(b["id"], "flood") < float(md.get("floods", 0.0)))))
+            uplit = (lm["floods"] if lm else
+                     md.get("crowns", True) and u(b["id"], "uplight") <
+                     0.4 * float(md.get("floods", 0.0)) * float(md.get("wealth", 0.5)))
+            if not crown and not uplit:
+                continue
+            color, temp_k, matched = self._flood_color(b, did)
+            top = sh.base + sh.body_top
+            if crown:
+                hc = min(zmax, max(zmin, zs * sh.body_top))
+                g = sh.crown[0]
+                k = 0
+                for side in sides(g):
+                    if side[5] - side[4] < P.CROWN_SIDE_MIN_M:
+                        continue
+                    lats = [None] if side[5] - side[4] <= P.CROWN_SPLIT_M else \
+                        [side[4] + 0.25 * (side[5] - side[4]),
+                         side[4] + 0.75 * (side[5] - side[4])]
+                    for tl in lats:
+                        rec = self._flood(b=b, sh=sh, did=did, owner=b["id"],
+                                          suffix=f"crown{k}", cls="crown_flood", g=g,
+                                          side=side, tl=tl, z_light=top - hc - 1.0,
+                                          z0=top - hc, z1=top, color=color, temp_k=temp_k,
+                                          out=P.PHOTOMETRY["crown_flood"]["out_m"])
+                        k += rec is not None
+                if k:
+                    self.flood_report["crowns"] += 1
+                    self.flood_report["matched_leds"] += int(matched)
+            if uplit:
+                shaft = sh.shaft()
+                if shaft is None:
+                    continue
+                up = min(P.FLOOD_UP_M[1], P.FLOOD_UP_M[0] * sh.body_top)
+                k = 0
+                for side in sides(shaft[0]):
+                    if side[5] - side[4] < P.CROWN_SIDE_MIN_M:
+                        continue
+                    n, t, c, e_n, t0, t1 = side
+                    tl = (t0 + t1) / 2.0
+                    o = P.PHOTOMETRY["facade_flood"]["out_m"]
+                    x = c[0] + n[0] * (e_n + o) + t[0] * tl
+                    y = c[1] + n[1] * (e_n + o) + t[1] * tl
+                    # (on the podium's roof under it, else the ground)
+                    under = sh.top_under(x, y, 0.5 * sh.body_top)
+                    zl = (sh.base + under if under is not None else self.c.ground(x, y)) + 0.5
+                    rec = self._flood(b=b, sh=sh, did=did, owner=b["id"], suffix=f"up{k}",
+                                      cls="facade_flood", g=shaft[0], side=side, tl=None,
+                                      z_light=zl, z0=zl + 1.0, z1=zl + up,
+                                      color=kelvin_linear(P.TEMPS[md.get("flood", "neutral")])
+                                      if not lm or not lm["color"] else color,
+                                      temp_k=None, out=o)
+                    k += rec is not None
+                self.flood_report["uplit"] += int(k > 0)
+
+    def aviation(self) -> None:
+        """Aviation warning lights (scope 6.1): on every building and megasite structure as
+        tall as `AVIATION_MIN_M` over its base (`AVIATION_PORT_MIN_M` in a spaceport's
+        district or megasite), red: flashing at its top (a mast's or spire's tip, else its
+        roof's corners), all of a building's together, `AVIATION_BLINK`; steady at its
+        corners every `AVIATION_STEP_M` under the top down to 45 m."""
+        red = unit(hex_linear(P.AVIATION_COLOR))
+        port_d = {did for did, md in self.moods.items() if md.get("archetype") == "spaceport"}
+        port_s = {s["id"] for s in self.c.m.get("megasites", []) or []
+                  if s.get("kind") == "spaceport"}
+        per, duty = P.AVIATION_BLINK
+        items = []
+        for bid in sorted(self.c.buildings):
+            b = self.c.buildings[bid]
+            items.append((bid, b.get("district_id"), b.get("megasite_id"), b,
+                          self.c.ground_at_base(b)))
+        for e in sorted(self.c.m.get("site_elements", []) or [], key=lambda e: e["id"]):
+            if e.get("masses"):
+                fp = (e.get("footprint") or {}).get("exterior") or [[0.0, 0.0]]
+                items.append((e["id"], self.c.district_of(e["id"]), e.get("megasite_id"),
+                              e, self.c.ground(fp[0][0], fp[0][1]) + float(e.get("z_m", 0.0))))
+        self.aviation_report = {"structures": 0, "flashing": 0, "steady": 0}
+        for oid, did, msid, rec, base in items:
+            tops = [float(m.get("z1_m", 0.0)) for m in rec.get("masses") or []]
+            if not tops:
+                continue
+            need = P.AVIATION_PORT_MIN_M if (did in port_d or msid in port_s) else \
+                P.AVIATION_MIN_M
+            if max(tops) < need:
+                continue
+            sh = Shape(rec, base)
+            if sh.tip is None:
+                continue
+            self.aviation_report["structures"] += 1
+            anim = {"mode": "blink", "period_s": per, "amount": duty,
+                    "phase": r3(math.floor(u(oid, "aviation") * 1000.0) / 1000.0)}
+            k = 0
+            g, _, z1, role = sh.tip
+            pts = []
+            if role in P.FLOOD_THIN_ROLES or g.area < 64.0:
+                c = g.representative_point()
+                pts.append((c.x, c.y, sh.base + z1 + 0.3))
+            else:
+                pts += [(x, y, sh.base + z1 + 0.4) for x, y in corners(g, 0.4)]
+            for x, y, z in pts:
+                self.add(owner=oid, suffix=f"aviation{k}", kind="aviation", cls="aviation",
+                         did=did, pos=(x, y, z), aim=(0.0, -90.0), color=red,
+                         cd=P.PHOTOMETRY["aviation"]["cd"], schedule="always",
+                         mount="beacon", anim=anim)
+                k += 1
+                self.aviation_report["flashing"] += 1
+            # the steady levels under the top, at the body's corners
+            zl = sh.body_top - (P.AVIATION_STEP_M if sh.body_top >= z1 - 0.5 else 0.0)
+            while zl >= 45.0:
+                lv = sh.at(zl)
+                if lv is not None:
+                    for x, y in corners(lv[0], -0.4):
+                        self.add(owner=oid, suffix=f"aviation{k}", kind="aviation",
+                                 cls="aviation", did=did, pos=(x, y, sh.base + zl),
+                                 aim=(0.0, -90.0), color=red,
+                                 cd=P.PHOTOMETRY["aviation"]["cd"] * P.AVIATION_STEADY,
+                                 schedule="always", mount="beacon")
+                        k += 1
+                        self.aviation_report["steady"] += 1
+                zl -= P.AVIATION_STEP_M
+
+    def searchlights(self) -> None:
+        """Searchlights sweeping the sky from roofs (scope 6.1): every landmark's
+        (`LandmarkLights.searchlights`, by its kind), and per district its mood's number on
+        its tallest towers (else its tallest buildings over 30 m: a spaceport's control
+        tower), two to a roof, from its corners; a sweep by hash (period, reach, phase), white
+        or (in a district whose palette is its signs') a neon tint now and then."""
+        jobs: list[tuple[dict, Shape, int]] = []
+        tw = self._towers()
+        for b, sh in tw:
+            if b.get("landmark"):
+                n = self._landmark(b)["searchlights"]
+                if n:
+                    jobs.append((b, sh, n))
+        by_d: dict[str, list] = {}
+        for b, sh in tw:
+            if not b.get("landmark") and not (self.c.ag15().get(b["id"]) or {}).get("vacant"):
+                by_d.setdefault(b.get("district_id") or "", []).append((b, sh))
+        for did in sorted(self.moods):
+            n = int(self.mood(did).get("searchlights", 0))
+            if n <= 0:
+                continue
+            cands = sorted(by_d.get(did, []), key=lambda r: (-r[1].top, r[0]["id"]))
+            if not cands:
+                tall = [b for b in self.c.buildings.values() if b.get("district_id") == did
+                        and float(b.get("height_m") or 0.0) >= 30.0 and not b.get("landmark")
+                        and not (self.c.ag15().get(b["id"]) or {}).get("vacant")]
+                cands = sorted(((b, Shape(b, self.c.ground_at_base(b))) for b in tall),
+                               key=lambda r: (-r[1].top, r[0]["id"]))
+            for b, sh in cands[: (n + 1) // 2]:
+                if sh.crown is None:
+                    continue
+                jobs.append((b, sh, min(2, n)))
+                n -= 2
+        white = kelvin_linear(6500)
+        lo_p, hi_p = P.SEARCHLIGHT_PITCH
+        lo_a, hi_a = P.SEARCHLIGHT_SWEEP
+        lo_t, hi_t = P.SEARCHLIGHT_PERIOD
+        for b, sh, n in jobs:
+            did = b.get("district_id")
+            cs = corners(sh.crown[0], 2.0)
+            if not cs:
+                continue
+            g = sh.crown[0].centroid
+            z = sh.base + sh.body_top + 1.5
+            for k in range(n):
+                x, y = cs[(k * max(1, len(cs) // max(1, n))) % len(cs)]
+                key = f"{b['id']}.search{k}"
+                yaw = math.degrees(math.atan2(y - g.y, x - g.x)) + 60.0 * (u(key, "yaw") - 0.5)
+                col = white
+                if self.mood(did).get("archetype") == "entertainment_market" and \
+                        u(key, "tint") < 0.5:
+                    col = self.mood_color(did, key, "tint.c")
+                self.add(owner=b["id"], suffix=f"search{k}", kind="searchlight",
+                         cls="searchlight", did=did, pos=(x, y, z),
+                         aim=(yaw, lo_p + (hi_p - lo_p) * u(key, "pitch")), color=col,
+                         temp_k=6500 if col is white else None,
+                         cd=P.PHOTOMETRY["searchlight"]["cd"], schedule="late", mount="roof",
+                         anim={"mode": "sweep",
+                               "period_s": r3(lo_t + (hi_t - lo_t) * u(key, "period")),
+                               "amount": r3(lo_a + (hi_a - lo_a) * u(key, "amp")),
+                               "phase": r3(math.floor(u(key, "phase") * 1000.0) / 1000.0)})
+
+    # -- AT2: megasites (a port's yard and cranes, a spaceport's apron and pads) --
+
+    def megasites(self) -> None:
+        """A freight terminal's yard under high masts every `HIGH_MAST_STEP_M` (off its
+        buildings and stacks) and its cranes' boom floods; a spaceport's apron with high masts
+        along its long sides and blue edge lights round it, its launch pads' rims in green and
+        white, each pad flooded from its launch tower (scope 6.1)."""
+        from shapely.geometry import Point, Polygon
+        els: dict[str, list] = {}
+        for e in self.c.m.get("site_elements", []) or []:
+            els.setdefault(e.get("megasite_id") or "", []).append(e)
+        self.site_report: dict[str, int] = {}
+
+        def count(k):
+            self.site_report[k] = self.site_report.get(k, 0) + 1
+
+        for ms in sorted(self.c.m.get("megasites", []) or [], key=lambda s: s["id"]):
+            kind = ms.get("kind")
+            ring = (ms.get("polygon") or {}).get("exterior") or []
+            if kind not in ("freight_terminal", "spaceport") or len(ring) < 3:
+                continue
+            did = ms.get("district_id")
+            md = self.mood(did)
+            temp = P.TEMPS[md.get("temp", "neutral") if kind == "freight_terminal" else
+                           md.get("flood", "neutral")]
+            col = kelvin_linear(temp)
+            site = Polygon(ring)
+            if not site.is_valid:
+                site = site.buffer(0)
+            mine = sorted(els.get(ms["id"], []), key=lambda e: e["id"])
+            solid = []
+            for e in mine:
+                for m_ in e.get("masses") or []:
+                    ext = (m_.get("footprint") or {}).get("exterior") or []
+                    if len(ext) >= 3:
+                        solid.append(Polygon(ext).buffer(3.0))
+            for b in self.c.buildings.values():
+                if b.get("megasite_id") == ms["id"]:
+                    ext = (b.get("footprint") or {}).get("exterior") or []
+                    if len(ext) >= 3:
+                        solid.append(Polygon(ext).buffer(3.0))
+            from shapely import union_all
+            blocked = union_all(solid) if solid else None
+
+            def free(x, y):
+                p = Point(x, y)
+                return site.buffer(-4.0).contains(p) and \
+                    (blocked is None or not blocked.contains(p))
+
+            def mast(x, y, k, owner, cls="high_mast", aim=(0.0, -90.0), mount="mast",
+                     kind_="high_mast"):
+                z = self.c.ground(x, y) + P.HIGH_MAST_Z_M
+                self.add(owner=owner, suffix=f"mast{k:03d}", kind=kind_, cls=cls, did=did,
+                         pos=(x, y, z - P.PHOTOMETRY[cls]["drop_m"]), aim=aim, color=col,
+                         temp_k=temp, cd=P.PHOTOMETRY[cls]["cd"], schedule="dusk_dawn",
+                         mount=mount)
+                count(kind_)
+
+            if kind == "freight_terminal":
+                x0, y0, x1, y1 = site.bounds
+                st = P.HIGH_MAST_STEP_M
+                k = 0
+                nx = max(1, int(math.floor((x1 - x0) / st)))
+                ny = max(1, int(math.floor((y1 - y0) / st)))
+                for i in range(nx):
+                    for j in range(ny):
+                        x = x0 + (x1 - x0) * (i + 0.5) / nx
+                        y = y0 + (y1 - y0) * (j + 0.5) / ny
+                        # (off a stack or a building: the nearest free spot within 15 m)
+                        for dx, dy in ((0, 0), (8, 0), (-8, 0), (0, 8), (0, -8), (15, 0),
+                                       (-15, 0), (0, 15), (0, -15)):
+                            if free(x + dx, y + dy):
+                                mast(x + dx, y + dy, k, ms["id"])
+                                k += 1
+                                break
+                for e in mine:
+                    if e.get("kind") != "gantry_crane":
+                        continue
+                    boom = [m_ for m_ in e.get("masses") or [] if m_.get("role") == "boom"]
+                    if not boom:
+                        continue
+                    g = Polygon(boom[0]["footprint"]["exterior"])
+                    sd = sides(g)
+                    if not sd:
+                        continue
+                    n_, t_, c_, e_n, t0, t1 = sd[0]
+                    zb = self.c.ground(c_[0], c_[1]) + float(boom[0].get("z0_m", 42.0))
+                    # (two floods under the boom's long axis, a quarter in from each end)
+                    long_ = max(sd[:2], key=lambda s_: s_[5] - s_[4])
+                    n_, t_, c_, e_n, t0, t1 = long_
+                    for k2, f in enumerate((0.25, 0.75)):
+                        tl = t0 + (t1 - t0) * f
+                        self.add(owner=e["id"], suffix=f"boom{k2}", kind="flood",
+                                 cls="boom_flood", did=did,
+                                 pos=(c_[0] + t_[0] * tl, c_[1] + t_[1] * tl,
+                                      zb - P.PHOTOMETRY["boom_flood"]["drop_m"]),
+                                 aim=(0.0, -90.0), color=col, temp_k=temp,
+                                 cd=P.PHOTOMETRY["boom_flood"]["cd"], schedule="dusk_dawn",
+                                 mount="mast")
+                        count("boom_flood")
+                continue
+            # a spaceport: its apron and pads
+            blue = unit(hex_linear(P.GROUND_COLORS["apron"]))
+            towers = [e for e in mine if e.get("kind") == "launch_tower"]
+            for e in mine:
+                ext = (e.get("footprint") or {}).get("exterior") or []
+                if len(ext) < 3:
+                    continue
+                g = Polygon(ext)
+                if e.get("kind") == "apron":
+                    sd = sides(g)
+                    k = 0
+                    for side in sd:
+                        n_, t_, c_, e_n, t0, t1 = side
+                        if t1 - t0 < 0.6 * max(s_[5] - s_[4] for s_ in sd):
+                            continue                         # (the long sides only)
+                        m = max(1, int(round((t1 - t0) / P.APRON_MAST_STEP_M)))
+                        for i in range(m):
+                            tl = t0 + (t1 - t0) * (i + 0.5) / m
+                            x = c_[0] + n_[0] * (e_n - 2.0) + t_[0] * tl
+                            y = c_[1] + n_[1] * (e_n - 2.0) + t_[1] * tl
+                            mast(x, y, k, e["id"])
+                            k += 1
+                    ring_ = list(g.exterior.coords)
+                    ln = Line([(p[0], p[1]) for p in ring_])
+                    m = max(4, int(round(ln.L / P.APRON_EDGE_STEP_M)))
+                    for i in range(m):
+                        x, y, _, tx, ty = ln.at(ln.L * i / m)
+                        # (0.5 m in from the edge: the ring runs counterclockwise, in is left)
+                        side_ = 1.0 if g.exterior.is_ccw else -1.0
+                        x, y = x - ty * 0.5 * side_, y + tx * 0.5 * side_
+                        self.add(owner=e["id"], suffix=f"edge{i:03d}", kind="runway",
+                                 cls="ground_light", did=did,
+                                 pos=(x, y, self.c.ground(x, y) + 0.15), aim=(0.0, -90.0),
+                                 color=blue, cd=P.PHOTOMETRY["ground_light"]["cd"],
+                                 schedule="dusk_dawn", mount="ground")
+                        count("runway")
+                elif e.get("kind") == "launch_pad":
+                    c = g.centroid
+                    r = float((e.get("attrs") or {}).get("radius_m") or
+                              math.sqrt(g.area / math.pi)) + 0.5
+                    top = max((float(m_.get("z1_m", 0.0)) for m_ in e.get("masses") or []),
+                              default=0.0)
+                    zg = self.c.ground(c.x, c.y)
+                    m = max(8, int(round(2.0 * math.pi * r / P.PAD_RIM_STEP_M)))
+                    for i in range(m):
+                        a = 2.0 * math.pi * i / m
+                        x, y = c.x + r * math.cos(a), c.y + r * math.sin(a)
+                        tint = P.GROUND_COLORS["rim" if i % 2 == 0 else "rim_alt"]
+                        self.add(owner=e["id"], suffix=f"rim{i:03d}", kind="runway",
+                                 cls="ground_light", did=did, pos=(x, y, zg + top + 0.1),
+                                 aim=(0.0, -90.0), color=unit(hex_linear(tint)),
+                                 cd=P.PHOTOMETRY["ground_light"]["cd"], schedule="dusk_dawn",
+                                 mount="ground")
+                        count("runway")
+                    # (flooded from the nearest launch tower's top)
+                    if towers:
+                        tw = min(towers, key=lambda t: (Polygon(
+                            t["footprint"]["exterior"]).centroid.distance(c), t["id"]))
+                        tc = Polygon(tw["footprint"]["exterior"]).centroid
+                        tz = zg + max(float(m_.get("z1_m", 0.0)) for m_ in tw["masses"]) + 1.0
+                        dh = math.hypot(c.x - tc.x, c.y - tc.y)
+                        self.add(owner=e["id"], suffix="flood", kind="flood",
+                                 cls="high_mast", did=did, pos=(tc.x, tc.y, tz),
+                                 aim=(math.degrees(math.atan2(c.y - tc.y, c.x - tc.x)),
+                                      -math.degrees(math.atan2(tz - zg, max(dh, 1.0)))),
+                                 color=col, temp_k=temp, cd=P.PHOTOMETRY["high_mast"]["cd"],
+                                 schedule="dusk_dawn", mount="roof")
+                        count("pad_flood")
 
     # -- junction corners the lux check finds dark --
 
@@ -999,7 +1677,7 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
         return r
 
     for name in ("lamps", "signals", "roads", "alleys", "decks", "tunnels", "stations",
-                 "signs", "spill"):
+                 "signs", "spill", "megasites", "floods", "aviation", "searchlights"):
         timed(name, getattr(pl, name))
     # the lux check (scope 8): the dark junctions' corner poles first, then every class
     from . import lux as LX
@@ -1012,6 +1690,9 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     lux = timed("check", LX.check, smp, E, levels)
     lux["corners"] = pl.corner_report
     lux["fill"] = pl.fill_report
+    # AT2: the lit faces against their own walls, and what they throw across the street
+    faces = timed("faces", LX.face_check, pl.face_walls, occ)
+    faces["dimmed_for_opposite"] = pl.dimmed
     by_tile: dict[str, list[dict]] = {}
     for L in sorted(pl.lights, key=lambda r: r["id"]):
         by_tile.setdefault(L["tile"], []).append(L)
@@ -1060,11 +1741,13 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
                        near_max=min(tiers["near"]["max"], filled["budgets"]["shadowed"]),
                        mid_m=tiers["mid"]["radius_m"],
                        mid_max=min(tiers["mid"]["max"], filled["budgets"]["live"]),
+                       high_m=tiers["high"]["radius_m"],
+                       high_max=min(tiers["high"]["max"], filled["budgets"].get("high", 48)),
                        far_m=tiers["far"]["radius_m"]),
         budgets=filled["budgets"], tiles=index, counts=dict(sorted(counts.items())),
         sources={"derived": sum(1 for L in pl.lights if L["source"] == "derived"),
                  "assetgen": sum(1 for L in pl.lights if L["source"] == "assetgen")},
-        checks={"lux": lux})
+        checks={"lux": lux, "faces": faces})
     ptext = json.dumps(json.loads(plan.model_dump_json(by_alias=True, exclude={"schema_ref"})),
                        indent=1, sort_keys=True) + "\n"
     if _write(od / "atmos_plan.json", ptext):
@@ -1089,11 +1772,16 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
            "skipped": dict(sorted(pl.skipped.items())),
            "mounts": dict(sorted(mounts.items())),
            "asked": sum(v for k, v in mounts.items() if k in PM.ASKED),
-           "lux": lux, "ok": lux["ok"],
+           "lux": lux, "faces": faces, "ok": lux["ok"] and faces["ok"],
+           "floods": pl.flood_report, "aviation": pl.aviation_report,
+           "megasites": dict(sorted(pl.site_report.items())),
+           "tiers": {k: sum(1 for L in pl.lights if L["tier"] == k)
+                     for k in ("near", "mid", "high")},
            "timings": tm,
            "sign_colors_from_pages": city.signs.from_pages,
            "districts": {k: {x: v[x] for x in ("name", "archetype", "lamp", "temp", "grit",
-                                                "flicker", "broken", "neon")}
+                                                "flicker", "broken", "neon", "flood",
+                                                "floods", "searchlights", "palette")}
                          for k, v in filled["moods"].items()},
            "seconds": round(time.time() - t0, 1)}
     rtext = json.dumps(rep, indent=1, sort_keys=True) + "\n"
@@ -1135,9 +1823,26 @@ def report_text(rep: dict) -> str:
         if f:
             lines.append("filled dark stretches: " + ", ".join(f"{k} {v}" for k, v in f.items()))
         lines.append(check_text(rep["lux"]).rstrip())
+    if rep.get("faces"):
+        from .lux import face_text
+        lines.append(face_text(rep["faces"]).rstrip())
+    if rep.get("floods"):
+        f = rep["floods"]
+        lines.append(f"towers and landmarks: {f['towers']}, crowns flooded {f['crowns']} "
+                     f"({f['matched_leds']} in their crown LEDs' accent, AG15), uplit "
+                     f"{f['uplit']}, vacant {f['vacant']}")
+    if rep.get("aviation"):
+        a = rep["aviation"]
+        lines.append(f"aviation lights: {a['flashing']} flashing, {a['steady']} steady, on "
+                     f"{a['structures']} structures")
+    if rep.get("megasites"):
+        lines.append("megasites: " + ", ".join(f"{k} {v}" for k, v in rep["megasites"].items()))
+    if rep.get("tiers"):
+        lines.append("tiers: " + ", ".join(f"{k} {v}" for k, v in rep["tiers"].items()))
     lines.append("district moods:")
     for did, m in sorted(rep["districts"].items()):
         lines.append(f"  {did} {m['name']} ({m['archetype']}): {m['lamp']}, {m['temp']}, "
                      f"grit {m['grit']}, flicker {m['flicker']}, broken {m['broken']}, "
-                     f"neon {m['neon']}")
+                     f"neon {m['neon']}, floods {m['flood']} {m['floods']}, searchlights "
+                     f"{m['searchlights']}, palette {' '.join(m['palette'])}")
     return "\n".join(lines) + "\n"

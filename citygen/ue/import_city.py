@@ -72,7 +72,8 @@ HASH_TAG = "cg.hash"
 # unchanged build applies the change (stored hashes are "<version>.<content hash>")
 MESH_VERSION = "3"
 ACTOR_VERSION = "1"
-ATMOS_VERSION = "atmos1"  # AT1: the atmos controller's and cells' actors (their own versions)
+ATMOS_VERSION = "atmos2"  # the atmos controller's and cells' actors (2, AT2: the high tier,
+                          # blinks and sweeps in the packed lights)
 SWIM_BRUSH_CM = 200.0   # the cube brush a volume spawned from its class gets (CubeBuilder)
 SWIM_FRICTION = 0.3
 GRAPH_VARS = [("City", "string"), ("Graph", "name"), ("Hash", "string"), ("Ids", "[name"),
@@ -3761,6 +3762,8 @@ class Importer:
                          ("max_live", ctl["max_live"]), ("mid_range_m", ctl["mid_range_m"]),
                          ("max_shadowed", ctl["max_shadowed"]),
                          ("near_range_m", ctl["near_range_m"]), ("cell_m", ctl["cell_m"]),
+                         ("max_high", int(ctl.get("max_high", 0))),
+                         ("high_range_m", float(ctl.get("high_range_m", 750.0))),
                          ("lights", True)):
                 a.set_editor_property(k, v)
             a.tags = self.tags(info["key"], hv, [], "atmos", "atmos", "", "")

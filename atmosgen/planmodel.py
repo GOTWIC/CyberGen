@@ -31,18 +31,37 @@ RGB = Annotated[list[float], Field(min_length=3, max_length=3,
 Hours = Annotated[list[float], Field(min_length=24, max_length=24,
                                      description="On share by hour, 0 to 23.")]
 Shape = Literal["spot", "point", "rect"]
-Tier = Literal["near", "mid"]
+Tier = Literal["near", "mid", "high"]
+# (AT2 adds `neon`, a neon band's spill, and `runway`, an airfield's ground lights; `flood`,
+# `aviation`, `searchlight` and `high_mast` were set down in AT0)
 LightKind = Literal["street_light", "wall_light", "sign", "shop_sign", "spill", "soffit",
                     "flood", "aviation", "searchlight", "tunnel", "station", "high_mast",
-                    "signal", "corner", "road", "alley", "underpass"]
+                    "signal", "corner", "road", "alley", "underpass", "neon", "runway"]
 # what a light hangs on (AT1): the city's own fixture (an M6 prop, an M20 sign, an M3
 # shopfront, AG10's soffit fixture, AG7's tunnel strip), or one the plan asks of stage 2
 # (scope 4.1, `emitters.py`'s third ask): a pole at a junction corner, along a highway or a
 # service road, a mast arm on a traffic signal, a wall pack over an alley, a platform
 # downlight under a station's canopy
+# AT2 asks four more of stage 2 (`emitters.py`'s fourth ask): `roof` (a flood or searchlight
+# on a roof or setback, a flood's outrigger), `beacon` (an aviation light's lens on a roof
+# corner or a mast's tip), `mast` (a port's or an apron's high mast, a crane boom's flood),
+# `ground` (an airfield light in the pavement)
 Mount = Literal["prop", "sign", "facade", "soffit", "tunnel", "pole", "mast_arm", "wall",
-                "canopy"]
-ASKED = ("pole", "mast_arm", "wall", "canopy")
+                "canopy", "roof", "beacon", "mast", "ground"]
+ASKED = ("pole", "mast_arm", "wall", "canopy", "roof", "beacon", "mast", "ground")
+
+
+class Anim(BaseModel):
+    """AT2: how a light moves or blinks (the runtime animates it from the world's time)."""
+    model_config = ConfigDict(extra="forbid")
+    mode: Literal["blink", "sweep"] = Field(description="`blink` on for `amount` of each "
+                                                        "period (an aviation light); `sweep` "
+                                                        "its yaw swinging `amount` degrees "
+                                                        "either way (a searchlight).")
+    period_s: float
+    amount: float
+    phase: float = Field(ge=0.0, lt=1.0, description="Its share of a period at time 0 (a "
+                                                     "building's lights blink together).")
 
 
 class _Model(BaseModel):
@@ -91,7 +110,9 @@ class Light(_Model):
                                         "glossy surface reflects already.")
     mount: Mount = Field("prop", description="What it hangs on (AT1): the city's own "
                                              "fixture, or one the plan asks of stage 2 "
-                                             "(pole, mast_arm, wall, canopy).")
+                                             "(pole, mast_arm, wall, canopy; AT2 roof, "
+                                             "beacon, mast, ground).")
+    anim: Anim | None = Field(None, description="AT2: a blink or a sweep.")
     hash: str
 
 
@@ -161,6 +182,8 @@ class Tiers(_Model):
     near_max: int
     mid_m: float
     mid_max: int
+    high_m: float = Field(750.0, description="AT2: the high tier's range (m) ...")
+    high_max: int = Field(48, description="... and how many of its lights live at most.")
     far_m: float
 
 

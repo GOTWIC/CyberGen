@@ -126,7 +126,9 @@ def test_plan(build):
     od = build / "atmos"
     plan = PM.AtmosPlan.model_validate_json((od / "atmos_plan.json").read_text())
     assert plan.counts["street_light"] == 2 and plan.counts["wall_light"] == 1
-    assert plan.counts["sign"] == 3 and plan.counts["shop_sign"] == 2 and plan.counts["spill"] == 2
+    # (AT2: a front holo-board's back looks at its wall and casts nothing; a blade sign is
+    # one light)
+    assert plan.counts["sign"] == 2 and plan.counts["shop_sign"] == 1 and plan.counts["spill"] == 2
     assert plan.sources["derived"] == plan.counts["all"] and plan.preset == "neon_rain"
     lights = {}
     for t in plan.tiles:
@@ -142,19 +144,27 @@ def test_plan(build):
     assert a.temp_k == P.TEMPS["cool"] and a.on and a.flicker == 0.0
     # on a pedestrian street a post top; sodium in the old town
     b = lights["d02.prop.street_light.e300n5.light"]
-    assert b.cls == "post_top" and b.shape == "point" and b.temp_k == P.TEMPS["sodium"]
+    # (AT2: a gritty district's lamps of mixed temperatures; this one drawn among them)
+    assert b.cls == "post_top" and b.shape == "point" and (
+        b.temp_k == P.TEMPS["sodium"] or
+        b.color in [PL.hex_linear(c) for c in P.MIX_COLORS.values()])
     w = lights["d02.prop.wall_light.e310n12.light"]
     assert w.cls == "wall_pack" and math.isclose(w.pos[2], 3.0 - 0.35 - 0.2, abs_tol=1e-6)
-    # a billboard's lit face: a rect light its size, a little in front of its frame
+    # a billboard's lit face: a rect light its size, stood off its face on its frame (AT2),
+    # a share of the face's luminance as light, no highlight
     s = lights["d01.lot.e10n6.bld.slot.billboard.e10n12.z20.light"]
+    ph = P.PHOTOMETRY["sign_face"]
     assert s.shape == "rect" and s.size == [6.0, 3.0] and s.tier == "mid"
-    assert s.pos[1] > 12.0 + 0.3 and math.isclose(s.cd, P.PHOTOMETRY["sign_face"]["nits"] * 18)
-    # a blade sign: two faces, near-tier only; a two-sided holo-board: front and back
+    assert math.isclose(s.pos[1], 12.0 + 0.3 + ph["out_m"]) and s.specular == 0.0
+    assert math.isclose(s.cd, ph["nits"] * ph["light"] * 18)
+    # a blade sign: one small point at its middle, near-tier only (AT2's neon spill); a
+    # holo-board in front of a facade lights only away from it
     assert {k for k in lights if k.startswith("city.prop.sign.e5n0.slot")} == \
-        {"city.prop.sign.e5n0.slot.light", "city.prop.sign.e5n0.slot.light1"}
-    assert lights["city.prop.sign.e5n0.slot.light"].tier == "near"
+        {"city.prop.sign.e5n0.slot.light"}
+    bl = lights["city.prop.sign.e5n0.slot.light"]
+    assert bl.tier == "near" and bl.shape == "point" and bl.pos == [5.0, -0.5, 4.0]
     holo = [L for k, L in lights.items() if "holo_ad" in k]
-    assert len(holo) == 2 and {round(L.aim[0]) % 360 for L in holo} == {90, 270}
+    assert len(holo) == 1 and round(holo[0].aim[0]) == 90
     # shopfronts spill out of the building, onto the sidewalk south of it
     sp = lights["d01.lot.e10n6.bld.u00.spill"]
     assert sp.pos[1] < 0.0 and round(sp.aim[0]) == -90 and sp.schedule == "bar"
@@ -186,6 +196,10 @@ def test_sign_faces_and_lamp_heads():
     f = EM.sign_face({"kind": "billboard", "mount": "facade", "position": [0, 0, 10],
                       "yaw_deg": 0.0, "width_m": 4.0, "height_m": 2.0})
     assert len(f) == 1 and f[0]["c"] == [0.3, 0.0, 10] and f[0]["size"] == [4.0, 2.0]
+    # the second ask met (AT2): a drawn face's record, a two-sided one's back marked
+    g = EM.faces_of({"c": [1.0, 2.0, 3.0], "n": [0.0, 1.0, 0.0], "size": [2.0, 1.0],
+                     "two_sided": True})
+    assert len(g) == 2 and round(g[0]["yaw"]) == 90 and g[1].get("back")
 
 
 def test_tiles_are_citygens():

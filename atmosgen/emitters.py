@@ -28,6 +28,21 @@ What atmosgen needs and the other stages do not record yet:
    (its `pos` plus its class's `drop_m`), headed its aim's way, would meet the ask; the
    plan's report counts them (`mounts`, `asked`).
 
+4. **Fixtures for AT2's lights** (AG4, AG7, AG8): `roof` (a crown flood on its setback or an
+   outrigger 4 m off the facade, a searchlight on a roof), `beacon` (an aviation light's red
+   lens at a roof corner or a mast's tip: until drawn, the runtime shows each as a small red
+   glow of its own, blinking with its light), `mast` (a port yard's or an apron's 30 m high
+   mast, a crane boom's floods), `ground` (an apron's edge light or a launch pad's rim light
+   in the pavement). As the third ask: a fixture at the light's `pos`, headed its aim's way.
+
+AT2 reads the second ask where assetgen meets it (`SignColors.face`, `.emit`: a slot record
+of `signs.json` that is an object with `cell` and `face`, or a top-level `faces` map by slot
+id; a cell's `emit`), so the light sits on the drawn face in its drawn color and luminance
+(`Light.source` "assetgen"), and derives them otherwise: the face from M20's slot and the
+prototype's frame, the color from the cell (its own, else the mean of its bright pixels), and
+now the luminance too, the page cell's mean brightness against a typical page's
+(`presets.SIGN_LUMA_REF`), so a dark ad with a thin neon line lights less than a bright one.
+
 Each derived light says so (`Light.source` "derived"); `plan.counts` and `sources` count
 them, so the asks' progress shows in every plan.
 """
@@ -76,7 +91,7 @@ def sign_face(slot: dict) -> list[dict]:
                   "yaw": math.degrees(a), "size": [w, h]})
     if slot.get("two_sided"):
         faces.append({"c": [x - 0.02 * math.cos(a), y - 0.02 * math.sin(a), z],
-                      "yaw": math.degrees(a) + 180.0, "size": [w, h]})
+                      "yaw": math.degrees(a) + 180.0, "size": [w, h], "back": True})
     return faces
 
 
@@ -109,36 +124,87 @@ class SignColors:
             self.pages[name] = img
         return self.pages[name]
 
+    def _cell_id(self, slot_id: str) -> str | None:
+        rec = (self.data.get("slots") or {}).get(slot_id)
+        if isinstance(rec, dict):              # (the ask met: {cell, face})
+            return rec.get("cell")
+        return rec
+
     def color(self, slot_id: str) -> str | None:
-        cell_id = (self.data.get("slots") or {}).get(slot_id)
+        return self.emit(slot_id)[0]
+
+    def emit(self, slot_id: str) -> tuple[str | None, float | None, bool]:
+        """(color, luminance scale, from assetgen) of a slot's cell: the ask's `emit` where
+        AG6 records it (its nits over the class's), else the cell's own color or the mean of
+        its bright pixels, and its page's mean brightness over `presets.SIGN_LUMA_REF`
+        (None without a page); (None, None, False) without signs.json or a cell."""
+        cell_id = self._cell_id(slot_id)
         if cell_id is None:
-            return None
+            return None, None, False
         if cell_id in self.cache:
             return self.cache[cell_id]
         cell = (self.data.get("cells") or {}).get(cell_id) or {}
+        em = cell.get("emit")
+        if isinstance(em, dict) and em.get("color"):
+            out = (em["color"], (float(em["nits"]) if em.get("nits") is not None else None),
+                   True)
+            self.cache[cell_id] = out
+            return out
         col = cell.get("color")
-        if col is None and cell.get("page"):
+        luma = None
+        if cell.get("page"):
             img = self._page(cell["page"])
             if img is not None:
-                col = _mean_bright(img, cell["uv"])
-                self.from_pages += 1
-        self.cache[cell_id] = col
-        return col
+                top, luma = _mean_bright(img, cell["uv"])
+                if col is None:
+                    col = top
+                    self.from_pages += 1
+        out = (col, luma, False)
+        self.cache[cell_id] = out
+        return out
+
+    def face(self, slot_id: str) -> dict | None:
+        """The ask's drawn face of a slot ({c, n, size, two_sided}), when assetgen records
+        it (in the slot's record, or a top-level `faces` map)."""
+        rec = (self.data.get("slots") or {}).get(slot_id)
+        if isinstance(rec, dict) and isinstance(rec.get("face"), dict):
+            return rec["face"]
+        f = (self.data.get("faces") or {}).get(slot_id)
+        return f if isinstance(f, dict) else None
 
 
-def _mean_bright(img, uv) -> str | None:
+def faces_of(face: dict) -> list[dict]:
+    """The second ask's face record as `sign_face` returns faces (its normal's heading; a
+    two-sided face's back the other way)."""
+    n = face["n"]
+    yaw = math.degrees(math.atan2(float(n[1]), float(n[0])))
+    c = [float(v) for v in face["c"]]
+    out = [{"c": c, "yaw": yaw, "size": [float(v) for v in face["size"]]}]
+    if face.get("two_sided"):
+        out.append({"c": c, "yaw": yaw + 180.0, "size": out[0]["size"], "back": True})
+    return out
+
+
+def _mean_bright(img, uv) -> tuple[str | None, float]:
     """The mean color of a page cell's brightest quarter of pixels (what glows), as
-    #rrggbb, integer arithmetic only."""
+    #rrggbb, and the cell's mean relative luminance (0 to 1, linear), integer arithmetic for
+    the color."""
     W, H = img.size
     x0, y0 = int(uv[0] * W), int(uv[1] * H)
     x1, y1 = max(x0 + 1, int(uv[2] * W)), max(y0 + 1, int(uv[3] * H))
-    px = list(img.crop((x0, y0, x1, y1)).getdata())
-    if not px:
-        return None
-    lum = sorted(((2126 * r + 7152 * g + 722 * b), r, g, b) for r, g, b in px)
-    top = lum[len(lum) * 3 // 4:] or lum
+    import numpy as np
+    px = np.asarray(img.crop((x0, y0, x1, y1)), dtype=np.int64).reshape(-1, 3)
+    if not len(px):
+        return None, 0.0
+    r_, g_, b_ = px[:, 0], px[:, 1], px[:, 2]
+    # (sorted by luminance, then r, g, b: as sorting the tuples)
+    order = np.lexsort((b_, g_, r_, 2126 * r_ + 7152 * g_ + 722 * b_))
+    top = px[order[len(px) * 3 // 4:]] if len(px) * 3 // 4 < len(px) else px
     n = len(top)
-    r = sum(t[1] for t in top) // n
-    g = sum(t[2] for t in top) // n
-    b = sum(t[3] for t in top) // n
-    return f"#{r:02x}{g:02x}{b:02x}"
+    r, g, b = (int(top[:, k].sum()) // n for k in range(3))
+    # (the mean of the pixels' linear luminance: a lookup of the sRGB curve per 8 bits)
+    lin = np.array([((c / 255.0) / 12.92 if c <= 10 else ((c / 255.0 + 0.055) / 1.055) ** 2.4)
+                    for c in range(256)])
+    # (an exact sum, not numpy's reduction: the same on every machine)
+    y = math.fsum((0.2126 * lin[r_] + 0.7152 * lin[g_] + 0.0722 * lin[b_]).tolist()) / len(px)
+    return f"#{r:02x}{g:02x}{b:02x}", round(y, 4)

@@ -70,6 +70,9 @@ def test_cells_pack_every_light(build):
     assert len(ctl["schedule_hours"]) == 24 * len(ctl["schedule_names"])
     assert ctl["schedule_names"] == sorted(plan["schedules"])
     assert ctl["max_live"] == plan["tiers"]["mid_max"] and ctl["cell_m"] == UA.CELL_M
+    # AT2: the high tier's pool and range
+    assert ctl["max_high"] == plan["tiers"]["high_max"] and \
+        ctl["high_range_m"] == plan["tiers"]["high_m"]
 
 
 def test_pack_frames_and_flags():
@@ -95,6 +98,19 @@ def test_pack_frames_and_flags():
     # a lit face's stand-in casts no specular highlight (bit 5)
     _, i = UA.pack({**R, "specular": 0.0}, ["always", "dusk_dawn"], kinds, mounts)
     assert i[0] & 32
+    # AT2: a light without an animation packs zeros for it, and is not in the high tier
+    assert f[16:19] == [0.0, 0.0, 0.0] and not i[0] & 64 and (i[0] >> 28) & 3 == 0
+    # a blinking aviation light and a sweeping searchlight in the high tier
+    B = {**L, "shape": "point", "kind": "aviation", "mount": "beacon",
+         "anim": {"mode": "blink", "period_s": 2.0, "amount": 0.3, "phase": 0.25}}
+    f, i = UA.pack(B, ["always", "dusk_dawn"], kinds, mounts)
+    assert f[16:19] == [2.0, 0.3, 0.25] and (i[0] >> 28) & 3 == 1 and not i[0] & 64
+    assert (i[0] >> 24) & 0xf == mounts.index("beacon")
+    W = {**L, "kind": "searchlight", "tier": "high", "mount": "roof",
+         "anim": {"mode": "sweep", "period_s": 20.0, "amount": 30.0, "phase": 0.5}}
+    f, i = UA.pack(W, ["always", "dusk_dawn"], kinds, mounts)
+    assert f[16:19] == [20.0, 30.0, 0.5] and (i[0] >> 28) & 3 == 2 and i[0] & 64
+    assert len(f) == UA.FLOATS and i[0] > 0
 
 
 def test_hashes_follow_the_lights(build, tmp_path):
@@ -120,6 +136,11 @@ def test_a_failed_check_is_not_delivered(build):
     p.write_text(json.dumps(plan))
     at = UA.write_atmos(build)
     assert at.get("skipped") and not at.get("cells") and UA.actor_hashes(at) == {}
+    # AT2: a plan whose faces check failed neither
+    plan["checks"]["lux"]["ok"] = True
+    plan["checks"]["faces"] = {"ok": False}
+    p.write_text(json.dumps(plan))
+    assert "faces" in UA.write_atmos(build)["skipped"]
     # an AT0 plan (no check) neither
     del plan["checks"]
     p.write_text(json.dumps(plan))
