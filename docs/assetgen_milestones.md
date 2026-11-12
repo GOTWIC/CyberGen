@@ -3061,9 +3061,13 @@ folder):
   LOD3 (the budget has no room for a hull each).
 - The Cab's fold-out step is still out (its script draws it either way).
 - The other nine packs (Vanta-R, Sable, Dart, Lumen, Pebble, Aria, Bastion, Mino, Porter)
-  are as first built and published; they pass their checks and take these rules when they
-  are next rebuilt (a hover car's belly then counts as underside, fine relief stays as
-  geometry at LOD0).
+  are as first built; they pass their checks and take these rules when they are next
+  rebuilt (a hover car's belly then counts as underside, fine relief stays as geometry at
+  LOD0). One of them, the Dart, was built with the new rules into a scratch folder to see:
+  every check passes (its LOD3 texture share 0.0388 of 0.04).
+- All 18 packs are published again as the release `vehicle-packs-2026-11-12b`
+  (`vehicles/packs.json`; the release of the first run is left as it was, for older
+  commits).
 
 Next: the design improvements B to E.
 
