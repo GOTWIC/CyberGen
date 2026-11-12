@@ -254,3 +254,9 @@ def test_busy_sees_any_benchmark():
     # (from the packaged run's side, this benchmark and its game are busy)
     assert B._busy(procs, 102) == ["python.exe 11", "python.exe 12", "UnrealEditor.exe 13",
                                    "CityAG16.exe 101", "UnrealEditor.exe 105"]
+    # AT3: a game and a screen recorder share the GPU: busy too
+    procs.update({106: (1, "javaw.exe", "javaw.exe -cp minecraft.jar"),
+                  107: (1, "ow-obs.exe", "ow-obs.exe --capture"),
+                  108: (1, "Overwolf.exe", "Overwolf.exe")})
+    assert B._busy(procs, 12) == ["CityAG16.exe 101", "python.exe 102", "UnrealEditor.exe 105",
+                                  "javaw.exe 106", "ow-obs.exe 107"]

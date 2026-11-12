@@ -1,4 +1,4 @@
-# atmosgen: light, sky, air and weather (scope, v2: decided 2026-11-10, AT0 to AT2 done)
+# atmosgen: light, sky, air and weather (scope, v2: decided 2026-11-10, AT0 to AT3 done)
 
 Stage 3 (atmosgen) of CyberGen's five stages. It takes a built city with its assets and
 makes the city's light and air: every light source that casts light, the sky, fog, smog,
@@ -229,6 +229,14 @@ stages have); never required to edit. Fields, all with defaults:
 - Time of day: sun and moon, the night gain, `Hour` moving through the day so AG15's
   window schedules and every light's schedule follow (offices dark late, bars open, shops
   closing), the exposure by hour.
+- AT3 built it (`atmosgen/sky.py`, `docs/progress/AT3/`): the sun and the moon from the
+  latitude, the day of the year and the moon's phase; curves over the sun's elevation for the
+  exposure (held: the night at -3 EV100 in Unreal's frame, the day's, dusk between), `Night`,
+  the sun's light, the sky light and the stars; the street lights' schedule set by the sun;
+  the deck's glow as a raster of the plan's upward flux on its underside; in Unreal one
+  directional light as the sun and then the moon, a sky dome material (the sky atmosphere,
+  stars, the moon with its phase, the deck lit by the sun, the moon and the city), the
+  exposure held per hour, and the play features' time-of-day slider.
 
 ### 6.3 Air
 

@@ -339,9 +339,14 @@ def job(route_: dict, out_dir: Path, passes=PASSES, warm: bool = True,
 
 # --- running it ---------------------------------------------------------------------------
 
+# AT3: games and screen recorders, by their executable's name (without .exe)
+GAMES = ("javaw", "ow-obs", "obs64", "obs32")
+
+
 def busy() -> list[str]:
     """Heavy processes that would skew a benchmark (another build, test run, Blender or
-    Unreal editor, another benchmark), as `name pid` strings; Windows only (else nothing).
+    Unreal editor, another benchmark, AT3: a game or a screen recorder), as `name pid`
+    strings; Windows only (else nothing).
     This process, its ancestors (the venv's python.exe launcher runs the interpreter as its
     child, with the same command line) and its descendants are its own, never another's."""
     if os.name != "nt":
@@ -389,7 +394,10 @@ def _busy(procs: dict[int, tuple[int, str, str]], me: int) -> list[str]:
         # the project's own, so only its -CityGenBench= names it; a shell that only names
         # it, waiting on it, is not one)
         shell = name.lower().split(".")[0] in ("bash", "sh", "powershell", "pwsh", "cmd")
+        # (AT3: a game or a screen recorder shares the GPU: Delta's night ran 1.5 to 2 times
+        # slower under a Java game and Overwolf's recorder, `GAMES`)
         if ("unrealeditor" in name.lower() or "blender" in name.lower() or
+                name.lower().split(".")[0] in GAMES or
                 (not shell and ("-citygenbench=" in low or "automationtool" in low)) or
                 ("python" in name.lower() and re.search(
                     r"citygen (build|sweep)|assetgen|pytest|bench", low))):
