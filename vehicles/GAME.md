@@ -68,7 +68,10 @@ Each GLB has one empty root `car` at the origin with these children, one mesh an
 material each:
 
 - `body`: everything rigid and opaque, hover pods, spares and skids included; material `pack_body`.
-- `glass`: every transmissive surface; material `pack_glass`.
+- `glass`: every transmissive surface; material `pack_glass`. A lamp's lens and a light
+  guide's sleeve (the kit's `lens...` and `optic` materials) are not glass: they are left
+  out of the pack, so the lamp behind them (housing, reflectors, emitters) is the surface
+  baked and drawn, lit by the emissive texture.
 - `wheel_<tag>` (`fl`, `fr`, `rl`, `rr`, ...): tire, rim, hub, light ring, disc, drum. The
   node's translation is the axle's middle, its rotation identity, so it spins about its
   local y and steers about its local z; material `pack_wheels`.

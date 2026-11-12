@@ -31,6 +31,28 @@ flanks, a carbon spine from the nose over the roof to the tail, dark cladding lo
 
 About 240,000 triangles in 93 objects (the two honeycomb meshes are about 60,000 of them).
 
+## Step B: lamps, cut lines, glass (2026-11-12)
+
+The first car on step B's kit (`docs/assetgen_milestones.md`, AG18, step B). The sheet,
+clay, zebra and check above are of this build.
+
+- Front lamps: a channel 38 mm wide and 55 mm deep cut into the band under the lip, turning
+  down each corner, under a clear lens with the body's gap round it; inside, a light guide in
+  a frosted sleeve along the whole run and three projector lenses on the outer stretch.
+- Tail lamp: one channel round the whole tail under a red lens, its corners rounded; a red
+  guide and bright ribs behind it.
+- Cut lines: the flush door handles and the hexagonal charge flaps are cut through the skin
+  (they were strips lying on it), the ten slots over the wheels are pockets 20 mm deep.
+- Gaps: 3.5 mm shut lines everywhere (2.4 mm before).
+- Glass: the side and rear panes with a black frit border as part of the glass; the
+  windshield with a gloss frame made on one side and mirrored (the old frames were 4 to 14 mm
+  off at their corners and faced into the car). Frit on the windshield showed shards of
+  reflection where its top rows curve into the roof crease, which a frame covers.
+- Wiper: a boss at the cowl, a tapered arm, a yoke and a rubber blade lying on the glass.
+- The light bands round the mouth and the tail are 58 mm wide all round (`even=True`), so
+  the channels sit in their middle.
+- About 305,000 triangles (240,000 before; the lamps 24,500 of them).
+
 ## Files
 
 | File | What |

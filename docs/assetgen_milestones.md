@@ -2675,7 +2675,7 @@ the Unreal tests updated); results `docs/progress/AG16/`.
 
 ## AG18: hero vehicles (in progress)
 
-**Phase 1 built, waiting for review; phase 3 (game packs) built for 18 vehicles; step A (the kit) done.** Scope 14.19 (Swagnik, 2026-11-10): vehicles designed one by one, not
+**Phase 1 built, waiting for review; phase 3 (game packs) built for 18 vehicles; step A (the kit) done; step B in progress.** Scope 14.19 (Swagnik, 2026-11-10): vehicles designed one by one, not
 generated. Everything is in `vehicles/` (the kit `carkit.py`, a script per car in `cars/`,
 the brand book `BRANDS.md`, the design brief `BRIEF.md`, `post.py`, the render queue
 `blender.sh`); a car's sheet and notes are in `docs/progress/AG18/<car>/`. The concept
@@ -3072,6 +3072,64 @@ folder):
 Next: the design improvements B to E.
 
 The roster with sizes and sheets: [`docs/progress/AG18/README.md`](progress/AG18/README.md).
+
+**Step B, lamps, cut lines and glass** (in progress, 2026-11-12; scope 14.19's improvements
+1, 2 and 6, glass). The kit first, then the cars; the Vanta-R is the first car, the other
+twenty build exactly as before (`survey.py --sign` and `--compare`: every car but the
+Vanta-R the same).
+
+- **Cutters on the uncut hull** (`build_body(cutters=fn)`): the function is called once the
+  cage stands, subdivided and uncut, with `on_body()`, `snap()` and `trace()` seeing that
+  hull, so cutters are laid on the surface as it will be built, and returns the list.
+  `groove()` is a blade through the skin along a traced path: with its defaults a shut line
+  (0.6 mm and twice the body's gap; 4 mm on the Vanta-R's 1.75 mm gap), closed an outline (a
+  flush handle, a flap), 25 to 40 mm wide a light channel (width and depth may vary along
+  the path, `up` fixes the way out, `round` cuts its corners round first, sections that
+  would still fold are dropped). `pocket()` pushes an outline straight in to a flat floor
+  (a lamp housing, a handle recess, a slot) and returns where its skin and floor are.
+  `trace()`, `chaikin()`, `rounded()`, `ngon()` draw the paths.
+- **Skin panels**: a cutter `(g, housing, "skin", P)` keeps its cut faces as the housing and
+  makes the skin it took away a panel `P` with the gap all round (the hull intersected with
+  the cutter, its cut faces dropped): a lens over its housing, a flap over its recess.
+  `"cover"` drops the cut faces.
+- **Lamps** (`Lamp`): the inside of a lamp by material (housing, chrome, clear glass,
+  frosted optic, lit): projector modules (bezel, barrel, a convex lens, the emitter),
+  faceted reflector cups, rows of LEDs in cups, light guides in a frosted sleeve, lit bars,
+  fins. Lenses (`lens()`, `lens_clear`, `lens_smoke`, `lens_red`, `lens_amber`) let a shadow
+  through, tinted, so what is behind them is lit.
+- **Glass**: `glass` modes `"frame"` (a trim frame made on the left half before the mirror:
+  the same on both sides and facing out, step A's finding on the old frames) and `"frit"`
+  (the frame as part of the glass, no gap, the glass's thickness, in `frit`); frit panes and
+  their border sharp at their rims. `wiper()`: a boss, a tapered arm, a yoke and a blade
+  lying on the glass.
+- **Even cap bands** (`even=True`): a mouth's or tail's band one width all round, square to
+  the lip, where the old band narrowed past the cap's center.
+- **Lazy materials** (`need()`, `LAZY`): the new materials are made only when a car names
+  one, so a car that uses none builds the same materials as before.
+- **Checks**: a body piece keeps the paths of its cuts (`Body.cuts`), and the panel check
+  takes an edge along one for a cut, not an open edge.
+- **Game packs**: lenses and light guide sleeves (`lens...`, `optic`) are left out of the
+  pack (`game.LENS_MATS`), so the lamp behind them is the surface baked and drawn and its
+  emitters light the emissive texture; a pack is opaque but for its glass.
+- **Vanta-R** (`docs/progress/AG18/vanta_r/`): a front channel 38 by 55 mm in the band under
+  the lip under a clear lens, a guide and three projectors; a channel round the whole tail
+  under a red lens, a guide and ribs; the door handles and charge flaps cut, the slots over
+  the wheels pockets; 3.5 mm shut lines; frit on the side and rear panes, the windshield on a
+  mirrored gloss frame (frit there showed shards of reflection where its top rows curve into
+  the roof crease); a wiper; 58 mm even bands. 304,992 triangles (240,286). Checks: panels
+  ok, no cabin part in the open, tires and symmetry `look` as before (the lightband 4.5 mm,
+  the wiper by design). Pack rebuilt, every check passing: 145,912, 59,990, 19,956, 4,756
+  triangles, standard class, texels 428 px/m (5th percentile), LOD3 22.6 of 40 degrees,
+  0.043 of 0.10 bent, 0.0076 of 0.04 texture. All 18 packs published as
+  `vehicle-packs-2026-11-12c` (the Vanta-R's the only new one).
+- **Found on the way**: a wide channel turning a corner tighter than its width folds and
+  breaks the boolean (the whole hull came out empty); the groove now drops such sections,
+  and `round` avoids them. A rounded path snapped onto the hull can jump to a mouth's inner
+  frame: the Vanta-R's front channel is not rounded.
+- **Next**: a pilot car of each of the other five brands (lamps by `BRANDS.md`, each
+  switching to its `vehicles/brands/` module), shown to Swagnik before the other twelve;
+  step A's street-distance findings (tires in the body, cabin tubs in the wells) on each car
+  as it is redone.
 
 ## Order
 
