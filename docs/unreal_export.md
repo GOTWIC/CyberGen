@@ -1696,7 +1696,14 @@ hash changes, by `VEHICLE_MESH_VERSION` or the masters' `VEHICLE_VERSION`):
   toward `GlassCenter` (the middle of the car's box, set per car) is the inner sheet and is
   left out: from outside it is the far side's glass seen through the near side, drawn in the
   same mesh in triangle order, not by depth, and it composited over the near glass in black
-  and bright patches. **`M_CgVehicleGlassDark`** (`MI_<car>_glass_dark`): opaque, the glass
+  and bright patches. From inside the cabin it is the other way round (the outer sheets face
+  away and are culled, so the glass was not there from the seats): the inner sheet is drawn
+  while the eye is inside the cabin's box (`CabinCenter`, `CabinHalf`, set per car: the
+  glass's own box from the pack's LOD0, the record's `glass_box`, taken down to the car's
+  floor; the eye in the mesh's own space is the pixel's local position plus the way to the
+  camera turned as the normal is). An eye outside that box but inside it in plan, hugging a
+  window that leans in, sees both sheets; a record without a glass box keeps the inner
+  sheet out, as before. **`M_CgVehicleGlassDark`** (`MI_<car>_glass_dark`): opaque, the glass
   color times 0.06, as the proof draws LOD2 and LOD3.
 
 **What the importer makes of a placement**: a `BP_CityGenGroup` actor at the entry's pivot
