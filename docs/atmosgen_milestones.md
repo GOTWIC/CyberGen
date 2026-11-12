@@ -62,6 +62,73 @@ recommendations: [`docs/progress/AT0/README.md`](progress/AT0/README.md).
   `busy`), `tests/test_unreal_play.py` (both plugins installed), `tests/test_no_network.py`
   (atmosgen too).
 
+## AT2: neon and signs as light
+
+Built on the Windows PC (2026-11-11), on main after AT1 (#195) and the packaged game fixes
+(#197). Report, measurements and images: [`docs/progress/AT2/README.md`](progress/AT2/README.md).
+
+- **Lit faces** (`plan.signs`): billboards, banners and holo-boards as rect lights the size of
+  their face (`sign_face`, `banner_face`, `holo_face`), stood off the drawn face (`out_m` 0.65 m
+  past the 0.3 m frame: the light's plane 0.95 m out of the wall, past everything stage 2 hangs
+  on a facade, `envelope.OVERHANG_MM` 0.91 m; AT0's light 0.15 m in front flooded its wall), a
+  share of the face's luminance as light (`light`: 0.6, 0.35, 0.5) times the page cell's mean
+  brightness over `SIGN_LUMA_REF` (within 0.4 to 1.4), in the page's color scaled to full; a
+  front holo-board's back (facing its wall) left out; a face whose light on the facade it faces
+  passes `OPPOSITE_MAX_LX` 150 lx dimmed to it (at most to 0.15). No specular (AT1's rule).
+- **The faces check** (`lux.face_check`, the plan's `checks.faces`): each lit face's light on
+  its own wall and on what stands out of it (fronts at 0, 0.45 and 0.9 m, sides at 0.45 m,
+  1 m round the face, without barn doors: Unreal's are 20 cm) at most `FACE_WALL_MAX_LX` 1 lx;
+  the facade opposite (`lux.opposite`: the first building cell straight out within reach)
+  reported. A plan that fails it is not delivered (`atmosgen plan` exits 1, the exporter
+  leaves it out).
+- **Neon spill:** a neon band or facade shop sign a small spot 0.4 to 0.5 m off the sign, aimed
+  out and 35 to 40 degrees down, its cone 76 degrees (`neon_spill`, `shop_neon`); a blade sign
+  one point at its middle (`blade_neon`; AT1 two rects); near tier, no specular.
+- **Buildings** (`floods`, `aviation`, `searchlights`; `Shape`, `sides`, `corners`): crown
+  floods (`crown_flood`) on each side of the crown's box (two past 45 m), 4 m off the facade or
+  on the setback under it, below the lit zone (`CROWN_ZONE`: 18% of the height, 8 to 40 m),
+  aimed at its upper middle, the cone covering its width, the intensity $I = E d^3 / o$ for
+  70 lx there (a grazing light $o$ off the facade), the reach its top; on every landmark, every
+  tower AG15 gave crown LEDs (in their accent: `City.ag15` reads assetgen's manifest) and a share
+  of the others (`floods`: by archetype, up with wealth, down with grit), never a vacant tower;
+  uplights (`facade_flood`) from the podium or the ground on landmarks and some towers. Aviation
+  lights on anything 60 m tall over its base (40 m in a spaceport's district or megasite):
+  flashing 30 a minute at the top (a thin top's tip, else the roof's corners), a structure's
+  together; steady every 90 m under it down to 45 m; near tier. Searchlights on landmarks (by
+  kind, `LANDMARK_SEARCHLIGHTS`, or the spec's) and the mood's number on a district's tallest
+  towers (else its tallest buildings: a spaceport's control tower), two to a roof, pitched 62
+  to 80 degrees, sweeping 22 to 40 degrees over 14 to 26 s.
+- **Megasites** (`megasites`): a freight terminal's yard, high masts every 90 m off its stacks
+  and buildings, its cranes' two boom floods; a spaceport's apron, high masts along its long
+  sides every 80 m and blue edge lights every 30 m, its pads' rims green and white every 6 m,
+  each pad flooded from its launch tower. (citygen's spaceports have pads and an apron, no
+  runway: these are its airfield lights.)
+- **Moods** (`spec.mood`): a palette per archetype (`PALETTES`), the spec's city palette for
+  districts without their own; floods' white and share, searchlights (`FLOODS`); grit past 0.3
+  mixes a share of a district's lamps to other temperatures and dims some (`MIX_*`); flicker and
+  broken by kind (`FLICKER_BY_KIND`, `BROKEN_BY_KIND`), safety and structure lights kept
+  (`KEPT_KINDS`), a broken sign dying (a deep flicker, `DYING_DEPTH`) rather than dark.
+- **Tiers:** `high` (floods, searchlights, high masts) 48 within 750 m, a pool of its own;
+  `near` for aviation lights and the neon spill.
+- **The emitter asks:** the second read where met (`SignColors.emit`, `.face`, `faces_of`;
+  `Light.source` assetgen), the luminance derived from the page meanwhile; a fourth ask, the
+  fixtures of AT2's lights (`roof`, `beacon`, `mast`, `ground` mounts).
+- **Exporter and runtime** (`docs/unreal_export.md`, "From AT2"): packing version 2 (19 floats,
+  flags bit 6 high and bits 28-29 the animation), `ATMOS_VERSION` atmos2; the controller's high
+  pool (`MaxHigh`, `HighRangeM`, searchlights first), blinks and sweeps from the world's time,
+  each animated light's live-set fade kept; per cell an instanced red glow per aviation light
+  (`M_CgBeacon`) and a cone per searchlight (`M_CgBeam`), shown by night; atmos assets version
+  3; `CityGenAtmos.High`, `.Fixtures`; the status and the check's night lines.
+- **The plans:** every city passes both checks; Delta 50,304 lights (5,425 lit faces, 13,128
+  neon and shop spill, 1,527 floods on 310 crowns, 217 in AG15's accents, 2,201 aviation lights,
+  8 searchlights, 29 high masts), no lit face over 0 lx on its own wall, the facade opposite at a
+  median 25 lx.
+- **Unreal** (Delta in CityAG16): the import re-packs the 500 cells and the controller in under
+  2 min; the check passes by night. **The night, native 1440p, p95** (three runs each, before
+  AT1's plan, after AT2's): lights 14.0 to 14.3 ms over the route, 14.2 to 14.5 walking, the
+  deferred lights pass flat (3.50 to 3.54 ms walking); with AT0's fog, rain and wet street
+  prototypes 16.0 to 16.4 over the route and 16.3 to 16.7 walking, at the budget.
+
 ## AT1: streets at night
 
 Built on the Windows PC (2026-11-10), on main after AT0 (#185). Report, measurements and
