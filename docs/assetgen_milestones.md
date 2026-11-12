@@ -3173,6 +3173,31 @@ Vanta-R the same).
   in the pack; they are lit faces under the lens now. Pack rebuilt, every check passing:
   139,138, 57,536, 20,230, 8,071 triangles, large class, texels 331 px/m (5th percentile),
   LOD3 18.4 of 40 degrees, 0.025 of 0.10 bent, 0.0058 of 0.04 texture. Not published.
+- **Aurel Prelate** (`docs/progress/AG18/aurel_prelate/`, the Aurel pilot, now on
+  `vehicles/brands/aurel.py`, its wheel bound to the car's sizes): every slot of the light
+  lozenge a channel 10 mm wide and deep, in the slab hanging from its top edge and on the
+  hood (deck) running back from it, the edge whole between them (102 at the nose, 70 at the
+  tail), each under a flush lens of its own with a light guide's lit face right under it;
+  the corner blades pockets 34 mm wide and 30 mm deep under one lens, a lit guide in a
+  frosted sleeve between stacked reflector facets, bright liners on the long walls (the
+  brand's two bright edges) and bright end caps; the hairline round each corner a slot
+  under a lens; door pulls as recesses with the bright bar in them; the crest's outline cut
+  as a charge flap through each rear quarter; 3.5 mm shut lines (1.2 mm); both glass frames
+  in `"frame"` mode. The kit's new cutter mode `"into"` (`build_body`: the panel's own
+  surface run down into the cut, no panel edge round it): as housing panels of their own the
+  172 slots held the pack's LOD3 at 10,804 triangles and failed its fidelity check. The
+  car's own `shrink()` and a tidy pass (slivers' way in from their neighbors, moves kept in
+  the surface, faces under 1 mm dissolved, the few facing in turned back) take away the fins
+  of up to 14 mm the cuts' gaps pushed out (the sill's and door's asymmetry were such fins).
+  Street distances: the front wells wider inside the skin (steering 5 to 30 degrees), the
+  cabin floor and the tub's walls inboard of the rear tires (0.1 to 47.6 mm), the door cards
+  ahead of the rear arch (8% of the tub in the open to none). Every check `ok` (tires were
+  `fail`, symmetry and through `look`; the driver's wheel told as meant). 296,311 triangles
+  (215,832). Pack rebuilt, every check passing: 147,114, 59,993, 20,316, 4,545 triangles,
+  standard class, texels 416 px/m (5th percentile), LOD3 14.5 of 40 degrees, 0.025 of 0.10
+  bent, 0.025 of 0.04 texture; its far LODs smear the nose's lozenge (the collapse folds the
+  channels; 6 mm deep channels were worse). Every other car signs as before (the Vex cars
+  not built). Not published.
 - **Next**: a pilot car of each of the other five brands (lamps by `BRANDS.md`, each
   switching to its `vehicles/brands/` module), shown to Swagnik before the other twelve;
   step A's street-distance findings (tires in the body, cabin tubs in the wells) on each car

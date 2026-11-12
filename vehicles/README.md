@@ -325,7 +325,12 @@ bevelled edges.
   `(Geo, housing, "skin", P)` keeps the cut faces as `housing` and makes the skin the
   cutter took away a panel `P` of its own, with the gap all round: a lamp's lens over its
   housing (a `lens...` material makes it a thin lens, `lens_thick` 3 mm), a flap over its
-  recess. `(Geo, P, "cover")` makes the skin `P` and drops the cut faces.
+  recess. `(Geo, P, "cover")` makes the skin `P` and drops the cut faces. `(Geo, P, "into")`
+  runs panel `P`'s own surface down into the cut (`P` an ordinary panel, with its gap, rim
+  and bevel at its edges): a recess with no panel edge round it. A game pack's far LODs keep
+  every panel edge, so a field of many small channels (the Aurel Prelate's 172 light slots)
+  cut as panels of their own held its LOD3 at twice its budget; cut `"into"` the paint, with
+  their lenses built apart, they smooth away.
 - **Cut lines and lamps** (step B). `cutters` may be a function: `build_body` calls it once
   the cage stands, uncut and subdivided, and `on_body()`, `snap()` and `trace()` then see
   that hull, so `groove()` and `pocket()` lay their cutters on the surface as it will be

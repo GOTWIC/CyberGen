@@ -797,7 +797,11 @@ def build_body(stations, panel_of, pmat, line_crease=0.0, station_crease=0.0, na
                     took away a panel P of its own with the gap all round: a lamp's lens
                     over its housing (a lens... material makes it a thin lens), a handle or
                     a flap over its recess. (Geo, P, "cover") makes the skin panel P and
-                    drops the cut faces. A cutter on one side only cuts that side.
+                    drops the cut faces. (Geo, P, "into") runs panel P's own surface down
+                    into the cut, P an ordinary panel (gap, rim, bevel at its edges): a
+                    recess with no edge of a panel round it, which a game pack's far LODs
+                    can smooth away (a field of light slots). A cutter on one side only
+                    cuts that side.
                     A function instead of the list is called once the cage stands, uncut:
                     on_body() and snap() then see that hull, so groove() and pocket() can
                     lay cutters on the surface; it returns the list.
@@ -986,9 +990,11 @@ def build_body(stations, panel_of, pmat, line_crease=0.0, station_crease=0.0, na
     raw, dropped, skins = set(), set(), {}
     for ct in cutters:
         mode = ct[2] if len(ct) > 2 else None
-        if mode not in (None, "drop", "skin", "cover"):
+        if mode not in (None, "drop", "skin", "cover", "into"):
             raise ValueError("build_body(%s): cutter mode %r" % (name, mode))
         pidx(ct[1])
+        if mode == "into":
+            continue
         if mode == "cover":
             dropped.add(ct[1])
             continue

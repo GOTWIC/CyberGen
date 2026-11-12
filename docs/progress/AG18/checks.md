@@ -4,7 +4,7 @@
 
 | Car | Tires | Ground | Symmetry | Panels | Through | Triangles |
 |---|---|---|---|---|---|---|
-| [aurel_prelate](aurel_prelate/check.json) | FAIL: 0.1 mm to interior.tub, steers 5 deg | ok: 150.0 mm (body.floor) | look: 5 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 215832 |
+| [aurel_prelate](aurel_prelate/check.json) | ok: 47.6 mm to body.well, steers 30 deg | ok: 150.0 mm (body.floor) | ok: 0 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 296311 |
 | [aurel_regent](aurel_regent/check.json) | FAIL: 0.1 mm to interior.tub, steers 5 deg | ok: 150.0 mm (body.floor) | look: 2 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 228554 |
 | [aurel_zenith](aurel_zenith/check.json) | ok: none (hover) | ok: 270.3 mm (emitter.crest) | look: 1 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 129135 |
 | [brakk_bastion](brakk_bastion/check.json) | ok: 25.8 mm to fender.gussets, steers 20 deg | ok: 280.0 mm (chassis) | look: 13 objects | ok: 0 open runs, 0 cutter holes | look: 2 parts | ok: 269389 |
@@ -25,14 +25,9 @@
 
 ## Findings by car
 
-**aurel_prelate** (FAIL)
+**aurel_prelate** (ok)
 
-- tire `fl`: 47.6 mm to `body.well`, turns 5 degrees before it touches `body.well`
-- tire `rl`: 0.1 mm to `interior.tub`
-- tire `fr`: 47.6 mm to `body.well`, turns 5 degrees before it touches `body.well`
-- tire `rr`: 0.1 mm to `interior.tub`
-- not mirrored: `interior.wheel` 189.7 mm, `cowl.slot` 19.0 mm, `body.trim_ws` 14.0 mm, `body.sill` 9.9 mm, `body.trim_b` 8.6 mm
-- cabin part in the open: `interior.tub`, 8% of it, up to 38.3 mm from what would hide it, at (-0.984, 0.876, 0.175)
+- nothing
 
 **aurel_regent** (FAIL)
 
