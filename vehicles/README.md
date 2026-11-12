@@ -110,6 +110,10 @@ vehicles/blender.sh vehicles/game.py --car vanta_r --test           # 1024 / 512
 - **Time.** About 8 to 14 minutes a car at full size, up to 27 for the largest (most of it
   the bakes, the LOD fits and the proof); `--lods` alone 1 to 4 minutes. Packs are 20 to
   51 MB and never go in git.
+- **On another machine.** The built packs are a GitHub release of this repo:
+  `python vehicles/packs.py fetch` downloads the 18 (about 600 MB) into the packs' cache and
+  checks every file against `vehicles/packs.json`; `publish` uploads new ones (`GAME.md`,
+  "Sharing packs between machines").
 
 ## Workflow
 

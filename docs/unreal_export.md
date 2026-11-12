@@ -1567,6 +1567,8 @@ of layer 2 (`citygen/unreal_vehicles.py` on the venv side; `Importer.vehicles`,
 **The library.** A folder of packs, one per car (`<car>/pack.json`, `lod0.glb` to `lod3.glb`,
 `collision.glb`, five textures per baked slot): by default the packs' cache
 `~/.cache/cybergen/vehicles/game`, else `$CITYGEN_VEHICLES` or `citygen unreal --vehicles DIR`.
+A machine that has not built the packs fetches them from the repo's release with
+`python vehicles/packs.py fetch` (`vehicles/GAME.md`, "Sharing packs between machines").
 `--all-vehicles` imports every car of it, placed or not; otherwise only the cars the
 placements name. What a pack must hold: `pack.json` of format `cybergen.vehicle_pack` version
 1 with four LODs, the files it names (`read_pack` refuses a pack missing one), parts with
