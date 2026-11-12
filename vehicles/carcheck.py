@@ -24,6 +24,7 @@ import bmesh
 import bpy
 from mathutils import Vector as V3
 from mathutils.bvhtree import BVHTree
+from mathutils.kdtree import KDTree
 
 TRI_BUDGET = 400000         # a design mesh (the game pack's LOD0 is baked down to 150,000)
 TIRE_TOUCH_M = 0.004        # a tire this close to anything else touches it
@@ -246,12 +247,31 @@ def _loops(bm, edges):
     return out
 
 
+def _cut_points(piece, step=0.004):
+    """Points every few millimeters along a piece's cut lines and pocket outlines."""
+    kd_pts = []
+    for path in getattr(piece, "cuts", ()):
+        for a, b in zip(path, path[1:]):
+            n = max(1, int((b - a).length / step))
+            kd_pts += [a.lerp(b, k / n) for k in range(n + 1)]
+    if not kd_pts:
+        return None
+    kd = KDTree(len(kd_pts))
+    for i, q in enumerate(kd_pts):
+        kd.insert(q, i)
+    kd.balance()
+    return kd
+
+
 def check_panels(K, S):
-    """Open edges, cutter holes and lost panels of the body pieces build_body made."""
+    """Open edges, cutter holes and lost panels of the body pieces build_body made. An edge
+    along a cut line or a pocket the car laid on purpose (groove(), pocket()) is neither."""
     names = [o.name for o in S.obs]
     tree, own = S.tree(names)
     open_runs, holes, gone = [], [], []
+    cut_edges = 0
     for piece in K.PIECES.values():
+        kd = _cut_points(piece)
         raw_names = set()
         for pn in piece.raw:
             try:
@@ -274,14 +294,19 @@ def check_panels(K, S):
                 length = sum(e.calc_length() for e in run)
                 near_raw, lone = 0.0, []
                 near = EDGE_NEAR_M + 2 * piece.gap
+                on_cut = 0.0
                 for e in run:
                     mid = (e.verts[0].co + e.verts[1].co) / 2
+                    if kd is not None and kd.find(mid)[2] <= near:
+                        on_cut += e.calc_length()
+                        continue
                     hits = [own[i] for (_, _, i, _) in tree.find_nearest_range(mid, near)
                             if own[i] != name]
                     if not hits:
                         lone.append(e)
                     elif all(h in raw_names for h in hits):
                         near_raw += e.calc_length()
+                cut_edges += 1 if on_cut > 0.5 * length else 0
                 if lone:
                     # runs of open edges inside this loop
                     for part in _loops(bm, lone):
@@ -304,7 +329,7 @@ def check_panels(K, S):
     real = [r for r in open_runs if not r["meant"]]
     v = "fail" if real else ("look" if [h for h in holes if not h["meant"]] else "ok")
     return dict(verdict=v, open_edges=open_runs[:30], open_mm=sum(r["length_mm"] for r in real),
-                cutter_holes=holes[:20], pieces={n: dict(closed=p.closed, panels=len(p.parts))
+                cutter_holes=holes[:20], cut_loops=cut_edges, pieces={n: dict(closed=p.closed, panels=len(p.parts))
                                                  for n, p in K.PIECES.items()})
 
 

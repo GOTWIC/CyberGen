@@ -1306,7 +1306,9 @@ target is a current AAA open-world game's hero vehicles.
   car as built (`carcheck.py`), what the design sessions asked of the kit, a survey of every
   car (`survey.py`, `docs/progress/AG18/checks.md`) and a fingerprint of what each script
   builds (`signature.py`), with which the kit was changed without moving any car. Steps B to
-  E change the cars.
+  E change the cars. Step B is in progress (2026-11-12): its kit (cut lines and pockets laid
+  on the uncut hull, lenses over lamp housings, lamp modules, frit glass, a wiper) is done
+  and the Vanta-R is its first car; a pilot car per brand follows, then the rest.
 - **Phase 3, game-ready** (steps F and G; built 2026-11-11 for the 18 vehicles other than
   Vex, PRs #194, #196, #198, #199): `vehicles/game.py` turns a car's script, unchanged,
   into a game pack (named parts with wheel and brake pivots, baked atlases with the paint as
@@ -1403,12 +1405,13 @@ target is a current AAA open-world game's hero vehicles.
 **Plan** (each step a session or two, after Swagnik's review of phase 1). F and G are done
 (phase 3), and the packs are in the exporter and tested in Unreal (2026-11-11); H is done
 (2026-11-11: the vehicles parked in the generated cities); A is done (2026-11-12: the kit).
-Next: the design improvements B to E, B first.
+B is in progress: its kit and the Vanta-R are done (2026-11-12); next a pilot car of each
+other brand for Swagnik's look, then the other twelve.
 
 | Step | Work | Covers |
 |---|---|---|
 | A | Kit: clay and zebra renders, the checks, the designers' wishes (the line-up render is done). Done | 3, 13, 14 |
-| B | What shows at street distance: lamps, cut lines, glass, on the kept cars | 1, 2, 6 (glass) |
+| B | What shows at street distance: lamps, cut lines, glass, on the kept cars. Kit and Vanta-R done | 1, 2, 6 (glass) |
 | C | Wheels, running gear, hover gear, undersides | 4, 5, 7 |
 | D | Cabins | 6 (cabin) |
 | E | Night lights, trims, optional parts, wear | 8, 9 |

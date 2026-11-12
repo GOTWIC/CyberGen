@@ -2280,8 +2280,15 @@ waits for Swagnik's review.
   studio and the cameras of every car, Vex included). The same fingerprints mean the same
   sheets and packs; a car that moves is named in the PR and its sheet and pack left to the
   step that changes it.
-- **Next:** the design improvements (steps B to E), B first (lamps, cut lines and glass on
-  the kept cars), once Swagnik agrees to its plan.
+- **Step B** (lamps, cut lines and glass; started 2026-11-12, `vehicles/README.md`,
+  "build_body"): `build_body(cutters=fn)` lays cutters on the uncut hull (`groove()` shut
+  lines and light channels, `pocket()` housings and recesses; `"skin"` makes the skin cut
+  away a lens or a flap with the gap all round), `Lamp` (projectors, reflectors, guides),
+  frit glass and mirrored trim frames (`glass` modes `"frit"`, `"frame"`), even cap bands,
+  `wiper()`, lazy materials (`need()`: lenses, chrome, frit). The game pack leaves lenses out
+  (`game.LENS_MATS`), baking the lamp behind them. Done: the kit and the Vanta-R (its pack
+  rebuilt). Next: a pilot car of each other brand, shown to Swagnik, then the other twelve,
+  each switching to its `vehicles/brands/` module.
 - The other phases (improvements, AG8's parked vehicles and
   stage 4's fleet drawing on them) are listed in the scope with their plan.
 

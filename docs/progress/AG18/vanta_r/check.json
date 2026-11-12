@@ -6,7 +6,7 @@
   1.19
  ],
  "top_z": 1.19,
- "objects": 93,
+ "objects": 105,
  "palette": {
   "paint": [
    0.15,
@@ -87,7 +87,7 @@
  "symmetry": {
   "verdict": "look",
   "center_off_mm": 0.0,
-  "objects": 4,
+  "objects": 5,
   "asymmetric": [
    {
     "object": "interior.wheel",
@@ -109,20 +109,29 @@
    },
    {
     "object": "wiper",
-    "off_mm": 30.1,
+    "off_mm": 19.7,
     "at": [
-     0.913,
-     0.27,
-     0.827
+     0.988,
+     0.138,
+     0.778
     ]
    },
    {
-    "object": "body.trim",
-    "off_mm": 8.0,
+    "object": "wiper.blade",
+    "off_mm": 9.5,
     "at": [
-     -0.773,
-     -0.542,
-     1.082
+     0.948,
+     -0.039,
+     0.792
+    ]
+   },
+   {
+    "object": "body.lightband",
+    "off_mm": 4.5,
+    "at": [
+     -2.144,
+     0.911,
+     0.675
     ]
    }
   ]
@@ -132,10 +141,11 @@
   "open_edges": [],
   "open_mm": 0,
   "cutter_holes": [],
+  "cut_loops": 34,
   "pieces": {
    "body": {
     "closed": true,
-    "panels": 21
+    "panels": 27
    }
   }
  },
@@ -146,12 +156,16 @@
  },
  "triangles": {
   "verdict": "ok",
-  "total": 240286,
+  "total": 304992,
   "budget": 400000,
   "top": [
    [
     "tail.mesh",
     28800
+   ],
+   [
+    "body.lightband",
+    19152
    ],
    [
     "mouth.mesh",
@@ -174,18 +188,14 @@
     14384
    ],
    [
-    "body.trim",
-    8804
-   ],
-   [
-    "body.floor",
-    7106
+    "body.fender_f",
+    9468
    ]
   ],
   "groups": [
    [
     "body",
-    67384
+    106754
    ],
    [
     "tire",
@@ -194,6 +204,10 @@
    [
     "tail",
     28964
+   ],
+   [
+    "lamp",
+    24504
    ],
    [
     "rim",
@@ -210,10 +224,6 @@
    [
     "arch",
     4464
-   ],
-   [
-    "interior",
-    3376
    ]
   ]
  },

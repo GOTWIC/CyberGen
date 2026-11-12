@@ -279,6 +279,9 @@ def paint_nodes(m):
                 dust=tuple(dm.node.inputs["Color2"].default_value)[:3])
 
 
+LENS_MATS = ("lens", "optic")
+
+
 class MatInfo:
     def __init__(self, m):
         self.m = m
@@ -287,6 +290,9 @@ class MatInfo:
         self.b = b
         self.glass = b is not None and not b.inputs["Transmission Weight"].is_linked and \
             b.inputs["Transmission Weight"].default_value >= 0.5
+        # a lamp's lens or light guide sleeve (the kit's lens... and optic materials): left
+        # out of the pack, so the lamp behind it is baked as it is seen through it
+        self.lens = self.glass and m.name.startswith(LENS_MATS)
         es = val(b, "Emission Strength", 0.0)
         ec = val(b, "Emission Color", (0, 0, 0, 1))
         self.strength = es if b is not None and not b.inputs["Emission Strength"].is_linked else 0.0
@@ -596,8 +602,13 @@ def gather(K, infos):
         for o in mem:
             member[o.name] = (tag, o.name.split(".", 1)[0])
     pieces = []
+    lenses = 0
     for ob in objs:
         for mat, me in piece_meshes(ob, dg):
+            if infos.get(mat) is not None and infos[mat].lens:
+                bpy.data.meshes.remove(me)
+                lenses += 1
+                continue
             me.materials.append(bpy.data.materials.get(mat) or void_material())
             p = Piece("%s#%s" % (ob.name, mat), ob, mat, me)
             mi = infos.get(mat)
@@ -609,6 +620,8 @@ def gather(K, infos):
             pieces.append(p)
     for i, p in enumerate(pieces):
         p.idx = i
+    if lenses:
+        log("lenses left out: %d pieces (the lamps behind them are baked as seen)" % lenses)
     return pieces, wheels
 
 

@@ -3,20 +3,20 @@
  "title": "Halcyon Vanta-R",
  "ok": true,
  "triangles": {
-  "original": 240286,
+  "original": 304992,
   "lods": [
-   118974,
-   59992,
-   19800,
-   5107
+   145912,
+   59990,
+   19956,
+   4756
   ],
   "lod0_parts": {
-   "body": 69990,
+   "body": 96916,
    "glass": 2976,
-   "wheel_fl": 11680,
-   "wheel_fr": 11680,
-   "wheel_rl": 10916,
-   "wheel_rr": 10916,
+   "wheel_fl": 11684,
+   "wheel_fr": 11684,
+   "wheel_rl": 10918,
+   "wheel_rr": 10918,
    "brake_fl": 204,
    "brake_fr": 204,
    "brake_rl": 204,
@@ -24,12 +24,12 @@
   }
  },
  "objects": {
-  "original": 93,
+  "original": 105,
   "parts": 10
  },
  "size_class": {
   "name": "standard",
-  "exterior_m2": 35.62,
+  "exterior_m2": 36.03,
   "rule": "large when the body's exterior is 55 m2 or more",
   "lod_budgets": [
    150000,
@@ -46,19 +46,18 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 32940805,
- "seconds": 42.3,
+ "pack_bytes": 36538476,
+ "seconds": 560.3,
  "stage_seconds": {
-  "build": 0.5,
-  "render_original": 25.6,
-  "parts": 6.2,
+  "build": 1.7,
+  "render_original": 62.7,
+  "parts": 11.4,
   "nodes": 0.0,
-  "uv": 48.0,
-  "bake": 251.5,
-  "lods_export": 12.4,
-  "lods_only": 12.2,
-  "textures": 0.0,
-  "proof": 30.066203832626343
+  "uv": 59.4,
+  "bake": 247.0,
+  "lods_export": 47.4,
+  "textures": 8.418112993240356,
+  "proof": 121.57801079750061
  },
  "baked_down": {
   "card_src": {
@@ -70,13 +69,12 @@
    ]
   },
   "relief": {
-   "pieces": 6,
-   "triangles": 6536,
+   "pieces": 5,
+   "triangles": 6004,
    "names": [
     "decals",
     "led.name",
     "lettering",
-    "lines",
     "plate.glyphs",
     "sensors"
    ]
@@ -95,41 +93,41 @@
  "texel_px_per_m": {
   "body": {
    "exterior": {
-    "area_m2": 35.62,
-    "p5": 423.4,
-    "median": 436.5
+    "area_m2": 36.034,
+    "p5": 428.6,
+    "median": 443.7
    },
    "underside": {
-    "area_m2": 0.178,
-    "p5": 153.2,
-    "median": 447.2
+    "area_m2": 0.237,
+    "p5": 155.1,
+    "median": 444.2
    },
    "cabin": {
-    "area_m2": 11.827,
-    "p5": 174.3,
-    "median": 174.4
+    "area_m2": 12.717,
+    "p5": 177.3,
+    "median": 177.6
    },
    "lamp_in_gaps": {
-    "area_m2": 0.172,
-    "p5": 140.0,
-    "median": 152.5
+    "area_m2": 2.251,
+    "p5": 155.1,
+    "median": 155.1
    }
   },
   "wheels": {
    "exterior": {
     "area_m2": 5.092,
-    "p5": 387.4,
-    "median": 422.3
+    "p5": 381.9,
+    "median": 418.8
    },
    "underside": {
     "area_m2": 0.024,
-    "p5": 147.8,
-    "median": 416.6
+    "p5": 146.6,
+    "median": 418.8
    },
    "lamp_in_gaps": {
-    "area_m2": 0.035,
-    "p5": 147.8,
-    "median": 147.8
+    "area_m2": 0.047,
+    "p5": 146.6,
+    "median": 146.6
    }
   }
  },
@@ -137,11 +135,11 @@
  "collision_hulls": 7,
  "source": {
   "script": "vehicles/cars/vanta_r.py",
-  "script_sha256": "5af82e8775bac6f88aa1e842b7e6aa0f88a1e721750ca746a4c3b1cc1b9aa9ae",
-  "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
-  "game_sha256": "9e6108a54d1f801bd18195adc59470f9bd92b6d763a2afc8f84531218c054eab",
-  "original_triangles": 240286,
-  "original_objects": 93
+  "script_sha256": "ae102d317113650449a3c8b6662e1dea7665dd8848524bc48e99f2e8766c5be6",
+  "carkit_sha256": "80020b974b190e7b6db524668c8c6d0164b3484f712ec8a6420c6e9961b53ea5",
+  "game_sha256": "32271c5b2195e75c93509022799b7dd770add377d59cc906b924e040e27ff1db",
+  "original_triangles": 304992,
+  "original_objects": 105
  },
  "test": false,
  "checks": [
@@ -160,25 +158,25 @@
    "detail": [
     {
      "lod": 0,
-     "triangles": 118974,
+     "triangles": 145912,
      "budget": 150000,
      "ok": true
     },
     {
      "lod": 1,
-     "triangles": 59992,
+     "triangles": 59990,
      "budget": 60000,
      "ok": true
     },
     {
      "lod": 2,
-     "triangles": 19800,
+     "triangles": 19956,
      "budget": 20000,
      "ok": true
     },
     {
      "lod": 3,
-     "triangles": 5107,
+     "triangles": 4756,
      "budget": 5000,
      "ok": true
     }
@@ -191,13 +189,13 @@
     "limit": 0.005,
     "slots": {
      "body": {
-      "overlap": 0.001,
-      "coverage": 0.5455,
+      "overlap": 0.00024,
+      "coverage": 0.575,
       "outside_unit": 0.0
      },
      "wheels": {
       "overlap": 0.0,
-      "coverage": 0.2179,
+      "coverage": 0.2149,
       "outside_unit": 0.0
      }
     }
@@ -208,14 +206,14 @@
    "ok": true,
    "detail": {
     "body": {
-     "p5": 423.4,
-     "median": 436.5,
+     "p5": 428.6,
+     "median": 443.7,
      "floor": 300.0,
      "ok": true
     },
     "wheels": {
-     "p5": 387.4,
-     "median": 422.3,
+     "p5": 381.9,
+     "median": 418.8,
      "floor": 300.0,
      "ok": true
     }
@@ -320,7 +318,7 @@
      "deviation_m": [
       0.0,
       0.0,
-      0.0
+      0.0001
      ],
      "tolerance_m": [
       0.0703,
@@ -334,7 +332,7 @@
      "deviation_m": [
       0.0007,
       0.0007,
-      0.0038
+      0.0055
      ],
      "tolerance_m": [
       0.0703,
@@ -347,7 +345,7 @@
      "lod": 3,
      "deviation_m": [
       0.0005,
-      0.0007,
+      0.009,
       0.0
      ],
      "tolerance_m": [
@@ -364,10 +362,10 @@
    "ok": true,
    "detail": [
     {
-     "normal_p95_deg": 1.59,
-     "bent_share": 0.0016,
-     "texture_share": 0.0006,
-     "miss_share": 0.0018,
+     "normal_p95_deg": 3.01,
+     "bent_share": 0.0032,
+     "texture_share": 0.0004,
+     "miss_share": 0.0073,
      "lod": 1,
      "limits": {
       "p95": 12.0,
@@ -377,10 +375,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 12.99,
-     "bent_share": 0.0052,
-     "texture_share": 0.001,
-     "miss_share": 0.0006,
+     "normal_p95_deg": 16.95,
+     "bent_share": 0.0254,
+     "texture_share": 0.0051,
+     "miss_share": 0.0094,
      "lod": 2,
      "limits": {
       "p95": 25.0,
@@ -390,10 +388,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 30.67,
-     "bent_share": 0.0731,
-     "texture_share": 0.0101,
-     "miss_share": 0.022,
+     "normal_p95_deg": 22.59,
+     "bent_share": 0.0425,
+     "texture_share": 0.0076,
+     "miss_share": 0.0307,
      "lod": 3,
      "limits": {
       "p95": 40.0,
@@ -411,12 +409,12 @@
     "hulls": 7,
     "vertices": [
      294,
-     252,
-     132,
-     176,
-     126,
-     224,
-     352
+     272,
+     142,
+     152,
+     112,
+     218,
+     346
     ]
    }
   }
