@@ -138,10 +138,16 @@ So that LOD0 is near 150,000 triangles without decimating the silhouette:
 - **Over the budget, in this order**: relief up to 12.5 mm (bolt rows, badges, lenses),
   most triangles first; then every part of 600 triangles or more alike, body panels too
   (glass, lamps and wheels never), at most halved a round, four rounds. Collapsed parts
-  have their originals baked onto them.
+  have their originals baked onto them, and their shading normals weighted by face area as
+  the designs' panels are (a large flat face keeps its own normal to its edges; with plain
+  smooth normals the map had to bend a flat panel's corners back, and its triangles showed
+  as a glossy zigzag).
 - **Never seen**: faces no ray from outside reaches (through glass counts, for the cabin)
   are removed (a lamp's never: a light band behind a row of flutes, seen only through the
-  gaps, is its own class), and coincident faces (one of two facing the same way, both of
+  gaps, is its own class; a face over 20 cm2 only after a second look from 13 points and
+  along 600 directions, 96 at first: the back of a vent is seen only between its louvres,
+  along their tilt, and without it the vent showed black; a face found so is of the gaps
+  class), and coincident faces (one of two facing the same way, both of
   two facing apart). Faces seen only through glass are the cabin class, only from below the
   underside class. A face never seen from its front but seen from its back (a design
   face turned the wrong way, which Blender draws and an engine culls) is turned round, and
@@ -150,13 +156,38 @@ So that LOD0 is near 150,000 triangles without decimating the silhouette:
 
 `baked_down` in `pack.json` lists every piece and what became of it.
 
+**Fine relief stays at LOD0.** When LOD0 is under its budget with nothing shed, relief
+whose loose parts are under 4 texels wide at the texel floor (flutes and slots 13 mm wide or
+less, small lettering: no atlas draws them as lines and letters, they come out as a beat
+pattern or as dots) is also kept as it is in LOD0, over its baked image (`kept_at_lod0` in
+`baked_down`), the smallest pieces first while that fits the budget and takes no more than
+20% of it; lamps never. Its faces are left out from LOD1 on, where the baked image alone
+draws it. Relief too small for any image (every part of it under 8 texels long: letters
+12 mm tall, screw heads) is kept at LOD0 the same way with nothing baked under it
+(`lod0_only`): its image was dots, and showed round the letters. A piece with one larger
+part (a hull number among small print) keeps its image. What lies under relief (the faces the image is baked on, the islands given more
+texels) is the panel, never the relief's own copy.
+
+Before the bakes every part's quads and larger faces are cut into triangles, so the bake,
+the file and an engine all work on the same ones: a tangent space normal map is only right
+on the triangles it was baked with, and where a flat panel carries slanted shading normals
+(a collapsed panel keeping its bevels' normals) a quad's other diagonal showed as a glossy
+zigzag across it.
+
+A pack is the car parked and shut: the script is run with `CYBERGEN_SHUT=1` set, and a
+script that poses an opening part for its sheet builds it closed then (the taxi's sliding
+door; a script written before the convention by its own variable, `SHUT_ENV` in `game.py`).
+`carkit.Group`'s poses are per view and never reach a pack.
+
 ## UVs
 
 Smart projection per slot (66 degrees; the islands that end up covering texels another
 island covers, over 0.1% of the atlas, as a lip curling under its frame does, are projected
-again at 34 degrees, those still lying over themselves once more at 20), each island scaled to one texel density times its class's
-weight (exterior 1, cabin 0.4, underside 0.35, a lamp seen only in gaps 0.35, a rim face
-0.5), then a skyline packer at the largest
+again at 34 degrees, those still lying over themselves once more at 20, then at 11, then at 6; what still does, layers that face one way and meet at a vertex, is laid flat face by face, each an island of its own), each island scaled to one texel density times its class's
+weight (exterior 1, cabin 0.4, underside 0.35, a lamp or a large face seen only in gaps 0.35, a rim face
+0.5; on a vehicle with no wheels, which floats and sets down when parked, a face under 0.5 m
+that only rays going down leave is underside: no eye gets under it, and its belly's texels
+go to what is seen), then a skyline packer at the largest
 common scale, each lying flat or stood up, a smaller one first in a gap a taller one left
 under the skyline, with 8 px between islands at 4096 (bake margins 8 px; whole texels
 between islands down to the 512 mip); an island narrower than 16 px has half its width
@@ -166,7 +197,11 @@ that, 8 times at most, while that grows the atlas by 10% at most (else 1.5, then
 texel), so it covers texel centers and bakes. The body's islands
 that carry baked-down relief (lettering, decals, small lamps) get up to twice the density,
 less where that would grow the atlas by more than 20% or take the exterior's 5th
-percentile under 3% over the floor (`uv.detail_boost`). Baked-down detail is carried out
+percentile under 3% over the floor (`uv.detail_boost`). Where that leaves a boost under
+1.25 (the relief lies on large panels, and the boost is spread thin), it goes instead to
+the exterior islands under fine relief alone: pieces whose loose parts are under 4 texels
+wide at the floor's density (flutes, slots, small lettering), which need it to bake as
+lines and letters. Baked-down detail is carried out
 into the margins round its islands, so a seam across it does not show the surface under
 it. Measured density (px/m, area weighted median and 5th percentile, per class) is in
 `uv.texel_px_per_m`.
@@ -214,24 +249,37 @@ budget still steps down), and share LOD0's textures. Per part, in this order:
    to that floor, so no panel or light strip vanishes (the floors are lowered with the
    rest where they alone would pass the budget). Glass LOD0 draws through its normals
    (a coarse sheet shaded smooth: over 10% of its corners 15 degrees off their face) is not
-   collapsed while it is under 30% of the LOD (LOD3: 20%); over that its grid is
-   unsubdivided instead (every kept corner where LOD0 had it), and collapsed only if still
+   collapsed while it is under 30% of the LOD (LOD3: 20%); over that, at LOD3 (opaque and
+   dark), its facets are merged at 4, 7, 11, then 16 degrees whatever their shading (every
+   kept corner where LOD0 had it, the sheet on LOD0's surface and its edge on its frame);
+   still over, or at LOD1 and LOD2, its grid is unsubdivided, and collapsed only if still
    over. Other glass is kept as merged at LOD3 while under 12% of the LOD (flat panes a few
-   triangles each: a pane collapsed further pulls away from its frame), else collapsed as
-   any part.
+   triangles each: a pane collapsed further pulls away from its frame); dense glass over
+   that is merged at the same growing angles, and collapsed as any part only if no angle
+   brings it under 20%.
 5. **Wrecks put right** (LOD3, body). A loose part the collapse took off its own shape (a
    point of the collapsed part, its faces' and edges' middles, more than 1 cm or 12% of its
    size from the part as prepared, or the part's 95th percentile that far from the
    collapse; a part over 60 cm: 3 cm or 2% of its size, at the 98th percentile: a drum's
-   flanges folded through it, a step or a tow hook flattened into a spike) is put right,
+   flanges folded through it, a step or a tow hook flattened into a spike; or a small closed
+   solid the collapse left open: a flute or a bolt folded into a sliver that shows its dark
+   inside though every point of it is near the solid) is put right,
    the cheapest first while the fixes cost no more than 20% of the LOD over the collapse
    (halved while the collapse alone cannot pay): a part no larger than 60 cm becomes its
    convex hull (26 corners at most, closed and clean) where the hull keeps within that
    distance of it both ways (its faces on the part or on what the part stands against, whose
    faces there were removed as unseen); a larger one
-   becomes its hull where that is within 3 cm of it (a cable coiled on a drum), else, as a
-   lamp, is collapsed again alone at twice its triangles. Any other small wreck, or one past
+   becomes its hull where that is within 3 cm of it (26 corners, then 96), else, as a
+   lamp, is collapsed again alone at twice its triangles. Before that, a piece of six
+   loose parts or more, half of them wrecked, that is one convex shape as a whole becomes
+   one hull of 96 corners where that keeps within 3 cm of it both ways and the parts' own
+   hulls fill 35% of its volume (a cable's turns on a drum stack into a cylinder; each turn
+   alone collapsed to a crumpled ring; six panels round a nose do not fill their common
+   hull, and keep their own). Any other small wreck, or one past
    the budget, goes, unless it is on the edge of the box (it stays as the collapse left it).
+   The small wrecked parts of one piece (a row of flutes, a bolt circle) fare alike: hulls
+   for all of them when the budget has room for them all, else none (a row with gaps reads
+   as damage).
    Every vertex is then kept inside the part's own LOD0 box (the collapse places some
    past the surface).
 6. **Wheels at LOD3** are made anew: a round tube of 20 segments through LOD0's tire
@@ -253,6 +301,17 @@ budget still steps down), and share LOD0's textures. Per part, in this order:
 A LOD whose box falls short of LOD0's (or passes it) by more than `lod_bounds` allows (a
 glass crown collapsed away) has the parts that reach that side collapsed again at twice
 their ratio, the others a little more to hold the budget.
+
+A far LOD whose collapse is starved (a ratio under 3%: the hulls, the floors, the wheels
+and the lamps take the budget, and what is left tears the panels apart at their gaps) is
+prepared again with the small parts left out up to twice, then three times the size (24 cm,
+then 36 cm, at LOD3).
+
+A LOD short of its fidelity limits (below) is made again, twice at most: the body's pieces
+that carry 70% of the area drawn more than the limit off LOD0's normals (12 pieces at most:
+round bars, springs and axles collapsed to a few sides) are collapsed again alone at 2.5
+times the triangles the common ratio left them, the rest pay, and the LOD is kept when its
+body then draws nearer LOD0.
 
 Each LOD is measured against LOD0 (`lods[k].fidelity` in `pack.json`, check
 `lod_fidelity`): at points spread over the body's exterior (one per 40 cm2 at least), LOD0's
@@ -330,8 +389,10 @@ What the first import into Unreal Engine 5.8 showed (2026-11-11; the exporter's 
   the Aurels' glass roofs), and in shadow maps each sheet shadows the other. So an engine
   draws only the faces that point away from the car's middle (the inner sheet left out from
   outside), casts no shadow from the glass, and tints what shows through by the glass color
-  squared (the proof's ray crosses both sheets). From inside the cabin the glass would then be
-  invisible; a driver's view needs the inner sheet back.
+  squared (the proof's ray crosses both sheets). From inside the cabin it is the
+  other way round: the outer sheets face away and are culled, so the inner sheet is the
+  glass, and an engine draws it while the eye is inside the glass's box taken down to the
+  car's floor (Unreal's importer does; without that the glass is not there from the seats).
 - **Hulls carry their part's material.** LOD3's convex hull stand-ins (step 5 of the LODs)
   came out with no material, a glTF primitive with none, which an engine draws with its
   default (Unreal's checker): the two Aurels with covers had one each. Fixed: a hull wears its

@@ -140,10 +140,15 @@ vehicles/blender.sh vehicles/game.py --car vanta_r --test           # 1024 / 512
 - **No hints from the car.** The script runs unchanged; wheels, glass, paint channels and
   what to bake down are found by rules on the built objects (`GAME.md` lists them). Fix the
   tool, not the car.
+- **Parked and shut.** A pack is built with `CYBERGEN_SHUT=1` set: a script that poses an
+  opening part for its sheet builds it closed then (`K.Group` poses are per view and never
+  reach a pack).
 - **Baked down.** Lettering, ribbons and other flat relief go onto the surface under them;
   dense arrays (honeycombs) become cards; dense tires become lathes with the tread and
   sidewall marks baked on; over budget, taller relief such as bolt rows, then a collapse of
-  every part alike (never glass, lamps or wheels). Faces nothing can see are removed; a
+  every part alike (never glass, lamps or wheels). Under budget, fine relief (flutes, slots,
+  small lettering no atlas draws as lines) also stays as geometry at LOD0. Faces nothing can
+  see are removed; a
   face seen better from behind is turned round. Islands under baked lettering get more
   texels, thin islands at least two texels across.
 - **LODs.** Small parts and the cabin left out first, flat faces merged, then a collapse

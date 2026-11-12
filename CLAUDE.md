@@ -2243,8 +2243,10 @@ waits for Swagnik's review.
   file checked against the committed `vehicles/packs.json`; `publish` after rebuilding
   packs, committing `packs.json` in the same PR; `status`). Size classes standard
   and large (55 m2 of exterior or more: LOD3 8,000 triangles, texel floor 240 px/m against
-  5,000 and 300). Built for 18 vehicles; kestrel_meridian and brakk_hauler (`lod_fidelity`)
-  and halcyon_ridge (`uv_overlap`) fail one check each by a hair, recorded.
+  5,000 and 300). Built for 18 vehicles, every check passing (the faults of the first run
+  fixed in `game.py` and nine packs rebuilt, 2026-11-12; the other nine are as first built).
+  A pack is the car parked and shut (`CYBERGEN_SHUT`, `SHUT_ENV` in `game.py`).
+  `CYBERGEN_GAME_DEBUG=1` logs each far LOD wreck.
 - **Vex** (vex_wraith, vex_halo, vex_strix) is to be redesigned (Swagnik, 2026-11-10): no
   packs, out of every later step until redone.
 - **In the cities** (step H, 2026-11-11; `assetgen/parked/`, tests

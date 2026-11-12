@@ -5,13 +5,13 @@
  "triangles": {
   "original": 228554,
   "lods": [
-   110611,
-   59991,
-   20593,
+   121393,
+   59994,
+   20012,
    5137
   ],
   "lod0_parts": {
-   "body": 60871,
+   "body": 71653,
    "glass": 3020,
    "wheel_fl": 11680,
    "wheel_fr": 11680,
@@ -25,7 +25,7 @@
  },
  "size_class": {
   "name": "standard",
-  "exterior_m2": 48.18,
+  "exterior_m2": 48.51,
   "rule": "large when the body's exterior is 55 m2 or more",
   "lod_budgets": [
    150000,
@@ -42,24 +42,23 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 27857414,
- "seconds": 42.5,
+ "pack_bytes": 30361427,
+ "seconds": 752.9,
  "stage_seconds": {
   "build": 0.4,
-  "render_original": 21.5,
-  "parts": 9.0,
+  "render_original": 22.7,
+  "parts": 33.2,
   "nodes": 0.0,
-  "uv": 43.2,
-  "bake": 492.1,
-  "lods_export": 12.4,
-  "lods_only": 10.6,
-  "textures": 0.0,
-  "proof": 31.892213106155396
+  "uv": 97.4,
+  "bake": 510.2,
+  "lods_export": 12.5,
+  "textures": 7.92553186416626,
+  "proof": 68.10969805717468
  },
  "baked_down": {
   "relief": {
-   "pieces": 39,
-   "triangles": 27792,
+   "pieces": 38,
+   "triangles": 24582,
    "names": [
     "blade.light.f",
     "blade.light.r",
@@ -85,7 +84,6 @@
     "division.slot",
     "flap",
     "led.stop",
-    "lettering",
     "lozenge.flutes.f",
     "lozenge.flutes.r",
     "lozenge.light.f",
@@ -102,6 +100,13 @@
     "wordmark"
    ]
   },
+  "lod0_only": {
+   "pieces": 1,
+   "triangles": 3210,
+   "names": [
+    "lettering"
+   ]
+  },
   "lathe": {
    "pieces": 4,
    "triangles": 57536,
@@ -116,24 +121,24 @@
  "texel_px_per_m": {
   "body": {
    "exterior": {
-    "area_m2": 48.175,
+    "area_m2": 48.505,
     "p5": 342.5,
     "median": 344.6
    },
    "cabin": {
-    "area_m2": 33.125,
+    "area_m2": 37.54,
     "p5": 137.6,
     "median": 137.7
    },
+   "lamp_in_gaps": {
+    "area_m2": 2.385,
+    "p5": 120.4,
+    "median": 344.1
+   },
    "underside": {
     "area_m2": 0.096,
-    "p5": 333.5,
+    "p5": 344.1,
     "median": 345.1
-   },
-   "lamp_in_gaps": {
-    "area_m2": 0.649,
-    "p5": 120.4,
-    "median": 120.4
    }
   },
   "wheels": {
@@ -154,8 +159,8 @@
  "source": {
   "script": "vehicles/cars/aurel_regent.py",
   "script_sha256": "37fa661e27d95c6c49cc100b00188b1a8ad2c773df195f4a4f7b43862c713e87",
-  "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
-  "game_sha256": "d465cc36c23ee311f11607a1d6df3c589e936e5c61db3dee4b3568780c548a2e",
+  "carkit_sha256": "86fc2281f799baae0c26b3ac0a61705bd4f58e4eb5e5443afa1c08342131b5e3",
+  "game_sha256": "9f14193bfa1a5692614bd58ee2196f52e11cb24b8159b4eb325b1ab704877169",
   "original_triangles": 228554,
   "original_objects": 114
  },
@@ -176,19 +181,19 @@
    "detail": [
     {
      "lod": 0,
-     "triangles": 110611,
+     "triangles": 121393,
      "budget": 150000,
      "ok": true
     },
     {
      "lod": 1,
-     "triangles": 59991,
+     "triangles": 59994,
      "budget": 60000,
      "ok": true
     },
     {
      "lod": 2,
-     "triangles": 20593,
+     "triangles": 20012,
      "budget": 20000,
      "ok": true
     },
@@ -207,8 +212,8 @@
     "limit": 0.005,
     "slots": {
      "body": {
-      "overlap": 0.00059,
-      "coverage": 0.5154,
+      "overlap": 0.00055,
+      "coverage": 0.5538,
       "outside_unit": 0.0
      },
      "wheels": {
@@ -363,8 +368,8 @@
      "lod": 3,
      "deviation_m": [
       0.0,
-      0.0065,
-      0.0003
+      0.001,
+      0.0001
      ],
      "tolerance_m": [
       0.0889,
@@ -381,9 +386,9 @@
    "detail": [
     {
      "normal_p95_deg": 0.83,
-     "bent_share": 0.0003,
+     "bent_share": 0.0001,
      "texture_share": 0.0,
-     "miss_share": 0.0,
+     "miss_share": 0.0002,
      "lod": 1,
      "limits": {
       "p95": 12.0,
@@ -393,10 +398,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 2.05,
-     "bent_share": 0.0043,
-     "texture_share": 0.0025,
-     "miss_share": 0.0021,
+     "normal_p95_deg": 2.19,
+     "bent_share": 0.0041,
+     "texture_share": 0.0021,
+     "miss_share": 0.0013,
      "lod": 2,
      "limits": {
       "p95": 25.0,
@@ -406,10 +411,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 8.12,
-     "bent_share": 0.0191,
-     "texture_share": 0.0069,
-     "miss_share": 0.0152,
+     "normal_p95_deg": 12.54,
+     "bent_share": 0.0273,
+     "texture_share": 0.0104,
+     "miss_share": 0.0107,
      "lod": 3,
      "limits": {
       "p95": 40.0,

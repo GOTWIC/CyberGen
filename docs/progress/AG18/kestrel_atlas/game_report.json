@@ -5,13 +5,13 @@
  "triangles": {
   "original": 151203,
   "lods": [
-   87139,
-   52282,
-   20080,
-   8215
+   101852,
+   59999,
+   20122,
+   8120
   ],
   "lod0_parts": {
-   "body": 86403,
+   "body": 101116,
    "glass": 736
   }
  },
@@ -21,7 +21,7 @@
  },
  "size_class": {
   "name": "large",
-  "exterior_m2": 76.05,
+  "exterior_m2": 72.29,
   "rule": "large when the body's exterior is 55 m2 or more",
   "lod_budgets": [
    150000,
@@ -37,19 +37,18 @@
  "textures": {
   "body": 4096
  },
- "pack_bytes": 34888721,
- "seconds": 56.8,
+ "pack_bytes": 40042384,
+ "seconds": 864.9,
  "stage_seconds": {
   "build": 0.3,
-  "render_original": 24.4,
-  "parts": 10.1,
+  "render_original": 55.7,
+  "parts": 31.1,
   "nodes": 0.0,
-  "uv": 164.0,
-  "bake": 182.0,
-  "lods_export": 31.2,
-  "lods_only": 27.1,
-  "textures": 0.0,
-  "proof": 29.638833045959473
+  "uv": 473.5,
+  "bake": 178.6,
+  "lods_export": 26.3,
+  "textures": 6.583182096481323,
+  "proof": 92.24397087097168
  },
  "baked_down": {
   "relief": {
@@ -79,24 +78,24 @@
  "texel_px_per_m": {
   "body": {
    "exterior": {
-    "area_m2": 76.048,
-    "p5": 310.1,
-    "median": 320.5
+    "area_m2": 72.291,
+    "p5": 316.8,
+    "median": 327.5
    },
    "cabin": {
-    "area_m2": 11.105,
-    "p5": 128.1,
-    "median": 314.7
+    "area_m2": 14.024,
+    "p5": 130.9,
+    "median": 327.5
    },
    "underside": {
-    "area_m2": 1.414,
-    "p5": 112.1,
-    "median": 320.2
+    "area_m2": 5.214,
+    "p5": 113.7,
+    "median": 114.6
    },
    "lamp_in_gaps": {
-    "area_m2": 1.033,
-    "p5": 112.1,
-    "median": 112.1
+    "area_m2": 5.136,
+    "p5": 114.6,
+    "median": 327.4
    }
   }
  },
@@ -105,8 +104,8 @@
  "source": {
   "script": "vehicles/cars/kestrel_atlas.py",
   "script_sha256": "7233b4fec97c51f6005241ffd298f5cf884b3e91b7fa31da5207297cea6c4ae4",
-  "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
-  "game_sha256": "9e6108a54d1f801bd18195adc59470f9bd92b6d763a2afc8f84531218c054eab",
+  "carkit_sha256": "86fc2281f799baae0c26b3ac0a61705bd4f58e4eb5e5443afa1c08342131b5e3",
+  "game_sha256": "ac27f7dab3eb8522bd38e910dcf6fb19a322ef1ddc91ecb329ca4dd13073d991",
   "original_triangles": 151203,
   "original_objects": 155
  },
@@ -127,25 +126,25 @@
    "detail": [
     {
      "lod": 0,
-     "triangles": 87139,
+     "triangles": 101852,
      "budget": 150000,
      "ok": true
     },
     {
      "lod": 1,
-     "triangles": 52282,
+     "triangles": 59999,
      "budget": 60000,
      "ok": true
     },
     {
      "lod": 2,
-     "triangles": 20080,
+     "triangles": 20122,
      "budget": 20000,
      "ok": true
     },
     {
      "lod": 3,
-     "triangles": 8215,
+     "triangles": 8120,
      "budget": 8000,
      "ok": true
     }
@@ -158,8 +157,8 @@
     "limit": 0.005,
     "slots": {
      "body": {
-      "overlap": 0.00341,
-      "coverage": 0.5147,
+      "overlap": 5e-05,
+      "coverage": 0.5598,
       "outside_unit": 0.0
      }
     }
@@ -170,8 +169,8 @@
    "ok": true,
    "detail": {
     "body": {
-     "p5": 310.1,
-     "median": 320.5,
+     "p5": 316.8,
+     "median": 327.5,
      "floor": 240.0,
      "ok": true
     }
@@ -217,7 +216,7 @@
     {
      "lod": 3,
      "deviation_m": [
-      0.0,
+      0.0007,
       0.0,
       0.0003
      ],
@@ -235,10 +234,10 @@
    "ok": true,
    "detail": [
     {
-     "normal_p95_deg": 2.0,
-     "bent_share": 0.0063,
-     "texture_share": 0.0031,
-     "miss_share": 0.0101,
+     "normal_p95_deg": 0.76,
+     "bent_share": 0.0055,
+     "texture_share": 0.0022,
+     "miss_share": 0.0035,
      "lod": 1,
      "limits": {
       "p95": 12.0,
@@ -248,10 +247,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 22.27,
-     "bent_share": 0.0369,
-     "texture_share": 0.0111,
-     "miss_share": 0.0071,
+     "normal_p95_deg": 22.43,
+     "bent_share": 0.0372,
+     "texture_share": 0.0139,
+     "miss_share": 0.0057,
      "lod": 2,
      "limits": {
       "p95": 25.0,
@@ -261,10 +260,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 35.07,
-     "bent_share": 0.0845,
-     "texture_share": 0.0288,
-     "miss_share": 0.0716,
+     "normal_p95_deg": 37.31,
+     "bent_share": 0.0801,
+     "texture_share": 0.0298,
+     "miss_share": 0.054,
      "lod": 3,
      "limits": {
       "p95": 40.0,
@@ -284,10 +283,10 @@
      314,
      366,
      194,
-     228,
+     238,
      212,
      268,
-     218,
+     224,
      314,
      198,
      232,

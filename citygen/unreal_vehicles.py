@@ -113,6 +113,37 @@ def _accessor(doc: dict, blob: bytes, k: int) -> list:
     return out
 
 
+def glass_box(path: Path) -> dict | None:
+    """The box of a pack's glass at LOD0 in the car's frame (x forward, y left, z up, meters),
+    {"min": [x, y, z], "max": [x, y, z]}, from the glTF's accessor bounds; None for a car with
+    no glass. The importer's glass master takes an eye inside it for an eye in the cabin."""
+    doc, blob = _glb(path)
+    lo, hi = None, None
+    for node in doc.get("nodes", []):
+        if node.get("name") != "glass" or "mesh" not in node:
+            continue
+        t = node.get("translation", [0.0, 0.0, 0.0])
+        for prim in doc["meshes"][node["mesh"]]["primitives"]:
+            k = prim["attributes"]["POSITION"]
+            a = doc["accessors"][k]
+            amin, amax = a.get("min"), a.get("max")
+            if amin is None or amax is None:
+                rows = _accessor(doc, blob, k)
+                if not rows:
+                    continue
+                amin = [min(r[i] for r in rows) for i in range(3)]
+                amax = [max(r[i] for r in rows) for i in range(3)]
+            # (glTF's x, y, z are the car's x, z, -y)
+            g0 = [amin[i] + t[i] for i in range(3)]
+            g1 = [amax[i] + t[i] for i in range(3)]
+            b0, b1 = [g0[0], -g1[2], g0[1]], [g1[0], -g0[2], g1[1]]
+            lo = b0 if lo is None else [min(x, y) for x, y in zip(lo, b0)]
+            hi = b1 if hi is None else [max(x, y) for x, y in zip(hi, b1)]
+    if lo is None:
+        return None
+    return {"min": [round(v, 4) for v in lo], "max": [round(v, 4) for v in hi]}
+
+
 def tangents(path: Path) -> bool:
     """Whether every primitive of a glTF file carries its tangents (GAME.md says they are in
     the glTF; Blender's exporter leaves them out of a mesh it cannot compute them for, and
@@ -209,6 +240,7 @@ def read_pack(folder: Path) -> dict:
         "materials": {s: dict((pk["materials"].get(s) or {}).get("params") or {})
                       for s in slots},
         "glass": glass,
+        "glass_box": glass_box(folder / lods[0]["file"]),
         "colors": {c: pk["colors"][c]["color"] for c in CHANNELS if c in pk["colors"]},
         "emissive_strength": pk.get("emissive_strength", 1.0),
         "micro_detail": pk.get("micro_detail") or {},
