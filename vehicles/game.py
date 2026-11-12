@@ -1335,7 +1335,7 @@ def unwrap(ob, size, pad_px=None, boost=None, floor=None, thin=True, again=None,
     edit(ob)
     bpy.ops.uv.smart_project(angle_limit=1.15, island_margin=0.0, area_weight=0.0,
                              correct_aspect=True, scale_to_bounds=False)
-    for k, faces in enumerate(again or []):
+    for k, faces in enumerate((again or [])[:len(UV_AGAIN_ANGLES)]):
         # the faces of islands that lay over themselves, projected again in smaller charts
         # (a second, a third and a fourth time, smaller still, those that still did)
         bpy.ops.mesh.select_all(action='DESELECT')
@@ -1349,6 +1349,22 @@ def unwrap(ob, size, pad_px=None, boost=None, floor=None, thin=True, again=None,
         bpy.ops.uv.smart_project(angle_limit=UV_AGAIN_ANGLES[k], island_margin=0.0,
                                  area_weight=0.0, correct_aspect=True, scale_to_bounds=False)
     bpy.ops.object.mode_set(mode='OBJECT')
+    for faces in (again or [])[len(UV_AGAIN_ANGLES):]:
+        # still over themselves at the smallest angle (layers that face one way and meet
+        # at a vertex: no projection by direction parts them): each of those faces laid
+        # flat in its own plane, an island of its own
+        uvd = me.uv_layers.active.data
+        for i in sorted(faces):
+            poly = me.polygons[i]
+            nrm = V3(poly.normal)
+            if nrm.length < 0.5:
+                continue
+            e1 = nrm.orthogonal().normalized()
+            e2 = nrm.cross(e1)
+            for li, vi in zip(poly.loop_indices, poly.vertices):
+                d_ = me.vertices[vi].co - poly.center
+                uvd[li].uv = (d_.dot(e1), d_.dot(e2))
+        log("  %d faces laid flat one by one" % len(faces))
     log("  smart projection %s: %s" % (ob.name, _uvbox(me)))
     from bpy_extras import mesh_utils
     islands = mesh_utils.mesh_linked_uv_islands(me)
@@ -1458,14 +1474,16 @@ def unwrap(ob, size, pad_px=None, boost=None, floor=None, thin=True, again=None,
     log("  packed %s: %d islands, %.0f%% of the square, uv box %s" % (
         ob.name, len(islands), fill * 100, _uvbox(me)))
     ob["cg_detail_boost"] = f
-    if len(again or []) < len(UV_AGAIN_ANGLES):
+    if len(again or []) <= len(UV_AGAIN_ANGLES):
         # an island the projection laid over itself (a lip curling under its frame within
-        # the angle limit) is projected again in smaller charts; four times at most
+        # the angle limit) is projected again in smaller charts; four times at most, and
+        # what still lies over itself then is laid flat face by face
         lay = self_overlap(me, U, islands)
         if lay:
             n = len(again or [])
-            log("  %d islands (%d faces) overlap themselves: projected again at %.2f rad" % (
-                lay[0], len(lay[1]), UV_AGAIN_ANGLES[n]))
+            log("  %d islands (%d faces) overlap themselves: %s" % (
+                lay[0], len(lay[1]), "projected again at %.2f rad" % UV_AGAIN_ANGLES[n]
+                if n < len(UV_AGAIN_ANGLES) else "laid flat face by face"))
             return unwrap(ob, size, pad_px, boost, floor, thin,
                           again=list(again or []) + [lay[1]], fine=fine)
     return len(islands)

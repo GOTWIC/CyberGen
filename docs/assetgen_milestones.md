@@ -3016,7 +3016,10 @@ What the survey found on the 18 cars ([`checks.md`](progress/AG18/checks.md) has
     panels the relief lies on, 23 m2; sending it to the islands under fine relief alone,
     also added, still left 6.6 m2).
   - The unwrap's retry for islands lying over themselves has a third and a fourth, smaller
-    angle (the Ridge's overlap: 0.52% of the texels against a limit of 0.5%).
+    angle, and what still lies over itself then is laid flat face by face (the Ridge's
+    overlap, 0.52% of the texels against a limit of 0.5%, is at the rear of its roof:
+    layers that face one way and meet at a vertex, which no smaller angle parted: 0.49%
+    after the third, 0.50% after the fourth).
 - **Parked and shut.** A pack is built with `CYBERGEN_SHUT=1` (and the Cab's own
   `CAB_SHUT`, `SHUT_ENV`): the taxi's sliding door is closed. Its fold-out step is still
   out (the script draws it either way).

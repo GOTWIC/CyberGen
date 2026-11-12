@@ -182,7 +182,7 @@ door; a script written before the convention by its own variable, `SHUT_ENV` in 
 
 Smart projection per slot (66 degrees; the islands that end up covering texels another
 island covers, over 0.1% of the atlas, as a lip curling under its frame does, are projected
-again at 34 degrees, those still lying over themselves once more at 20, then at 11, then at 6), each island scaled to one texel density times its class's
+again at 34 degrees, those still lying over themselves once more at 20, then at 11, then at 6; what still does, layers that face one way and meet at a vertex, is laid flat face by face, each an island of its own), each island scaled to one texel density times its class's
 weight (exterior 1, cabin 0.4, underside 0.35, a lamp or a large face seen only in gaps 0.35, a rim face
 0.5; on a vehicle with no wheels, which floats and sets down when parked, a face under 0.5 m
 that only rays going down leave is underside: no eye gets under it, and its belly's texels
