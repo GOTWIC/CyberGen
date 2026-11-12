@@ -227,6 +227,17 @@ heading and the class; a column, arm, pack or downlight drawn there (the column'
 ground or the road under it) would make the light come from a fixture. Until then the light
 is right and the fixture is missing; the plan's report counts them by mount.
 
+AT2 adds a fourth, **fixtures for its lights** (AG4, AG7, AG8): `roof` (a crown flood on the
+setback under a tower's crown or on an outrigger 4 m off its facade, a searchlight on a roof),
+`beacon` (an aviation light's red lens at a roof corner, a mast's tip or a corner of a
+facade every 90 m down), `mast` (a port yard's or an apron's 30 m high mast, a crane boom's
+floods) and `ground` (an apron's edge light, a launch pad's rim light, in the pavement). As
+the third: a fixture at the light's lens, headed its aim's way. Until then the runtime shows
+a beacon's glow and a searchlight's beam itself (`docs/unreal_export.md`, "From AT2"). AT2
+also reads the second ask wherever `signs.json` meets it (a slot record that is an object
+with `cell` and `face`, or a top-level `faces` map by slot id; a cell's `emit`), and derives
+the luminance too until then: the page cell's mean brightness.
+
 ## 5. Feature catalog
 
 ### 5.1 Buildings

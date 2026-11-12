@@ -1518,6 +1518,48 @@ import go):
 - **A city without an atmos plan** imports as before (no controller, no cells), its night
   lit by the light pools alone.
 
+### From AT2: neon and signs as light
+
+The plan's AT2 lights (`docs/atmosgen_scope.md` 6.1: lit faces stood off their walls, neon
+spill, crown floods and uplights, aviation lights, searchlights, a port's and a spaceport's
+lights) come through the same cells; what changed in the exporter and the runtime:
+
+- **Packing version 2** (`unreal_atmos.PACK_VERSION`, `CityGenAtmosPack`): 19 floats a light,
+  AT1's 16 then an animation's period (s), amount (a blink's on share, a sweep's swing in
+  degrees either way) and phase (0 to 1); the flags' bit 6 the high tier, bits 28-29 the
+  animation (0 none, 1 blink, 2 sweep). The importer's `ATMOS_VERSION` is `atmos2`, so an
+  import over an AT1 level re-packs every cell and the controller, and nothing else.
+- **The high tier** (the plan's `tiers.high_m`, `high_max`; the controller's `MaxHigh`,
+  `HighRangeM`, 48 within 750 m by default, `max_high` and `high_range_m` in `atmos.json`):
+  crown floods, uplights, searchlights and high masts are a pool of their own, the nearest
+  within World Partition's loading range, so they never take a street light's place in the
+  mid set nor it theirs; never shadowed, the farthest fifth of the range fading.
+  `CityGenAtmos.High LIVE RANGE_M` sets it.
+- **Animation:** a blinking light (aviation) is on for its share of each period from the
+  world's time; a sweeping one (a searchlight) swings its yaw by its amount and its pitch a
+  little, out of step; both with the flicker in one per-frame pass over the live set (which
+  now keeps each light's fade, so a flickering light no longer pops to full at the live
+  range's edge).
+- **The fixtures' stand-ins** (until stage 2 draws them, the plan's fourth ask): per cell an
+  instanced component of red glows, one per aviation light (`/Engine/BasicShapes/Sphere`
+  0.9 m across in `M_CgBeacon`, blinking from per-instance data with its light), and per
+  searchlight a beam (`/Engine/BasicShapes/Cone`, 400 m long, its apex at the light, in
+  `M_CgBeam`: additive, fading along it and at its silhouette, depth-faded where it meets a
+  surface; its color, glow and half length in custom primitive data), turned with its sweep
+  every frame. Made as a cell registers and destroyed as it streams out, shown only while
+  the lights show (by night). `CityGenAtmos.Fixtures [0|1]` switches them; the controller's
+  `BeaconGlow` and `BeamGlow` scale them.
+- **Assets** (`atmos_assets.py` version 3): `M_CgBeacon` and `M_CgBeam` beside AT0's,
+  under `/Game/CityGen/Core/Atmos` (cooked always, as `unreal.ALWAYS_COOK` already lists the
+  folder and `/Engine/BasicShapes`).
+- **Not delivered when a lit face floods its wall:** a plan whose faces check failed is left
+  out as one whose lux check failed (`atmos.skipped`).
+- **Status and the check:** `CityGenAtmos.Status` adds `high`, `max_high`, `high_m`,
+  `candidates_high`, `animated`, `beacons`, `beams` and `fixtures`; the check's night line
+  and its night views log them.
+- **The lit faces' stand-ins** (billboards, banners, holo-boards, neon bands, shop signs) keep
+  AT1's rule: no specular highlight.
+
 ### A packaged game
 
 A project a city was imported into packages as any Unreal project (UAT's `BuildCookRun`,

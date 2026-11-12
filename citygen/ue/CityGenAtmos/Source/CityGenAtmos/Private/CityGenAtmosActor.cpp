@@ -333,6 +333,7 @@ void ACityGenAtmos::ReleaseAll()
 		Release(K);
 	}
 	Flickering.Reset();
+	FadeOf.Reset();
 }
 
 void ACityGenAtmos::ApplyLight(ULocalLightComponent* C, const FCityGenAtmosLight& L, float Fade, bool bShadowed)
@@ -498,6 +499,7 @@ void ACityGenAtmos::UpdateLive()
 	}
 	const double FarCm = N > 0 ? FMath::Min(MidCm, Near[N - 1].Key) : MidCm;
 	Flickering.Reset();
+	FadeOf.Reset();
 	for (int32 k = 0; k < N; ++k)
 	{
 		const int64 Key = Near[k].Value;
@@ -521,6 +523,7 @@ void ACityGenAtmos::UpdateLive()
 		if (L->Flicker > 0.f || L->Anim != 0)
 		{
 			Flickering.Add(Key);
+			FadeOf.Add(Key, Fade);
 		}
 	}
 	// the high pool's: no shadows, the farthest fifth of its range fading
@@ -544,6 +547,7 @@ void ACityGenAtmos::UpdateLive()
 		if (L->Flicker > 0.f || L->Anim != 0)
 		{
 			Flickering.Add(H.Value);
+			FadeOf.Add(H.Value, Fade);
 		}
 	}
 	UpdateMs = (FPlatformTime::Seconds() - T) * 1000.0;
@@ -571,13 +575,14 @@ void ACityGenAtmos::UpdateFlicker(double Now)
 			Drop = R < 0.18f ? L->Flicker : (R < 0.3f ? 0.3f * L->Flicker : 0.f);
 		}
 		// (AT2: a blink from the world's time, as the beacon's material blinks; a sweep turns
-		// the light; the live set's fade is left to its 0.2 s update)
+		// the light; the live set's fade kept from its last choice)
 		if (L->Anim == 2)
 		{
 			(*C)->SetWorldRotation(AnimRot(*L, T));
 		}
+		const float* Fade = FadeOf.Find(Key);
 		(*C)->SetIntensity(L->Intensity * Scale() * ScheduleAt(L->Schedule) * (1.f - Drop) *
-			AnimGain(*L, T));
+			AnimGain(*L, T) * (Fade ? *Fade : 1.f));
 	}
 }
 

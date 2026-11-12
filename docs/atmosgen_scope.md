@@ -1,4 +1,4 @@
-# atmosgen: light, sky, air and weather (scope, v2: decided 2026-11-10, AT0 and AT1 done)
+# atmosgen: light, sky, air and weather (scope, v2: decided 2026-11-10, AT0 to AT2 done)
 
 Stage 3 (atmosgen) of CyberGen's five stages. It takes a built city with its assets and
 makes the city's light and air: every light source that casts light, the sky, fog, smog,
@@ -120,7 +120,9 @@ and size in the variant's frame) and `signs.json`'s slot record gains `face` (mi
 normal, size, two-sided) and its cell `emit` (color, nits). Until assetgen writes them the
 plan derives both from citygen (M6's prototype lamp head, M20's slot with the prototype's
 frame, the cell's own color or the mean of its bright pixels on the page), and every light
-says which (`Light.source`, the plan's `sources`).
+says which (`Light.source`, the plan's `sources`). AT2 reads the second ask where it is met
+and derives a sign's luminance from its page cell's brightness until then; it adds a fourth
+ask, the fixtures of its own lights (`roof`, `beacon`, `mast`, `ground`: assetgen scope 4.6).
 
 ### 4.2 Outputs and the exporter
 

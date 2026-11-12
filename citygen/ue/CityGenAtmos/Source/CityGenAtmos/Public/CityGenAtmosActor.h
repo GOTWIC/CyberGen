@@ -317,6 +317,7 @@ private:
 	TArray<TObjectPtr<ULocalLightComponent>> AllLights;
 	TSet<int64> Shadowed;
 	TArray<int64> Flickering;               // (AT2: and the blinking and sweeping)
+	TMap<int64, float> FadeOf;              // (their live set's fade)
 	int32 LiveHigh = 0;
 	int32 CandidatesHigh = 0;
 	UPROPERTY(Transient)
