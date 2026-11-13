@@ -3,29 +3,29 @@
  "title": "Brakk Bastion",
  "ok": true,
  "triangles": {
-  "original": 269389,
+  "original": 297973,
   "lods": [
-   145477,
-   59997,
-   20168,
-   8078
+   145150,
+   59993,
+   20233,
+   8187
   ],
   "lod0_parts": {
-   "body": 82957,
+   "body": 84222,
    "glass": 1056,
-   "wheel_fl": 15096,
-   "wheel_fr": 15456,
-   "wheel_rl": 15456,
-   "wheel_rr": 15456
+   "wheel_fl": 14968,
+   "wheel_fr": 14968,
+   "wheel_rl": 14968,
+   "wheel_rr": 14968
   }
  },
  "objects": {
-  "original": 153,
+  "original": 187,
   "parts": 6
  },
  "size_class": {
   "name": "large",
-  "exterior_m2": 60.77,
+  "exterior_m2": 57.09,
   "rule": "large when the body's exterior is 55 m2 or more",
   "lod_budgets": [
    150000,
@@ -42,89 +42,189 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 41258566,
- "seconds": 41.3,
+ "pack_bytes": 49331866,
+ "seconds": 1859.9,
  "stage_seconds": {
-  "build": 0.9,
-  "render_original": 19.9,
-  "parts": 18.3,
+  "build": 1.1,
+  "render_original": 243.4,
+  "parts": 49.9,
   "nodes": 0.0,
-  "uv": 190.4,
-  "bake": 390.5,
-  "lods_export": 17.4,
-  "lods_only": 15.9,
-  "textures": 0.0,
-  "proof": 25.41908288002014
+  "uv": 155.2,
+  "bake": 965.3,
+  "lods_export": 18.9,
+  "textures": 14.960665702819824,
+  "proof": 410.40801191329956
  },
  "baked_down": {
+  "collapse": {
+   "pieces": 42,
+   "triangles": 103860,
+   "names": [
+    "cables",
+    "chassis",
+    "door.hardware",
+    "drone.frame",
+    "fender.plates",
+    "hatch.hinges",
+    "hatch.louvres",
+    "hood.eyes",
+    "hooks",
+    "hub.spare",
+    "hull.cowl",
+    "hull.cowl_side",
+    "hull.door_f",
+    "hull.door_r",
+    "hull.floor",
+    "hull.nose_side",
+    "hull.roof",
+    "hull.roof_edge",
+    "hull.sill",
+    "hull.tail_ring",
+    "hull.tail_side",
+    "hull.trim",
+    "interior.seats",
+    "mast",
+    "pylon.f",
+    "pylon.f.guard",
+    "pylon.r",
+    "pylon.r.guard",
+    "rack.rails",
+    "rim.spare",
+    "roofbar",
+    "roofbar.ends",
+    "sensor.lens",
+    "shutters",
+    "spare.arm",
+    "springs",
+    "step.hinges",
+    "steps",
+    "tire.spare",
+    "winch.rollers",
+    "wipers",
+    "work.lamps"
+   ]
+  },
   "relief": {
-   "pieces": 16,
-   "triangles": 52997,
+   "pieces": 57,
+   "triangles": 72873,
    "names": [
     "bolts",
+    "campod.lens",
+    "case.latches",
     "chevrons",
+    "drone.blades",
+    "drone.padbolts",
+    "drone.padmark",
     "fender.bolts",
+    "hitch.hole",
+    "hood.bolts",
     "hood.louvres",
+    "hood.plate",
+    "lamp.blade.chrome",
+    "lamp.pylon_f.chrome",
+    "lamp.pylon_f.housing",
+    "lamp.pylon_f_turn.chrome",
+    "lamp.pylon_r.chrome",
+    "lamp.pylon_r.housing",
+    "lamp.pylon_r_turn.chrome",
+    "lamp.stop.chrome",
     "led.pad",
     "lettering",
     "markings",
+    "motorband.fl",
+    "motorband.fr",
+    "motorband.rl",
+    "motorband.rr",
     "motorbolts.fl",
+    "motorbolts.fr",
+    "motorbolts.rl",
+    "motorbolts.rr",
+    "nose.bolts",
+    "port.hinges",
+    "prow.blade.bolts",
+    "pylon.f.bezel",
+    "pylon.f.bolts",
+    "pylon.r.bezel",
+    "pylon.r.bolts",
+    "rimholes.fl",
+    "rimholes.fr",
+    "rimholes.rl",
+    "rimholes.rr",
+    "rimholes.spare",
+    "roof.ribs",
+    "roofbar.bolts",
+    "rubstrips",
     "sensor.eye",
     "step.pads",
+    "step.ribs",
     "tiretext.fl",
     "tiretext.fr",
     "tiretext.rl",
     "tiretext.rr",
     "tiretext.spare",
-    "winch.slot"
+    "winch.fairlead",
+    "winch.slot",
+    "wiper.blades"
+   ]
+  },
+  "card_src": {
+   "pieces": 1,
+   "triangles": 4236,
+   "names": [
+    "lamp.roofbar.chrome"
    ]
   }
  },
  "texel_px_per_m": {
   "body": {
    "exterior": {
-    "area_m2": 60.773,
-    "p5": 306.8,
-    "median": 318.5
-   },
-   "underside": {
-    "area_m2": 3.484,
-    "p5": 111.1,
-    "median": 317.9
+    "area_m2": 57.085,
+    "p5": 329.5,
+    "median": 341.3
    },
    "cabin": {
-    "area_m2": 6.831,
-    "p5": 127.0,
-    "median": 317.8
+    "area_m2": 14.08,
+    "p5": 135.9,
+    "median": 140.4
+   },
+   "underside": {
+    "area_m2": 2.066,
+    "p5": 119.3,
+    "median": 340.2
    },
    "lamp_in_gaps": {
-    "area_m2": 0.19,
-    "p5": 111.1,
-    "median": 111.1
+    "area_m2": 3.544,
+    "p5": 118.9,
+    "median": 137.2
    }
   },
   "wheels": {
    "exterior": {
-    "area_m2": 13.517,
-    "p5": 346.0,
-    "median": 374.1
+    "area_m2": 8.963,
+    "p5": 415.1,
+    "median": 452.3
    },
    "underside": {
-    "area_m2": 0.388,
-    "p5": 130.9,
-    "median": 380.1
+    "area_m2": 0.259,
+    "p5": 158.3,
+    "median": 446.9
+   },
+   "lamp_in_gaps": {
+    "area_m2": 1.082,
+    "p5": 158.3,
+    "median": 158.3
    }
   }
  },
- "lights": 31,
+ "lights": 49,
  "collision_hulls": 10,
  "source": {
   "script": "vehicles/cars/brakk_bastion.py",
-  "script_sha256": "9cae1c68db6b30a9c35bce7874869d4709826cda9f9957f3b17f5fc53e673318",
-  "carkit_sha256": "b469413d954a716ff0d8e2ee83b2e30d278a1a5e922d9a3a2c98f8daac2fee39",
-  "game_sha256": "9e6108a54d1f801bd18195adc59470f9bd92b6d763a2afc8f84531218c054eab",
-  "original_triangles": 269389,
-  "original_objects": 153
+  "script_sha256": "8cefb845c122c8781f41daaae800e3bbb5f0f93f1a49bfdb948f76786c2caafa",
+  "carkit_sha256": "4a1b9a9a1c4472c37227e0b9171ff94263a6d3d320dd4d13ad55783936af1832",
+  "game_sha256": "32271c5b2195e75c93509022799b7dd770add377d59cc906b924e040e27ff1db",
+  "original_triangles": 297973,
+  "original_objects": 187
  },
  "test": false,
  "checks": [
@@ -143,25 +243,25 @@
    "detail": [
     {
      "lod": 0,
-     "triangles": 145477,
+     "triangles": 145150,
      "budget": 150000,
      "ok": true
     },
     {
      "lod": 1,
-     "triangles": 59997,
+     "triangles": 59993,
      "budget": 60000,
      "ok": true
     },
     {
      "lod": 2,
-     "triangles": 20168,
+     "triangles": 20233,
      "budget": 20000,
      "ok": true
     },
     {
      "lod": 3,
-     "triangles": 8078,
+     "triangles": 8187,
      "budget": 8000,
      "ok": true
     }
@@ -174,13 +274,13 @@
     "limit": 0.005,
     "slots": {
      "body": {
-      "overlap": 0.00147,
-      "coverage": 0.4942,
+      "overlap": 0.00066,
+      "coverage": 0.5596,
       "outside_unit": 0.0
      },
      "wheels": {
       "overlap": 0.0,
-      "coverage": 0.4621,
+      "coverage": 0.4551,
       "outside_unit": 0.0
      }
     }
@@ -191,14 +291,14 @@
    "ok": true,
    "detail": {
     "body": {
-     "p5": 306.8,
-     "median": 318.5,
+     "p5": 329.5,
+     "median": 341.3,
      "floor": 240.0,
      "ok": true
     },
     "wheels": {
-     "p5": 346.0,
-     "median": 374.1,
+     "p5": 415.1,
+     "median": 452.3,
      "floor": 240.0,
      "ok": true
     }
@@ -303,7 +403,7 @@
      "deviation_m": [
       0.0,
       0.0,
-      0.0003
+      0.0002
      ],
      "tolerance_m": [
       0.0775,
@@ -317,7 +417,7 @@
      "deviation_m": [
       0.0036,
       0.0029,
-      0.0022
+      0.0024
      ],
      "tolerance_m": [
       0.0775,
@@ -329,9 +429,9 @@
     {
      "lod": 3,
      "deviation_m": [
-      0.0006,
+      0.0005,
       0.0,
-      0.0021
+      0.0
      ],
      "tolerance_m": [
       0.0775,
@@ -347,10 +447,10 @@
    "ok": true,
    "detail": [
     {
-     "normal_p95_deg": 8.93,
-     "bent_share": 0.0052,
-     "texture_share": 0.0022,
-     "miss_share": 0.0057,
+     "normal_p95_deg": 6.68,
+     "bent_share": 0.0023,
+     "texture_share": 0.0023,
+     "miss_share": 0.0051,
      "lod": 1,
      "limits": {
       "p95": 12.0,
@@ -360,10 +460,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 20.14,
-     "bent_share": 0.0337,
-     "texture_share": 0.0069,
-     "miss_share": 0.0105,
+     "normal_p95_deg": 15.08,
+     "bent_share": 0.0249,
+     "texture_share": 0.0066,
+     "miss_share": 0.0055,
      "lod": 2,
      "limits": {
       "p95": 25.0,
@@ -373,10 +473,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 16.91,
-     "bent_share": 0.0213,
-     "texture_share": 0.0056,
-     "miss_share": 0.0084,
+     "normal_p95_deg": 12.67,
+     "bent_share": 0.0156,
+     "texture_share": 0.0051,
+     "miss_share": 0.0039,
      "lod": 3,
      "limits": {
       "p95": 40.0,
@@ -393,16 +493,16 @@
    "detail": {
     "hulls": 10,
     "vertices": [
-     328,
-     208,
+     322,
+     234,
+     226,
+     244,
      174,
-     270,
-     82,
-     284,
-     310,
+     252,
+     328,
      142,
-     338,
-     194
+     340,
+     252
     ]
    }
   }

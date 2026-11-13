@@ -6,7 +6,7 @@
   2.309
  ],
  "top_z": 2.309,
- "objects": 153,
+ "objects": 187,
  "palette": {
   "paint": [
    0.006,
@@ -93,18 +93,19 @@
   "under_floor": []
  },
  "symmetry": {
-  "verdict": "look",
+  "verdict": "ok",
   "center_off_mm": 0.0,
-  "objects": 13,
+  "objects": 0,
   "asymmetric": [
    {
     "object": "mast",
-    "off_mm": 261.5,
+    "off_mm": 227.5,
     "at": [
-     -1.169,
-     0.268,
+     -1.151,
+     0.267,
      2.309
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "interior.wheel",
@@ -113,7 +114,8 @@
      0.541,
      0.314,
      1.117
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "led.mast",
@@ -122,7 +124,8 @@
      -1.054,
      0.245,
      2.246
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "mast.eye",
@@ -131,7 +134,8 @@
      -1.056,
      0.235,
      2.23
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "interior.screens",
@@ -140,16 +144,18 @@
      0.791,
      0.27,
      1.474
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "spare.arm",
-    "off_mm": 56.6,
+    "off_mm": 56.3,
     "at": [
      -2.196,
      -0.473,
      0.764
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "hooks",
@@ -158,34 +164,18 @@
      2.578,
      0.055,
      0.477
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "wipers",
-    "off_mm": 23.7,
+    "off_mm": 22.0,
     "at": [
-     1.2,
-     0.028,
-     1.547
-    ]
-   },
-   {
-    "object": "port.cover",
-    "off_mm": 23.3,
-    "at": [
-     1.532,
-     0.601,
-     1.287
-    ]
-   },
-   {
-    "object": "port.bolts",
-    "off_mm": 14.0,
-    "at": [
-     1.551,
-     0.594,
-     1.161
-    ]
+     0.98,
+     0.22,
+     1.654
+    ],
+    "meant": true
    },
    {
     "object": "winch.rollers",
@@ -194,7 +184,8 @@
      2.57,
      0.018,
      0.53
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "hood.louvres",
@@ -203,7 +194,18 @@
      1.581,
      0.36,
      1.407
-    ]
+    ],
+    "meant": true
+   },
+   {
+    "object": "wiper.blades",
+    "off_mm": 9.6,
+    "at": [
+     1.196,
+     -0.368,
+     1.533
+    ],
+    "meant": true
    },
    {
     "object": "drone.blades",
@@ -212,7 +214,8 @@
      0.005,
      0.319,
      1.973
-    ]
+    ],
+    "meant": true
    }
   ]
  },
@@ -221,6 +224,7 @@
   "open_edges": [],
   "open_mm": 0,
   "cutter_holes": [],
+  "cut_loops": 4,
   "pieces": {
    "hull": {
     "closed": true,
@@ -229,36 +233,13 @@
   }
  },
  "through": {
-  "verdict": "look",
-  "parts": [
-   {
-    "object": "interior.seats",
-    "out_mm": 29.9,
-    "share": 0.01,
-    "at": [
-     -1.012,
-     -0.636,
-     1.505
-    ],
-    "meant": false
-   },
-   {
-    "object": "interior.tub",
-    "out_mm": 9.9,
-    "share": 0.05,
-    "at": [
-     0.947,
-     -0.607,
-     0.583
-    ],
-    "meant": false
-   }
-  ],
-  "count": 2
+  "verdict": "ok",
+  "parts": [],
+  "count": 0
  },
  "triangles": {
   "verdict": "ok",
-  "total": 269389,
+  "total": 297973,
   "budget": 400000,
   "top": [
    [
@@ -283,11 +264,11 @@
    ],
    [
     "bolts",
-    9600
+    8832
    ],
    [
     "lettering",
-    7526
+    8206
    ],
    [
     "springs",
@@ -305,7 +286,7 @@
    ],
    [
     "hull",
-    25160
+    25864
    ],
    [
     "motor",
@@ -320,14 +301,14 @@
     15840
    ],
    [
-    "bolts",
-    9600
+    "pylon",
+    11968
    ],
    [
-    "fender",
-    8632
+    "lamp",
+    11340
    ]
   ]
  },
- "verdict": "look"
+ "verdict": "ok"
 }

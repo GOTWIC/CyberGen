@@ -6,7 +6,7 @@
   2.76
  ],
  "top_z": 2.76,
- "objects": 183,
+ "objects": 234,
  "palette": {
   "paint": [
    0.115,
@@ -30,83 +30,83 @@
   ]
  },
  "tires": {
-  "verdict": "look",
+  "verdict": "ok",
   "wheels": [
    {
     "tag": "fl",
-    "clearance_mm": 22.2,
-    "nearest": "fender.plates",
+    "clearance_mm": 38.7,
+    "nearest": "fender.gussets",
     "at": [
-     2.188,
-     1.156,
-     0.96
+     2.489,
+     0.784,
+     0.878
     ],
     "foot_mm": 0.0,
     "steer_hits": "cables",
     "steer_deg": 20,
-    "verdict": "look"
+    "verdict": "ok"
    },
    {
     "tag": "ml",
-    "clearance_mm": 22.2,
-    "nearest": "fender.plates",
+    "clearance_mm": 38.7,
+    "nearest": "fender.gussets",
     "at": [
-     -1.302,
-     1.156,
-     0.96
+     -1.05,
+     0.782,
+     0.903
     ],
     "foot_mm": 0.0,
-    "verdict": "look"
+    "verdict": "ok"
    },
    {
     "tag": "rl",
-    "clearance_mm": 22.2,
-    "nearest": "fender.plates",
+    "clearance_mm": 35.3,
+    "nearest": "fender.gussets",
     "at": [
-     -2.542,
-     1.156,
-     0.96
+     -2.769,
+     0.786,
+     0.907
     ],
     "foot_mm": 0.0,
-    "verdict": "look"
+    "verdict": "ok"
    },
    {
     "tag": "fr",
-    "clearance_mm": 22.2,
-    "nearest": "fender.plates",
+    "clearance_mm": 38.7,
+    "nearest": "fender.gussets",
     "at": [
-     2.188,
-     -1.156,
-     0.96
+     2.489,
+     -0.784,
+     0.878
     ],
     "foot_mm": 0.0,
     "steer_hits": "cables",
     "steer_deg": 20,
-    "verdict": "look"
+    "verdict": "ok"
    },
    {
     "tag": "mr",
-    "clearance_mm": 22.2,
-    "nearest": "fender.plates",
+    "clearance_mm": 38.7,
+    "nearest": "fender.gussets",
     "at": [
-     -1.302,
-     -1.156,
-     0.96
+     -1.05,
+     -0.782,
+     0.903
     ],
     "foot_mm": 0.0,
-    "verdict": "look"
+    "verdict": "ok"
    },
    {
     "tag": "rr",
-    "clearance_mm": 22.2,
-    "nearest": "fender.plates",
+    "clearance_mm": 35.3,
+    "nearest": "fender.gussets",
     "at": [
-     -2.542,
-     -1.156,
-     0.96
+     -2.769,
+     -0.786,
+     0.907
     ],
     "foot_mm": 0.0,
-    "verdict": "look"
+    "verdict": "ok"
    }
   ]
  },
@@ -117,9 +117,9 @@
   "under_floor": []
  },
  "symmetry": {
-  "verdict": "look",
+  "verdict": "ok",
   "center_off_mm": 0.0,
-  "objects": 34,
+  "objects": 0,
   "asymmetric": [
    {
     "object": "cargo.case",
@@ -128,7 +128,8 @@
      -0.042,
      0.348,
      1.7
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "cargo.crates",
@@ -137,7 +138,8 @@
      -1.921,
      0.732,
      1.756
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "cargo.straps",
@@ -146,7 +148,8 @@
      -0.055,
      0.591,
      1.694
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "whip",
@@ -155,7 +158,8 @@
      -3.039,
      -0.601,
      2.76
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "interior.wheel",
@@ -164,7 +168,8 @@
      2.418,
      0.37,
      1.334
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "cargo.drums",
@@ -173,7 +178,8 @@
      -1.071,
      -0.737,
      1.94
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "roof.hatch",
@@ -182,7 +188,8 @@
      1.363,
      0.5,
      2.652
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "box.platebolts",
@@ -191,7 +198,8 @@
      -0.214,
      -1.122,
      1.422
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "chevrons",
@@ -200,7 +208,8 @@
      -0.206,
      -1.118,
      1.42
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "markings",
@@ -209,7 +218,8 @@
      -0.605,
      -1.117,
      1.673
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "placard.ink",
@@ -218,7 +228,8 @@
      0.08,
      -1.118,
      1.638
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "box.plates",
@@ -227,7 +238,8 @@
      0.346,
      -1.116,
      1.374
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "cargo.drumbands",
@@ -236,7 +248,8 @@
      -0.72,
      -1.108,
      1.37
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "cargo.boxes",
@@ -245,7 +258,8 @@
      -2.001,
      0.882,
      1.764
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "underrun",
@@ -254,7 +268,8 @@
      0.296,
      -1.091,
      0.479
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "ladder.ribs",
@@ -263,7 +278,8 @@
      -0.332,
      0.92,
      0.819
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "door.guides",
@@ -272,7 +288,8 @@
      -1.016,
      0.921,
      2.211
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "ladder",
@@ -281,7 +298,8 @@
      -0.516,
      0.904,
      0.814
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "collar.hoses",
@@ -290,16 +308,8 @@
      1.163,
      -0.753,
      1.441
-    ]
-   },
-   {
-    "object": "interior.tub",
-    "off_mm": 74.8,
-    "at": [
-     2.662,
-     -0.698,
-     1.395
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "hold.slots",
@@ -308,7 +318,8 @@
      -0.19,
      -1.011,
      1.51
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "interior.screens",
@@ -317,7 +328,8 @@
      2.709,
      0.51,
      1.634
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "cargo.marks",
@@ -326,7 +338,8 @@
      -0.596,
      0.952,
      1.51
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "bolts.left",
@@ -335,16 +348,18 @@
      0.602,
      1.106,
      1.28
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "wipers",
-    "off_mm": 23.7,
+    "off_mm": 22.0,
     "at": [
-     2.932,
-     0.155,
-     1.723
-    ]
+     2.91,
+     0.198,
+     1.761
+    ],
+    "meant": true
    },
    {
     "object": "hold.rails",
@@ -353,7 +368,8 @@
      0.748,
      -1.01,
      1.497
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "cooler.louvres",
@@ -362,7 +378,8 @@
      1.181,
      0.618,
      2.596
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "cooler.blades",
@@ -371,7 +388,8 @@
      0.529,
      -0.215,
      2.673
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "door.curtain",
@@ -380,7 +398,8 @@
      0.567,
      1.047,
      2.145
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "led.hold",
@@ -389,7 +408,8 @@
      -1.4,
      0.265,
      2.305
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "door.bar",
@@ -398,7 +418,18 @@
      -0.537,
      1.087,
      1.9
-    ]
+    ],
+    "meant": true
+   },
+   {
+    "object": "wiper.blades",
+    "off_mm": 9.7,
+    "at": [
+     2.976,
+     -0.399,
+     1.604
+    ],
+    "meant": true
    },
    {
     "object": "box.ribs",
@@ -407,7 +438,8 @@
      0.533,
      -1.1,
      2.276
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "door.sill",
@@ -416,7 +448,8 @@
      0.444,
      1.044,
      1.166
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "box.shell",
@@ -425,7 +458,8 @@
      0.62,
      1.064,
      2.314
-    ]
+    ],
+    "meant": true
    }
   ]
  },
@@ -434,33 +468,22 @@
   "open_edges": [],
   "open_mm": 0,
   "cutter_holes": [],
+  "cut_loops": 2,
   "pieces": {
    "hull": {
     "closed": true,
-    "panels": 19
+    "panels": 20
    }
   }
  },
  "through": {
-  "verdict": "look",
-  "parts": [
-   {
-    "object": "interior.tub",
-    "out_mm": 11.8,
-    "share": 0.06,
-    "at": [
-     2.998,
-     0.698,
-     1.454
-    ],
-    "meant": false
-   }
-  ],
-  "count": 1
+  "verdict": "ok",
+  "parts": [],
+  "count": 0
  },
  "triangles": {
   "verdict": "ok",
-  "total": 364552,
+  "total": 392506,
   "budget": 400000,
   "top": [
    [
@@ -473,7 +496,7 @@
    ],
    [
     "bolts",
-    12384
+    11232
    ],
    [
     "hub.fl",
@@ -519,17 +542,17 @@
    ],
    [
     "hull",
-    15912
+    15810
    ],
    [
     "markings",
     14947
    ],
    [
-    "lettering",
-    13509
+    "fender",
+    13592
    ]
   ]
  },
- "verdict": "look"
+ "verdict": "ok"
 }
