@@ -488,6 +488,7 @@ def _roof(parts: list[dict]) -> list[float] | None:
 
 START_OPEN_M = 10.0        # the player start: nothing overhead within this ...
 START_OVER_M = 3.0         # ... (a road, a transit deck, a slab or a span this high or more)
+START_GUIDE_M = 6.0        # ... (a raised transit line: its half width)
 START_LIT_M = 20.0         # ... a street or wall light within this
 START_REACH_M = 400.0      # ... on a sidewalk within this of the fast-travel point
 START_KINDS = ("sidewalk", "promenade", "pedestrian_street", "plaza")
@@ -496,9 +497,9 @@ START_STEP_M = 5.0         # the sidewalks' points tried, this far apart
 
 def _overhead(m: dict) -> list:
     """What stands over the ground a player could start under, as shapely geometries: raised
-    road stretches (buffered by their half width), transit decks, tubes, beams and canopies,
-    M14's slabs, skybridges."""
-    from shapely.geometry import LineString, Polygon
+    road stretches (buffered by their half width), transit lines' raised stretches, decks,
+    tubes, beams and canopies, M14's slabs, skybridges."""
+    from shapely.geometry import LineString, Point, Polygon
     from shapely.ops import substring
     out = []
     for s in m.get("road_segments", []):
@@ -510,6 +511,18 @@ def _overhead(m: dict) -> list:
         if ln.length <= 0.0:
             continue
         out.append(substring(ln, min(hi), max(hi)).buffer(float(s.get("width_m", 8.0)) / 2.0))
+    # (a transit line's raised stretches: its guideway or tube over the street)
+    for t in m.get("transit_lines", []):
+        run = []
+        for q in (t.get("path") or []) + [None]:
+            if q is not None and len(q) > 2 and q[2] >= START_OVER_M:
+                run.append(q[:2])
+                continue
+            if len(run) >= 2:
+                out.append(LineString(run).buffer(START_GUIDE_M))
+            elif len(run) == 1:
+                out.append(Point(run[0]).buffer(START_GUIDE_M))
+            run = []
     for st in m.get("structures", []):
         fp = (st.get("footprint") or {}).get("exterior") or []
         if len(fp) >= 3 and float(st.get("z0_m") or 0.0) >= START_OVER_M:
