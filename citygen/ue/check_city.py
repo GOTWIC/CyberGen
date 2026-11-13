@@ -1132,7 +1132,9 @@ def play_views(world, a, slug, prefix):
             unreal.SystemLibrary.execute_console_command(
                 world, f"CityGenAtmos.Weather {wm.group(2)}")
             yield from wait(float(wm.group(3)))
-        yield from ui_shot(world, v["name"], "HighResShot 1920x1080", 180)
+        # (AT7: CITYGEN_UE_VIEW_RES sets the views' size, 7680x4320 for an 8K shot)
+        res = os.environ.get("CITYGEN_UE_VIEW_RES") or "1920x1080"
+        yield from ui_shot(world, v["name"], f"HighResShot {res}", 600)
         at = atmos_status(world)
         # (AT6: what the look showed at each view: the district, the exposure, the post)
         if at and "post" in at:
@@ -1213,7 +1215,14 @@ def ui_shot(world, name, cmd="shot showui", timeout=30):
     while not new and time.time() - t < timeout:
         yield
         new = [p for p, m in pngs().items() if p not in before or m > before[p]]
-    yield from wait(1.0)
+    # (until the file stops growing: an 8K PNG takes a few seconds to write)
+    size, t = -1, time.time()
+    while new and time.time() - t < 120:
+        yield from wait(1.0)
+        s = os.path.getsize(max(new, key=os.path.getmtime))
+        if s == size:
+            break
+        size = s
     if new:
         import shutil
         shutil.copyfile(max(new, key=os.path.getmtime), path)

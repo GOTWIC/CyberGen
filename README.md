@@ -583,11 +583,17 @@ of day (a slider) and the weather (clear, drizzle, rain, fog, smog); the console
 the far city, the hour). Controls and every command: [`docs/unreal_export.md`](docs/unreal_export.md)
 ("atmosgen's runtime" and after).
 
-Its Blender preview renders the same night in Cycles, lit by the plan's lights:
+A Corporate Core street in rain by night in Unreal, with its parked cars (8K):
 
-| The Corporate Core by night, Blender preview (8K) | A Corporate Core street in rain (8K) |
-|---|---|
-| <img src="docs/progress/AT0/core_night.jpg" width="420"> | <img src="docs/progress/AT0/core_street_night.jpg" width="420"> |
+<img src="docs/progress/AT7/readme/night_core_street_rain_8k.jpg" width="860">
+
+`atmosgen preview` renders the same night in Blender (Cycles), lit by the plan's lights. It is
+a preview of the light only: it draws stage 2's stand-in cars, not the hero vehicles, which
+only the Unreal import places.
+
+| Blender preview: the Corporate Core by night (8K, stand-in cars) |
+|---|
+| <img src="docs/progress/AT0/core_night.jpg" width="420"> |
 
 Plan: [`docs/atmosgen_scope.md`](docs/atmosgen_scope.md); what each milestone did:
 [`docs/atmosgen_milestones.md`](docs/atmosgen_milestones.md).

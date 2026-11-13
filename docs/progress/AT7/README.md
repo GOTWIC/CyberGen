@@ -168,7 +168,27 @@ were needed for tuning.
 
 ## The packaged game
 
-PACKAGE_RESULT
+- `C:\Users\swagn\CityGen\builds\packaged\Delta_at7\Windows\CityAG16.exe` (2.95 GB):
+  CityAG16 mirrored into CityPackaged without `Saved`, `Intermediate`, `DerivedDataCache` and
+  the plugins' `Intermediate` and `Binaries`, then cooked and packaged (Development, Win64,
+  BUILD SUCCESSFUL in 8 min 46 s).
+- Smoke launch with `-userdir` outside the package, 1280 x 720 windowed,
+  `-CityGenSelfie=12`: exits cleanly; the log shows the atmos controller (518 cells, 50,300
+  lights, the sight raster), "weather rain (now)", "the far city: 11653 glows and 10947 pools
+  and washes in 13 blocks (10.6 ms)", the walker walking 8 m; no error, nothing skipped, and
+  the package keeps no `Saved` folder.
+
+## The README's street image
+
+The README's stage 3 section showed AT0's Blender preview of a Corporate Core street, whose
+cars are AG8's stand-ins (the Blender preview draws those; AG18's hero cars reach a city only
+through the Unreal import). It is now an Unreal shot of a Corporate Core street in rain by
+night with the parked hero cars and AT4 to AT7's look, taken at 8K (7680 x 4320: the check's
+views at any size since AT7, `CITYGEN_UE_VIEW_RES`) from CityAG16's Delta
+(`readme/night_core_street_rain_8k.jpg`; from the sidewalk, `unreal/night_core_cars_sidewalk.jpg`).
+The Blender preview kept beside it says it draws the stand-in cars.
+
+![](readme/night_core_street_rain_8k.jpg)
 
 ## Open items
 

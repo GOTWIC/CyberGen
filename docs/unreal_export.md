@@ -2020,7 +2020,8 @@ far skyline keeps its emissive; and the cloud deck glows from the plan's upward 
   `far_mid_m`, `far_high_m`, `far_fix_m`.
 - **The check:** by night every card drawn and shown, none by day; a `--view` named `*_nofar`
   renders without them (the same view's before); each view's far city in the result's
-  `far_views`.
+  `far_views`. `CITYGEN_UE_VIEW_RES` sets the play views' size (`HighResShot`, 1920x1080 by
+  default; 7680x4320 for an 8K shot, the copy waiting until the file stops growing).
 - **The benchmark** (`bench.ATMOS_PASSES`): every atmos pass sets `CityGenAtmos.Far 1` (so
   none leaks), `ATMOS_OFF` `Far 0`; `night_plan_nofar` without them (the play features' pools
   instead: what the cards cost).
