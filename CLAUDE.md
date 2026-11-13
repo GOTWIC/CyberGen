@@ -2251,15 +2251,21 @@ waits for Swagnik's review.
   A pack is the car parked and shut (`CYBERGEN_SHUT`, `SHUT_ENV` in `game.py`).
   `CYBERGEN_GAME_DEBUG=1` logs each far LOD wreck.
 - **Vex** (vex_wraith, vex_halo, vex_strix) is to be redesigned (Swagnik, 2026-11-10): no
-  packs, out of every later step until redone.
+  packs, out of every later step until redone. **The Aurels** (aurel_prelate, aurel_regent,
+  aurel_zenith) likewise since the play fixes (Swagnik, 2026-11-12: "they look terrible"):
+  their scripts stay, their packs are no longer shared (out of `packs.json`), and nothing
+  places or imports them (`assetgen/parked/table.EXCLUDED`, `citygen/unreal_vehicles.EXCLUDED`,
+  `vehicles/packs.py` and `survey.py`'s `EXCLUDED`). 15 cars are in the cities.
 - **In the cities** (step H, 2026-11-11; `assetgen/parked/`, tests
   `tests/assetgen/test_ag_vehicles.py`): `assetgen vehicles BUILD` (also in `assetgen build`
   after the props, `--no-vehicles`) makes every M6 parked car AG8 draws a pack vehicle: a model
   by its district's weights (`parked/table.py`: a row per archetype scaled by wealth and danger
   through the model's class; the spec's `vehicles.weights`), the first in that hashed order
   whose plan box lies on its own road's carriageway faces of M22's map, off the crosswalks,
-  0.5 m from its neighbors and not the fourth of one model in a row, else left out with a
-  reason; paint per placement from its role's palette and the district's colors; hover cars
+  0.5 m from its neighbors and never the third of one model in a row (the play fixes: the
+  model before it on the curb is tried last, so two running happen only where nothing else
+  fits: Delta 1 of 2,848 curb neighbors, 10.7% before; `vehicles_variety` fails on three in a
+  row or a share of 5%), else left out with a reason; paint per placement from its role's palette and the district's colors; hover cars
   set down on their lowest point. `unreal_contribution.vehicles.json` (a placement entry per
   tile replacing `prop.parked_vehicle.<tile>`; the exporter drops what a placement replaces
   from stage 2, `unreal_vehicles.without_replaced`), `vehicles_report.txt` (checks

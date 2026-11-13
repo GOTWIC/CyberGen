@@ -125,7 +125,8 @@ Then open the project: the editor opens on the city, and Play (Alt+P) puts you i
   walker whatever `--play` set (the project's character where the importer made no walker:
   where it spawned and what it stands on, whether it has a body it sees, streaming,
   collision, a walk along a sidewalk, off a curb onto the road and back up; with `--shots`
-  `unreal_walk_body.png` and `unreal_walk_ahead.png`), then flying with the fly pawn (its speed, no collision, the city loaded where it ends).
+  `unreal_walk_body.png` and `unreal_walk_ahead.png` by day, standing at the eye of a `--view
+  walk_spot ...` and facing its target when one is given), then flying with the fly pawn (its speed, no collision, the city loaded where it ends).
   The walk and the flight report how long their frames took (median, 95%, longest). With
   `--shots DIR` it renders views of the city (each once small first, so its Nanite pages
   have streamed in) and two from the fly pawn. The views load the whole city in the editor,
