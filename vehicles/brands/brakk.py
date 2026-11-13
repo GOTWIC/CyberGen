@@ -16,8 +16,9 @@ pylon, coil, wheel. Differences between the copies, kept by parameters:
 
 Step B's lamp pylon (lamp_pylon, with lbox and lpt) is the Hauler's step B pylon as its own
 copy builds it (housings of plates round pockets, an LED bar in a reflector V and an amber
-cell under lenses, bolted bezels, a guard); the Hauler keeps its copy, the Bastion uses this
-one; the older pylon above stays for the cars not yet redone.
+cell under lenses, bolted bezels, a guard); the Hauler keeps its copy, the Bastion and the
+Mule use this one (the Mule with bar, a wider LED bar); the older pylon above stays for the
+cars not yet redone.
 
 Left in the cars: the Mule's yz_prism, xy_prism and xz_prism (one car; the kit's
 Geo.prism_on now lays a polygon on any named plane), the hulls' rows and the cars' own
@@ -352,12 +353,14 @@ def lpt(o, R, a, b, z):
 
 
 def lamp_pylon(key, x, y, z0, z1, yaw, lit, lens, face=0.05, lens_at=0.044, sw=0.03,
-               sink=0.03, guard=4):
+               sink=0.03, guard=4, bar=0.018):
     """Step B's light pylon on a chamfered corner, facing yaw (degrees): a housing of plates
     sunk sink into the corner, a tall window over an LED bar right under its lens in a V of
     reflector plates and an amber cell at its foot under an amber lens, each in a bolted
     bezel, a guard of guard bars over the tall one (0: none). face is how far the plates
-    stand off the corner, lens_at where the lenses lie, sw half a window's width. Made on
+    stand off the corner, lens_at where the lenses lie, sw half a window's width, bar the
+    LED bar's width (up to the window's, 2 sw - 0.01: a bar that fills the V's mouth reads
+    lit far off, where the V's chrome bakes dark). Made on
     the left side and mirrored: objects pylon.<key>, .bezel, .bolts, .guard,
     lamp.pylon_<key> and lamp.pylon_<key>_turn."""
     R = Matrix.Rotation(rad(yaw), 3, 'Z')
@@ -403,7 +406,7 @@ def lamp_pylon(key, x, y, z0, z1, yaw, lit, lens, face=0.05, lens_at=0.044, sw=0
                      + [lpt(o, R, 0.034, sg * sw, z) for z in (wt, wb)],
                      [(0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3),
                       (3, 7, 4, 0)])
-    L.bar([lpt(o, R, 0.036, 0, wb + 0.008), lpt(o, R, 0.036, 0, wt - 0.008)], 0.018, 0.008,
+    L.bar([lpt(o, R, 0.036, 0, wb + 0.008), lpt(o, R, 0.036, 0, wt - 0.008)], bar, 0.008,
           up=n)
     lbox(L.housing, o, R, (0.012, 0.032), (-0.006, 0.006), (wb, wt))     # the bar's spine
     lbox(L.glass, o, R, (lens_at - 0.003, lens_at), (-sw, sw), (wb, wt))

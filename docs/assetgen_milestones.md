@@ -3349,6 +3349,26 @@ Vanta-R the same).
   8,187 triangles, large class, texels 330 px/m (5th percentile), LOD3 12.7 of 40 degrees,
   0.016 of 0.10 bent, 0.005 of 0.04 texture (main 16.9, 0.021, 0.006); its LOD row reads as
   main's, the lamps lit at every LOD. Not published.
+- **Brakk Mule** (`docs/progress/AG18/brakk_mule/`, on `vehicles/brands/brakk.py`, its wheel
+  bound to the car's sizes with the hub motor, signed the same as main before any change;
+  `lamp_pylon` gains `bar`, the LED bar's width, 18 mm by default, the Hauler and the Bastion
+  signed the same before and after): the brand's step B pylons on every chamfered corner
+  (white with a guard on the cab's face, tall red on the box's tail posts, tall amber markers
+  on the box's front posts), each bar the window's width (the 18 mm bar left the V's chrome
+  to the bake, which drew the amber markers dark at every LOD); the face blade a framed LED
+  bar under a clear lens; the roof bar as the Bastion's (the same housing): eight cells of
+  three LED modules behind one lens, amber end lamps in bolted end plates; the stop lamp ten
+  LEDs under a red lens; reversing lamps and fender markers LED bars under lenses in bezels;
+  a recess cut behind each door handle; 3.5 mm shut lines; `"frame"` glass; the kit's wipers.
+  A charge flap cut through each nose side, as the Bastion's, was left out: its plate
+  collapsed at LOD2 and LOD3 into a black octagon. Step A: the fender plates' folded edge
+  60 mm deep (80), tires 35.3 mm clear (22.2), the dash inside the hull and symmetric, the
+  one-sided parts (the roller door and all it shows, ladder, under-run bars, plates, whips,
+  wipers, ...) told as meant; the cab roof hatch's lean fixed. Every check `ok` (tires,
+  symmetry and through were `look`). 392,506 triangles (364,552). Pack rebuilt, every check
+  passing: 146,484, 59,991, 20,080, 8,187 triangles, large class, texels 244 px/m (5th
+  percentile), LOD3 14.3 of 40 degrees, 0.019 of 0.10 bent, 0.007 of 0.04 texture (main
+  13.4, 0.015, 0.007); the lamps lit at every LOD. Not published.
 - **Next**: the other cars of the Brakk and Tanager brands on the
   pilots' patterns (Bastion, Mule, Cab, Porter), each switching to its `vehicles/brands/` module, with step A's street-distance
   findings fixed as it is redone.
