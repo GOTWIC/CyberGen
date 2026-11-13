@@ -101,7 +101,7 @@ PMAT = dict(front="paint", petal="paint", rear="paint", glass="glass_dome", glas
             lamp_r="lamp_housing")
 GAP = 0.00175                       # 3.5 mm shut lines
 LAMP = {}                           # the ribbons' channels on the skin: [(point, way out)]
-RIB_W, RIB_D = 0.017, 0.014         # a ribbon channel's width and depth, drawn out to RIB_TIP
+RIB_W, RIB_D = 0.017, 0.009         # a ribbon channel's width and depth, drawn out to RIB_TIP
 RIB_TIP, RIB_TAPER = 0.005, 0.05    # at its ends (at the flaps) over RIB_TAPER meters
 FLAP = (0.070, 0.050)               # the flank flaps' half sizes round the flank pebbles
 D_U, SHUT_M = 0.40, 0.03            # the petal cuts' |x| on the ribbon's line; the channels
@@ -219,10 +219,11 @@ def build_hull():
         md.offset = 0.0
 
 
-def chop(ob, tr, step=0.09):
+def chop(ob, tr, step=0.045):
     """A channel's walls cut into loose pieces step long across its path tr (the same
-    surface): a game pack's far LOD leaves such small pieces out, where the whole wall,
-    1.8 m of thin sheet round the nose, collapsed into dark shards over the paint."""
+    surface): a game pack's LOD2 and LOD3 leave pieces under 5 cm out, where the whole wall,
+    1.8 m of thin sheet round the nose, collapsed into dark shards over the paint (and 9 cm
+    pieces into dark specks at LOD2)."""
     import bmesh
     bm = bmesh.new()
     bm.from_mesh(ob.data)
@@ -232,7 +233,7 @@ def chop(ob, tr, step=0.09):
     s, last, cuts = 0.0, 0.0, set()
     for a, b in zip(P, P[1:]):
         s += (b - a).length
-        if s - last < step or s > ln - step / 2:
+        if s - last < step or s > ln - 0.01:        # the last piece no longer than step
             continue
         last = s
         geom = list(bm.verts) + list(bm.edges) + list(bm.faces)
@@ -336,13 +337,13 @@ def pebble(g, seat, a, b, h, seg=40, up=(0, 0, 1)):
 
 
 def build_lights():
-    """The ribbon: in each channel under its flush lens a light guide, its lit face as wide
-    as the lens right under it over a frosted sleeve; the tail's face cut into cells. The
-    pebbles stay lit beads: on each pole over the lens, on each flank on its flap."""
-    for key, lit, lens, cell in (("front", "led_front", "lens_clear", 0.0),
-                                 ("mid", "led_front", "lens_clear", 0.0),
-                                 ("mid_r", "led_front", "lens_clear", 0.0),
-                                 ("rear", "led_rear", "lens_red", 0.022)):
+    """The ribbon: in each channel under its flush lens a light guide, its lit face right
+    under it over a frosted sleeve, one unbroken face (red cells came apart into dashes in
+    a game pack's far LODs). The pebbles stay lit beads: on each pole over the lens, on each
+    flank on its flap."""
+    for key, lit, lens in (("front", "led_front", "lens_clear"),
+                           ("mid", "led_front", "lens_clear"),
+                           ("mid_r", "led_front", "lens_clear"), ("rear", "led_rear", "lens_red")):
         tr = LAMP[key]
         if len(tr) < 2:
             continue
@@ -355,18 +356,13 @@ def build_lights():
         # the lens: flush with the skin, the body's gap on both sides (a lens cut from the
         # skin itself keeps the boolean's slivers, and its reflections zigzag)
         band(L.glass, fr, lambda f: w(f) - 2 * GAP, lambda f: 0.0, lambda f: 0.003)
-        face = (lambda f: w(f) - 2 * GAP - 0.0005, lambda f: 0.0032,
-                lambda f: 0.0032 + w(f) * 0.18)
-        if not cell:
-            band(L.emit(), fr, *face)
-        else:                           # cells, the dark channel between them
-            s0, rib = 0.003, 0.0022
-            while s0 < ln - 0.003 - rib:
-                s1 = min(s0 + cell - rib, ln - 0.003)
-                band(L.emit(), along(tr, s0, s1, 0.008), *face)
-                s0 = s1 + rib
+        # the guide's lit face right under the lens and wider than the channel's mouth, its
+        # edges tucked 1.5 mm under the paint each side: wherever a game pack's far LOD moves
+        # the mouth's edges, the gap shows the lit face, never the dark behind it
+        face = (lambda f: w(f) + 0.003, lambda f: 0.0032, lambda f: 0.0032 + w(f) * 0.18)
+        band(L.emit(), fr, *face)
         band(L.optic, fr, lambda f: w(f) * 0.70, lambda f: 0.0032 + w(f) * 0.18,
-             lambda f: RIB_D - 0.003)
+             lambda f: RIB_D - 0.0005)
         L.obj()
     g = Geo()
     pebble(g, LAMP["peb.front"], 0.066, 0.043, 0.011)

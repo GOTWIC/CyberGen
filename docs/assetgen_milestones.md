@@ -3290,24 +3290,27 @@ Vanta-R the same).
   dot there. Not published.
 - **Orrin Pebble** (`docs/progress/AG18/orrin_pebble/`, on `vehicles/brands/orrin.py`, which
   gains `lune_cut` and `NARROW` and a `tread` for `disc`): the waist ribbon channels cut
-  along the widest line, 17 mm wide and 14 mm deep, round the nose, round the tail and along
+  along the widest line, 17 mm wide and 9 mm deep, round the nose, round the tail and along
   each petal to its flank flap, each stopping 30 mm short of a shut line (one channel all
   round split the nose and tail panels in two, which LOD3 collapsed apart), a lit face right
-  under a flush lens of its own (clear in front; red behind over 22 mm cells), the pole
+  under a flush lens of its own, wider than the channel's mouth, its edges tucked under the
+  paint (clear in front, red behind, unbroken: cells came apart into dashes far off), the pole
   pebbles kept; an oval flap cut round each flank pebble (the left the charge port's) in
   place of the hairline ring; the crescent slots and the leaf's grab recess told to the
   checks (ten cutter holes before, none now); 3.5 mm shut lines; the dome keeps its
   frameless glass. Step A's tires: room cut inside the skin beside the sidewalls under the
   eyelids (0.0 mm to the well before, 16.6 front and 15.9 rear) and a narrow road tread (the
   kit's stood 7 mm into the ground; 0.0 now); the front still cannot steer under its lids.
-  326,370 triangles (266,030). For the pack the channels' walls are a 1 mm sheet (bare,
-  the lit face baked dark) cut into 9 cm pieces across the channel (`chop`): whole, 1.8 m of
-  thin sheet round the nose starved LOD3 (ratio 0.025) and collapsed into dark shards over
-  the paint; in pieces LOD3 leaves them out (ratio 0.07). Pack rebuilt, every check
-  passing: 149,113, 59,991, 20,116, 5,019 triangles, standard class, texels 564 px/m (5th percentile), LOD3 9.9
-  of 40 degrees, 0.013 of 0.10 bent, 0.008 of 0.04 texture (main 6.2, 0.006, 0.009); LOD0 and
-  LOD1 read as main's, LOD2 has a few dark specks and LOD3 is coarser over the front fender,
-  the channels a dark slit beside the lit line. Not published.
+  329,588 triangles (266,030). For the pack the channels' walls are a 1 mm sheet (bare,
+  the lit face baked dark) cut into 4.5 cm pieces across the channel (`chop`): whole, 1.8 m
+  of thin sheet round the nose starved LOD3 (ratio 0.025) and collapsed into dark shards over
+  the paint, 9 cm pieces left dark specks at LOD2; under 5 cm, LOD2 and LOD3 leave them out
+  (ratio 0.07), and the wide lit face keeps the line lit where the mouth's edges move (as
+  wide as the lens, the mouth showed as a dark slit beside it). Pack rebuilt, every check
+  passing: 148,442, 59,992, 20,001, 5,025 triangles, standard class, texels 555 px/m (5th
+  percentile), LOD3 9.6 of 40 degrees, 0.013 of 0.10 bent, 0.009 of 0.04 texture (main 6.2,
+  0.006, 0.009); the ribbon one lit line at every LOD, LOD2 a few dark specks and LOD3 torn
+  bits round the petal's front cut and glass edge that main's do not have. Not published.
 - **Next**: the other cars of the Orrin, Brakk and Tanager brands on the
   pilots' patterns (Pebble, Aria, Bastion, Mule, Cab, Porter), each switching to its `vehicles/brands/` module, with step A's street-distance
   findings fixed as it is redone.

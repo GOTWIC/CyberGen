@@ -4,7 +4,7 @@
 
 - **Brand, model, type:** Orrin Pebble, city pod, 2 seats side by side (all names made up). The Lumen's little sibling.
 - **Size:** 2.82 m long, 1.61 m wide, 1.52 m high, wheelbase 1.78 m, wheels 0.59 m, ground clearance 0.14 m.
-- **Triangles:** 326,370 in 61 objects (body at subdivision 4).
+- **Triangles:** 329,588 in 61 objects (body at subdivision 4).
 - **Build:** `vehicles/blender.sh vehicles/cars/orrin_pebble.py --out docs/progress/AG18/orrin_pebble --sheet`
 
 ## The design
@@ -25,18 +25,22 @@ for normals, `orrin.setup(axis=(0.8, 0.7))`, is this car's). The sheet, clay, ze
 above are of this build.
 
 - Ribbon: the waist ribbon is now channels cut into the skin along the widest line, 17 mm
-  wide and 14 mm deep: one round the nose and one round the tail, each between the petal
+  wide and 9 mm deep: one round the nose and one round the tail, each between the petal
   cuts, and one along each petal from beside its front cut to the flank flap, drawn out to
   5 mm over their last 50 mm. Each stops 30 mm short of a shut line, so the ribbon reads as
   passing under the petal cuts and no panel is cut in two (one channel all the way round
   split the nose and tail panels into two strips each, which the game pack's far LOD
-  collapsed apart). In each, a light guide's lit face right under a flush lens of its own (a
-  band along the channel with the body's gap each side), a frosted sleeve behind it: clear
-  in front, red behind over 22 mm cells. The pole pebbles stay, seated on the skin as it
+  collapsed apart). In each, a flush lens of its own (a band along the channel with the body's
+  gap each side), a light guide's lit face right under it, wider than the channel's mouth
+  with its edges tucked 1.5 mm under the paint, and a frosted sleeve behind: clear in front,
+  red behind, one unbroken face each (red cells, as on the Lumen, came apart into dashes in
+  the pack's LOD2 and LOD3). The pole pebbles stay, seated on the skin as it
   stood before the cuts, over the lens. For the pack the channels' walls are a 1 mm sheet
-  (bare, the lit face baked dark) cut into 9 cm pieces across the channel (`chop`): whole,
+  (bare, the lit face baked dark) cut into 4.5 cm pieces across the channel (`chop`): whole,
   1.8 m of thin sheet round the nose starved LOD3 and collapsed into dark shards over the
-  paint; in pieces LOD3 leaves them out.
+  paint, and 9 cm pieces left dark specks at LOD2; under 5 cm, LOD2 and LOD3 leave them out,
+  and the lit face under the mouth's edges keeps the line lit where the far LODs move them
+  (with a lit face as wide as the lens, the mouth showed as a dark slit beside it).
 - Flank flaps: an oval flap (140 by 100 mm) cut round each flank pebble, where white turns
   red; the ribbon stops 20 mm short of it in front and the red channel starts behind the rear
   petal cut. The left one is the charge port's, as
@@ -52,19 +56,19 @@ above are of this build.
   the well before, 16.6 mm front and 15.9 mm rear now. The tires take a narrow road tread
   (`orrin.NARROW`, the same as Tanager's): the kit's grooves fell outside a 0.185 m tire's
   crown and its blocks stood 7 mm into the ground; now 0.0 mm.
-- 326,370 triangles (266,030 before; the cut hull most of it, the lamps 21,500).
-- Game pack rebuilt, every check passing: 149,113, 59,991, 20,116, 5,019 triangles, standard
-  class, texels 564 px/m (5th percentile), LOD3 9.9 of 40 degrees, 0.013 of 0.10 bent, 0.008
-  of 0.04 texture (main 6.2, 0.006, 0.009). LOD0 and LOD1 read as main's with the ribbon lit
-  all along; LOD2 shows a few dark specks along the glass edge, and LOD3 is coarser over the
-  front fender with the channels a dark slit beside the lit line (main's surface strip had no
-  slit to open).
+- 329,588 triangles (266,030 before; the cut hull most of it, the lamps 21,768).
+- Game pack rebuilt, every check passing: 148,442, 59,992, 20,001, 5,025 triangles, standard
+  class, texels 555 px/m (5th percentile), LOD3 9.6 of 40 degrees, 0.013 of 0.10 bent, 0.009
+  of 0.04 texture (main 6.2, 0.006, 0.009). The ribbon reads as one lit line, white and red,
+  at every LOD. Against main's: LOD0 and LOD1 as main's; LOD2 has a few small dark specks on
+  the petal above the ribbon by its front cut; LOD3 has torn bits there and along the glass
+  edge over the petal, where main's LOD3 was cleaner.
 
 Left: the front wheels still cannot steer (0 degrees), as on the Lumen: they are faired in
 under the eyelids, and turning them would swing the tires through the lids, a change to the
 silhouette. At a grazing angle a few millimeters of the panel's rim show in the flaps' shut
 lines at their front and rear ends. The small teeth where the paint meets the glass tongue
-beside each pole pebble are as before. The far LODs (above) read a little worse than main's.
+beside each pole pebble are as before. LOD2 and LOD3 (above) still show dark specks round the petal's front cut that main's do not.
 
 ## What I would improve
 
