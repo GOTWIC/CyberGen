@@ -108,7 +108,8 @@ Then open the project: the editor opens on the city, and Play (Alt+P) puts you i
 - **A packaged game's proof:** `-CityGenSelfie=SECONDS` on the game's command line takes a
   screenshot looking down at the body and one looking ahead that long after the walker
   spawns, logs `CITYGEN_WALKER` lines (its class, body, place, whether it stands on the
-  ground) and quits.
+  ground) and quits. Launch it with `-userdir=` a folder outside the package, so the run leaves
+  no `Saved/` in it (its saved window size would stick for the next player).
 - **Streaming.** The city loads in 128 m cells within 768 m of you (`--view-range`; 256 m cells to 1,500
   m before AG16, which loaded most of a sample city at once and streamed it all the time).
   Beyond that you see the far view, World Partition's HLODs (the city's own meshes and
@@ -1732,7 +1733,11 @@ and `emitters`) comes with the cells and the controller:
 
 A project a city was imported into packages as any Unreal project (UAT's `BuildCookRun`,
 for example Development Win64 with `-cook -stage -pak -archive` and `-map=` the city's
-level). Three fixes made Delta Megacity's packaged game (after AT1) play as the editor's
+level). **A smoke or test launch of a package leaves no `Saved/` folder in it:** launch it
+with `-userdir=` a folder outside the package, or delete `<archive>/Windows/<Project>/Saved`
+after the run. A run's `Saved/Config/Windows/GameUserSettings.ini` keeps its window size
+(the play fixes' smoke run at `-ResX=1920 -ResY=1080` left 1920 x 1080 there), and the
+native start below then never applies for the player who opens it next. Three fixes made Delta Megacity's packaged game (after AT1) play as the editor's
 `-game` does:
 
 - **What the runtimes load by path is cooked.** A cook takes only what the maps reference.

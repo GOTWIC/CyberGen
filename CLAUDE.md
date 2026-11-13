@@ -2419,7 +2419,9 @@ AT1 (streets at night) is in place:
   project's DefaultGame.ini, so a cook takes them (keep anything loaded by path in one of
   them); the play module opens a game with no saved resolution windowed fullscreen at the
   monitor's native resolution; the Tab menu has Fog, Rain, Wet streets and hour rows driving
-  the atmos controller (found by class name, no link between the plugins).
+  the atmos controller (found by class name, no link between the plugins). A smoke or test
+  launch of a package leaves no `Saved/` folder in it (`-userdir=` outside the package, or
+  delete it after the run): a saved resolution there stops the native start for the player.
 
 AT2 (neon and signs as light) is in place:
 - **Lit faces** (`plan.signs`): billboards, banners and holo-boards as rect lights the size

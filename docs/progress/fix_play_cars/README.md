@@ -135,3 +135,9 @@ The packaged game (Development, Win64, 3.0 GB) is at
 CityPackaged, a copy of CityAG16. Smoke run with `-CityGenSelfie=60`: BP_CityGenWalker with
 SKM_Manny_Simple, seen by its player, on the ground at the player start, and W held walks
 8.0 m in 2 s.
+
+That smoke run was launched without `-userdir`, so it left a `Saved/` folder in the package
+whose `GameUserSettings.ini` kept its 1920 x 1080 window: Swagnik's first start opened at that
+size, not his native 2560 x 1440. The rule now in `docs/unreal_export.md` ("A packaged game")
+and CLAUDE.md: a smoke or test launch leaves no `Saved/` in a package (`-userdir=` outside it,
+or delete it after the run).
