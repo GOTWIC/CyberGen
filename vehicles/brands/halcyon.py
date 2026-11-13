@@ -12,6 +12,9 @@ What they repeated:
   car's PT and ORDER are arguments; inset moves the point in from the edge (the Sable
   0.028) and miss is what it gives off the spine (the Sable 0.1, the Ridge 0.2).
 
+On step B the Vanta-R and the Sable cut their strips as light channels under lenses
+(carkit's groove and Lamp), each car's own; cap_band is the strip as it was before.
+
 Left in the cars: the hulls (stations, panels, creases), the Ridge's slab, honey_on,
 tow_eye, armor_ring and tire (one car each), each car's sill strips.
 """
