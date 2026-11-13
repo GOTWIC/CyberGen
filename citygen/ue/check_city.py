@@ -717,7 +717,10 @@ def spawn_and_body(world, pawn, man, slug):
         # `--view walk_spot ...` (the player stood there, facing its target)
         pc = unreal.GameplayStatics.get_player_controller(world, 0)
         yaw = -float(man["player_start"].get("yaw_deg", 0.0))
-        spot = next((v for v in JOB.get("views", []) if v["name"] == "walk_spot"), None)
+        # (`--view walk_spot__<state> ...`: in that weather state, settled, as the play views)
+        spot = next((v for v in JOB.get("views", []) if v["name"] == "walk_spot"
+                     or v["name"].startswith("walk_spot__")), None)
+        state = spot["name"].split("__", 1)[1] if spot and "__" in spot["name"] else None
         here = pawn.get_actor_location()
         if spot is not None:
             ex, ey, ez = spot["eye"]
@@ -733,10 +736,23 @@ def spawn_and_body(world, pawn, man, slug):
             yaw = unreal.MathLibrary.find_look_at_rotation(ue(*spot["eye"]),
                                                            ue(*spot["target"])).yaw
         unreal.SystemLibrary.execute_console_command(world, "CityGen.Night 0")
+        st0w = None
+        if state:
+            st0w = (atmos_status(world) or {}).get("weather_target") or "rain"
+            unreal.SystemLibrary.execute_console_command(
+                world, f"CityGenAtmos.Weather {state} now")
+            yield from wait(4.0)
+        # (CITYGEN_UE_VIEW_RES: a HighResShot of that size, as the play views, each after the
+        # exposure has settled on its view; else the play window as drawn)
+        res = os.environ.get("CITYGEN_UE_VIEW_RES")
         for name, pitch in (("walk_body", -68.0), ("walk_ahead", -8.0)):
             pc.set_control_rotation(unreal.Rotator(roll=0.0, pitch=pitch, yaw=yaw))
-            yield from wait(2.0)
-            yield from ui_shot(world, name, cmd="shot")
+            yield from wait(8.0 if res else 2.0)
+            yield from ui_shot(world, name, cmd=f"HighResShot {res}" if res else "shot",
+                               timeout=600 if res else 30)
+        if st0w:
+            unreal.SystemLibrary.execute_console_command(
+                world, f"CityGenAtmos.Weather {st0w} now")
         if spot is not None:
             pawn.set_actor_location(here, False, True)
             yield from wait(1.0)

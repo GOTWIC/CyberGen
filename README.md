@@ -15,6 +15,31 @@ your machine.
 | 4 | [lifegen](#stage-4-lifegen) | Traffic, crowds, trains and aircraft, generated | Planned ([draft plan](docs/lifegen_scope.md)) |
 | 5 | [storygen](#stage-5-storygen) | Story, characters and cutscenes | Planned |
 
+## Showcase
+
+One generated city in Unreal Engine 5.8, with every stage so far: its layout, its buildings
+and streets, its parked cars, its lights, sky and weather. Click a picture for the full 8K
+image.
+
+| The whole city from the air by night | The downtown skyline across the water at dusk |
+|---|---|
+| [<img src="docs/progress/showcase/city_night_air.jpg" width="420">](docs/progress/showcase/city_night_air.jpg) | [<img src="docs/progress/showcase/core_dusk_water.jpg" width="420">](docs/progress/showcase/core_dusk_water.jpg) |
+| **A downtown street in the rain** | **Neon and puddles in the old town** |
+| [<img src="docs/progress/showcase/core_street_rain.jpg" width="420">](docs/progress/showcase/core_street_rain.jpg) | [<img src="docs/progress/showcase/oldtown_puddles.jpg" width="420">](docs/progress/showcase/oldtown_puddles.jpg) |
+| **A night market in the haze** | **Mist over a canal lined with neon signs** |
+| [<img src="docs/progress/showcase/market_night.jpg" width="420">](docs/progress/showcase/market_night.jpg) | [<img src="docs/progress/showcase/canal_mist.jpg" width="420">](docs/progress/showcase/canal_mist.jpg) |
+| **Sodium lamps in the port's smog** | **A riverside walk under the monorail** |
+| [<img src="docs/progress/showcase/port_smog.jpg" width="420">](docs/progress/showcase/port_smog.jpg) | [<img src="docs/progress/showcase/monorail_walk.jpg" width="420">](docs/progress/showcase/monorail_walk.jpg) |
+| **Steam rising from the street between parked cars** | **Searchlights sweeping over the tower crowns** |
+| [<img src="docs/progress/showcase/steam_street.jpg" width="420">](docs/progress/showcase/steam_street.jpg) | [<img src="docs/progress/showcase/searchlights.jpg" width="420">](docs/progress/showcase/searchlights.jpg) |
+| **Parked cars up close on a wet crossing** | **A junction at dusk in the rain** |
+| [<img src="docs/progress/showcase/hero_cars.jpg" width="420">](docs/progress/showcase/hero_cars.jpg) | [<img src="docs/progress/showcase/junction_dusk_rain.jpg" width="420">](docs/progress/showcase/junction_dusk_rain.jpg) |
+
+More: [the city by day](docs/progress/showcase/city_day_air.jpg),
+[the skyline from the sea at night](docs/progress/showcase/core_night_water.jpg),
+[looking down at yourself and your shadow on foot](docs/progress/showcase/walker_shadow.jpg),
+[all of them](docs/progress/showcase).
+
 ---
 
 ## Stage 1: layoutgen
@@ -259,11 +284,11 @@ logos (8K).
 |---|---|
 | <img src="docs/progress/AG15/vesper_bay/core.jpg" width="420"> | <img src="docs/progress/AG15/vesper_bay/core_night.jpg" width="420"> |
 
-<img src="docs/progress/AG15/delta_megacity/core_street_night.jpg" width="840">
+<img src="docs/progress/showcase/core_street_night.jpg" width="840">
 
-A street in Delta Megacity's core at night under its lamps (8K).
-`assetgen materials preview out/<city> --views core --night` renders these. More:
-[`docs/progress/AG15`](docs/progress/AG15).
+A street in Delta Megacity's core at night under its lamps, with its parked cars, in Unreal
+(8K). `assetgen materials preview out/<city> --views core --night` renders the views above
+in Blender. More: [`docs/progress/AG15`](docs/progress/AG15).
 
 <img src="docs/progress/AG2/towers.jpg" width="840">
 
