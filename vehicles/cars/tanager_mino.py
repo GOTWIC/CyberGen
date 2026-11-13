@@ -7,8 +7,8 @@ Run (always through the wrapper, one Blender job at a time on this machine):
 
 The first Tanager, so it sets the family's cues (docs/progress/AG18/tanager_mino/README.md):
 a soft tall box with the wheels at its corners, flat glass in rounded-rectangle openings with
-fat black seals and a frit border, a visor across each end: a pocket under one flush clear
-lens holding one light bar between two rounded-rectangle lamps (a lit ring round a row of LED
+fat black seals and a frit border, a visor across each end: a hole under a clear lens in a
+gloss black surround holding one light bar between two rounded-rectangle lamps (a lit ring round a row of LED
 cups) and a dot-matrix display under its own smoked lens; squircle wheel arches in grained
 plastic cladding with a bump strip, steel wheels under slotted covers, a white cap roof with
 its gear, a fleet roundel and service lettering.
@@ -16,8 +16,8 @@ its gear, a fleet roundel and service lettering.
 The body is ten lines over sixteen stations with no hard edge but the cladding's step. The
 windows are not panels of the cage: cutters open rounded holes in the skin, and the glass and
 its seal are laid behind each hole on the skin as built. Everything else cut into the skin
-(the visors, the stop lamp, the side repeaters, the handle recesses, the charge door and the
-hood's service flap) is laid on the hull as it stands uncut (cutters()). The brand's helpers
+(the visors, the side repeaters, the handle recesses and the charge door) is laid on the
+hull as it stands uncut (cutters()). The brand's helpers
 (outlines, pads, bars, dot matrices, windows, plate, badge, arch, wheel) are in
 vehicles/brands/tanager.py.
 """
@@ -117,13 +117,6 @@ def under(pts, proj, depth):
     return P, U
 
 
-def frame_on(g, outline, proj, w, z0, z1):
-    """A wall w thick along a closed outline on the skin, from z0 to z1 over it (negative:
-    under it, a bezel in a pocket)."""
-    P, U = under(dense(outline), proj, 0.0)
-    g.sweep(P, [(-w / 2, z0), (w / 2, z0), (w / 2, z1), (-w / 2, z1)], up=U, closed=True)
-
-
 # ---------------------------------------------------------------------------------------
 # body: stations and character lines
 # ---------------------------------------------------------------------------------------
@@ -215,9 +208,7 @@ def panel_of(i, j):
 PMAT = dict(nose="paint", hood="paint", fender="paint", screen="paint", roof="paint2",
             door_f="paint", door_r="paint", quarter="paint", gate="paint", clad="plastic",
             floor="underbody", well="well", wincut="void",
-            visor_f="visor", visor_r="visor", rep_h="lamp_housing",
-            lens_rep="lens_amber", slot="plastic", cut="void")
-HOUSINGS = ("visor_f", "visor_r", "rep_h")
+            visor_f="void", visor_r="void", rep_h="void", slot="plastic", cut="void")
 
 
 def line_crease(i, j):
@@ -259,45 +250,56 @@ W_REAR = MinoWin(rect(0, 1.2075, .52, .1625), .075, 'X')
 # ---------------------------------------------------------------------------------------
 # the cuts, laid on the hull as it stands uncut, and what stands inside them
 # ---------------------------------------------------------------------------------------
+def frame_on(g, outline, proj, w, z0, z1):
+    """A wall w thick along a closed outline on the skin, from z0 to z1 over it."""
+    P, U = under(dense(outline), proj, 0.0)
+    g.sweep(P, [(-w / 2, z0), (w / 2, z0), (w / 2, z1), (-w / 2, z1)], up=U, closed=True)
+
+
 def visor(tag):
-    """A visor: a pocket across the face under one flush clear lens, laid on the skin as it
-    stands uncut (the body's own skin cut out as a lens kept the boolean's slivers at the
-    face's rounded ends, and its reflections zigzagged). Inside: a gloss black back plate; on each side a lamp of a chrome
-    bezel, a lit ring of light guide and a row of three LED cups on a dark tray; the light
-    bar between them, a guide on a chrome strip; the display on the car's left, a screen with
-    its lit dots under a smoked lens of its own in a dark bezel. Every lit face a few
-    millimeters under the lens."""
+    """A visor: a hole across the face (the paint's own 14 mm rim its walls, a gloss black
+    back plate closing it 14 mm in), a gloss black surround standing 9.5 mm proud round its
+    edge and a clear lens in it, all laid on the skin as it stands uncut (the skin cut out
+    as a lens zigzagged at the face's rounded ends). The lamps stand in the hole with their
+    lit faces 2 to 4 mm proud of the skin, under the lens: the game pack's far LOD draws
+    the nose's flat face across the hole, and lit faces behind it would be lost; nothing in
+    it is a small ring, which that LOD fills into a lid. At each end a lamp of a chrome
+    plate, a lit ring of light guide and a row of three LED cups on a dark tray; the light
+    bar between them, a guide on a chrome strip; the display on the car's left, a screen
+    with its lit dots under a smoked lens of its own."""
     proj, cv, lit, pix, msg = VIS[tag]
     t = tag[0]
     sg = -1.0 if proj == 'X' else 1.0          # the car's left as this view's u
     g, lens = Geo(), Geo()
     K.pocket(g, K.rounded(0.0, cv, 1.25, 0.17, 0.05), proj, depth=0.03)
-    pad(lens, 0, cv, 0.625, 0.085, 0.05, proj, lift=0.0, sink=0.003, nv=10, nc=8, step=0.01)
+    frame_on(lens, rrect(0, cv, 0.6235, 0.0835, 0.0485), proj, 0.008, -0.004, 0.0095)
+    glass = Geo()
+    pad(glass, 0, cv, 0.620, 0.080, 0.045, proj, lift=0.009, sink=-0.006, nv=10, nc=8,
+        step=0.01)
     back = Geo()
-    pad(back, 0, cv, 0.618, 0.078, 0.046, proj, lift=-0.024, sink=0.028, nv=6)
+    pad(back, 0, cv, 0.632, 0.092, 0.052, proj, lift=-0.0140, sink=0.0175, nv=6)
     # the lamps at each end (the left one, mirrored)
     E = K.Lamp("lamp.%s" % tag, lit=lit, optic="lens_red" if t == "r" else "optic")
-    frame_on(E.chrome, rrect(0.52, cv, 0.072, 0.055, 0.028), proj, 0.005, -0.024, -0.006)
-    P, U = under(dense(rrect(0.52, cv, 0.0615, 0.0445, 0.021)), proj, 0.0095)
-    E.guide(P, r=0.0033, sleeve=1.6, closed=True, up=U)
-    pad(E.housing, 0.52, cv, 0.050, 0.034, 0.016, proj, lift=-0.020, sink=0.023)
+    pad(E.chrome, 0.52, cv, 0.072, 0.055, 0.028, proj, lift=-0.003, sink=0.004)
+    P, U = under(dense(rrect(0.52, cv, 0.0615, 0.0445, 0.021)), proj, -0.0005)
+    E.guide(P, r=0.0032, sleeve=1.6, closed=True, up=U)
+    pad(E.housing, 0.52, cv, 0.050, 0.034, 0.016, proj, lift=-0.002, sink=0.0029)
     for u in (0.488, 0.52, 0.552):
         loc, n = skin(u, cv, proj)
-        E.reflector(loc - n * 0.0065, n, r=0.0125, depth=0.0085, seg=16, led=0.0055)
+        E.reflector(loc + n * 0.002, n, r=0.0125, depth=0.0055, seg=16, led=0.0055)
     # the light bar: a guide on a chrome strip
     B = K.Lamp("lamp.%s_bar" % tag, lit=lit, optic="lens_red" if t == "r" else "optic")
     P, U = under(dense([(-0.44, cv + 0.034), (0.44, cv + 0.034)], 0.02, closed=False), proj,
-                 0.0115)
-    B.guide(P, r=0.0045, sleeve=1.55, up=U)
-    pad(B.chrome, 0, cv + 0.034, 0.442, 0.0115, 0.008, proj, lift=-0.019, sink=0.022)
+                 0.0)
+    B.guide(P, r=0.0038, sleeve=1.45, up=U)
+    pad(B.chrome, 0, cv + 0.034, 0.442, 0.0115, 0.008, proj, lift=-0.004, sink=0.005)
     # the display under its own smoked lens
     du, dv = sg * 0.235, cv - 0.03
-    bz, sc, px, ln = Geo(), Geo(), Geo(), Geo()
-    frame_on(bz, rrect(du, dv, 0.1415, 0.0405, 0.016), proj, 0.006, -0.024, -0.0045)
-    pad(sc, du, dv, 0.138, 0.037, 0.014, proj, lift=-0.0085, sink=0.024)
-    dots(px, banner(msg), du, dv, 0.0072, proj, -0.0075, 0.0052)
-    pad(ln, du, dv, 0.139, 0.038, 0.015, proj, lift=-0.0047, sink=0.0059)
-    LATE[tag] = (lens, back, E, B, bz, sc, px, ln, pix)
+    sc, px, ln = Geo(), Geo(), Geo()
+    pad(sc, du, dv, 0.141, 0.040, 0.016, proj, lift=0.001, sink=0.004)
+    dots(px, banner(msg), du, dv, 0.0072, proj, 0.002, 0.0052)
+    pad(ln, du, dv, 0.139, 0.038, 0.015, proj, lift=0.0047, sink=-0.0035)
+    LATE[tag] = (lens, glass, back, E, B, sc, px, ln, pix)
     return g
 
 
@@ -316,11 +318,14 @@ def cutters():
         w.cut(wins)
     vf, vr = visor("front"), visor("rear")
     # the side repeaters on the front fenders: an amber cell under an amber lens
+    # (a hole like the visors': the paint's rim its walls, a back plate, a flush lens)
     rep = Geo()
     K.pocket(rep, K.rounded(1.09, 0.80, 0.064, 0.022), 'y', depth=0.012, mirror=True)
     R = K.Lamp("lamp.repeater", lit="led_accent", glass="lens_amber")
-    pad(R.chrome, 1.09, 0.80, 0.031, 0.0105, 0.009, 'y', lift=-0.0085, sink=0.011)
+    pad(R.housing, 1.09, 0.80, 0.0355, 0.0145, 0.012, 'y', lift=-0.0140, sink=0.016)
+    pad(R.chrome, 1.09, 0.80, 0.031, 0.0105, 0.009, 'y', lift=-0.0085, sink=0.0139)
     pad(R.emit(), 1.09, 0.80, 0.025, 0.006, 0.005, 'y', lift=-0.0045, sink=0.0065)
+    pad(R.glass, 1.09, 0.80, 0.032, 0.011, 0.011, 'y', lift=0.0, sink=0.003)
     LATE["rep"] = R
     # handle recesses: a cup under each pull, the pull's ends on the skin past it
     pulls, gp = Geo(), Geo()
@@ -332,8 +337,9 @@ def cutters():
     # a shut line: the charge door on the left front fender
     cut = Geo()
     K.groove(cut, rrect(1.33, 0.775, 0.075, 0.052, 0.022), 'y', closed=True)
-    return [(wells, "well"), (wins, "wincut", "drop"), (vf, "visor_f"), (vr, "visor_r"),
-            (rep, "rep_h", "skin", "lens_rep"), (pulls, "slot"), (cut, "cut", "drop")]
+    return [(wells, "well"), (wins, "wincut", "drop"), (vf, "visor_f", "drop"),
+            (vr, "visor_r", "drop"), (rep, "rep_h", "drop"), (pulls, "slot"),
+            (cut, "cut", "drop")]
 
 
 def unfold(ob):
@@ -372,24 +378,18 @@ def build_hull():
                         front=dict(kind="flat", panel="nose", crease=0.0),
                         rear=dict(kind="flat", panel="gate", crease=0.0),
                         cutters=cutters, subdiv=3, gap=GAP)
-    folds = {pn: unfold(body.parts[pn]) for pn in ("nose", "gate", "lens_rep")}
+    folds = {pn: unfold(body.parts[pn]) for pn in ("nose", "gate")}
     K.log("folds taken out: %s" % {k: v for k, v in folds.items() if v})
     tail_n = V3((-1.0, 0.0, 0.1026)).normalized()
     for pn, n in (("nose", V3((1, 0, 0))), ("gate", tail_n)):
         K.log("%s: %d faces flat" % (pn, flatten(body.parts[pn], n)))
-    for pn in HOUSINGS:                 # the housings' walls a sheet 1 mm thick: a game
-        ob = body.parts.get(pn)         # pack keeps them as they are (a bare sheet, it
-        if ob is not None:              # bakes them down onto the lit faces)
-            md = ob.modifiers.new("solid", 'SOLIDIFY')
-            md.thickness = 0.001
-            md.offset = 0.0
     for tag in ("front", "rear"):
-        lens, back, E, B, bz, sc, px, ln, pix = LATE[tag]
+        rim, lens, back, E, B, sc, px, ln, pix = LATE[tag]
+        rim.obj("visor.rim." + tag, "visor", bevel=0.0015)
         lens.obj("visor.lens." + tag, "lens_clear", sharp=40)
         back.obj("visor.back." + tag, "visor", bevel=0.002)
         E.obj(mirror=True)
         B.obj()
-        bz.obj("display.bezel." + tag, "lamp_housing", bevel=0.001)
         sc.obj("display." + tag, "panel", bevel=0.001)
         px.obj("pixels." + tag, pix)
         ln.obj("display.lens." + tag, "lens_smoke")
@@ -444,18 +444,19 @@ def build_glass():
 # ---------------------------------------------------------------------------------------
 def small_lamp(name, proj, u, v, a, b, r, cups, cup_r, lit="lamp", glass="lens_clear",
                base=0.012, mirror=False):
-    """A lamp standing on a bumper pad (its face base over the skin): a bezel, a chrome
-    back, LED cups and a lens over them."""
+    """A lamp standing on a bumper pad (its face base over the skin): a dark housing plate,
+    a chrome back, LED cups and a block of clear lens over them (no ring of a bezel, which
+    a game pack's far LOD fills into a lid)."""
     L = K.Lamp(name, lit=lit, glass=glass)
-    frame_on(L.housing, rrect(u, v, a + 0.003, b + 0.003, r + 0.003), proj, 0.006, base - 0.002,
-             base + 0.007)
+    pad(L.housing, u, v, a + 0.004, b + 0.004, r + 0.004, proj, lift=base - 0.0005,
+        sink=-(base - 0.003))
     pad(L.chrome, u, v, a, b, r, proj, lift=base + 0.0005, sink=-(base - 0.002))
     for k in range(cups):
         cu = u + (2 * a - 2.6 * cup_r) * ((k + 0.5) / cups - 0.5)
         loc, n = skin(cu, v, proj)
         L.reflector(loc + n * (base + 0.0045), n, r=cup_r, depth=cup_r * 0.45, seg=16,
                     led=cup_r * 0.55)
-    pad(L.glass, u, v, a, b, r, proj, lift=base + 0.0065, sink=-(base + 0.005))
+    pad(L.glass, u, v, a, b, r, proj, lift=base + 0.0065, sink=-(base + 0.0006))
     L.obj(mirror=mirror)
 
 
@@ -504,15 +505,15 @@ def build_ends():
     g.obj("reflectors", "reflector", bevel=0.001)
     small_lamp("lamp.reverse", 'X', 0.0, 0.352, 0.058, 0.0145, 0.009, 3, 0.0085)
     tanager.plate('X', 0.0, 0.655, "VB 07-717", low=0.55)
-    # the high stop lamp over the rear window: a slim housing on the skin, a lit bar on a
-    # chrome strip under a red lens (a pocket here, where the tail rolls into the roof,
+    # the high stop lamp over the rear window: a dark plate on the skin, a lit bar on a
+    # chrome strip in a block of red lens (a pocket here, where the tail rolls into the roof,
     # left stars in the paint's shading)
     S = K.Lamp("lamp.stop", lit="led_rear", glass="lens_red")
-    frame_on(S.housing, rrect(0, 1.418, 0.173, 0.0155, 0.012), 'X', 0.005, -0.002, 0.0075)
-    pad(S.chrome, 0, 1.418, 0.168, 0.011, 0.009, 'X', lift=0.0015, sink=0.002)
+    pad(S.housing, 0, 1.418, 0.174, 0.0155, 0.012, 'X', lift=0.0012, sink=0.002)
+    pad(S.chrome, 0, 1.418, 0.168, 0.011, 0.009, 'X', lift=0.0018, sink=0.0)
     P, U = under(dense([(-0.16, 1.418), (0.16, 1.418)], 0.02, closed=False), 'X', -0.0035)
     S.bar(P, 0.012, 0.003, up=U)
-    pad(S.glass, 0, 1.418, 0.170, 0.0125, 0.010, 'X', lift=0.0068, sink=-0.0055)
+    pad(S.glass, 0, 1.418, 0.170, 0.0125, 0.010, 'X', lift=0.0068, sink=-0.0019)
     S.obj()
     g = Geo()
     text_proj(g, "MINO", 0.062, 0.40, 0.735, 'X', spacing=1.1)

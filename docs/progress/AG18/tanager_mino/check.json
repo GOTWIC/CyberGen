@@ -1,12 +1,12 @@
 {
  "car": "tanager_mino",
  "size": [
-  3.434,
+  3.433,
   1.871,
   1.632
  ],
  "top_z": 1.632,
- "objects": 143,
+ "objects": 141,
  "palette": {
   "paint": [
    0.7,
@@ -148,6 +148,26 @@
     "meant": true
    },
    {
+    "object": "display.front",
+    "off_mm": 10.0,
+    "at": [
+     1.696,
+     0.138,
+     0.66
+    ],
+    "meant": true
+   },
+   {
+    "object": "display.rear",
+    "off_mm": 10.0,
+    "at": [
+     -1.636,
+     -0.095,
+     0.882
+    ],
+    "meant": true
+   },
+   {
     "object": "permit",
     "off_mm": 10.0,
     "at": [
@@ -178,30 +198,10 @@
     "meant": true
    },
    {
-    "object": "display.front",
-    "off_mm": 6.2,
-    "at": [
-     1.691,
-     0.363,
-     0.624
-    ],
-    "meant": true
-   },
-   {
-    "object": "display.rear",
-    "off_mm": 6.2,
-    "at": [
-     -1.632,
-     -0.097,
-     0.877
-    ],
-    "meant": true
-   },
-   {
     "object": "pixels.front",
-    "off_mm": 4.5,
+    "off_mm": 4.0,
     "at": [
-     1.692,
+     1.702,
      0.236,
      0.672
     ],
@@ -209,11 +209,11 @@
    },
    {
     "object": "pixels.rear",
-    "off_mm": 4.5,
+    "off_mm": 4.0,
     "at": [
-     -1.634,
+     -1.643,
      -0.342,
-     0.873
+     0.874
     ],
     "meant": true
    },
@@ -243,11 +243,11 @@
   "open_edges": [],
   "open_mm": 0,
   "cutter_holes": [],
-  "cut_loops": 12,
+  "cut_loops": 10,
   "pieces": {
    "body": {
     "closed": true,
-    "panels": 17
+    "panels": 13
    }
   }
  },
@@ -258,7 +258,7 @@
  },
  "triangles": {
   "verdict": "ok",
-  "total": 277367,
+  "total": 276187,
   "budget": 400000,
   "top": [
    [
@@ -297,7 +297,7 @@
   "groups": [
    [
     "body",
-    73826
+    67538
    ],
    [
     "tire",
@@ -305,11 +305,11 @@
    ],
    [
     "lamp",
-    32092
+    31344
    ],
    [
     "visor",
-    16160
+    25184
    ],
    [
     "seal",

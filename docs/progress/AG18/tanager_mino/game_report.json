@@ -3,15 +3,15 @@
  "title": "Tanager Mino",
  "ok": true,
  "triangles": {
-  "original": 277367,
+  "original": 276187,
   "lods": [
-   145419,
-   59987,
-   20116,
-   4713
+   143087,
+   59994,
+   20076,
+   5361
   ],
   "lod0_parts": {
-   "body": 116419,
+   "body": 114087,
    "glass": 2024,
    "wheel_fl": 6744,
    "wheel_fr": 6744,
@@ -20,12 +20,12 @@
   }
  },
  "objects": {
-  "original": 143,
+  "original": 141,
   "parts": 6
  },
  "size_class": {
   "name": "standard",
-  "exterior_m2": 26.73,
+  "exterior_m2": 26.3,
   "rule": "large when the body's exterior is 55 m2 or more",
   "lod_budgets": [
    150000,
@@ -42,37 +42,40 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 33818118,
- "seconds": 680.9,
+ "pack_bytes": 34400583,
+ "seconds": 748.5,
  "stage_seconds": {
-  "build": 1.7,
-  "render_original": 76.4,
-  "parts": 22.1,
+  "build": 1.2,
+  "render_original": 68.2,
+  "parts": 20.7,
   "nodes": 0.0,
-  "uv": 78.4,
-  "bake": 346.4,
-  "lods_export": 48.8,
-  "textures": 7.872652053833008,
-  "proof": 98.70981311798096
+  "uv": 79.3,
+  "bake": 410.9,
+  "lods_export": 53.9,
+  "textures": 7.975658893585205,
+  "proof": 105.70435929298401
  },
  "baked_down": {
   "relief": {
-   "pieces": 21,
-   "triangles": 20337,
+   "pieces": 24,
+   "triangles": 23534,
    "names": [
     "badge.disc.X",
     "badge.disc.z",
     "charge.bolt",
-    "charge.label",
     "cover.cap.fl",
     "cover.cap.fr",
     "cover.cap.rl",
     "cover.cap.rr",
+    "lamp.fog.housing",
+    "lamp.front.housing",
+    "lamp.rear.housing",
+    "lamp.reverse.housing",
     "lamp.stop.chrome",
+    "lamp.stop.housing",
     "lettering.rear",
     "lettering.side",
     "permit.mark",
-    "permit.text",
     "pixels.front",
     "pixels.rear",
     "roof.number",
@@ -84,11 +87,13 @@
    ]
   },
   "lod0_only": {
-   "pieces": 4,
-   "triangles": 808,
+   "pieces": 6,
+   "triangles": 2319,
    "names": [
     "badge.t.X",
     "badge.t.z",
+    "charge.label",
+    "permit.text",
     "plate.glyphs.X",
     "plate.glyphs.x"
    ]
@@ -107,24 +112,24 @@
  "texel_px_per_m": {
   "body": {
    "exterior": {
-    "area_m2": 26.734,
-    "p5": 470.4,
-    "median": 485.1
+    "area_m2": 26.297,
+    "p5": 489.4,
+    "median": 505.0
    },
    "underside": {
-    "area_m2": 0.313,
-    "p5": 169.1,
-    "median": 169.1
+    "area_m2": 0.14,
+    "p5": 176.0,
+    "median": 485.0
    },
    "cabin": {
-    "area_m2": 15.996,
-    "p5": 190.8,
-    "median": 193.5
+    "area_m2": 16.17,
+    "p5": 199.2,
+    "median": 201.4
    },
    "lamp_in_gaps": {
-    "area_m2": 3.606,
-    "p5": 169.1,
-    "median": 169.1
+    "area_m2": 3.183,
+    "p5": 176.0,
+    "median": 176.0
    }
   },
   "wheels": {
@@ -149,11 +154,11 @@
  "collision_hulls": 7,
  "source": {
   "script": "vehicles/cars/tanager_mino.py",
-  "script_sha256": "ad7952e86be5be3547b1dcd7536fed0cea814e3cdce3b199a8517f7d32d81c3e",
+  "script_sha256": "7a80192d2cfd84e69a7ff85caae81a873d5857fd83a315b0fa355f6818118cfc",
   "carkit_sha256": "80020b974b190e7b6db524668c8c6d0164b3484f712ec8a6420c6e9961b53ea5",
   "game_sha256": "32271c5b2195e75c93509022799b7dd770add377d59cc906b924e040e27ff1db",
-  "original_triangles": 277367,
-  "original_objects": 143
+  "original_triangles": 276187,
+  "original_objects": 141
  },
  "test": false,
  "checks": [
@@ -172,25 +177,25 @@
    "detail": [
     {
      "lod": 0,
-     "triangles": 145419,
+     "triangles": 143087,
      "budget": 150000,
      "ok": true
     },
     {
      "lod": 1,
-     "triangles": 59987,
+     "triangles": 59994,
      "budget": 60000,
      "ok": true
     },
     {
      "lod": 2,
-     "triangles": 20116,
+     "triangles": 20076,
      "budget": 20000,
      "ok": true
     },
     {
      "lod": 3,
-     "triangles": 4713,
+     "triangles": 5361,
      "budget": 5000,
      "ok": true
     }
@@ -204,7 +209,7 @@
     "slots": {
      "body": {
       "overlap": 6e-05,
-      "coverage": 0.5191,
+      "coverage": 0.5522,
       "outside_unit": 0.0
      },
      "wheels": {
@@ -220,8 +225,8 @@
    "ok": true,
    "detail": {
     "body": {
-     "p5": 470.4,
-     "median": 485.1,
+     "p5": 489.4,
+     "median": 505.0,
      "floor": 300.0,
      "ok": true
     },
@@ -344,7 +349,7 @@
     {
      "lod": 2,
      "deviation_m": [
-      0.0002,
+      0.0005,
       0.001,
       0.0011
      ],
@@ -358,9 +363,9 @@
     {
      "lod": 3,
      "deviation_m": [
-      0.0013,
-      0.0082,
-      0.0
+      0.0002,
+      0.0027,
+      0.0005
      ],
      "tolerance_m": [
       0.0515,
@@ -376,10 +381,10 @@
    "ok": true,
    "detail": [
     {
-     "normal_p95_deg": 0.48,
-     "bent_share": 0.0002,
-     "texture_share": 0.0001,
-     "miss_share": 0.0002,
+     "normal_p95_deg": 0.45,
+     "bent_share": 0.0001,
+     "texture_share": 0.0002,
+     "miss_share": 0.0001,
      "lod": 1,
      "limits": {
       "p95": 12.0,
@@ -389,10 +394,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 13.07,
-     "bent_share": 0.0115,
+     "normal_p95_deg": 12.54,
+     "bent_share": 0.0101,
      "texture_share": 0.0007,
-     "miss_share": 0.0008,
+     "miss_share": 0.0017,
      "lod": 2,
      "limits": {
       "p95": 25.0,
@@ -402,10 +407,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 18.37,
-     "bent_share": 0.0351,
-     "texture_share": 0.0217,
-     "miss_share": 0.1169,
+     "normal_p95_deg": 15.37,
+     "bent_share": 0.0243,
+     "texture_share": 0.0333,
+     "miss_share": 0.1084,
      "lod": 3,
      "limits": {
       "p95": 40.0,
@@ -425,10 +430,10 @@
      438,
      226,
      364,
-     364,
+     360,
      132,
-     454,
-     246
+     456,
+     258
     ]
    }
   }

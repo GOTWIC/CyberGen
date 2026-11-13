@@ -4,7 +4,7 @@
 
 - **Brand, model, type:** Tanager Mino, city car, 4 seats (all names made up). The first Tanager: it sets the family's cues.
 - **Size:** 3.43 m long, 1.57 m wide over the arch trims (1.87 m over the mirrors), 1.55 m to the roof, 1.61 m over the rack and 1.64 m over the sensor puck, wheelbase 2.45 m, wheels 0.56 m, ground clearance 0.20 m.
-- **Triangles:** 277,367 in 143 objects (body at subdivision 3; 223,689 in 110 before step B).
+- **Triangles:** 276,187 in 141 objects (body at subdivision 3; 223,689 in 110 before step B).
 - **Build:** `vehicles/blender.sh vehicles/cars/tanager_mino.py --out docs/progress/AG18/tanager_mino --sheet` (`MINO_HULL=1` with `--preview` shows the bare hull).
 
 ## The design
@@ -22,20 +22,24 @@ GLYPH, banner, dots, Win, sheet, grain, plate, badge, arch_pts and the wheel; th
 window cutter planes kept in a subclass, `MinoWin`). The sheet, clay, zebra and check above
 are of this build.
 
-- **Visors:** each is now a pocket cut 30 mm and more into the nose and the tail under one
-  flush clear lens (a slab laid on the skin as it stood uncut: the body's own skin cut out as
-  the lens kept the boolean's slivers on the face's rounded ends and its reflections
-  zigzagged). Inside, on a gloss black back plate 24 mm down: at each end a lamp of a chrome
-  rounded-rectangle bezel, a lit ring of light guide in a frosted sleeve (red in the tail)
-  and a row of three LED cups on a dark tray; between them the light bar, a guide in its
-  sleeve on a chrome strip; the display on the car's left a dark screen with its lit dots
-  under a smoked lens of its own in a bezel. Every lit face 5 to 7 mm under the lens. The
-  housings' walls are a 1 mm sheet, so the game pack keeps them.
-- **Other lamps:** the fog and reverse lamps bezels on the bumper pads with a chrome back,
-  two or three LED cups and a clear lens; the high stop lamp a slim housing over the rear
-  window, a lit bar on a chrome strip under a red lens (a pocket there, where the tail rolls
-  into the roof, left stars in the paint); the side repeaters on the front fenders amber
-  cells in pockets under amber lenses.
+- **Visors:** each is now a hole across the nose and the tail face (the paint's own 14 mm
+  rim its walls, a gloss black back plate closing it 14 mm in) with a gloss black surround
+  standing 9.5 mm proud round its edge (about the old visor pad's 4 mm and its lamps' 9.5 mm)
+  and a clear lens in it, all laid on the skin as it stood uncut (the body's own skin cut
+  out as the lens kept the boolean's slivers on the face's rounded ends and its reflections
+  zigzagged). In it, at each end a lamp of a chrome plate, a lit ring of light guide in a
+  frosted sleeve (red in the tail) and a row of three LED cups on a dark tray; between them
+  the light bar, a guide in its sleeve on a chrome strip; the display on the car's left a
+  dark screen with its lit dots under a smoked lens of its own. The lit faces stand 2 to
+  4 mm proud of the skin under the lens: in the game pack's LOD3 the nose's flat face is
+  drawn across the hole, and a first build with them deeper (a pocket's cup) lost them
+  there under a dark lid. Nothing in the lamps is a small ring (a bezel), which LOD3 fills
+  into a lid.
+- **Other lamps:** the fog and reverse lamps a dark housing plate on the bumper pads, a
+  chrome back, two or three LED cups and a block of clear lens; the high stop lamp over the
+  rear window a lit bar on a chrome strip in a block of red lens (a pocket there, where the
+  tail rolls into the roof, left stars in the paint); the side repeaters on the front
+  fenders amber cells in holes under flush amber lenses.
 - **Cut lines:** the charge door cut through the fender (it was a drawn outline), the door
   pulls in cups cut 14 mm into the doors with the pulls' ends on the skin past them, 3.5 mm
   shut lines (2.4 mm before). Washer jets in front of the windshield. The hood's service flap
@@ -62,9 +66,10 @@ are of this build.
   `look` as before: the one-sided parts (driver's wheel and screens, wipers, antenna, tow
   eye, permit, displays, charge door) are told as meant, and `body.screen`, 3.8 mm off at
   the windshield's top corner (the boolean's triangles at the window's hole), is left.
-- **Game pack** (rebuilt locally, not published): every check passing; 145,419, 59,987,
-  20,116 and 4,713 triangles, standard class, texels 470 px/m (5th percentile). The lamps,
-  bar and displays bake lit; LOD3 keeps the visor as a dark band and the glass dark.
+- **Game pack** (rebuilt locally, not published): every check passing; 143,087, 59,994,
+  20,076 and 5,361 triangles, standard class, texels 489 px/m (5th percentile). The lamps,
+  bar and displays bake lit, and LOD3 keeps the visors' lamp rings and bars lit and the
+  glass dark gray.
 
 ## Tanager's signature cues (for the Cab and the Porter to repeat)
 
