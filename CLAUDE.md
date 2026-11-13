@@ -2314,7 +2314,13 @@ carriageway) and previewed in Blender; layer 3 of the manifest; a C++ runtime pl
 `CityGenAtmos`, beside `CityGenPlay`, that renders it (lights per tile, time of day,
 weather, effects, post) and takes over the play features' lamps, pools, washes, moon and
 night exposure. AG16's benchmark by night is its baseline; the night pass stays at or under
-16.7 ms p95 at native 1440p on the PC (decision 12.6). Package `atmosgen/` beside the
+16.7 ms p95 at native 1440p on the PC (decision 12.6). **Benchmarks** (Swagnik, 2026-11-12):
+the lean route (`--bench-route lean`, the default with `--bench-atmos`: one walk, the drive,
+the flight, no teleport, a short warm-up), only `night_plan_all` and the passes the change
+touches (`dusk_plan` only where it differs by dusk), one run (a second only within 0.3 ms of
+16.7 ms or when the run was flagged: foreground lost, CPU starved), no "before" run (the
+previous milestone's "after"); tune with quick GPU profiles at fixed viewpoints, not route
+runs. Package `atmosgen/` beside the
 others, which it reads only (citygen's model JSON, assetgen's `signs.json`); tests in
 `tests/atmosgen/` (`test_at_*.py`, no `conftest.py`).
 
@@ -2484,6 +2490,35 @@ AT3 (sky and time) is in place:
   (`front_owner`, `lost_to`) and the driver takes it back every 2 s (`take_front`, `retaken`).
 Results (Delta's night 14.4 ms p95, dusk 14.3, day 11.1; with AT0's prototypes 16.4, 16.8
 walking): `docs/progress/AT3/`.
+
+AT4 (air) is in place:
+- **The plan's air** (`atmosgen/air.py`, `planmodel.Air`, `FogVolume`, `Emitter`;
+  `presets.AIR_LOOK`, `SCATTER`, `VOLUMES`, `EMITTERS`, `AIR_SCHEDULES`, `AIR_CVARS`): the
+  height fog of the look and weather (`density`, `extinction`, `falloff` per look: neon rain's
+  haze keeps to the street canyons), thicker by night (`fog_hours` from the sky's Night), its
+  volumetric fog to `view_m`; light shafts as each light kind's volumetric scattering (street
+  lights, high masts, floods; none from the neon spill, shop signs and shopfronts; none from
+  searchlights, which keep AT2's beam meshes, brighter in fog); volumes (ellipsoids: mist along
+  canals, basins and rivers after dusk, smog over industrial and spaceport districts and their
+  megasites, haze under decks and in road tunnels, each times its district's haze and danger,
+  with a `glow` of the city's light); emitters (steam from AG7's manholes and drains read from
+  the street packs, `air.street_details`, road pieces only; M9's vents; exhaust from M3's roof
+  mechanical units; cooking from M6's stalls and kiosks; smoke from chimneys on industrial
+  roofs and stove pipes on shanty stacks, the fifth emitter ask), the share that steams by grit;
+  the air check (`checks.air`: emitters on their sources and out of the masses, volumes over
+  their water, district or deck, budgets per tile), a plan failing it not delivered;
+  `atmosgen lux` adds `preview_air.png`.
+- **Exporter and runtime** (`docs/unreal_export.md`, "From AT4"): packing version 3 (a cell's
+  volumes and emitters, `pack_volume`, `pack_emitter`; cells wherever any lie),
+  `unreal_atmos.air_settings`, `ATMOS_VERSION` atmos4; the controller's air (`bAir`, fog by
+  the hour, `KindScatter`, a pool of local fog volumes, the nearest 24, with a glow by night;
+  per cell an instanced component of plume cards in `M_CgSteam`, atmos assets version 12;
+  `TunedSettings` applied while it runs); console `.Air`, `.Tuned`, `.VolumeGain`,
+  `.VolumeGlow`, `.SteamGain`, `.FogSet`, `.FogView`, `.PlumeDebug`; the check's `*_noair`
+  views and `$CITYGEN_UE_ATMOS_CMDS`; bench passes `night_plan_air`, `dusk_plan_air`,
+  `day_plan_air`, `night_plan_proto`, the exploring `x_*` (`bench.TUNABLE`). Parked cars: cull
+  distances by part, wheels without shadows (`VEHICLE_CULL_M`, `VEHICLE_ACTOR_VERSION` 3).
+Results: `docs/progress/AT4/`.
 
 ## Life generator (lifegen)
 

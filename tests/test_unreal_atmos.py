@@ -9,6 +9,8 @@ import math
 import pytest
 
 from atmosgen import plan as PL
+from atmosgen import planmodel as PM
+from atmosgen import presets as P
 from citygen import unreal_atmos as UA
 
 
@@ -127,6 +129,55 @@ def test_hashes_follow_the_lights(build, tmp_path):
     h2 = UA.actor_hashes(UA.write_atmos(build))
     changed = sorted(k for k in h if h[k] != h2[k])
     assert len(changed) == 1 and changed[0].startswith("atmos.lights.")
+
+
+def test_cells_pack_volumes_and_emitters(build):
+    """AT4: a cell holds the fog volumes whose middle and the plumes whose foot lie in it (a
+    cell made where only they lie), packed in Unreal's frame; the controller has the air."""
+    p = build / "atmos" / "atmos_plan.json"
+    plan = json.loads(p.read_text())
+    assert plan["air"]["cvars"] and plan["air"]["scatter"]["shop_sign"] == 0.0
+    plan["volumes"] = [{"id": "ww.mist000", "owner_id": "ww", "kind": "mist", "tile": "t+00+00",
+                        "center": [600.0, 10.0, -1.5], "extent": [60.0, 10.0, 7.0],
+                        "yaw_deg": 90.0, "density": 0.02, "floor": 0.7, "phase_g": 0.45,
+                        "albedo": [0.4, 0.45, 0.5], "schedule": "mist", "hash": "a" * 16}]
+    plan["emitters"] = [{"id": "rs.manhole00", "owner_id": "rs", "kind": "steam",
+                         "mount": "manhole", "tile": "t+00+00", "pos": [20.0, -1.0, 0.05],
+                         "width_m": 0.8, "rise_m": 4.5, "rate": 0.9, "color": [0.7, 0.7, 0.7],
+                         "schedule": "steam", "source": "assetgen", "hash": "b" * 16}]
+    p.write_text(json.dumps(plan))
+    at = UA.write_atmos(build)
+    data = json.loads((build / "unreal" / UA.DATA).read_text())
+    assert at["volumes"] == 1 and at["emitters"] == 1
+    cells = {c["cell"]: c for c in data["cells"]}
+    vc = cells[UA.cell_name(*UA.cell_of(600.0, 10.0))[1]]
+    assert vc["count"] == 0 and vc["volumes"] == 1                  # (a cell of its own)
+    f, i = vc["volume_floats"], vc["volume_ints"]
+    assert len(f) == UA.VFLOATS and len(i) == UA.VINTS
+    assert f[:4] == [60000.0, -1000.0, -150.0, -90.0] and f[4:7] == [6000.0, 1000.0, 700.0]
+    sched = sorted(plan["schedules"])
+    assert i[0] & 0xff == sched.index("mist") and i[0] >> 8 == UA.VOLUME_KINDS.index("mist")
+    ec = cells[UA.cell_name(*UA.cell_of(20.0, -1.0))[1]]
+    assert ec["emitters"] == 1 and ec["count"] > 0
+    f, i = ec["emitter_floats"], ec["emitter_ints"]
+    assert f[:5] == [2000.0, 100.0, 5.0, 80.0, 450.0] and len(f) == UA.EFLOATS
+    assert (i[0] >> 8) & 0xff == UA.EMITTER_KINDS.index("steam")
+    assert (i[0] >> 16) & 0xff == UA.EMITTER_MOUNTS.index("manhole") and len(i) == UA.EINTS
+    ctl = data["controller"]
+    assert ctl["air"] and len(ctl["fog_hours"]) == 24
+    assert len(ctl["kind_scatter"]) == len(ctl["kind_names"])
+    assert ctl["kind_scatter"][ctl["kind_names"].index("spill")] == 0.0
+    assert ctl["puffs"] == [P.PUFFS[k] for k in UA.EMITTER_KINDS]
+    assert all("=" in c for c in ctl["cvars"])
+    # the kinds the exporter indexes are the plan's
+    from typing import get_args
+    assert UA.VOLUME_KINDS == get_args(PM.FogVolume.model_fields["kind"].annotation)
+    assert UA.EMITTER_KINDS == get_args(PM.Emitter.model_fields["kind"].annotation)
+    assert UA.EMITTER_MOUNTS == get_args(PM.Emitter.model_fields["mount"].annotation)
+    # a plan whose air check failed is not delivered
+    plan["checks"]["air"] = {"ok": False}
+    p.write_text(json.dumps(plan))
+    assert "air" in UA.write_atmos(build)["skipped"]
 
 
 def test_a_failed_check_is_not_delivered(build):

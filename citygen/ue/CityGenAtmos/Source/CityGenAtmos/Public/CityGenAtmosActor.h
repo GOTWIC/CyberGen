@@ -19,7 +19,12 @@
 // light, the exposure (held per look and hour: no eye adaptation pumping), MPC_CityGen's Night
 // and Hour, every light's schedule (interpolated between the hours) and a sky dome (M_CgSky:
 // the sky atmosphere, the stars, the moon, the cloud deck lit by the city's glow); the play
-// features' day and night button and their menu's time-of-day slider drive it. Frames:
+// features' day and night button and their menu's time-of-day slider drive it. AT4 (air): the
+// height and volumetric fog of the plan's look by the hour, light shafts by light kind (each
+// kind's volumetric scattering), the plan's fog volumes (mist, smog, haze: the nearest
+// MaxVolumes as local fog volumes from a pool), its steam and smoke plumes (per cell an
+// instanced component of cards in M_CgSteam, rising by world position offset), the searchlight
+// beams brighter in fog, and the engine settings the air's budget needs while it runs. Frames:
 // Unreal cm, X east, Y south.
 
 #pragma once
@@ -38,6 +43,7 @@ class APostProcessVolume;
 class UDecalComponent;
 class UInstancedStaticMeshComponent;
 class ULocalLightComponent;
+class USceneComponent;
 class UStaticMeshComponent;
 class UPrimitiveComponent;
 class UMaterialInterface;
@@ -69,6 +75,21 @@ struct FCityGenAtmosLight
 	float AnimAmount = 0.f;                 // a blink's on share, a sweep's swing (deg)
 	float AnimPhase = 0.f;                  // 0 to 1
 	uint32 Seed = 0;
+};
+
+/** AT4: one fog volume of the plan (a local fog volume while live). */
+struct FCityGenAtmosVolume
+{
+	FVector Pos = FVector::ZeroVector;      // cm
+	float Yaw = 0.f;
+	FVector Ext = FVector(500.f);           // half sizes (cm)
+	float Density = 0.01f;                  // 1/m at its middle
+	float Floor = 0.f;
+	float PhaseG = 0.4f;
+	FLinearColor Albedo = FLinearColor::White;
+	float Glow = 0.f;                       // its emissive's share (of its albedo)
+	uint8 Schedule = 0;
+	uint8 Kind = 0;
 };
 
 UCLASS(HideCategories = (Actor, Input, Replication, Rendering, Collision, HLOD, Physics,
@@ -335,6 +356,87 @@ public:
 	UPROPERTY(EditAnywhere, Category = "CityGen|Sky")
 	bool bLockExposure = true;
 
+	// -- AT4: the air (the plan's `air`; docs/unreal_export.md, "From AT4") --
+
+	/** The fog volumes (mist, smog, haze) and the steam and smoke plumes. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	bool bAir = false;
+
+	/** The height fog's start (m from the eye), the volumetric fog's reach (m), its
+	 *  scattering's phase g. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	float FogStartM = 2.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	float FogViewM = 200.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	float FogPhaseG = 0.6f;
+
+	/** The fog's density by the hour (24 shares of FogDensity; empty: 1). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	TArray<float> FogHours;
+
+	/** Light shafts: each light kind's volumetric scattering (by KindNames; empty: 1). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	TArray<float> KindScatter;
+
+	/** A searchlight beam's glow grows by this times the fog's share while the fog is on. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	float BeamFogGain = 0.6f;
+
+	/** The live fog volumes: at most this many (Unreal draws 32 a view) within this (m). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	int32 MaxVolumes = 24;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	float VolumeRangeM = 900.f;
+
+	/** The plumes show within this (m). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	float EmitterRangeM = 220.f;
+
+	/** Cards per plume by emitter kind (EmitterKinds: steam, smoke, exhaust, cooking). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	TArray<int32> Puffs;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	TArray<FString> EmitterKinds;
+
+	/** Engine settings applied while the controller runs ("name=value"; restored at its end):
+	 *  the room the air's budget needs (AT4). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	TArray<FString> TunedSettings;
+
+	/** Whether TunedSettings are applied. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	bool bTuned = true;
+
+	/** A gain on every fog volume's density (art direction). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	float VolumeGain = 1.f;
+
+	/** The city's light the fog volumes glow with by night (their emissive: albedo times this,
+	 *  times Night), so the mist and smog read where no live light reaches them. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	float VolumeGlow = 0.15f;
+
+	/** The plumes' opacity (MPC_CityGenAtmos's SteamGain, art direction). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	float SteamGain = 10.f;
+
+	/** AT4: the plume components nearest the view, as one JSON line (debugging); with a
+	 *  material's path, every plume component drawn in it. */
+	FString PlumeDebug(const FString& Material);
+
+	/** AT4: the fog volumes and plumes on or off. */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	void SetAir(bool bOn);
+
+	/** AT4: the engine settings (TunedSettings) applied, or the project's own. */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	void SetTuned(bool bOn);
+
 	/** AT3: the sky and time on or off. */
 	UFUNCTION(BlueprintCallable, Category = "CityGen")
 	void SetSky(bool bOn);
@@ -428,6 +530,13 @@ private:
 		TArray<int32> High;
 		TWeakObjectPtr<UInstancedStaticMeshComponent> Beacons;
 		TArray<TPair<int32, TWeakObjectPtr<UStaticMeshComponent>>> Beams;
+		// AT4: its fog volumes, its plumes' cards (one instanced component) and each card's
+		// plume schedule, opacity and instance index
+		TArray<FCityGenAtmosVolume> Volumes;
+		TWeakObjectPtr<UInstancedStaticMeshComponent> Plumes;
+		TArray<uint8> PlumeSchedule;
+		TArray<float> PlumeRate;
+		int32 Emitters = 0;
 		bool bUsed = false;
 	};
 
@@ -510,6 +619,37 @@ private:
 	TObjectPtr<UMaterialParameterCollection> CityCollection;
 	FVector WetAt = FVector(1e12);
 	bool bBegun = false;
+
+	// AT4: the air
+	void UpdateVolumes();
+	void ReleaseVolumes();
+	void MakePlumes(int32 Slot);
+	void DropPlumes(int32 Slot);
+	void ShowPlumes(bool bOn);
+	void UpdatePlumeRates();
+	void ApplyCVars(bool bOn);
+	void UpdateBeamGlow();
+	float FogShare() const;
+	float ScatterOf(uint8 Kind) const;
+	TMap<int64, TObjectPtr<USceneComponent>> LiveVolumes;   // (local fog volume components,
+	                                                        // kept from GC by AllVolumes)
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<USceneComponent>> FreeVolumes;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<USceneComponent>> AllVolumes;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UPrimitiveComponent>> PlumeComps;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> SteamMaterial;
+	TMap<FString, FString> SavedCVars;
+	bool bCVarsApplied = false;
+	bool bPlumesShown = false;
+	int32 RegisteredVolumes = 0;
+	int32 RegisteredEmitters = 0;
+	int32 PlumeCards = 0;
+	int32 CandidatesVolumes = 0;
+	double VolumesAt = -1.0;
+	float PlumeHour = -100.f;
 	bool bShowing = false;                  // the lights live now (on, a plan, by night)
 
 	// AT3: the sky and time

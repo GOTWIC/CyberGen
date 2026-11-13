@@ -4,7 +4,8 @@
 // .Scattering S,
 // .Status (the state as one JSON line). AT3: .Hour also takes day, dusk or night; .Sky and
 // .Exposure [0|1] (the sky and time; the exposure held at the hour's), .TimeSpeed H (hours a
-// second), .Cover C (the cloud deck's cover for the session). AT1: the plan comes with the level (the importer's
+// second), .Cover C (the cloud deck's cover for the session). AT4: .Air [0|1] (the fog volumes
+// and plumes), .Tuned [0|1] (the plan's engine settings), .VolumeGain G, .FogView M. AT1: the plan comes with the level (the importer's
 // controller and its cells' data actors), no longer from a folder (AT0's .Load and
 // -CityGenAtmosPlan are gone).
 
@@ -45,7 +46,54 @@ namespace
 	CG_ATMOS_TOGGLE(SkyCmd, "CityGenAtmos.Sky", "CityGenAtmos.Sky [0|1]: AT3's sky and time (the sun, the moon, the sky dome, the exposure by the hour)", bSky, SetSky)
 	CG_ATMOS_TOGGLE(ExposureCmd, "CityGenAtmos.Exposure", "CityGenAtmos.Exposure [0|1]: the exposure held at the hour's (0: the engine's eye adaptation)", bLockExposure, SetLockExposure)
 	CG_ATMOS_TOGGLE(FixturesCmd, "CityGenAtmos.Fixtures", "CityGenAtmos.Fixtures [0|1]: AT2's aviation beacons and searchlight beams", bFixtures, SetFixtures)
+	CG_ATMOS_TOGGLE(AirCmd, "CityGenAtmos.Air", "CityGenAtmos.Air [0|1]: AT4's fog volumes (mist, smog, haze) and steam and smoke plumes", bAir, SetAir)
+	CG_ATMOS_TOGGLE(TunedCmd, "CityGenAtmos.Tuned", "CityGenAtmos.Tuned [0|1]: AT4's engine settings (the plan's cvars) applied, or the project's own", bTuned, SetTuned)
 #undef CG_ATMOS_TOGGLE
+
+	FAutoConsoleCommandWithWorldAndArgs VolumeGainCmd(TEXT("CityGenAtmos.VolumeGain"),
+		TEXT("CityGenAtmos.VolumeGain G: AT4: a gain on every fog volume's density"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenAtmos* A = AtmosIn(World);
+			if (A && Args.Num()) { A->VolumeGain = FCString::Atof(*Args[0]); A->SetAir(A->bAir); }
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs VolumeGlowCmd(TEXT("CityGenAtmos.VolumeGlow"),
+		TEXT("CityGenAtmos.VolumeGlow G: AT4: the fog volumes' glow by night (their emissive, of their albedo)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenAtmos* A = AtmosIn(World);
+			if (A && Args.Num()) { A->VolumeGlow = FCString::Atof(*Args[0]); A->SetAir(A->bAir); }
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs SteamGainCmd(TEXT("CityGenAtmos.SteamGain"),
+		TEXT("CityGenAtmos.SteamGain G: AT4: the plumes' opacity"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenAtmos* A = AtmosIn(World);
+			if (A && Args.Num()) { A->SteamGain = FCString::Atof(*Args[0]); A->SetFog(A->bFog); }
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs FogSetCmd(TEXT("CityGenAtmos.FogSet"),
+		TEXT("CityGenAtmos.FogSet DENSITY [FALLOFF [EXTINCTION [PHASE_G]]]: AT4: the height fog's density and falloff, the volumetric fog's extinction scale and phase g (this session)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenAtmos* A = AtmosIn(World);
+			if (!A || !Args.Num()) { return; }
+			A->FogDensity = FCString::Atof(*Args[0]);
+			if (Args.Num() > 1) { A->FogFalloff = FCString::Atof(*Args[1]); }
+			if (Args.Num() > 2) { A->FogVolumetric = FCString::Atof(*Args[2]); }
+			if (Args.Num() > 3) { A->FogPhaseG = FCString::Atof(*Args[3]); }
+			A->SetFog(A->bFog);
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs FogViewCmd(TEXT("CityGenAtmos.FogView"),
+		TEXT("CityGenAtmos.FogView M: AT4: the volumetric fog's reach (m)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenAtmos* A = AtmosIn(World);
+			if (A && Args.Num()) { A->FogViewM = FCString::Atof(*Args[0]); A->SetFog(A->bFog); }
+		}));
 
 	FAutoConsoleCommandWithWorldAndArgs HighCmd(TEXT("CityGenAtmos.High"),
 		TEXT("CityGenAtmos.High LIVE RANGE_M: AT2's high tier (floods, searchlights, high masts): its size and range (m)"),
@@ -107,6 +155,16 @@ namespace
 		{
 			ACityGenAtmos* A = AtmosIn(World);
 			if (A && Args.Num()) { A->VolumetricScattering = FCString::Atof(*Args[0]); A->SetTiers(A->MaxLive, A->MidRangeM, A->MaxShadowed); }
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs PlumeDebugCmd(TEXT("CityGenAtmos.PlumeDebug"),
+		TEXT("CityGenAtmos.PlumeDebug [MATERIAL]: AT4: log the plume components near the view (and draw them in MATERIAL, a material's path, to test)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (ACityGenAtmos* A = AtmosIn(World))
+			{
+				UE_LOG(LogTemp, Display, TEXT("CITYGEN_ATMOS_PLUMES %s"), *A->PlumeDebug(Args.Num() ? Args[0] : FString()));
+			}
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs StatusCmd(TEXT("CityGenAtmos.Status"),

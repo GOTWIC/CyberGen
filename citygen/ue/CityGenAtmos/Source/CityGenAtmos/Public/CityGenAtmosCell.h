@@ -26,6 +26,18 @@ namespace CityGenAtmosPack
 	// 8-15 schedule index; 16-23 kind index; 24-27 mount index; 28-29 animation (AT2):
 	// 0 none, 1 blink, 2 sweep), seed (a hash of its id)
 	constexpr int32 Ints = 2;
+	// AT4: a fog volume's floats: its middle x, y, z (cm), yaw (deg), half sizes along its
+	// yaw, across and up (cm), density (extinction at its middle, 1/m), floor (the share of
+	// it that is height fog), phase g, albedo r, g, b (linear), glow (its emissive's share);
+	// ints: flags (bits 0-7 schedule index, 8-15 kind: mist, smog, haze, tunnel_haze,
+	// steam_bank)
+	constexpr int32 VolFloats = 14;
+	constexpr int32 VolInts = 1;
+	// AT4: a plume's floats: its foot x, y, z (cm), width, rise (cm), opacity, albedo r, g, b;
+	// ints: flags (bits 0-7 schedule index, 8-15 kind: steam, smoke, exhaust, cooking, 16-23
+	// mount: manhole, drain, vent, roof, stall, chimney, stove), seed
+	constexpr int32 EmitFloats = 9;
+	constexpr int32 EmitInts = 2;
 }
 
 UCLASS(HideCategories = (Input, Replication, Rendering, Collision, HLOD, Physics, Networking,
@@ -52,6 +64,20 @@ public:
 	/** Its lights' packed ints (CityGenAtmosPack::Ints each). */
 	UPROPERTY(EditAnywhere, Category = "CityGen")
 	TArray<int32> LightInts;
+
+	/** AT4: its fog volumes, packed (CityGenAtmosPack::VolFloats and VolInts each). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	TArray<float> VolumeFloats;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	TArray<int32> VolumeInts;
+
+	/** AT4: its steam and smoke plumes, packed (EmitFloats and EmitInts each). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	TArray<float> EmitterFloats;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	TArray<int32> EmitterInts;
 
 protected:
 	virtual void BeginPlay() override;

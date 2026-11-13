@@ -72,8 +72,9 @@ HASH_TAG = "cg.hash"
 # unchanged build applies the change (stored hashes are "<version>.<content hash>")
 MESH_VERSION = "3"
 ACTOR_VERSION = "1"
-ATMOS_VERSION = "atmos3"  # the atmos controller's and cells' actors (2, AT2: the high tier,
-                          # blinks and sweeps in the packed lights; 3, AT3: the sky and time)
+ATMOS_VERSION = "atmos4"  # the atmos controller's and cells' actors (2, AT2: the high tier,
+                          # blinks and sweeps in the packed lights; 3, AT3: the sky and time;
+                          # 4, AT4: the air, a cell's fog volumes and emitters)
 SWIM_BRUSH_CM = 200.0   # the cube brush a volume spawned from its class gets (CubeBuilder)
 SWIM_FRICTION = 0.3
 GRAPH_VARS = [("City", "string"), ("Graph", "name"), ("Hash", "string"), ("Ids", "[name"),
@@ -1537,7 +1538,10 @@ def stage2_master(master, defaults=None):
 
 VEHICLE_VERSION = "7"        # of the vehicle masters (`cg.vehicle` metadata)
 VEHICLE_MESH_VERSION = "3"   # of what the importer makes of a car (with its manifest hash)
-VEHICLE_ACTOR_VERSION = "2"  # of the placement actors (2: the glass casts no shadow)
+VEHICLE_ACTOR_VERSION = "3"  # of the placement actors (2: the glass casts no shadow;
+                             # 3, AT4: cull distances by part, the wheels cast no shadow)
+VEHICLE_CULL_M = {"body": 450.0, "glass": 250.0, "wheel": 120.0, "brake": 80.0,
+                  "other": 150.0}
 # the paint per placement: Custom Primitive Data, or per-instance custom data on an
 # instanced component, three linear colors (citygen.unreal_vehicles.PAINT_CPD)
 PAINT_INDEX = (0, 3, 6)
@@ -2957,6 +2961,13 @@ class Importer:
                             # mm apart: cast into the shadow maps, each sheet shadowed the
                             # other in blocky black patches, the Aurels' glass roofs worst)
                             comp.set_cast_shadow(False)
+                        # (AT4: each part drawn only as near as it shows, so the 4,354
+                        # components of Delta's parked cars stop drawing past it: a wheel
+                        # under its arch, the glass, the body; the wheels cast no shadow)
+                        cull = VEHICLE_CULL_M.get(p["kind"], VEHICLE_CULL_M["other"])
+                        comp.set_cull_distances(int(0.85 * cull * 100.0), int(cull * 100.0))
+                        if p["kind"] in ("wheel", "brake"):
+                            comp.set_cast_shadow(False)
                         tags = ["cg.member", f"cg.key={r['key']}.{car}.{p['name']}",
                                 "cg.type=vehicle", "cg.category=vehicle", f"cg.kind={car}",
                                 f"cg.vehicle={car}", f"cg.part={p['name']}"]
@@ -3768,12 +3779,23 @@ class Importer:
                 a.set_editor_property("count", int(c["count"]))
                 a.set_editor_property("light_floats", [float(v) for v in d["floats"]])
                 a.set_editor_property("light_ints", [int(v) for v in d["ints"]])
+                # AT4: its fog volumes and steam and smoke emitters (a plugin before AT4 has
+                # none of them)
+                for k, conv in (("volume_floats", float), ("volume_ints", int),
+                                ("emitter_floats", float), ("emitter_ints", int)):
+                    try:
+                        a.set_editor_property(k, [conv(v) for v in d.get(k, [])])
+                    except Exception as e:
+                        log(f"atmos: no {k} ({e})")
+                        break
                 a.tags = self.tags(c["key"], h, [], "atmos_lights", "atmos", c["tile"], "")
 
             self.place(have, c["key"], c["hash"], cls.static_class(), make, update,
                        "CityGen/Atmos", version=ATMOS_VERSION)
         self.stats["atmos"] = {"made": True, "cells": len(self.man["atmos"]["cells"]),
-                               "lights": self.man["atmos"]["lights"]}
+                               "lights": self.man["atmos"]["lights"],
+                               "volumes": self.man["atmos"].get("volumes", 0),
+                               "emitters": self.man["atmos"].get("emitters", 0)}
 
     def atmos_glow(self, info):
         """AT3: Atmos/T_<City>_SkyGlow, the cloud deck's glow (unreal/atmos_sky_glow.png:
@@ -3865,6 +3887,21 @@ class Importer:
                 c = ctl["moon_color"]
                 sky.append(("moon_color", unreal.LinearColor(c[0], c[1], c[2], 1.0)))
             sky.append(("sky_glow", glow))
+            # AT4: the air (the fog of the look and weather by the hour, light shafts by
+            # kind, the live sets of volumes and plumes, the engine settings it runs with)
+            if ctl.get("air"):
+                c = ctl["fog_albedo_linear"]
+                sky += [("fog_albedo", unreal.LinearColor(c[0], c[1], c[2], 1.0)),
+                        ("fog", True), ("air", True)]
+                for k in ("fog_start_m", "fog_view_m", "fog_phase_g", "beam_fog_gain",
+                          "volume_range_m", "emitter_range_m", "steam_gain", "volume_glow"):
+                    sky.append((k, float(ctl[k])))
+                sky.append(("max_volumes", int(ctl["max_volumes"])))
+                for k in ("fog_hours", "kind_scatter"):
+                    sky.append((k, [float(x) for x in ctl[k]]))
+                sky.append(("puffs", [int(x) for x in ctl["puffs"]]))
+                sky.append(("emitter_kinds", list(ctl["emitter_kinds"])))
+                sky.append(("tuned_settings", list(ctl["cvars"])))
             for k, v in sky:
                 try:
                     a.set_editor_property(k, v)

@@ -1,4 +1,4 @@
-# atmosgen: light, sky, air and weather (scope, v2: decided 2026-11-10, AT0 to AT3 done)
+# atmosgen: light, sky, air and weather (scope, v2: decided 2026-11-10, AT0 to AT4 done)
 
 Stage 3 (atmosgen) of CyberGen's five stages. It takes a built city with its assets and
 makes the city's light and air: every light source that casts light, the sky, fog, smog,
@@ -154,7 +154,9 @@ ask, the fixtures of its own lights (`roof`, `beacon`, `mast`, `ground`: assetge
   from code that holds up. AT0 found none: UE 5.8 exposes no API to author a Niagara
   emitter from code (only an engine template could be duplicated and fed user parameters),
   so effects are C++ components and code-made materials (AT0's rain cards and wet decal,
-  `docs/progress/AT0/`).
+  `docs/progress/AT0/`). AT4 settled it for the air: the fog volumes are the engine's local
+  fog volume components, pooled by the controller, and the steam and smoke plumes instanced
+  cards in a code-made material (`M_CgSteam`) rising by world position offset; no Niagara.
 
 ### 4.3 The line with assetgen
 
@@ -245,6 +247,19 @@ stages have); never required to edit. Fields, all with defaults:
   industry and the port, haze under decks (M14), haze in tunnels, thicker where danger is.
 - Emitters: steam from manholes and drains (AG7), roof vents and exhausts (AG4), food
   stalls (M6), tunnel ventilation buildings (M9); smoke from chimneys.
+- AT4 built it (`atmosgen/air.py`, `docs/progress/AT4/`): the plan's `air` (the height and
+  volumetric fog of the look and weather by the hour, thicker by night; each light kind's
+  volumetric scattering, the light shafts: the street lights, high masts and floods, none from
+  the many small neon and shop lights; the live sets; the engine settings the night's budget
+  needs), `volumes` (ellipsoids: mist along the canals, basins and rivers after dusk, smog over
+  the industrial and spaceport districts and their megasites, haze under the decks and in the
+  road tunnels and underpasses, each times its district's haze and danger) and `emitters`
+  (steam from AG7's manholes and drains read from the street packs, M9's vents, exhaust from
+  M3's roof mechanical units, cooking from M6's food stalls and kiosks, smoke from chimneys on
+  industrial roofs and stove pipes on shanty stacks, a fixture asked of stage 2; the share
+  that steams by the district's grit), and the air check (scope 8). In Unreal the nearest
+  volumes are local fog volumes, the plumes rising cards in `M_CgSteam`; the searchlights keep
+  AT2's beams (brighter in fog), their spot lights scattering none.
 
 ### 6.4 Weather
 
@@ -306,7 +321,7 @@ its inputs.
   big cities overrun Nanite's root pages there.
 - **Baseline:** AG16's benchmark (`citygen unreal ... --bench`: a fixed route by day and by
   night, frame times p50, p95 and p99, hitches, GPU and VRAM) before AT0 and after every
-  AT milestone. AG16's proposed targets for Delta at 1440p are 16.7 ms p50 and 25 ms p95
+  AT milestone (since AT4 the lean route, one run: decision 12.6). AG16's proposed targets for Delta at 1440p are 16.7 ms p50 and 25 ms p95
   walking; atmosgen's lights, shadows, fog and volumetrics live within what is left.
 - **Many lights:** a night city wants thousands of lights near the view. MegaLights (if it
   is production-ready in 5.8) or the tiers of 6.1, measured in AT0: MegaLights is still
@@ -351,7 +366,14 @@ All six were answered on 2026-11-10, before AT0.
    down by wealth from the archetype's mood in `presets.MOOD`).
 6. **The night's frame budget:** the night pass stays at or under 16.7 ms p95 at native
    1440p on the PC, by AG16's benchmark (Delta's night was 12.6 ms p95 after AG16, so about
-   4 ms for atmosgen), run by night before and after every AT milestone.
+   4 ms for atmosgen), run by night after every AT milestone. How (Swagnik, 2026-11-12: the
+   benchmarks were too slow): the lean route (`--bench-route lean`, the default with
+   `--bench-atmos`: one walk, the drive, the flight, no teleport, a short warm-up), only the
+   worst condition (`night_plan_all`) and the passes the change touches (`dusk_plan` only
+   where the change differs by dusk), one run (a second only when the result is within
+   0.3 ms of 16.7 ms or the run was flagged: the foreground lost, the CPU starved), no
+   "before" run (the previous milestone's "after" is it); tuning by quick GPU profiles at
+   fixed viewpoints, not route runs.
 
 ## 13. Milestones
 
@@ -367,5 +389,7 @@ All six were answered on 2026-11-10, before AT0.
 | AT7 | Far city and release | the skyline at night (HLOD emissive, light cards, cloud glow), budgets on every sample, Unreal checks on the PC, README | AT6 |
 
 Each milestone updates the exporter and the plugin in its own PR and runs AG16's benchmark
-by night, as stages 1 and 2 update the exporter. AT2 and AT3 can run side by side after
+by night after it (the lean route, `night_plan_all` and the passes it touches, one run, the
+previous milestone's "after" as its before: decision 12.6), as stages 1 and 2 update the
+exporter. AT2 and AT3 can run side by side after
 AT1.

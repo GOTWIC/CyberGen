@@ -35,6 +35,14 @@ What atmosgen needs and the other stages do not record yet:
    mast, a crane boom's floods), `ground` (an apron's edge light or a launch pad's rim light
    in the pavement). As the third ask: a fixture at the light's `pos`, headed its aim's way.
 
+5. **Flues for AT4's smoke** (AG4, AG5): a chimney on an industrial roof (warehouses, sheds,
+   yards and labs in the industrial, spaceport, megablock and old-town districts) and a
+   stove pipe on a shanty stack, at the plume's foot (`Emitter.pos`, mount `chimney`,
+   `stove`; a flue `presets.CHIMNEY_M` wide and tall under it). AT4's steam needs no ask:
+   AG7's manholes and drains are read from the street packs where drawn (`Emitter.source`
+   "assetgen", `air.street_details`), M3's roof mechanical units are AG4's roof equipment,
+   M6's stalls and M9's vents are drawn already.
+
 AT2 reads the second ask where assetgen meets it (`SignColors.face`, `.emit`: a slot record
 of `signs.json` that is an object with `cell` and `face`, or a top-level `faces` map by slot
 id; a cell's `emit`), so the light sits on the drawn face in its drawn color and luminance

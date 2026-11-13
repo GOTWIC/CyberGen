@@ -21,6 +21,12 @@ run headless by `citygen.unreal_atmos.make_assets`, the job in $CITYGEN_UE_JOB):
   raster, a texture per city the controller hands its dynamic instance); the sky light's
   real-time capture takes it too, so the city under a glowing deck takes its color.
 
+- AT4: `M_CgSteam`, a plume's puff (steam, exhaust, cooking, smoke): translucent and lit by
+  the translucency volume (so the steam takes the street's and the neon's colors), each card
+  of a cell's instanced plume turned to face the eye and rising from its foot by world
+  position offset, its life, size, opacity and albedo from its per-instance data. The fog
+  volumes are the engine's local fog volumes (no asset).
+
 Niagara is not used: UE 5.8 exposes no API to author a Niagara emitter from code (its
 editor library builds nothing; only an engine template could be duplicated and fed user
 parameters), so the effects are C++ components and these materials (decision for AT4, AT5).
@@ -35,8 +41,9 @@ import unreal
 
 JOB = json.load(open(os.environ["CITYGEN_UE_JOB"], encoding="utf-8"))
 FOLDER = "/Game/CityGen/Core/Atmos"
-VERSION = "8"   # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air);
-                # 3 (AT2): M_CgBeacon and M_CgBeam; 4 to 8 (AT3): M_CgSky
+VERSION = "12"  # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air);
+                # 3 (AT2): M_CgBeacon and M_CgBeam; 4 to 8 (AT3): M_CgSky; 9 to 12 (AT4):
+                # M_CgSteam, MPC_CityGenAtmos's SteamGain
 EAL = unreal.EditorAssetLibrary
 AT = unreal.AssetToolsHelpers.get_asset_tools()
 MEL = unreal.MaterialEditingLibrary
@@ -88,7 +95,8 @@ def collection():
         c = AT.create_asset("MPC_CityGenAtmos", FOLDER, unreal.MaterialParameterCollection,
                             unreal.MaterialParameterCollectionFactoryNew())
     have = []
-    for name, v in (("Rain", 0.0), ("Wetness", 0.0), ("FogDensity", 0.0), ("WindMS", 4.0)):
+    for name, v in (("Rain", 0.0), ("Wetness", 0.0), ("FogDensity", 0.0), ("WindMS", 4.0),
+                    ("SteamGain", 10.0)):
         q = unreal.CollectionScalarParameter()
         q.set_editor_property("parameter_name", name)
         q.set_editor_property("default_value", v)
@@ -457,6 +465,113 @@ def sky_material():
     return m, True
 
 
+# AT4: a plume's puff (steam, exhaust, cooking, smoke): a card of the cell's instanced plume,
+# turned to face the eye about its own middle and rising from the plume's foot by world
+# position offset; its life a phase of the plume's period (rising fast, slowing, widening,
+# drifting with the wind); from its per-instance data: the foot (cm), phase, period (s),
+# rise and width (cm), opacity, albedo
+STEAM_WPO = """
+float t = frac(Time / max(Period, 0.1) + Phase);
+float up = 1.0 - (1.0 - t) * (1.0 - t);
+float3 c = Foot + float3(0.0, 0.0, Rise * up);
+c.xy += float2(0.8, 0.45) * Wind * 100.0 * t * Period * 0.25;
+float half_ = Width * (0.45 + 1.1 * t) + Rise * 0.05 * t;
+float3 dir = normalize(c - Cam);
+float3 right = normalize(cross(float3(0.0, 0.0, 1.0), dir) + float3(1e-4, 0.0, 0.0));
+float3 upv = cross(dir, right);
+float2 q = LP.xy / 50.0;
+return c + (q.x * right + q.y * upv) * half_ - WP;
+"""
+# its opacity: a soft round puff broken up by a value noise moved by its phase, faded in and
+# out over its life and near the eye
+STEAM_OP = """
+float t = frac(Time / max(Period, 0.1) + Phase);
+float2 p = UV * 2.0 - 1.0;
+float r = length(p);
+float2 g = UV * 3.0 + Phase * 17.0 + float2(0.0, -t * 1.5);
+float2 i = floor(g);
+float2 f = frac(g);
+f = f * f * (3.0 - 2.0 * f);
+float a = frac(sin(dot(i, float2(127.1, 311.7))) * 43758.5453);
+float b = frac(sin(dot(i + float2(1, 0), float2(127.1, 311.7))) * 43758.5453);
+float c = frac(sin(dot(i + float2(0, 1), float2(127.1, 311.7))) * 43758.5453);
+float d = frac(sin(dot(i + float2(1, 1), float2(127.1, 311.7))) * 43758.5453);
+float n = lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y);
+float2 g2 = g * 2.7 + 5.3;
+float2 i2 = floor(g2);
+float2 f2 = frac(g2);
+f2 = f2 * f2 * (3.0 - 2.0 * f2);
+float a2 = frac(sin(dot(i2, float2(127.1, 311.7))) * 43758.5453);
+float b2 = frac(sin(dot(i2 + float2(1, 0), float2(127.1, 311.7))) * 43758.5453);
+float c2 = frac(sin(dot(i2 + float2(0, 1), float2(127.1, 311.7))) * 43758.5453);
+float d2 = frac(sin(dot(i2 + float2(1, 1), float2(127.1, 311.7))) * 43758.5453);
+n = 0.65 * n + 0.35 * lerp(lerp(a2, b2, f2.x), lerp(c2, d2, f2.x), f2.y);
+float soft = pow(saturate(1.0 - r), 1.4) * saturate(n * 1.6 - 0.3);
+float life = sin(3.14159 * t) * saturate(t * 6.0);
+float near_ = saturate((Depth - 80.0) / 300.0);
+return saturate(soft * life * Rate * Gain * near_ * Fade);
+"""
+
+
+def steam(c):
+    m, made = material("M_CgSteam")
+    if not made:
+        return m, False
+    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
+    m.set_editor_property("two_sided", True)
+    m.set_editor_property("translucency_lighting_mode",
+                          unreal.TranslucencyLightingMode.TLM_VOLUMETRIC_NON_DIRECTIONAL)
+    names, ins = [], []
+    for k, n in enumerate(("FootX", "FootY", "FootZ", "Phase", "Period", "Rise", "Width",
+                           "Rate", "AlbR", "AlbG", "AlbB")):
+        ins.append(expr(m, unreal.MaterialExpressionPerInstanceCustomData, -1300, 90 * k,
+                        data_index=k,
+                        const_default_value=(0, 0, 0, 0, 4, 450, 80, 0.8, 0.8, 0.8, 0.8)[k]))
+        names.append(n)
+    foot = custom(m, -1000, 0, "return float3(X, Y, Z);", ["X", "Y", "Z"], "CMOT_FLOAT3",
+                  "CgFoot")
+    for k, n in enumerate(("X", "Y", "Z")):
+        link(ins[k], "", foot, n)
+    alb = custom(m, -1000, 800, "return float3(R, G, B);", ["R", "G", "B"], "CMOT_FLOAT3",
+                 "CgAlbedo")
+    for k, n in enumerate(("R", "G", "B")):
+        link(ins[8 + k], "", alb, n)
+    tm = expr(m, unreal.MaterialExpressionTime, -1300, 1100)
+    lp = expr(m, unreal.MaterialExpressionPreSkinnedPosition, -1300, 1200)
+    wp = expr(m, unreal.MaterialExpressionWorldPosition, -1300, 1300)
+    cam = expr(m, unreal.MaterialExpressionCameraPositionWS, -1300, 1400)
+    wind = mpc_param(m, c, "WindMS", -1300, 1500)
+    wpo = custom(m, -700, 900, STEAM_WPO,
+                 ["Foot", "Phase", "Period", "Rise", "Width", "Time", "LP", "WP", "Cam", "Wind"],
+                 "CMOT_FLOAT3", "CgSteamRise")
+    for a, n in ((foot, "Foot"), (ins[3], "Phase"), (ins[4], "Period"), (ins[5], "Rise"),
+                 (ins[6], "Width"), (tm, "Time"), (lp, "LP"), (wp, "WP"), (cam, "Cam"),
+                 (wind, "Wind")):
+        link(a, "", wpo, n)
+    uv = expr(m, unreal.MaterialExpressionTextureCoordinate, -1300, 1700, coordinate_index=0)
+    depth = expr(m, unreal.MaterialExpressionPixelDepth, -1300, 1800)
+    fade = expr(m, unreal.MaterialExpressionDepthFade, -1300, 1900, fade_distance_default=120.0)
+    one = expr(m, unreal.MaterialExpressionConstant, -1500, 1900, r=1.0)
+    link(one, "", fade, "Opacity")
+    gain = mpc_param(m, c, "SteamGain", -1300, 2000)
+    op = custom(m, -700, 1500, STEAM_OP,
+                ["UV", "Phase", "Period", "Rate", "Time", "Depth", "Fade", "Gain"],
+                "CMOT_FLOAT1", "CgSteamOpacity")
+    for a, n in ((uv, "UV"), (ins[3], "Phase"), (ins[4], "Period"), (ins[7], "Rate"),
+                 (tm, "Time"), (depth, "Depth"), (fade, "Fade"), (gain, "Gain")):
+        link(a, "", op, n)
+    rough = expr(m, unreal.MaterialExpressionConstant, -700, 1900, r=1.0)
+    MEL.connect_material_property(alb, "", MP.MP_BASE_COLOR)
+    MEL.connect_material_property(op, "", MP.MP_OPACITY)
+    MEL.connect_material_property(rough, "", MP.MP_ROUGHNESS)
+    MEL.connect_material_property(wpo, "", MP.MP_WORLD_POSITION_OFFSET)
+    m.set_editor_property("used_with_instanced_static_meshes", True)
+    MEL.recompile_material(m)
+    EAL.set_metadata_tag(m, "cg.atmos", VERSION)
+    EAL.save_loaded_asset(m, only_if_is_dirty=False)
+    return m, True
+
+
 def main():
     res = {"ok": False, "version": VERSION}
     try:
@@ -468,6 +583,7 @@ def main():
         _, res["beacon_made"] = beacon()
         _, res["beam_made"] = beam()
         _, res["sky_made"] = sky_material()
+        _, res["steam_made"] = steam(c)
         res["ok"] = True
     except Exception:
         res["error"] = traceback.format_exc()
