@@ -4,7 +4,7 @@
 
 - **Brand, model, type:** Orrin Pebble, city pod, 2 seats side by side (all names made up). The Lumen's little sibling.
 - **Size:** 2.82 m long, 1.61 m wide, 1.52 m high, wheelbase 1.78 m, wheels 0.59 m, ground clearance 0.14 m.
-- **Triangles:** 329,588 in 61 objects (body at subdivision 4).
+- **Triangles:** 324,498 in 61 objects (body at subdivision 4).
 - **Build:** `vehicles/blender.sh vehicles/cars/orrin_pebble.py --out docs/progress/AG18/orrin_pebble --sheet`
 
 ## The design
@@ -27,7 +27,7 @@ above are of this build.
 - Ribbon: the waist ribbon is now channels cut into the skin along the widest line, 17 mm
   wide and 9 mm deep: one round the nose and one round the tail, each between the petal
   cuts, and one along each petal from beside its front cut to the flank flap, drawn out to
-  5 mm over their last 50 mm. Each stops 30 mm short of a shut line, so the ribbon reads as
+  5 mm over their last 50 mm. Each stops 80 mm short of a shut line, so the ribbon reads as
   passing under the petal cuts and no panel is cut in two (one channel all the way round
   split the nose and tail panels into two strips each, which the game pack's far LOD
   collapsed apart). In each, a flush lens of its own (a band along the channel with the body's
@@ -48,27 +48,29 @@ above are of this build.
   hairline ring that was laid on the skin.
 - Cut lines: the crescent slots and the leaf's grab recess (all `lune_cut`, the Lumen's,
   now in the brand module) tell their outlines to the checks: ten cutter holes before, none
-  now. 3.5 mm shut lines (2.4 mm before).
+  now. Shut lines stay the kit's 2.4 mm: at step B's 3.5 mm the game pack's LOD2 and
+  LOD3 tore dark round the petal cuts and along the glass edge over the petal (a test pack
+  with 2.4 mm brought its LOD3 from 9.5 to 5.9 degrees off LOD0, main's 6.2), and the
+  channels' ends 80 mm from the cuts (30 mm before) took the last dark ticks at LOD2.
 - Glass: unchanged. The dome is one leaf from pole to pole with no frame by design, so there
   was no old frame to move to `"frame"` or `"frit"`.
 - Wheels: room cut inside the skin beside the tires' sidewalls under the eyelids (the wells'
   outer wall 26 mm further out, 10 mm wider in radius than the tire round it): 0.0 mm to
-  the well before, 16.6 mm front and 15.9 mm rear now. The tires take a narrow road tread
+  the well before, 16.2 mm front and 16.1 mm rear now. The tires take a narrow road tread
   (`orrin.NARROW`, the same as Tanager's): the kit's grooves fell outside a 0.185 m tire's
   crown and its blocks stood 7 mm into the ground; now 0.0 mm.
-- 329,588 triangles (266,030 before; the cut hull most of it, the lamps 21,768).
-- Game pack rebuilt, every check passing: 148,442, 59,992, 20,001, 5,025 triangles, standard
-  class, texels 555 px/m (5th percentile), LOD3 9.6 of 40 degrees, 0.013 of 0.10 bent, 0.009
+- 324,498 triangles (266,030 before; the cut hull most of it, the lamps 20,904).
+- Game pack rebuilt, every check passing: 148,060, 59,993, 19,949, 5,067 triangles, standard
+  class, texels 569 px/m (5th percentile), LOD3 5.9 of 40 degrees, 0.007 of 0.10 bent, 0.008
   of 0.04 texture (main 6.2, 0.006, 0.009). The ribbon reads as one lit line, white and red,
-  at every LOD. Against main's: LOD0 and LOD1 as main's; LOD2 has a few small dark specks on
-  the petal above the ribbon by its front cut; LOD3 has torn bits there and along the glass
-  edge over the petal, where main's LOD3 was cleaner.
+  at every LOD; LOD2 and LOD3 read as main's (LOD3 a little cleaner over the front fender,
+  with one small dark tick where the front petal cut meets the glass edge).
 
 Left: the front wheels still cannot steer (0 degrees), as on the Lumen: they are faired in
 under the eyelids, and turning them would swing the tires through the lids, a change to the
 silhouette. At a grazing angle a few millimeters of the panel's rim show in the flaps' shut
 lines at their front and rear ends. The small teeth where the paint meets the glass tongue
-beside each pole pebble are as before. LOD2 and LOD3 (above) still show dark specks round the petal's front cut that main's do not.
+beside each pole pebble are as before.
 
 ## What I would improve
 

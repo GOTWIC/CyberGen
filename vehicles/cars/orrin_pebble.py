@@ -99,12 +99,13 @@ def stations():
 PMAT = dict(front="paint", petal="paint", rear="paint", glass="glass_dome", glass_t="glass_dome",
             floor="underbody", well="well", slot="void", cut="void", lamp_f="lamp_housing",
             lamp_r="lamp_housing")
-GAP = 0.00175                       # 3.5 mm shut lines
+GAP = 0.0012                        # 2.4 mm shut lines, the kit's (3.5 mm opened dark tears
+                                    # round the petal cuts in a game pack's far LODs)
 LAMP = {}                           # the ribbons' channels on the skin: [(point, way out)]
 RIB_W, RIB_D = 0.017, 0.009         # a ribbon channel's width and depth, drawn out to RIB_TIP
 RIB_TIP, RIB_TAPER = 0.005, 0.05    # at its ends (at the flaps) over RIB_TAPER meters
 FLAP = (0.070, 0.050)               # the flank flaps' half sizes round the flank pebbles
-D_U, SHUT_M = 0.40, 0.03            # the petal cuts' |x| on the ribbon's line; the channels
+D_U, SHUT_M = 0.40, 0.08            # the petal cuts' |x| on the ribbon's line; the channels
                                     # stop SHUT_M short of them
 
 

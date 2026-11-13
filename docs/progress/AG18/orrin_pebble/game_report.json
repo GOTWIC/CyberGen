@@ -3,15 +3,15 @@
  "title": "Orrin Pebble",
  "ok": true,
  "triangles": {
-  "original": 329588,
+  "original": 324498,
   "lods": [
-   148442,
-   59992,
-   20001,
-   5025
+   148060,
+   59993,
+   19949,
+   5067
   ],
   "lod0_parts": {
-   "body": 46306,
+   "body": 45924,
    "glass": 62848,
    "wheel_fl": 9822,
    "wheel_fr": 9822,
@@ -25,7 +25,7 @@
  },
  "size_class": {
   "name": "standard",
-  "exterior_m2": 12.09,
+  "exterior_m2": 11.36,
   "rule": "large when the body's exterior is 55 m2 or more",
   "lod_budgets": [
    150000,
@@ -42,23 +42,23 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 35715794,
- "seconds": 1099.0,
+ "pack_bytes": 35267478,
+ "seconds": 1117.2,
  "stage_seconds": {
-  "build": 2.1,
-  "render_original": 227.7,
-  "parts": 29.9,
+  "build": 2.0,
+  "render_original": 233.8,
+  "parts": 30.9,
   "nodes": 0.0,
-  "uv": 52.5,
-  "bake": 371.1,
-  "lods_export": 15.7,
-  "textures": 12.844257116317749,
-  "proof": 386.56957173347473
+  "uv": 51.8,
+  "bake": 378.6,
+  "lods_export": 14.8,
+  "textures": 12.696352005004883,
+  "proof": 392.0603930950165
  },
  "baked_down": {
   "collapse": {
    "pieces": 16,
-   "triangles": 161284,
+   "triangles": 157058,
    "names": [
     "body.floor",
     "body.front",
@@ -102,24 +102,24 @@
  "texel_px_per_m": {
   "body": {
    "exterior": {
-    "area_m2": 12.092,
-    "p5": 554.5,
-    "median": 573.9
+    "area_m2": 11.364,
+    "p5": 569.0,
+    "median": 586.6
    },
    "cabin": {
-    "area_m2": 7.548,
-    "p5": 231.1,
-    "median": 574.1
+    "area_m2": 8.273,
+    "p5": 234.2,
+    "median": 586.9
    },
    "underside": {
-    "area_m2": 0.633,
-    "p5": 180.5,
-    "median": 208.6
+    "area_m2": 0.602,
+    "p5": 186.0,
+    "median": 212.7
    },
    "lamp_in_gaps": {
-    "area_m2": 0.442,
-    "p5": 195.3,
-    "median": 234.0
+    "area_m2": 0.424,
+    "p5": 199.1,
+    "median": 239.3
    }
   },
   "wheels": {
@@ -144,10 +144,10 @@
  "collision_hulls": 6,
  "source": {
   "script": "vehicles/cars/orrin_pebble.py",
-  "script_sha256": "0a7cbbe2db5c3b4b88a537018de8f922b7374e9482f8f3fb217bf717a51cf0a5",
+  "script_sha256": "b38e25f7af29cfd4ac73cfbdd730d14441f9a42b2d4d781946075bedb7d4006c",
   "carkit_sha256": "4a1b9a9a1c4472c37227e0b9171ff94263a6d3d320dd4d13ad55783936af1832",
   "game_sha256": "32271c5b2195e75c93509022799b7dd770add377d59cc906b924e040e27ff1db",
-  "original_triangles": 329588,
+  "original_triangles": 324498,
   "original_objects": 61
  },
  "test": false,
@@ -167,25 +167,25 @@
    "detail": [
     {
      "lod": 0,
-     "triangles": 148442,
+     "triangles": 148060,
      "budget": 150000,
      "ok": true
     },
     {
      "lod": 1,
-     "triangles": 59992,
+     "triangles": 59993,
      "budget": 60000,
      "ok": true
     },
     {
      "lod": 2,
-     "triangles": 20001,
+     "triangles": 19949,
      "budget": 20000,
      "ok": true
     },
     {
      "lod": 3,
-     "triangles": 5025,
+     "triangles": 5067,
      "budget": 5000,
      "ok": true
     }
@@ -198,8 +198,8 @@
     "limit": 0.005,
     "slots": {
      "body": {
-      "overlap": 0.00022,
-      "coverage": 0.4359,
+      "overlap": 0.00026,
+      "coverage": 0.4479,
       "outside_unit": 0.0
      },
      "wheels": {
@@ -215,8 +215,8 @@
    "ok": true,
    "detail": {
     "body": {
-     "p5": 554.5,
-     "median": 573.9,
+     "p5": 569.0,
+     "median": 586.6,
      "floor": 300.0,
      "ok": true
     },
@@ -371,10 +371,10 @@
    "ok": true,
    "detail": [
     {
-     "normal_p95_deg": 0.97,
-     "bent_share": 0.0017,
-     "texture_share": 0.0008,
-     "miss_share": 0.0095,
+     "normal_p95_deg": 0.88,
+     "bent_share": 0.0011,
+     "texture_share": 0.0009,
+     "miss_share": 0.0058,
      "lod": 1,
      "limits": {
       "p95": 12.0,
@@ -384,10 +384,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 3.55,
-     "bent_share": 0.0018,
-     "texture_share": 0.0028,
-     "miss_share": 0.0063,
+     "normal_p95_deg": 3.14,
+     "bent_share": 0.001,
+     "texture_share": 0.0025,
+     "miss_share": 0.0025,
      "lod": 2,
      "limits": {
       "p95": 25.0,
@@ -397,10 +397,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 9.58,
-     "bent_share": 0.0127,
-     "texture_share": 0.0094,
-     "miss_share": 0.0264,
+     "normal_p95_deg": 5.87,
+     "bent_share": 0.0072,
+     "texture_share": 0.008,
+     "miss_share": 0.0145,
      "lod": 3,
      "limits": {
       "p95": 40.0,
@@ -417,11 +417,11 @@
    "detail": {
     "hulls": 6,
     "vertices": [
-     538,
-     358,
-     322,
+     534,
+     356,
+     300,
      261,
-     528,
+     526,
      358
     ]
    }

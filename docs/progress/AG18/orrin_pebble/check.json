@@ -30,12 +30,12 @@
   "wheels": [
    {
     "tag": "fl",
-    "clearance_mm": 16.6,
+    "clearance_mm": 16.2,
     "nearest": "body.front",
     "at": [
      1.211,
      0.612,
-     0.282
+     0.281
     ],
     "foot_mm": 0.0,
     "steer_hits": "body.well",
@@ -44,24 +44,24 @@
    },
    {
     "tag": "rl",
-    "clearance_mm": 15.9,
+    "clearance_mm": 16.1,
     "nearest": "body.rear",
     "at": [
      -1.19,
      0.607,
-     0.284
+     0.283
     ],
     "foot_mm": 0.0,
     "verdict": "look"
    },
    {
     "tag": "fr",
-    "clearance_mm": 16.7,
+    "clearance_mm": 16.2,
     "nearest": "body.front",
     "at": [
      1.211,
      -0.612,
-     0.282
+     0.281
     ],
     "foot_mm": 0.0,
     "steer_hits": "body.well",
@@ -70,12 +70,12 @@
    },
    {
     "tag": "rr",
-    "clearance_mm": 15.9,
+    "clearance_mm": 16.1,
     "nearest": "body.rear",
     "at": [
      -1.19,
      -0.607,
-     0.284
+     0.283
     ],
     "foot_mm": 0.0,
     "verdict": "look"
@@ -225,7 +225,7 @@
  },
  "triangles": {
   "verdict": "ok",
-  "total": 329588,
+  "total": 324498,
   "budget": 400000,
   "top": [
    [
@@ -234,15 +234,15 @@
    ],
    [
     "body.rear",
-    37692
+    36056
    ],
    [
     "body.front",
-    36827
+    35809
    ],
    [
     "body.petal",
-    20340
+    19624
    ],
    [
     "body.glass_t",
@@ -254,7 +254,7 @@
    ],
    [
     "body.lamp_f",
-    12488
+    11888
    ],
    [
     "tire.fl",
@@ -264,7 +264,7 @@
   "groups": [
    [
     "body",
-    190456
+    186230
    ],
    [
     "tire",
@@ -272,7 +272,7 @@
    ],
    [
     "lamp",
-    21768
+    20904
    ],
    [
     "liner",
