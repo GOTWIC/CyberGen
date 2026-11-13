@@ -173,10 +173,15 @@ pawn itself, so the walker's body is below the view.
 - **The vehicle check** (`--check-vehicles`): meshes, placements and wheels pass. Collision
   fails for the Kestrel Atlas only (88 of 132 side traces hit; its known pack fault: its
   hulls leave the open cab uncovered). Every other car passes.
-- **Tests:** `tests/assetgen/test_ag_vehicles.py`, `tests/test_unreal_vehicles.py` and
-  `tests/test_unreal.py`'s play flags and its two small-city imports into a fresh First
-  Person project. On the small city the walker spawned on its feet, walked 133 m, climbed a
-  0.15 m curb, and the free camera came back to it.
+- **Tests** (all pass):
+  - `tests/assetgen/test_ag_vehicles.py` and `tests/test_unreal_vehicles.py`;
+  - `tests/test_transit.py` (all of it);
+  - `tests/test_unreal.py` but its deck test, including its two small-city imports into a
+    fresh First Person project. On the small city the walker spawned on its feet, walked
+    133 m, climbed a 0.15 m curb, and the free camera came back to it.
+- **Goldens:** citygen's (`tests/data/golden_hashes.json`, all nine cities built) and
+  assetgen's (the samples' briefs and Vesper Bay's streets; the small city, Vesper Bay's
+  buildings and the water are unchanged) are rewritten from the branch's builds.
 
 | A Tanager Cab by day, before (AT3) | After |
 |---|---|
