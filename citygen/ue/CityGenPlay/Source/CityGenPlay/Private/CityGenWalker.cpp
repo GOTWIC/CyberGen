@@ -8,7 +8,14 @@
 #include "Engine/SkeletalMesh.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
+#include "GameFramework/PlayerController.h"
+#include "HAL/PlatformMisc.h"
 #include "InputCoreTypes.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+#include "TimerManager.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogCityGenWalker, Log, All);
 
 ACityGenWalker::ACityGenWalker(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -88,6 +95,61 @@ void ACityGenWalker::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
 	ApplyBody();
+}
+
+void ACityGenWalker::BeginPlay()
+{
+	Super::BeginPlay();
+	const USkeletalMeshComponent* Body = GetMesh();
+	const FVector L = GetActorLocation();
+	UE_LOG(LogCityGenWalker, Display,
+		TEXT("CITYGEN_WALKER %s: body %s, %s its player, at (%.2f, %.2f, %.2f) m"),
+		*GetClass()->GetName(),
+		Body && Body->GetSkeletalMeshAsset() ? *Body->GetSkeletalMeshAsset()->GetPathName() : TEXT("none"),
+		HasVisibleBody() ? TEXT("seen by") : TEXT("NOT seen by"),
+		L.X / 100.0, -L.Y / 100.0, L.Z / 100.0);
+	// -CityGenSelfie=SECONDS (a packaged game's proof): after that long, a screenshot
+	// looking down at the body and one looking ahead, then the game quits
+	float After = 0.f;
+	if (IsPlayerControlled() && FParse::Value(FCommandLine::Get(), TEXT("-CityGenSelfie="), After))
+	{
+		GetWorldTimerManager().SetTimer(SelfieTimer, this, &ACityGenWalker::SelfieStep,
+			FMath::Max(After, 1.f), false);
+	}
+}
+
+void ACityGenWalker::SelfieStep()
+{
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (!PC)
+	{
+		return;
+	}
+	static const float Pitch[] = {-62.f, -8.f};
+	if (SelfieShot < 2)
+	{
+		if (SelfieAimed)
+		{
+			PC->ConsoleCommand(TEXT("shot"));
+			const FVector L = GetActorLocation();
+			UE_LOG(LogCityGenWalker, Display, TEXT("CITYGEN_WALKER selfie %d at (%.2f, %.2f, %.2f) m, %s"),
+				SelfieShot, L.X / 100.0, -L.Y / 100.0, L.Z / 100.0,
+				GetCharacterMovement()->IsMovingOnGround() ? TEXT("on the ground") : TEXT("NOT on the ground"));
+			++SelfieShot;
+			SelfieAimed = false;
+		}
+		else
+		{
+			FRotator R = PC->GetControlRotation();
+			R.Pitch = Pitch[SelfieShot];
+			PC->SetControlRotation(R);
+			SelfieAimed = true;
+		}
+		GetWorldTimerManager().SetTimer(SelfieTimer, this, &ACityGenWalker::SelfieStep, 2.f, false);
+		return;
+	}
+	UE_LOG(LogCityGenWalker, Display, TEXT("CITYGEN_WALKER selfies done"));
+	FPlatformMisc::RequestExit(false, TEXT("CityGenSelfie"));
 }
 
 bool ACityGenWalker::HasVisibleBody() const

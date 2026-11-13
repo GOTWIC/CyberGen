@@ -7,6 +7,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/TimerHandle.h"
 #include "GameFramework/Character.h"
 #include "CityGenWalker.generated.h"
 
@@ -64,6 +65,7 @@ public:
 
 	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void PostInitializeComponents() override;
+	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
 
 protected:
@@ -84,4 +86,9 @@ private:
 	void RunOn();
 	void RunOff();
 	void Move(const FVector& Axis, float V);
+	void SelfieStep();
+
+	FTimerHandle SelfieTimer;
+	int32 SelfieShot = 0;
+	bool SelfieAimed = false;
 };
