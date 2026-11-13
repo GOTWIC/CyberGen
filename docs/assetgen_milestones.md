@@ -3348,7 +3348,7 @@ Vanta-R the same).
   297,973 triangles (269,389). Pack rebuilt, every check passing: 145,150, 59,993, 20,233,
   8,187 triangles, large class, texels 330 px/m (5th percentile), LOD3 12.7 of 40 degrees,
   0.016 of 0.10 bent, 0.005 of 0.04 texture (main 16.9, 0.021, 0.006); its LOD row reads as
-  main's, the lamps lit at every LOD. Not published.
+  main's, the lamps lit at every LOD.
 - **Brakk Mule** (`docs/progress/AG18/brakk_mule/`, on `vehicles/brands/brakk.py`, its wheel
   bound to the car's sizes with the hub motor, signed the same as main before any change;
   `lamp_pylon` gains `bar`, the LED bar's width, 18 mm by default, the Hauler and the Bastion
@@ -3368,9 +3368,10 @@ Vanta-R the same).
   symmetry and through were `look`). 392,506 triangles (364,552). Pack rebuilt, every check
   passing: 146,484, 59,991, 20,080, 8,187 triangles, large class, texels 244 px/m (5th
   percentile), LOD3 14.3 of 40 degrees, 0.019 of 0.10 bent, 0.007 of 0.04 texture (main
-  13.4, 0.015, 0.007); the lamps lit at every LOD. Not published.
+  13.4, 0.015, 0.007); the lamps lit at every LOD. Published with the Bastion as
+  `vehicle-packs-2026-11-13d`.
 - **Next**: the other cars of the Brakk and Tanager brands on the
-  pilots' patterns (Bastion, Mule, Cab, Porter), each switching to its `vehicles/brands/` module, with step A's street-distance
+  pilots' patterns (Cab, Porter), each switching to its `vehicles/brands/` module, with step A's street-distance
   findings fixed as it is redone.
 
 ### Parked in Delta Megacity on the PC (2026-11-12)
