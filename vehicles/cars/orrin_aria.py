@@ -14,16 +14,23 @@ ends, as the Lumen's and the Pebble's hulls do:
   yoke    one hoop over the glass behind the heads whose two legs fly back over the channels
           and sink into the hips' crests: the flying buttresses.
 A blade under the nose (the through-duct's floor) and a blade across the three tails tie the
-drops together; faired arms cross the channels at the rear axle. Lights, shut lines and dot
-fields lie on the surface as built (snap), crescents and lidded wheel wells are cut out.
+drops together; faired arms cross the channels at the rear axle. The light ribbons are
+channels cut into the skin, each piece its own (core round the nose, the pods from behind
+the wheels round their tips and up the slots, the buttresses and the hips' crests), a light
+guide in each under a flush lens; the crescents, the door pulls, the charge flaps, the side
+markers and the lidded wheel wells are cut too (the *_cutters functions, on each piece as it
+stands uncut). Hairlines and dot fields lie on the surface as built (snap). The brand's
+helpers are in vehicles/brands/orrin.py.
 """
 import os
 import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import bpy                                                          # noqa: E402
 import carkit as K                                                  # noqa: E402
+from brands import orrin                                            # noqa: E402
+from brands.orrin import (both, dot_field, lid_cutter, lune_cut, ring, snap,  # noqa: E402
+                          spline, stone, strip, text_proj)
 from carkit import Geo, Matrix, V3, cos, on_body, pi, rad, sin, text_flat   # noqa: E402
 
 # ---------------------------------------------------------------------------------------
@@ -45,13 +52,6 @@ LINES = "CGESULRB"
 #        R rocker, B floor centerline
 ORDER = ["P0", "N1", "N2", "A1", "FA", "A3", "D1", "M1", "D2", "B1", "RA", "R3", "T1", "T0"]
 PT = {}
-
-
-def ring(x, c, g, e, s, u, lo, r, b):
-    """A station at one x (or one x per line): z of C, (y, z) of the others, z of B."""
-    xs = x if isinstance(x, (list, tuple)) else [x] * 8
-    pts = [(0.0, c), g, e, s, u, lo, r, (0.0, b)]
-    return [(xs[k], p[0], p[1]) for k, p in enumerate(pts)]
 
 
 def stations():
@@ -92,7 +92,22 @@ def stations():
 
 
 PMAT = dict(front="paint", door="paint", sill="paint", rear="paint", glass="glass_dome",
-            floor="underbody", well="well", slot="void", pod="paint", hip="paint", yoke="paint")
+            floor="underbody", well="well", slot="void", pod="paint", hip="paint", yoke="paint",
+            cut="void", lamp_n="lamp_housing", lamp_p="lamp_housing", lamp_y="lamp_housing",
+            lamp_h="lamp_housing", lamp_m="lamp_housing")
+GAP = 0.0012                        # 2.4 mm shut lines, the kit's (the Pebble found 3.5 mm
+                                    # opening dark tears round its cuts in a pack's far LODs)
+LAMP = {}                           # the ribbons' channels on the skin: [(point, way out)]
+RIB_W, RIB_D, RIB_TIP = 0.016, 0.009, 0.005     # a ribbon channel's width, depth, end width
+LENS_SINK = 0.0012                  # the lenses under the skin: the nose's tight curve across
+                                    # the channel stood a flush lens's edges proud
+# the triangle budget (step A: 501,460 of 400,000): the pods and hips at subdivision 3, the
+# yoke (a slim section) at 2, the channels sampled every CHAN_STEP and their lamps every
+# LAMP_STEP, the liner (under the glass) at subdivision 2, the tires' tread at 80 segments
+# (a 0.3 mm chord on its round), the stones hidden under the seats coarser
+SUBDIV_POD, SUBDIV_YOKE = 3, 2
+CHAN_STEP, LAMP_STEP = 0.018, 0.02
+TREAD = dict(K.TREADS["road"], seg=80)
 
 
 def panel_of(i, j):
@@ -152,91 +167,199 @@ def pod_cage(rows, poles):
     return [first] + S + [last]
 
 
-def lid_cutter(g, cx, top, a=0.425, z0=0.31, n=2.6, y0=0.92, depth=0.4):
-    """A wheel opening: straight sides and a flattened arch for a top (a superellipse), so
-    the body comes down over the tire like an eyelid."""
-    b = top - z0
-    pts = []
-    for k in range(29):
-        t = pi * k / 28
-        c, s = cos(t), sin(t)
-        pts.append((cx + a * (abs(c) ** (2 / n)) * (1 if c >= 0 else -1),
-                    z0 + b * (s ** (2 / n))))
+CORE = []                               # the core's panels: what the liner and the yoke snap to
+ANG = list(range(-25, 206, 10))
+
+
+def mirrored(tr):
+    return [(V3((q.x, -q.y, q.z)), V3((n.x, -n.y, n.z))) for q, n in tr]
+
+
+def channel(g, key, ctrl, taper, mirror, w=RIB_W, depth=RIB_D, tip=RIB_TIP):
+    """A ribbon's channel cut along the curve through ctrl on the piece being built (the
+    cutters' tree is that piece alone), its path kept in LAMP[key] (and key + "_r" for the
+    mirror image) with its width function."""
+    pts = orrin.on_skin(ctrl)
+    ln = sum((b - a).length for a, b in zip(pts, pts[1:]))
+
+    def wf(t, ln=ln):
+        return orrin.taper_width(t, ln, w, tip, taper)
+    LAMP[key] = (K.groove(g, pts, width=wf, depth=depth, step=CHAN_STEP, mirror=mirror),
+                 wf)
+    if mirror:
+        LAMP[key + "_r"] = (mirrored(LAMP[key][0]), wf)
+
+
+def core_cutters():
+    """The core's cuts, laid on it as it stands uncut: the crescents under the nose pole,
+    the door pulls, room beside the front tires (inside the fender pods), and the nose
+    ribbon's channel round the nose from slot to slot."""
+    slots, cav, chan = Geo(), Geo(), Geo()
+    lune_cut(slots, (2.285, .17, .385), (2.10, .305, .40), (0.45, 0.85, -0.25), (0, 0, -1),
+             0.030, 0.014, depth=0.035, flare=0.010)
+    # the door pulls: a small crescent recess under each shoulder
+    a, _ = snap((0.34, 0.80, 0.70))
+    b, _ = snap((0.20, 0.80, 0.70))
+    lune_cut(slots, a, b, (0, 1, 0.1), (0, 0, 1), 0.014, 0.004, depth=0.025, flare=0.006)
+    K.well_cutter(cav, FA_X, R, 0.40, 0.655, ANG, depth=0.40)
+    tree = K._tree(None)                # its edge on the core, told to the checks: a cut on
+    for sgn in (1, -1):                 # purpose, inside the pod
+        Q = []
+        for a in ANG:
+            hit = tree.ray_cast(V3((FA_X + 0.40 * cos(rad(a)), sgn * 1.5,
+                                    R + 0.40 * sin(rad(a)))), V3((0, -sgn, 0)), 1.0)[0]
+            if hit is not None and abs(hit.y) > 0.655:
+                Q.append(hit)
+        if len(Q) > 1:
+            K.CUTS.append(Q)
+    half = [(1.565, .525, .456), (1.62, .50, .455), (1.76, .455, .45), (1.95, .375, .44),
+            (2.10, .32, .43), (2.24, .24, .42), (2.31, .14, .41), (NOSE.x + 0.01, 0, NOSE.z + 0.012)]
+    channel(chan, "nose", both(half), (0.05, 0.05), False)
+    LAMP["peb.nose"] = snap((NOSE.x + 0.05, 0, NOSE.z + 0.02))
+    LAMP["peb.tail"] = snap((TAIL.x - 0.05, 0, TAIL.z + 0.02))
+    return [(slots, "slot"), (cav, "well"), (chan, "lamp_n")]
+
+
+def arch_cutter(g, cx, r_side, r_top, y0, depth, cz=R):
+    """A wheel well (as K.well_cutter, both sides) whose arch is r_side at its sides and
+    r_top at its top: room at the tire's front and back, under a crown that falls away
+    close over it."""
     for sgn in (1, -1):
-        poly = ([V3((pts[0][0], sgn * y0, -0.3))] + [V3((x, sgn * y0, z)) for x, z in pts]
-                + [V3((pts[-1][0], sgn * y0, -0.3))])
+        pts = []
+        for a in ANG:
+            r = r_side - (r_side - r_top) * max(0.0, sin(rad(a))) ** 4
+            pts.append(V3((cx + r * cos(rad(a)), sgn * y0, cz + r * sin(rad(a)))))
+        poly = [V3((pts[0].x, sgn * y0, -0.3))] + pts + [V3((pts[-1].x, sgn * y0, -0.3))]
         g.prism(poly, (0, sgn * depth, 0))
 
 
-def lune(g, a, b, d, toward, far, near, out=0.2, depth=0.04, flare=0.02, n=16):
-    """A crescent slot for the cutters: the chord a to b seen about along d, both edges bowed
-    toward `toward` (by far and by near), cut from outside to depth behind the chord. The
-    slot widens by flare on its way in, so the panels' rims stay behind its walls."""
-    a, b, d = V3(a), V3(b), V3(d).normalized()
-    u = b - a
-    ln = u.length
-    u.normalize()
-    d = (d - u * d.dot(u)).normalized()     # cut square to the chord: both tips on the skin
-    v = d.cross(u).normalized()
-    if v.dot(V3(toward)) < 0:
-        v = -v
-    ts = [k / n for k in range(n + 1)]
-    hi = [a + u * ln * t + v * far * 4 * t * (1 - t) for t in ts]
-    lo = [a + u * ln * t + v * near * 4 * t * (1 - t) for t in ts[1:-1]]
-    hi2 = [p + v * flare * (4 * t * (1 - t)) ** 0.5 for p, t in zip(hi, ts)]
-    lo2 = [p - v * flare * (4 * t * (1 - t)) ** 0.5 for p, t in zip(lo, ts[1:-1])]
+def lid_outline(cx, top, a=0.425, z0=0.31, n=2.6, y0=0.92):
+    """The wheel opening lid_cutter() cuts, traced on the skin as it stands uncut and told
+    to the checks (K.CUTS): an opening on purpose."""
+    tree = K._tree(None)
+    b = top - z0
     for sgn in (1, -1):
-        dd = V3((d.x, sgn * d.y, d.z))
-        rim = [V3((p.x, sgn * p.y, p.z)) for p in hi + lo[::-1]]
-        rim2 = [V3((p.x, sgn * p.y, p.z)) for p in hi2 + lo2[::-1]]
-        m = 2 * n
-        faces = [(k, (k + 1) % m, m + (k + 1) % m, m + k) for k in range(m)]
-        for o in (0, m):
-            faces.append((o, o + 1, o + m - 1))
-            faces += [(o + k, o + k + 1, o + m - k - 1, o + m - k) for k in range(1, n - 1)]
-            faces.append((o + n - 1, o + n, o + n + 1))
-        g.add([p + dd * out for p in rim] + [p - dd * depth for p in rim2], faces)
+        Q = []
+        for k in range(29):
+            t = pi * k / 28
+            c, s_ = cos(t), sin(t)
+            p = V3((cx + a * (abs(c) ** (2 / n)) * (1 if c >= 0 else -1), sgn * 1.5,
+                    z0 + b * (s_ ** (2 / n))))
+            hit = tree.ray_cast(p, V3((0, -sgn, 0)), 1.0)[0]
+            if hit is not None:
+                Q.append(hit)
+        if len(Q) > 1:
+            K.CUTS.append(Q)
 
 
-CORE = []                               # the core's panels: what the liner and the yoke snap to
+def pod_cutters():
+    """The front fender pods' cuts: the wheel wells (with room beside the tires) and lids,
+    the crescent in each wheel's wake, the ribbon's channel from behind the wheel over its
+    lid, round the pod's tip and back up the slot."""
+    cav, cav2, cav3, lids, slots, chan = Geo(), Geo(), Geo(), Geo(), Geo(), Geo()
+    # the well: an arch lower at its top reaching in beside the tire's inner sidewall (under
+    # the pod's inner crown), the full one from the tire's face out, and the outer part lower
+    # at its top again where the pod's crown falls away (the old one broke through the skin
+    # over the tire). Each its own cutter, no two ending on one plane (the boolean then
+    # emptied a pod).
+    arch_cutter(cav, FA_X, 0.405, 0.392, 0.655, 0.80 - 0.655)
+    cav4, cav5 = Geo(), Geo()
+    K.well_cutter(cav4, FA_X, R, 0.405, 0.685, ANG, depth=0.87 - 0.685)
+    arch_cutter(cav2, FA_X, 0.405, 0.392, 0.86, 0.915 - 0.86)
+    arch_cutter(cav5, FA_X, 0.405, 0.372, 0.905, F_OUT + 0.008 - 0.905)
+    K.well_cutter(cav3, FA_X, R, 0.36, 0.93, ANG, depth=F_OUT + 0.022 - 0.93)
+    lid_cutter(lids, FA_X, F_LID)
+    lid_outline(FA_X, F_LID)
+    lune_cut(slots, (0.905, .97, .30), (0.955, .97, .63), (0, 1, 0), (-1, 0, 0), 0.058, 0.028,
+             depth=0.05, flare=0.018)                               # the wheel's wake
+    half = [(0.62, .92, .535), (0.86, .975, .665), (1.12, 1.025, .69), (FA_X, 1.04, .69),
+            (1.70, 1.03, .655), (1.95, 1.0, .56), (2.14, .96, .45), (2.27, .90, .37),
+            (2.32, .80, .335), (2.27, .70, .355), (2.14, .625, .395), (1.95, .585, .425),
+            (1.74, .575, .445), (1.60, .578, .452)]
+    channel(chan, "pod", half, (0.40, 0.05), True)
+    return [(cav, "well"), (cav4, "well"), (cav2, "well"), (cav5, "well"), (cav3, "well"),
+            (lids, "well"),
+            (slots, "slot"), (chan, "lamp_p")]
+
+
+def hip_cutters():
+    """The rear hips' cuts: the wheel wells (with room beside the tires) and lids, the
+    paired intakes, the charge flap (left) and a service flap (right) on the hip's nose, the
+    side markers and the tail ribbon's channel along the crest (from under the buttress)
+    round the hip's tip."""
+    cav, cav2, cav3, lids, slots, chan, mark, cut = (Geo(), Geo(), Geo(), Geo(), Geo(), Geo(),
+                                                     Geo(), Geo())
+    # the well as the pod's: lower at its top at both sides, where the hip's crown falls away
+    # (the old one broke through the skin over the tire into the channel)
+    arch_cutter(cav, RA_X, 0.405, 0.392, 0.63, 0.75 - 0.63)
+    cav4, cav5 = Geo(), Geo()
+    K.well_cutter(cav4, RA_X, R, 0.405, 0.69, ANG, depth=0.87 - 0.69)
+    arch_cutter(cav2, RA_X, 0.405, 0.392, 0.86, 0.93 - 0.86)
+    arch_cutter(cav5, RA_X, 0.405, 0.372, 0.92, R_OUT + 0.008 - 0.92)
+    K.well_cutter(cav3, RA_X, R, 0.36, 0.93, ANG, depth=R_OUT + 0.022 - 0.93)
+    lid_cutter(lids, RA_X, R_LID)
+    lid_outline(RA_X, R_LID)
+    for x0 in (-0.845, -0.775):                                     # paired crescents: intakes
+        lune_cut(slots, (x0 + 0.03, 1.0, .31), (x0 - 0.02, 1.0, .60), (0, 1, 0), (1, 0, 0),
+                 0.044, 0.022, depth=0.045, flare=0.014)
+    # round the hip's tip in a wide turn, drawn out to the tail blade's light bar's height
+    # (turned tight, the channel folded into chips at the tip)
+    crest = [(-1.55, .785, .95), (-1.72, .78, .93), (-1.90, .775, .90), (-2.08, .745, .80),
+             (-2.22, .715, .70), (-2.30, .70, .63), (-2.345, .69, .57), (-2.36, .665, .535),
+             (-2.345, .63, .52), (-2.31, .595, .52)]
+    channel(chan, "hip", crest, (0.05, 0.14), True, tip=0.008)
+    channel(mark, "mark", [(-1.84, 1.05, .47), (-1.93, 1.0, .475), (-2.02, .95, .48)],
+            (0.04, 0.04), True, w=0.008, depth=0.006, tip=0.003)
+    K.groove(cut, [(PORT[0] + PORT[2] * cos(rad(a)), PORT[1] + PORT[2] * sin(rad(a)))
+                   for a in range(5, 365, 10)], 'y', closed=True, mirror=True, round=2)
+    chan.add(mark.v, mark.f)
+    # the light ring in each flap, seated on the skin as it stands uncut (snapped after the
+    # cut, its points fell into the flap's shut line)
+    LAMP["port"] = [[on_body(PORT[0] + 0.040 * cos(rad(a)), PORT[1] + 0.040 * sin(rad(a)),
+                             proj) for a in range(0, 361, 10)] for proj in ('y', 'Y')]
+    return [(cav, "well"), (cav4, "well"), (cav2, "well"), (cav5, "well"), (cav3, "well"),
+            (lids, "well"),
+            (slots, "slot"), (chan, "lamp_h"), (cut, "cut", "drop")]
+
+
+PORT = (-0.42, 0.50, 0.054)         # the charge flap on each hip's nose: x, z, radius
+
+
+def finish_channels(body, parts):
+    """A channel's walls cut into 4.5 cm pieces and made a 1 mm sheet (the Pebble's way: a
+    game pack keeps them as a panel, and drops the pieces from its far LODs cleanly)."""
+    for pn, keys in parts:
+        ob = body.parts.get(pn)
+        if ob is None:
+            continue
+        for key in keys:
+            if key in LAMP:
+                orrin.chop(ob, LAMP[key][0])
+        md = ob.modifiers.new("solid", 'SOLIDIFY')
+        md.thickness = 0.001
+        md.offset = 0.0
 
 
 def build_hull():
-    ang = list(range(-25, 206, 10))
     # ---- the core
-    slots = Geo()
-    lune(slots, (2.285, .17, .385), (2.10, .305, .40), (0.45, 0.85, -0.25), (0, 0, -1),
-         0.030, 0.014, depth=0.035, flare=0.010)
     body = K.build_body(stations(), panel_of, PMAT, 0.0, 0.0,
                         front=dict(kind="flat", panel="front", crease=0.0),
                         rear=dict(kind="flat", panel="rear", crease=0.0),
-                        cutters=[(slots, "slot")], subdiv=4, thick=0.004)
-    CORE.extend(ob for pn, ob in body.parts.items() if pn not in ("slot",))
+                        cutters=core_cutters, subdiv=4, thick=0.004, gap=GAP)
+    CORE.extend(ob for pn, ob in body.parts.items() if pn not in ("slot", "lamp_n"))
+    finish_channels(body, [("lamp_n", ("nose",))])
     # ---- the front fender pods
-    cav, cav2, lids, slots = Geo(), Geo(), Geo(), Geo()
-    K.well_cutter(cav, FA_X, R, 0.405, 0.685, ang, depth=0.245)
-    K.well_cutter(cav2, FA_X, R, 0.392, 0.92, ang, depth=F_OUT + 0.008 - 0.92)
-    lid_cutter(lids, FA_X, F_LID)
-    lune(slots, (0.905, .97, .30), (0.955, .97, .63), (0, 1, 0), (-1, 0, 0), 0.058, 0.028,
-         depth=0.05, flare=0.018)                                   # the wheel's wake
-    K.build_body(pod_cage(FRONT, FRONT_POLES), lambda i, j: "pod", PMAT, 0.0, 0.0, name="pod",
-                 front=dict(kind="flat", panel="pod", crease=0.0),
-                 rear=dict(kind="flat", panel="pod", crease=0.0), wrap=True,
-                 cutters=[(cav, "well"), (cav2, "well"), (lids, "well"), (slots, "slot")],
-                 subdiv=4, thick=0.004)
+    body = K.build_body(pod_cage(FRONT, FRONT_POLES), lambda i, j: "pod", PMAT, 0.0, 0.0,
+                        name="pod", front=dict(kind="flat", panel="pod", crease=0.0),
+                        rear=dict(kind="flat", panel="pod", crease=0.0), wrap=True,
+                        cutters=pod_cutters, subdiv=SUBDIV_POD, thick=0.004, gap=GAP)
+    finish_channels(body, [("lamp_p", ("pod", "pod_r"))])
     # ---- the rear hips
-    cav, cav2, lids, slots = Geo(), Geo(), Geo(), Geo()
-    K.well_cutter(cav, RA_X, R, 0.405, 0.63, ang, depth=0.30)
-    K.well_cutter(cav2, RA_X, R, 0.392, 0.92, ang, depth=R_OUT + 0.008 - 0.92)
-    lid_cutter(lids, RA_X, R_LID)
-    for x0 in (-0.845, -0.775):                                     # paired crescents: intakes
-        lune(slots, (x0 + 0.03, 1.0, .31), (x0 - 0.02, 1.0, .60), (0, 1, 0), (1, 0, 0),
-             0.044, 0.022, depth=0.045, flare=0.014)
-    K.build_body(pod_cage(HIP, HIP_POLES), lambda i, j: "hip", PMAT, 0.0, 0.0, name="hip",
-                 front=dict(kind="flat", panel="hip", crease=0.0),
-                 rear=dict(kind="flat", panel="hip", crease=0.0), wrap=True,
-                 cutters=[(cav, "well"), (cav2, "well"), (lids, "well"), (slots, "slot")],
-                 subdiv=4, thick=0.004)
+    body = K.build_body(pod_cage(HIP, HIP_POLES), lambda i, j: "hip", PMAT, 0.0, 0.0,
+                        name="hip", front=dict(kind="flat", panel="hip", crease=0.0),
+                        rear=dict(kind="flat", panel="hip", crease=0.0), wrap=True,
+                        cutters=hip_cutters, subdiv=SUBDIV_POD, thick=0.004, gap=GAP)
+    finish_channels(body, [("lamp_h", ("hip", "hip_r", "mark", "mark_r"))])
 
 
 # ---------------------------------------------------------------------------------------
@@ -285,137 +408,28 @@ def build_yoke():
         S.append(ringp)
     c = P[-1]
     S.append([tuple(YOKE_POLE + (V3(p) - c) * 0.25) for p in S[-1]])
-    K.build_body(S, lambda i, j: "yoke", PMAT, 0.0, 0.0, name="yoke", front=None,
-                 rear=dict(kind="flat", panel="yoke", crease=0.0), wrap=True, subdiv=3,
-                 thick=0.004)
+
+    def cutters():
+        """The tail ribbon's channel along the top of each buttress, from the roof down to
+        where the leg sinks into the hip (the hip's own channel goes on from under it)."""
+        chan = Geo()
+        crest = [P[i] + N[i] * 0.08 for i in range(2, len(P))]
+        crest += [V3((-1.80, .772, .87)), V3((-1.90, .768, .83)), V3((-1.97, .763, .79))]
+        # full width to its end, inside the hip: it runs into the hip's channel
+        channel(chan, "yoke", crest, (0.35, 0.0), True)
+        return [(chan, "lamp_y")]
+    body = K.build_body(S, lambda i, j: "yoke", PMAT, 0.0, 0.0, name="yoke", front=None,
+                        rear=dict(kind="flat", panel="yoke", crease=0.0), wrap=True,
+                        subdiv=SUBDIV_YOKE, thick=0.004, cutters=cutters, gap=GAP)
+    finish_channels(body, [("lamp_y", ("yoke", "yoke_r"))])
     return P, N
 
 
 # ---------------------------------------------------------------------------------------
 # things lying on the surface as built
 # ---------------------------------------------------------------------------------------
-def snap(p, tree=None):
-    """The nearest surface point to p (of every body piece, or of tree) and its normal,
-    turned toward p (give points a little outside the skin)."""
-    if tree is None:
-        if K._BVH[0] is None:
-            K.body_bvh()
-        tree = K._BVH[0]
-    p = V3(p)
-    loc, n, _, _ = tree.find_nearest(p)
-    if (p - loc).length > 1e-5 and n.dot(p - loc) < 0:
-        n = -n
-    return loc, n
-
-
-def spline(ctrl, n=12):
-    """A smooth curve through the control points."""
-    P = [V3(p) for p in ctrl]
-    out = []
-    for i in range(len(P) - 1):
-        p0, p1, p2, p3 = P[max(i - 1, 0)], P[i], P[i + 1], P[min(i + 2, len(P) - 1)]
-        for k in range(n):
-            t = k / n
-            out.append(0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t
-                              + (3 * p1 - p0 - 3 * p2 + p3) * t ** 3))
-    out.append(P[-1])
-    return out
-
-
-def strip(g, ctrl, w, lift=0.0026, sink=-0.0003, taper=(0.0, 0.0), n=12):
-    """A band of width w lying on the surface along a curve near it, its ends drawn out to
-    points over the taper lengths. It stays above the skin (a light under it would shine
-    into the shell, which has no thickness)."""
-    P, N = [], []
-    for q in spline(ctrl, n):
-        loc, nn = snap(q)
-        if not P or (loc - P[-1]).length > 1e-4:
-            P.append(loc)
-            N.append(nn)
-    s = [0.0]
-    for a, b in zip(P, P[1:]):
-        s.append(s[-1] + (b - a).length)
-    vs = []
-    for i in range(len(P)):
-        t = (P[min(i + 1, len(P) - 1)] - P[max(i - 1, 0)]).normalized()
-        sd = N[i].cross(t).normalized()
-        k = 1.0
-        if taper[0]:
-            k = min(k, (s[i] / taper[0]) ** 0.6)
-        if taper[1]:
-            k = min(k, ((s[-1] - s[i]) / taper[1]) ** 0.6)
-        h = w * max(k, 0.06) / 2
-        vs += [P[i] - N[i] * sink + sd * h, P[i] + N[i] * lift + sd * h,
-               P[i] + N[i] * lift - sd * h, P[i] - N[i] * sink - sd * h]
-    m = len(P)
-    faces = [(4 * i + j, 4 * i + (j + 1) % 4, 4 * i + 4 + (j + 1) % 4, 4 * i + 4 + j)
-             for i in range(m - 1) for j in range(4)]
-    faces += [(0, 1, 2, 3), tuple(4 * (m - 1) + j for j in range(4))]
-    g.add(vs, faces)
-
-
-def pebble(g, at, a, b, h, seg=40, up=(0, 0, 1)):
-    """A low oval bead on the surface at the point nearest `at`: a wide, b high, h proud."""
-    loc, n = snap(at)
-    t1 = V3(up).cross(n).normalized()
-    t2 = n.cross(t1)
-    rings = [(1.0, -0.003), (1.0, 0.0), (0.95, h * 0.42), (0.80, h * 0.76), (0.52, h * 0.95),
-             (0.2, h)]
-    o = len(g.v)
-    for r, z in rings:
-        g.v += [loc + n * z + t1 * (a * r * cos(2 * pi * k / seg))
-                + t2 * (b * r * sin(2 * pi * k / seg)) for k in range(seg)]
-    for i in range(len(rings) - 1):
-        g.f += [(o + i * seg + k, o + i * seg + (k + 1) % seg, o + (i + 1) * seg + (k + 1) % seg,
-                 o + (i + 1) * seg + k) for k in range(seg)]
-    g.f.append(tuple(o + (len(rings) - 1) * seg + k for k in range(seg)))
-
-
-def both(half):
-    """A left-side curve ending on the centerline, carried on round the right side."""
-    half = [V3(p) for p in half]
-    return half + [V3((p.x, -p.y, p.z)) for p in half[-2::-1]]
-
-
 def mir(pts, sgn):
     return [V3((p[0], sgn * p[1], p[2])) for p in pts]
-
-
-def text_proj(g, txt, size, u0, v0, proj, lift=0.0012, spacing=1.0):
-    """Lettering on the body seen along proj (as carkit.on_body), reading left to right."""
-    vs, fs = K.text_mesh(txt, size, spacing)
-    sx = {'y': -1, 'Y': 1, 'x': 1, 'X': -1}[proj]
-    out = []
-    for p in vs:
-        loc, n = on_body(u0 + sx * p.x, v0 + p.y, proj)
-        if loc is None:
-            return
-        out.append(loc + n * lift)
-    g.add(out, fs)
-
-
-def dot_field(g, proj, u0, v0, hu, hv, pitch=0.0125, rmax=0.0044):
-    """Perforations: a lens of dots that shrink toward its rim (seen along proj)."""
-    rows = int(hv / (pitch * 0.866)) + 1
-    for r in range(-rows, rows + 1):
-        v = r * pitch * 0.866
-        cols = int(hu / pitch) + 1
-        for c in range(-cols, cols + 1):
-            u = (c + (0.5 if r % 2 else 0.0)) * pitch
-            f = 1.0 - (u / hu) ** 2 - (v / hv) ** 2
-            if f <= 0.08:
-                continue
-            loc, n = on_body(u0 + u, v0 + v, proj)
-            if loc is None:
-                continue
-            rad_ = rmax * min(1.0, f * 1.6) ** 0.5
-            t = n.cross(V3((0, 0, 1)))
-            t = t.normalized() if t.length > 1e-3 else V3((0, 1, 0))
-            b = n.cross(t)
-            o = len(g.v)
-            g.v += [loc + n * 0.0009 + (t * cos(rad(a)) + b * sin(rad(a))) * rad_
-                    for a in range(0, 360, 60)]
-            g.f.append(tuple(range(o, o + 6)))
 
 
 LENS = [(0.5 * cos(rad(a)), 0.5 * sin(rad(a)) * abs(sin(rad(a))) ** 0.3)
@@ -455,31 +469,25 @@ def build_blades():
     return ob
 
 
-def build_lights(YP, YN):
-    P = PT
-    # ---- the nose ribbon traces the slots between the nose and the fenders: from behind a
-    # front wheel over its lid, round the pod's tip, back up the slot, out along the nose
-    half = [(0.60, .93, .50), (0.86, .99, .60), (1.12, 1.03, .668), (FA_X, 1.04, .682),
-            (1.70, 1.03, .655), (1.95, 1.0, .56), (2.14, .96, .45), (2.27, .90, .37),
-            (2.32, .80, .335), (2.27, .70, .355), (2.14, .625, .395), (1.95, .585, .425),
-            (1.74, .575, .445), (1.60, .58, .452), (1.53, .575, .456), (1.50, .555, .46),
-            (1.53, .53, .457), (1.62, .50, .455), (1.76, .455, .45), (1.95, .375, .44),
-            (2.10, .32, .43), (2.24, .24, .42), (2.31, .14, .41),
-            (NOSE.x + 0.01, 0, NOSE.z + 0.012)]
+def build_lights():
+    """The ribbons: in each channel under its flush lens a light guide's lit face over a
+    frosted sleeve (orrin.channel_lamp), white round the nose and the fender pods, red along
+    the buttresses and the hips' crests; the lit pebbles on the poles, seated on the skin as
+    it stood before the cuts."""
+    for key, lit, lens in (("nose", "led_front", "lens_clear"), ("pod", "led_front", "lens_clear"),
+                           ("pod_r", "led_front", "lens_clear"), ("yoke", "led_rear", "lens_red"),
+                           ("yoke_r", "led_rear", "lens_red"), ("hip", "led_rear", "lens_red"),
+                           ("hip_r", "led_rear", "lens_red"), ("mark", "led_rear", "lens_red"),
+                           ("mark_r", "led_rear", "lens_red")):
+        tr, wf = LAMP[key]
+        depth = 0.006 if key.startswith("mark") else RIB_D
+        orrin.channel_lamp("lamp." + key, tr, wf, depth, GAP, lit=lit, lens=lens,
+                           step=LAMP_STEP, sink=LENS_SINK)
     g = Geo()
-    strip(g, both(half), 0.016, taper=(0.45, 0.45), n=8)
-    pebble(g, (NOSE.x + 0.05, 0, NOSE.z + 0.02), 0.040, 0.030, 0.008)
+    orrin.seated(g, LAMP["peb.nose"], 0.040, 0.030, 0.008)
     g.obj("led.front", "led_front", sharp=50)
-    # ---- the tail ribbon traces the channels: down each buttress from the roof, along the
-    # hip's crest, round its tip, and across the tail blade to the pebble on the tail pole
     g = Geo()
-    for sgn in (1, -1):
-        crest = [YP[i] + YN[i] * 0.08 for i in range(2, len(YP))]
-        crest += [V3((-1.90, .775, .90)), V3((-2.08, .745, .80)), V3((-2.22, .715, .70)),
-                  V3((-2.32, .69, .61)), V3((-2.37, .675, .525)), V3((-2.34, .62, .52)),
-                  V3((-2.30, .585, .525))]
-        strip(g, mir(crest, sgn), 0.016, taper=(0.35, 0.0), n=8)
-    pebble(g, (TAIL.x - 0.05, 0, TAIL.z + 0.02), 0.036, 0.030, 0.008)
+    orrin.seated(g, LAMP["peb.tail"], 0.036, 0.030, 0.008)
     g.obj("led.rear", "led_rear", sharp=50)
 
 
@@ -493,18 +501,18 @@ def build_details():
                   0.005, lift=0.0012, n=8)
         strip(g, mir([P[st]["G"] for st in ("D1", "M1", "D2")], sgn), 0.005, lift=0.0012, n=10)
     g.obj("glass.lines", "gloss_black", sharp=50)
-    # ---- door pulls: a small crescent under each shoulder
+    # ---- the charge port: a ring of light on the left hip's nose, in its flap
     g = Geo()
-    for sgn in (1, -1):
-        strip(g, mir([(0.34, .80, .70), (0.27, .80, .71), (0.20, .80, .70)], sgn), 0.014,
-              lift=0.0009, taper=(0.05, 0.05), n=6)
-    g.obj("lines", "void", sharp=50)
-    # ---- the charge port: a ring of light on the left hip's nose, a pebble in it
-    g = Geo()
-    strip(g, [(-0.42 + 0.04 * cos(rad(a)), 1.1, 0.50 + 0.04 * sin(rad(a)))
-              for a in range(0, 361, 30)], 0.005, lift=0.0012, n=3)
-    strip(g, [(-0.42 + 0.04 * cos(rad(a)), -1.1, 0.50 + 0.04 * sin(rad(a)))
-              for a in range(0, 361, 30)], 0.005, lift=0.0012, n=3)
+    for seats in LAMP["port"]:
+        vs = []
+        for i, (q, n) in enumerate(seats):
+            t = (seats[(i + 1) % (len(seats) - 1)][0] - seats[i - 1][0]).normalized()
+            sd = n.cross(t).normalized() * 0.0025
+            vs += [q + n * 0.0003 + sd, q + n * 0.0012 + sd, q + n * 0.0012 - sd,
+                   q + n * 0.0003 - sd]
+        m = len(seats)
+        g.add(vs, [(4 * i + j, 4 * i + (j + 1) % 4, 4 * i + 4 + (j + 1) % 4, 4 * i + 4 + j)
+                   for i in range(m - 1) for j in range(4)])
     g.obj("led.port", "led_accent", sharp=50)
     # ---- where it breathes: dot lenses on the pods' fronts and the hips' tails
     g = Geo()
@@ -536,55 +544,11 @@ def build_details():
                                     (0.0012, 0.001)], 14)
     g.obj("cameras", "paint", sharp=40)
     gl.obj("camera.lens", "gloss_black")
-    # ---- side markers: a short light dash low on each hip behind the wheel lid
-    g = Geo()
-    for sgn in (1, -1):
-        strip(g, mir([(-1.84, 1.05, .47), (-1.93, 1.0, .475), (-2.02, .95, .48)], sgn),
-              0.008, taper=(0.04, 0.04), n=6)
-    g.obj("led.marker", "led_rear", sharp=50)
 
 
 # ---------------------------------------------------------------------------------------
 # interior: a liner under the long glass (nose deck, tub, tail deck), two seats of stones
 # ---------------------------------------------------------------------------------------
-def stone(g, c, r, rot=None, n=2.6, seg=32, rows=16):
-    """A smooth stone: a superellipsoid at c with half sizes r, turned by rot (a matrix)."""
-    e = 2.0 / n
-
-    def pw(v):
-        return (abs(v) ** e) * (1 if v >= 0 else -1)
-
-    xf = Matrix.Translation(V3(c)) @ (rot.to_4x4() if rot is not None else Matrix.Identity(4))
-    vs = [(0, 0, -r[2])]
-    for i in range(1, rows):
-        ph = -pi / 2 + pi * i / rows
-        for k in range(seg):
-            th = 2 * pi * k / seg
-            vs.append((r[0] * pw(cos(ph)) * pw(cos(th)), r[1] * pw(cos(ph)) * pw(sin(th)),
-                       r[2] * pw(sin(ph))))
-    vs.append((0, 0, r[2]))
-    fs = [(0, 1 + (k + 1) % seg, 1 + k) for k in range(seg)]
-    for i in range(rows - 2):
-        a, b = 1 + i * seg, 1 + (i + 1) * seg
-        fs += [(a + k, a + (k + 1) % seg, b + (k + 1) % seg, b + k) for k in range(seg)]
-    top, a = len(vs) - 1, 1 + (rows - 2) * seg
-    fs += [(a + k, a + (k + 1) % seg, top) for k in range(seg)]
-    g.add(vs, fs, xf=xf)
-
-
-def rim_at(x, tree):
-    """A point just under the paint below the glass edge at x: the liner's rim."""
-    xs = [PT[k]["S"].x for k in ORDER]
-    for a, b, xa, xb in zip(ORDER, ORDER[1:], xs, xs[1:]):
-        if xb <= x <= xa:
-            t = (xa - x) / (xa - xb)
-            e = PT[a]["E"].lerp(PT[b]["E"], t)
-            s = PT[a]["S"].lerp(PT[b]["S"], t)
-            loc, n = snap(e.lerp(s, 0.35) + V3((0, 0.03, 0.03)), tree)
-            return loc - n * 0.016
-    raise ValueError(x)
-
-
 def build_interior():
     tree = K.body_bvh(CORE, default=False)
     rows = [(2.26, None, .004), (2.10, None, .010), (1.75, None, .022), (FA_X, None, .034),
@@ -594,7 +558,7 @@ def build_interior():
             (-2.20, None, .005)]
     S, rims = [], []
     for x, zf, drop in rows:
-        rm = rim_at(x, tree)
+        rm = orrin.rim_at(x, tree, pt=PT, order=ORDER)
         rims.append(rm)
         zf = rm.z - drop if zf is None else zf
         deep = rm.z - zf > 0.2
@@ -602,7 +566,7 @@ def build_interior():
                   (rm.x, rm.y * (0.82 if deep else 0.86), zf), (rm.x, 0.0, zf)])
     hold = {5: 0.6, 6: 0.75, 7: 0.5, 10: 0.5, 11: 0.75, 12: 0.6}
     K.build_body(S, lambda i, j: "liner", dict(liner="liner"), 0.0,
-                 lambda i, j: hold.get(i, 0.0), name="liner", project=False, subdiv=3)
+                 lambda i, j: hold.get(i, 0.0), name="liner", project=False, subdiv=2)
     # ---- a hair of light under the glass round both tongues, the word under the nose glass
     g = Geo()
     sec = [(-0.0025, -0.002), (0.0025, -0.002), (0.0025, 0.002), (-0.0025, 0.002)]
@@ -622,10 +586,10 @@ def build_interior():
         stone(g, (0.14, y, 0.305), (0.26, 0.225, 0.07), Matrix.Rotation(rad(-9), 3, 'Y'), n=3.0)
         stone(g, (-0.215, y, 0.60), (0.070, 0.215, 0.30), back, n=3.0)
         stone(g, (-0.375, y, 0.935), (0.045, 0.105, 0.070), back, n=2.6)
-        stone(gi, (0.10, y, 0.215), (0.20, 0.18, 0.05), n=3.0)
+        stone(gi, (0.10, y, 0.215), (0.20, 0.18, 0.05), n=3.0, seg=20, rows=10)
     g.obj("interior.seats", "seat", sharp=60)
     stone(gi, (0.86, 0, 0.705), (0.085, 0.56, 0.040), Matrix.Rotation(rad(14), 3, 'Y'), n=3.2)
-    stone(gi, (0.25, 0, 0.27), (0.50, 0.060, 0.095), n=3.0)
+    stone(gi, (0.25, 0, 0.27), (0.50, 0.060, 0.095), n=3.0, seg=20, rows=10)
     yoke = (Matrix.Translation((0.66, 0.325, 0.665)) @ Matrix.Rotation(rad(-66), 4, 'Y')
             @ Matrix.Rotation(pi / 2, 4, 'X'))
     gi.lathe([(-0.010, 0.140), (0.0, 0.150), (0.010, 0.140), (0.0, 0.130)], 28, xf=yoke)
@@ -634,48 +598,6 @@ def build_interior():
     g = Geo()
     stone(g, (0.775, 0, 0.705), (0.012, 0.46, 0.022), Matrix.Rotation(rad(14), 3, 'Y'), n=4)
     g.obj("interior.screen", "screen", sharp=60)
-
-
-# ---------------------------------------------------------------------------------------
-# wheels: the kit's tire round a smooth disc with a turbine of fine vanes and two light rings
-# ---------------------------------------------------------------------------------------
-def build_disc(tag, cx, W, out_y, side, vanes=60):
-    K.build_wheel(tag, cx, R, W, RIM, out_y, side, style="disc", ring=None, caliper=None)
-    for part in ("rim.", "hub."):
-        ob = bpy.data.objects[part + tag]
-        me = ob.data
-        bpy.data.objects.remove(ob)
-        bpy.data.meshes.remove(me)
-    hw = W / 2
-    flip = side < 0
-    loc = (cx, side * (out_y - hw), R)
-    r_in, r_out = 0.118, RIM - 0.026
-    g = Geo()
-    g.lathe([(-hw + 0.03, RIM), (hw - 0.006, RIM), (hw - 0.004, RIM - 0.007),
-             (hw - 0.012, RIM - 0.017), (hw - 0.036, RIM - 0.022), (hw - 0.038, r_in - 0.004),
-             (hw - 0.014, 0.102), (hw - 0.008, 0.072), (hw - 0.004, 0.040), (hw - 0.003, 0.004),
-             (hw - 0.08, 0.004), (hw - 0.08, RIM - 0.03), (-hw + 0.03, RIM - 0.02)], 96)
-    g.obj("rim." + tag, "wheel_face", flip_y=flip, loc=loc, sharp=35)
-    g = Geo()
-    for k in range(vanes):
-        a0 = 2 * pi * k / vanes
-        path = []
-        for q in range(6):
-            f = q / 5
-            a = a0 + rad(40) * f ** 1.3
-            r = r_in + (r_out - r_in) * f
-            path.append((r * cos(a), hw - 0.026 + 0.004 * f, r * sin(a)))
-        g.sweep(path, [(-0.0016, -0.010), (0.0016, -0.010), (0.0016, 0.010), (-0.0016, 0.010)],
-                up=(0, 1, 0))
-    g.lathe([(hw - 0.0025, 0.026), (hw - 0.0025, 0.035), (hw - 0.0005, 0.035),
-             (hw - 0.0005, 0.026)], 40)
-    g.obj("vanes." + tag, "wheel_vane", flip_y=flip, loc=loc, sharp=40)
-    g = Geo()
-    g.lathe([(hw - 0.0375, r_out - 0.012), (hw - 0.0375, r_out + 0.003),
-             (hw - 0.033, r_out + 0.003), (hw - 0.033, r_out - 0.012)], 96)
-    g.lathe([(hw - 0.0375, r_in - 0.003), (hw - 0.0375, r_in + 0.008),
-             (hw - 0.033, r_in + 0.008), (hw - 0.033, r_in - 0.003)], 64)
-    g.obj("ring." + tag, "led_wheel", flip_y=flip, loc=loc)
 
 
 # ---------------------------------------------------------------------------------------
@@ -725,16 +647,16 @@ def main():
           **{"Transmission Weight": 1.0, "IOR": 1.14})
     K.pbr("liner", (0.012, 0.012, 0.014), 0.0, 0.24)   # dark and glossy under the glass
     build_hull()
-    YP, YN = build_yoke()
+    build_yoke()
     K.log("hull")
     build_blades()
-    build_lights(YP, YN)
+    build_lights()
     build_details()
     build_interior()
     K.log("details")
     for side, s in ((1, "l"), (-1, "r")):
-        build_disc("f" + s, FA_X, F_W, F_OUT, side)
-        build_disc("r" + s, RA_X, R_W, R_OUT, side)
+        orrin.disc("f" + s, FA_X, F_OUT, side, R=R, W=F_W, rim=RIM, tread=TREAD)
+        orrin.disc("r" + s, RA_X, R_OUT, side, R=R, W=R_W, rim=RIM, tread=TREAD)
     K.log("wheels")
     K.shoot(extra=dict(view="quarter", size=(1040, 585), corner="tl"))
     second_tile()

@@ -2,11 +2,11 @@
  "car": "orrin_aria",
  "size": [
   4.738,
-  2.059,
+  2.056,
   1.121
  ],
  "top_z": 1.121,
- "objects": 53,
+ "objects": 83,
  "palette": {
   "paint": [
    0.01,
@@ -26,59 +26,59 @@
   "paint2_finish": "gloss"
  },
  "tires": {
-  "verdict": "fail",
+  "verdict": "look",
   "wheels": [
    {
     "tag": "fl",
-    "clearance_mm": 0.0,
-    "nearest": "body.front",
+    "clearance_mm": 5.0,
+    "nearest": "pod.well",
     "at": [
-     1.084,
-     0.671,
-     0.31
+     1.459,
+     0.915,
+     0.749
     ],
     "foot_mm": 0.0,
     "steer_hits": "pod.well",
     "steer_deg": 0,
-    "verdict": "fail"
+    "verdict": "look"
    },
    {
     "tag": "rl",
-    "clearance_mm": 2.8,
+    "clearance_mm": 5.0,
     "nearest": "hip.well",
     "at": [
-     -1.048,
-     0.963,
-     0.52
+     -1.291,
+     0.93,
+     0.749
     ],
     "foot_mm": 0.0,
-    "verdict": "fail"
+    "verdict": "look"
    },
    {
     "tag": "fr",
-    "clearance_mm": 0.0,
-    "nearest": "body.front",
+    "clearance_mm": 5.0,
+    "nearest": "pod.well",
     "at": [
-     1.084,
-     -0.671,
-     0.31
+     1.459,
+     -0.915,
+     0.749
     ],
     "foot_mm": 0.0,
     "steer_hits": "pod.well",
     "steer_deg": 0,
-    "verdict": "fail"
+    "verdict": "look"
    },
    {
     "tag": "rr",
-    "clearance_mm": 2.8,
+    "clearance_mm": 5.0,
     "nearest": "hip.well",
     "at": [
-     -1.048,
-     -0.963,
-     0.52
+     -1.291,
+     -0.93,
+     0.749
     ],
     "foot_mm": 0.0,
-    "verdict": "fail"
+    "verdict": "look"
    }
   ]
  },
@@ -95,11 +95,11 @@
   "asymmetric": [
    {
     "object": "interior.fittings",
-    "off_mm": 216.3,
+    "off_mm": 224.1,
     "at": [
-     0.612,
+     0.594,
      0.325,
-     0.533
+     0.541
     ]
    },
    {
@@ -114,44 +114,44 @@
   ]
  },
  "panels": {
-  "verdict": "look",
+  "verdict": "ok",
   "open_edges": [
    {
     "panel": "liner.liner",
-    "length_mm": 2860,
+    "length_mm": 2920,
     "at": [
-     -0.0,
-     0.487,
-     0.753
+     -0.019,
+     0.484,
+     0.751
     ],
     "meant": true
    },
    {
     "panel": "liner.liner",
-    "length_mm": 2860,
+    "length_mm": 2920,
     "at": [
-     -0.0,
-     -0.487,
-     0.753
+     -0.019,
+     -0.484,
+     0.751
     ],
     "meant": true
    },
    {
     "panel": "liner.liner",
-    "length_mm": 69,
+    "length_mm": 61,
     "at": [
      2.235,
-     -0.084,
+     0.095,
      0.434
     ],
     "meant": true
    },
    {
     "panel": "liner.liner",
-    "length_mm": 69,
+    "length_mm": 61,
     "at": [
      2.235,
-     0.084,
+     -0.095,
      0.434
     ],
     "meant": true
@@ -178,144 +178,24 @@
    }
   ],
   "open_mm": 0,
-  "cutter_holes": [
-   {
-    "panel": "body.front",
-    "length_mm": 491,
-    "at": [
-     2.18,
-     0.215,
-     0.384
-    ],
-    "meant": false
-   },
-   {
-    "panel": "body.front",
-    "length_mm": 491,
-    "at": [
-     2.18,
-     -0.215,
-     0.384
-    ],
-    "meant": false
-   },
-   {
-    "panel": "pod.pod",
-    "length_mm": 429,
-    "at": [
-     1.435,
-     0.945,
-     0.762
-    ],
-    "meant": false
-   },
-   {
-    "panel": "pod.pod",
-    "length_mm": 168,
-    "at": [
-     1.445,
-     0.929,
-     0.781
-    ],
-    "meant": false
-   },
-   {
-    "panel": "pod.pod",
-    "length_mm": 429,
-    "at": [
-     1.435,
-     -0.945,
-     0.762
-    ],
-    "meant": false
-   },
-   {
-    "panel": "pod.pod",
-    "length_mm": 168,
-    "at": [
-     1.445,
-     -0.929,
-     0.781
-    ],
-    "meant": false
-   },
-   {
-    "panel": "hip.hip",
-    "length_mm": 629,
-    "at": [
-     -0.818,
-     -1.022,
-     0.452
-    ],
-    "meant": false
-   },
-   {
-    "panel": "hip.hip",
-    "length_mm": 629,
-    "at": [
-     -0.748,
-     -1.02,
-     0.453
-    ],
-    "meant": false
-   },
-   {
-    "panel": "hip.hip",
-    "length_mm": 284,
-    "at": [
-     -1.293,
-     0.631,
-     0.777
-    ],
-    "meant": false
-   },
-   {
-    "panel": "hip.hip",
-    "length_mm": 629,
-    "at": [
-     -0.748,
-     1.02,
-     0.453
-    ],
-    "meant": false
-   },
-   {
-    "panel": "hip.hip",
-    "length_mm": 629,
-    "at": [
-     -0.818,
-     1.022,
-     0.452
-    ],
-    "meant": false
-   },
-   {
-    "panel": "hip.hip",
-    "length_mm": 284,
-    "at": [
-     -1.293,
-     -0.631,
-     0.777
-    ],
-    "meant": false
-   }
-  ],
+  "cutter_holes": [],
+  "cut_loops": 15,
   "pieces": {
    "body": {
     "closed": true,
-    "panels": 7
+    "panels": 9
    },
    "pod": {
     "closed": true,
-    "panels": 3
+    "panels": 4
    },
    "hip": {
     "closed": true,
-    "panels": 3
+    "panels": 4
    },
    "yoke": {
     "closed": false,
-    "panels": 1
+    "panels": 2
    },
    "liner": {
     "closed": false,
@@ -329,25 +209,25 @@
   "count": 0
  },
  "triangles": {
-  "verdict": "look",
-  "total": 501460,
+  "verdict": "ok",
+  "total": 393388,
   "budget": 400000,
   "top": [
-   [
-    "hip.hip",
-    104132
-   ],
-   [
-    "pod.pod",
-    101625
-   ],
    [
     "body.glass",
     54336
    ],
    [
+    "hip.hip",
+    44795
+   ],
+   [
     "body.front",
-    35290
+    43581
+   ],
+   [
+    "pod.pod",
+    40810
    ],
    [
     "body.rear",
@@ -355,51 +235,51 @@
    ],
    [
     "yoke.yoke",
-    21044
+    14798
    ],
    [
-    "liner.liner",
-    15984
+    "pod.lamp_p",
+    13296
    ],
    [
-    "tire.fl",
-    14384
+    "body.floor",
+    10152
    ]
   ],
   "groups": [
    [
     "body",
-    139854
-   ],
-   [
-    "hip",
-    105902
+    156031
    ],
    [
     "pod",
-    103052
+    55808
+   ],
+   [
+    "hip",
+    54187
    ],
    [
     "tire",
-    57536
+    32128
    ],
    [
     "yoke",
-    21044
+    22790
    ],
    [
-    "liner",
-    15984
+    "lamp",
+    15660
    ],
    [
     "vanes",
     11840
    ],
    [
-    "interior",
-    10828
+    "rim",
+    9984
    ]
   ]
  },
- "verdict": "fail"
+ "verdict": "look"
 }

@@ -15,9 +15,9 @@
 | [kestrel_atlas](kestrel_atlas/check.json) | ok: none (hover) | ok: 374.4 mm (pod.skid.r) | look: 11 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 181915 |
 | [kestrel_dart](kestrel_dart/check.json) | ok: none (hover) | ok: 325.0 mm (keel) | look: 3 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 112558 |
 | [kestrel_meridian](kestrel_meridian/check.json) | ok: none (hover) | ok: 335.0 mm (lamp.keel.glass) | look: 3 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 119902 |
-| [orrin_aria](orrin_aria/check.json) | FAIL: 0.0 mm to body.front, steers 0 deg | ok: 131.8 mm (body.floor) | look: 2 objects | look: 0 open runs, 12 cutter holes | ok: 0 parts | look: 501460 |
+| [orrin_aria](orrin_aria/check.json) | look: 5.0 mm to pod.well, steers 0 deg | ok: 131.8 mm (body.floor) | look: 2 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 393388 |
 | [orrin_lumen](orrin_lumen/check.json) | look: 14.6 mm to body.well, steers 0 deg | ok: 130.0 mm (body.floor) | look: 2 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 356940 |
-| [orrin_pebble](orrin_pebble/check.json) | FAIL: 0.0 mm to body.well, steers 0 deg | ok: 143.3 mm (body.floor) | look: 5 objects | look: 0 open runs, 10 cutter holes | ok: 0 parts | ok: 266030 |
+| [orrin_pebble](orrin_pebble/check.json) | look: 16.1 mm to body.rear, steers 0 deg | ok: 143.3 mm (body.floor) | look: 5 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 324498 |
 | [tanager_cab](tanager_cab/check.json) | FAIL: 0.0 mm to bumper.guards.rear, steers 0 deg | ok: 120.0 mm (mudflaps) | look: 39 objects | FAIL: 4 open runs, 0 cutter holes | look: 1 parts | ok: 285996 |
 | [tanager_mino](tanager_mino/check.json) | ok: 51.9 mm to body.clad, steers 35 deg | ok: 110.0 mm (mudflaps) | look: 1 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 276187 |
 | [tanager_porter](tanager_porter/check.json) | FAIL: 0.0 mm to interior.tub, steers 0 deg | ok: 120.0 mm (mudflaps) | look: 87 objects | FAIL: 5 open runs, 0 cutter holes | look: 5 parts | ok: 314760 |
@@ -89,27 +89,14 @@
 
 - not mirrored: `led.step` 236.8 mm, `step.tread` 234.2 mm, `interior.yoke` 219.6 mm, `step.links` 198.5 mm, `step.grip` 197.6 mm, `step.bay` 16.1 mm, `pod.f.pod_low` 11.0 mm, `led.name` 5.2 mm, `fin.code` 3.3 mm
 
-**orrin_aria** (FAIL)
+**orrin_aria** (look)
 
-- tire `fl`: 0.0 mm to `body.front`, turns 0 degrees before it touches `pod.well`
-- tire `rl`: 2.8 mm to `hip.well`
-- tire `fr`: 0.0 mm to `body.front`, turns 0 degrees before it touches `pod.well`
-- tire `rr`: 2.8 mm to `hip.well`
-- not mirrored: `interior.fittings` 216.3 mm, `led.cabin` 6.0 mm
+- tire `fl`: 5.0 mm to `pod.well`, turns 0 degrees before it touches `pod.well`
+- tire `rl`: 5.0 mm to `hip.well`
+- tire `fr`: 5.0 mm to `pod.well`, turns 0 degrees before it touches `pod.well`
+- tire `rr`: 5.0 mm to `hip.well`
+- not mirrored: `interior.fittings` 224.1 mm, `led.cabin` 6.0 mm
 - open ends of open pieces (meant): `liner.liner`
-- a cutter's hole inside `body.front`: 491 mm round, at (2.18, 0.215, 0.384)
-- a cutter's hole inside `body.front`: 491 mm round, at (2.18, -0.215, 0.384)
-- a cutter's hole inside `pod.pod`: 429 mm round, at (1.435, 0.945, 0.762)
-- a cutter's hole inside `pod.pod`: 168 mm round, at (1.445, 0.929, 0.781)
-- a cutter's hole inside `pod.pod`: 429 mm round, at (1.435, -0.945, 0.762)
-- a cutter's hole inside `pod.pod`: 168 mm round, at (1.445, -0.929, 0.781)
-- a cutter's hole inside `hip.hip`: 629 mm round, at (-0.818, -1.022, 0.452)
-- a cutter's hole inside `hip.hip`: 629 mm round, at (-0.748, -1.02, 0.453)
-- a cutter's hole inside `hip.hip`: 284 mm round, at (-1.293, 0.631, 0.777)
-- a cutter's hole inside `hip.hip`: 629 mm round, at (-0.748, 1.02, 0.453)
-- a cutter's hole inside `hip.hip`: 629 mm round, at (-0.818, 1.022, 0.452)
-- a cutter's hole inside `hip.hip`: 284 mm round, at (-1.293, -0.631, 0.777)
-- triangles: 501460 over the 400000 budget; most in `body` 139854, `hip` 105902, `pod` 103052, `tire` 57536
 
 **orrin_lumen** (look)
 
@@ -120,24 +107,14 @@
 - not mirrored: `interior.wheel` 161.6 mm, `led.cabin` 8.3 mm
 - open ends of open pieces (meant): `deck.front.deck`, `deck.rear.deck`
 
-**orrin_pebble** (FAIL)
+**orrin_pebble** (look)
 
-- tire `fl`: 0.0 mm to `body.well`, turns 0 degrees before it touches `body.well`, its foot -7.0 mm off the ground
-- tire `rl`: 0.0 mm to `body.well`, its foot -7.0 mm off the ground
-- tire `fr`: 0.0 mm to `body.well`, turns 0 degrees before it touches `body.well`, its foot -7.0 mm off the ground
-- tire `rr`: 0.0 mm to `body.well`, its foot -7.0 mm off the ground
+- tire `fl`: 16.2 mm to `body.front`, turns 0 degrees before it touches `body.well`
+- tire `rl`: 16.1 mm to `body.rear`
+- tire `fr`: 16.2 mm to `body.front`, turns 0 degrees before it touches `body.well`
+- tire `rr`: 16.1 mm to `body.rear`
 - not mirrored: `interior.fittings` 160.0 mm, `luggage.case` 113.6 mm, `luggage.straps` 99.7 mm, `luggage.bag` 74.3 mm, `led.cabin` 5.4 mm
 - open ends of open pieces (meant): `liner.liner`
-- a cutter's hole inside `body.front`: 751 mm round, at (1.357, -0.332, 0.439)
-- a cutter's hole inside `body.front`: 559 mm round, at (0.519, 0.772, 0.352)
-- a cutter's hole inside `body.front`: 751 mm round, at (1.357, 0.332, 0.439)
-- a cutter's hole inside `body.front`: 559 mm round, at (0.519, -0.772, 0.352)
-- a cutter's hole inside `body.petal`: 503 mm round, at (0.18, -0.793, 0.623)
-- a cutter's hole inside `body.petal`: 503 mm round, at (0.18, 0.793, 0.623)
-- a cutter's hole inside `body.rear`: 751 mm round, at (-1.358, -0.331, 0.489)
-- a cutter's hole inside `body.rear`: 751 mm round, at (-1.358, 0.331, 0.489)
-- a cutter's hole inside `body.rear`: 559 mm round, at (-0.498, -0.771, 0.351)
-- a cutter's hole inside `body.rear`: 559 mm round, at (-0.498, 0.771, 0.351)
 
 **tanager_cab** (FAIL)
 
