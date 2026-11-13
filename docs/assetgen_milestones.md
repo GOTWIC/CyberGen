@@ -3288,8 +3288,8 @@ Vanta-R the same).
   LOD3 37.3 of 40 degrees, 0.091 of 0.10 bent, 0.026 of 0.04 texture (main 37.3, 0.080,
   0.030); its LOD row reads as main's, the prow's cells lit at LOD3, the charge flap a dark
   dot there. Not published.
-- **Next**: the other cars of the Kestrel, Orrin, Brakk and Tanager brands on the
-  pilots' patterns (Meridian, Atlas, Pebble, Aria, Bastion, Mule, Cab, Porter), each switching to its `vehicles/brands/` module, with step A's street-distance
+- **Next**: the other cars of the Orrin, Brakk and Tanager brands on the
+  pilots' patterns (Pebble, Aria, Bastion, Mule, Cab, Porter), each switching to its `vehicles/brands/` module, with step A's street-distance
   findings fixed as it is redone.
 
 ### Parked in Delta Megacity on the PC (2026-11-12)
