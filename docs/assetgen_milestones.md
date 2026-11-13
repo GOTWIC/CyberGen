@@ -3198,10 +3198,20 @@ Vanta-R the same).
   triangles, standard class, texels 489 px/m (5th percentile), LOD3 15.4 of 40 degrees,
   0.024 of 0.10 bent, 0.033 of 0.04 texture; LOD3 keeps the lamps and bars lit. Not
   published.
-- **Next**: a pilot car of each of the other five brands (lamps by `BRANDS.md`, each
-  switching to its `vehicles/brands/` module), shown to Swagnik before the other twelve;
-  step A's street-distance findings (tires in the body, cabin tubs in the wells) on each car
-  as it is redone.
+- **Pilots' lessons**: a lens cut from a doubly curved skin with `"skin"` keeps the
+  boolean's slivers (its reflections zigzag): build it as its own band or slab along the cut.
+  In the pack, a lit face deep under a lens bakes as dashes, emitters deep in reflector
+  bowls bake white, bare channel walls are baked down onto the lit face (give them a 1 mm
+  solidify); a lamp's pocket cup collapses into a dark lid at LOD3, so a lamp that must read
+  far off stands proud of the skin under its lens. Many thin cuts in one face tear apart in
+  the far LODs. Lettering floating off a leaning face mirrors a ghost: lay it on the face.
+- **Aurel set aside** (Swagnik, 2026-11-12: not in use for now): the Prelate's step B pass
+  (its slot grille tore in the pack's far LODs) is kept on branch
+  `claude/ag18-prelate-step-b-wip`, not merged; the Aurels are left out of the next batches.
+- **Next**: the other cars of the Kestrel, Orrin, Brakk, Halcyon and Tanager brands on the
+  pilots' patterns (Meridian, Atlas, Pebble, Aria, Bastion, Mule, Sable, Ridge, Cab,
+  Porter), each switching to its `vehicles/brands/` module, with step A's street-distance
+  findings fixed as it is redone.
 
 ## Order
 

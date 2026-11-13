@@ -42,18 +42,18 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 34400583,
- "seconds": 748.5,
+ "pack_bytes": 34400594,
+ "seconds": 777.6,
  "stage_seconds": {
   "build": 1.2,
-  "render_original": 68.2,
-  "parts": 20.7,
+  "render_original": 78.7,
+  "parts": 21.7,
   "nodes": 0.0,
-  "uv": 79.3,
-  "bake": 410.9,
-  "lods_export": 53.9,
-  "textures": 7.975658893585205,
-  "proof": 105.70435929298401
+  "uv": 85.1,
+  "bake": 406.4,
+  "lods_export": 53.3,
+  "textures": 8.459035873413086,
+  "proof": 122.07246899604797
  },
  "baked_down": {
   "relief": {
@@ -154,7 +154,7 @@
  "collision_hulls": 7,
  "source": {
   "script": "vehicles/cars/tanager_mino.py",
-  "script_sha256": "7a80192d2cfd84e69a7ff85caae81a873d5857fd83a315b0fa355f6818118cfc",
+  "script_sha256": "20ac4bbcaf2d63672338601e84fabad0c14c33f448a9a25c815a6d5df53b22b4",
   "carkit_sha256": "80020b974b190e7b6db524668c8c6d0164b3484f712ec8a6420c6e9961b53ea5",
   "game_sha256": "32271c5b2195e75c93509022799b7dd770add377d59cc906b924e040e27ff1db",
   "original_triangles": 276187,
