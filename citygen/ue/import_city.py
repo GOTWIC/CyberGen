@@ -75,12 +75,13 @@ HASH_TAG = "cg.hash"
 # unchanged build applies the change (stored hashes are "<version>.<content hash>")
 MESH_VERSION = "3"
 ACTOR_VERSION = "1"
-ATMOS_VERSION = "atmos6"  # the atmos controller's and cells' actors (2, AT2: the high tier,
+ATMOS_VERSION = "atmos7"  # the atmos controller's and cells' actors (2, AT2: the high tier,
                           # blinks and sweeps in the packed lights; 3, AT3: the sky and time;
                           # 4, AT4: the air, a cell's fog volumes and emitters; 5, the visible
                           # lights: the controller's sight raster, the cells always loaded; 6,
                           # AT5: the weather, its textures, a cell's drip lines; AT6's look is
-                          # in the controller's own hash: no new version, the cells kept)
+                          # in the controller's own hash: no new version, the cells kept; 7,
+                          # AT7: a cell's far cards, the controller's far city)
 SWIM_BRUSH_CM = 200.0   # the cube brush a volume spawned from its class gets (CubeBuilder)
 SWIM_FRICTION = 0.3
 GRAPH_VARS = [("City", "string"), ("Graph", "name"), ("Hash", "string"), ("Ids", "[name"),
@@ -4021,7 +4022,8 @@ class Importer:
                 # none of them)
                 for k, conv in (("volume_floats", float), ("volume_ints", int),
                                 ("emitter_floats", float), ("emitter_ints", int),
-                                ("drip_floats", float)):
+                                ("drip_floats", float), ("far_floats", float),
+                                ("far_ints", int)):
                     try:
                         a.set_editor_property(k, [conv(v) for v in d.get(k, [])])
                     except Exception as e:
@@ -4034,7 +4036,8 @@ class Importer:
         self.stats["atmos"] = {"made": True, "cells": len(self.man["atmos"]["cells"]),
                                "lights": self.man["atmos"]["lights"],
                                "volumes": self.man["atmos"].get("volumes", 0),
-                               "emitters": self.man["atmos"].get("emitters", 0)}
+                               "emitters": self.man["atmos"].get("emitters", 0),
+                               "far": (self.man["atmos"].get("far") or {}).get("cards", 0)}
 
     def atmos_glow(self, info):
         """AT3: Atmos/T_<City>_SkyGlow, the cloud deck's glow (unreal/atmos_sky_glow.png:
@@ -4239,6 +4242,12 @@ class Importer:
                 sky += [("steam_glow", float(ctl["steam_glow"])),
                         ("steam_far", float(ctl["steam_far"][0])),
                         ("steam_far_m", float(ctl["steam_far"][1]))]
+            # AT7: the far city (the cells' far cards past the live set; the play features'
+            # light pools give way to them)
+            if ctl.get("far"):
+                sky += [("far", True), ("far_gain", float(ctl["far_gain"])),
+                        ("far_px", float(ctl["far_px"])), ("far_fade", float(ctl["far_fade"])),
+                        ("far_spread", float(ctl["far_spread"]))]
             for k, v in sky:
                 try:
                     a.set_editor_property(k, v)

@@ -45,6 +45,11 @@
   each district's, the district raster as runs with its bounds, the blend, the day's exposure
   with its bias and the overcast's compensation), all in the controller's hash; the air's
   `steam_glow` and `steam_far` (the plumes by night and far off).
+- AT7 (the far city): the packing's version 5: a cell also holds the far cards whose middle
+  lies in it (`pack_far`: a glow, a pool or a wash per light the far view sees, from the
+  plan's `far/<tile>.json`), a cell made where any lie; the controller's `far_settings` (the
+  cards' gain, least width on screen and fade); a plan whose far check failed is not
+  delivered.
 """
 
 from __future__ import annotations
@@ -62,10 +67,13 @@ DATA = "atmos.json"                         # BUILD/unreal/atmos.json
 GLOW = "atmos_sky_glow.png"                 # BUILD/unreal/atmos_sky_glow.png (AT3)
 CONTROLLER_KEY = "atmos"
 CELL_M = 128.0                              # World Partition's main cells (unreal.MAIN_CELL_M)
-PACK_VERSION = 4                            # 2 (AT2): the high tier, a blink or a sweep;
+PACK_VERSION = 5                            # 2 (AT2): the high tier, a blink or a sweep;
                                             # 3 (AT4): a cell's fog volumes and emitters;
-                                            # 4 (AT5): its drip lines
+                                            # 4 (AT5): its drip lines; 5 (AT7): its far cards
 DFLOATS = 7                                 # AT5: a drip line (CityGenAtmosPack::DripFloats)
+FFLOATS = 12                                # AT7: a far card (CityGenAtmosPack::FarFloats)
+FAR_TYPES = ("glow", "pool", "wash")
+FAR_TIERS = ("mid", "high", "fixture")
 DRIP_KINDS = ("awning", "deck", "road", "canopy", "shelter")
 # AT5: the weather states' values as the controller holds them (`WeatherValues`: these per
 # state, in `WeatherNames` order)
@@ -225,6 +233,42 @@ def pack_drip(D: dict) -> list[float]:
     return [_r(ax * 100.0, 1), _r(-ay * 100.0, 1), _r(bx * 100.0, 1), _r(-by * 100.0, 1),
             _r(D["z_m"] * 100.0, 1), _r(D["ground_m"] * 100.0, 1),
             _r(round(float(D["rate"]), 3) + 8.0 * DRIP_KINDS.index(D["kind"]), 3)]
+
+
+def pack_far(C: dict, schedules: list[str]):
+    """AT7: a far card as the cell actor holds it (CityGenAtmosCell.h): FFLOATS floats in
+    Unreal's frame (its middle in cm; its color times its value: a glow's intensity in cd, a
+    pool's or wash's luminance at its middle in cd/m2, the plan's frame; its size in cm: a
+    glow's near, a pool's radius, a wash's half width; a pool's falloff or a wash's half
+    height in cm; a wash's yaw in Unreal's frame; a blink's period, on share and phase) and an
+    int (flags: type, tier << 2, blinking << 4, schedule index << 8)."""
+    x, y, z = C["pos"]
+    v = float(C["value"])
+    col = C["color"]
+    an = C.get("anim") or {}
+    blink = an.get("mode") == "blink" and float(an.get("period_s", 0.0)) > 0.0
+    f = [_r(x * 100.0, 1), _r(-y * 100.0, 1), _r(z * 100.0, 1),
+         _r(col[0] * v, 4), _r(col[1] * v, 4), _r(col[2] * v, 4),
+         _r(float(C["size_m"]) * 100.0, 1), _r(float(C.get("h_m") or 0.0) * 100.0, 1),
+         _r(-float(C.get("yaw") or 0.0)),
+         _r(an.get("period_s", 0.0) if blink else 0.0),
+         _r(an.get("amount", 1.0) if blink else 1.0),
+         _r(an.get("phase", 0.0) if blink else 0.0)]
+    flags = (FAR_TYPES.index(C["type"]) | (FAR_TIERS.index(C["tier"]) << 2)
+             | ((16 if blink else 0)) | (schedules.index(C["schedule"]) << 8))
+    return f, flags
+
+
+def far_settings(plan: dict) -> dict:
+    """AT7: the controller's far city from the plan's `far` (a plan before AT7 has none: {}):
+    the cards' gain, their least width on screen and the share of each live range they fade
+    in over."""
+    f = plan.get("far")
+    if not f:
+        return {}
+    return {"far": True, "far_gain": float(f["gain"]), "far_px": float(f["px"]),
+            "far_fade": float(f["fade"]), "far_spread": float(f["spread"]),
+            "far_cards": int((f.get("counts") or {}).get("all", 0))}
 
 
 def weather_settings(plan: dict) -> dict:
@@ -494,6 +538,10 @@ def atmos_data(pdir: Path, dest: Path | None = None) -> tuple[dict | None, str]:
         return None, "the plan's weather check failed (AT5: a cover out of its rain shadow, " \
                      "a puddle under a cover, in a building or on the water, a tile without " \
                      "its mask or over its drips' budget)"
+    fck = (plan.get("checks") or {}).get("far")
+    if fck is not None and not fck.get("ok"):
+        return None, "the plan's far check failed (AT7: a lamp without its far card, a card " \
+                     "with bad numbers, or a tile over its budget)"
     schedules = sorted(plan["schedules"])
     kinds, mounts = _kinds(), _mounts()
     cells: dict[tuple[int, int], list[dict]] = {}
@@ -516,12 +564,20 @@ def atmos_data(pdir: Path, dest: Path | None = None) -> tuple[dict | None, str]:
             mx = (D["a"][0] + D["b"][0]) / 2.0
             my = (D["a"][1] + D["b"][1]) / 2.0
             drips.setdefault(cell_of(mx, my), []).append(D)
+    # AT7: a cell's far cards (by their middle)
+    fars: dict[tuple[int, int], list[dict]] = {}
+    for ft in ((plan.get("far") or {}).get("tiles") or []):
+        if not (pdir / ft["file"]).is_file():
+            continue
+        for C in json.loads((pdir / ft["file"]).read_text(encoding="utf-8"))["cards"]:
+            fars.setdefault(cell_of(C["pos"][0], C["pos"][1]), []).append(C)
     out = []
-    for (ix, iy) in sorted(set(cells) | set(vols) | set(emits) | set(drips)):
+    for (ix, iy) in sorted(set(cells) | set(vols) | set(emits) | set(drips) | set(fars)):
         ls = sorted(cells.get((ix, iy), []), key=lambda r: r["id"])
         vs = sorted(vols.get((ix, iy), []), key=lambda r: r["id"])
         es = sorted(emits.get((ix, iy), []), key=lambda r: r["id"])
         ds = sorted(drips.get((ix, iy), []), key=lambda r: r["id"])
+        fs = sorted(fars.get((ix, iy), []), key=lambda r: r["id"])
         fl, it = [], []
         for L in ls:
             f, i = pack(L, schedules, kinds, mounts)
@@ -543,13 +599,21 @@ def atmos_data(pdir: Path, dest: Path | None = None) -> tuple[dict | None, str]:
                "hash": _sha16([PACK_VERSION, [L["hash"] for L in ls]] +
                               ([[V["hash"] for V in vs], [E["hash"] for E in es]]
                                if vs or es else []) +
-                              ([[D["hash"] for D in ds]] if ds else [])),
+                              ([[D["hash"] for D in ds]] if ds else []) +
+                              ([["far"] + [C["hash"] for C in fs]] if fs else [])),
                "floats": fl, "ints": it}
         if vs or es:
             rec.update({"volumes": len(vs), "emitters": len(es), "volume_floats": vf,
                         "volume_ints": vi, "emitter_floats": ef, "emitter_ints": ei})
         if ds:
             rec.update({"drips": len(ds), "drip_floats": [v for D in ds for v in pack_drip(D)]})
+        if fs:
+            ff, fi = [], []
+            for C in fs:
+                f, i = pack_far(C, schedules)
+                ff += f
+                fi.append(i)
+            rec.update({"far": len(fs), "far_floats": ff, "far_ints": fi})
         out.append(rec)
     ws = plan.get("weather_state") or {}
     tiers = plan.get("tiers") or {}
@@ -574,6 +638,7 @@ def atmos_data(pdir: Path, dest: Path | None = None) -> tuple[dict | None, str]:
     ctl.update(sight_settings(plan, pdir))
     ctl.update(weather_settings(plan))
     ctl.update(post_settings(plan, pdir))
+    ctl.update(far_settings(plan))
     if dest is not None and ctl.get("weather"):
         wt = wet_textures(plan, pdir, dest)
         if wt:
@@ -636,6 +701,10 @@ def write_atmos(build: str | Path, given: str | Path | None = None) -> dict | No
                                   "sha256": ctl["post_sha256"]}
                                  if ctl.get("post_runs") is not None else None)}
                      if ctl.get("post") else None),
+            # AT7: the far city's cards
+            "far": ({"cards": sum(c.get("far", 0) for c in data["cells"]),
+                     "gain": ctl["far_gain"], "px": ctl["far_px"]}
+                    if ctl.get("far") else None),
             "cells": [{k: c[k] for k in ("key", "cell", "tile", "center", "count", "hash")}
                       for c in data["cells"]]}
 

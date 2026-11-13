@@ -278,3 +278,48 @@ def test_weather_rides_on_the_controller(build):
     plan["checks"]["weather"]["ok"] = False
     (build / "atmos" / "atmos_plan.json").write_text(json.dumps(plan))
     assert "weather" in UA.write_atmos(build)["skipped"]
+
+
+def test_far_cards_ride_in_the_cells(build):
+    """AT7: every far card packed into the cell its middle lies in (its color times its value,
+    Unreal's frame, its flags), the controller's far settings, the manifest's count; a cell
+    of far cards alone is made; a failed far check is not delivered."""
+    at = UA.write_atmos(build)
+    data = json.loads((build / "unreal" / UA.DATA).read_text())
+    plan = json.loads((build / "atmos" / "atmos_plan.json").read_text())
+    n = plan["far"]["counts"]["all"]
+    assert n > 0 and at["far"]["cards"] == n == sum(c.get("far", 0) for c in data["cells"])
+    ctl = data["controller"]
+    assert ctl["far"] and ctl["far_gain"] == P.FAR_GAIN and ctl["far_px"] == P.FAR_PX
+    for c in data["cells"]:
+        if c.get("far"):
+            assert len(c["far_floats"]) == UA.FFLOATS * c["far"] == \
+                UA.FFLOATS * len(c["far_ints"])
+    sch = sorted(plan["schedules"])
+    C = {"id": "x.far.wash", "type": "wash", "tier": "high", "pos": [300.0, 400.0, 90.0],
+         "color": [1.0, 0.5, 0.25], "value": 8.0, "size_m": 12.0, "h_m": 9.0, "yaw": 90.0,
+         "schedule": "late", "hash": "aa"}
+    f, i = UA.pack_far(C, sch)
+    assert f == [30000.0, -40000.0, 9000.0, 8.0, 4.0, 2.0, 1200.0, 900.0, -90.0, 0.0, 1.0, 0.0]
+    assert i == 2 | (1 << 2) | (sch.index("late") << 8)
+    G = dict(C, type="glow", tier="fixture", yaw=None, h_m=0.0,
+             anim={"mode": "blink", "period_s": 1.5, "amount": 0.3, "phase": 0.25})
+    f, i = UA.pack_far(G, sch)
+    assert f[9:] == [1.5, 0.3, 0.25] and i & 3 == 0 and (i >> 2) & 3 == 2 and i & 16
+    # a cell of far cards alone
+    far = plan["far"]
+    (build / "atmos" / "far").mkdir(exist_ok=True)
+    (build / "atmos" / "far" / "t+01+01.json").write_text(json.dumps(
+        {"version": 1, "city": plan["city"], "tile": "t+01+01", "bounds": [256, 256, 512, 512],
+         "cards": [C]}))
+    far["tiles"].append({"tile": "t+01+01", "file": "far/t+01+01.json", "count": 1,
+                         "sha256": "x"})
+    (build / "atmos" / "atmos_plan.json").write_text(json.dumps(plan))
+    at2 = UA.write_atmos(build)
+    data2 = json.loads((build / "unreal" / UA.DATA).read_text())
+    cell = next(c for c in data2["cells"] if c["cell"] == "t+01+01.nw")
+    assert cell["count"] == 0 and cell["far"] == 1 and at2["far"]["cards"] == n + 1
+    # a failed far check: not delivered
+    plan["checks"]["far"]["ok"] = False
+    (build / "atmos" / "atmos_plan.json").write_text(json.dumps(plan))
+    assert "far" in UA.write_atmos(build)["skipped"]

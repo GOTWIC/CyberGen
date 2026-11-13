@@ -2314,7 +2314,7 @@ or the goldens move.
 
 ## Light and atmosphere generator (atmosgen)
 
-`docs/atmosgen_scope.md` is the spec for stage 3 (milestones AT0 to AT7, section 13;
+`docs/atmosgen_scope.md` is the spec for stage 3 (milestones AT0 to AT7, all done, section 13;
 Swagnik's decisions of 2026-11-10 in section 12), its log `docs/atmosgen_milestones.md`: a
 generator of light and air, not of geometry. A deterministic plan per city (every light
 that casts light, fog and smog volumes, steam emitters, rain shadow and wetness masks, sky
@@ -2419,7 +2419,35 @@ AT1 (streets at night) is in place:
   project's DefaultGame.ini, so a cook takes them (keep anything loaded by path in one of
   them); the play module opens a game with no saved resolution windowed fullscreen at the
   monitor's native resolution; the Tab menu has Fog, Rain, Wet streets and hour rows driving
-  the atmos controller (found by class name, no link between the plugins). A smoke or test
+  the atmos controller (found by class name, no link between the plugins).
+
+AT2 to AT6 are in place (neon and signs as light, sky and time, air, weather, looks; the
+visible lights after AT4: a walker's live set the lights it sees within 1,200 m through the
+plan's sight raster); each milestone's record is in `docs/atmosgen_milestones.md` and
+`docs/unreal_export.md` ("From AT2" to "From AT6", "Visible lights").
+
+AT7 (far city and release) is in place, which completes stage 3:
+- **Far cards** (`atmosgen/far.py`, the plan's `far`, `far/<tile>.json`, `presets.FAR`): past
+  the live set every light the far view sees as cards by photometric class: a glow at its lens
+  turned to the eye (aviation lights blinking), a pool on the surface a light aimed down
+  lights (the lux check's walkway and lane points under it, else the ground), a wash on the
+  facade a flood lights; signs, neon and windows need none (the instanced HLODs keep their
+  emissive, AG16), the cloud glow is AT3's. The far check (`checks.far`: every street lamp
+  with its pool or a reason, every aviation light with its glow, 3,000 cards a tile);
+  `preview_far.png`.
+- **Budgets across cities:** `atmosgen budgets PLAN... --out DIR` (`atmosgen/budgets.py`:
+  plan time, checks, tiers, the most per tile against each budget, the most near the view
+  against the live caps). Every sample and demo plans with every check passing
+  (`docs/progress/AT7/plans/budgets.md`). AT4's mist stands on M13's water level on a
+  terrain city (`air._surface_of`: M16 leaves `surface_m` unset there).
+- **Exporter and runtime:** packing version 5 (a cell's far cards), `ATMOS_VERSION` atmos7,
+  the controller's `bFar`, `FarGain`, `FarPx`, `FarFade`; the cards instanced per 1 km block
+  in `M_CgFarGlow` and `M_CgFarFlat` (atmos assets 19), fading in where each tier's live
+  lights fade out (`MPC_CityGenAtmos`'s `FarMidM`, `FarHighM`, `FarFixM`), collapsed to a
+  point where they do not show; they replace the play features' light pools; console
+  `CityGenAtmos.Far`, `.FarGain`; the check's `*_nofar` views, the benchmark's
+  `night_plan_nofar`. `docs/unreal_export.md`, "From AT7".
+- Delta's night after AT7: 15.0 ms p95 on the lean route. Results: `docs/progress/AT7/`. A smoke or test
   launch of a package leaves no `Saved/` folder in it (`-userdir=` outside the package, or
   delete it after the run): a saved resolution there stops the native start for the player.
 

@@ -1,4 +1,4 @@
-# atmosgen: light, sky, air and weather (scope, v2: decided 2026-11-10, AT0 to AT6 done)
+# atmosgen: light, sky, air and weather (scope, v2: decided 2026-11-10, AT0 to AT7 done)
 
 Stage 3 (atmosgen) of CyberGen's five stages. It takes a built city with its assets and
 makes the city's light and air: every light source that casts light, the sky, fog, smog,
@@ -318,6 +318,19 @@ stages have); never required to edit. Fields, all with defaults:
 
 - The skyline at night: HLODs that keep their emissive, far lights as light cards from the
   plan, the cloud glow. The far city must glitter, not go gray.
+- AT7 built it (`atmosgen/far.py`, `docs/progress/AT7/`): the plan's `far`, a card per light
+  the far view sees (`presets.FAR`, by photometric class): a glow at the lens turned to the
+  eye (a share of the light's intensity, at least two pixels wide, its intensity held as it
+  grows; aviation lights blinking), a pool on the surface a light aimed down lights (the
+  walkways and lanes under it, a raised road's deck too; its luminance $E_0 \rho / \pi$ falling
+  as a point light's illuminance does), a wash on the facade a crown flood or uplight lights;
+  signs, neon, shopfronts and lit windows need none, the instanced HLODs keeping their
+  emissive surfaces past World Partition's loading range (AG16's per-instance data); the far
+  check (every street lamp with its pool, every aviation light with its glow, a budget per
+  tile). In Unreal the cells' cards instanced per 1 km block, each fading in where its tier's
+  live lights fade out (the walker's 1,200 m by sight, the circle's 300 m, the high tier's,
+  the beacons'), collapsed to a point where it does not show; they replace the play features'
+  light pools. The cloud glow is AT3's. `atmosgen budgets` tabulates the plans across cities.
 
 ## 7. Outputs (canonical)
 

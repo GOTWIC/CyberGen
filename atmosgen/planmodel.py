@@ -432,6 +432,64 @@ class Post(_Model):
                                                   "size and sha256.")
 
 
+class FarCard(_Model):
+    """AT7: a light as the far city shows it past the live set (`far.py`, scope 6.6)."""
+    id: str = Field(description="`<light id>.far.<type>`.")
+    light_id: str
+    type: Literal[P.FAR_TYPES] = Field(description="`glow` the fixture seen from afar, a dot "
+                                                   "turned to the eye; `pool` where a light "
+                                                   "aimed down lands, a disc on the surface "
+                                                   "under it; `wash` a flood's lit patch on "
+                                                   "its facade.")
+    tier: Literal[P.FAR_TIERS] = Field(description="Where it fades in: past the street's "
+                                                   "live range (`mid`), the high tier's "
+                                                   "(`high`), the beacons' (`fixture`).")
+    kind: LightKind
+    district_id: str | None = None
+    tile: str
+    pos: Vec3 = Field(description="A glow's lens, a pool's middle (on its surface, "
+                                  "`FAR_POOL_UP_M` over it), a wash's patch middle (m, "
+                                  "absolute z).")
+    color: RGB
+    value: float = Field(description="A glow's intensity toward the eye (cd); a pool's or "
+                                     "wash's luminance at its middle (cd/m2); in the plan's "
+                                     "frame (its `night_ev100`).")
+    size_m: float = Field(description="A glow's size near (m); a pool's radius; a wash's "
+                                      "half width.")
+    h_m: float = Field(0.0, description="A pool's light over its middle (m), its falloff: "
+                                        "the luminance $L_0 (1 + (r/h)^2)^{-3/2}$ to its "
+                                        "radius; a wash's half height.")
+    yaw: float | None = Field(None, description="A wash's facing (degrees counterclockwise "
+                                                "from east): a flat card on its facade.")
+    schedule: str
+    anim: Anim | None = Field(None, description="A blinking light's blink.")
+    hash: str
+
+
+class TileFar(_Model):
+    """AT7: `far/<tile>.json`: a tile's far cards."""
+    version: Literal[1] = 1
+    city: str
+    tile: str
+    bounds: list[float]
+    cards: list[FarCard]
+
+
+class Far(_Model):
+    """AT7: the far city's cards (scope 6.6, `far.py`): their tiles, counts and the runtime's
+    settings."""
+    tiles: list[dict] = Field(description="{tile, file, count, sha256} per tile.")
+    counts: dict[str, int]
+    gain: float = Field(description="The runtime's gain on every card (art direction).")
+    px: float = Field(description="A glow's least width on screen (pixels).")
+    spread: float = Field(description="A card's gaussian over its square: its peak luminance "
+                                      "is its intensity over this times its size squared.")
+    fade: float = Field(description="Cards fade in over this share of each live range, as "
+                                    "the live lights fade out there.")
+    pool_up_m: float
+    albedo: dict[str, float]
+
+
 class AtmosPlan(_Model):
     schema_ref: str | None = Field(None, alias="$schema")
     version: Literal[1] = PLAN_VERSION
@@ -464,6 +522,8 @@ class AtmosPlan(_Model):
                                                   "runtime picks a walker's lights by.")
     post: Post | None = Field(None, description="AT6: the look's post and grade, per "
                                                 "district.")
+    far: Far | None = Field(None, description="AT7: the far city's light cards past the "
+                                              "live set.")
     counts: dict[str, int]
     sources: dict[str, int] = Field(description="Lights by source: derived or assetgen "
                                                 "(the asks met).")
@@ -509,4 +569,5 @@ def json_schema(model=AtmosPlan, title: str = "atmosgen atmos plan") -> dict:
 SCHEMAS = {"atmos_plan": (AtmosPlan, "atmosgen atmos plan"),
            "tile_lights": (TileLights, "atmosgen tile lights"),
            "tile_drips": (TileDrips, "atmosgen tile drips"),
+           "tile_far": (TileFar, "atmosgen tile far cards"),
            "contribution": (Contribution, "atmosgen unreal contribution")}

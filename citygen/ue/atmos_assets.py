@@ -51,7 +51,7 @@ import unreal
 
 JOB = json.load(open(os.environ["CITYGEN_UE_JOB"], encoding="utf-8"))
 FOLDER = "/Game/CityGen/Core/Atmos"
-VERSION = "17"  # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air);
+VERSION = "19"  # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air);
                 # 3 (AT2): M_CgBeacon and M_CgBeam; 4 to 8 (AT3): M_CgSky; 9 to 12 (AT4):
                 # M_CgSteam, MPC_CityGenAtmos's SteamGain; 13 (AT5): the weather (M_CgWet
                 # gone: M_CgWetColor and M_CgWetGloss, M_CgRain cut by the covers and leaning
@@ -62,7 +62,11 @@ VERSION = "17"  # 2: fewer, smaller puddles (1 blotched big paved yards seen fro
                 # 16 (AT6): M_CgSteam lit by the city by night (SteamGlow) and kept opaque far
                 # off (SteamFar, SteamFarM); 17 (AT6): the wet decals' face normal from fine
                 # derivatives (a pixel's own neighbor, not its 2 x 2 quad's: a curb's edge
-                # read as half floor, half wall in quads, AT5's white sawtooth along it)
+                # read as half floor, half wall in quads, AT5's white sawtooth along it);
+                # 18 (AT7): M_CgFarGlow and M_CgFarFlat, the far city's cards, and their
+                # parameters in MPC_CityGenAtmos (FarScale, FarMidM, FarHighM, FarFixM,
+                # FarFade, FarPx, FarSpread); 19: a wash soft to its edges ((1 - u^2)^2 a
+                # side: 18's (1 - u^4)^2 drew the far crowns as blocks)
 # AT5: MPC_CityGenAtmos: the weather now (the controller blends its states): the rain's rate,
 # how wet the open surfaces are and how full the puddles, the fog, the wind (its speed with
 # its gusts, its heading as a unit vector), the plumes' gain, the streaks' length and the
@@ -70,7 +74,12 @@ VERSION = "17"  # 2: fewer, smaller puddles (1 blotched big paved yards seen fro
 COLLECTION = (("Rain", 0.0), ("Wetness", 0.0), ("Puddles", 0.0), ("FogDensity", 0.0),
               ("WindMS", 4.0), ("WindX", 0.77), ("WindY", -0.64), ("SteamGain", 10.0),
               ("Streak", 1.0), ("Drops", 1.0), ("SteamGlow", 0.0), ("SteamFar", 0.0),
-              ("SteamFarM", 150.0))
+              ("SteamFarM", 150.0),
+              # AT7: the far city's cards: the lights' scale while they show (0 by day),
+              # where each tier's cards fade in (m), over what share of it, a few pixels'
+              # width per distance, a glow's gaussian over its square
+              ("FarScale", 0.0), ("FarMidM", 300.0), ("FarHighM", 750.0), ("FarFixM", 832.0),
+              ("FarFade", 0.2), ("FarPx", 0.002), ("FarSpread", 0.0982))
 EAL = unreal.EditorAssetLibrary
 AT = unreal.AssetToolsHelpers.get_asset_tools()
 MEL = unreal.MaterialEditingLibrary
@@ -966,6 +975,162 @@ def steam(c):
     return m, True
 
 
+# AT7: the far city's cards (the plan's `far`, the controller instancing them on the engine's
+# plane per 1 km block). Each fades in past its tier's live range (FarMidM, FarHighM, FarFixM:
+# the farthest FarFade of it, as the live lights fade out there); faded out, or off by its
+# schedule or by day (FarScale 0), its quad collapses to a point by world position offset, so
+# it costs no pixel. A glow: turned to the eye, at least FarPx of the distance wide (a few
+# pixels), pulled toward the eye by half its size (clear of its own fixture and wall), a
+# gaussian whose intensity holds as it grows: its peak luminance its intensity over FarSpread
+# times its size squared; blinking from its per-instance data as its light does.
+FAR_WHERE = """
+float S = Tier < 0.5 ? Mid : (Tier < 1.5 ? High : Fix);
+float d = length(C - Cam) * 0.01;
+return saturate((d - S * (1.0 - Fade)) / max(S * Fade, 1.0));
+"""
+FAR_GLOW_WPO = """
+float3 toC = C - Cam;
+float d = max(length(toC), 1.0);
+float3 dir = toC / d;
+float s = max(Size, d * Px);
+float on = (Where > 0.0 && Level * Scale > 0.0) ? 1.0 : 0.0;
+float3 right = normalize(cross(float3(0.0, 0.0, 1.0), dir) + float3(1e-4, 0.0, 0.0));
+float3 up = cross(dir, right);
+float3 c = C - dir * min(s * 0.5 + 50.0, d * 0.25);
+float2 q = LP.xy / 50.0;
+return c + (q.x * right + q.y * up) * s * 0.5 * on - WP;
+"""
+FAR_GLOW_EM = """
+float d = max(length(C - Cam), 1.0);
+float s = max(Size, d * Px) * 0.01;
+float2 p = UV * 2.0 - 1.0;
+float r2 = dot(p, p);
+float g = exp(-8.0 * r2) * saturate(1.0 - r2);
+float blink = Period > 0.0 ? (frac(Time / Period + Phase) < Duty ? 1.0 : 0.0) : 1.0;
+return float3(R, G, B) * (Level * Scale * Where * blink * g / (Spread * s * s));
+"""
+# a pool lying on its surface (the luminance at its middle falling as a point light's
+# illuminance does over its falloff, H, to its radius) or a wash standing on its facade (soft
+# at its edges); its quad collapsed to its middle where it does not show
+FAR_FLAT_WPO = """
+float on = (Where > 0.0 && Level * Scale > 0.0) ? 1.0 : 0.0;
+return on > 0.5 ? float3(0.0, 0.0, 0.0) : C - WP;
+"""
+FAR_FLAT_EM = """
+float2 p = UV * 2.0 - 1.0;
+float prof;
+if (Type < 1.5)
+{
+    float r = length(p);
+    float rm = r * Rad / max(H, 1.0);
+    float w = saturate(1.0 - r * r * r * r);
+    prof = pow(1.0 + rm * rm, -1.5) * w * w;
+}
+else
+{
+    float2 a = saturate(1.0 - p * p);
+    prof = a.x * a.x * a.y * a.y;
+}
+return float3(R, G, B) * (Level * Scale * Where * prof);
+"""
+
+
+def _far_inputs(m, c, names, defaults):
+    ins = {}
+    for k, n in enumerate(names):
+        ins[n] = expr(m, unreal.MaterialExpressionPerInstanceCustomData, -1500, 90 * k,
+                      data_index=k, const_default_value=defaults[k])
+    cpos = custom(m, -1200, 0, "return float3(X, Y, Z);", ["X", "Y", "Z"], "CMOT_FLOAT3",
+                  "CgFarAt")
+    for n in ("X", "Y", "Z"):
+        link(ins[n], "", cpos, n)
+    cam = expr(m, unreal.MaterialExpressionCameraPositionWS, -1500, 1200)
+    where = custom(m, -1000, 1200, FAR_WHERE,
+                   ["C", "Cam", "Tier", "Mid", "High", "Fix", "Fade"], "CMOT_FLOAT1",
+                   "CgFarWhere")
+    for a, n in ((cpos, "C"), (cam, "Cam"), (ins["Tier"], "Tier"),
+                 (mpc_param(m, c, "FarMidM", -1500, 1300), "Mid"),
+                 (mpc_param(m, c, "FarHighM", -1500, 1350), "High"),
+                 (mpc_param(m, c, "FarFixM", -1500, 1400), "Fix"),
+                 (mpc_param(m, c, "FarFade", -1500, 1450), "Fade")):
+        link(a, "", where, n)
+    return ins, cpos, cam, where
+
+
+def far_material(m):
+    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_ADDITIVE)
+    m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
+    m.set_editor_property("used_with_instanced_static_meshes", True)
+
+
+def far_glow(c):
+    m, made = material("M_CgFarGlow")
+    if not made:
+        return m, False
+    far_material(m)
+    names = ("X", "Y", "Z", "R", "G", "B", "Size", "Tier", "Period", "Duty", "Phase", "Level")
+    ins, cpos, cam, where = _far_inputs(m, c, names,
+                                        (0, 0, 0, 1, 1, 1, 30, 0, 0, 1, 0, 1))
+    lp = expr(m, unreal.MaterialExpressionPreSkinnedPosition, -1500, 1600)
+    wp = expr(m, unreal.MaterialExpressionWorldPosition, -1500, 1700)
+    px = mpc_param(m, c, "FarPx", -1500, 1800)
+    scale = mpc_param(m, c, "FarScale", -1500, 1900)
+    wpo = custom(m, -700, 900, FAR_GLOW_WPO,
+                 ["C", "Cam", "Size", "Px", "Where", "Level", "Scale", "LP", "WP"],
+                 "CMOT_FLOAT3", "CgFarGlowWPO")
+    for a, n in ((cpos, "C"), (cam, "Cam"), (ins["Size"], "Size"), (px, "Px"),
+                 (where, "Where"), (ins["Level"], "Level"), (scale, "Scale"), (lp, "LP"),
+                 (wp, "WP")):
+        link(a, "", wpo, n)
+    uv = expr(m, unreal.MaterialExpressionTextureCoordinate, -1500, 2000, coordinate_index=0)
+    tm = expr(m, unreal.MaterialExpressionTime, -1500, 2100)
+    em = custom(m, -700, 200, FAR_GLOW_EM,
+                ["C", "Cam", "Size", "Px", "UV", "R", "G", "B", "Period", "Duty", "Phase",
+                 "Time", "Level", "Scale", "Where", "Spread"], "CMOT_FLOAT3", "CgFarGlow")
+    for a, n in ((cpos, "C"), (cam, "Cam"), (ins["Size"], "Size"), (px, "Px"), (uv, "UV"),
+                 (ins["R"], "R"), (ins["G"], "G"), (ins["B"], "B"), (ins["Period"], "Period"),
+                 (ins["Duty"], "Duty"), (ins["Phase"], "Phase"), (tm, "Time"),
+                 (ins["Level"], "Level"), (scale, "Scale"), (where, "Where"),
+                 (mpc_param(m, c, "FarSpread", -1500, 2200), "Spread")):
+        link(a, "", em, n)
+    MEL.connect_material_property(em, "", MP.MP_EMISSIVE_COLOR)
+    MEL.connect_material_property(wpo, "", MP.MP_WORLD_POSITION_OFFSET)
+    MEL.recompile_material(m)
+    EAL.set_metadata_tag(m, "cg.atmos", VERSION)
+    EAL.save_loaded_asset(m, only_if_is_dirty=False)
+    return m, True
+
+
+def far_flat(c):
+    m, made = material("M_CgFarFlat")
+    if not made:
+        return m, False
+    far_material(m)
+    names = ("X", "Y", "Z", "R", "G", "B", "Type", "Rad", "H", "Tier", "Level")
+    ins, cpos, cam, where = _far_inputs(m, c, names, (0, 0, 0, 1, 1, 1, 1, 1500, 700, 0, 1))
+    wp = expr(m, unreal.MaterialExpressionWorldPosition, -1500, 1600)
+    scale = mpc_param(m, c, "FarScale", -1500, 1700)
+    wpo = custom(m, -700, 900, FAR_FLAT_WPO, ["C", "Where", "Level", "Scale", "WP"],
+                 "CMOT_FLOAT3", "CgFarFlatWPO")
+    for a, n in ((cpos, "C"), (where, "Where"), (ins["Level"], "Level"), (scale, "Scale"),
+                 (wp, "WP")):
+        link(a, "", wpo, n)
+    uv = expr(m, unreal.MaterialExpressionTextureCoordinate, -1500, 1800, coordinate_index=0)
+    em = custom(m, -700, 200, FAR_FLAT_EM,
+                ["UV", "Type", "Rad", "H", "R", "G", "B", "Level", "Scale", "Where"],
+                "CMOT_FLOAT3", "CgFarFlat")
+    for a, n in ((uv, "UV"), (ins["Type"], "Type"), (ins["Rad"], "Rad"), (ins["H"], "H"),
+                 (ins["R"], "R"), (ins["G"], "G"), (ins["B"], "B"), (ins["Level"], "Level"),
+                 (scale, "Scale"), (where, "Where")):
+        link(a, "", em, n)
+    MEL.connect_material_property(em, "", MP.MP_EMISSIVE_COLOR)
+    MEL.connect_material_property(wpo, "", MP.MP_WORLD_POSITION_OFFSET)
+    MEL.recompile_material(m)
+    EAL.set_metadata_tag(m, "cg.atmos", VERSION)
+    EAL.save_loaded_asset(m, only_if_is_dirty=False)
+    return m, True
+
+
 def main():
     res = {"ok": False, "version": VERSION}
     try:
@@ -982,6 +1147,8 @@ def main():
         _, res["beam_made"] = beam()
         _, res["sky_made"] = sky_material()
         _, res["steam_made"] = steam(c)
+        _, res["far_glow_made"] = far_glow(c)
+        _, res["far_flat_made"] = far_flat(c)
         res["ok"] = True
     except Exception:
         res["error"] = traceback.format_exc()

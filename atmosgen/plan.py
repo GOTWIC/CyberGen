@@ -49,7 +49,7 @@ from . import sky as SK
 from . import spec as S
 
 CODE_FILES = ("presets.py", "spec.py", "planmodel.py", "emitters.py", "plan.py", "lux.py",
-              "sky.py", "air.py", "sight.py", "weather.py", "look.py")
+              "sky.py", "air.py", "sight.py", "weather.py", "look.py", "far.py")
 OUT = "atmos"
 TILE_M = 256.0
 
@@ -70,7 +70,7 @@ def code_hash() -> str:
     here = Path(__file__).parent
     for name in CODE_FILES:
         h.update(name.encode() + b"\0" + (here / name).read_bytes().replace(b"\r\n", b"\n"))
-    return f"at5.{h.hexdigest()[:12]}"
+    return f"at7.{h.hexdigest()[:12]}"
 
 
 def u(*key) -> float:
@@ -1748,6 +1748,13 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     timed("weather.drips", we.drips_of, od)
     we_check = timed("weather.check", we.check, od)
     we_set = we.settings()
+    # AT7: the far city: every light the far view sees as cards past the live set
+    from . import far as FA
+    fa = FA.Far(pl.lights, smp.points, city.ground)
+    timed("far", fa.make)
+    far_index = timed("far.write", fa.write, od, city.name)
+    far_check = timed("far.check", fa.check)
+    far_set = fa.settings(far_index)
     by_tile: dict[str, list[dict]] = {}
     for L in sorted(pl.lights, key=lambda r: r["id"]):
         by_tile.setdefault(L["tile"], []).append(L)
@@ -1808,9 +1815,11 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
         emitters=[PM.Emitter(**e) for e in air.emitters],
         sight=PM.Sight(**sight),
         post=PM.Post(**post),
+        far=PM.Far(**far_set),
         masks=[PM.Mask(**mk) for mk in we.masks],
         weather_plan=PM.Weather(**we_set),
-        checks={"lux": lux, "faces": faces, "air": air_check, "weather": we_check})
+        checks={"lux": lux, "faces": faces, "air": air_check, "weather": we_check,
+                "far": far_check})
     ptext = json.dumps(json.loads(plan.model_dump_json(by_alias=True, exclude={"schema_ref"})),
                        indent=1, sort_keys=True) + "\n"
     if _write(od / "atmos_plan.json", ptext):
@@ -1844,7 +1853,9 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
            "air_counts": air_set["counts"],
            "air_sources": {k: v for k, v in air.report.items() if k != "skipped"},
            "air_skipped": dict(sorted(air.report["skipped"].items())),
-           "ok": lux["ok"] and faces["ok"] and air_check["ok"] and we_check["ok"],
+           "ok": lux["ok"] and faces["ok"] and air_check["ok"] and we_check["ok"] and
+           far_check["ok"],
+           "far": far_check,
            "weather": we_check, "weather_counts": we_set["counts"],
            "weather_stats": we_set["stats"],
            "weather_covers": dict(sorted(we.report["covers"].items())),
@@ -1946,6 +1957,9 @@ def report_text(rep: dict) -> str:
             "; " + ", ".join(f"{k} {v}" for k, v in sorted((rep.get("weather_stats") or {})
                                                            .items())))
         lines.append(we_text(rep["weather"]).rstrip())
+    if rep.get("far"):
+        from .far import check_text as far_text
+        lines.append(far_text(rep["far"]).rstrip())
     if rep.get("floods"):
         f = rep["floods"]
         lines.append(f"towers and landmarks: {f['towers']}, crowns flooded {f['crowns']} "

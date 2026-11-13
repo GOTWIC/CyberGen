@@ -84,6 +84,19 @@ namespace
 	constexpr float PlumeSpeedCm = 120.f;    // steam rises about 1.2 m/s ...
 	constexpr float SmokeSpeedCm = 200.f;    // ... smoke 2 m/s
 	constexpr double FixturesEvery = 0.5;    // s between making and dropping cells' fixtures
+	// AT7: the far city's cards (M_CgFarGlow turned to the eye, M_CgFarFlat lying on its
+	// surface), instanced on the engine's plane per 1 km block
+	const TCHAR* FarGlowMaterialPath = TEXT("/Game/CityGen/Core/Atmos/M_CgFarGlow.M_CgFarGlow");
+	const TCHAR* FarFlatMaterialPath = TEXT("/Game/CityGen/Core/Atmos/M_CgFarFlat.M_CgFarFlat");
+	constexpr double FarBlockCm = 102400.0;
+	constexpr int32 FarGlowData = 12;        // a glow's: middle xyz, rgb, size, tier, period,
+	                                         // on share, phase, level
+	constexpr int32 FarFlatData = 11;        // a pool's or wash's: middle xyz, rgb, type,
+	                                         // radius (half width), falloff (half height),
+	                                         // tier, level
+	constexpr float FarGlowBoundCm = 2500.f; // a glow instance's bounds (its card grows with
+	                                         // distance to a few pixels: 25 m at 10 km)
+	constexpr double FarSettleS = 0.5;       // cells registering: the cards built once they rest
 	// visible lights: the walker's class (the play features', by name) and the mode's switch
 	const FName WalkerClass(TEXT("CityGenWalker"));
 	TAutoConsoleVariable<int32> CVarSight(TEXT("CityGenAtmos.Sight"), -1,
@@ -173,6 +186,7 @@ void ACityGenAtmos::EndPlay(const EEndPlayReason::Type Reason)
 {
 	FinishSight();
 	SetPlayLamps(true);
+	DropFar();
 	ReleaseAll();
 	ReleaseVolumes();
 	ApplyCVars(false);
@@ -211,7 +225,13 @@ void ACityGenAtmos::RegisterCell(ACityGenAtmosCell* Cell)
 	}
 	// AT5: or only drip lines
 	const int32 ND = Cell->DripFloats.Num() / CityGenAtmosPack::DripFloats;
-	if (N <= 0 && NV <= 0 && NE <= 0 && ND <= 0)
+	// AT7: or only far cards
+	int32 NF = Cell->FarInts.Num();
+	if (Cell->FarFloats.Num() < NF * CityGenAtmosPack::FarFloats)
+	{
+		NF = 0;
+	}
+	if (N <= 0 && NV <= 0 && NE <= 0 && ND <= 0 && NF <= 0)
 	{
 		return;
 	}
@@ -284,6 +304,17 @@ void ACityGenAtmos::RegisterCell(ACityGenAtmosCell* Cell)
 		S.Drips.Append(Cell->DripFloats.GetData(), ND * CityGenAtmosPack::DripFloats);
 		DripLines += ND;
 		DripsAt = -1.0;
+	}
+	// AT7: its far cards (drawn once the cells rest: RebuildFar)
+	S.Far.Reset();
+	S.FarFlags.Reset();
+	if (NF > 0)
+	{
+		S.Far.Append(Cell->FarFloats.GetData(), NF * CityGenAtmosPack::FarFloats);
+		S.FarFlags.Append(Cell->FarInts.GetData(), NF);
+		FarCards += NF;
+		bFarDirty = true;
+		FarDirtyAt = FPlatformTime::Seconds();
 	}
 	// (its beacons, beams and plumes when the view comes near it: UpdateFixtureCells)
 	S.bMade = false;
@@ -359,6 +390,15 @@ void ACityGenAtmos::UnregisterCell(ACityGenAtmosCell* Cell)
 	DripLines -= S.Drips.Num() / CityGenAtmosPack::DripFloats;
 	S.Drips.Reset();
 	DripsAt = -1.0;
+	// AT7: its far cards out (drawn again once the cells rest)
+	if (S.FarFlags.Num())
+	{
+		FarCards -= S.FarFlags.Num();
+		bFarDirty = true;
+		FarDirtyAt = FPlatformTime::Seconds();
+	}
+	S.Far.Reset();
+	S.FarFlags.Reset();
 	VolumesAt = -1.0;
 	S.Lights.Reset();
 	S.High.Reset();
@@ -1209,9 +1249,10 @@ void ACityGenAtmos::SetPlayLamps(bool bOn) const
 	// (AT1: the play features keep only their light pools; with the plan's lights on, the
 	// pools stand past the live range, AT0's far tier, `bFarPools`; with them off, from the
 	// view out, as before atmosgen)
+	// (AT7: with the far city's cards the pools go: the cards are the far tier)
 	if (IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(TEXT("CityGen.PlayLamps")))
 	{
-		V->Set(bOn ? 1 : (bFarPools ? 2 : 0), ECVF_SetByCode);
+		V->Set(bOn ? 1 : ((bFarPools && !HasFar()) ? 2 : 0), ECVF_SetByCode);
 	}
 	if (IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(TEXT("CityGen.PlayPoolsFromM")))
 	{
@@ -1241,6 +1282,242 @@ void ACityGenAtmos::SetFarPools(bool bOn)
 	if (bLights)
 	{
 		SetPlayLamps(!bShowing);
+	}
+}
+
+// -- AT7: the far city --
+
+void ACityGenAtmos::SetFar(bool bOn)
+{
+	bFar = bOn;
+	if (bOn && FarComps.Num() == 0 && FarCards > 0)
+	{
+		bFarDirty = true;
+		FarDirtyAt = -1.0;
+	}
+	ShowFar(bShowing && HasFar());
+	if (bLights)
+	{
+		SetPlayLamps(!bShowing);
+	}
+}
+
+void ACityGenAtmos::DropFar()
+{
+	for (UPrimitiveComponent* C : FarComps)
+	{
+		if (C)
+		{
+			C->DestroyComponent();
+		}
+	}
+	FarComps.Reset();
+	FarBlocks.Reset();
+	FarGlows = FarFlats = 0;
+	bFarShown = false;
+	FarHourSet = -100.f;
+}
+
+void ACityGenAtmos::RebuildFar()
+{
+	// every registered cell's cards, by 1 km block: a glow component and a flat one each
+	const double T0 = FPlatformTime::Seconds();
+	DropFar();
+	bFarDirty = false;
+	if (!bFar || FarCards <= 0 || !GetWorld())
+	{
+		return;
+	}
+	UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, RainMesh);
+	UMaterialInterface* GlowMat = LoadObject<UMaterialInterface>(nullptr, FarGlowMaterialPath);
+	UMaterialInterface* FlatMat = LoadObject<UMaterialInterface>(nullptr, FarFlatMaterialPath);
+	if (!Mesh || !GlowMat || !FlatMat)
+	{
+		UE_LOG(LogCityGenAtmos, Warning, TEXT("CityGen atmos: the far city's mesh or materials are missing (atmosgen's assets before AT7?)"));
+		return;
+	}
+	struct FBuild
+	{
+		TArray<FTransform> GlowX, FlatX;
+		TArray<float> GlowD, FlatD;
+		TArray<uint8> GlowS, FlatS;
+	};
+	TMap<FIntPoint, FBuild> By;
+	for (const FSlot& S : Slots)
+	{
+		if (!S.bUsed)
+		{
+			continue;
+		}
+		for (int32 k = 0; k < S.FarFlags.Num(); ++k)
+		{
+			const float* f = S.Far.GetData() + k * CityGenAtmosPack::FarFloats;
+			const uint32 Flags = uint32(S.FarFlags[k]);
+			const int32 Type = int32(Flags & 3u);
+			const float Tier = float((Flags >> 2) & 3u);
+			const bool bBlink = (Flags & 16u) != 0;
+			const uint8 Sched = uint8((Flags >> 8) & 0xffu);
+			const FVector P(f[0], f[1], f[2]);
+			const FIntPoint B(FMath::FloorToInt32(P.X / FarBlockCm), FMath::FloorToInt32(P.Y / FarBlockCm));
+			FBuild& Bd = By.FindOrAdd(B);
+			if (Type == 0)
+			{
+				Bd.GlowX.Add(FTransform(FRotator::ZeroRotator, P, FVector(FarGlowBoundCm / 100.f)));
+				Bd.GlowD.Append({f[0], f[1], f[2], f[3], f[4], f[5], f[6], Tier,
+					bBlink ? f[9] : 0.f, bBlink ? f[10] : 1.f, bBlink ? f[11] : 0.f, 1.f});
+				Bd.GlowS.Add(Sched);
+			}
+			else
+			{
+				// a pool lies on its surface; a wash stands on its facade, its face (+Z) along
+				// its yaw (pitch -90 turns +Z onto +X), its height along the plane's X
+				const float R = FMath::Max(10.f, f[6]);
+				const float H = FMath::Max(10.f, f[7]);
+				const FTransform X = Type == 1 ?
+					FTransform(FRotator::ZeroRotator, P, FVector(2.f * R / 100.f, 2.f * R / 100.f, 1.f)) :
+					FTransform(FRotator(-90.f, f[8], 0.f), P, FVector(2.f * H / 100.f, 2.f * R / 100.f, 1.f));
+				Bd.FlatX.Add(X);
+				Bd.FlatD.Append({f[0], f[1], f[2], f[3], f[4], f[5], float(Type), R, H, Tier, 1.f});
+				Bd.FlatS.Add(Sched);
+			}
+		}
+	}
+	auto Make = [this, Mesh](UMaterialInterface* Mat, int32 NData, const TArray<FTransform>& X,
+		const TArray<float>& D) -> UInstancedStaticMeshComponent*
+	{
+		UInstancedStaticMeshComponent* I = NewObject<UInstancedStaticMeshComponent>(this);
+		I->SetupAttachment(RootComponent);
+		I->SetUsingAbsoluteLocation(true);
+		I->SetUsingAbsoluteRotation(true);
+		I->SetUsingAbsoluteScale(true);
+		I->SetStaticMesh(Mesh);
+		I->SetMaterial(0, Mat);
+		I->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		I->SetGenerateOverlapEvents(false);
+		I->SetCastShadow(false);
+		I->SetMobility(EComponentMobility::Movable);
+		I->bAffectDynamicIndirectLighting = false;
+		I->bAffectDistanceFieldLighting = false;
+		I->bReceivesDecals = false;
+		I->SetVisibleInRayTracing(false);
+		I->NumCustomDataFloats = NData;
+		I->AddInstances(X, false, true, false);
+		for (int32 i = 0; i < X.Num(); ++i)
+		{
+			I->SetCustomData(i, TArrayView<const float>(D.GetData() + i * NData, NData), false);
+		}
+		I->SetVisibility(false);
+		I->RegisterComponent();
+		FarComps.Add(I);
+		return I;
+	};
+	for (TPair<FIntPoint, FBuild>& KV : By)
+	{
+		FFarBlock& Blk = FarBlocks.FindOrAdd(KV.Key);
+		if (KV.Value.GlowX.Num())
+		{
+			Blk.Glows = Make(GlowMat, FarGlowData, KV.Value.GlowX, KV.Value.GlowD);
+			Blk.GlowSchedule = MoveTemp(KV.Value.GlowS);
+			FarGlows += KV.Value.GlowX.Num();
+		}
+		if (KV.Value.FlatX.Num())
+		{
+			Blk.Flats = Make(FlatMat, FarFlatData, KV.Value.FlatX, KV.Value.FlatD);
+			Blk.FlatSchedule = MoveTemp(KV.Value.FlatS);
+			FarFlats += KV.Value.FlatX.Num();
+		}
+	}
+	FarBuildMs = (FPlatformTime::Seconds() - T0) * 1000.0;
+	UE_LOG(LogCityGenAtmos, Display, TEXT("CityGen atmos: the far city: %d glows and %d pools and washes in %d blocks (%.1f ms)"),
+		FarGlows, FarFlats, FarBlocks.Num(), FarBuildMs);
+	UpdateFarLevels();
+	ShowFar(bShowing && HasFar());
+}
+
+void ACityGenAtmos::ShowFar(bool bOn)
+{
+	bFarShown = bOn && FarComps.Num() > 0;
+	for (UPrimitiveComponent* C : FarComps)
+	{
+		if (C)
+		{
+			C->SetVisibility(bFarShown);
+		}
+	}
+	UpdateFarParams();
+}
+
+void ACityGenAtmos::UpdateFarLevels()
+{
+	// each card's level: its schedule's share at the hour (set when the hour moves a little)
+	FarHourSet = Hour;
+	TArray<float> Level;
+	Level.SetNumUninitialized(256);
+	for (int32 s = 0; s < 256; ++s)
+	{
+		Level[s] = ScheduleAt(uint8(s));
+	}
+	auto Set = [&Level](UInstancedStaticMeshComponent* I, const TArray<uint8>& Sch, int32 Idx)
+	{
+		if (!I)
+		{
+			return;
+		}
+		for (int32 i = 0; i < Sch.Num(); ++i)
+		{
+			I->SetCustomDataValue(i, Idx, Level[Sch[i]], false);
+		}
+		I->MarkRenderStateDirty();
+	};
+	for (TPair<FIntPoint, FFarBlock>& KV : FarBlocks)
+	{
+		Set(KV.Value.Glows.Get(), KV.Value.GlowSchedule, FarGlowData - 1);
+		Set(KV.Value.Flats.Get(), KV.Value.FlatSchedule, FarFlatData - 1);
+	}
+}
+
+void ACityGenAtmos::UpdateFarParams()
+{
+	// MPC_CityGenAtmos's far city: the lights' scale (the scene's exposure against the plan's,
+	// the gain) while they show, where each tier's cards fade in (the live ranges now: a
+	// walker's by sight, else the circle's; the beacons' while they are drawn), how wide a few
+	// pixels are per distance at the view's field of view
+	if (!AtmosCollection)
+	{
+		return;
+	}
+	float Px = 0.f;
+	const UWorld* World = GetWorld();
+	const APlayerController* PC = World ? World->GetFirstPlayerController() : nullptr;
+	int32 W = 0, Hh = 0;
+	if (PC)
+	{
+		PC->GetViewportSize(W, Hh);
+	}
+	const float Fov = (PC && PC->PlayerCameraManager) ? PC->PlayerCameraManager->GetFOVAngle() : 90.f;
+	if (W > 0)
+	{
+		Px = FarPx * 2.f * FMath::Tan(FMath::DegreesToRadians(0.5f * FMath::Clamp(Fov, 5.f, 170.f))) / float(W);
+	}
+	else
+	{
+		Px = FarPx * 2.f / 1920.f;
+	}
+	FarPxNow = Px;
+	const float Sc = bFarShown ? Scale() * FarGain : 0.f;
+	const float Mid = LiveRangeM();
+	const float Hi = bSightPicked ? SightRangeM : HighRangeM;
+	const float Fix = bFixturesShown ? FixtureRangeM : 0.f;
+	const float Vals[7] = {Sc, Mid, Hi, Fix, FarFade, Px, FarSpread};
+	static const TCHAR* Names[7] = {TEXT("FarScale"), TEXT("FarMidM"), TEXT("FarHighM"),
+		TEXT("FarFixM"), TEXT("FarFade"), TEXT("FarPx"), TEXT("FarSpread")};
+	for (int32 k = 0; k < 7; ++k)
+	{
+		if (FarSet[k] != Vals[k])
+		{
+			FarSet[k] = Vals[k];
+			UKismetMaterialLibrary::SetScalarParameterValue(this, AtmosCollection, Names[k], Vals[k]);
+		}
 	}
 }
 
@@ -2715,6 +2992,25 @@ void ACityGenAtmos::Tick(float DeltaSeconds)
 	{
 		ShowFixtures(bShowing && bFixtures);
 	}
+	// AT7: the far city's cards: built once the cells rest, shown with the lights, each card's
+	// level as the hour moves, where they fade in as the live ranges move
+	if (bFar && bFarDirty && (FarDirtyAt < 0.0 || Now - FarDirtyAt > FarSettleS))
+	{
+		RebuildFar();
+	}
+	const bool bFarWant = bShowing && HasFar() && FarComps.Num() > 0;
+	if (bFarWant != bFarShown)
+	{
+		ShowFar(bFarWant);
+	}
+	if (bFarShown)
+	{
+		if (FMath::Abs(Hour - FarHourSet) > 0.05f)
+		{
+			UpdateFarLevels();
+		}
+		UpdateFarParams();
+	}
 	// a cell's beacons, beams and plumes near the view, by day too
 	if (FixturesAt < 0.0 || Now - FixturesAt > FixturesEvery)
 	{
@@ -2820,7 +3116,7 @@ FString ACityGenAtmos::GetStatus() const
 			"\"splashes_live\": %d, \"drips\": %d, \"drip_lines\": %d, \"wet_textures\": %s, "
 			"\"weather_speed\": %.2f, \"post\": %s, \"post_districts\": %s, \"post_where\": \"%s\", "
 			"\"post_bloom\": %.3f, \"post_grain\": %.3f, \"post_fringe\": %.3f, \"post_saturation\": %.3f, "
-			"\"post_contrast\": %.3f, \"post_sharpen\": %.3f, \"overcast_shift\": %.3f"),
+			"\"post_contrast\": %.3f, \"post_sharpen\": %.3f, \"overcast_shift\": %.3f, %s"),
 			HasWeather() ? TEXT("true") : TEXT("false"), *GetWeatherLabel(),
 			WeatherNames.IsValidIndex(WeatherTarget) ? *WeatherNames[WeatherTarget] : TEXT(""),
 			TransitionT, WeatherNow[WRain], WeatherNow[WDrops], WeatherNow[WStreak], WetNow, PuddleNow,
@@ -2831,7 +3127,14 @@ FString ACityGenAtmos::GetStatus() const
 			(WetCover && WetSurface) ? TEXT("true") : TEXT("false"), WeatherSpeed,
 			HasPost() ? TEXT("true") : TEXT("false"), bDistrictPost ? TEXT("true") : TEXT("false"),
 			*PostWhere, PostNow[PBloom], PostNow[PGrain], PostNow[PChromatic], PostNow[PSaturation],
-			PostNow[PContrast], PostNow[PSharpen], OvercastShift()));
+			PostNow[PContrast], PostNow[PSharpen], OvercastShift(),
+			// AT7: the far city
+			*FString::Printf(TEXT("\"far\": %s, \"far_cards\": %d, \"far_glows\": %d, \"far_flats\": %d, "
+				"\"far_blocks\": %d, \"far_shown\": %s, \"far_build_ms\": %.1f, \"far_px\": %.6f, "
+				"\"far_gain\": %.3f, \"far_mid_m\": %.0f, \"far_high_m\": %.0f, \"far_fix_m\": %.0f"),
+				HasFar() ? TEXT("true") : TEXT("false"), FarCards, FarGlows, FarFlats, FarBlocks.Num(),
+				bFarShown ? TEXT("true") : TEXT("false"), FarBuildMs, FarPxNow, FarGain, FarSet[1],
+				FarSet[2], FarSet[3])));
 }
 
 // -- AT3: the sky and time --

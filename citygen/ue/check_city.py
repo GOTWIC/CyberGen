@@ -981,6 +981,15 @@ def play_features(world, man, slug):
         post_ok = bool(an["post"]) and an.get("post_bloom", 0.0) > 0.0 and (
             not (man["atmos"]["post"] or {}).get("districts") or bool(an.get("post_where")))
         lit = lit and post_ok
+    # AT7: with the plan's far cards, every one of them drawn and shown by night (the play
+    # features' light pools gone), none by day
+    far_ok = True
+    if an is not None and an.get("far") is not None and \
+            ((man.get("atmos") or {}).get("far") or {}).get("cards"):
+        far_ok = bool(an["far"]) and bool(an.get("far_shown")) and \
+            an.get("far_glows", 0) + an.get("far_flats", 0) == an.get("far_cards", -1) and \
+            (ad is None or not ad.get("far_shown"))
+        lit = lit and far_ok
     ok = (got["start"]["ready"] and got["start"]["overlay"] and got["start"]["map_texture"]
           and got["map"] and got["menu"] and got["night"]["night"] and lit
           and got["free_cam"]["free_cam"] and got["free_cam"]["pawn"].startswith("CityGenFreeCam")
@@ -1027,6 +1036,13 @@ def play_features(world, man, slug):
             f"{an.get('post_fringe', 0):.2f}, saturation {an.get('post_saturation', 0):.2f}, "
             f"contrast {an.get('post_contrast', 0):.2f}, sharpen {an.get('post_sharpen', 0):.2f}) "
             + ("(ok)" if post_ok else "(FAIL)"))
+    if an is not None and an.get("far") is not None:
+        RES["lines"].append(
+            f"far city (AT7): {an.get('far_glows', 0)} glows and {an.get('far_flats', 0)} "
+            f"pools and washes of {an.get('far_cards', 0)} cards in {an.get('far_blocks', 0)} "
+            f"blocks (built in {an.get('far_build_ms', 0):.0f} ms), shown {an.get('far_shown')} "
+            f"by night, past {an.get('far_mid_m', 0):.0f} m (high {an.get('far_high_m', 0):.0f}, "
+            f"beacons {an.get('far_fix_m', 0):.0f}) " + ("(ok)" if far_ok else "(FAIL)"))
     RES["lines"].append(
         f"play features: map, menu, night ({night}, "
         f"{got['night'].get('light_pools', 0)} light pools), free camera "
@@ -1083,6 +1099,11 @@ def play_views(world, a, slug, prefix):
         nopost = "_nopost" in v["name"]
         if nopost:
             unreal.SystemLibrary.execute_console_command(world, "CityGenAtmos.Post 0")
+        # (AT7: a view named `*_nofar` without the far city's cards, the play features' light
+        # pools past the live range instead: the same view's before; the cards again after it)
+        nofar = "_nofar" in v["name"]
+        if nofar:
+            unreal.SystemLibrary.execute_console_command(world, "CityGenAtmos.Far 0")
         # (visible lights: a view named `*_sight` with the live set picked by sight, as round
         # a walker, `*_circle` by the circle, the same view's before; by the pawn after it)
         mode = 1 if v["name"].endswith("_sight") else 0 if v["name"].endswith("_circle") else None
@@ -1111,7 +1132,9 @@ def play_views(world, a, slug, prefix):
             unreal.SystemLibrary.execute_console_command(
                 world, f"CityGenAtmos.Weather {wm.group(2)}")
             yield from wait(float(wm.group(3)))
-        yield from ui_shot(world, v["name"], "HighResShot 1920x1080", 180)
+        # (AT7: CITYGEN_UE_VIEW_RES sets the views' size, 7680x4320 for an 8K shot)
+        res = os.environ.get("CITYGEN_UE_VIEW_RES") or "1920x1080"
+        yield from ui_shot(world, v["name"], f"HighResShot {res}", 600)
         at = atmos_status(world)
         # (AT6: what the look showed at each view: the district, the exposure, the post)
         if at and "post" in at:
@@ -1122,6 +1145,14 @@ def play_views(world, a, slug, prefix):
                                        "post_sharpen")}
         if nopost:
             unreal.SystemLibrary.execute_console_command(world, "CityGenAtmos.Post 1")
+        # (AT7: what the far city showed at each view)
+        if at and "far" in at:
+            RES.setdefault("far_views", {})[v["name"]] = {
+                k: at.get(k) for k in ("far", "far_shown", "far_glows", "far_flats",
+                                       "far_mid_m", "far_high_m", "far_fix_m", "far_px",
+                                       "live", "sight", "ev100")}
+        if nofar:
+            unreal.SystemLibrary.execute_console_command(world, "CityGenAtmos.Far 1")
         if wm:
             if at:
                 RES.setdefault("weather_views", {})[v["name"]] = {
@@ -1184,7 +1215,14 @@ def ui_shot(world, name, cmd="shot showui", timeout=30):
     while not new and time.time() - t < timeout:
         yield
         new = [p for p, m in pngs().items() if p not in before or m > before[p]]
-    yield from wait(1.0)
+    # (until the file stops growing: an 8K PNG takes a few seconds to write)
+    size, t = -1, time.time()
+    while new and time.time() - t < 120:
+        yield from wait(1.0)
+        s = os.path.getsize(max(new, key=os.path.getmtime))
+        if s == size:
+            break
+        size = s
     if new:
         import shutil
         shutil.copyfile(max(new, key=os.path.getmtime), path)

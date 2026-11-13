@@ -1,0 +1,713 @@
+[
+ {
+  "checks": {
+   "air": true,
+   "faces": true,
+   "far": true,
+   "lux": true,
+   "weather": true
+  },
+  "city": "Vesper Bay",
+  "far": {
+   "all": 21016,
+   "glow": 11151,
+   "pool": 9148,
+   "wash": 717
+  },
+  "lights": 46780,
+  "near_view": {
+   "high": {
+    "cap": 48,
+    "max": 693,
+    "over_share": 0.347,
+    "p50": 22,
+    "range_m": 750.0
+   },
+   "mid": {
+    "cap": 512,
+    "max": 5130,
+    "over_share": 0.478,
+    "p50": 463,
+    "range_m": 300.0
+   },
+   "shadowed": {
+    "cap": 16,
+    "max": 40,
+    "over_share": 0.083,
+    "p50": 2,
+    "range_m": 60.0
+   },
+   "sight": {
+    "cap": 512,
+    "max": 22397,
+    "over_share": 0.991,
+    "p50": 13267,
+    "range_m": 1200.0
+   }
+  },
+  "on": 44715,
+  "per_tile": {
+   "drips": [
+    877,
+    4000
+   ],
+   "emitters": [
+    14,
+    400
+   ],
+   "far": [
+    375,
+    3000
+   ],
+   "lights": [
+    1271,
+    6000
+   ],
+   "volumes": [
+    7,
+    24
+   ]
+  },
+  "plan": "C:\\Users\\swagn\\CityGen\\builds\\at7\\plans\\vesper_bay",
+  "post": true,
+  "seconds": 53.8,
+  "tiers": {
+   "high": 788,
+   "mid": 31275,
+   "near": 14717
+  },
+  "tiles": 143
+ },
+ {
+  "checks": {
+   "air": true,
+   "faces": true,
+   "far": true,
+   "lux": true,
+   "weather": true
+  },
+  "city": "Nexus City",
+  "far": {
+   "all": 23379,
+   "glow": 12109,
+   "pool": 10224,
+   "wash": 1046
+  },
+  "lights": 54451,
+  "near_view": {
+   "high": {
+    "cap": 48,
+    "max": 798,
+    "over_share": 0.511,
+    "p50": 53,
+    "range_m": 750.0
+   },
+   "mid": {
+    "cap": 512,
+    "max": 5083,
+    "over_share": 0.507,
+    "p50": 539,
+    "range_m": 300.0
+   },
+   "shadowed": {
+    "cap": 16,
+    "max": 35,
+    "over_share": 0.087,
+    "p50": 2,
+    "range_m": 60.0
+   },
+   "sight": {
+    "cap": 512,
+    "max": 35788,
+    "over_share": 0.996,
+    "p50": 13338,
+    "range_m": 1200.0
+   }
+  },
+  "on": 52491,
+  "per_tile": {
+   "drips": [
+    583,
+    4000
+   ],
+   "emitters": [
+    15,
+    400
+   ],
+   "far": [
+    357,
+    3000
+   ],
+   "lights": [
+    1381,
+    6000
+   ],
+   "volumes": [
+    8,
+    24
+   ]
+  },
+  "plan": "C:\\Users\\swagn\\CityGen\\builds\\at7\\plans\\nexus_city",
+  "post": true,
+  "seconds": 52.4,
+  "tiers": {
+   "high": 1110,
+   "mid": 36257,
+   "near": 17084
+  },
+  "tiles": 158
+ },
+ {
+  "checks": {
+   "air": true,
+   "faces": true,
+   "far": true,
+   "lux": true,
+   "weather": true
+  },
+  "city": "Greyhook",
+  "far": {
+   "all": 14161,
+   "glow": 7599,
+   "pool": 6328,
+   "wash": 234
+  },
+  "lights": 26880,
+  "near_view": {
+   "high": {
+    "cap": 48,
+    "max": 147,
+    "over_share": 0.29,
+    "p50": 23,
+    "range_m": 750.0
+   },
+   "mid": {
+    "cap": 512,
+    "max": 4915,
+    "over_share": 0.418,
+    "p50": 308,
+    "range_m": 300.0
+   },
+   "shadowed": {
+    "cap": 16,
+    "max": 30,
+    "over_share": 0.025,
+    "p50": 0,
+    "range_m": 60.0
+   },
+   "sight": {
+    "cap": 512,
+    "max": 19528,
+    "over_share": 0.997,
+    "p50": 6899,
+    "range_m": 1200.0
+   }
+  },
+  "on": 25906,
+  "per_tile": {
+   "drips": [
+    495,
+    4000
+   ],
+   "emitters": [
+    7,
+    400
+   ],
+   "far": [
+    247,
+    3000
+   ],
+   "lights": [
+    1203,
+    6000
+   ],
+   "volumes": [
+    4,
+    24
+   ]
+  },
+  "plan": "C:\\Users\\swagn\\CityGen\\builds\\at7\\plans\\peninsula_city",
+  "post": true,
+  "seconds": 43.9,
+  "tiers": {
+   "high": 268,
+   "mid": 18395,
+   "near": 8217
+  },
+  "tiles": 137
+ },
+ {
+  "checks": {
+   "air": true,
+   "faces": true,
+   "far": true,
+   "lux": true,
+   "weather": true
+  },
+  "city": "Saltreach Free Port",
+  "far": {
+   "all": 14072,
+   "glow": 7325,
+   "pool": 5773,
+   "wash": 974
+  },
+  "lights": 27505,
+  "near_view": {
+   "high": {
+    "cap": 48,
+    "max": 935,
+    "over_share": 0.494,
+    "p50": 44,
+    "range_m": 750.0
+   },
+   "mid": {
+    "cap": 512,
+    "max": 5913,
+    "over_share": 0.331,
+    "p50": 207,
+    "range_m": 300.0
+   },
+   "shadowed": {
+    "cap": 16,
+    "max": 37,
+    "over_share": 0.055,
+    "p50": 0,
+    "range_m": 60.0
+   },
+   "sight": {
+    "cap": 512,
+    "max": 22627,
+    "over_share": 0.94,
+    "p50": 6284,
+    "range_m": 1200.0
+   }
+  },
+  "on": 26341,
+  "per_tile": {
+   "drips": [
+    491,
+    4000
+   ],
+   "emitters": [
+    16,
+    400
+   ],
+   "far": [
+    369,
+    3000
+   ],
+   "lights": [
+    1516,
+    6000
+   ],
+   "volumes": [
+    6,
+    24
+   ]
+  },
+  "plan": "C:\\Users\\swagn\\CityGen\\builds\\at7\\plans\\archipelago_free_port",
+  "post": true,
+  "seconds": 37.4,
+  "tiers": {
+   "high": 1004,
+   "mid": 18027,
+   "near": 8474
+  },
+  "tiles": 110
+ },
+ {
+  "checks": {
+   "air": true,
+   "faces": true,
+   "far": true,
+   "lux": true,
+   "weather": true
+  },
+  "city": "Vesper Bay Pinned",
+  "far": {
+   "all": 19921,
+   "glow": 10727,
+   "pool": 9170,
+   "wash": 24
+  },
+  "lights": 47959,
+  "near_view": {
+   "high": {
+    "cap": 48,
+    "max": 36,
+    "over_share": 0.0,
+    "p50": 4,
+    "range_m": 750.0
+   },
+   "mid": {
+    "cap": 512,
+    "max": 5326,
+    "over_share": 0.396,
+    "p50": 279,
+    "range_m": 300.0
+   },
+   "shadowed": {
+    "cap": 16,
+    "max": 41,
+    "over_share": 0.096,
+    "p50": 1,
+    "range_m": 60.0
+   },
+   "sight": {
+    "cap": 512,
+    "max": 23176,
+    "over_share": 0.999,
+    "p50": 12878,
+    "range_m": 1200.0
+   }
+  },
+  "on": 45596,
+  "per_tile": {
+   "drips": [
+    507,
+    4000
+   ],
+   "emitters": [
+    16,
+    400
+   ],
+   "far": [
+    362,
+    3000
+   ],
+   "lights": [
+    1529,
+    6000
+   ],
+   "volumes": [
+    7,
+    24
+   ]
+  },
+  "plan": "C:\\Users\\swagn\\CityGen\\builds\\at7\\plans\\vesper_bay_pinned",
+  "post": true,
+  "seconds": 48.4,
+  "tiers": {
+   "high": 82,
+   "mid": 32582,
+   "near": 15295
+  },
+  "tiles": 158
+ },
+ {
+  "checks": {
+   "air": true,
+   "faces": true,
+   "far": true,
+   "lux": true,
+   "weather": true
+  },
+  "city": "Vesper Bay Stacks",
+  "far": {
+   "all": 19964,
+   "glow": 10679,
+   "pool": 9261,
+   "wash": 24
+  },
+  "lights": 48022,
+  "near_view": {
+   "high": {
+    "cap": 48,
+    "max": 36,
+    "over_share": 0.0,
+    "p50": 4,
+    "range_m": 750.0
+   },
+   "mid": {
+    "cap": 512,
+    "max": 5436,
+    "over_share": 0.403,
+    "p50": 295,
+    "range_m": 300.0
+   },
+   "shadowed": {
+    "cap": 16,
+    "max": 42,
+    "over_share": 0.098,
+    "p50": 1,
+    "range_m": 60.0
+   },
+   "sight": {
+    "cap": 512,
+    "max": 23119,
+    "over_share": 0.999,
+    "p50": 12700,
+    "range_m": 1200.0
+   }
+  },
+  "on": 45683,
+  "per_tile": {
+   "drips": [
+    688,
+    4000
+   ],
+   "emitters": [
+    19,
+    400
+   ],
+   "far": [
+    364,
+    3000
+   ],
+   "lights": [
+    1422,
+    6000
+   ],
+   "volumes": [
+    7,
+    24
+   ]
+  },
+  "plan": "C:\\Users\\swagn\\CityGen\\builds\\at7\\plans\\vesper_bay_stacks",
+  "post": true,
+  "seconds": 48.6,
+  "tiers": {
+   "high": 82,
+   "mid": 32585,
+   "near": 15355
+  },
+  "tiles": 157
+ },
+ {
+  "checks": {
+   "air": true,
+   "faces": true,
+   "far": true,
+   "lux": true,
+   "weather": true
+  },
+  "city": "Vesper Bay Decks",
+  "far": {
+   "all": 21470,
+   "glow": 11378,
+   "pool": 9375,
+   "wash": 717
+  },
+  "lights": 51337,
+  "near_view": {
+   "high": {
+    "cap": 48,
+    "max": 693,
+    "over_share": 0.347,
+    "p50": 22,
+    "range_m": 750.0
+   },
+   "mid": {
+    "cap": 512,
+    "max": 5130,
+    "over_share": 0.52,
+    "p50": 582,
+    "range_m": 300.0
+   },
+   "shadowed": {
+    "cap": 16,
+    "max": 40,
+    "over_share": 0.087,
+    "p50": 2,
+    "range_m": 60.0
+   },
+   "sight": {
+    "cap": 512,
+    "max": 25296,
+    "over_share": 0.991,
+    "p50": 14271,
+    "range_m": 1200.0
+   }
+  },
+  "on": 49272,
+  "per_tile": {
+   "drips": [
+    1115,
+    4000
+   ],
+   "emitters": [
+    14,
+    400
+   ],
+   "far": [
+    375,
+    3000
+   ],
+   "lights": [
+    1271,
+    6000
+   ],
+   "volumes": [
+    8,
+    24
+   ]
+  },
+  "plan": "C:\\Users\\swagn\\CityGen\\builds\\at7\\plans\\vesper_bay_decks",
+  "post": true,
+  "seconds": 54.5,
+  "tiers": {
+   "high": 788,
+   "mid": 34709,
+   "near": 15840
+  },
+  "tiles": 143
+ },
+ {
+  "checks": {
+   "air": true,
+   "faces": true,
+   "far": true,
+   "lux": true,
+   "weather": true
+  },
+  "city": "Cragmouth",
+  "far": {
+   "all": 22023,
+   "glow": 11460,
+   "pool": 9770,
+   "wash": 793
+  },
+  "lights": 57031,
+  "near_view": {
+   "high": {
+    "cap": 48,
+    "max": 631,
+    "over_share": 0.486,
+    "p50": 42,
+    "range_m": 750.0
+   },
+   "mid": {
+    "cap": 512,
+    "max": 5426,
+    "over_share": 0.621,
+    "p50": 847,
+    "range_m": 300.0
+   },
+   "shadowed": {
+    "cap": 16,
+    "max": 43,
+    "over_share": 0.139,
+    "p50": 7,
+    "range_m": 60.0
+   },
+   "sight": {
+    "cap": 512,
+    "max": 41955,
+    "over_share": 1.0,
+    "p50": 15394,
+    "range_m": 1200.0
+   }
+  },
+  "on": 54672,
+  "per_tile": {
+   "drips": [
+    996,
+    4000
+   ],
+   "emitters": [
+    14,
+    400
+   ],
+   "far": [
+    371,
+    3000
+   ],
+   "lights": [
+    1326,
+    6000
+   ],
+   "volumes": [
+    5,
+    24
+   ]
+  },
+  "plan": "C:\\Users\\swagn\\CityGen\\builds\\at7\\plans\\cragmouth",
+  "post": true,
+  "seconds": 50.4,
+  "tiers": {
+   "high": 815,
+   "mid": 38535,
+   "near": 17681
+  },
+  "tiles": 130
+ },
+ {
+  "checks": {
+   "air": true,
+   "faces": true,
+   "far": true,
+   "lux": true,
+   "weather": true
+  },
+  "city": "Delta Megacity",
+  "far": {
+   "all": 22600,
+   "glow": 11653,
+   "pool": 9440,
+   "wash": 1507
+  },
+  "lights": 50300,
+  "near_view": {
+   "high": {
+    "cap": 48,
+    "max": 993,
+    "over_share": 0.596,
+    "p50": 126,
+    "range_m": 750.0
+   },
+   "mid": {
+    "cap": 512,
+    "max": 5830,
+    "over_share": 0.563,
+    "p50": 747,
+    "range_m": 300.0
+   },
+   "shadowed": {
+    "cap": 16,
+    "max": 43,
+    "over_share": 0.101,
+    "p50": 4,
+    "range_m": 60.0
+   },
+   "sight": {
+    "cap": 512,
+    "max": 30368,
+    "over_share": 0.997,
+    "p50": 13425,
+    "range_m": 1200.0
+   }
+  },
+  "on": 48292,
+  "per_tile": {
+   "drips": [
+    722,
+    4000
+   ],
+   "emitters": [
+    24,
+    400
+   ],
+   "far": [
+    359,
+    3000
+   ],
+   "lights": [
+    1531,
+    6000
+   ],
+   "volumes": [
+    7,
+    24
+   ]
+  },
+  "plan": "C:\\Users\\swagn\\CityGen\\builds\\at7\\plans\\delta_megacity",
+  "post": true,
+  "seconds": 69.0,
+  "tiers": {
+   "high": 1556,
+   "mid": 33414,
+   "near": 15330
+  },
+  "tiles": 134
+ }
+]

@@ -862,3 +862,59 @@ SKY_SHARE = 0.1
 POST_CELL_M = 32.0
 POST_BLEND_M = 90.0
 POST_EASE_S = 1.5
+
+# --- the far city (AT7, scope 6.6) ------------------------------------------------------------
+
+# Past the live set (the circle's 300 m, the high tier's 750 m, a walker's 1,200 m by sight,
+# the beacons' 832 m) a light is no light: it shows as a card of the plan's (`far.py`), drawn
+# by the runtime as instanced additive cards that fade in where the light fades out, so the
+# skyline glitters to the horizon. Three kinds of card:
+#   glow: the fixture seen from afar, a soft dot at the lens turned to the eye (`glow` the
+#         share of the light's intensity it shows sideways; at least `FAR_PX` pixels wide,
+#         dimmer as it grows, so its intensity holds);
+#   pool: where a light aimed down lands, a disc on the surface under it lit as that light
+#         lights it (its luminance at the middle E rho / pi, falling off as a point light's
+#         illuminance does, (1 + (r / h)^2)^(-3/2), to its radius h tan(`FAR_POOL_DEG`));
+#   wash: a crown flood's or uplight's lit patch on its facade (the class's design
+#         illuminance at the patch's middle times the facade's albedo over pi), a flat card
+#         the size of the lit zone on the facade, `FAR_WASH_OUT_M` off it, soft at its edges.
+# Signs, neon, shopfronts and windows need none: their faces are emissive surfaces the
+# instanced HLODs keep past World Partition's loading range (AG16); soffit, tunnel and
+# platform lights are under their covers, unseen from afar.
+FAR = {
+    "cobra_head": {"glow": 0.3, "pool": True},
+    "post_top": {"glow": 0.5, "pool": True},
+    "wall_pack": {"glow": 0.3, "pool": True},
+    "high_mast": {"glow": 0.05, "pool": True},
+    "highway": {"glow": 0.25, "pool": True},
+    "boom_flood": {"glow": 0.05, "pool": True},
+    "aviation": {"glow": 1.0},
+    "ground_light": {"glow": 1.0},
+    "searchlight": {"glow": 0.002},
+    "crown_flood": {"wash": True},
+    "facade_flood": {"wash": True},
+}
+# wet asphalt and paving; a tower's facade (mostly glass and dark panels: AT7's first 0.35 drew
+# the far crowns as white blocks over their own LEDs and windows)
+FAR_ALBEDO = {"pool": 0.15, "wash": 0.08}
+FAR_POOL_DEG = 70.0                         # a pool's radius: h tan(this), at most the reach
+FAR_POOL_MIN_H = 1.5                        # (a light lower over its surface: no pool)
+FAR_POOL_UP_M = 0.25                        # a pool card this far over its surface
+FAR_SURFACE_M = 4.0                         # a pool's surface: the walkways and lanes this
+                                            # near its middle, else the ground
+FAR_WASH_OUT_M = 0.5                        # a wash card this far off its facade, at most
+FAR_WASH_MAX_M = 30.0                       # ... this half wide
+FAR_GLOW_MIN_M = 0.3                        # a glow's size near: its source's, at least this
+FAR_PX = 2.0                                # a glow at least this many pixels wide
+# the share of a gaussian card's square its intensity spreads over (exp(-8 r^2) on a unit
+# disc: pi / 32), so a card's peak luminance is cd / (FAR_SPREAD s^2)
+FAR_SPREAD = 0.0982
+# where each card fades in (the runtime's live ranges): `mid` from the street's live range,
+# `high` from the high tier's, `fixture` from where the beacons stop (FixtureRangeM); over
+# the farthest `FAR_FADE` of it, as the live lights fade out there
+FAR_FADE = 0.2
+FAR_TIERS = ("mid", "high", "fixture")
+FAR_TYPES = ("glow", "pool", "wash")
+# the far cards' budget per 256 m tile (the check) and the runtime's gain (art direction)
+FAR_BUDGETS = {"cards_per_tile": 3000}
+FAR_GAIN = 1.0

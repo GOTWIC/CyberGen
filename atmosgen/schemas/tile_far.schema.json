@@ -1,0 +1,244 @@
+{
+ "$defs": {
+  "Anim": {
+   "additionalProperties": false,
+   "description": "AT2: how a light moves or blinks (the runtime animates it from the world's time).",
+   "properties": {
+    "amount": {
+     "title": "Amount",
+     "type": "number"
+    },
+    "mode": {
+     "description": "`blink` on for `amount` of each period (an aviation light); `sweep` its yaw swinging `amount` degrees either way (a searchlight).",
+     "enum": [
+      "blink",
+      "sweep"
+     ],
+     "title": "Mode",
+     "type": "string"
+    },
+    "period_s": {
+     "title": "Period S",
+     "type": "number"
+    },
+    "phase": {
+     "description": "Its share of a period at time 0 (a building's lights blink together).",
+     "exclusiveMaximum": 1.0,
+     "minimum": 0.0,
+     "title": "Phase",
+     "type": "number"
+    }
+   },
+   "required": [
+    "mode",
+    "period_s",
+    "amount",
+    "phase"
+   ],
+   "title": "Anim",
+   "type": "object"
+  },
+  "FarCard": {
+   "additionalProperties": false,
+   "description": "AT7: a light as the far city shows it past the live set (`far.py`, scope 6.6).",
+   "properties": {
+    "anim": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Anim"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A blinking light's blink."
+    },
+    "color": {
+     "description": "Linear RGB, 0 to 1.",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 3,
+     "minItems": 3,
+     "title": "Color",
+     "type": "array"
+    },
+    "district_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "District Id"
+    },
+    "h_m": {
+     "default": 0.0,
+     "description": "A pool's light over its middle (m), its falloff: the luminance $L_0 (1 + (r/h)^2)^{-3/2}$ to its radius; a wash's half height.",
+     "title": "H M",
+     "type": "number"
+    },
+    "hash": {
+     "title": "Hash",
+     "type": "string"
+    },
+    "id": {
+     "description": "`<light id>.far.<type>`.",
+     "title": "Id",
+     "type": "string"
+    },
+    "kind": {
+     "enum": [
+      "street_light",
+      "wall_light",
+      "sign",
+      "shop_sign",
+      "spill",
+      "soffit",
+      "flood",
+      "aviation",
+      "searchlight",
+      "tunnel",
+      "station",
+      "high_mast",
+      "signal",
+      "corner",
+      "road",
+      "alley",
+      "underpass",
+      "neon",
+      "runway"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "light_id": {
+     "title": "Light Id",
+     "type": "string"
+    },
+    "pos": {
+     "description": "A glow's lens, a pool's middle (on its surface, `FAR_POOL_UP_M` over it), a wash's patch middle (m, absolute z).",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 3,
+     "minItems": 3,
+     "title": "Pos",
+     "type": "array"
+    },
+    "schedule": {
+     "title": "Schedule",
+     "type": "string"
+    },
+    "size_m": {
+     "description": "A glow's size near (m); a pool's radius; a wash's half width.",
+     "title": "Size M",
+     "type": "number"
+    },
+    "tier": {
+     "description": "Where it fades in: past the street's live range (`mid`), the high tier's (`high`), the beacons' (`fixture`).",
+     "enum": [
+      "mid",
+      "high",
+      "fixture"
+     ],
+     "title": "Tier",
+     "type": "string"
+    },
+    "tile": {
+     "title": "Tile",
+     "type": "string"
+    },
+    "type": {
+     "description": "`glow` the fixture seen from afar, a dot turned to the eye; `pool` where a light aimed down lands, a disc on the surface under it; `wash` a flood's lit patch on its facade.",
+     "enum": [
+      "glow",
+      "pool",
+      "wash"
+     ],
+     "title": "Type",
+     "type": "string"
+    },
+    "value": {
+     "description": "A glow's intensity toward the eye (cd); a pool's or wash's luminance at its middle (cd/m2); in the plan's frame (its `night_ev100`).",
+     "title": "Value",
+     "type": "number"
+    },
+    "yaw": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A wash's facing (degrees counterclockwise from east): a flat card on its facade.",
+     "title": "Yaw"
+    }
+   },
+   "required": [
+    "id",
+    "light_id",
+    "type",
+    "tier",
+    "kind",
+    "tile",
+    "pos",
+    "color",
+    "value",
+    "size_m",
+    "schedule",
+    "hash"
+   ],
+   "title": "FarCard",
+   "type": "object"
+  }
+ },
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": false,
+ "description": "AT7: `far/<tile>.json`: a tile's far cards.",
+ "properties": {
+  "bounds": {
+   "items": {
+    "type": "number"
+   },
+   "title": "Bounds",
+   "type": "array"
+  },
+  "cards": {
+   "items": {
+    "$ref": "#/$defs/FarCard"
+   },
+   "title": "Cards",
+   "type": "array"
+  },
+  "city": {
+   "title": "City",
+   "type": "string"
+  },
+  "tile": {
+   "title": "Tile",
+   "type": "string"
+  },
+  "version": {
+   "const": 1,
+   "default": 1,
+   "title": "Version",
+   "type": "integer"
+  }
+ },
+ "required": [
+  "city",
+  "tile",
+  "bounds",
+  "cards"
+ ],
+ "title": "atmosgen tile far cards",
+ "type": "object"
+}

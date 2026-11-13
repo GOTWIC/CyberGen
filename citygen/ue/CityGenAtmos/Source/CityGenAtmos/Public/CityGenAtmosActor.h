@@ -31,8 +31,12 @@
 // lands) marched through the plan's sight raster (the building masses and deck slabs, 2 m
 // cells) on a worker thread, a sweep every LiveEvery; lights near but out of sight leave the
 // set, far ones in sight join it; the fly pawn and the free camera keep the circle. Every
-// light fades in and out over FadeS as it joins and leaves the set. Frames: Unreal cm, X east,
-// Y south.
+// light fades in and out over FadeS as it joins and leaves the set. AT7 (the far city): past
+// the live set every light the far view sees shows as a card of the plan's (a glow at its lens
+// turned to the eye, a pool on the surface it lights, a wash on the facade it floods), the
+// cells' cards instanced per 1 km block in M_CgFarGlow and M_CgFarFlat, each fading in where
+// its tier's live lights fade out and collapsing to a point where it does not show; they take
+// the play features' light pools' place. Frames: Unreal cm, X east, Y south.
 
 #pragma once
 
@@ -803,6 +807,40 @@ public:
 
 	static constexpr int32 PostFloats = 20;
 
+	// -- AT7: the far city (the plan's `far`; docs/unreal_export.md, "From AT7") --
+
+	/** The plan gave far cards: past the live set each light the far view sees shows as a
+	 *  card of the cells' (a glow at its lens turned to the eye, a pool on the surface it
+	 *  lights, a wash on the facade it floods), fading in where the live lights fade out, so
+	 *  the far city glitters by night; the play features' light pools give way to them. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Far")
+	bool bFar = false;
+
+	/** A gain on every card (art direction). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Far")
+	float FarGain = 1.f;
+
+	/** A glow at least this many pixels wide (dimmer as it grows, its intensity kept). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Far")
+	float FarPx = 2.f;
+
+	/** The cards fade in over the farthest this share of each live range, as the lights fade
+	 *  out there. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Far")
+	float FarFade = 0.2f;
+
+	/** A glow's gaussian over its square: its peak luminance is its intensity over this times
+	 *  its size squared. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Far")
+	float FarSpread = 0.0982f;
+
+	/** AT7: the far cards on or off (off: the play features' light pools past the live range,
+	 *  as before AT7). */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	void SetFar(bool bOn);
+
+	bool HasFar() const { return bFar && FarCards > 0; }
+
 	// -- the cells --
 
 	/** A cell's data actor brings its lights in (CityGenAtmosCell::BeginPlay). */
@@ -878,6 +916,9 @@ private:
 		int32 Emitters = 0;
 		// AT5: its drip lines (CityGenAtmosPack::DripFloats each)
 		TArray<float> Drips;
+		// AT7: its far cards (CityGenAtmosPack::FarFloats each) and their flags
+		TArray<float> Far;
+		TArray<int32> FarFlags;
 		bool bUsed = false;
 		bool bMade = false;                 // its beacons, beams and plumes made (near the view)
 	};
@@ -993,6 +1034,35 @@ private:
 	bool bFixturesShown = false;
 	int32 BeaconCount = 0;
 	int32 BeamCount = 0;
+
+	// AT7: the far cards, drawn as instanced cards per 1 km block (a glow component turned to
+	// the eye, a flat one for the pools and washes), each instance's schedule kept to set its
+	// level as the hour moves
+	struct FFarBlock
+	{
+		TWeakObjectPtr<UInstancedStaticMeshComponent> Glows;
+		TWeakObjectPtr<UInstancedStaticMeshComponent> Flats;
+		TArray<uint8> GlowSchedule;
+		TArray<uint8> FlatSchedule;
+	};
+	void RebuildFar();
+	void DropFar();
+	void ShowFar(bool bOn);
+	void UpdateFarLevels();
+	void UpdateFarParams();
+	TMap<FIntPoint, FFarBlock> FarBlocks;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UPrimitiveComponent>> FarComps;   // (kept from GC)
+	int32 FarCards = 0;                     // registered (in the cells)
+	int32 FarGlows = 0;                     // drawn
+	int32 FarFlats = 0;
+	bool bFarDirty = false;
+	bool bFarShown = false;
+	double FarDirtyAt = -1.0;
+	float FarHourSet = -100.f;
+	float FarPxNow = 0.f;                   // (world size per distance of FarPx pixels)
+	float FarSet[7] = {-1.f, -1.f, -1.f, -1.f, -1.f, -1.f, -1.f};   // (the MPC's, as last set)
+	double FarBuildMs = 0.0;
 	double LiveAt = -1.0;
 	double UpdateMs = 0.0;
 	double UpdateMsMax = 0.0;

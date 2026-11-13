@@ -6,6 +6,22 @@ root [README](../README.md) has the short version. Spec: [`atmosgen_scope.md`](a
 grows here as it lands, as in [`citygen_milestones.md`](citygen_milestones.md) and
 [`assetgen_milestones.md`](assetgen_milestones.md).
 
+## Stage 3 in summary
+
+Stage 3 is done (AT0 to AT7, 2026-11-10 to 2026-11-13, all on the Windows PC). atmosgen is a
+generator of light and air: from a built city (and its assets where stage 2 has run) and an
+optional atmos spec it writes a deterministic plan keyed by M10's ids (every light that casts
+light, by photometric class, schedule and district mood; the sky by latitude, day and hour;
+fog, mist, smog, haze, steam and smoke; the rain shadow, wetness, puddles and drips; the look's
+post per look and district; the far city's cards), checks it (light on every walkway and
+carriageway, faces off their walls, the air, the weather, the far city, budgets per tile),
+previews it (lux, plan, sky, air, weather, post and far maps, Blender night renders) and
+hands it to Unreal through the exporter as layer 3: the `CityGenAtmos` runtime plugin renders
+the live lights by tier or by sight, the hour, the weather, the effects and the post. Every
+sample and demo plans with every check passing; Delta Megacity's night runs at 15.0 ms p95 at
+native 1440p on the PC (decision 12.6's budget 16.7). What stays open is listed in each
+milestone's report.
+
 ## Milestones
 
 | Milestone | What it adds | Status | Outputs |
@@ -17,7 +33,7 @@ grows here as it lands, as in [`citygen_milestones.md`](citygen_milestones.md) a
 | AT4 | Air: the height and volumetric fog of the look by the hour, light shafts by light kind (none from the small many, searchlights keeping AT2's beams), mist over the water at night, smog over industry and the port, haze under decks and in tunnels (thicker where danger is), steam and smoke plumes from manholes and drains (read from AG7's packs), roof units, stalls, vents and chimneys; the air check; in Unreal pooled local fog volumes and instanced plume cards; the engine settings that keep the night in budget; the parked cars' cull distances | Done | [`docs/progress/AT4`](progress/AT4) |
 | AT5 | Weather: the rain shadow of every low cover (moved downwind by the rain's lean), masks per tile (cover, puddles, drip band, gloss when wet), puddles in the worn spots, gutters, sags and round the drains (more where grit is), drip lines under the low covers' edges, five states with their rain, wetness, puddles, fog, clouds and wind, the rain's age; the weather check; in Unreal the masks city-wide, two DBuffer decals for wet streets (darker, then glossy, puddles that mirror with the rain's rings, the markings kept), rain cut under the covers and leaning in the wind, splashes where traces from the sky land, drips, rings on the water, the grass and plumes in the wind, blended states and the Tab menu's weather row | Done | [`docs/progress/AT5`](progress/AT5) |
 | AT6 | Looks and art direction: a post set per look by night and by day (bloom, lens flares, film grain, chromatic aberration, vignette, sharpening, a teal and magenta grade for neon rain, a black lift, local exposure), a post per district pulled by its grit and tinted by its archetype (the corporate core crisp and cool, old towns, markets and the port gritty), blended in the runtime by where the view stands; the day's exposure measured (a clear day's, moved by the weather's clouds); plumes lit by night and readable far off, a stall's cooking denser; the wet decals' curb sawtooth fixed; `atmosgen review`, `atmosgen spec diff` and the `atmosgen` skill | Done | [`docs/progress/AT6`](progress/AT6) |
-| AT7 | Far city and release: the skyline at night, budgets on every sample, Unreal checks | Planned | |
+| AT7 | Far city and release: past the live set every light the far view sees as cards from the plan (a glow at its lens, a pool on the surface it lights, a wash on the facade it floods), the HLODs keeping the far skyline's emissive and AT3's cloud glow over it; the far check; the plans' budgets on every sample and demo (`atmosgen budgets`), Cragmouth's mist on terrain fixed; Delta checked in Unreal by night, dusk and day, Vesper Bay in a fresh project; the release docs | Done | [`docs/progress/AT7`](progress/AT7) |
 
 ## AT0: contract and spike
 
@@ -61,6 +77,46 @@ recommendations: [`docs/progress/AT0/README.md`](progress/AT0/README.md).
 - **Tests:** `tests/atmosgen/test_at_plan.py`; `tests/test_bench.py` (the spike's job,
   `busy`), `tests/test_unreal_play.py` (both plugins installed), `tests/test_no_network.py`
   (atmosgen too).
+
+## AT7: far city and release
+
+Built on the Windows PC (2026-11-13), on main after AT6 (#218). Report, measurements and
+images: [`docs/progress/AT7/README.md`](progress/AT7/README.md).
+
+- **Far cards** (`atmosgen/far.py`, `planmodel.FarCard`, `TileFar`, `Far`; `presets.FAR`,
+  `FAR_*`): past the live set every light the far view sees as cards by its photometric
+  class, written per tile (`far/<tile>.json`): a glow at its lens turned to the eye (a share
+  of its intensity, aviation lights whole and blinking), a pool on the surface a light aimed
+  down lights (the lux check's walkway and lane points under it, a raised road's deck too;
+  $E_0 \rho / \pi$ falling as $(1 + (r/h)^2)^{-3/2}$), a wash on the facade a flood lights
+  (its zone from the flood's reach, the class's design illuminance, facade albedo 0.08);
+  broken lights none. Signs, neon and windows are the HLODs' own emissive (AG16); the cloud
+  glow AT3's.
+- **The far check** (`checks.far`): every street-lighting lamp with its pool or a reason,
+  every aviation light with its glow, finite positive numbers, 3,000 cards a tile; a failing
+  plan is not delivered. `preview_far.png` (from above and from 150 m over the corner).
+- **Budgets on every sample** (`atmosgen/budgets.py`, `atmosgen budgets`): the five samples,
+  the pinned, stack and deck demos and Cragmouth planned from main; every check passes; at most
+  1,531 lights, 8 volumes, 24 emitters, 1,115 drip lines and 375 far cards a tile; 37 to 69 s a
+  plan; near the view the live caps bind (up to 5,900 lights within 300 m for 512 live).
+- **Cragmouth** failed at first: AT4's mist read M16's `surface_m`, unset on a terrain city;
+  it stands on M13's water level now (`air._surface_of`, a river's profile).
+- **Exporter and runtime** (`docs/unreal_export.md`, "From AT7"): packing version 5 (a cell's
+  far cards, `pack_far`), `far_settings`, `ATMOS_VERSION` atmos7; the controller's cards
+  instanced per 1 km block (`RebuildFar`), `MPC_CityGenAtmos`'s `FarScale`, `FarMidM`,
+  `FarHighM`, `FarFixM`, `FarFade`, `FarPx`, `FarSpread`, levels by schedule; `M_CgFarGlow`
+  and `M_CgFarFlat` (atmos assets 18, 19), a card not shown collapsed to a point; the play
+  features' light pools give way; console `.Far`, `.FarGain`; the check's `*_nofar` views and
+  `far_views`; the benchmark's `night_plan_nofar`.
+- **Unreal:** Delta over AT6's import in CityAG16 (cells and controller only, 3 min 23 s), its
+  check by night, dusk and day passing with the far city; Vesper Bay (AG16's stage 2 build)
+  into a fresh throwaway project with its HLODs, checked. The other samples are not imported.
+- **Benchmark** (the lean route once, AT6's after as the before): Delta's night 15.0 ms p95 over
+  the route (AT6 15.4; walk 14.8, drive 14.9, fly 15.2), 1.7 ms under the budget.
+- **Release:** the root README's stage 3 section (what atmosgen makes and how to run it), the
+  milestone tables, the scope's header (AT0 to AT7 done), CLAUDE.md.
+- **Tests:** `tests/atmosgen/test_at_far.py`; `test_at_plan.py` (schemas), `test_at_air.py`,
+  `tests/test_unreal_atmos.py`, `tests/test_bench.py`.
 
 ## AT6: looks and art direction
 

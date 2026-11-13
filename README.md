@@ -11,7 +11,7 @@ your machine.
 |---|---|---|---|
 | 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M22 done |
 | 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG8, AG10, AG12 to AG17 done, the rest to come |
-| 3 | [atmosgen](#stage-3-atmosgen) | Lighting, sky, weather and atmospherics | AT0 to AT6 done, AT7 to come |
+| 3 | [atmosgen](#stage-3-atmosgen) | Lighting, sky, weather and atmospherics | AT0 to AT7 done |
 | 4 | [lifegen](#stage-4-lifegen) | Traffic, crowds, trains and aircraft, generated | Planned ([draft plan](docs/lifegen_scope.md)) |
 | 5 | [storygen](#stage-5-storygen) | Story, characters and cutscenes | Planned |
 
@@ -525,115 +525,75 @@ brings them in ([`docs/progress/AG18/city`](docs/progress/AG18/city)).
 
 ## Stage 3: atmosgen
 
-The city's light and air at every hour and in every weather: every lamp, shopfront and
-sign lighting the streets around it, haze and steam that catch the light, rain and wet
-streets that mirror the neon, a low sky lit from below by the city, and time of day moving
-every light and window through the night. It is planned as a generator like the first two:
-it works out where every light, fog pocket, steam vent and puddle goes from the city and
-its assets, checks that every street is lit, previews the night in Blender, and hands the
-plan to Unreal through the same exporter.
+The city's light and air at every hour and in every weather. From a built city (and its
+models, where stage 2 has run) atmosgen plans every light that lights it: each street and
+wall lamp by its kind, the lights on traffic signals, highway columns, alleys, decks,
+tunnels and station platforms, every shopfront's spill and every billboard, banner, neon band
+and holo-board lighting the street and the facade across from it in its own colors, crown
+floods, aviation lights and searchlights, the port's high masts. Each light has its hours
+and its district's mood: cool white and steady in a wealthy corporate core, sodium,
+flickering and some broken in an old town. Around them it plans the sky (the sun and moon by
+the city's latitude, the day of the year and the moon's phase, a low cloud deck glowing from
+the city under it), the air (a haze by the hour, mist on the water after dusk, smog over the
+port, haze under decks, steam and smoke from manholes, roofs, stalls and chimneys), the
+weather (rain kept out from under awnings, decks and viaducts, wet streets with puddles that
+mirror the neon, drips and splashes, five weather states that blend into each other) and the
+look (a grade per look and per district, a crisp corporate core, grainy old towns and port).
+Far off the city keeps glittering: past the lights that are live near the view, every lamp's
+pool, every aviation light and every floodlit crown still shows, to the horizon.
 
-The look: near-photorealistic cyberpunk, clean or gritty by place (a spotless corporate
-core, gritty markets, old towns and poor districts), with rain and wet streets by default.
+The default look is neon rain at 23:00: near-photorealistic cyberpunk with wet streets. An
+optional atmos spec picks another look (clear night, smog dusk, overcast day), the start
+hour and weather, and art-directs the palette, the light levels and each district's mood;
+the `atmosgen` skill writes one from the city's prompt.
 
-The streets at night are in place. From a built city it plans every light that lights a
-street: each street and wall lamp by its kind (cobra heads over the road, post tops, wall
-packs), a light on the mast arm of every traffic signal, corner lights where a junction
-would be dark, columns along the highways, posts along pedestrian streets and promenades,
-wall packs down the alleys, the light under decks, in tunnels and on station platforms,
-every shopfront's spill and every sign's lit face, each with its photometry, color, hours
-and its district's mood (cool white and steady in a wealthy core, sodium, flickering and
-some broken in an old town). Then it checks the plan as a lighting engineer would: the
-light on every sidewalk, crosswalk, road and alley, buildings casting their shadows,
-against a target for each (a plan with dark streets is not delivered):
-
-```bash
-.venv/bin/python -m atmosgen plan out/vesper_bay              # BUILD/atmos: the plan and its light check
-.venv/bin/python -m atmosgen lux out/vesper_bay               # the light map and the lux map round the core
-.venv/bin/python -m atmosgen preview out/vesper_bay           # a Blender night render lit by the plan
-```
-
-| The plan's lights, Delta Megacity | Light on the ground round the Corporate Core |
+| The skyline from 150 m over the port by night | The same at dusk |
 |---|---|
-| <img src="docs/progress/AT1/wip/01_plan/delta_preview_plan.png" width="420"> | <img src="docs/progress/AT1/wip/01_plan/delta_preview_lux.png" width="420"> |
-
-`citygen unreal` takes the plan into the Unreal level with the city: its lights travel with
-the level's streamed cells, and atmosgen's runtime plugin (`CityGenAtmos`, built with the
-play features) lights the nearest of them by night. Haze, rain and wet streets are prototypes
-for now (AT0):
-
-| A Corporate Core junction by night | An Old Town street in rain |
-|---|---|
-| <img src="docs/progress/AT1/unreal/night_core_junction.jpg" width="420"> | <img src="docs/progress/AT1/bench/after/shots/night_plan_all_walk_d04.jpg" width="420"> |
-| An Old Town alley | A highway through the port |
-| <img src="docs/progress/AT1/unreal/night_oldtown_alley.jpg" width="420"> | <img src="docs/progress/AT1/unreal/night_highway.jpg" width="420"> |
-
-Signs and neon light the city too: every billboard, banner and holo-board lights the street
-and the facade across from it in its own colors (never washing its own wall), neon bands and
-shop signs spill color onto the sidewalks, tower crowns are floodlit in the color of their LED
-trim, searchlights sweep the sky from the landmarks, red aviation lights blink on every tall
-roof, and the port's yards and the spaceport's apron have their high masts. Each district has
-its palette, clean or gritty by place: neon flickers and dies more where it is dangerous.
-
-| The Corporate Core: lit crowns, searchlights, aviation lights | Neon spill on an Old Town street |
-|---|---|
-| <img src="docs/progress/AT2/unreal/night_core_towers_air.jpg" width="420"> | <img src="docs/progress/AT2/unreal/night_signs_oldtown_a.jpg" width="420"> |
-| The megatower's searchlights | The port's yard under its high masts |
-| <img src="docs/progress/AT2/unreal/night_megatower_searchlights.jpg" width="420"> | <img src="docs/progress/AT2/unreal/night_port_yard.jpg" width="420"> |
-
-The sky and the time of day follow the city too: the sun and the moon stand where the city's
-latitude, the day of the year and the moon's phase put them; the exposure, the windows, the
-neon and every light's hours follow the hour (street lights come on as the sun sets, shops
-close, offices go dark late); and a low cloud deck glows over the city from its own light,
-brightest over the core and the port, with the moon and a few stars in its gaps. In the game
-the developer menu (Tab) has a time-of-day slider:
-
-| The Corporate Core under its glowing cloud deck | Dusk: the sun just set behind the port |
-|---|---|
-| <img src="docs/progress/AT3/unreal/night_core_skyline.jpg" width="420"> | <img src="docs/progress/AT3/unreal/dusk_west.jpg" width="420"> |
-| The moon over the bay, the deck opened | The Corporate Core by day |
-| <img src="docs/progress/AT3/unreal/night_moon_east_clear.jpg" width="420"> | <img src="docs/progress/AT3/unreal/pday_core_skyline.jpg" width="420"> |
-
-The air: a haze by the hour that takes every lamp and sign into a halo, mist on the canals and
-rivers after dusk, smog over the port, haze under the decks and in tunnels, and steam and smoke
-rising from manholes, roofs, stalls and chimneys:
-
-| Old Town's neon in the haze | Mist on a canal at night |
-|---|---|
-| <img src="docs/progress/AT4/unreal/night_oldtown_fog.jpg" width="420"> | <img src="docs/progress/AT4/unreal/night_canal_mist.jpg" width="420"> |
-
-The weather: rain kept out from under awnings, decks and viaducts, wet streets whose puddles
-mirror the neon, drips, splashes and rings, the wind, and five weather states (clear, drizzle,
-rain, fog, smog) that blend into each other, picked from the game's Tab menu:
-
-| Puddles on an Old Town street in rain | Dry under a viaduct, wet past it |
-|---|---|
-| <img src="docs/progress/AT5/unreal/night_oldtown_low__rain.jpg" width="420"> | <img src="docs/progress/AT5/unreal/night_viaduct__rain.jpg" width="420"> |
-
-The look: each look has its own grade by night and by day (neon rain teal in the shadows and
-magenta in the highlights, with bloom, lens flares, a little grain and fringing), and each
-district its own on top, by how clean or gritty it is: a crisp, cool corporate core, grainy
-old towns and port with lifted blacks and sodium highlights, blended as you walk from one into
-the next. The exposure is held per hour, so a rainy day reads as a grey, wet street rather
-than a dark one. Art-direction rounds compare a round's shots with the last
-(`atmosgen review`), and a Claude Code skill writes the light and look from the city's prompt:
-
+| <img src="docs/progress/AT7/readme/night_air.jpg" width="420"> | <img src="docs/progress/AT7/readme/dusk_air.jpg" width="420"> |
 | The Corporate Core by night: crisp and cool | Old Town by night: warm and grainy |
-|---|---|
 | <img src="docs/progress/AT6/unreal/after/night_core.jpg" width="420"> | <img src="docs/progress/AT6/unreal/after/night_oldtown.jpg" width="420"> |
-| An Old Town street by day in rain | Under a viaduct by day in rain |
-| <img src="docs/progress/AT6/unreal/after/pday_oldtown.jpg" width="420"> | <img src="docs/progress/AT6/unreal/after/pday_viaduct.jpg" width="420"> |
+| Puddles on an Old Town street in rain | Mist on a canal at night |
+| <img src="docs/progress/AT5/unreal/night_oldtown_low__rain.jpg" width="420"> | <img src="docs/progress/AT4/unreal/night_canal_mist.jpg" width="420"> |
+| The megatower's searchlights | Dusk: the sun just set behind the port |
+| <img src="docs/progress/AT2/unreal/night_megatower_searchlights.jpg" width="420"> | <img src="docs/progress/AT3/unreal/dusk_west.jpg" width="420"> |
+
+### Run it
+
+After `citygen build` (and, for the city's own lamp, sign and building records, `assetgen
+build`):
 
 ```bash
-.venv/bin/python -m atmosgen review out/vesper_bay --spec cities/vesper_bay/atmos_spec.json --shots SHOTS
+.venv/bin/python -m atmosgen plan out/vesper_bay              # BUILD/atmos: the plan and its checks
+.venv/bin/python -m atmosgen lux out/vesper_bay               # the previews: light, plan, sky, air, weather, look, far city
+.venv/bin/python -m atmosgen preview out/vesper_bay           # a Blender night render lit by the plan (--hour 19.4 for dusk)
+.venv/bin/python -m atmosgen plan out/vesper_bay --spec atmos_spec.json   # with an atmos spec
+.venv/bin/python -m atmosgen review out/vesper_bay --spec S --shots SHOTS --prev P          # an art-direction round
 ```
 
-Its Blender preview renders the same night in Cycles, lit by the plan's lights (and dusk, at an
-hour the sun has just set: `atmosgen preview out/vesper_bay --hour 19.4`):
+`atmosgen plan` checks the plan as a lighting engineer would (light on every sidewalk,
+crosswalk, road and alley with the buildings' shadows, signs never flooding their own wall,
+the air, the weather, the far city) and exits 1 if a check fails; such a plan is not taken
+into Unreal. `atmosgen budgets PLAN... --out DIR` puts several cities' plans side by side.
 
-| The Corporate Core by night, Blender preview (8K) | A Corporate Core street in rain (8K) |
-|---|---|
-| <img src="docs/progress/AT0/core_night.jpg" width="420"> | <img src="docs/progress/AT0/core_street_night.jpg" width="420"> |
+`citygen unreal` takes the plan into the Unreal level with the city (from `BUILD/atmos`, or
+`--atmos DIR`; `--no-atmos` leaves it out) and builds atmosgen's runtime plugin
+(`CityGenAtmos`) beside the play features. In the game the developer menu (Tab) has the time
+of day (a slider) and the weather (clear, drizzle, rain, fog, smog); the console has
+`CityGenAtmos.*` commands for every part (the lights, fog, air, rain, wet streets, the post,
+the far city, the hour). Controls and every command: [`docs/unreal_export.md`](docs/unreal_export.md)
+("atmosgen's runtime" and after).
+
+A Corporate Core street in rain by night in Unreal, with its parked cars (8K):
+
+<img src="docs/progress/AT7/readme/night_core_street_rain_8k.jpg" width="860">
+
+`atmosgen preview` renders the same night in Blender (Cycles), lit by the plan's lights. It is
+a preview of the light only: it draws stage 2's stand-in cars, not the hero vehicles, which
+only the Unreal import places.
+
+| Blender preview: the Corporate Core by night (8K, stand-in cars) |
+|---|
+| <img src="docs/progress/AT0/core_night.jpg" width="420"> |
 
 Plan: [`docs/atmosgen_scope.md`](docs/atmosgen_scope.md); what each milestone did:
 [`docs/atmosgen_milestones.md`](docs/atmosgen_milestones.md).
@@ -649,7 +609,7 @@ Plan: [`docs/atmosgen_scope.md`](docs/atmosgen_scope.md); what each milestone di
 | AT4 | Air | Fog and haze by the hour, mist over the water, smog over the port, haze under the decks and in tunnels, light shafts, steam and smoke from manholes, roofs, stalls and chimneys | Done |
 | AT5 | Weather | Rain kept out from under decks and awnings, wet streets and puddles, drips and splashes, rings on the canals, wind, five weather states that blend into each other | Done |
 | AT6 | Looks and art direction | Color grading and post per look and district (a crisp corporate core, gritty old towns and port), a day exposure that reads, art-direction rounds, the prompt-to-look skill | Done |
-| AT7 | Far city and release | The skyline glittering at night to the horizon, every sample city lit, checked in Unreal | Planned |
+| AT7 | Far city and release | The skyline glittering at night to the horizon (every far lamp, aviation light and lit crown), every sample city lit, the release | Done |
 
 ---
 
