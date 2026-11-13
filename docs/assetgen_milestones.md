@@ -3333,6 +3333,22 @@ Vanta-R the same).
   triangles, standard class, texels 393 px/m (5th percentile), LOD3 15.8 of 40 degrees,
   0.023 of 0.10 bent, 0.010 of 0.04 texture (main 15.0, 0.022, 0.010); its LOD row reads as
   main's. Not published.
+- **Brakk Bastion** (`docs/progress/AG18/brakk_bastion/`, on `vehicles/brands/brakk.py`, its
+  wheel bound to the car's sizes with the hub motor; the module gains `lamp_pylon`, the
+  Hauler's step B pylon, which the Hauler keeps as its own copy and builds as before, signed
+  the same): the corner pylons as the Hauler's (housings sunk into the chamfers, an LED bar
+  under a clear or red lens in a reflector V, an amber cell under an amber lens, bolted
+  bezels, a guard); the prow blade a framed LED bar under a clear lens, proud of the nose;
+  the roof bar eight cells of three LED modules behind one lens with amber end lamps in
+  bolted end plates; new work lamps on the rack's rear bar; the stop lamp eight LEDs under a
+  red lens; the charge port's flap an octagon cut through each nose side (a raised plate on
+  the left only before); 3.5 mm shut lines; `"frame"` glass; the kit's wipers. Step A: the
+  cabin tub's floor and the rear seat backs inside the hull (none in the open now), the
+  one-sided parts told as meant; every check `ok` (symmetry and through were `look`).
+  297,973 triangles (269,389). Pack rebuilt, every check passing: 145,150, 59,993, 20,233,
+  8,187 triangles, large class, texels 330 px/m (5th percentile), LOD3 12.7 of 40 degrees,
+  0.016 of 0.10 bent, 0.005 of 0.04 texture (main 16.9, 0.021, 0.006); its LOD row reads as
+  main's, the lamps lit at every LOD. Not published.
 - **Next**: the other cars of the Brakk and Tanager brands on the
   pilots' patterns (Bastion, Mule, Cab, Porter), each switching to its `vehicles/brands/` module, with step A's street-distance
   findings fixed as it is redone.
