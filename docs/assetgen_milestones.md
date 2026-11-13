@@ -3312,6 +3312,27 @@ Vanta-R the same).
   passing: 148,060, 59,993, 19,949, 5,067 triangles, standard class, texels 569 px/m (5th
   percentile), LOD3 5.9 of 40 degrees, 0.007 of 0.10 bent, 0.008 of 0.04 texture (main 6.2,
   0.006, 0.009); the ribbon one lit line at every LOD, LOD2 and LOD3 reading as main's. Not published.
+- **Orrin Aria** (`docs/progress/AG18/orrin_aria/`, on `vehicles/brands/orrin.py`, which
+  gains the Pebble's channel parts as copies, `channel_lamp` among them, and a `chop` that
+  splits only the faces near each cut; the Lumen and the Pebble build as before): the light
+  ribbons channels cut into each body piece, 16 mm wide and 9 mm deep (round the nose, along
+  each fender pod from behind the wheel round its tip and up the slot, down each buttress and
+  on along the hip's crest round its tip to the tail blade's light bar, the buttress's
+  channel running into the hip's from under the leg), each with the Pebble's flush lens (set
+  1.2 mm under the skin: on the nose's tight curve a flush lens's edges stood proud), wide
+  lit face and chopped 1 mm walls; side markers as short channels; a round flap cut round
+  each charge port with its light ring inside; the door pulls a crescent recess; the
+  crescents and the wheel openings told to the checks (twelve cutter holes, none now; four
+  were the wells breaking through the skin over the tires, their arches now lowered at the
+  top); the kit's 2.4 mm shut lines kept; the frameless teardrop canopy unchanged. Step A's
+  tires: room cut beside the front tires in the core and the pods' wells (each cutter a solid
+  of its own: two overlapping in one emptied a pod), 0.0 front and 2.8 mm rear before, 5.0
+  now; the front still cannot steer. 393,388 triangles (501,460): pods and hips at
+  subdivision 3, the yoke and the liner at 2, the channels and lamps sampled coarser, the
+  tread at 80 segments. Pack rebuilt, every check passing: 145,467, 59,963, 20,262, 5,141
+  triangles, standard class, texels 393 px/m (5th percentile), LOD3 15.8 of 40 degrees,
+  0.023 of 0.10 bent, 0.010 of 0.04 texture (main 15.0, 0.022, 0.010); its LOD row reads as
+  main's. Not published.
 - **Next**: the other cars of the Orrin, Brakk and Tanager brands on the
   pilots' patterns (Pebble, Aria, Bastion, Mule, Cab, Porter), each switching to its `vehicles/brands/` module, with step A's street-distance
   findings fixed as it is redone.

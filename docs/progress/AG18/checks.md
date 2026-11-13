@@ -15,7 +15,7 @@
 | [kestrel_atlas](kestrel_atlas/check.json) | ok: none (hover) | ok: 374.4 mm (pod.skid.r) | look: 11 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 181915 |
 | [kestrel_dart](kestrel_dart/check.json) | ok: none (hover) | ok: 325.0 mm (keel) | look: 3 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 112558 |
 | [kestrel_meridian](kestrel_meridian/check.json) | ok: none (hover) | ok: 335.0 mm (lamp.keel.glass) | look: 3 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 119902 |
-| [orrin_aria](orrin_aria/check.json) | FAIL: 0.0 mm to body.front, steers 0 deg | ok: 131.8 mm (body.floor) | look: 2 objects | look: 0 open runs, 12 cutter holes | ok: 0 parts | look: 501460 |
+| [orrin_aria](orrin_aria/check.json) | look: 5.0 mm to pod.well, steers 0 deg | ok: 131.8 mm (body.floor) | look: 2 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 393388 |
 | [orrin_lumen](orrin_lumen/check.json) | look: 14.6 mm to body.well, steers 0 deg | ok: 130.0 mm (body.floor) | look: 2 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 356940 |
 | [orrin_pebble](orrin_pebble/check.json) | look: 16.1 mm to body.rear, steers 0 deg | ok: 143.3 mm (body.floor) | look: 5 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 324498 |
 | [tanager_cab](tanager_cab/check.json) | FAIL: 0.0 mm to bumper.guards.rear, steers 0 deg | ok: 120.0 mm (mudflaps) | look: 39 objects | FAIL: 4 open runs, 0 cutter holes | look: 1 parts | ok: 285996 |
@@ -89,27 +89,14 @@
 
 - not mirrored: `led.step` 236.8 mm, `step.tread` 234.2 mm, `interior.yoke` 219.6 mm, `step.links` 198.5 mm, `step.grip` 197.6 mm, `step.bay` 16.1 mm, `pod.f.pod_low` 11.0 mm, `led.name` 5.2 mm, `fin.code` 3.3 mm
 
-**orrin_aria** (FAIL)
+**orrin_aria** (look)
 
-- tire `fl`: 0.0 mm to `body.front`, turns 0 degrees before it touches `pod.well`
-- tire `rl`: 2.8 mm to `hip.well`
-- tire `fr`: 0.0 mm to `body.front`, turns 0 degrees before it touches `pod.well`
-- tire `rr`: 2.8 mm to `hip.well`
-- not mirrored: `interior.fittings` 216.3 mm, `led.cabin` 6.0 mm
+- tire `fl`: 5.0 mm to `pod.well`, turns 0 degrees before it touches `pod.well`
+- tire `rl`: 5.0 mm to `hip.well`
+- tire `fr`: 5.0 mm to `pod.well`, turns 0 degrees before it touches `pod.well`
+- tire `rr`: 5.0 mm to `hip.well`
+- not mirrored: `interior.fittings` 224.1 mm, `led.cabin` 6.0 mm
 - open ends of open pieces (meant): `liner.liner`
-- a cutter's hole inside `body.front`: 491 mm round, at (2.18, 0.215, 0.384)
-- a cutter's hole inside `body.front`: 491 mm round, at (2.18, -0.215, 0.384)
-- a cutter's hole inside `pod.pod`: 429 mm round, at (1.435, 0.945, 0.762)
-- a cutter's hole inside `pod.pod`: 168 mm round, at (1.445, 0.929, 0.781)
-- a cutter's hole inside `pod.pod`: 429 mm round, at (1.435, -0.945, 0.762)
-- a cutter's hole inside `pod.pod`: 168 mm round, at (1.445, -0.929, 0.781)
-- a cutter's hole inside `hip.hip`: 629 mm round, at (-0.818, -1.022, 0.452)
-- a cutter's hole inside `hip.hip`: 629 mm round, at (-0.748, -1.02, 0.453)
-- a cutter's hole inside `hip.hip`: 284 mm round, at (-1.293, 0.631, 0.777)
-- a cutter's hole inside `hip.hip`: 629 mm round, at (-0.748, 1.02, 0.453)
-- a cutter's hole inside `hip.hip`: 629 mm round, at (-0.818, 1.022, 0.452)
-- a cutter's hole inside `hip.hip`: 284 mm round, at (-1.293, -0.631, 0.777)
-- triangles: 501460 over the 400000 budget; most in `body` 139854, `hip` 105902, `pod` 103052, `tire` 57536
 
 **orrin_lumen** (look)
 
