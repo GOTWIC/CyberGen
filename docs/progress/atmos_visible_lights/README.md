@@ -155,6 +155,20 @@ than the near lights behind the blocks they replace. Gathering a sweep on the ga
 2.4 ms in the benchmark's run before that cache), the sweep 3 to 5 ms on its worker thread. No
 tuning was needed.
 
+## The packaged game
+
+CityAG16 mirrored into CityPackaged (robocopy without `Saved`, `Intermediate` and
+`DerivedDataCache`) and packaged (Development, Win64) into
+`C:/Users/swagn/CityGen/builds/packaged/Delta_lights/Windows/CityAG16.exe`, 3.0 GB. A smoke launch
+(`-userdir=` outside the package, no `Saved/` left in it) loads the city with its controller,
+the 518 cells' 50,300 lights and the 1,750 x 1,750 sight raster, nothing skipped.
+
+The first try failed to link: the mirror copies each plugin's own `Intermediate` folder, whose
+build files name CityAG16's paths, so the package's editor build linked the atmos plugin into
+CityAG16's `Binaries` and found no `.pdb` of its own. With `Plugins/*/Intermediate` and
+`Plugins/*/Binaries` cleared in CityPackaged it builds and cooks; a mirror for packaging should
+leave those out as well.
+
 ## Validation
 
 - Tests (logged, `-v -rfE --durations=25`): `tests/atmosgen/test_at_sight.py` (new),
