@@ -27,6 +27,8 @@ struct FCityGenBenchSegment
 	double Speed = 500.0;         // cm/s
 	double Pitch = 0.0;           // degrees (negative: looking down)
 	double Hold = 5.0;            // s held after a teleport has streamed in
+	TArray<FString> Commands;     // console commands at its start (atmosgen's live set by sight
+	                              // on the ground, the circle in the air)
 };
 
 /** One pass over the route: day or night at a screen percentage. */

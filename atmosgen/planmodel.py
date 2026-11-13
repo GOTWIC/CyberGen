@@ -298,6 +298,31 @@ class Tiers(_Model):
     high_m: float = Field(750.0, description="AT2: the high tier's range (m) ...")
     high_max: int = Field(48, description="... and how many of its lights live at most.")
     far_m: float
+    sight_m: float = Field(1200.0, description="Visible lights: round a walker the runtime "
+                                               "keeps live the lights it sees (a line of "
+                                               "sight through the plan's `sight` raster) "
+                                               "within this (m) ...")
+    sight_max: int = Field(512, description="... at most this many (the high tier's pool "
+                                            "keeps `high_max`).")
+
+
+class Sight(_Model):
+    """What a walker sees: the occluders the runtime marches a line of sight through
+    (`sight.py`: the lux check's, on `cell_m` cells, every rounding toward seeing)."""
+    file: str = Field(description="`sight.png` beside the plan, row 0 the north edge: red "
+                                  "the top (absolute, `top_step_m` steps, 0 none), green the "
+                                  "bottom over the ground (`bottom_step_m` steps, 0 on the "
+                                  "ground), blue the ground (`ground_step_m` steps).")
+    bounds: list[float] = Field(description="[x0, y0, x1, y1] (m).")
+    cell_m: float
+    px: list[int] = Field(description="[width, height].")
+    top_step_m: float
+    bottom_step_m: float
+    ground_step_m: float
+    skip_eye_m: float = Field(description="The march leaves out this much from the eye ...")
+    skip_light_m: float = Field(description="... and this much to the light.")
+    occupied: float = Field(description="The share of the cells something stands in.")
+    sha256: str
 
 
 class AtmosPlan(_Model):
@@ -325,6 +350,8 @@ class AtmosPlan(_Model):
     volumes: list[FogVolume] = Field(default_factory=list)
     emitters: list[Emitter] = Field(default_factory=list)
     masks: list[Mask] = Field(default_factory=list)
+    sight: Sight | None = Field(None, description="Visible lights: the sight raster the "
+                                                  "runtime picks a walker's lights by.")
     counts: dict[str, int]
     sources: dict[str, int] = Field(description="Lights by source: derived or assetgen "
                                                 "(the asks met).")

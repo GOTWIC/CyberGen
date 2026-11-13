@@ -5,7 +5,9 @@
 // .Status (the state as one JSON line). AT3: .Hour also takes day, dusk or night; .Sky and
 // .Exposure [0|1] (the sky and time; the exposure held at the hour's), .TimeSpeed H (hours a
 // second), .Cover C (the cloud deck's cover for the session). AT4: .Air [0|1] (the fog volumes
-// and plumes), .Tuned [0|1] (the plan's engine settings), .VolumeGain G, .FogView M. AT1: the plan comes with the level (the importer's
+// and plumes), .Tuned [0|1] (the plan's engine settings), .VolumeGain G, .FogView M. Visible
+// lights: the console variable CityGenAtmos.Sight -1|0|1 (the live set by sight round a walker,
+// the circle, by sight whatever the pawn; the actor's file defines it), .SightRange M [MAX]. AT1: the plan comes with the level (the importer's
 // controller and its cells' data actors), no longer from a folder (AT0's .Load and
 // -CityGenAtmosPlan are gone).
 
@@ -103,6 +105,20 @@ namespace
 			if (A && Args.Num() >= 2)
 			{
 				A->SetHigh(FCString::Atoi(*Args[0]), FCString::Atof(*Args[1]));
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs SightRangeCmd(TEXT("CityGenAtmos.SightRange"),
+		TEXT("CityGenAtmos.SightRange M [MAX] [FADE_S]: visible lights: a walker's range (m), how many live at most, the fade's time (s)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenAtmos* A = AtmosIn(World);
+			if (A && Args.Num())
+			{
+				A->SightRangeM = FMath::Max(1.f, FCString::Atof(*Args[0]));
+				if (Args.Num() > 1) { A->SightMax = FMath::Max(0, FCString::Atoi(*Args[1])); }
+				if (Args.Num() > 2) { A->FadeS = FMath::Max(0.f, FCString::Atof(*Args[2])); }
+				A->SetSight(-2);
 			}
 		}));
 

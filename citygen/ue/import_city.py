@@ -75,9 +75,10 @@ HASH_TAG = "cg.hash"
 # unchanged build applies the change (stored hashes are "<version>.<content hash>")
 MESH_VERSION = "3"
 ACTOR_VERSION = "1"
-ATMOS_VERSION = "atmos4"  # the atmos controller's and cells' actors (2, AT2: the high tier,
+ATMOS_VERSION = "atmos5"  # the atmos controller's and cells' actors (2, AT2: the high tier,
                           # blinks and sweeps in the packed lights; 3, AT3: the sky and time;
-                          # 4, AT4: the air, a cell's fog volumes and emitters)
+                          # 4, AT4: the air, a cell's fog volumes and emitters; 5, the visible
+                          # lights: the controller's sight raster, the cells always loaded)
 SWIM_BRUSH_CM = 200.0   # the cube brush a volume spawned from its class gets (CubeBuilder)
 SWIM_FRICTION = 0.3
 GRAPH_VARS = [("City", "string"), ("Graph", "name"), ("Hash", "string"), ("Ids", "[name"),
@@ -3882,8 +3883,10 @@ class Importer:
 
     def atmos_cells(self, have):
         """A data actor per 128 m cell of the plan's lights (CityGenAtmosCell), at the cell's
-        middle and spatially loaded: World Partition streams it with its main grid cell, and
-        while loaded it registers its lights with the controller."""
+        middle; while loaded it registers its lights with the controller. Always loaded since
+        the visible lights (atmos5): a walker's live set reaches the lights it sees out to the
+        plan's `sight_m` (1,200 m), past World Partition's loading range (768 m); the
+        controller makes a cell's beacons, beams and plumes only near the view."""
         if not self.atmos_ok():
             info = self.man.get("atmos") or {}
             self.stats["atmos"] = {
@@ -3901,7 +3904,7 @@ class Importer:
 
             def update(a, h, c=c, d=d):
                 a.set_actor_location(ue_loc(*c["center"]), False, False)
-                a.set_editor_property("is_spatially_loaded", True)
+                a.set_editor_property("is_spatially_loaded", False)
                 a.set_editor_property("cell", c["cell"])
                 a.set_editor_property("count", int(c["count"]))
                 a.set_editor_property("light_floats", [float(v) for v in d["floats"]])
@@ -4029,6 +4032,22 @@ class Importer:
                 sky.append(("puffs", [int(x) for x in ctl["puffs"]]))
                 sky.append(("emitter_kinds", list(ctl["emitter_kinds"])))
                 sky.append(("tuned_settings", list(ctl["cvars"])))
+            # visible lights: the sight raster a walker's live set is picked by (its runs over
+            # the rows from the north edge), the range and size of that set
+            if ctl.get("sight_runs") is not None:
+                st, sk = ctl["sight_steps"], ctl["sight_skips"]
+                sky += [("sight_range_m", float(ctl["sight_m"])),
+                        ("sight_max", int(ctl["sight_max"])),
+                        ("sight_bounds", [float(x) for x in ctl["sight_bounds"]]),
+                        ("sight_cell_m", float(ctl["sight_cell_m"])),
+                        ("sight_width", int(ctl["sight_px"][0])),
+                        ("sight_height", int(ctl["sight_px"][1])),
+                        ("sight_top_step_m", float(st[0])),
+                        ("sight_bottom_step_m", float(st[1])),
+                        ("sight_ground_step_m", float(st[2])),
+                        ("sight_skip_eye_m", float(sk[0])),
+                        ("sight_skip_light_m", float(sk[1])),
+                        ("sight_runs", [int(x) for x in ctl["sight_runs"]])]
             for k, v in sky:
                 try:
                     a.set_editor_property(k, v)

@@ -126,6 +126,39 @@ def test_inside_concave():
     assert Polygon(ring, [hole]).contains(Point(x, y))
 
 
+def test_player_start_on_an_open_lit_sidewalk(tmp_path):
+    """Visible lights (Delta's start stood under a viaduct): the fast-travel point nearest the
+    middle moved to the nearest sidewalk point with nothing overhead within 10 m and a street
+    light within 20 m, facing along the sidewalk toward the middle."""
+    b = tmp_path / "build"
+    b.mkdir()
+    (b / "gameplay.json").write_text(json.dumps({"travel_points": [
+        {"id": "stn.a.fast_travel", "kind": "fast_travel", "position": [0.0, 5.0],
+         "access": {"position": [0.0, 5.0]}},
+        {"id": "rn.far.fast_travel", "kind": "fast_travel", "position": [900.0, 900.0]}]}))
+    (b / "graphs.json").write_text(json.dumps({"walkways": [
+        {"id": "wk.1", "kind": "sidewalk", "line": [[-200.0, 5.0, 0.0], [200.0, 5.0, 0.0]]}]}))
+    model = {"road_segments": [
+        {"id": "rs.v", "centerline": [[-60.0, 0.0], [60.0, 0.0]], "width_m": 20.0,
+         "z_profile": [{"s": 0.0, "z": 9.0}, {"s": 120.0, "z": 9.0}]}],
+        "structures": [], "skybridges": [],
+        "props": [{"type": "prop.street_light", "position": [-120.0, 8.0, 0.0]},
+                  {"type": "prop.street_light", "position": [90.0, 8.0, 0.0]}]}
+    (b / "city_model.json").write_text(json.dumps(model))
+    ps = U.player_start(b, {"bounds": [-1000.0, -1000.0, 1000.0, 1000.0]})
+    x, y, z = ps["position"]
+    # 10 m clear of the viaduct (its deck's rounded end 10 m past x 60), by the lamp at x 90;
+    # x -80 as near but unlit
+    assert ps["spot"] == "open_lit" and ps["source"] == "stn.a.fast_travel"
+    assert (x, y) == (80.0, 5.0) and z == U.PLAYER_Z_M
+    assert ps["yaw_deg"] == 180.0         # along the sidewalk, toward the middle
+    # with no light near the sidewalk, the fast-travel point as before
+    model["props"] = []
+    (b / "city_model.json").write_text(json.dumps(model))
+    ps = U.player_start(b, {"bounds": [-1000.0, -1000.0, 1000.0, 1000.0]})
+    assert ps["position"][:2] == [0.0, 5.0] and "spot" not in ps
+
+
 def test_manifest_is_deterministic(build, manifest):
     again = U.build_manifest(build)
     assert json.dumps(again[0], sort_keys=True) == json.dumps(manifest[0], sort_keys=True)

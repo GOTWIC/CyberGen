@@ -448,11 +448,15 @@ PLATFORM_Z_M = 3.6                # a platform's downlights over its floor
 # (no light: emissive points or light cards, AT7). AT2's `high` tier: the lights seen from
 # afar (crown floods and uplights, searchlights, a port's high masts), a pool of their own
 # within World Partition's loading range (768 m), so they never take the street's place in
-# the mid set nor it theirs
+# the mid set nor it theirs. Visible lights (Swagnik, 2026-11-12): round a walker the
+# runtime keeps live the lights it sees instead (a line of sight through the plan's sight
+# raster, `sight.py`) out to `sight`'s radius, four times the mid tier's, each pool at its
+# size; the fly pawn and the free camera keep the circle
 TIERS = {"near": {"radius_m": 60.0, "max": 16},
          "mid": {"radius_m": 300.0, "max": 512},
          "high": {"radius_m": 750.0, "max": 48},
-         "far": {"radius_m": 1500.0, "max": 0}}
+         "far": {"radius_m": 1500.0, "max": 0},
+         "sight": {"radius_m": 1200.0, "max": 512}}
 HIGH_KINDS = ("flood", "searchlight", "high_mast")
 # an aviation light is live only near the view (its red glow, the runtime's beacon, is what
 # shows from afar): from the air, 228 of the 512 mid lights were aviation lights at first

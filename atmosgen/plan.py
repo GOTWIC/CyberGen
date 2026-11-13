@@ -49,7 +49,7 @@ from . import sky as SK
 from . import spec as S
 
 CODE_FILES = ("presets.py", "spec.py", "planmodel.py", "emitters.py", "plan.py", "lux.py",
-              "sky.py", "air.py")
+              "sky.py", "air.py", "sight.py")
 OUT = "atmos"
 TILE_M = 256.0
 
@@ -1713,6 +1713,10 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
         sky["upward_lm"] = round(g["upward_lm"])
     elif (od / SK.GLOW_FILE).is_file():
         (od / SK.GLOW_FILE).unlink()
+    # visible lights: the occluders the runtime marches a walker's line of sight through
+    from . import sight as SI
+    sight = timed("sight", lambda: SI.write(
+        SI.raster(occ, city.ground_many if city._grid is not None else None), od))
     # AT4: the air: fog and smog volumes, steam and smoke emitters, their check
     from . import air as AR
     air = AR.Air(pl)
@@ -1775,13 +1779,16 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
                        mid_max=min(tiers["mid"]["max"], filled["budgets"]["live"]),
                        high_m=tiers["high"]["radius_m"],
                        high_max=min(tiers["high"]["max"], filled["budgets"].get("high", 48)),
-                       far_m=tiers["far"]["radius_m"]),
+                       far_m=tiers["far"]["radius_m"],
+                       sight_m=tiers["sight"]["radius_m"],
+                       sight_max=min(tiers["sight"]["max"], filled["budgets"]["live"])),
         budgets=filled["budgets"], tiles=index, counts=dict(sorted(counts.items())),
         sources={"derived": sum(1 for L in pl.lights if L["source"] == "derived"),
                  "assetgen": sum(1 for L in pl.lights if L["source"] == "assetgen")},
         air=PM.Air(**air_set),
         volumes=[PM.FogVolume(**v) for v in air.volumes],
         emitters=[PM.Emitter(**e) for e in air.emitters],
+        sight=PM.Sight(**sight),
         checks={"lux": lux, "faces": faces, "air": air_check})
     ptext = json.dumps(json.loads(plan.model_dump_json(by_alias=True, exclude={"schema_ref"})),
                        indent=1, sort_keys=True) + "\n"
@@ -1816,6 +1823,7 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
            "megasites": dict(sorted(pl.site_report.items())),
            "tiers": {k: sum(1 for L in pl.lights if L["tier"] == k)
                      for k in ("near", "mid", "high")},
+           "sight": {k: sight[k] for k in ("cell_m", "px", "occupied")},
            "timings": tm,
            "sky": {"hours": sky["hours"], "ev_day": sky["ev_day"], "ev_night": sky["ev_night"],
                    "moon": {k: sky["moon"][k] for k in ("phase", "lit", "share")},
@@ -1892,6 +1900,10 @@ def report_text(rep: dict) -> str:
         lines.append("megasites: " + ", ".join(f"{k} {v}" for k, v in rep["megasites"].items()))
     if rep.get("tiers"):
         lines.append("tiers: " + ", ".join(f"{k} {v}" for k, v in rep["tiers"].items()))
+    if rep.get("sight"):
+        s = rep["sight"]
+        lines.append(f"sight raster (a walker's visible lights): {s['px'][0]} x {s['px'][1]} "
+                     f"cells of {s['cell_m']:g} m, {100.0 * s['occupied']:.1f}% occupied")
     if rep.get("sky"):
         s = rep["sky"]
         g = s.get("glow") or {}
