@@ -12,7 +12,7 @@
 | [brakk_mule](brakk_mule/check.json) | look: 22.2 mm to fender.plates, steers 20 deg | ok: 280.0 mm (chassis) | look: 34 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 364552 |
 | [halcyon_ridge](halcyon_ridge/check.json) | ok: 39.5 mm to body.well, steers 25 deg | ok: 237.8 mm (skid.front) | look: 1 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 250007 |
 | [halcyon_sable](halcyon_sable/check.json) | ok: 31.8 mm to interior.seats, steers 30 deg | ok: 100.0 mm (splitter) | look: 1 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 280675 |
-| [kestrel_atlas](kestrel_atlas/check.json) | ok: none (hover) | ok: 374.4 mm (pod.skid.r) | look: 19 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 151203 |
+| [kestrel_atlas](kestrel_atlas/check.json) | ok: none (hover) | ok: 374.4 mm (pod.skid.r) | look: 11 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 181915 |
 | [kestrel_dart](kestrel_dart/check.json) | ok: none (hover) | ok: 325.0 mm (keel) | look: 3 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 112558 |
 | [kestrel_meridian](kestrel_meridian/check.json) | ok: none (hover) | ok: 335.0 mm (lamp.keel.glass) | look: 3 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 119902 |
 | [orrin_aria](orrin_aria/check.json) | FAIL: 0.0 mm to body.front, steers 0 deg | ok: 131.8 mm (body.floor) | look: 2 objects | look: 0 open runs, 12 cutter holes | ok: 0 parts | look: 501460 |
@@ -78,8 +78,7 @@
 
 **kestrel_atlas** (look)
 
-- not mirrored: `interior.yoke` 242.0 mm, `case.bands` 209.8 mm, `cases` 199.0 mm, `straps` 180.0 mm, `case.stencil` 175.5 mm, `case.latches` 114.0 mm, `led.beacon` 110.6 mm, `strap.ratchets` 43.4 mm, `roof.gear` 29.8 mm, `pod.f.pod_side` 11.9 mm, `pod.m.pod_top` 11.8 mm, `pod.m.pod_low` 11.4 mm and 7 more
-- cabin part in the open: `interior.tub`, 35% of it, up to 125.3 mm from what would hide it, at (2.24, -0.734, 0.606)
+- not mirrored: `interior.yoke` 242.0 mm, `case.bands` 209.8 mm, `cases` 199.0 mm, `straps` 180.0 mm, `case.stencil` 175.5 mm, `case.latches` 114.0 mm, `led.beacon` 110.6 mm, `strap.ratchets` 43.4 mm, `roof.gear` 29.8 mm, `pod.f.pod_side` 11.9 mm, `pod.m.pod_top` 11.8 mm, `pod.m.pod_low` 11.4 mm
 
 **kestrel_dart** (look)
 
