@@ -279,6 +279,21 @@ def test_air_passes():
     assert "r.VolumetricFog.GridPixelSize 16" in by["x_grid16"][3]
 
 
+def test_weather_passes():
+    """AT5: every atmos pass sets a weather state at once (rain by default, so none leaks into
+    the next), the weather's own passes theirs, each before its hour."""
+    by = {p[0]: p for p in B.ATMOS_PASSES}
+    for name, p in by.items():
+        ws = [c for c in p[3] if c.startswith("CityGenAtmos.Weather ")]
+        assert len(ws) == 1 and ws[0].endswith(" now") and p[3][-1].startswith("CityGenAtmos.Hour")
+    assert "CityGenAtmos.Weather rain now" in by["night_plan_all"][3]
+    for name, state in (("night_plan_drizzle", "drizzle"), ("night_plan_clear", "clear"),
+                        ("night_plan_fogstate", "fog"), ("night_plan_smog", "smog")):
+        cmds = by[name][3]
+        assert f"CityGenAtmos.Weather {state} now" in cmds
+        assert {"CityGenAtmos.Rain 1", "CityGenAtmos.Wet 1", "CityGenAtmos.Air 1"} <= set(cmds)
+
+
 def test_others_summary_names_who_took_the_foreground():
     """AT3: the samples say which processes took the game's foreground and how often it was
     taken back; the summary adds them up."""

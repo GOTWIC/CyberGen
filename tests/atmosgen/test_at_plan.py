@@ -174,11 +174,14 @@ def test_plan(build):
         rec = json.loads(L.model_dump_json(exclude_none=True))
         h = rec.pop("hash")
         assert h == PL.sha(PL.dumps(rec))[:16]
-    # the contribution: the controller and a spawner per tile
+    # the contribution: the controller and a spawner per tile; AT5: the weather's mask per tile
     con = PM.Contribution.model_validate_json(
         (od / "unreal_contribution.atmos.json").read_text())
     assert con.entries[0].key == "atmos" and \
-        {e.key for e in con.entries[1:]} == {f"atmos.lights.{t.tile}" for t in plan.tiles}
+        {e.key for e in con.entries[1:] if e.kind == "tile_lights"} == \
+        {f"atmos.lights.{t.tile}" for t in plan.tiles}
+    assert {e.key for e in con.entries if e.kind == "weather"} == \
+        {f"atmos.weather.{m.tile}" for m in plan.masks}
     assert rep["counts"] == plan.counts and (od / "atmos_report.txt").is_file()
 
 

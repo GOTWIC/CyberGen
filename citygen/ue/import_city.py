@@ -1264,6 +1264,21 @@ return Opacity * lerp(1.0, 0.25 + 0.75 * l, Textured);
 """
 
 
+# AT5: the trees' crowns in the wind: a sway along the grass's own direction growing with the
+# square of the vertex's height in its tree (LP.z, cm, the variant's frame: its base at 0), a
+# phase by where it stands, and a flutter; within 120 m of the eye (past it still)
+LEAF_SWAY = True
+LEAF_WIND = "wind1"         # (M_CgLeaves' version past STAGE2_VERSION with the sway)
+LEAF_WPO_CODE = """
+float h = saturate(LP.z / 1400.0);
+float k = h * h * Wind * saturate(1.0 - length(WP - Cam) / 12000.0);
+float ph = WP.x * 0.0013 + WP.y * 0.0017;
+float s = sin(T * 1.05 + ph) * 0.7 + sin(T * 2.2 + ph * 1.9) * 0.3 + 0.45;
+float f = sin(T * 6.5 + dot(WP, float3(0.031, 0.027, 0.043)));
+return float3(0.92, 0.38, 0.0) * s * k * 45.0 + float3(-0.38, 0.92, 0.6) * f * k * 4.0;
+"""
+
+
 def leaves_master(m, defaults):
     """AG8's leaf cards: a leaf clump tile on UV0 / TileM, the tint over its leaves, cut
     where the tile has no leaf (the tint mask, ORM alpha), two-sided."""
@@ -1286,6 +1301,19 @@ def leaves_master(m, defaults):
     MEL.connect_material_property(orm, "G", MP.MP_ROUGHNESS)
     MEL.connect_material_property(nrm, "RGB", MP.MP_NORMAL)
     MEL.connect_material_property(orm, "A", MP.MP_OPACITY_MASK)
+    if LEAF_SWAY:
+        # AT5: the crowns sway in the wind (MPC_CityGen's Wind, which atmosgen's weather
+        # drives), more toward their tops (the vertex's height in the tree's own frame)
+        lp = expr(m, unreal.MaterialExpressionPreSkinnedPosition, -1400, 1100)
+        wp = expr(m, unreal.MaterialExpressionWorldPosition, -1400, 1200)
+        cam = expr(m, unreal.MaterialExpressionCameraPositionWS, -1400, 1300)
+        tm = expr(m, unreal.MaterialExpressionTime, -1400, 1400)
+        sw = custom(m, -1000, 1100, LEAF_WPO_CODE, ["LP", "WP", "Cam", "T", "Wind"], cmot(F3),
+                    "CgLeafSway")
+        for a, b in ((lp, "LP"), (wp, "WP"), (cam, "Cam"), (tm, "T"),
+                     (wind(m, -1400, 1500), "Wind")):
+            link(a, "", sw, b)
+        MEL.connect_material_property(sw, "", MP.MP_WORLD_POSITION_OFFSET)
     m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
     m.set_editor_property("opacity_mask_clip_value", 0.5)      # as the Blender preview cuts
     m.set_editor_property("two_sided", True)
@@ -1543,6 +1571,8 @@ def master_tag(master):
     alone; its instances, and every other master, are kept)."""
     if master == "water" and atmos_mpc() is not None:
         return f"{STAGE2_VERSION}.{WATER_RAIN}"
+    if master == "leaves" and LEAF_SWAY:
+        return f"{STAGE2_VERSION}.{LEAF_WIND}"
     return STAGE2_VERSION
 
 

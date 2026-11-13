@@ -2959,7 +2959,10 @@ void ACityGenAtmos::ApplyTime()
 		const bool bSunLight = SunWeight > 0.f;
 		const FVector To = bSunLight ? S : M;
 		Sun->SetActorRotation((-To).Rotation());
-		L->SetIntensity(bSunLight ? SunLux * SunWeight : MoonLux);
+		// (AT5: the weather's overcast takes the sun's direct light: a rainy, foggy day's light
+		// comes from the sky, not hard sun shadows; a clear day keeps it all)
+		const float Overcast = HasWeather() ? 1.f - 0.75f * FMath::Clamp((CoverNow - 0.5f) / 0.5f, 0.f, 1.f) : 1.f;
+		L->SetIntensity(bSunLight ? SunLux * SunWeight * Overcast : MoonLux);
 		L->SetLightColor(bSunLight ? DaySunColor : MoonColor);
 	}
 	if (USkyLightComponent* SL = SkyLightActor ? SkyLightActor->GetLightComponent() : nullptr)

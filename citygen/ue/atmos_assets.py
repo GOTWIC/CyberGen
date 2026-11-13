@@ -8,8 +8,8 @@ run headless by `citygen.unreal_atmos.make_assets`, the job in $CITYGEN_UE_JOB):
 - `M_CgRain`: rain streaks, translucent and lit by the translucency volume (so the drops take
   the neon's colors), falling by world position offset with a phase per instance, drifting
   with the wind; the actor draws them as instanced cards round the view.
-- `M_CgWet`: wet streets, a deferred (DBuffer) decal darkening the surfaces it covers and
-  making them glossy, with puddles by a value noise on the world's plan.
+- AT0's `M_CgWet` (a single DBuffer decal, puddles by a value noise) is gone since AT5: the
+  wet streets are `M_CgWetColor` and `M_CgWetGloss` (below).
 - AT2: `M_CgBeacon`, an aviation light's red glow (unlit, on the instanced spheres the
   controller places per cell), blinking from its per-instance data as the light does; and
   `M_CgBeam`, a searchlight's beam (additive and unlit on a cone along its aim, its color,
@@ -27,6 +27,16 @@ run headless by `citygen.unreal_atmos.make_assets`, the job in $CITYGEN_UE_JOB):
   position offset, its life, size, opacity and albedo from its per-instance data. The fog
   volumes are the engine's local fog volumes (no asset).
 
+- AT5: the weather. `M_CgWetColor` and `M_CgWetGloss`, two DBuffer decals round the view
+  reading the plan's masks (the city's cover and surface textures, set on their instances by
+  the controller): the wet surfaces darker (the color at an opacity, the markings kept), then
+  glossy with puddles as mirrors and the rain's rings in them (roughness and a world-space
+  normal); `M_CgRain` cut where the pixel is under its texel's cover, leaning and drifting with
+  the wind, drizzle's streaks short; `M_CgSplash` (a crown of droplets where a trace from the
+  sky lands) and `M_CgDrip` (a streak falling from a low cover's edge), both instanced cards
+  the controller places; `MPC_CityGenAtmos` gains `Puddles`, `WindX`, `WindY`, `Streak` and
+  `Drops`.
+
 Niagara is not used: UE 5.8 exposes no API to author a Niagara emitter from code (its
 editor library builds nothing; only an engine template could be duplicated and fed user
 parameters), so the effects are C++ components and these materials (decision for AT4, AT5).
@@ -41,11 +51,13 @@ import unreal
 
 JOB = json.load(open(os.environ["CITYGEN_UE_JOB"], encoding="utf-8"))
 FOLDER = "/Game/CityGen/Core/Atmos"
-VERSION = "13"  # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air);
+VERSION = "14"  # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air);
                 # 3 (AT2): M_CgBeacon and M_CgBeam; 4 to 8 (AT3): M_CgSky; 9 to 12 (AT4):
                 # M_CgSteam, MPC_CityGenAtmos's SteamGain; 13 (AT5): the weather (M_CgWet
                 # gone: M_CgWetColor and M_CgWetGloss, M_CgRain cut by the covers and leaning
-                # in the wind, M_CgSplash, M_CgDrip, the steam drifting with the wind's heading)
+                # in the wind, M_CgSplash, M_CgDrip, the steam drifting with the wind's heading);
+                # 14: a drizzle's streets glossy too (the gloss and darkening by the wetness's
+                # square root)
 # AT5: MPC_CityGenAtmos: the weather now (the controller blends its states): the rain's rate,
 # how wet the open surfaces are and how full the puddles, the fog, the wind (its speed with
 # its gusts, its heading as a unit vector), the plumes' gain, the streaks' length and the
@@ -325,7 +337,7 @@ def wet_color(c):
     w, _ = wet_inputs(m, c, -1600, 0)
     dark = expr(m, unreal.MaterialExpressionScalarParameter, -1000, 1200,
                 parameter_name="Darken", default_value=0.55)
-    op = custom(m, -600, 300, "return saturate(W.x * (0.25 + D * W.z) + W.y * 0.42);",
+    op = custom(m, -600, 300, "return saturate(sqrt(W.x) * (0.25 + D * W.z) + W.y * 0.42);",
                 ["W", "D"], "CMOT_FLOAT1", "CgWetDarken")
     link(w, "", op, "W")
     link(dark, "", op, "D")
@@ -394,7 +406,7 @@ def wet_gloss(c):
     rough = custom(m, -600, 300, "return lerp(0.16, 0.03, W.y);", ["W"], "CMOT_FLOAT1",
                    "CgWetRough")
     link(w, "", rough, "W")
-    op = custom(m, -600, 500, "return saturate(W.x * W.z * 0.85 + W.y);", ["W"], "CMOT_FLOAT1",
+    op = custom(m, -600, 500, "return saturate(sqrt(W.x) * W.z * 0.85 + W.y);", ["W"], "CMOT_FLOAT1",
                 "CgWetGlossOpacity")
     link(w, "", op, "W")
     MEL.connect_material_property(rough, "", MP.MP_ROUGHNESS)

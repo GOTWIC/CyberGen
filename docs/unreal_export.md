@@ -1800,6 +1800,114 @@ the fly pawn and the free camera keep the circle.
   `open_lit`, `moved_m`); where there is none, as before. Delta's start stood under the Industrial
   Port's elevated rail (dark even by day); it is 108 m along the sidewalk past it.
 
+### From AT5: weather
+
+The plan's weather (`docs/atmosgen_scope.md` 6.4, `atmosgen/weather.py`: the plan's
+`weather_plan`, `masks` and drip lines) comes with the cells and the controller; AT0's rain
+cards and wet decal become the real thing:
+
+- **Packing version 4** (`unreal_atmos.PACK_VERSION`, `CityGenAtmosPack::DripFloats`): a cell
+  also holds the drip lines whose middle lies in it (7 floats: the ends' x and y in cm, the
+  edge's and the ground's z in cm, the rate plus 8 times the kind's index), the cell actor's
+  `DripFloats`; a cell is made wherever any of the four lie. `ATMOS_VERSION` is `atmos6`: an
+  import over an earlier level re-packs the cells and sets the controller, and touches nothing
+  else but the water master (below).
+- **The masks city-wide** (`unreal_atmos.wet_textures`): the plan's 0.5 m tile masks stitched
+  at `WET_TEXEL_M` (1 m: a power of two a side, Delta's 4,096, about 22 MB of video memory with
+  their mips, against 89 at 0.5 m) into `BUILD/unreal/atmos_wet_cover.png` (grey: the cover,
+  the lowest underside of a texel's covered masks where two or more of its four are covered)
+  and `atmos_wet_surface.png` (red the gloss when wet, green the puddles, their means; blue the
+  drips, their most), written only when their bytes change; the manifest's `atmos.weather`
+  names them (`wet`: files, sha256, size, bounds). The import makes them
+  `Atmos/T_<City>_WetCover` (uncompressed grayscale: the heights exact) and `_WetSurface`
+  (compressed), linear, clamped, never streamed, again only when their bytes change
+  (`Importer.atmos_wet`).
+- **The controller's weather** (`unreal_atmos.weather_settings`, in its hash): the states
+  (`WeatherNames`) and their values (`WeatherValues`, `WEATHER_KEYS` per state: rain, streak,
+  drops, wetness, puddles, cloud cover, the fog volumes' gain, gusts, the wind's speed, the
+  fog's density, falloff, extinction and albedo), the start state (`WeatherStart`), the rain's
+  age (`TransitionS`, `WetS`, `DryS`, `FillS`, `DrainS`), the wind (`WindHeadingDeg`,
+  `RainLean`, `GaleMS`), the cover's datum and step (`CoverZ0Cm`, `CoverStepCm`), the textures
+  and their bounds (`WetCover`, `WetSurface`, `WetBounds`), what it keeps near the view
+  (`MaxSplashes`, `SplashRangeM`, `MaxDrips`, `DripRangeM`, `DripStepM`, `RainCards`). With a
+  weather the import turns the rain and the wet streets on (`bRain`, `bWet`): each shows as
+  the state has it.
+- **States and transitions** (`ACityGenAtmos::SetWeatherState`, `UpdateWeather`): a state
+  change blends every value over `TransitionS` (20 s, smoothstep); the fog follows (the
+  height fog's density, falloff, volumetric extinction and albedo), the cloud deck's cover (a
+  clear night opens it for the moon and the stars; `CityGenAtmos.Cover` holds till the next
+  change), the fog volumes' gain (mist and smog thicker in fog and smog), the wind with its
+  gusts. The rain's age runs in the runtime's own seconds (`WeatherSpeed` times real time):
+  the open surfaces wet toward the state's wetness over `WetS` at full rain (slower in
+  drizzle) and dry over `DryS`; the puddles fill over `FillS` and drain over `DrainS`, so a
+  clear night after rain keeps its wet streets and puddles a while. Every value goes to
+  `MPC_CityGenAtmos` 15 times a second (`Rain`, `Wetness`, `Puddles`, `WindMS` with its gust,
+  `WindX` and `WindY` the heading in Unreal's frame, `Streak`, `Drops`), and the wind to
+  `MPC_CityGen`'s `Wind` (its speed over `GaleMS`: AG13's grass sways with the weather).
+- **Wet streets** (`M_CgWetColor` and `M_CgWetGloss`, two DBuffer decals round the view, 1.2 km
+  square, recentred every 100 m, 50 m deep either side of 30 m over the ground under the view):
+  per pixel the texel's cover against the pixel's height (under its cover dry: the street under
+  a viaduct, the sidewalk under an awning or an overhang; a deck's or a viaduct's top over it
+  wet), the face's normal from the depth (its derivatives, turned to the eye: floors full,
+  walls `WallShare` 0.35, undersides none), the surface's gloss (asphalt mirrors, grass does
+  not, the water none: its own master), the drip band wetter, and the puddle (the texel's
+  depth against `Puddles`, its edge broken by a fine noise). The first decal darkens (the
+  DBuffer's color: black at an opacity, so a surface is its own color times one less it and
+  the lane markings stay, darker); the second makes glossy (roughness and a world-space normal
+  at an opacity: wet asphalt 0.16, a puddle a 0.03 mirror) with the rain's rings in the
+  puddles and fainter on the wet floor near the eye (`RingM` 30 m). One decal could not do
+  both: the DBuffer's color, normal and roughness share one opacity. Past the textures the
+  ground is `FarGloss` wet with no shelter or puddle.
+- **Rain** (`M_CgRain`): the cards (6,000 within 25 m) cut where the pixel is under its
+  texel's cover (`WetCover` on the rain's own instance), the share that falls (`Drops`), the
+  streaks' length (`Streak`: drizzle short and slower), each card leaning downwind and
+  drifting as it falls (`WindX`, `WindY`, `WindMS`); shown only while the state rains.
+- **Splashes** (`M_CgSplash`, `UpdateSplashes`): `MaxSplashes` cards within `SplashRangeM`
+  of the view, each at a spot a trace down from 40 m over a random point finds (`ECC_Visibility`,
+  the pawn left out; a spot whose surface does not face up has none): the rain's own landing
+  spots, so none under a cover and on an awning's top its own; a few re-traced every tick,
+  round robin. Each a crown of droplets thrown up over a short life, turned to the eye.
+- **Drips** (`M_CgDrip`, `UpdateDrips`): along the plan's drip lines within `DripRangeM`, a
+  card every `DripStepM` (jittered and phased by a hash), the nearest `MaxDrips`, again every
+  half second once the view has moved 4 m; each a streak falling from the edge to the ground
+  under gravity, drifting downwind; dripping while it rains and a while after (the wetness).
+- **Rain on the water** (`M_CgWater`, the importer's stage 2 master): rings spreading from
+  drops (hashed points in two layers of 35 cm cells) added to its normal by
+  `MPC_CityGenAtmos`'s `Rain`, within 40 m of the eye. The master's version tag gains `.rain1`
+  (`import_city.master_tag`) where the project has atmosgen's collection, so an import with
+  an atmos plan rebuilds the water master alone (its instances and every other master kept).
+- **Wind**: the steam and smoke plumes (`M_CgSteam`) drift along the wind's heading, the rain
+  leans in it, the drips drift with it, AG13's grass sways with `MPC_CityGen`'s `Wind`. Trees
+  and flags: see `docs/progress/AT5`'s open items.
+- **Assets** (`atmos_assets.py` version 13): `M_CgWetColor`, `M_CgWetGloss`, `M_CgSplash`,
+  `M_CgDrip` and the new `M_CgRain`; AT0's `M_CgWet` is deleted; `MPC_CityGenAtmos` gains
+  `Puddles`, `WindX`, `WindY`, `Streak` and `Drops`. All under `/Game/CityGen/Core/Atmos`
+  (cooked always).
+- **Console commands:** `CityGenAtmos.Weather NAME [now]` (a state, blended or at once; `+`
+  and `-` step it), `.WeatherSpeed S` (the rain's age), `.Wetness W [P]` (the wetness and the
+  puddles held, for shots; -1 by the age again); `.Rain` and `.Wet` switch the weather's rain
+  (streaks, splashes, drips) and the wet streets. `.Status` adds `weather`, `weather_now`
+  (`a > b` while it turns), `weather_target`, `transition`, `rain_now`, `drops`, `streak`,
+  `wetness`, `puddles`, `wind_ms`, `cloud_cover`, `volume_gain`, `fog_density`, `rain_shown`,
+  `wet_shown`, `splashes`, `splashes_live`, `drips`, `drip_lines`, `wet_textures`,
+  `weather_speed`.
+- **The play features' menu:** with a weather, the Tab menu's AT0 rows (Fog, Rain, Wet
+  streets) are one Weather row: the state's name (`a > b` while it turns), its arrows the
+  previous and the next state, a click the next (`ClickMenuRow` `weather+`, `weather-`,
+  `weather=NAME`, `weather=NAME!` at once; the controller found by its class name, its
+  `StepWeather`, `SetWeatherState`, `GetWeatherLabel`); `CityGen.Status` gives `weather`.
+- **The check:** by night the controller's weather (its textures set, the start state's rain
+  falling and streets wet where it rains); a `--view` named `*__<state>` renders in that state
+  settled, `*__<a>2<b>_<n>s` in state a turning to b for n seconds (a frame of the
+  transition), the start state again after it; their states in the result's `weather_views`.
+- **The benchmark** (`bench.ATMOS_PASSES`): every atmos pass sets a state at once
+  (`CityGenAtmos.Weather <state> now`, rain by default, so none leaks into the next);
+  `night_plan_all` is the rain (streaks, splashes, drips, the wet streets with their puddles,
+  the rain's fog), `night_plan_drizzle`, `night_plan_clear`, `night_plan_fogstate` and
+  `night_plan_smog` the other states with everything on.
+- **A plan whose weather check failed** is not delivered (`atmos.skipped`); a plan without a
+  weather (AT4's) keeps AT0's prototypes' switches and the menu's rows.
+
 ### A packaged game
 
 A project a city was imported into packages as any Unreal project (UAT's `BuildCookRun`,
@@ -1841,7 +1949,8 @@ native start below then never applies for the player who opens it next. Three fi
   (`night`, `freecam`, `minimap`, `messages`, `fog`, `rain`, `wet`, `hour+`, `hour-`),
   also the console's `CityGen.MenuRow ROW`, so a script or the benchmark's pass commands
   drive the menu as a click does; `CityGen.Status` gives `atmos`, `fog`, `rain`, `wet` and
-  `hour`. AT5's weather states replace these rows.
+  `hour`. AT5's weather row replaces the Fog, Rain and Wet streets rows where the plan has a
+  weather ("From AT5" above).
 
 ## AG18's vehicles
 
