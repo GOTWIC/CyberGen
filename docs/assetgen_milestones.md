@@ -3245,9 +3245,8 @@ Vanta-R the same).
 - **Aurel set aside** (Swagnik, 2026-11-12: not in use for now): the Prelate's step B pass
   (its slot grille tore in the pack's far LODs) is kept on branch
   `claude/ag18-prelate-step-b-wip`, not merged; the Aurels are left out of the next batches.
-- **Next**: the other cars of the Kestrel, Orrin, Brakk, Halcyon and Tanager brands on the
-  pilots' patterns (Meridian, Atlas, Pebble, Aria, Bastion, Mule, Sable, Ridge, Cab,
-  Porter), each switching to its `vehicles/brands/` module, with step A's street-distance
+- **Next**: the other cars of the Kestrel, Orrin, Brakk and Tanager brands on the
+  pilots' patterns (Meridian, Atlas, Pebble, Aria, Bastion, Mule, Cab, Porter), each switching to its `vehicles/brands/` module, with step A's street-distance
   findings fixed as it is redone.
 
 ### Parked in Delta Megacity on the PC (2026-11-12)

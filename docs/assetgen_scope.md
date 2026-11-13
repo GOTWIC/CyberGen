@@ -1406,12 +1406,12 @@ target is a current AAA open-world game's hero vehicles.
 (phase 3), and the packs are in the exporter and tested in Unreal (2026-11-11); H is done
 (2026-11-11: the vehicles parked in the generated cities); A is done (2026-11-12: the kit).
 B is in progress: its kit, the Vanta-R and a pilot of four more brands (Dart, Lumen, Hauler,
-Mino) are done (2026-11-12); the Aurels are set aside for now; next the other ten.
+Mino) are done (2026-11-12), the Sable and Ridge (2026-11-13); the Aurels are set aside for now; next the other eight.
 
 | Step | Work | Covers |
 |---|---|---|
 | A | Kit: clay and zebra renders, the checks, the designers' wishes (the line-up render is done). Done | 3, 13, 14 |
-| B | What shows at street distance: lamps, cut lines, glass, on the kept cars. Kit, Vanta-R, Dart, Lumen, Hauler, Mino done | 1, 2, 6 (glass) |
+| B | What shows at street distance: lamps, cut lines, glass, on the kept cars. Kit, Vanta-R, Sable, Ridge, Dart, Lumen, Hauler, Mino done | 1, 2, 6 (glass) |
 | C | Wheels, running gear, hover gear, undersides | 4, 5, 7 |
 | D | Cabins | 6 (cabin) |
 | E | Night lights, trims, optional parts, wear | 8, 9 |
