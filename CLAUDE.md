@@ -2298,7 +2298,7 @@ waits for Swagnik's review.
   (`game.LENS_MATS`), baking the lamp behind them. Done: the kit and the Vanta-R (its pack
   rebuilt), then the Dart, Lumen, Hauler and Mino as brand pilots. The Aurels are set aside
   (Swagnik, 2026-11-12; the Prelate's attempt on branch `claude/ag18-prelate-step-b-wip`).
-  The Sable, Ridge, Meridian and Atlas followed (2026-11-13). Next: the other six non-Aurel cars, each switching to its `vehicles/brands/` module.
+  The Sable, Ridge, Meridian, Atlas, Pebble and Aria followed (2026-11-13; the Orrins keep 2.4 mm shut lines, which tore their far LODs at 3.5 mm). Next: the other four non-Aurel cars, each switching to its `vehicles/brands/` module.
 - The other phases (improvements, AG8's parked vehicles and
   stage 4's fleet drawing on them) are listed in the scope with their plan.
 

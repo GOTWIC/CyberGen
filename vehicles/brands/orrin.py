@@ -23,6 +23,14 @@ build_disc). Differences kept by parameters:
   hub (three radii of the hub's face), sweep (the vanes' turn, degrees) and cap (the
   center ring) set the face, size=DISC_SMALL the Pebble's slimmer face throughout.
 
+Added for the Pebble's step B: lune_cut (the Lumen's lune_cut, slots told to the checks),
+NARROW (a narrow tire's tread, disc(tread=NARROW)).
+
+Added for the Aria's step B, the Pebble's light channel parts (the Pebble keeps its own
+copies): on_skin, taper_width, along, band, chop, seated (the Pebble's pebble on a seat
+taken before the cuts) and channel_lamp (a ribbon's lens, lit face and sleeve in its
+channel).
+
 Covered by the kit: spline is carkit's spline() (the same code), re-exported. The kit's
 snap() and strip() are newer, more general ones (objs, out), but snap's turn of the normal
 differs from both Orrin rules, so the Orrin pair stays here.
@@ -152,6 +160,33 @@ def lune(g, a, b, d, toward, far, near, out=0.2, depth=0.04, flare=0.02, n=16):
         g.add([p + dd * out for p in rim] + [p - dd * depth for p in rim2], faces)
 
 
+def lune_cut(g, a, b, d, toward, far, near, n=16, **kw):
+    """lune(), and its outline on the skin told to the checks (K.CUTS: a slot cut on purpose,
+    not a hole). Call it from build_body's cutters function, while the hull stands uncut.
+    (The Lumen keeps a copy of its own.)"""
+    lune(g, a, b, d, toward, far, near, n=n, **kw)
+    a, b, d = V3(a), V3(b), V3(d).normalized()
+    u = b - a
+    ln = u.length
+    u.normalize()
+    d = (d - u * d.dot(u)).normalized()
+    v = d.cross(u).normalized()
+    if v.dot(V3(toward)) < 0:
+        v = -v
+    ts = [k / n for k in range(n + 1)]
+    rim = ([a + u * ln * t + v * far * 4 * t * (1 - t) for t in ts]
+           + [a + u * ln * t + v * near * 4 * t * (1 - t) for t in ts[-2:0:-1]])
+    tree = K._tree(None)
+    for sgn in (1, -1):
+        dd = V3((d.x, sgn * d.y, d.z))
+        Q = []
+        for p in rim:
+            p = V3((p.x, sgn * p.y, p.z))
+            hit = tree.ray_cast(p + dd * 0.2, -dd, 0.4)[0]
+            Q.append(hit if hit is not None else p)
+        K.CUTS.append(Q + [Q[0]])
+
+
 def pebble(g, at, a, b, h, seg=40, up=(0, 0, 1)):
     """A low oval bead on the surface at the point nearest `at`: a wide, b high, h proud."""
     loc, n = snap(at)
@@ -256,6 +291,13 @@ def rim_at(x, tree=None, *, pt, order, line="S", at=0.35, push=(0, 0.03, 0.03), 
     raise ValueError(x)
 
 
+NARROW = dict(grooves=(-0.11, 0.11), gw=(0.009, 0.005), gd=0.008, mod=4, shift=2,
+              inset=(0.002, 0.006), seg=144)
+"""A road tread for a narrow tire (the Pebble's 0.185 m): the kit's "road" grooves fall
+outside such a tire's crown, its profile folds back and its blocks stand 7 mm under the
+ground. The same as Tanager's NARROW."""
+
+
 # the disc's face: the profile's offsets (from the rim and from the tire's half width:
 # rim1, out1, rim2, out2, rim3, out3, hub_out, back, back_rim, rim_end), the vanes' outer
 # radius under the rim, their offset and half section, the rings' offsets
@@ -267,12 +309,14 @@ DISC_SMALL = dict(face=(0.006, 0.011, 0.014, 0.032, 0.018, 0.034, 0.013, 0.07, 0
 
 
 def disc(tag, cx, out_y, side, vanes=60, *, R, W, rim, r_in=0.118, hub=(0.102, 0.072, 0.040),
-         sweep=40, cap=(0.026, 0.035), size=DISC):
+         sweep=40, cap=(0.026, 0.035), size=DISC, tread="road"):
     """The Orrin turbine disc on the kit's tire (radius R, width W, rim radius rim, its outer
     face at y out_y): a smooth face, vanes curved sweep degrees from r_in out to the rim, a
-    lit ring at each end of them. The kit's rim and hub are taken away."""
+    lit ring at each end of them. The kit's rim and hub are taken away. tread: a kit tread
+    or NARROW."""
     RIM = rim
-    K.build_wheel(tag, cx, R, W, RIM, out_y, side, style="disc", ring=None, caliper=None)
+    K.build_wheel(tag, cx, R, W, RIM, out_y, side, style="disc", ring=None, caliper=None,
+                  tread=tread)
     for part in ("rim.", "hub."):
         ob = bpy.data.objects[part + tag]
         me = ob.data
@@ -310,3 +354,137 @@ def disc(tag, cx, out_y, side, vanes=60, *, R, W, rim, r_in=0.118, hub=(0.102, 0
     g.lathe([(hw - y0, r_in - 0.003), (hw - y0, r_in + d_in),
              (hw - y1, r_in + d_in), (hw - y1, r_in - 0.003)], 64)
     g.obj("ring." + tag, "led_wheel", flip_y=flip, loc=loc)
+
+
+def on_skin(ctrl, n=12, lift=0.004):
+    """The smooth curve through ctrl laid on the skin, each point lift outside it (so the
+    kit's trace() turns its normals out)."""
+    out = []
+    for q in spline(ctrl, n):
+        loc, nn = snap(q)
+        if not out or (loc - out[-1][0]).length > 1e-4:
+            out.append((loc, nn))
+    return [q + nn * lift for q, nn in out]
+
+
+def taper_width(t, ln, w, tip, taper):
+    """A channel's width at share t of its run, ln long: w, drawn out to tip over the
+    taper lengths (start, end) at its ends."""
+    k = 1.0
+    if taper[0]:
+        k = min(k, (t * ln / taper[0]) ** 0.6)
+    if taper[1]:
+        k = min(k, ((1 - t) * ln / taper[1]) ** 0.6)
+    return tip + (w - tip) * max(0.0, k)
+
+
+def along(tr, s0=0.0, s1=None, step=0.03):
+    """Frames every step along a traced path between the lengths s0 and s1:
+    [(point, normal, tangent, side, share)], side = tangent x normal, share of the run."""
+    P = [q for q, _ in tr]
+    S = [0.0]
+    for a, b in zip(P, P[1:]):
+        S.append(S[-1] + (b - a).length)
+    s1 = S[-1] if s1 is None else min(s1, S[-1])
+    n = max(1, int(round((s1 - s0) / step)))
+    out, i = [], 0
+    for k in range(n + 1):
+        s = s0 + (s1 - s0) * k / n
+        while i < len(S) - 2 and S[i + 1] < s:
+            i += 1
+        t = (s - S[i]) / max(S[i + 1] - S[i], 1e-9)
+        tg = (P[i + 1] - P[i]).normalized()
+        nn = tr[i][1].lerp(tr[i + 1][1], t).normalized()
+        out.append((P[i].lerp(P[i + 1], t), nn, tg, tg.cross(nn).normalized(), s / S[-1]))
+    return out
+
+
+def band(g, fr, w, z0, z1):
+    """A bar inside a channel along frames fr: w(frame) wide, from z0(frame) to z1(frame)
+    under the skin, its section changing along it."""
+    vs = []
+    for f in fr:
+        q, n, _, sd, _ = f
+        h, a, b = w(f) / 2, z0(f), z1(f)
+        vs += [q - n * a - sd * h, q - n * a + sd * h, q - n * b + sd * h, q - n * b - sd * h]
+    m = len(fr)
+    faces = [(4 * i + j, 4 * i + (j + 1) % 4, 4 * i + 4 + (j + 1) % 4, 4 * i + 4 + j)
+             for i in range(m - 1) for j in range(4)]
+    faces += [(3, 2, 1, 0), tuple(4 * (m - 1) + j for j in range(4))]
+    g.add(vs, faces)
+
+
+def chop(ob, tr, step=0.045, near=0.06):
+    """A channel's walls cut into loose pieces step long across its path tr (the same
+    surface): a game pack's LOD2 and LOD3 leave pieces under 5 cm out, where a whole wall
+    of thin sheet collapses into dark shards over the paint. Each cut splits only the faces
+    within near of its point (the Pebble's copy splits the whole object at every cut)."""
+    import bmesh
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    xf = ob.matrix_world.inverted()
+    P = [xf @ q for q, _ in tr]
+    ln = sum((b - a).length for a, b in zip(P, P[1:]))
+    s, last, cuts = 0.0, 0.0, set()
+    for a, b in zip(P, P[1:]):
+        s += (b - a).length
+        if s - last < step or s > ln - 0.01:        # the last piece no longer than step
+            continue
+        last = s
+        # only the faces near this point: a plane through the whole object would split the
+        # channel everywhere it crosses it again (the other side, a turn), for nothing
+        faces = [f for f in bm.faces if any((v.co - b).length < near for v in f.verts)]
+        edges = list({e for f in faces for e in f.edges})
+        verts = list({v for f in faces for v in f.verts})
+        res = bmesh.ops.bisect_plane(bm, geom=verts + edges + faces, plane_co=b,
+                                     plane_no=(b - a).normalized(), dist=1e-6)
+        for e in res["geom_cut"]:          # only the cut across the channel here
+            if isinstance(e, bmesh.types.BMEdge) and all((v.co - b).length < 0.05
+                                                          for v in e.verts):
+                cuts.add(e)
+    bmesh.ops.split_edges(bm, edges=[e for e in cuts if e.is_valid])
+    bm.to_mesh(ob.data)
+    bm.free()
+    ob.data.update()
+
+
+def seated(g, seat, a, b, h, seg=40, up=(0, 0, 1)):
+    """pebble() on a seat (point, normal) taken before the cuts: a low oval bead a wide, b
+    high, h proud."""
+    loc, n = seat
+    t1 = V3(up).cross(n).normalized()
+    t2 = n.cross(t1)
+    rings = [(1.0, -0.003), (1.0, 0.0), (0.95, h * 0.42), (0.80, h * 0.76), (0.52, h * 0.95),
+             (0.2, h)]
+    o = len(g.v)
+    for r, z in rings:
+        g.v += [loc + n * z + t1 * (a * r * cos(2 * pi * k / seg))
+                + t2 * (b * r * sin(2 * pi * k / seg)) for k in range(seg)]
+    for i in range(len(rings) - 1):
+        g.f += [(o + i * seg + k, o + i * seg + (k + 1) % seg, o + (i + 1) * seg + (k + 1) % seg,
+                 o + (i + 1) * seg + k) for k in range(seg)]
+    g.f.append(tuple(o + (len(rings) - 1) * seg + k for k in range(seg)))
+
+
+def channel_lamp(name, tr, w, depth, gap, lit="led_front", lens="lens_clear", step=0.008,
+                 sink=0.0):
+    """A ribbon in its channel (traced path tr, width w(share)): a flush lens with the
+    body's gap each side (a lens cut from the skin keeps the boolean's slivers), a light
+    guide's lit face right under it, 3 mm wider than the channel's mouth with its edges
+    tucked under the paint (a far LOD that moves the mouth shows light, not a slit), and a
+    frosted sleeve behind it. sink: the lens set that far under the skin (a flat lens's
+    edges stand proud where the skin curves tightly across the channel)."""
+    if len(tr) < 2:
+        return
+    ln = sum((b[0] - a[0]).length for a, b in zip(tr, tr[1:]))
+    fr = along(tr, 0.003, ln - 0.003, step)
+
+    def wf(f):
+        return w(f[4])
+    L = K.Lamp(name, lit=lit, glass=lens)
+    band(L.glass, fr, lambda f: wf(f) - 2 * gap, lambda f: sink, lambda f: sink + 0.003)
+    band(L.emit(), fr, lambda f: wf(f) + 0.003, lambda f: sink + 0.0032,
+         lambda f: sink + 0.0032 + wf(f) * 0.18)
+    band(L.optic, fr, lambda f: wf(f) * 0.70, lambda f: sink + 0.0032 + wf(f) * 0.18,
+         lambda f: depth - 0.0005)
+    L.obj()

@@ -3288,8 +3288,53 @@ Vanta-R the same).
   LOD3 37.3 of 40 degrees, 0.091 of 0.10 bent, 0.026 of 0.04 texture (main 37.3, 0.080,
   0.030); its LOD row reads as main's, the prow's cells lit at LOD3, the charge flap a dark
   dot there. Not published.
-- **Next**: the other cars of the Orrin, Brakk and Tanager brands on the
-  pilots' patterns (Pebble, Aria, Bastion, Mule, Cab, Porter), each switching to its `vehicles/brands/` module, with step A's street-distance
+- **Orrin Pebble** (`docs/progress/AG18/orrin_pebble/`, on `vehicles/brands/orrin.py`, which
+  gains `lune_cut` and `NARROW` and a `tread` for `disc`): the waist ribbon channels cut
+  along the widest line, 17 mm wide and 9 mm deep, round the nose, round the tail and along
+  each petal to its flank flap, each stopping 80 mm short of a shut line (one channel all
+  round split the nose and tail panels in two, which LOD3 collapsed apart), a lit face right
+  under a flush lens of its own, wider than the channel's mouth, its edges tucked under the
+  paint (clear in front, red behind, unbroken: cells came apart into dashes far off), the pole
+  pebbles kept; an oval flap cut round each flank pebble (the left the charge port's) in
+  place of the hairline ring; the crescent slots and the leaf's grab recess told to the
+  checks (ten cutter holes before, none now); the kit's 2.4 mm shut lines kept (at 3.5 mm,
+  and with the channels 30 mm from the petal cuts, LOD2 and LOD3 tore dark round the cuts
+  and the glass edge over the petal); the dome keeps its
+  frameless glass. Step A's tires: room cut inside the skin beside the sidewalls under the
+  eyelids (0.0 mm to the well before, 16.2 front and 16.1 rear) and a narrow road tread (the
+  kit's stood 7 mm into the ground; 0.0 now); the front still cannot steer under its lids.
+  324,498 triangles (266,030). For the pack the channels' walls are a 1 mm sheet (bare,
+  the lit face baked dark) cut into 4.5 cm pieces across the channel (`chop`): whole, 1.8 m
+  of thin sheet round the nose starved LOD3 (ratio 0.025) and collapsed into dark shards over
+  the paint, 9 cm pieces left dark specks at LOD2; under 5 cm, LOD2 and LOD3 leave them out
+  (ratio 0.07), and the wide lit face keeps the line lit where the mouth's edges move (as
+  wide as the lens, the mouth showed as a dark slit beside it). Pack rebuilt, every check
+  passing: 148,060, 59,993, 19,949, 5,067 triangles, standard class, texels 569 px/m (5th
+  percentile), LOD3 5.9 of 40 degrees, 0.007 of 0.10 bent, 0.008 of 0.04 texture (main 6.2,
+  0.006, 0.009); the ribbon one lit line at every LOD, LOD2 and LOD3 reading as main's. Not published.
+- **Orrin Aria** (`docs/progress/AG18/orrin_aria/`, on `vehicles/brands/orrin.py`, which
+  gains the Pebble's channel parts as copies, `channel_lamp` among them, and a `chop` that
+  splits only the faces near each cut; the Lumen and the Pebble build as before): the light
+  ribbons channels cut into each body piece, 16 mm wide and 9 mm deep (round the nose, along
+  each fender pod from behind the wheel round its tip and up the slot, down each buttress and
+  on along the hip's crest round its tip to the tail blade's light bar, the buttress's
+  channel running into the hip's from under the leg), each with the Pebble's flush lens (set
+  1.2 mm under the skin: on the nose's tight curve a flush lens's edges stood proud), wide
+  lit face and chopped 1 mm walls; side markers as short channels; a round flap cut round
+  each charge port with its light ring inside; the door pulls a crescent recess; the
+  crescents and the wheel openings told to the checks (twelve cutter holes, none now; four
+  were the wells breaking through the skin over the tires, their arches now lowered at the
+  top); the kit's 2.4 mm shut lines kept; the frameless teardrop canopy unchanged. Step A's
+  tires: room cut beside the front tires in the core and the pods' wells (each cutter a solid
+  of its own: two overlapping in one emptied a pod), 0.0 front and 2.8 mm rear before, 5.0
+  now; the front still cannot steer. 393,388 triangles (501,460): pods and hips at
+  subdivision 3, the yoke and the liner at 2, the channels and lamps sampled coarser, the
+  tread at 80 segments. Pack rebuilt, every check passing: 145,467, 59,963, 20,262, 5,141
+  triangles, standard class, texels 393 px/m (5th percentile), LOD3 15.8 of 40 degrees,
+  0.023 of 0.10 bent, 0.010 of 0.04 texture (main 15.0, 0.022, 0.010); its LOD row reads as
+  main's. Not published.
+- **Next**: the other cars of the Brakk and Tanager brands on the
+  pilots' patterns (Bastion, Mule, Cab, Porter), each switching to its `vehicles/brands/` module, with step A's street-distance
   findings fixed as it is redone.
 
 ### Parked in Delta Megacity on the PC (2026-11-12)
