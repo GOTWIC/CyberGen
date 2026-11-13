@@ -274,20 +274,37 @@ class Weather:
         gm = self.ground_many
         # M3's masses whose floor is off the ground: overhangs, towers over their podium's
         # edge, cantilevers (their footprint as drawn; the lowest ground under its corners)
+        # (only where it hangs over no mass of its own building that reaches up to it: a tower
+        # standing on its podium covers the podium's roof, not the street beside it)
         for b in sorted(m.get("buildings", []), key=lambda b: b["id"]):
             base = c.ground_at_base(b)
-            for k, ms in enumerate(b.get("masses") or []):
-                z0 = float(ms.get("z0_m", 0.0))
-                if z0 < 0.8:
-                    continue
+            polys = []
+            for ms in b.get("masses") or []:
                 fp = ms.get("footprint") or {}
                 ext = fp.get("exterior") or []
-                if len(ext) < 3:
+                g = None
+                if len(ext) >= 3:
+                    g = Polygon(ext, [h for h in fp.get("holes") or [] if len(h) >= 3])
+                    if not g.is_valid:
+                        g = g.buffer(0)
+                polys.append((g, float(ms.get("z0_m", 0.0)), float(ms.get("z1_m", 0.0))))
+            for k, (g, z0, z1) in enumerate(polys):
+                if z0 < 0.8 or g is None or g.is_empty:
                     continue
-                g = float(np.min(gm([p[0] for p in ext], [p[1] for p in ext])))
-                self._add(cid=f"{b['id']}.m{k}", kind="mass",
-                          rings=[ext] + list(fp.get("holes") or []), under=base + z0,
-                          ground=g)
+                held = [q for j, (q, a0, a1) in enumerate(polys)
+                        if j != k and q is not None and a0 < z0 and a1 >= z0 - 0.5]
+                if held:
+                    from shapely import union_all
+                    g = g.difference(union_all(held))
+                for i, part in enumerate(getattr(g, "geoms", [g])):
+                    if part.geom_type != "Polygon" or part.area < 1.0:
+                        continue
+                    ext = [list(p) for p in part.exterior.coords][:-1]
+                    gz = float(np.min(gm([p[0] for p in ext], [p[1] for p in ext])))
+                    self._add(cid=f"{b['id']}.m{k}" + (f".{i}" if i else ""), kind="mass",
+                              rings=[ext] + [[list(p) for p in h.coords][:-1]
+                                             for h in part.interiors],
+                              under=base + z0, ground=gz)
         # M14's deck slabs (their light wells open)
         for dk in sorted(m.get("decks", []) or [], key=lambda d: d["id"]):
             poly = dk.get("polygon") or {}

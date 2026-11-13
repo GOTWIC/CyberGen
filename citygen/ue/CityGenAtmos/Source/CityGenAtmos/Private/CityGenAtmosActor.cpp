@@ -2237,6 +2237,14 @@ void ACityGenAtmos::UpdateSplashes(const FVector& View)
 		return;
 	}
 	Splashes->SetWorldLocation(FVector(View.X, View.Y, View.Z - 100.0));
+	// (in batches five times a second: each batch sends the cards' data to the render thread
+	// once; every frame cost the render thread a fraction of a millisecond)
+	const double Now = FPlatformTime::Seconds();
+	if (SplashesAt >= 0.0 && Now - SplashesAt < 0.2)
+	{
+		return;
+	}
+	SplashesAt = Now;
 	const double R = SplashRangeM * 100.0;
 	FCollisionQueryParams Q(SCENE_QUERY_STAT(CityGenSplash), false);
 	if (const APlayerController* PC = World->GetFirstPlayerController())
@@ -2248,7 +2256,7 @@ void ACityGenAtmos::UpdateSplashes(const FVector& View)
 	}
 	bool bAny = false;
 	const int32 N = SplashAt.Num();
-	const int32 Per = FMath::Clamp(N / 12, 8, 48);
+	const int32 Per = FMath::Clamp(N / 3, 8, 192);
 	for (int32 n = 0; n < Per; ++n)
 	{
 		const int32 k = SplashNext;

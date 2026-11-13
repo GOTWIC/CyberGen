@@ -992,6 +992,7 @@ private:
 	TObjectPtr<UInstancedStaticMeshComponent> DripCards;
 	TArray<FVector> SplashAt;               // each splash card's spot (Z < -1e8: none)
 	int32 SplashNext = 0;
+	double SplashesAt = -1.0;               // (re-traced in batches 5 times a second)
 	int32 SplashesLive = 0;
 	double DripsAt = -1.0;
 	FVector DripsView = FVector(1e12);
