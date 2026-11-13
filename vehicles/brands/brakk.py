@@ -14,6 +14,12 @@ pylon, coil, wheel. Differences between the copies, kept by parameters:
   dish the rim's dish and hub sizes (DISH_SMALL is the Hauler's); motor=False leaves the
   hub motor out (the Hauler, the Bastion's spare) and shows a dark void through the dish.
 
+Step B's lamp pylon (lamp_pylon, with lbox and lpt) is the Hauler's step B pylon as its own
+copy builds it (housings of plates round pockets, an LED bar in a reflector V and an amber
+cell under lenses, bolted bezels, a guard); the Hauler keeps its copy, the Bastion and the
+Mule use this one (the Mule with bar, a wider LED bar); the older pylon above stays for the
+cars not yet redone.
+
 Left in the cars: the Mule's yz_prism, xy_prism and xz_prism (one car; the kit's
 Geo.prism_on now lays a polygon on any named plane), the hulls' rows and the cars' own
 parts. The kit's Geo.cyl, Geo.ring and bolt_row are newer, more general helpers but do
@@ -326,3 +332,88 @@ def wheel(tag, cx, side, loc=None, yaw=0.0, motor=True, *, R, w, rim, out, lugs,
         g.obj("motorband." + tag, "stator", flip_y=flip, loc=loc)
     for ob in list(K.CAR.objects)[n0:]:
         ob.rotation_euler = (0, 0, yaw)
+
+
+# ---------------------------------------------------------------------------------------
+# step B's lamp pylon (the Hauler's own copy, which it keeps; the Bastion builds on this one)
+# ---------------------------------------------------------------------------------------
+def lbox(g, o, R, a, b, z):
+    """A box in a lamp's own frame: o its foot on the body, R its turn, a its range along
+    the way out, b across, z up (absolute)."""
+    c = V3(o) + R @ V3(((a[0] + a[1]) / 2, (b[0] + b[1]) / 2, 0))
+    c.z = (z[0] + z[1]) / 2
+    g.box(c, (a[1] - a[0], b[1] - b[0], z[1] - z[0]), rot=R)
+
+
+def lpt(o, R, a, b, z):
+    """A point in a lamp's own frame (as lbox)."""
+    p = V3(o) + R @ V3((a, b, 0))
+    p.z = z
+    return p
+
+
+def lamp_pylon(key, x, y, z0, z1, yaw, lit, lens, face=0.05, lens_at=0.044, sw=0.03,
+               sink=0.03, guard=4, bar=0.018):
+    """Step B's light pylon on a chamfered corner, facing yaw (degrees): a housing of plates
+    sunk sink into the corner, a tall window over an LED bar right under its lens in a V of
+    reflector plates and an amber cell at its foot under an amber lens, each in a bolted
+    bezel, a guard of guard bars over the tall one (0: none). face is how far the plates
+    stand off the corner, lens_at where the lenses lie, sw half a window's width, bar the
+    LED bar's width (up to the window's, 2 sw - 0.01: a bar that fills the V's mouth reads
+    lit far off, where the V's chrome bakes dark). Made on
+    the left side and mirrored: objects pylon.<key>, .bezel, .bolts, .guard,
+    lamp.pylon_<key> and lamp.pylon_<key>_turn."""
+    R = Matrix.Rotation(rad(yaw), 3, 'Z')
+    o = V3((x, y, 0))
+    n = R @ V3((1, 0, 0))
+    wb, wt = z0 + 0.135, z1 - 0.035            # the tall window
+    ab, at = z0 + 0.04, z0 + 0.105             # the amber cell's window
+    g = Geo()
+    lbox(g, o, R, (-sink, 0.0), (-0.05, 0.05), (z0, z1))
+    for sg in (1, -1):
+        lbox(g, o, R, (0.0, face), sorted((sg * sw, sg * 0.05)), (z0, z1))
+    for zz in ((wt, z1), (at, wb), (z0, ab)):
+        lbox(g, o, R, (0.0, face), (-sw, sw), zz)
+    g.obj("pylon." + key, "cladding", bevel=0.003, mirror=True)
+    gb, gn = Geo(), Geo()
+    for lo, hi in ((wb, wt), (ab, at)):
+        for sg in (1, -1):
+            lbox(gb, o, R, (face, face + 0.006), sorted((sg * (sw - 0.005), sg * (sw + 0.012))),
+                 (lo - 0.012, hi + 0.012))
+        for zz in ((hi - 0.005, hi + 0.012), (lo - 0.012, lo + 0.005)):
+            lbox(gb, o, R, (face, face + 0.006), (-sw + 0.005, sw - 0.005), zz)
+        for zz in (lo - 0.006, hi + 0.006):
+            for b in (-sw - 0.0035, sw + 0.0035):
+                bolt(gn, lpt(o, R, face + 0.006, b, zz), n, 0.0045, 0.003)
+    gb.obj("pylon.%s.bezel" % key, "paint2", bevel=0.0015, mirror=True)
+    gn.obj("pylon.%s.bolts" % key, "rim_bright", mirror=True)
+    if guard:
+        gg = Geo()
+        for i in range(guard):
+            zz = wb + (wt - wb) * (i + 0.5) / guard
+            tube(gg, lpt(o, R, face + 0.016, -sw - 0.006, zz),
+                 lpt(o, R, face + 0.016, sw + 0.006, zz), 0.0035, 8)
+        for b in (-sw - 0.006, sw + 0.006):
+            lbox(gg, o, R, (face + 0.004, face + 0.02), (b - 0.004, b + 0.004),
+                 (wb - 0.004, wt + 0.004))
+        gg.obj("pylon.%s.guard" % key, "rim", bevel=0.001, mirror=True)
+    L = K.Lamp("lamp.pylon_" + key, lit=lit, glass=lens)
+    lbox(L.housing, o, R, (0.0, 0.012), (-sw, sw), (wb, wt))
+    for sg in (1, -1):                         # the reflector's two leaves
+        L.chrome.add([lpt(o, R, 0.012, sg * 0.004, z) for z in (wb, wt)]
+                     + [lpt(o, R, 0.036, sg * sw, z) for z in (wt, wb)]
+                     + [lpt(o, R, 0.012, sg * 0.006, z) for z in (wb, wt)]
+                     + [lpt(o, R, 0.034, sg * sw, z) for z in (wt, wb)],
+                     [(0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3),
+                      (3, 7, 4, 0)])
+    L.bar([lpt(o, R, 0.036, 0, wb + 0.008), lpt(o, R, 0.036, 0, wt - 0.008)], bar, 0.008,
+          up=n)
+    lbox(L.housing, o, R, (0.012, 0.032), (-0.006, 0.006), (wb, wt))     # the bar's spine
+    lbox(L.glass, o, R, (lens_at - 0.003, lens_at), (-sw, sw), (wb, wt))
+    L.obj(mirror=True)
+    A = K.Lamp("lamp.pylon_%s_turn" % key, lit="led_accent", glass="lens_amber")
+    lbox(A.chrome, o, R, (0.0, 0.026), (-sw, sw), (ab, at))
+    A.bar([lpt(o, R, 0.034, -sw + 0.007, (ab + at) / 2), lpt(o, R, 0.034, sw - 0.007, (ab + at) / 2)],
+          0.012, at - ab - 0.016, up=V3((0, 0, 1)))
+    lbox(A.glass, o, R, (lens_at - 0.003, lens_at), (-sw, sw), (ab, at))
+    A.obj(mirror=True)

@@ -7,9 +7,9 @@
 | [aurel_prelate](aurel_prelate/check.json) | FAIL: 0.1 mm to interior.tub, steers 5 deg | ok: 150.0 mm (body.floor) | look: 5 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 215832 |
 | [aurel_regent](aurel_regent/check.json) | FAIL: 0.1 mm to interior.tub, steers 5 deg | ok: 150.0 mm (body.floor) | look: 2 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 228554 |
 | [aurel_zenith](aurel_zenith/check.json) | ok: none (hover) | ok: 270.3 mm (emitter.crest) | look: 1 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 129135 |
-| [brakk_bastion](brakk_bastion/check.json) | ok: 25.8 mm to fender.gussets, steers 20 deg | ok: 280.0 mm (chassis) | look: 13 objects | ok: 0 open runs, 0 cutter holes | look: 2 parts | ok: 269389 |
+| [brakk_bastion](brakk_bastion/check.json) | ok: 25.8 mm to fender.gussets, steers 20 deg | ok: 280.0 mm (chassis) | ok: 0 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 297973 |
 | [brakk_hauler](brakk_hauler/check.json) | ok: 33.1 mm to springs, steers 20 deg | ok: 290.0 mm (chassis) | ok: 0 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 259196 |
-| [brakk_mule](brakk_mule/check.json) | look: 22.2 mm to fender.plates, steers 20 deg | ok: 280.0 mm (chassis) | look: 34 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 364552 |
+| [brakk_mule](brakk_mule/check.json) | ok: 35.3 mm to fender.gussets, steers 20 deg | ok: 280.0 mm (chassis) | ok: 0 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 392506 |
 | [halcyon_ridge](halcyon_ridge/check.json) | ok: 39.5 mm to body.well, steers 25 deg | ok: 237.8 mm (skid.front) | look: 1 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 250007 |
 | [halcyon_sable](halcyon_sable/check.json) | ok: 31.8 mm to interior.seats, steers 30 deg | ok: 100.0 mm (splitter) | look: 1 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 280675 |
 | [kestrel_atlas](kestrel_atlas/check.json) | ok: none (hover) | ok: 374.4 mm (pod.skid.r) | look: 11 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 181915 |
@@ -47,26 +47,17 @@
 
 - not mirrored: `interior.wheel` 187.4 mm
 
-**brakk_bastion** (look)
+**brakk_bastion** (ok)
 
-- not mirrored: `mast` 261.5 mm, `interior.wheel` 208.9 mm, `led.mast` 190.0 mm, `mast.eye` 174.0 mm, `interior.screens` 76.6 mm, `spare.arm` 56.6 mm, `hooks` 37.6 mm, `wipers` 23.7 mm, `port.cover` 23.3 mm, `port.bolts` 14.0 mm, `winch.rollers` 12.2 mm, `hood.louvres` 10.9 mm and 1 more
-- cabin part in the open: `interior.seats`, 1% of it, up to 29.9 mm from what would hide it, at (-1.012, -0.636, 1.505)
-- cabin part in the open: `interior.tub`, 5% of it, up to 9.9 mm from what would hide it, at (0.947, -0.607, 0.583)
+- nothing
 
 **brakk_hauler** (ok)
 
 - nothing
 
-**brakk_mule** (look)
+**brakk_mule** (ok)
 
-- tire `fl`: 22.2 mm to `fender.plates`, turns 20 degrees before it touches `cables`
-- tire `ml`: 22.2 mm to `fender.plates`
-- tire `rl`: 22.2 mm to `fender.plates`
-- tire `fr`: 22.2 mm to `fender.plates`, turns 20 degrees before it touches `cables`
-- tire `mr`: 22.2 mm to `fender.plates`
-- tire `rr`: 22.2 mm to `fender.plates`
-- not mirrored: `cargo.case` 298.0 mm, `cargo.crates` 297.5 mm, `cargo.straps` 295.0 mm, `whip` 250.2 mm, `interior.wheel` 238.6 mm, `cargo.drums` 224.1 mm, `roof.hatch` 202.4 mm, `box.platebolts` 176.0 mm, `chevrons` 169.1 mm, `markings` 162.7 mm, `placard.ink` 160.0 mm, `box.plates` 155.6 mm and 22 more
-- cabin part in the open: `interior.tub`, 6% of it, up to 11.8 mm from what would hide it, at (2.998, 0.698, 1.454)
+- nothing
 
 **halcyon_ridge** (look)
 
