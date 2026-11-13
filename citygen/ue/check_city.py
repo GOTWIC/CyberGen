@@ -721,8 +721,14 @@ def spawn_and_body(world, pawn, man, slug):
         here = pawn.get_actor_location()
         if spot is not None:
             ex, ey, ez = spot["eye"]
+            # (held in the air until the city there has streamed in, then let down)
+            if mc is not None:
+                mc.disable_movement()
             teleport(pawn, ex, ey, ez + 1.2)
             yield from settle(world, slug, at=ue(ex, ey, ez))
+            yield from wait(3.0)
+            if mc is not None:
+                mc.set_movement_mode(unreal.MovementMode.MOVE_FALLING)
             yield from wait(2.0)
             yaw = unreal.MathLibrary.find_look_at_rotation(ue(*spot["eye"]),
                                                            ue(*spot["target"])).yaw

@@ -100,10 +100,10 @@ with 112.
 
 ## 5. Car glass that reads as glass
 
-`M_CgVehicleGlass` (the importer's, so the packs need no rebuild; `VEHICLE_VERSION` 8):
-- the glass color is pulled toward a dark teal (`GlassTint`, `TintMix` 0.45) before it is
+`M_CgVehicleGlass` (the importer's, so the packs need no rebuild; `VEHICLE_VERSION` 9):
+- the glass color is pulled toward a dark teal (`GlassTint`, `TintMix` 0.6) before it is
   squared as the transmittance;
-- a share of the glass is covered (the pack's transmission times `TransmissionScale` 0.8),
+- a share of the glass is covered (the pack's transmission times `TransmissionScale` 0.65),
   and more toward grazing angles (`GrazingCover` 0.6 of $(1 - N \cdot V)^4$), on top of the
   shading model's own Fresnel;
 - the reflectance is at least `MinF0` 6%. The domes' IOR of 1.12 to 1.14 had reflected almost
@@ -141,3 +141,31 @@ whose `GameUserSettings.ini` kept its 1920 x 1080 window: Swagnik's first start 
 size, not his native 2560 x 1440. The rule now in `docs/unreal_export.md` ("A packaged game")
 and CLAUDE.md: a smoke or test launch leaves no `Saved/` in a package (`-userdir=` outside it,
 or delete it after the run).
+
+## The night's frame time
+
+The lean benchmark ran once (`--bench-atmos`, `night_plan_all`; `bench/`) with the walker as
+the pawn and the darker glass (`VEHICLE_VERSION` 8). The p95 was 15.5 ms over the route: walk
+15.6, drive 15.3, flight 15.7. AT4 left it at 15.6, and the budget is 16.7. Delta's model is
+the branch's here (no station canopies, and main's later model changes). The bench moves the
+pawn itself, so the walker's body is below the view.
+
+## Checks
+
+- **Delta's city check** (`--check --shots`): passes. Spawn on the ground, 0.0 m from the
+  player start, with a body it sees; a walk of 345 m along a 347 m sidewalk path, 100% of
+  frames on the ground; a curb stepped 0.07 m down and back up; the console, play features,
+  sky, air and flight as before.
+- **The vehicle check** (`--check-vehicles`): meshes, placements and wheels pass. Collision
+  fails for the Kestrel Atlas only (88 of 132 side traces hit; its known pack fault: its
+  hulls leave the open cab uncovered). Every other car passes.
+- **Tests:** `tests/assetgen/test_ag_vehicles.py`, `tests/test_unreal_vehicles.py` and
+  `tests/test_unreal.py`'s play flags and its two small-city imports into a fresh First
+  Person project. On the small city the walker spawned on its feet, walked 133 m, climbed a
+  0.15 m curb, and the free camera came back to it.
+
+| A Tanager Cab by day, before (AT3) | After |
+|---|---|
+| ![](glass_hero_tanager_cab_day_before.jpg) | ![](glass_hero_tanager_cab_day_after.jpg) |
+| **An Orrin Pebble's dome, before** | **After** |
+| ![](glass_hero_orrin_pebble_day_before.jpg) | ![](glass_hero_orrin_pebble_day_after.jpg) |

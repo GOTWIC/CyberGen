@@ -1617,7 +1617,7 @@ def stage2_master(master, defaults=None):
 
 # --- AG18's vehicles (citygen/unreal_vehicles.py; the packs' contract: vehicles/GAME.md) ------
 
-VEHICLE_VERSION = "8"        # of the vehicle masters (`cg.vehicle` metadata; 8: darker glass)
+VEHICLE_VERSION = "9"        # of the vehicle masters (`cg.vehicle` metadata; 8 and 9: darker glass)
 VEHICLE_MESH_VERSION = "3"   # of what the importer makes of a car (with its manifest hash)
 VEHICLE_ACTOR_VERSION = "3"  # of the placement actors (2: the glass casts no shadow;
                              # 3, AT4: cull distances by part, the wheels cast no shadow)
@@ -1842,7 +1842,7 @@ def vehicle_glass_master(opaque):
         # the surface: black, a coverage of the share the glass does not transmit (the pack's
         # transmission times TransmissionScale), more toward grazing angles; what shows
         # through is tinted by the glass color
-        tsc = sparam(m, "TransmissionScale", -700, 1180, 0.8)
+        tsc = sparam(m, "TransmissionScale", -700, 1180, 0.65)
         graze = sparam(m, "GrazingCover", -700, 1260, 0.6)
         cv = expr(m, unreal.MaterialExpressionCameraVectorWS, -700, 1340)
         op = custom(m, -450, 360,
@@ -1873,7 +1873,7 @@ def vehicle_glass_master(opaque):
                               unreal.TranslucencyLightingMode.TLM_SURFACE_PER_PIXEL_LIGHTING)
         tto = expr(m, unreal.MaterialExpressionThinTranslucentMaterialOutput, -150, 0)
         gtint = vparam(m, "GlassTint", -700, 1420, (0.09, 0.14, 0.18))
-        mix = sparam(m, "TintMix", -700, 1540, 0.45)
+        mix = sparam(m, "TintMix", -700, 1540, 0.6)
         tint = custom(m, -450, 0, "float3 c = lerp(C, K, X); "
                       "return lerp(float3(1, 1, 1), c * c, T * (1.0 - In));",
                       ["C", "K", "X", "T", "In"], cmot(F3), "CgGlassTint")
