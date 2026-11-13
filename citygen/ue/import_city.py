@@ -79,7 +79,8 @@ ATMOS_VERSION = "atmos6"  # the atmos controller's and cells' actors (2, AT2: th
                           # blinks and sweeps in the packed lights; 3, AT3: the sky and time;
                           # 4, AT4: the air, a cell's fog volumes and emitters; 5, the visible
                           # lights: the controller's sight raster, the cells always loaded; 6,
-                          # AT5: the weather, its textures, a cell's drip lines)
+                          # AT5: the weather, its textures, a cell's drip lines; AT6's look is
+                          # in the controller's own hash: no new version, the cells kept)
 SWIM_BRUSH_CM = 200.0   # the cube brush a volume spawned from its class gets (CubeBuilder)
 SWIM_FRICTION = 0.3
 GRAPH_VARS = [("City", "string"), ("Graph", "name"), ("Hash", "string"), ("Ids", "[name"),
@@ -4214,6 +4215,30 @@ class Importer:
                 if ctl.get("wet_bounds"):
                     sky += [("wet_bounds", [float(x) for x in ctl["wet_bounds"]]),
                             ("wet_cover", wet[0]), ("wet_surface", wet[1])]
+            # AT6: the look (the post of the look and of each district, the raster that
+            # blends them by where the view stands, the overcast's compensation by day) and
+            # the plumes by night and far off
+            if ctl.get("post"):
+                sky += [("post", True),
+                        ("post_base", [float(x) for x in ctl["post_base"]]),
+                        ("post_districts", [float(x) for x in ctl["post_districts"]]),
+                        ("post_names", list(ctl["post_names"])),
+                        ("post_blend_m", float(ctl["post_blend_m"])),
+                        ("post_ease_s", float(ctl["post_ease_s"])),
+                        ("overcast_comp", float(ctl["overcast_comp"])),
+                        ("overcast_take", [float(x) for x in ctl["overcast_take"]]),
+                        ("sky_share", float(ctl["sky_share"])),
+                        ("ref_cover", float(ctl["ref_cover"]))]
+                if ctl.get("post_runs") is not None:
+                    sky += [("post_runs", [int(x) for x in ctl["post_runs"]]),
+                            ("post_bounds", [float(x) for x in ctl["post_bounds"]]),
+                            ("post_cell_m", float(ctl["post_cell_m"])),
+                            ("post_width", int(ctl["post_px"][0])),
+                            ("post_height", int(ctl["post_px"][1]))]
+            if "steam_glow" in ctl:
+                sky += [("steam_glow", float(ctl["steam_glow"])),
+                        ("steam_far", float(ctl["steam_far"][0])),
+                        ("steam_far_m", float(ctl["steam_far"][1]))]
             for k, v in sky:
                 try:
                     a.set_editor_property(k, v)

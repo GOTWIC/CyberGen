@@ -95,10 +95,24 @@
      "title": "Scatter",
      "type": "object"
     },
+    "steam_far": {
+     "description": "AT6: the plumes' opacity times 1 + a from 30 m to b m off (they read far off).",
+     "items": {
+      "type": "number"
+     },
+     "title": "Steam Far",
+     "type": "array"
+    },
     "steam_gain": {
      "default": 10.0,
      "description": "The plumes' opacity gain.",
      "title": "Steam Gain",
+     "type": "number"
+    },
+    "steam_glow": {
+     "default": 0.0,
+     "description": "AT6: the plumes lit by the city by night (their emissive, of their albedo, times Night).",
+     "title": "Steam Glow",
      "type": "number"
     },
     "volume_glow": {
@@ -598,6 +612,82 @@
     "cloud"
    ],
    "title": "Moon",
+   "type": "object"
+  },
+  "Post": {
+   "additionalProperties": false,
+   "description": "AT6: the look's post and grade (scope 6.5, `atmosgen/look.py`): the look's night and\nday sets, each district's, the exposure, the district raster the runtime blends them by.",
+   "properties": {
+    "base": {
+     "additionalProperties": true,
+     "description": "The look's sets: {night, day}, each its `keys` and `shadows_gain`, `highlights_gain` (rgb).",
+     "title": "Base",
+     "type": "object"
+    },
+    "blend_m": {
+     "description": "The runtime weighs the districts over a disc this wide round the view ...",
+     "title": "Blend M",
+     "type": "number"
+    },
+    "districts": {
+     "additionalProperties": {
+      "additionalProperties": true,
+      "type": "object"
+     },
+     "description": "Each district's sets by id (its grit and tint over the look's).",
+     "title": "Districts",
+     "type": "object"
+    },
+    "ease_s": {
+     "description": "... and eases to them over this (s).",
+     "title": "Ease S",
+     "type": "number"
+    },
+    "exposure": {
+     "additionalProperties": true,
+     "description": "The night's and the day's exposure (EV100), the day's bias and the overcast's compensation.",
+     "title": "Exposure",
+     "type": "object"
+    },
+    "keys": {
+     "description": "The scalar keys of a set (`presets.POST_KEYS`).",
+     "items": {
+      "type": "string"
+     },
+     "title": "Keys",
+     "type": "array"
+    },
+    "order": {
+     "description": "The districts in the raster's index order.",
+     "items": {
+      "type": "string"
+     },
+     "title": "Order",
+     "type": "array"
+    },
+    "raster": {
+     "anyOf": [
+      {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "`post_districts.png`: each cell's district (an index into `order`), rows from the north edge, its bounds, cell, size and sha256.",
+     "title": "Raster"
+    }
+   },
+   "required": [
+    "keys",
+    "base",
+    "exposure",
+    "blend_m",
+    "ease_s"
+   ],
+   "title": "Post",
    "type": "object"
   },
   "Sight": {
@@ -1239,6 +1329,18 @@
    "description": "The exposure the lights are set for; a scene shown at another scales them by 2^(EV_scene - night_ev100).",
    "title": "Night Ev100",
    "type": "number"
+  },
+  "post": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/Post"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "description": "AT6: the look's post and grade, per district."
   },
   "preset": {
    "enum": [

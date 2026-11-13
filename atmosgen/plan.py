@@ -49,7 +49,7 @@ from . import sky as SK
 from . import spec as S
 
 CODE_FILES = ("presets.py", "spec.py", "planmodel.py", "emitters.py", "plan.py", "lux.py",
-              "sky.py", "air.py", "sight.py", "weather.py")
+              "sky.py", "air.py", "sight.py", "weather.py", "look.py")
 OUT = "atmos"
 TILE_M = 256.0
 
@@ -1713,6 +1713,13 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
         sky["upward_lm"] = round(g["upward_lm"])
     elif (od / SK.GLOW_FILE).is_file():
         (od / SK.GLOW_FILE).unlink()
+    # AT6: the look's post and grade, a post per district and the raster that blends them
+    from . import look as LK
+    post, ras = timed("post", LK.make, filled, sky, city.m)
+    if ras is not None:
+        post["raster"] = LK.write(ras, od)
+    elif (od / LK.RASTER_FILE).is_file():
+        (od / LK.RASTER_FILE).unlink()
     # visible lights: the occluders the runtime marches a walker's line of sight through
     from . import sight as SI
     gm = city.ground_many if city._grid is not None else None
@@ -1800,6 +1807,7 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
         volumes=[PM.FogVolume(**v) for v in air.volumes],
         emitters=[PM.Emitter(**e) for e in air.emitters],
         sight=PM.Sight(**sight),
+        post=PM.Post(**post),
         masks=[PM.Mask(**mk) for mk in we.masks],
         weather_plan=PM.Weather(**we_set),
         checks={"lux": lux, "faces": faces, "air": air_check, "weather": we_check})
@@ -1853,6 +1861,7 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
                    "upward_lm": sky["upward_lm"],
                    "glow": {k: v for k, v in (sky["glow"] or {}).items()
                             if k in ("max_luma_nits", "mean_nits", "peak_at", "px")}},
+           "post": post_summary(post),
            "sign_colors_from_pages": city.signs.from_pages,
            "districts": {k: {x: v[x] for x in ("name", "archetype", "lamp", "temp", "grit",
                                                 "flicker", "broken", "neon", "flood",
@@ -1869,6 +1878,27 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     rep["wrote"] = wrote
     rep["out"] = str(od)
     return rep
+
+
+POST_REPORT = ("bloom", "flare", "grain", "chromatic", "vignette", "sharpen", "saturation",
+               "contrast", "lift")
+
+
+def post_summary(post: dict) -> dict:
+    """AT6: the post's numbers for the report and the review: the exposure, the look's night
+    and day, each district's night by name."""
+    def few(s):
+        out = {k: s[k] for k in POST_REPORT}
+        out["shadows"] = s["shadows_gain"]
+        out["highlights"] = s["highlights_gain"]
+        return out
+    return {"exposure": post["exposure"],
+            "look": {w: few(post["base"][w]) for w in ("night", "day")},
+            "districts": {d["name"] or did: {"grit": d["grit"], "night": few(d["night"]),
+                                             "day": few(d["day"])}
+                          for did, d in sorted(post["districts"].items())},
+            "raster": ({k: post["raster"][k] for k in ("px", "cell_m")}
+                       if post.get("raster") else None)}
 
 
 def report_text(rep: dict) -> str:
@@ -1943,6 +1973,20 @@ def report_text(rep: dict) -> str:
                      f"{s['cloud_cover']:g}" + (
                          f", its glow up to {g['max_luma_nits']:g} cd/m2 ({g['mean_nits']:g} "
                          f"over the city) from {s['upward_lm'] / 1e6:.2f} Mlm up" if g else ""))
+    if rep.get("post"):
+        p = rep["post"]
+        ex = p["exposure"]
+        lines.append(f"post: exposure {ex['night_ev100']:g} EV100 by night, "
+                     f"{ex['day_ev100']:g} by day (overcast given back "
+                     f"{ex['overcast_comp']:g})")
+        for name, s in [("the look", p["look"])] + list(p["districts"].items()):
+            n = s["night"]
+            lines.append(f"  {name}" + (f" (grit {s['grit']:g})" if "grit" in s else "") +
+                         f": bloom {n['bloom']:g}, flare {n['flare']:g}, grain "
+                         f"{n['grain']:g}, fringe {n['chromatic']:g}, vignette "
+                         f"{n['vignette']:g}, sharpen {n['sharpen']:g}, saturation "
+                         f"{n['saturation']:g}, contrast {n['contrast']:g}, lift {n['lift']:g}, "
+                         f"shadows x{n['shadows']}, highlights x{n['highlights']} (night)")
     lines.append("district moods:")
     for did, m in sorted(rep["districts"].items()):
         lines.append(f"  {did} {m['name']} ({m['archetype']}): {m['lamp']}, {m['temp']}, "

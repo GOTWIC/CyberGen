@@ -973,6 +973,14 @@ def play_features(world, man, slug):
         weather_ok = bool(an.get("wet_textures")) and (
             not raining or (an.get("rain_shown") and an.get("wet_shown")))
         lit = lit and weather_ok
+    # AT6: with the plan's look, its post applied by night (a district under the view where
+    # the plan has some), the day's exposure brighter than the night's still
+    post_ok = True
+    if an is not None and an.get("post") is not None and \
+            (man.get("atmos") or {}).get("post"):
+        post_ok = bool(an["post"]) and an.get("post_bloom", 0.0) > 0.0 and (
+            not (man["atmos"]["post"] or {}).get("districts") or bool(an.get("post_where")))
+        lit = lit and post_ok
     ok = (got["start"]["ready"] and got["start"]["overlay"] and got["start"]["map_texture"]
           and got["map"] and got["menu"] and got["night"]["night"] and lit
           and got["free_cam"]["free_cam"] and got["free_cam"]["pawn"].startswith("CityGenFreeCam")
@@ -1012,6 +1020,13 @@ def play_features(world, man, slug):
             f"{an.get('splashes_live', 0)} splashes, {an.get('drips', 0)} drips of "
             f"{an.get('drip_lines', 0)} lines, textures {an.get('wet_textures')} "
             + ("(ok)" if weather_ok else "(FAIL)"))
+    if an is not None and an.get("post") is not None:
+        RES["lines"].append(
+            f"look (AT6): post {an.get('post')}, by the player {an.get('post_where') or '-'} "
+            f"(bloom {an.get('post_bloom', 0):.2f}, grain {an.get('post_grain', 0):.2f}, fringe "
+            f"{an.get('post_fringe', 0):.2f}, saturation {an.get('post_saturation', 0):.2f}, "
+            f"contrast {an.get('post_contrast', 0):.2f}, sharpen {an.get('post_sharpen', 0):.2f}) "
+            + ("(ok)" if post_ok else "(FAIL)"))
     RES["lines"].append(
         f"play features: map, menu, night ({night}, "
         f"{got['night'].get('light_pools', 0)} light pools), free camera "
@@ -1063,6 +1078,11 @@ def play_views(world, a, slug, prefix):
             st0 = atmos_status(world) or {}
             for c in ("CityGenAtmos.Fog 0", "CityGenAtmos.Air 0"):
                 unreal.SystemLibrary.execute_console_command(world, c)
+        # (AT6: a view named `*_nopost` without the look's post, the same view's before for
+        # AT6's pairs; the look again after it)
+        nopost = "_nopost" in v["name"]
+        if nopost:
+            unreal.SystemLibrary.execute_console_command(world, "CityGenAtmos.Post 0")
         # (visible lights: a view named `*_sight` with the live set picked by sight, as round
         # a walker, `*_circle` by the circle, the same view's before; by the pawn after it)
         mode = 1 if v["name"].endswith("_sight") else 0 if v["name"].endswith("_circle") else None
@@ -1093,6 +1113,15 @@ def play_views(world, a, slug, prefix):
             yield from wait(float(wm.group(3)))
         yield from ui_shot(world, v["name"], "HighResShot 1920x1080", 180)
         at = atmos_status(world)
+        # (AT6: what the look showed at each view: the district, the exposure, the post)
+        if at and "post" in at:
+            RES.setdefault("post_views", {})[v["name"]] = {
+                k: at.get(k) for k in ("post", "post_where", "ev100", "night_now",
+                                       "overcast_shift", "post_bloom", "post_grain",
+                                       "post_fringe", "post_saturation", "post_contrast",
+                                       "post_sharpen")}
+        if nopost:
+            unreal.SystemLibrary.execute_console_command(world, "CityGenAtmos.Post 1")
         if wm:
             if at:
                 RES.setdefault("weather_views", {})[v["name"]] = {

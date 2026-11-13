@@ -51,21 +51,24 @@ import unreal
 
 JOB = json.load(open(os.environ["CITYGEN_UE_JOB"], encoding="utf-8"))
 FOLDER = "/Game/CityGen/Core/Atmos"
-VERSION = "15"  # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air);
+VERSION = "16"  # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air);
                 # 3 (AT2): M_CgBeacon and M_CgBeam; 4 to 8 (AT3): M_CgSky; 9 to 12 (AT4):
                 # M_CgSteam, MPC_CityGenAtmos's SteamGain; 13 (AT5): the weather (M_CgWet
                 # gone: M_CgWetColor and M_CgWetGloss, M_CgRain cut by the covers and leaning
                 # in the wind, M_CgSplash, M_CgDrip, the steam drifting with the wind's heading);
                 # 14: a drizzle's streets glossy too (the gloss and darkening by the wetness's
                 # square root); 15: every material rebuilt from nothing (clear_material: the
-                # old nodes were left beside the new), the collection's parameters kept (ids)
+                # old nodes were left beside the new), the collection's parameters kept (ids);
+                # 16 (AT6): M_CgSteam lit by the city by night (SteamGlow) and kept opaque far
+                # off (SteamFar, SteamFarM)
 # AT5: MPC_CityGenAtmos: the weather now (the controller blends its states): the rain's rate,
 # how wet the open surfaces are and how full the puddles, the fog, the wind (its speed with
 # its gusts, its heading as a unit vector), the plumes' gain, the streaks' length and the
 # share of the rain cards that fall
 COLLECTION = (("Rain", 0.0), ("Wetness", 0.0), ("Puddles", 0.0), ("FogDensity", 0.0),
               ("WindMS", 4.0), ("WindX", 0.77), ("WindY", -0.64), ("SteamGain", 10.0),
-              ("Streak", 1.0), ("Drops", 1.0))
+              ("Streak", 1.0), ("Drops", 1.0), ("SteamGlow", 0.0), ("SteamFar", 0.0),
+              ("SteamFarM", 150.0))
 EAL = unreal.EditorAssetLibrary
 AT = unreal.AssetToolsHelpers.get_asset_tools()
 MEL = unreal.MaterialEditingLibrary
@@ -885,7 +888,8 @@ n = 0.65 * n + 0.35 * lerp(lerp(a2, b2, f2.x), lerp(c2, d2, f2.x), f2.y);
 float soft = pow(saturate(1.0 - r), 1.4) * saturate(n * 1.6 - 0.3);
 float life = sin(3.14159 * t) * saturate(t * 6.0);
 float near_ = saturate((Depth - 80.0) / 300.0);
-return saturate(soft * life * Rate * Gain * near_ * Fade);
+float far_ = 1.0 + Far * saturate((Depth - 3000.0) / max(100.0, FarM * 100.0 - 3000.0));
+return saturate(soft * life * Rate * Gain * near_ * Fade * far_);
 """
 
 
@@ -933,12 +937,22 @@ def steam(c):
     link(one, "", fade, "Opacity")
     gain = mpc_param(m, c, "SteamGain", -1300, 2000)
     op = custom(m, -700, 1500, STEAM_OP,
-                ["UV", "Phase", "Period", "Rate", "Time", "Depth", "Fade", "Gain"],
+                ["UV", "Phase", "Period", "Rate", "Time", "Depth", "Fade", "Gain", "Far",
+                 "FarM"],
                 "CMOT_FLOAT1", "CgSteamOpacity")
     for a, n in ((uv, "UV"), (ins[3], "Phase"), (ins[4], "Period"), (ins[7], "Rate"),
-                 (tm, "Time"), (depth, "Depth"), (fade, "Fade"), (gain, "Gain")):
+                 (tm, "Time"), (depth, "Depth"), (fade, "Fade"), (gain, "Gain"),
+                 (mpc_param(m, c, "SteamFar", -1300, 2100), "Far"),
+                 (mpc_param(m, c, "SteamFarM", -1300, 2200), "FarM")):
         link(a, "", op, n)
     rough = expr(m, unreal.MaterialExpressionConstant, -700, 1900, r=1.0)
+    # (AT6: lit by the city round it by night: its albedo times SteamGlow, which the controller
+    # sets to the plan's glow times Night)
+    glow = custom(m, -700, 2100, "return Alb * Glow;", ["Alb", "Glow"], "CMOT_FLOAT3",
+                  "CgSteamGlow")
+    link(alb, "", glow, "Alb")
+    link(mpc_param(m, c, "SteamGlow", -1300, 2300), "", glow, "Glow")
+    MEL.connect_material_property(glow, "", MP.MP_EMISSIVE_COLOR)
     MEL.connect_material_property(alb, "", MP.MP_BASE_COLOR)
     MEL.connect_material_property(op, "", MP.MP_OPACITY)
     MEL.connect_material_property(rough, "", MP.MP_ROUGHNESS)

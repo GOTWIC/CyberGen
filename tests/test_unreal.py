@@ -51,8 +51,12 @@ def regenerated(small_built):
 
 
 def _blockout_files(m, out: Path) -> Path:
-    """What `citygen blockout` writes before Blender runs (no glTF tiles)."""
+    """What `citygen blockout` writes before Blender runs (no glTF tiles), beside the city
+    model, as in a build folder (the player start reads the model: since the visible lights
+    it starts on an open lit sidewalk, `unreal._start_spot`; without the model here and with
+    it in `staged`, an import over the blockout updated `player_start`)."""
     out.mkdir(parents=True, exist_ok=True)
+    (out / "city_model.json").write_text(m.to_json() + "\n", encoding="utf-8")
     plan = BO.make_plan(m)
     (out / "blockout_plan.json").write_text(BO.plan_json(plan) + "\n", encoding="utf-8")
     (out / "tiles.json").write_text(json.dumps({"tile_size_m": BO.TILE_M,

@@ -41,6 +41,10 @@
   `atmos_wet_cover.png`, the cover channel, and `atmos_wet_surface.png`, gloss, puddles and
   drips), which the import makes textures the wet streets' decals and the rain read; a plan
   whose weather check failed is not delivered.
+- AT6 (looks): the controller's look (`post_settings`: the look's night and day post sets,
+  each district's, the district raster as runs with its bounds, the blend, the day's exposure
+  with its bias and the overcast's compensation), all in the controller's hash; the air's
+  `steam_glow` and `steam_far` (the plumes by night and far off).
 """
 
 from __future__ import annotations
@@ -78,6 +82,12 @@ INTS = 2
 VFLOATS = 14                                # AT4: a fog volume (CityGenAtmosPack::VolFloats)
 VINTS = 1
 EFLOATS = 9                                 # AT4: an emitter (CityGenAtmosPack::EmitFloats)
+# AT6: a post set's floats (CityGenAtmosActor.h's EPostKey, PostFloats): the look's scalar
+# keys (atmosgen.presets.POST_KEYS), then the shadows' and the highlights' gains
+POST_FLOATS = ("bloom", "flare", "flare_threshold", "grain", "chromatic", "chromatic_start",
+               "vignette", "sharpen", "saturation", "contrast", "highlight_sat", "lift",
+               "local_shadows", "local_highlights", "shadows_r", "shadows_g", "shadows_b",
+               "highlights_r", "highlights_g", "highlights_b")
 EINTS = 2
 VOLUME_KINDS = ("mist", "smog", "haze", "tunnel_haze", "steam_bank")
 EMITTER_KINDS = ("steam", "smoke", "exhaust", "cooking")
@@ -332,6 +342,9 @@ def air_settings(plan: dict) -> dict:
             "puffs": [int(a["puffs"].get(k, 4)) for k in EMITTER_KINDS],
             "steam_gain": float(a.get("steam_gain", 10.0)),
             "volume_glow": float(a.get("volume_glow", 0.15)),
+            # (AT6: the plumes by night and far off)
+            "steam_glow": float(a.get("steam_glow", 0.0)),
+            "steam_far": [float(v) for v in a.get("steam_far", [0.0, 150.0])],
             "cvars": [f"{k}={v}" for k, v in sorted(a.get("cvars", {}).items())],
             "volumes": len(plan.get("volumes") or []),
             "emitters": len(plan.get("emitters") or [])}
@@ -364,6 +377,46 @@ def sight_settings(plan: dict, pdir: Path) -> dict:
                             float(s["ground_step_m"])],
             "sight_skips": [float(s["skip_eye_m"]), float(s["skip_light_m"])],
             "sight_sha256": s["sha256"], "sight_runs": runs(rgb)}
+
+
+def _post_floats(s: dict) -> list[float]:
+    return [float(s[k]) for k in POST_FLOATS[:-6]] + \
+        [float(v) for v in s["shadows_gain"]] + [float(v) for v in s["highlights_gain"]]
+
+
+def post_settings(plan: dict, pdir: Path) -> dict:
+    """AT6: the controller's look from the plan's `post` (a plan before AT6 has none: {}):
+    the look's two sets (`POST_FLOATS` each, the night's then the day's), each district's in
+    the raster's order, the district raster as runs over its rows from the north edge
+    ([count, index] pairs, `atmosgen.look.runs`) with its bounds in Unreal's frame (cm: [min X,
+    min Y, max X, max Y], Y south, so row 0 is min Y), its cell and size, the blend, and the
+    exposure (the day's EV100 with its bias, which replaces the sky's; the overcast's
+    compensation)."""
+    p = plan.get("post")
+    if not p:
+        return {}
+    ex = p["exposure"]
+    out = {"post": True, "post_keys": list(POST_FLOATS),
+           "post_base": _post_floats(p["base"]["night"]) + _post_floats(p["base"]["day"]),
+           "post_names": [p["districts"][d]["name"] or d for d in p.get("order", [])],
+           "post_districts": [v for d in p.get("order", [])
+                              for w in ("night", "day")
+                              for v in _post_floats(p["districts"][d][w])],
+           "post_blend_m": float(p["blend_m"]), "post_ease_s": float(p["ease_s"]),
+           "day_ev100": float(ex["day_ev100"]), "overcast_comp": float(ex["overcast_comp"]),
+           "overcast_take": [float(v) for v in ex["overcast_take"]],
+           "sky_share": float(ex["sky_share"]), "ref_cover": float(ex["ref_cover"])}
+    r = p.get("raster")
+    if r and (pdir / r["file"]).is_file():
+        from atmosgen.look import read, runs
+        idx = read(pdir, r)
+        x0, y0, x1, y1 = r["bounds"]
+        out.update({"post_runs": runs(idx), "post_cell_m": float(r["cell_m"]),
+                    "post_px": [int(idx.shape[1]), int(idx.shape[0])],
+                    "post_bounds": [_r(x0 * 100.0, 1), _r(-y1 * 100.0, 1), _r(x1 * 100.0, 1),
+                                    _r(-y0 * 100.0, 1)],
+                    "post_sha256": r["sha256"]})
+    return out
 
 
 def cell_of(x: float, y: float) -> tuple[int, int]:
@@ -520,6 +573,7 @@ def atmos_data(pdir: Path, dest: Path | None = None) -> tuple[dict | None, str]:
     ctl.update(air_settings(plan))
     ctl.update(sight_settings(plan, pdir))
     ctl.update(weather_settings(plan))
+    ctl.update(post_settings(plan, pdir))
     if dest is not None and ctl.get("weather"):
         wt = wet_textures(plan, pdir, dest)
         if wt:
@@ -576,6 +630,12 @@ def write_atmos(build: str | Path, given: str | Path | None = None) -> dict | No
                                   "px": ctl["wet_px"], "bounds": ctl["wet_bounds"]}
                                  if ctl.get("wet_px") else None)}
                         if ctl.get("weather") else None),
+            # AT6: the look's post, its districts and their raster
+            "post": ({"districts": len(ctl["post_names"]),
+                      "raster": ({"px": ctl["post_px"], "cell_m": ctl["post_cell_m"],
+                                  "sha256": ctl["post_sha256"]}
+                                 if ctl.get("post_runs") is not None else None)}
+                     if ctl.get("post") else None),
             "cells": [{k: c[k] for k in ("key", "cell", "tile", "center", "count", "hash")}
                       for c in data["cells"]]}
 

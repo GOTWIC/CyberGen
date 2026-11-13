@@ -10,7 +10,7 @@ elevation, `SUN_CURVE`; the lights keep that scale at every hour, so they read d
 
 from __future__ import annotations
 
-PRESET_VERSION = 4
+PRESET_VERSION = 5
 
 # --- looks and weather ------------------------------------------------------------------------
 
@@ -590,8 +590,8 @@ EMITTERS = {
                 "rate": 0.8, "albedo": "#d0d4d8", "schedule": "always"},
     "roof":    {"kind": "exhaust", "share": (0.2, 0.4), "width_m": 1.6, "rise_m": 12.0,
                 "rate": 0.7, "albedo": "#c8ccd0", "schedule": "steam"},
-    "stall":   {"kind": "cooking", "share": (0.7, 0.3), "width_m": 1.2, "rise_m": 5.0,
-                "rate": 0.7, "albedo": "#d8d4cc", "schedule": "food"},
+    "stall":   {"kind": "cooking", "share": (0.7, 0.3), "width_m": 1.6, "rise_m": 5.5,
+                "rate": 1.0, "albedo": "#d8d4cc", "schedule": "food"},
     "chimney": {"kind": "smoke", "share": (0.25, 0.5), "width_m": 1.4, "rise_m": 30.0,
                 "rate": 0.8, "albedo": "#6f6a64", "schedule": "always"},
     "stove":   {"kind": "smoke", "share": (0.0, 0.12), "width_m": 0.5, "rise_m": 6.0,
@@ -606,12 +606,19 @@ STOVE_TYPES = ("shanty_stack",)
 # within `EmitterRangeM`) and budgets per 256 m tile (the check)
 AIR_LIVE = {"volumes": 24, "volume_m": 900.0, "emitter_m": 220.0}
 AIR_BUDGETS = {"volumes_per_tile": 24, "emitters_per_tile": 400}
-PUFFS = {"steam": 4, "exhaust": 4, "cooking": 3, "smoke": 6}      # cards per plume
+PUFFS = {"steam": 4, "exhaust": 4, "cooking": 6, "smoke": 6}      # cards per plume (AT6:
+# a stall's cooking 6 cards, wider and denser: with 3 it hardly showed)
 # the runtime's art direction (AT4's rounds on Delta): the plumes' opacity gain (a card's
 # opacity is its soft round puff times its life times its rate times this), and the city's
 # light the fog volumes glow with by night (their emissive, of their albedo times their glow)
 STEAM_GAIN = 10.0
 VOLUME_GLOW = 0.15
+# AT6 (AT4's open item: the plumes faint far off and against the dark): by night a plume is
+# lit by the city round it (its emissive, of its albedo, times Night: `STEAM_GLOW`), and it
+# keeps its opacity with distance (times 1 + `STEAM_FAR[0]` from 30 m to `STEAM_FAR[1]` m: a
+# card far off covers a few pixels, its soft edge faded to nothing)
+STEAM_GLOW = 0.015                # (about middle grey at the night's -3 EV100, of a white)
+STEAM_FAR = (1.5, 150.0)
 # what the fog's mist and smog keep to (24 values: 0 to 23 h); `steam` is stronger in the
 # cool night air, `mist` forms after dusk and lies thickest before dawn
 AIR_SCHEDULES = {
@@ -724,3 +731,129 @@ WEATHER_BUDGETS = {"drips_per_tile": 4000}
 # cards round the view
 WEATHER_LIVE = {"splashes": 480, "splash_m": 14.0, "drips": 640, "drip_m": 36.0,
                 "drip_step_m": 0.55, "rain_cards": 6000}
+
+# --- the look: post and grading (AT6, scope 6.5) ------------------------------------------------
+
+# Each look's post (decision 12.5: near-photorealistic, clean or gritty by place), a set by
+# night and a set by day; the runtime blends the two by the sky's Night (dusk between) and
+# each district's own (`DISTRICT_POST`) by where the view stands. A set:
+#   bloom:      Unreal's BloomIntensity (its default 0.675);
+#   flare:      LensFlareIntensity, over `flare_threshold` (scene linear, after the exposure);
+#   grain:      FilmGrainIntensity (0 to 1);
+#   chromatic:  SceneFringeIntensity (0 to 5), from `chromatic_start` of the way out (the
+#               middle of the frame clean);
+#   vignette:   VignetteIntensity;
+#   sharpen:    the tonemapper's Sharpen (crisp);
+#   saturation, contrast: the grade's global ColorSaturation and ColorContrast;
+#   shadows, highlights: a tint and its strength each, as gains in the shadows' and the
+#               highlights' ColorGain (the tint's hue over the mean of its linear rgb:
+#               `look.tint_gain`): neon rain's teal shadows and magenta highlights;
+#   highlight_sat: ColorSaturationHighlights (neon keeps its color where the rest is muted);
+#   lift:       ColorOffsetShadows (scene linear: the blacks lifted, a dirty lens);
+#   local_shadows, local_highlights: local exposure's contrast scales (under 1 the shadows
+#               lifted and the highlights held in their region of the frame: a street under a
+#               viaduct by day, a neon sign by night, as an eye sees them).
+POST_KEYS = ("bloom", "flare", "flare_threshold", "grain", "chromatic", "chromatic_start",
+             "vignette", "sharpen", "saturation", "contrast", "highlight_sat", "lift",
+             "local_shadows", "local_highlights")
+POST = {
+    "neon_rain": {
+        "night": {"bloom": 1.0, "flare": 0.45, "flare_threshold": 6.0, "grain": 0.12,
+                  "chromatic": 0.35, "chromatic_start": 0.45, "vignette": 0.5, "sharpen": 0.2,
+                  "saturation": 1.1, "contrast": 1.08, "highlight_sat": 1.05, "lift": 0.0,
+                  "local_shadows": 1.0, "local_highlights": 0.85,
+                  "shadows": ("#163a52", 0.16), "highlights": ("#ff4fb4", 0.08)},
+        "day": {"bloom": 0.5, "flare": 0.05, "flare_threshold": 8.0, "grain": 0.05,
+                "chromatic": 0.12, "chromatic_start": 0.5, "vignette": 0.3, "sharpen": 0.2,
+                "saturation": 0.96, "contrast": 1.02, "highlight_sat": 1.0, "lift": 0.0,
+                "local_shadows": 0.7, "local_highlights": 0.85,
+                "shadows": ("#163a52", 0.08), "highlights": ("#ffe8d0", 0.04)},
+    },
+    "clear_night": {
+        "night": {"bloom": 0.8, "flare": 0.35, "flare_threshold": 6.0, "grain": 0.08,
+                  "chromatic": 0.25, "chromatic_start": 0.5, "vignette": 0.45, "sharpen": 0.25,
+                  "saturation": 1.04, "contrast": 1.06, "highlight_sat": 1.0, "lift": 0.0,
+                  "local_shadows": 1.0, "local_highlights": 0.85,
+                  "shadows": ("#101c33", 0.14), "highlights": ("#ffd9a8", 0.08)},
+        "day": {"bloom": 0.5, "flare": 0.1, "flare_threshold": 8.0, "grain": 0.04,
+                "chromatic": 0.1, "chromatic_start": 0.5, "vignette": 0.3, "sharpen": 0.25,
+                "saturation": 1.0, "contrast": 1.04, "highlight_sat": 1.0, "lift": 0.0,
+                "local_shadows": 0.75, "local_highlights": 0.85,
+                "shadows": ("#101c33", 0.06), "highlights": ("#fff0dc", 0.04)},
+    },
+    "smog_dusk": {
+        "night": {"bloom": 0.9, "flare": 0.3, "flare_threshold": 6.0, "grain": 0.1,
+                  "chromatic": 0.25, "chromatic_start": 0.45, "vignette": 0.5, "sharpen": 0.1,
+                  "saturation": 0.95, "contrast": 1.02, "highlight_sat": 1.05, "lift": 0.001,
+                  "local_shadows": 0.95, "local_highlights": 0.85,
+                  "shadows": ("#2a2035", 0.14), "highlights": ("#ffb066", 0.12)},
+        "day": {"bloom": 0.7, "flare": 0.1, "flare_threshold": 8.0, "grain": 0.07,
+                "chromatic": 0.15, "chromatic_start": 0.5, "vignette": 0.4, "sharpen": 0.1,
+                "saturation": 0.9, "contrast": 1.0, "highlight_sat": 1.0, "lift": 0.001,
+                "local_shadows": 0.75, "local_highlights": 0.8,
+                "shadows": ("#2a2035", 0.08), "highlights": ("#ffb066", 0.1)},
+    },
+    "overcast_day": {
+        "night": {"bloom": 0.6, "flare": 0.2, "flare_threshold": 8.0, "grain": 0.06,
+                  "chromatic": 0.15, "chromatic_start": 0.5, "vignette": 0.4, "sharpen": 0.2,
+                  "saturation": 0.95, "contrast": 1.03, "highlight_sat": 1.0, "lift": 0.0,
+                  "local_shadows": 1.0, "local_highlights": 0.9,
+                  "shadows": ("#2d3640", 0.1), "highlights": ("#e8ecf0", 0.04)},
+        "day": {"bloom": 0.3, "flare": 0.0, "flare_threshold": 8.0, "grain": 0.04,
+                "chromatic": 0.05, "chromatic_start": 0.5, "vignette": 0.25, "sharpen": 0.25,
+                "saturation": 0.92, "contrast": 1.0, "highlight_sat": 1.0, "lift": 0.0,
+                "local_shadows": 0.7, "local_highlights": 0.85,
+                "shadows": ("#2d3640", 0.06), "highlights": ("#e8ecf0", 0.03)},
+    },
+}
+# per archetype: the district's own tint over the look's (shadows, highlights: a tint and its
+# strength): the corporate core steel blue and icy white, research and transit cool, the
+# residential heights warm, markets magenta, old towns a sickly sodium green with amber
+# highlights, the megablocks and the port sodium amber
+DISTRICT_TINT = {
+    "corporate_core":        {"shadows": ("#1f4f7a", 0.1), "highlights": ("#e8f4ff", 0.06)},
+    "research_campus":       {"shadows": ("#1f5f6a", 0.08), "highlights": ("#eafff6", 0.05)},
+    "residential_heights":   {"shadows": ("#3a3050", 0.06), "highlights": ("#ffe0b0", 0.08)},
+    "midtown_mixed":         {"shadows": ("#163a52", 0.0), "highlights": ("#ffffff", 0.0)},
+    "transit_hub":           {"shadows": ("#0f5060", 0.08), "highlights": ("#ffffff", 0.0)},
+    "spaceport":             {"shadows": ("#26384a", 0.08), "highlights": ("#f0f4ff", 0.05)},
+    "entertainment_market":  {"shadows": ("#3a1650", 0.12), "highlights": ("#ff70c0", 0.08)},
+    "old_town":              {"shadows": ("#2e3a1c", 0.12), "highlights": ("#ffb060", 0.1)},
+    "megablock_residential": {"shadows": ("#34361e", 0.1), "highlights": ("#ffb868", 0.08)},
+    "industrial_port":       {"shadows": ("#3a2a14", 0.12), "highlights": ("#ffa040", 0.12)},
+}
+# grit (spec.mood: the archetype's, pulled up by danger and down by wealth) on a district's
+# post: a key's value is the look's times a + b * grit (`mul`) or plus a + b * grit (`add`).
+# Clean is crisp: little grain and fringing, a touch more contrast and sharpening, a soft
+# bloom; gritty is dirty glass: grain, fringes and flares, halation, lifted blacks, muted
+# color but for the neon, a heavier vignette; the district's tint at a + b * grit of its
+# strength
+DISTRICT_POST = {
+    "mul": {"grain": (0.4, 1.8), "chromatic": (0.5, 1.5), "bloom": (0.85, 0.45),
+            "flare": (0.6, 1.0), "saturation": (1.03, -0.1), "contrast": (1.04, -0.07),
+            "highlight_sat": (1.0, 0.12), "tint": (0.6, 0.8)},
+    "add": {"vignette": (0.0, 0.15), "lift": (0.0, 0.0025), "sharpen": (0.4, -0.5)},
+}
+# the exposure per look (scope 6.5: locked per preset and hour, no adaptation pumping; the
+# night held at SCENE_NIGHT_EV100, the day at the sky's `ev_day` plus `day_bias`, dusk between
+# by the sun's curve), and by day the weather: `overcast_comp` of the sun's light the
+# weather's clouds take (the runtime's overcast, AT5) given back by the exposure (an overcast
+# street darker than a sunny one, not as dark as the sun's loss)
+POST_EXPOSURE = {
+    "neon_rain":    {"day_bias": 0.0, "overcast_comp": 0.75},
+    "clear_night":  {"day_bias": 0.0, "overcast_comp": 0.75},
+    "smog_dusk":    {"day_bias": 0.0, "overcast_comp": 0.75},
+    "overcast_day": {"day_bias": 0.0, "overcast_comp": 0.75},
+}
+# the overcast the runtime takes off the sun by day (AT5: 0.75 of its light at full cover,
+# from half cover up) and the share of a day street's light that stays (the sky light dims
+# with the deck too: Delta's Corporate Core street at the same exposure is a stop darker in
+# rain than clear, AT5's before shots, which this share gives)
+OVERCAST_TAKE = (0.5, 0.75)
+SKY_SHARE = 0.1
+# the districts by where the view stands: a raster of each cell's district (`POST_CELL_M`;
+# water and the map's edge the nearest district's), the runtime's weights from it in a disc
+# of `POST_BLEND_M` round the view, eased over `POST_EASE_S`
+POST_CELL_M = 32.0
+POST_BLEND_M = 90.0
+POST_EASE_S = 1.5
