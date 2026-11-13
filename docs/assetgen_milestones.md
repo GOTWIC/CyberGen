@@ -3370,8 +3370,30 @@ Vanta-R the same).
   percentile), LOD3 14.3 of 40 degrees, 0.019 of 0.10 bent, 0.007 of 0.04 texture (main
   13.4, 0.015, 0.007); the lamps lit at every LOD. Published with the Bastion as
   `vehicle-packs-2026-11-13d`.
+- **Tanager Cab** (`docs/progress/AG18/tanager_cab/`, on `vehicles/brands/tanager.py`,
+  unchanged, the Cab's cutter planes in `CabWin` with the Mino's frit panes): the visors as
+  the Mino's at the Cab's size (holes under flush clear lenses in gloss black surrounds,
+  chrome-plated lamps with light guide rings and three LED cups, the bar a guide on a chrome
+  strip, the displays under smoked lenses, lit faces proud of the skin); fog and reverse
+  lamps LED cups under lens blocks, the high stop lamp a lit bar under a red lens, side
+  repeaters in holes under amber lenses, rear markers under lenses; the charge door cut, the
+  luggage hatch's top and foot cut across the tail face (its sides the face's own shut lines:
+  a line cut beside them on the rounded edge left stars in the paint), handle cups cut into
+  the sliding doors and under the hatch's pull; 3.5 mm shut lines; frit glass. The open door
+  is now a pose (`K.Group`, the kit's first user): the car stands shut for the checks and the
+  pack, the left door and a fold-out step (one under each door, stowed under the sill) slide
+  out in the hero, side, top, door and low views. Step A: the wells' walls in from 0.60 to
+  0.48 m and the tub drawn in over them, the rear guards' far hit fixed (`skin()` as the
+  Mino's), the brand's `NARROW` tread (tires 7 mm in the ground before): 60 mm clear and 35
+  degrees of steering (0.0 mm and none); open runs, symmetry and the door card in the open
+  gone with the shut pose, the one-sided parts told as meant. Every check `ok` (tires and
+  panels FAIL, symmetry and through `look` before). 352,028 triangles (285,996). Pack rebuilt,
+  every check passing: 149,242, 59,995, 20,038, 4,756 triangles, standard class, texels 383
+  px/m (5th percentile), LOD3 17.3 of 40 degrees, 0.033 of 0.10 bent, 0.032 of 0.04 texture
+  (main 16.5, 0.030, 0.017); the lamps lit at every LOD, the windows' rims a little ragged at
+  LOD3. Not published.
 - **Next**: the other cars of the Brakk and Tanager brands on the
-  pilots' patterns (Cab, Porter), each switching to its `vehicles/brands/` module, with step A's street-distance
+  pilots' patterns (Porter), each switching to its `vehicles/brands/` module, with step A's street-distance
   findings fixed as it is redone.
 
 ### Parked in Delta Megacity on the PC (2026-11-12)

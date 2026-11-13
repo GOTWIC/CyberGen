@@ -18,7 +18,7 @@
 | [orrin_aria](orrin_aria/check.json) | look: 5.0 mm to pod.well, steers 0 deg | ok: 131.8 mm (body.floor) | look: 2 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 393388 |
 | [orrin_lumen](orrin_lumen/check.json) | look: 14.6 mm to body.well, steers 0 deg | ok: 130.0 mm (body.floor) | look: 2 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 356940 |
 | [orrin_pebble](orrin_pebble/check.json) | look: 16.1 mm to body.rear, steers 0 deg | ok: 143.3 mm (body.floor) | look: 5 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 324498 |
-| [tanager_cab](tanager_cab/check.json) | FAIL: 0.0 mm to bumper.guards.rear, steers 0 deg | ok: 120.0 mm (mudflaps) | look: 39 objects | FAIL: 4 open runs, 0 cutter holes | look: 1 parts | ok: 285996 |
+| [tanager_cab](tanager_cab/check.json) | ok: 60.0 mm to body.well, steers 35 deg | ok: 120.0 mm (mudflaps) | ok: 0 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 352028 |
 | [tanager_mino](tanager_mino/check.json) | ok: 51.9 mm to body.clad, steers 35 deg | ok: 110.0 mm (mudflaps) | look: 1 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 276187 |
 | [tanager_porter](tanager_porter/check.json) | FAIL: 0.0 mm to interior.tub, steers 0 deg | ok: 120.0 mm (mudflaps) | look: 87 objects | FAIL: 5 open runs, 0 cutter holes | look: 5 parts | ok: 314760 |
 | [vanta_r](vanta_r/check.json) | look: 12.8 mm to body.well, steers 0 deg | ok: 95.0 mm (splitter) | look: 5 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 304992 |
@@ -107,18 +107,9 @@
 - not mirrored: `interior.fittings` 160.0 mm, `luggage.case` 113.6 mm, `luggage.straps` 99.7 mm, `luggage.bag` 74.3 mm, `led.cabin` 5.4 mm
 - open ends of open pieces (meant): `liner.liner`
 
-**tanager_cab** (FAIL)
+**tanager_cab** (ok)
 
-- tire `fl`: 1.4 mm to `bumper.guards.rear`, turns 0 degrees before it touches `bumper.guards.rear`, its foot -7.0 mm off the ground
-- tire `rl`: 0.3 mm to `bumper.guards.rear`, its foot -7.0 mm off the ground
-- tire `fr`: 1.4 mm to `bumper.guards.rear`, turns 0 degrees before it touches `bumper.guards.rear`, its foot -7.0 mm off the ground
-- tire `rr`: 0.0 mm to `bumper.guards.rear`, its foot -7.0 mm off the ground
-- not mirrored: `body.slider` 500.0 mm, `glass.door.r` 500.0 mm, `seal.door.r` 500.0 mm, `checker.band.door.r` 500.0 mm, `roundel.r` 458.2 mm, `roundel.number.r` 392.9 mm, `lettering.door.r` 353.0 mm, `step.light` 286.4 mm, `step` 285.1 mm, `step.ribs` 257.8 mm, `body.sclad` 230.8 mm, `checker.molded.door.r` 188.9 mm and 27 more
-- open edge: `body.clad`, 1759 mm, at (0.01, 0.907, 0.42)
-- open edge: `body.roof`, 1260 mm, at (0.011, 0.814, 1.653)
-- open edge: `body.fender`, 1110 mm, at (0.641, 0.878, 1.055)
-- open edge: `body.quarter`, 1110 mm, at (-0.621, 0.878, 1.055)
-- cabin part in the open: `interior.card.l`, 21% of it, up to 37.0 mm from what would hide it, at (-0.656, 0.952, 0.326)
+- nothing
 
 **tanager_mino** (look)
 

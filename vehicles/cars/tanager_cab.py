@@ -6,18 +6,26 @@ Run (always through the wrapper, one Blender job at a time on this machine):
     vehicles/blender.sh vehicles/cars/tanager_cab.py --out DIR --sheet
 
 The Mino's bigger sibling (docs/progress/AG18/tanager_mino/README.md lists the family's
-cues, all repeated here): the soft tall box, holes for windows with flat glass and a fat
-seal, the gloss visor with a light bar between two lamp rings and a dot-matrix display,
-squircle arches, stepped grained cladding with a bump strip, steel wheels under slotted
-covers, a cap roof with its gear on two rails, roundel and small print, a round badge.
+cues, all repeated here): the soft tall box, holes for windows with flat glass, a fat seal
+and a frit border, the visor across each end (a hole under a clear lens in a gloss black
+surround holding one light bar between two lamp rings, and a dot-matrix display under a
+smoked lens of its own), squircle arches, stepped grained cladding with a bump strip, steel
+wheels under slotted covers, a cap roof with its gear on two rails, roundel and small print,
+a round badge.
 
 Its own job: one box with no hood and no driver (a sensor bar over the windshield), four
 seats facing each other in pairs across a low flat floor, one big sliding door each side on
-a visible track (the left one built open, over a fold-out step), a luggage hatch, and a
-roof sign that is a dot-matrix band all round.
+a visible track (the left one shown open in the sheet's views of its side, over a fold-out
+step), a luggage hatch cut into the tail, and a roof sign that is a dot-matrix band all
+round.
 
 The body is ten lines over fourteen stations. The windows are holes cut through the skin;
-the left door's panels, glass and details are objects of their own, slid back at the end.
+everything else cut into it (the visors, the side repeaters, the handle cups, the hatch and
+the charge door) is laid on the hull as it stands uncut (cutters()). The car stands with
+both doors shut; the left door and its step hang on groups that slide them open for the
+views of its side (CAB_SHUT=1: shut in every view). The brand's helpers (outlines, pads,
+bars, dot matrices, windows, door parts, plate, badge, arch, wheel) are in
+vehicles/brands/tanager.py.
 """
 import os
 import sys
@@ -26,25 +34,62 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import bmesh                                                        # noqa: E402
 import bpy                                                          # noqa: E402
 import carkit as K                                                  # noqa: E402
-from carkit import (Geo, Matrix, V3, atan2, cos, hypot, on_body, pi, rad, sin,    # noqa: E402
-                    stud)
+from functools import partial                                       # noqa: E402
+from brands import tanager                                          # noqa: E402
+from brands.tanager import (GD, GLYPH, badge, banner, bar_on, dots, dots_flat, grain,  # noqa: E402
+                            pad, rect, rpoly, rrect, sheet, split_left, text_proj, tile)
+from carkit import Geo, Matrix, V3, cos, hypot, pi, rad, stud       # noqa: E402
 
 # ---------------------------------------------------------------------------------------
 # dimensions
 # ---------------------------------------------------------------------------------------
 FA_X, RA_X = 1.50, -1.50            # axles: wheelbase 3.0
 T_R, T_W, T_RIM, T_OUT = 0.33, 0.205, 0.225, 0.888     # tire radius, width, rim, outer face
-ARCH_A, ARCH_B, ARCH_ZC, ARCH_N = 0.39, 0.395, 0.335, 3.4   # squircle arch: half width, rise
+ARCH = (0.39, 0.395, 0.335, 3.4)    # squircle arch: half width, rise, center height, exponent
+ARCH_A = ARCH[0]
+WELL_Y = 0.48                       # the wells' inner walls (0.60 before: room to steer)
 BELT, HEAD, ROOF = 1.00, 1.67, 1.78  # belt line, glass header, roof
 STEP = 0.53                         # the cladding's step
 D_F, D_R = 0.64, -0.62              # the sliding door's front and rear edges as built
 D_FC, D_RC = 0.772, -0.748          # their stations in the cage: subdivision draws an edge
 #                                     toward its neighbors, (prev + 4 x + next) / 6
 SLIDE = V3((-1.27, 0.09, 0.0))      # how far the open door has gone
+STEP_OUT = V3((0.0, 0.30, 0.0))     # how far the fold-out step comes out from under the sill
+OPEN_VIEWS = ("hero", "side", "top", "door", "low")    # the left door open in these
 FLOOR = 0.30                        # the cabin floor
-GD = 0.011                          # how far the glass lies behind the skin
 NUM = "31"
+GAP = 0.00175                       # shut lines 3.5 mm
+FRIT = 0.04                         # the frit border on the glass, from its edge
+VIS = dict(front=('x', 0.80, 0.7435, "led_front", "pixel", "z 64%"),      # the visors:
+           rear=('X', 0.90, 0.7635, "led_rear", "pixel_r", "NEXT>QUAY 6"))  # projection,
+#                                     middle height, half width, lights, display
 DOOR = []                           # objects that slide with the left door
+STEPS = []                          # objects of the left step
+LATE = {}                           # what cutters() lays inside the cuts, made after the build
+
+arch_pts = partial(tanager.arch_pts, arch=ARCH)
+build_wheel = partial(tanager.wheel, R=T_R, w=T_W, rim=T_RIM, out=T_OUT, tread=tanager.NARROW)
+door_obj = partial(tanager.door_obj, door=DOOR)
+
+FAR = {'x': lambda p: p.x < 1.0, 'X': lambda p: p.x > -1.0, 'y': lambda p: p.y < 0.4,
+       'Y': lambda p: p.y > -0.4, 'z': lambda p: False}
+_skin = tanager.skin
+
+
+def skin(u, v, proj):
+    """The brand's skin(), but a ray that slips through a shut line at the edge of a face
+    (3.5 mm wide now) or past a face's rounded edge and meets the inside of the body far
+    behind it (the rear bumper's guards once reached the front wheel wells) looks beside
+    it, as one that misses does. Set as the brand module's own, so its pads use it too."""
+    for du, dv in ((0, 0), (0, 0.004), (0, -0.004), (0.004, 0), (-0.004, 0), (0, 0.009),
+                   (0, -0.009), (0.009, 0), (-0.009, 0)):
+        loc, n = K.on_body(u + du, v + dv, proj)
+        if loc is not None and not FAR[proj](loc):
+            return loc, n
+    return _skin(u, v, proj)
+
+
+tanager.skin = skin
 
 
 def tail_x(z):
@@ -52,301 +97,43 @@ def tail_x(z):
     return -2.25 + (z - 0.32) * 0.105
 
 
-# ---------------------------------------------------------------------------------------
-# the family's helpers (from the Mino): outlines, things laid on the skin as built
-# ---------------------------------------------------------------------------------------
-def rpoly(corners, r, n=6, normals=False):
-    """A polygon with its corners rounded off (radius r, or one per corner); with normals
-    also each point's outward direction (a convex polygon)."""
-    m = len(corners)
-    rs = r if isinstance(r, (list, tuple)) else [r] * m
-    out, nrm = [], []
-    for k in range(m):
-        p = V3((*corners[k], 0))
-        d1 = (V3((*corners[k - 1], 0)) - p).normalized()
-        d2 = (V3((*corners[(k + 1) % m], 0)) - p).normalized()
-        half = d1.angle(d2) / 2
-        t = rs[k] / max(1e-6, abs(sin(half) / cos(half)))
-        c = p + (d1 + d2).normalized() * (rs[k] / sin(half))
-        a, b = p + d1 * t - c, p + d2 * t - c
-        a0 = atan2(a.y, a.x)
-        da = (atan2(b.y, b.x) - a0 + pi) % (2 * pi) - pi
-        for i in range(n + 1):
-            ang = a0 + da * i / n
-            out.append((c.x + rs[k] * cos(ang), c.y + rs[k] * sin(ang)))
-            nrm.append((cos(ang), sin(ang)))
-    return (out, nrm) if normals else out
+class CabWin(tanager.Win):
+    """The Cab's windows: its body's cutter planes, and flat glass with a frit border (the
+    glass's own thickness, no gap between them)."""
+
+    CUT = dict(y=(0.55, 0.6), x=(1.45, 1.2), X=(-1.60, -1.0))
+
+    def panes(self, gp, gf, w=FRIT):
+        def flat(p):
+            return p - self.n * ((p - self.c).dot(self.n) + GD)
+        O = [flat(p) for p in self.P]
+        In = [flat(p + d * w) for p, d in zip(self.P, self.D)]
+        m = len(O)
+        gp.add(In, [tuple(range(m))])
+        gf.add(O + In, [(k, (k + 1) % m, m + (k + 1) % m, m + k) for k in range(m)])
 
 
-def rect(cu, cv, a, b):
-    return [(cu + a, cv - b), (cu + a, cv + b), (cu - a, cv + b), (cu - a, cv - b)]
-
-
-def rrect(cu, cv, a, b, r, n=6):
-    return rpoly(rect(cu, cv, a, b), r, n)
-
-
-AXIS_U = {'y': V3((1, 0, 0)), 'Y': V3((1, 0, 0)), 'x': V3((0, 1, 0)), 'X': V3((0, 1, 0)),
-          'z': V3((1, 0, 0))}
-
-
-def skin(u, v, proj):
-    """The skin under (u, v); a ray that slips through a panel gap looks beside it."""
-    for du, dv in ((0, 0), (0, 0.004), (0, -0.004), (0.004, 0), (-0.004, 0), (0, 0.009),
-                   (0, -0.009), (0.009, 0), (-0.009, 0)):
-        loc, n = on_body(u + du, v + dv, proj)
-        if loc is not None:
-            return loc, n
-    raise ValueError("nothing under (%.3f, %.3f) seen along %s" % (u, v, proj))
-
-
-def pad(g, cu, cv, a, b, r, proj, lift=0.004, sink=0.003, nv=4, nc=5, step=0.03):
-    """A rounded-rectangle plate lying on the skin, following it: half sizes a (along u)
-    and b, corner radius r, its face lift over the skin."""
-    r = min(r, a, b)
-    cols = []
-    for k in range(nc, 0, -1):
-        t = rad(90.0 * k / nc)
-        cols.append((-(a - r) - r * sin(t), b - r + r * cos(t)))
-    ns = max(1, int(2 * (a - r) / step + 0.999)) if a - r > 1e-6 else 0
-    for k in range(ns + 1):
-        cols.append((-(a - r) + (2 * (a - r) * k / ns if ns else 0.0), b))
-    for k in range(1, nc + 1):
-        t = rad(90.0 * k / nc)
-        cols.append(((a - r) + r * sin(t), b - r + r * cos(t)))
-    top, bot = [], []
-    for (du, h) in cols:
-        h = max(h, 0.0012)
-        for j in range(nv + 1):
-            loc, n = skin(cu + du, cv + h * (2.0 * j / nv - 1.0), proj)
-            top.append(loc + n * lift)
-            bot.append(loc - n * sink)
-    nn, m = len(cols), nv + 1
-    N = nn * m
-    fs = []
-    for i in range(nn - 1):
-        for j in range(nv):
-            q = (i * m + j, (i + 1) * m + j, (i + 1) * m + j + 1, i * m + j + 1)
-            fs += [q, tuple(N + k for k in q)]
-        for j in (0, nv):
-            fs.append((i * m + j, (i + 1) * m + j, N + (i + 1) * m + j, N + i * m + j))
-    for i in (0, nn - 1):
-        for j in range(nv):
-            fs.append((i * m + j, i * m + j + 1, N + i * m + j + 1, N + i * m + j))
-    g.add(top + bot, fs)
-
-
-def bar_on(g, pts, proj, w, h, lift=0.0, step=0.02):
-    """A bar of width w and height h lying on the skin along a path given in projection."""
-    P, U = [], []
-    for a, b in zip(pts, pts[1:]):
-        n = max(1, int(hypot(b[0] - a[0], b[1] - a[1]) / step))
-        for k in range(n + (1 if b is pts[-1] else 0)):
-            t = k / n
-            loc, nr = skin(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, proj)
-            P.append(loc + nr * lift)
-            U.append(nr)
-    g.sweep(P, [(-w / 2, -0.002), (w / 2, -0.002), (w / 2, h), (-w / 2, h)], up=U)
-
-
-def tile(g, cu, cv, a, b, proj, lift, sink=0.001):
-    """A small rectangle on the skin: a flat mark (sink None) or a raised block."""
-    q = [skin(cu + du, cv + dv, proj) for du, dv in ((-a, -b), (a, -b), (a, b), (-a, b))]
-    top = [p + n * lift for p, n in q]
-    if sink is None:
-        g.add(top, [(0, 1, 2, 3)])
-    else:
-        g.hexa([p - n * sink for p, n in q] + top)
-
-
-def text_proj(g, txt, size, u0, v0, proj, lift=0.0012, spacing=1.0):
-    """Lettering on the nose ('x') or the tail ('X'), read from outside, its middle at
-    (u0, v0) = (y, z)."""
-    vs, fs = K.text_mesh(txt, size, spacing)
-    sg = -1.0 if proj == 'X' else 1.0
+def dense(pts, step=0.015, closed=True):
+    """A polyline with a point at least every step."""
     out = []
-    for p in vs:
-        loc, n = on_body(u0 + sg * p.x, v0 + p.y, proj)
-        if loc is None:
-            return
-        out.append(loc + n * lift)
-    g.add(out, fs)
+    segs = list(zip(pts, pts[1:] + pts[:1])) if closed else list(zip(pts, pts[1:]))
+    for a, b in segs:
+        n = max(1, int(hypot(b[0] - a[0], b[1] - a[1]) / step + 0.999))
+        out += [(a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n) for k in range(n)]
+    if not closed:
+        out.append(pts[-1])
+    return out
 
 
-GLYPH = {
-    "A": (".###.", "#...#", "#...#", "#####", "#...#", "#...#", "#...#"),
-    "B": ("####.", "#...#", "#...#", "####.", "#...#", "#...#", "####."),
-    "C": (".###.", "#...#", "#....", "#....", "#....", "#...#", ".###."),
-    "E": ("#####", "#....", "#....", "####.", "#....", "#....", "#####"),
-    "F": ("#####", "#....", "#....", "####.", "#....", "#....", "#...."),
-    "N": ("#...#", "##..#", "#.#.#", "#.#.#", "#..##", "#...#", "#...#"),
-    "Q": (".###.", "#...#", "#...#", "#...#", "#.#.#", "#..#.", ".##.#"),
-    "R": ("####.", "#...#", "#...#", "####.", "#.#..", "#..#.", "#...#"),
-    "T": ("#####", "..#..", "..#..", "..#..", "..#..", "..#..", "..#.."),
-    "U": ("#...#", "#...#", "#...#", "#...#", "#...#", "#...#", ".###."),
-    "X": ("#...#", "#...#", ".#.#.", "..#..", ".#.#.", "#...#", "#...#"),
-    "Y": ("#...#", "#...#", ".#.#.", "..#..", "..#..", "..#..", "..#.."),
-    "1": ("..#..", ".##..", "..#..", "..#..", "..#..", "..#..", ".###."),
-    "3": ("####.", "....#", "....#", ".###.", "....#", "....#", "####."),
-    "4": ("...#.", "..##.", ".#.#.", "#..#.", "#####", "...#.", "...#."),
-    "6": (".###.", "#....", "#....", "####.", "#...#", "#...#", ".###."),
-    "%": ("##..#", "##.#.", "...#.", "..#..", ".#...", ".#.##", "#..##"),
-    "z": ("...#.", "..##.", ".##..", "#####", "..##.", ".##..", ".#..."),      # a bolt
-    "h": (".#.#.", "#####", "#####", "#####", ".###.", "..#..", "....."),      # a heart
-    ">": ("#....", ".#...", "..#..", "...#.", "..#..", ".#...", "#...."),
-    " ": ("..", "..", "..", "..", "..", "..", ".."),
-}
-
-
-def banner(txt):
-    """Seven rows of dots for a line of glyphs, a column between them."""
-    return [".".join(GLYPH[ch][r] for ch in txt) for r in range(7)]
-
-
-def dots(g, rows, u0, v0, pitch, proj, lift, size, ch="#"):
-    """Lit dots of a dot-matrix display lying on the skin, its middle at (u0, v0)."""
-    sg = -1.0 if proj == 'X' else 1.0
-    W, H = len(rows[0]), len(rows)
-    for r, row in enumerate(rows):
-        for c, x in enumerate(row):
-            if x != ch:
-                continue
-            loc, n = skin(u0 + sg * (c - (W - 1) / 2) * pitch, v0 + ((H - 1) / 2 - r) * pitch,
-                          proj)
-            e1 = (AXIS_U[proj] - n * AXIS_U[proj].dot(n)).normalized()
-            e2 = n.cross(e1)
-            p, s = loc + n * lift, size / 2
-            g.add([p - e1 * s - e2 * s, p + e1 * s - e2 * s, p + e1 * s + e2 * s,
-                   p - e1 * s + e2 * s], [(0, 1, 2, 3)])
-
-
-def dots_flat(g, rows, c, right, up, pitch, size):
-    """Lit dots on a plane: the display's middle at c, reading along right."""
-    c, right, up = V3(c), V3(right), V3(up)
-    W, H, s = len(rows[0]), len(rows), size / 2
-    for r, row in enumerate(rows):
-        for k, x in enumerate(row):
-            if x == "#":
-                p = c + right * ((k - (W - 1) / 2) * pitch) + up * (((H - 1) / 2 - r) * pitch)
-                g.add([p - right * s - up * s, p + right * s - up * s, p + right * s + up * s,
-                       p - right * s + up * s], [(0, 1, 2, 3)])
-
-
-class Win:
-    """A window: a hole of a rounded outline cut through the skin along a projection, then
-    flat glass and a fat seal laid behind and round it on the skin as built."""
-
-    def __init__(self, corners, r, proj):
-        o, nr = rpoly(corners, r, normals=True)
-        self.o, self.nr, self.proj = [], [], proj
-        for k in range(len(o)):             # points along the straights too: the seal
-            a, b = o[k], o[(k + 1) % len(o)]            # follows a skin that is not flat
-            n = max(1, int(hypot(b[0] - a[0], b[1] - a[1]) / 0.04))
-            for i in range(n):
-                self.o.append((a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n))
-                self.nr.append(nr[k] if i == 0 else nr[(k + 1) % len(o)])
-
-    def cut(self, g):
-        if self.proj == 'y':
-            for sg in (1, -1):
-                g.prism([(u, sg * 0.55, v) for u, v in self.o], (0, sg * 0.6, 0))
-        elif self.proj == 'x':
-            g.prism([(1.45, u, v) for u, v in self.o], (1.2, 0, 0))
-        else:
-            g.prism([(-1.60, u, v) for u, v in self.o], (-1.0, 0, 0))
-
-    def fit(self):
-        def ring(d):
-            return [skin(u + a * d, v + b * d, self.proj)
-                    for (u, v), (a, b) in zip(self.o, self.nr)]
-        self.P = [p for p, _ in ring(0.010)]
-        self.N = [n for _, n in ring(0.010)]
-        self.D = []                         # inward along the skin, square to the outline
-        for p, n, (q, _) in zip(self.P, self.N, ring(0.024)):
-            d = p - q
-            self.D.append((d - n * d.dot(n)).normalized())
-        self.c = sum(self.P, V3()) / len(self.P)
-        self.n = sum(self.N, V3()).normalized()
-        self.eu = (AXIS_U[self.proj] - self.n * AXIS_U[self.proj].dot(self.n)).normalized()
-        self.ev = self.n.cross(self.eu)
-        if self.ev.z < 0:
-            self.ev = -self.ev
-        return self
-
-    def at(self, u, v, off=0.0):
-        """The point of the window's plane under (u, v), off out of it."""
-        (axis, a, b), far, d = K._RAYS[self.proj]
-        o = V3()
-        o[axis], o[a], o[b] = far, u, v
-        d = V3(d)
-        return o + d * ((self.c - o).dot(self.n) / d.dot(self.n)) + self.n * off
-
-    def glass(self, g):
-        """One flat pane, GD behind the skin."""
-        g.add([p - self.n * ((p - self.c).dot(self.n) + GD) for p in self.P],
-              [tuple(range(len(self.P)))])
-
-    def seal(self, g):
-        m = len(self.P)
-        sec = [(-0.007, -0.002), (-0.007, 0.0035), (0.017, 0.0035), (0.017, -GD)]
-        vs = []
-        for k in range(m):
-            vs += [self.P[k] + self.D[k] * a + self.N[k] * b for a, b in sec]
-        s = len(sec)
-        g.add(vs, [(k * s + j, k * s + (j + 1) % s, ((k + 1) % m) * s + (j + 1) % s,
-                    ((k + 1) % m) * s + j) for k in range(m) for j in range(s)])
-
-
-def sheet(g, name, **kw):
-    """Glass from a Geo of fans: thin, smooth."""
-    ob = g.obj(name, "glass", **kw)
-    md = ob.modifiers.new("solid", 'SOLIDIFY')
-    md.thickness = 0.004
-    md.offset = -1.0
-    return ob
-
-
-def grain(name, color, rough=0.62, scale=300.0, strength=0.5):
-    """Molded plastic: a fine pebbled grain."""
-    m, b = K.pbr(name, color, 0.0, rough)
-    nt = m.node_tree
-    tc = nt.nodes.new('ShaderNodeTexCoord')
-    nz = nt.nodes.new('ShaderNodeTexNoise')
-    nz.inputs["Scale"].default_value = scale
-    nz.inputs["Detail"].default_value = 3.0
-    bp = nt.nodes.new('ShaderNodeBump')
-    bp.inputs["Strength"].default_value = strength
-    bp.inputs["Distance"].default_value = 0.002
-    nt.links.new(tc.outputs["Object"], nz.inputs["Vector"])
-    nt.links.new(nz.outputs["Fac"], bp.inputs["Height"])
-    nt.links.new(bp.outputs["Normal"], b.inputs["Normal"])
-
-
-# ---------------------------------------------------------------------------------------
-# helpers of this car: the sliding door
-# ---------------------------------------------------------------------------------------
-def door_obj(g, name, mat, glass=False, **kw):
-    """A part of the sliding doors, drawn on the left: the left one will slide with its
-    door, the right one is its mirror image."""
-    make = sheet if glass else (lambda gg, nm, **k: gg.obj(nm, mat, **k))
-    DOOR.append(make(g, name + ".l", **kw))
-    make(g, name + ".r", flip_y=True, **kw)
-
-
-def split_left(ob):
-    """The left half of a mirrored panel as an object of its own."""
-    new = ob.copy()
-    new.data = ob.data.copy()
-    new.name = ob.name + ".l"
-    K.CAR.objects.link(new)
-    for o, keep in ((ob, -1.0), (new, 1.0)):
-        bm = bmesh.new()
-        bm.from_mesh(o.data)
-        bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.calc_center_median().y * keep < 0],
-                         context='FACES')
-        bm.to_mesh(o.data)
-        bm.free()
-    return new
+def under(pts, proj, depth):
+    """Points of a path in projection carried onto the skin and depth under it, with the
+    skin's normals."""
+    P, U = [], []
+    for u, v in pts:
+        loc, n = skin(u, v, proj)
+        P.append(loc - n * depth)
+        U.append(n)
+    return P, U
 
 
 # ---------------------------------------------------------------------------------------
@@ -432,7 +219,9 @@ def panel_of(i, j):
 
 PMAT = dict(nose="paint", fender="paint", screen="paint", roof="paint2", slider="paint",
             quarter="paint", gate="paint", clad="plastic", sclad="plastic",
-            floor="underbody", well="well", wincut="void")
+            floor="underbody", well="well", wincut="void",
+            visor_f="void", visor_r="void", rep_h="void", slot="plastic", hslot="plastic",
+            cut="void")
 
 
 def line_crease(i, j):
@@ -463,70 +252,209 @@ def station_crease(i, j):
     return 0.0
 
 
-def arch_pts(cx, grow=0.0, n=30):
-    """The squircle arch about an axle, front to rear over the top, as (x, z)."""
-    a, b = ARCH_A + grow, ARCH_B + grow
-    out = []
-    for k in range(n + 1):
-        t = pi * k / n
-        c, s = cos(t), sin(t)
-        e = 2.0 / ARCH_N
-        out.append((cx + a * (1 if c >= 0 else -1) * abs(c) ** e, ARCH_ZC + b * abs(s) ** e))
-    return out
-
-
-W_FQ = Win([(1.80, 1.055), (1.535, 1.585), (.77, 1.585), (.77, 1.055)], [.06, .08, .08, .08],
-           'y')
-W_DOOR = Win(rect(0.01, 1.32, .50, .265), .08, 'y')
-W_RQ = Win([(-.75, 1.055), (-.75, 1.585), (-1.885, 1.585), (-1.935, 1.055)], .08, 'y')
-W_FRONT = Win([(-.67, 1.125), (.67, 1.125), (.63, 1.60), (-.63, 1.60)], .09, 'x')
-W_REAR = Win(rect(0, 1.335, .60, .215), .085, 'X')
+W_FQ = CabWin([(1.80, 1.055), (1.535, 1.585), (.77, 1.585), (.77, 1.055)],
+              [.06, .08, .08, .08], 'y')
+W_DOOR = CabWin(rect(0.01, 1.32, .50, .265), .08, 'y')
+W_RQ = CabWin([(-.75, 1.055), (-.75, 1.585), (-1.885, 1.585), (-1.935, 1.055)], .08, 'y')
+W_FRONT = CabWin([(-.67, 1.125), (.67, 1.125), (.63, 1.60), (-.63, 1.60)], .09, 'x')
+W_REAR = CabWin(rect(0, 1.335, .60, .215), .085, 'X')
 WINS = [W_FQ, W_DOOR, W_RQ, W_FRONT, W_REAR]
 
 
-def build_hull():
+# ---------------------------------------------------------------------------------------
+# the cuts, laid on the hull as it stands uncut, and what stands inside them
+# ---------------------------------------------------------------------------------------
+def frame_on(g, outline, proj, w, z0, z1):
+    """A wall w thick along a closed outline on the skin, from z0 to z1 over it."""
+    P, U = under(dense(outline), proj, 0.0)
+    g.sweep(P, [(-w / 2, z0), (w / 2, z0), (w / 2, z1), (-w / 2, z1)], up=U, closed=True)
+
+
+def visor(tag):
+    """A visor, as the Mino's: a hole across the face (the paint's own 14 mm rim its walls,
+    a gloss black back plate closing it 14 mm in), a gloss black surround standing 9.5 mm
+    proud round its edge and a clear lens in it. The lamps stand in the hole with their lit
+    faces 2 to 4 mm proud of the skin, under the lens (the game pack's far LOD draws the
+    face across the hole), and nothing in it is a small ring (that LOD fills one into a
+    lid). At each end a lamp of a chrome plate, a lit ring of light guide and a row of three
+    LED cups on a dark tray, larger than the Mino's; the light bar between them, a guide on
+    a chrome strip; the display on the car's left, a screen with its lit dots under a
+    smoked lens of its own: the charge in front, the next stop behind."""
+    proj, cv, hw, lit, pix, msg = VIS[tag]
+    t = tag[0]
+    vh = 0.0885
+    sg = -1.0 if proj == 'X' else 1.0          # the car's left as this view's u
+    ly = hw - 0.1035                            # the lamps
+    g, lens = Geo(), Geo()
+    K.pocket(g, K.rounded(0.0, cv, 2 * hw + 0.003, 2 * vh + 0.003, 0.055), proj, depth=0.03)
+    frame_on(lens, rrect(0, cv, hw, vh, 0.0535), proj, 0.008, -0.004, 0.0095)
+    glass = Geo()
+    pad(glass, 0, cv, hw - 0.0035, vh - 0.0035, 0.05, proj, lift=0.009, sink=-0.006, nv=10,
+        nc=8, step=0.01)
+    back = Geo()
+    pad(back, 0, cv, hw + 0.0085, vh + 0.0085, 0.057, proj, lift=-0.0140, sink=0.0175, nv=6)
+    # the lamps at each end (the left one, mirrored)
+    E = K.Lamp("lamp.%s" % tag, lit=lit, optic="lens_red" if t == "r" else "optic")
+    pad(E.chrome, ly, cv, 0.081, 0.062, 0.032, proj, lift=-0.003, sink=0.004)
+    P, U = under(dense(rrect(ly, cv, 0.0695, 0.0505, 0.024)), proj, -0.0005)
+    E.guide(P, r=0.0035, sleeve=1.6, closed=True, up=U)
+    pad(E.housing, ly, cv, 0.057, 0.039, 0.018, proj, lift=-0.002, sink=0.0029)
+    for u in (ly - 0.036, ly, ly + 0.036):
+        loc, n = skin(u, cv, proj)
+        E.reflector(loc + n * 0.002, n, r=0.014, depth=0.006, seg=16, led=0.006)
+    # the light bar: a guide on a chrome strip
+    L = ly - 0.09
+    B = K.Lamp("lamp.%s_bar" % tag, lit=lit, optic="lens_red" if t == "r" else "optic")
+    P, U = under(dense([(-L, cv + 0.037), (L, cv + 0.037)], 0.02, closed=False), proj, 0.0)
+    B.guide(P, r=0.0042, sleeve=1.45, up=U)
+    pad(B.chrome, 0, cv + 0.037, L + 0.002, 0.0125, 0.008, proj, lift=-0.004, sink=0.005)
+    # the display under its own smoked lens
+    rows = banner(msg)
+    wd = len(rows[0]) * 0.0072 / 2 + 0.022
+    du, dv = sg * (ly - 0.105 - wd), cv - 0.03
+    sc, px, ln = Geo(), Geo(), Geo()
+    pad(sc, du, dv, wd, 0.036, 0.012, proj, lift=0.001, sink=0.004)
+    dots(px, rows, du, dv, 0.0072, proj, 0.002, 0.0052)
+    pad(ln, du, dv, wd - 0.002, 0.034, 0.011, proj, lift=0.0047, sink=-0.0035)
+    LATE[tag] = (lens, glass, back, E, B, sc, px, ln, pix)
+    return g
+
+
+def cutters():
+    """Everything cut into the hull: the wheel wells, the windows (holes), the visors and
+    the front side repeaters (housings under lenses), the handle cups (the sliding doors'
+    and the hatch's) and the shut lines of the luggage hatch and the charge door."""
     wells, wins = Geo(), Geo()
     for cx in (FA_X, RA_X):
         for sg in (1, -1):
             pts = arch_pts(cx)
-            poly = [(pts[0][0], sg * 0.60, -0.3)] + [(x, sg * 0.60, z) for x, z in pts]
-            poly.append((pts[-1][0], sg * 0.60, -0.3))
+            poly = [(pts[0][0], sg * WELL_Y, -0.3)] + [(x, sg * WELL_Y, z) for x, z in pts]
+            poly.append((pts[-1][0], sg * WELL_Y, -0.3))
             wells.prism(poly, (0, sg * 0.5, 0))
     for w in WINS:
         w.cut(wins)
+    vf, vr = visor("front"), visor("rear")
+    # the side repeaters ahead of the front arches: an amber cell under an amber lens
+    rep = Geo()
+    K.pocket(rep, K.rounded(1.92, 0.925, 0.066, 0.024), 'y', depth=0.012, mirror=True)
+    R = K.Lamp("lamp.repeater", lit="led_accent", glass="lens_amber")
+    pad(R.housing, 1.92, 0.925, 0.0365, 0.0155, 0.012, 'y', lift=-0.0140, sink=0.016)
+    pad(R.chrome, 1.92, 0.925, 0.032, 0.0115, 0.009, 'y', lift=-0.0085, sink=0.0139)
+    pad(R.emit(), 1.92, 0.925, 0.026, 0.0065, 0.005, 'y', lift=-0.0045, sink=0.0065)
+    pad(R.glass, 1.92, 0.925, 0.033, 0.012, 0.011, 'y', lift=0.0, sink=0.003)
+    LATE["rep"] = R
+    # handle cups: an upright one on each sliding door (it goes with the door), a long one
+    # under the luggage hatch; each pull's ends on the skin past its cup
+    hs, gp = Geo(), Geo()
+    K.pocket(hs, K.rounded(0.515, 0.715, 0.050, 0.172, 0.018), 'y', depth=0.014, mirror=True)
+    pad(gp, 0.515, 0.715, 0.0095, 0.096, 0.009, 'y', lift=0.010)
+    LATE["pulls"] = gp
+    hp, gh = Geo(), Geo()
+    K.pocket(hp, K.rounded(0.0, 0.621, 0.17, 0.040, 0.018), 'X', depth=0.014)
+    pad(gh, 0.0, 0.623, 0.105, 0.0095, 0.009, 'X', lift=0.009)
+    LATE["hatch"] = gh
+    # shut lines: the luggage hatch's top and foot across the tail face (its sides are the
+    # face's own shut lines at its edges: a line cut beside them on the rounded edge left
+    # stars in the paint), the charge door on the left
+    cut = Geo()
+    K.groove(cut, [(-0.76, 0.588), (0.76, 0.588)], 'X')
+    K.groove(cut, [(-0.69, 1.655), (0.69, 1.655)], 'X')
+    K.groove(cut, rrect(0.87, 0.70, 0.078, 0.054, 0.022), 'y', closed=True)
+    return [(wells, "well"), (wins, "wincut", "drop"), (vf, "visor_f", "drop"),
+            (vr, "visor_r", "drop"), (rep, "rep_h", "drop"), (hs, "hslot"), (hp, "slot"),
+            (cut, "cut", "drop")]
+
+
+def unfold(ob):
+    """Takes out the faces the boolean and the gap's shrink folded back over their
+    neighbors (slivers along a cut through a face's fan of quads)."""
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    bad = []
+    for f in bm.faces:
+        nb = [g for e in f.edges for g in e.link_faces if g is not f]
+        if nb and f.normal.dot(sum((g.normal * g.calc_area() for g in nb), V3())) < 0:
+            bad.append(f)
+    if bad:
+        bmesh.ops.delete(bm, geom=bad, context='FACES')
+        bm.to_mesh(ob.data)
+    bm.free()
+    return len(bad)
+
+
+def flatten(ob, n, deg=1.5):
+    """Flat shading on the faces of a panel that lie in its face's plane (normal n): the
+    cuts leave long thin triangles there, and smooth shading carried the rim's normals at
+    the cut along them in stars."""
+    c = cos(rad(deg))
+    k = 0
+    for p in ob.data.polygons:
+        if p.normal.dot(n) > c:
+            p.use_smooth = False
+            k += 1
+    return k
+
+
+def build_hull():
     body = K.build_body(stations(), panel_of, PMAT, line_crease, station_crease,
                         front=dict(kind="flat", panel="nose", crease=0.0),
                         rear=dict(kind="flat", panel="gate", crease=0.0),
-                        cutters=[(wells, "well"), (wins, "wincut")], subdiv=3)
-    ob = body.parts.pop("wincut")           # the holes stay, their walls go
-    me = ob.data
-    bpy.data.objects.remove(ob)
-    bpy.data.meshes.remove(me)
+                        cutters=cutters, subdiv=3, gap=GAP)
+    folds = {pn: unfold(body.parts[pn]) for pn in ("nose", "gate")}
+    K.log("folds taken out: %s" % {k: v for k, v in folds.items() if v})
+    tail_n = V3((-1.0, 0.0, 0.105)).normalized()
+    for pn, n in (("nose", V3((1, 0, 0))), ("gate", tail_n)):
+        K.log("%s: %d faces flat" % (pn, flatten(body.parts[pn], n)))
+    for tag in ("front", "rear"):
+        rim, lens, back, E, B, sc, px, ln, pix = LATE[tag]
+        rim.obj("visor.rim." + tag, "visor", bevel=0.0015)
+        lens.obj("visor.lens." + tag, "lens_clear", sharp=40)
+        back.obj("visor.back." + tag, "visor", bevel=0.002)
+        E.obj(mirror=True)
+        B.obj()
+        sc.obj("display." + tag, "panel", bevel=0.001)
+        px.obj("pixels." + tag, pix)
+        ln.obj("display.lens." + tag, "lens_smoke")
+    LATE["rep"].obj(mirror=True)
+    door_obj(LATE["pulls"], "handle.pull", "paint", bevel=0.002)
+    LATE["hatch"].obj("hatch.pull", "paint", bevel=0.002)
     return body
 
 
 # ---------------------------------------------------------------------------------------
 # glass, seals, wipers
 # ---------------------------------------------------------------------------------------
+def frit(g, name, **kw):
+    ob = g.obj(name, "frit", **kw)
+    md = ob.modifiers.new("solid", 'SOLIDIFY')
+    md.thickness = 0.004
+    md.offset = -1.0
+    return ob
+
+
 def build_glass():
     for w in WINS:
         w.fit()
-    g, gs = Geo(), Geo()
+    g, gf, gs = Geo(), Geo(), Geo()
     for w in (W_FQ, W_RQ):
-        w.glass(g)
+        w.panes(g, gf)
         w.seal(gs)
     sheet(g, "glass.side", mirror=True)
+    frit(gf, "frit.side", mirror=True)
     gs.obj("seal.side", "rubber", bevel=0.0012, mirror=True)
-    g, gs = Geo(), Geo()
-    W_DOOR.glass(g)
+    g, gf, gs = Geo(), Geo(), Geo()
+    W_DOOR.panes(g, gf)
     W_DOOR.seal(gs)
     door_obj(g, "glass.door", "glass", glass=True)
+    DOOR.append(frit(gf, "frit.door.l"))
+    frit(gf, "frit.door.r", flip_y=True)
     door_obj(gs, "seal.door", "rubber", bevel=0.0012)
-    g, gs = Geo(), Geo()
+    g, gf, gs = Geo(), Geo(), Geo()
     for w in (W_FRONT, W_REAR):
-        w.glass(g)
+        w.panes(g, gf, 0.05)
         w.seal(gs)
     sheet(g, "glass.ends")
+    frit(gf, "frit.ends")
     gs.obj("seal.ends", "rubber", bevel=0.0012)
     # one big wiper in front, a small one behind
     g = Geo()
@@ -543,33 +471,27 @@ def build_glass():
 
 
 # ---------------------------------------------------------------------------------------
-# the visors: light bar, lamp rings, display; bumpers, plates, badges, the luggage hatch
+# the ends: bumpers, fog, reverse and stop lamps, plates, badges, lettering
 # ---------------------------------------------------------------------------------------
+def small_lamp(name, proj, u, v, a, b, r, cups, cup_r, lit="lamp", glass="lens_clear",
+               base=0.012, mirror=False):
+    """A lamp standing on a bumper pad (its face base over the skin), as the Mino's: a dark
+    housing plate, a chrome back, LED cups and a block of clear lens over them."""
+    L = K.Lamp(name, lit=lit, glass=glass)
+    pad(L.housing, u, v, a + 0.004, b + 0.004, r + 0.004, proj, lift=base - 0.0005,
+        sink=-(base - 0.003))
+    pad(L.chrome, u, v, a, b, r, proj, lift=base + 0.0005, sink=-(base - 0.002))
+    for k in range(cups):
+        cu = u + (2 * a - 2.6 * cup_r) * ((k + 0.5) / cups - 0.5)
+        loc, n = skin(cu, v, proj)
+        L.reflector(loc + n * (base + 0.0045), n, r=cup_r, depth=cup_r * 0.45, seg=16,
+                    led=cup_r * 0.55)
+    pad(L.glass, u, v, a, b, r, proj, lift=base + 0.0065, sink=-(base + 0.0006))
+    L.obj(mirror=mirror)
+
+
 def build_ends():
-    for proj, tag, cv, zb, lit, hw in (('x', "front", 0.80, 0.455, "led_front", 0.745),
-                                       ('X', "rear", 0.90, 0.455, "led_rear", 0.765)):
-        sg = -1.0 if proj == 'X' else 1.0       # the car's left as this view's u
-        ly = hw - 0.105                         # the lamp rings
-        g = Geo()
-        pad(g, 0, cv, hw, 0.09, 0.055, proj, lift=0.004)
-        g.obj("visor." + tag, "visor", bevel=0.002)
-        gl, gk, gd = Geo(), Geo(), Geo()
-        for y in (ly, -ly):
-            pad(gl, y, cv, 0.082, 0.062, 0.032, proj, lift=0.0075)
-            pad(gk, y, cv, 0.063, 0.043, 0.02, proj, lift=0.0085)
-            pad(gl, y, cv, 0.022, 0.015, 0.009, proj, lift=0.0095)
-        bar_on(gl, [(-ly + 0.09, cv + 0.037), (ly - 0.09, cv + 0.037)], proj, 0.017, 0.0075)
-        gl.obj("led." + tag, lit, bevel=0.001)
-        # the display, on the car's left under the bar: charge in front, the next stop behind
-        rows = banner("z 64%" if tag == "front" else "NEXT>QUAY 6")
-        wd = len(rows[0]) * 0.0072 / 2 + 0.022
-        du = sg * (ly - 0.105 - wd)
-        pad(gd, du, cv - 0.03, wd, 0.036, 0.012, proj, lift=0.006)
-        gd.obj("display." + tag, "panel", bevel=0.001)
-        gk.obj("lamp.cores." + tag, "gloss_black", bevel=0.001)
-        gp = Geo()
-        dots(gp, rows, du, cv - 0.03, 0.0072, proj, 0.0068, 0.0052)
-        gp.obj("pixels." + tag, "pixel" if tag == "front" else "pixel_r")
+    for proj, tag, zb in (('x', "front", 0.455), ('X', "rear", 0.455)):
         # bumper: a grained pad, rubber guards on its corners, sensors
         bw = 0.75 if tag == "front" else 0.77
         g = Geo()
@@ -593,11 +515,8 @@ def build_ends():
     for z in (0.365, 0.385, 0.405):
         bar_on(gs, [(-0.395, z), (0.395, z)], 'x', 0.009, 0.0035, lift=0.0124)
     gs.obj("intake.slats", "plastic", bevel=0.001)
-    g = Geo()
-    for y in (0.54, -0.54):
-        pad(g, y, 0.39, 0.055, 0.028, 0.015, 'x', lift=0.0135)
-    g.obj("fog", "lamp", bevel=0.001)
-    plate('x', 0.0, 0.50)
+    small_lamp("lamp.fog", 'x', 0.54, 0.39, 0.052, 0.025, 0.013, 2, 0.011, mirror=True)
+    tanager.plate('x', 0.0, 0.50, "VB 31-204")
     g = Geo()
     loc, n = skin(-0.40, 0.50, 'x')
     stud(g, loc + n * 0.012, n, [(-0.001, 0.001), (-0.001, 0.026), (0.003, 0.024), (0.003, 0.001)],
@@ -615,59 +534,32 @@ def build_ends():
     text_proj(g, "tanager", 0.034, 0.0, 0.925, 'x', spacing=1.08)
     g.obj("lettering.front", "decal")
 
-    # ---- rear: the luggage hatch's shut line and pull, reflectors, plate, lettering
-    g = Geo()
-    K.ribbon(g, rrect(0.0, 1.11, 0.715, 0.545, 0.10), 'X', 0.006, closed=True)
-    g.obj("hatch.line", "void")
-    g, gp = Geo(), Geo()
-    pad(g, 0.0, 0.598, 0.10, 0.02, 0.018, 'X', lift=0.0008, sink=0.001)
-    pad(gp, 0.0, 0.606, 0.09, 0.009, 0.008, 'X', lift=0.008)
-    g.obj("hatch.pocket", "void")
-    gp.obj("hatch.pull", "paint", bevel=0.002)
+    # ---- rear: reflectors, reverse lamp, plate, the high stop lamp, lettering (the
+    #      luggage hatch's shut line and its handle cup are cut in cutters())
     g = Geo()
     for y in (0.52, -0.52):
         pad(g, y, 0.475, 0.095, 0.018, 0.012, 'X', lift=0.0135)
     g.obj("reflectors", "reflector", bevel=0.001)
-    g = Geo()
-    pad(g, 0.0, 0.375, 0.065, 0.016, 0.01, 'X', lift=0.0135)
-    g.obj("reverse", "lamp", bevel=0.001)
-    plate('X', 0.0, 0.688)
-    g = Geo()
-    bar_on(g, [(-0.20, 1.605), (0.20, 1.605)], 'X', 0.012, 0.004)
-    g.obj("led.stop", "led_rear")
+    small_lamp("lamp.reverse", 'X', 0.0, 0.375, 0.062, 0.0145, 0.009, 3, 0.0085)
+    tanager.plate('X', 0.0, 0.688, "VB 31-204")
+    # the high stop lamp over the rear window: a dark plate on the skin, a lit bar on a
+    # chrome strip in a block of red lens
+    S = K.Lamp("lamp.stop", lit="led_rear", glass="lens_red")
+    pad(S.housing, 0, 1.605, 0.214, 0.0155, 0.012, 'X', lift=0.0012, sink=0.002)
+    pad(S.chrome, 0, 1.605, 0.208, 0.011, 0.009, 'X', lift=0.0018, sink=0.0)
+    P, U = under(dense([(-0.20, 1.605), (0.20, 1.605)], 0.02, closed=False), 'X', -0.0035)
+    S.bar(P, 0.012, 0.003, up=U)
+    pad(S.glass, 0, 1.605, 0.210, 0.0125, 0.010, 'X', lift=0.0068, sink=-0.0019)
+    S.obj()
     g = Geo()
     text_proj(g, "CAB", 0.066, 0.46, 0.735, 'X', spacing=1.1)
     text_proj(g, "tanager", 0.032, -0.46, 0.745, 'X', spacing=1.05)
     text_proj(g, "CITY CAB  E-6  DRIVERLESS", 0.014, -0.46, 0.708, 'X', spacing=1.15)
     text_proj(g, "UNIT " + NUM, 0.017, 0.46, 0.682, 'X', spacing=1.2)
-    text_proj(g, "LUGGAGE  40 KG", 0.012, 0.0, 0.636, 'X', spacing=1.2)
+    text_proj(g, "LUGGAGE  40 KG", 0.012, 0.46, 0.660, 'X', spacing=1.2)
     g.obj("lettering.rear", "decal")
     badge('X', 0.0, 0.772, 0.032)
     badge('z', 2.172, 0.0, 0.036)
-
-
-def plate(proj, u, v):
-    g = Geo()
-    lift = 0.0125 if v < 0.57 else 0.0
-    pad(g, u, v, 0.15, 0.037, 0.008, proj, lift=lift + 0.004)
-    g.obj("plate." + proj, "plate", bevel=0.001)
-    g = Geo()
-    text_proj(g, "VB 31-204", 0.042, u, v, proj, lift=lift + 0.0052, spacing=1.1)
-    g.obj("plate.glyphs." + proj, "mark")
-
-
-def badge(proj, u, v, r):
-    """The round badge: a bright ring, a disc of the second color, a T."""
-    g, gd, gt = Geo(), Geo(), Geo()
-    pad(g, u, v, r, r, r, proj, lift=0.004, nc=8, nv=6)
-    g.obj("badge.ring." + proj, "rim_bright", bevel=0.001)
-    pad(gd, u, v, r * 0.80, r * 0.80, r * 0.80, proj, lift=0.0052, nc=8, nv=6)
-    gd.obj("badge.disc." + proj, "paint2", bevel=0.0008)
-    if proj == 'z':
-        K.text_on_body(gt, "T", r * 1.05, u, v, 1, lift=0.0062, proj='z', turn=-90)
-    else:
-        text_proj(gt, "T", r * 1.05, u, v, proj, lift=0.0062)
-    gt.obj("badge.t." + proj, "mark")
 
 
 # ---------------------------------------------------------------------------------------
@@ -754,13 +646,9 @@ def build_sides():
     g.box(loc + V3((-0.045, -0.004, 0)), (0.13, 0.02, 0.022))
     door_obj(g, "track.arm", "steel", bevel=0.003)
 
-    # ---- door handle (an upright pull in a pocket), lock, the roundel
-    g, gp, gr = Geo(), Geo(), Geo()
-    pad(g, 0.515, 0.715, 0.024, 0.085, 0.022, 'y', lift=0.0008, sink=0.001)
-    pad(gp, 0.523, 0.715, 0.0095, 0.075, 0.009, 'y', lift=0.010)
+    # ---- the roundel and the lettering (the handle's cup and pull are made with the hull)
+    gr = Geo()
     pad(gr, 0.17, 0.705, 0.118, 0.118, 0.118, 'y', lift=0.0025, nc=12, nv=8)
-    door_obj(g, "handle.pocket", "void")
-    door_obj(gp, "handle.pull", "paint", bevel=0.002)
     door_obj(gr, "roundel", "paint2", bevel=0.001)
     for side, tag in ((1, ".l"), (-1, ".r")):
         g, gw = Geo(), Geo()
@@ -796,7 +684,8 @@ def build_sides():
     gk.obj("pay.field", "panel", mirror=True)
     gp.obj("pay.pixels", "pixel", mirror=True)
 
-    # ---- corner cameras where a driver's mirrors would be, turn lamps
+    # ---- corner cameras where a driver's mirrors would be, with a turn lamp each end;
+    #      amber markers at the rear corners (a lit bar under a lens on a dark plate)
     g, gm, ga = Geo(), Geo(), Geo()
     g.tube((1.90, 0.875, 1.005), (1.90, 0.95, 1.035), 0.012, 8)
     g.obj("camera.stalks", "plastic", mirror=True)
@@ -804,15 +693,15 @@ def build_sides():
     gm.obj("camera.pods", "visor", bevel=0.014, segs=3, mirror=True)
     ga.box((1.953, 0.972, 1.045), (0.004, 0.034, 0.012))
     ga.box((1.847, 0.972, 1.045), (0.004, 0.034, 0.012))
-    pad(ga, 1.92, 0.925, 0.03, 0.011, 0.008, 'y', lift=0.003)
-    pad(ga, -2.03, 0.925, 0.03, 0.011, 0.008, 'y', lift=0.003)
     ga.obj("led.turn", "led_accent", mirror=True)
+    M = K.Lamp("lamp.marker", lit="led_accent", glass="lens_amber")
+    pad(M.housing, -2.03, 0.925, 0.034, 0.014, 0.010, 'y', lift=0.0012, sink=0.002)
+    pad(M.emit(), -2.03, 0.925, 0.026, 0.0065, 0.005, 'y', lift=0.0030, sink=-0.0005)
+    pad(M.glass, -2.03, 0.925, 0.030, 0.0115, 0.009, 'y', lift=0.0060, sink=-0.0015)
+    M.obj(mirror=True)
 
-    # ---- charge door on the left front quarter: outline, a lit bolt, a label
-    g, gp, gt = Geo(), Geo(), Geo()
-    K.ribbon(g, rrect(0.87, 0.70, 0.078, 0.054, 0.022), 'y', 0.004, closed=True)
-    K.ribbon(g, [(0.80, 0.675), (0.80, 0.725)], 'y', 0.006)
-    g.obj("charge.door", "void")
+    # ---- the charge door (cut in cutters()) on the left front quarter: a lit bolt, a label
+    gp, gt = Geo(), Geo()
     dots(gp, GLYPH["z"], 0.885, 0.703, 0.006, 'y', 0.001, 0.0045)
     gp.obj("charge.bolt", "pixel")
     K.text_on_body(gt, "CHARGE 22 KW", 0.011, 0.87, 0.628, 1, spacing=1.2)
@@ -919,29 +808,31 @@ def build_roof():
 # the cabin: a low flat floor, two pairs of seats facing each other, rails, screens
 # ---------------------------------------------------------------------------------------
 def build_interior():
+    """The cabin tub, kept inside the hull and out of the wheel wells (their walls at
+    WELL_Y, their arches up to 0.73 m): over the wells only its middle reaches down."""
+    yi = WELL_Y - 0.01
     g = Geo()
     g.box((0.0, 0, FLOOR - 0.015), (2.20, 1.70, 0.03))             # the floor between the arches
     for x in (1.48, -1.48):
-        g.box((x, 0, FLOOR - 0.015), (0.80, 1.16, 0.03))
+        g.box((x, 0, FLOOR - 0.015), (0.80, 2 * yi, 0.03))
     for x, top in ((1.19, 1.03), (-1.19, 1.0)):                    # bulkheads behind the seats
-        g.box((x, 0, 0.53), (0.03, 1.16, 0.46))
+        g.box((x, 0, 0.53), (0.03, 2 * yi, 0.46))
         g.box((x, 0, (0.76 + top) / 2), (0.03, 1.62, top - 0.76))
     g.box((1.625, 0, 1.02), (0.87, 1.60, 0.02))                      # the shelf under the screen
     g.box((-1.655, 0, 0.99), (0.93, 1.60, 0.02))                     # the luggage cover
     for y in (0.872, -0.872):                                       # wall cards
         for x in (0.87, -0.855):
             g.box((x, y, 0.655), (0.43, 0.02, 0.67))
-    g.box((0.01, -0.872, 0.655), (1.22, 0.02, 0.67))                # the right door's card
     for x in (D_F + 0.04, D_R - 0.04):                              # door pillars' linings
         for y in (0.845, -0.845):
             g.box((x, y, 0.655), (0.075, 0.05, 0.69))
     for x in (0.77, -0.77):                                         # seat plinths
         g.box((x, 0, 0.44), (0.38, 1.22, 0.28))
     g.obj("interior.tub", "interior", bevel=0.006)
-    g = Geo()
+    g = Geo()                                                       # the doors' cards
     g.box((0.01, 0.872, 0.655), (1.22, 0.02, 0.67))
     g.box((0.01, 0.868, 0.80), (0.50, 0.03, 0.035))                 # its pull
-    DOOR.append(g.obj("interior.card.l", "interior", bevel=0.006))
+    door_obj(g, "interior.card", "interior", bevel=0.006)
     g = Geo()
     g.box((0.0, 0, 1.735), (2.3, 1.36, 0.012))
     g.obj("interior.headliner", "liner", bevel=0.004)
@@ -996,19 +887,23 @@ def build_interior():
     gn.obj("threshold.nosing", "caliper", bevel=0.002)
     gv.obj("threshold.slot", "void")
 
-    # ---- the fold-out step under the open door, on two arms, a lit edge
+    # ---- a fold-out step under each door, on two arms, a lit edge: built stowed under
+    #      the sill, the left one comes out with its door
     g, gl, gr = Geo(), Geo(), Geo()
-    g.box((0.01, 1.035, 0.165), (1.06, 0.23, 0.022))
+    dy = -STEP_OUT.y
+    g.box((0.01, 1.035 + dy, 0.165), (1.06, 0.23, 0.022))
     for x in (0.38, -0.36):
-        g.hexa([(x - 0.02, 0.80, 0.215), (x + 0.02, 0.80, 0.215), (x + 0.02, 0.96, 0.160),
-                (x - 0.02, 0.96, 0.160), (x - 0.02, 0.80, 0.235), (x + 0.02, 0.80, 0.235),
-                (x + 0.02, 0.96, 0.178), (x - 0.02, 0.96, 0.178)])
+        g.hexa([(x - 0.02, 0.80 + dy, 0.215), (x + 0.02, 0.80 + dy, 0.215),
+                (x + 0.02, 0.96 + dy, 0.160), (x - 0.02, 0.96 + dy, 0.160),
+                (x - 0.02, 0.80 + dy, 0.235), (x + 0.02, 0.80 + dy, 0.235),
+                (x + 0.02, 0.96 + dy, 0.178), (x - 0.02, 0.96 + dy, 0.178)])
     for k in range(9):
-        gr.box((0.01, 0.945 + 0.0225 * k, 0.178), (1.0, 0.008, 0.004))
-    gl.box((0.01, 1.151, 0.165), (1.0, 0.004, 0.010))
-    g.obj("step", "steel", bevel=0.004)
-    gr.obj("step.ribs", "rubber")
-    gl.obj("step.light", "pixel")
+        gr.box((0.01, 0.945 + dy + 0.0225 * k, 0.178), (1.0, 0.008, 0.004))
+    gl.box((0.01, 1.151 + dy, 0.165), (1.0, 0.004, 0.010))
+    for gg, nm, mat, kw in ((g, "step", "steel", dict(bevel=0.004)),
+                            (gr, "step.ribs", "rubber", {}), (gl, "step.light", "pixel", {})):
+        STEPS.append(gg.obj(nm + ".l", mat, **kw))
+        gg.obj(nm + ".r", mat, flip_y=True, **kw)
 
     # ---- screens: one on each bulkhead between the headrests, a strip behind the windshield
     g, gs = Geo(), Geo()
@@ -1019,11 +914,11 @@ def build_interior():
     g.box((1.975, 0, 1.055), (0.03, 0.66, 0.07), rot=Matrix.Rotation(rad(-20), 3, 'Y'))
     g.box((1.55, 0, 1.065), (0.40, 0.50, 0.07))                     # the computer's hump
     g.obj("interior.screen.frames", "interior", bevel=0.006)
-    g, gp = Geo(), Geo()                        # the destination strip under the header
-    g.box((1.725, 0, 1.548), (0.02, 0.86, 0.088))
+    g, gp = Geo(), Geo()                        # the destination strip under the header,
+    g.box((1.725, 0, 1.488), (0.02, 0.86, 0.088))       # clear of the windshield's frit
     for y in (0.30, -0.30):
-        g.box((1.725, y, 1.625), (0.014, 0.03, 0.075))
-    dots_flat(gp, banner("CAB 31 >QUAY 6"), (1.7365, 0, 1.548), (0, 1, 0), (0, 0, 1), 0.0088,
+        g.box((1.725, y, 1.595), (0.014, 0.03, 0.135))
+    dots_flat(gp, banner("CAB 31 >QUAY 6"), (1.7365, 0, 1.488), (0, 1, 0), (0, 0, 1), 0.0088,
               0.0064)
     g.obj("interior.destination", "visor", bevel=0.004)
     gp.obj("interior.destination.pixels", "pixel")
@@ -1066,50 +961,18 @@ def build_interior():
 
 
 # ---------------------------------------------------------------------------------------
-# wheels: a steel rim under a slotted cover
+# the left door and its step slide open in the views of its side
 # ---------------------------------------------------------------------------------------
-def build_wheel(tag, cx, side):
-    K.build_wheel(tag, cx, T_R, T_W, T_RIM, T_OUT, side, rim=None, ring=None, caliper=None)
-    hw, Rr = T_W / 2, T_RIM
-    k = Rr / 0.19                           # the Mino's cover, grown with the rim
-    flip = side < 0
-    loc = (cx, side * (T_OUT - hw), T_R)
-    g = Geo()
-    g.lathe([(-hw + 0.03, Rr), (hw - 0.004, Rr), (hw - 0.004, Rr - 0.008), (hw - 0.03, Rr - 0.014),
-             (hw - 0.05, Rr - 0.05), (hw - 0.05, 0.004), (hw - 0.062, 0.004),
-             (hw - 0.062, Rr - 0.045), (-hw + 0.03, Rr - 0.012)], 56)
-    g.obj("rim." + tag, "steel", flip_y=flip, loc=loc, sharp=40)
-    g = Geo()
-    g.lathe([(hw + 0.017, 0.004), (hw + 0.017, 0.036 * k), (hw + 0.009, 0.046 * k),
-             (hw + 0.009, 0.135 * k), (hw + 0.003, 0.160 * k), (hw - 0.008, Rr - 0.005),
-             (hw - 0.018, Rr - 0.003), (hw - 0.024, Rr - 0.010), (hw - 0.012, 0.150 * k),
-             (hw - 0.004, 0.11 * k), (hw - 0.004, 0.004)], 64)
-    g.obj("cover." + tag, "cover", flip_y=flip, loc=loc, sharp=35)
-    g, gb = Geo(), Geo()
-    slot = rrect(0.097 * k, 0.0, 0.028 * k, 0.019 * k, 0.012 * k, 4)
-    for i in range(6):
-        a = 2 * pi * (i + 0.5) / 6
-        c, s = cos(a), sin(a)
-        g.prism([(u * c - v * s, hw + 0.004, u * s + v * c) for u, v in slot], (0, 0.0058, 0))
-    g.lathe([(hw + 0.004, 0.139 * k), (hw + 0.0096, 0.139 * k), (hw + 0.0096, 0.139 * k + 0.004),
-             (hw + 0.004, 0.139 * k + 0.004)], 64)
-    g.obj("cover.slots." + tag, "void", flip_y=flip, loc=loc)
-    gb.lathe([(hw + 0.0172, 0.004), (hw + 0.0172, 0.028 * k), (hw + 0.019, 0.026 * k),
-              (hw + 0.019, 0.004)], 24)
-    gb.obj("cover.cap." + tag, "paint", flip_y=flip, loc=loc)
-    g = Geo()
-    g.tube((Rr - 0.03, hw - 0.012, 0.0), (Rr - 0.022, hw + 0.014, 0.0), 0.004, 6)
-    g.obj("valve." + tag, "rubber", flip_y=flip, loc=loc)
-
-
-# ---------------------------------------------------------------------------------------
-# the left door slides open
-# ---------------------------------------------------------------------------------------
-def open_door(body):
-    for pn in ("slider", "sclad"):
+def door_groups(body):
+    """The left door's panels (slider, sclad, the handle's cup) split off the body; the door
+    and the step hang on groups, shut at rest (the checks, the game pack) and open in
+    OPEN_VIEWS unless CAB_SHUT is set."""
+    for pn in ("slider", "sclad", "hslot"):
         DOOR.append(split_left(body.parts[pn]))
-    for ob in DOOR:
-        ob.location = V3(ob.location) + SLIDE
+    if os.environ.get("CAB_SHUT"):
+        return
+    K.Group("door", DOOR, pivot=(0.0, 0.95, 0.9)).pose_for(OPEN_VIEWS, loc=SLIDE)
+    K.Group("step", STEPS, pivot=(0.0, 0.80, 0.2)).pose_for(OPEN_VIEWS, loc=STEP_OUT)
 
 
 # ---------------------------------------------------------------------------------------
@@ -1145,6 +1008,10 @@ def main():
     K.emit("dome", (1.0, 0.93, 0.82), 50.0)
     K.emit("pixel", (0.30, 1.0, 0.72), 36.0)
     K.emit("pixel_r", (1.0, 0.50, 0.08), 36.0)
+    K.need("lamp_housing", "chrome", "lens_clear", "lens_smoke", "lens_red", "lens_amber",
+           "optic", "frit")
+    K.meant("symmetry", "interior.screen*", "antenna", "tow.*", "wipers", "radar",
+            "permit*", "display*", "pixels*", "charge.*", "body.fender")
     body = build_hull()
     K.log("hull")
     if os.environ.get("CAB_HULL"):          # the bare hull, to judge the form
@@ -1155,8 +1022,7 @@ def main():
     build_roof()
     build_interior()
     K.log("details")
-    if not os.environ.get("CAB_SHUT"):      # CAB_SHUT=1: both doors closed
-        open_door(body)
+    door_groups(body)
     for side, s in ((1, "l"), (-1, "r")):
         build_wheel("f" + s, FA_X, side)
         build_wheel("r" + s, RA_X, side)
