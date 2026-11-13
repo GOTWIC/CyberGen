@@ -222,6 +222,15 @@ stages have); never required to edit. Fields, all with defaults:
 - **Tiers:** near (shadowed), mid (unshadowed), far (no light: emissive points or light
   cards). The tier is the plan's; how many of each the runtime keeps live near the view is
   set from the budgets (section 9).
+- **Visible lights** (Swagnik, 2026-11-12, after walking the packaged Delta): round a
+  walker the live set is the lights the walker sees, not a circle: every light within
+  `sight_m` (1,200 m, four times the mid tier's radius) that a line of sight reaches, at the
+  light or where its light lands, through the plan's sight raster (`atmosgen/sight.py`: the
+  lux check's occluders on 2 m cells, every rounding toward seeing), each pool at its size
+  (the street's `sight_max`, the high tier's `high_max`), shadows for the nearest seen; lights
+  near but out of sight leave the set, far ones in sight join it, each fading in and out. The
+  fly pawn and the free camera keep the circle. Docs: `docs/unreal_export.md`, "Visible
+  lights"; results `docs/progress/atmos_visible_lights/`.
 
 ### 6.2 Sky and time
 
@@ -329,7 +338,9 @@ its inputs.
   itself; MegaLights then saves 1.2 ms over the tiers and is flat in the light count, but
   the tiers without ray tracing are faster (15.8 against 17.4 ms p95 with everything on)
   and only they keep the 16.7 ms budget. The tiers it is: 512 live within 300 m, 16
-  shadowed within 60 m (`docs/progress/AT0/README.md`).
+  shadowed within 60 m (`docs/progress/AT0/README.md`). On foot since the visible lights:
+  the 512 the walker sees within 1,200 m (6.1), picked by a line of sight through the plan's
+  sight raster, swept on a worker thread every 0.2 s (`docs/progress/atmos_visible_lights/`).
 - **Blender:** night previews with Cycles' light tree (many lights) from the plan's glTF
   lights, over AG15's night materials, at 4K for review and 8K for the README.
 

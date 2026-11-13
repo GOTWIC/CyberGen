@@ -563,6 +563,83 @@
    "title": "Moon",
    "type": "object"
   },
+  "Sight": {
+   "additionalProperties": false,
+   "description": "What a walker sees: the occluders the runtime marches a line of sight through\n(`sight.py`: the lux check's, on `cell_m` cells, every rounding toward seeing).",
+   "properties": {
+    "bottom_step_m": {
+     "title": "Bottom Step M",
+     "type": "number"
+    },
+    "bounds": {
+     "description": "[x0, y0, x1, y1] (m).",
+     "items": {
+      "type": "number"
+     },
+     "title": "Bounds",
+     "type": "array"
+    },
+    "cell_m": {
+     "title": "Cell M",
+     "type": "number"
+    },
+    "file": {
+     "description": "`sight.png` beside the plan, row 0 the north edge: red the top (absolute, `top_step_m` steps, 0 none), green the bottom over the ground (`bottom_step_m` steps, 0 on the ground), blue the ground (`ground_step_m` steps).",
+     "title": "File",
+     "type": "string"
+    },
+    "ground_step_m": {
+     "title": "Ground Step M",
+     "type": "number"
+    },
+    "occupied": {
+     "description": "The share of the cells something stands in.",
+     "title": "Occupied",
+     "type": "number"
+    },
+    "px": {
+     "description": "[width, height].",
+     "items": {
+      "type": "integer"
+     },
+     "title": "Px",
+     "type": "array"
+    },
+    "sha256": {
+     "title": "Sha256",
+     "type": "string"
+    },
+    "skip_eye_m": {
+     "description": "The march leaves out this much from the eye ...",
+     "title": "Skip Eye M",
+     "type": "number"
+    },
+    "skip_light_m": {
+     "description": "... and this much to the light.",
+     "title": "Skip Light M",
+     "type": "number"
+    },
+    "top_step_m": {
+     "title": "Top Step M",
+     "type": "number"
+    }
+   },
+   "required": [
+    "file",
+    "bounds",
+    "cell_m",
+    "px",
+    "top_step_m",
+    "bottom_step_m",
+    "ground_step_m",
+    "skip_eye_m",
+    "skip_light_m",
+    "occupied",
+    "sha256"
+   ],
+   "title": "Sight",
+   "type": "object"
+  },
   "Sky": {
    "additionalProperties": false,
    "description": "AT3: the sky and the time of day (scope 6.2, `sky.make`).",
@@ -763,6 +840,18 @@
     "near_max": {
      "title": "Near Max",
      "type": "integer"
+    },
+    "sight_m": {
+     "default": 1200.0,
+     "description": "Visible lights: round a walker the runtime keeps live the lights it sees (a line of sight through the plan's `sight` raster) within this (m) ...",
+     "title": "Sight M",
+     "type": "number"
+    },
+    "sight_max": {
+     "default": 512,
+     "description": "... at most this many (the high tier's pool keeps `high_max`).",
+     "title": "Sight Max",
+     "type": "integer"
     }
    },
    "required": [
@@ -932,6 +1021,18 @@
    },
    "title": "Schedules",
    "type": "object"
+  },
+  "sight": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/Sight"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "description": "Visible lights: the sight raster the runtime picks a walker's lights by."
   },
   "sky": {
    "$ref": "#/$defs/Sky"

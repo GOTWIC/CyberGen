@@ -1,0 +1,82 @@
+{
+ "oldtown_circle": {
+  "frames": 421,
+  "frame_p50": 13.04,
+  "frame_p95": 21.57,
+  "gpu_p50": 12.21,
+  "gpu_p95": 12.45,
+  "draws": 847
+ },
+ "oldtown_sight": {
+  "frames": 492,
+  "frame_p50": 12.2,
+  "frame_p95": 12.49,
+  "gpu_p50": 11.51,
+  "gpu_p95": 11.77,
+  "draws": 437
+ },
+ "core_circle": {
+  "frames": 432,
+  "frame_p50": 13.64,
+  "frame_p95": 14.42,
+  "gpu_p50": 12.81,
+  "gpu_p95": 13.13,
+  "draws": 1573
+ },
+ "core_sight": {
+  "frames": 441,
+  "frame_p50": 13.61,
+  "frame_p95": 14.05,
+  "gpu_p50": 12.79,
+  "gpu_p95": 13.08,
+  "draws": 1572
+ },
+ "midtown_circle": {
+  "frames": 411,
+  "frame_p50": 14.35,
+  "frame_p95": 15.42,
+  "gpu_p50": 13.56,
+  "gpu_p95": 13.82,
+  "draws": 1798
+ },
+ "midtown_sight": {
+  "frames": 427,
+  "frame_p50": 14.07,
+  "frame_p95": 14.37,
+  "gpu_p50": 13.28,
+  "gpu_p95": 13.53,
+  "draws": 1504
+ },
+ "avenue_circle": {
+  "frames": 478,
+  "frame_p50": 12.53,
+  "frame_p95": 13.06,
+  "gpu_p50": 11.78,
+  "gpu_p95": 12.04,
+  "draws": 1333
+ },
+ "avenue_sight": {
+  "frames": 498,
+  "frame_p50": 12.04,
+  "frame_p95": 12.66,
+  "gpu_p50": 11.32,
+  "gpu_p95": 11.57,
+  "draws": 1272
+ },
+ "start_circle": {
+  "frames": 408,
+  "frame_p50": 13.76,
+  "frame_p95": 14.55,
+  "gpu_p50": 12.98,
+  "gpu_p95": 13.24,
+  "draws": 1505
+ },
+ "start_sight": {
+  "frames": 436,
+  "frame_p50": 13.77,
+  "frame_p95": 14.1,
+  "gpu_p50": 13.0,
+  "gpu_p95": 13.25,
+  "draws": 1594
+ }
+}

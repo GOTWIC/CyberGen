@@ -486,9 +486,112 @@ def _roof(parts: list[dict]) -> list[float] | None:
     return None if xy is None else xy + [top["z1"]]
 
 
+START_OPEN_M = 10.0        # the player start: nothing overhead within this ...
+START_OVER_M = 3.0         # ... (a road, a transit deck, a slab or a span this high or more)
+START_GUIDE_M = 6.0        # ... (a raised transit line: its half width)
+START_LIT_M = 20.0         # ... a street or wall light within this
+START_REACH_M = 400.0      # ... on a sidewalk within this of the fast-travel point
+START_KINDS = ("sidewalk", "promenade", "pedestrian_street", "plaza")
+START_STEP_M = 5.0         # the sidewalks' points tried, this far apart
+
+
+def _overhead(m: dict) -> list:
+    """What stands over the ground a player could start under, as shapely geometries: raised
+    road stretches (buffered by their half width), transit lines' raised stretches, decks,
+    tubes, beams and canopies, M14's slabs, skybridges."""
+    from shapely.geometry import LineString, Point, Polygon
+    from shapely.ops import substring
+    out = []
+    for s in m.get("road_segments", []):
+        prof = s.get("z_profile") or []
+        hi = [p["s"] for p in prof if p["z"] >= START_OVER_M]
+        if not hi:
+            continue
+        ln = LineString([q[:2] for q in s["centerline"]])
+        if ln.length <= 0.0:
+            continue
+        out.append(substring(ln, min(hi), max(hi)).buffer(float(s.get("width_m", 8.0)) / 2.0))
+    # (a transit line's raised stretches: its guideway or tube over the street)
+    for t in m.get("transit_lines", []):
+        run = []
+        for q in (t.get("path") or []) + [None]:
+            if q is not None and len(q) > 2 and q[2] >= START_OVER_M:
+                run.append(q[:2])
+                continue
+            if len(run) >= 2:
+                out.append(LineString(run).buffer(START_GUIDE_M))
+            elif len(run) == 1:
+                out.append(Point(run[0]).buffer(START_GUIDE_M))
+            run = []
+    for st in m.get("structures", []):
+        fp = (st.get("footprint") or {}).get("exterior") or []
+        if len(fp) >= 3 and float(st.get("z0_m") or 0.0) >= START_OVER_M:
+            out.append(Polygon(fp))
+    for d in m.get("decks", []) or []:
+        ex = (d.get("polygon") or {}).get("exterior") or []
+        if len(ex) >= 3:
+            out.append(Polygon(ex))
+    for sb in m.get("skybridges", []):
+        fp = (sb.get("footprint") or {}).get("exterior") or []
+        if len(fp) >= 3:
+            out.append(Polygon(fp))
+    return [g if g.is_valid else g.buffer(0) for g in out]
+
+
+def _start_spot(m: dict, walks: list, anchor: tuple, mid: tuple):
+    """Visible lights (Swagnik's walk of the packaged Delta, 2026-11-12: its start stood
+    under a viaduct, the first view dark by day too): the sidewalk point nearest the
+    fast-travel point `anchor` (within START_REACH_M) that is open (nothing overhead within
+    START_OPEN_M) and lit (a street or wall light within START_LIT_M), and the heading along
+    its walkway that looks more toward the city's middle `mid`. None when there is none."""
+    import numpy as np
+    from shapely.geometry import Point
+    from shapely.strtree import STRtree
+    over = _overhead(m)
+    tree = STRtree(over) if over else None
+    lamps = np.array([p["position"][:2] for p in m.get("props", [])
+                      if p.get("type") in ("prop.street_light", "prop.wall_light")]
+                     or np.zeros((0, 2)), dtype=float).reshape(-1, 2)
+    pts = []        # (d2 to the anchor, x, y, z, heading)
+    ax, ay = anchor
+    for w in walks:
+        if w["kind"] not in START_KINDS:
+            continue
+        line = w["line"]
+        for a, b in zip(line, line[1:]):
+            dx, dy = b[0] - a[0], b[1] - a[1]
+            n = max(1, int(math.hypot(dx, dy) // START_STEP_M))
+            head = math.degrees(math.atan2(dy, dx))
+            for k in range(n):
+                f = k / n
+                x, y = a[0] + f * dx, a[1] + f * dy
+                d2 = (x - ax) ** 2 + (y - ay) ** 2
+                if d2 <= START_REACH_M ** 2:
+                    z = (a[2] if len(a) > 2 else 0.0) * (1 - f) + (b[2] if len(b) > 2 else 0.0) * f
+                    pts.append((round(d2, 4), round(x, 2), round(y, 2), z, head))
+    pts.sort()
+    for _, x, y, z, head in pts:
+        if lamps.size and ((lamps[:, 0] - x) ** 2 + (lamps[:, 1] - y) ** 2).min() > START_LIT_M ** 2:
+            continue
+        if not lamps.size:
+            continue
+        zone = Point(x, y).buffer(START_OPEN_M)
+        if tree is not None and any(over[int(i)].intersects(zone) for i in tree.query(zone)):
+            continue
+        # (along the walkway, the way that looks more toward the middle)
+        to_mid = math.degrees(math.atan2(mid[1] - y, mid[0] - x))
+        if abs((head - to_mid + 180.0) % 360.0 - 180.0) > 90.0:
+            head = (head + 180.0) % 360.0
+        if head > 180.0:
+            head -= 360.0
+        return (x, y, z, head)
+    return None
+
+
 def player_start(build: Path, plan: dict) -> dict:
-    """On the walkway of the fast-travel point nearest the city's middle (the city center
-    if there is none), facing the middle."""
+    """The fast-travel point nearest the city's middle (the city center if there is none),
+    moved to the nearest open, lit sidewalk (`_start_spot`), facing along it toward the
+    middle; where there is none, on the walkway nearest the point, facing the middle."""
     b = plan["bounds"]
     mx, my = (b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0
     pos, src = (mx, my), "center"
@@ -503,20 +606,28 @@ def player_start(build: Path, plan: dict) -> dict:
             t = min(tps, key=d2)
             pos = tuple((t.get("access") or {}).get("position") or t["position"])[:2]
             src = t["id"]
-    z = 0.0
     gr = build / "graphs.json"
-    if gr.is_file():
-        best = None
-        for w in json.loads(gr.read_text(encoding="utf-8"))["walkways"]:
-            if w["kind"] not in ("sidewalk", "path", "promenade", "pedestrian_street",
-                                 "crossing", "plaza"):
-                continue
-            for p in w["line"]:
-                d = (p[0] - pos[0]) ** 2 + (p[1] - pos[1]) ** 2
-                if best is None or d < best[0]:
-                    best = (d, p[2] if len(p) > 2 else 0.0)
-        if best is not None and best[0] < 30.0 ** 2:
-            z = best[1]
+    walks = json.loads(gr.read_text(encoding="utf-8"))["walkways"] if gr.is_file() else []
+    mp = build / "city_model.json"
+    spot = _start_spot(json.loads(mp.read_text(encoding="utf-8")), walks, pos, (mx, my)) \
+        if mp.is_file() and walks else None
+    if spot is not None:
+        x, y, z, yaw = spot
+        return {"position": [round(x, 2), round(y, 2), round(z + PLAYER_Z_M, 2)],
+                "yaw_deg": round(yaw, 2), "source": src, "spot": "open_lit",
+                "moved_m": round(math.hypot(x - pos[0], y - pos[1]), 1)}
+    z = 0.0
+    best = None
+    for w in walks:
+        if w["kind"] not in ("sidewalk", "path", "promenade", "pedestrian_street",
+                             "crossing", "plaza"):
+            continue
+        for p in w["line"]:
+            d = (p[0] - pos[0]) ** 2 + (p[1] - pos[1]) ** 2
+            if best is None or d < best[0]:
+                best = (d, p[2] if len(p) > 2 else 0.0)
+    if best is not None and best[0] < 30.0 ** 2:
+        z = best[1]
     yaw = math.degrees(math.atan2(my - pos[1], mx - pos[0])) if (pos != (mx, my)) else 0.0
     return {"position": [round(pos[0], 2), round(pos[1], 2), round(z + PLAYER_Z_M, 2)],
             "yaw_deg": round(yaw, 2), "source": src}

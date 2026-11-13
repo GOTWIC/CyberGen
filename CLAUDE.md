@@ -2531,6 +2531,38 @@ AT4 (air) is in place:
   distances by part, wheels without shadows (`VEHICLE_CULL_M`, `VEHICLE_ACTOR_VERSION` 3).
 Results: `docs/progress/AT4/`.
 
+The visible lights are in place (an atmosgen runtime change after AT4, Swagnik's walk of the
+packaged Delta, 2026-11-12; `docs/unreal_export.md`, "Visible lights"):
+- **On foot, the lights the walker sees:** round the play features' `CityGenWalker` (by its
+  class's name; console variable `CityGenAtmos.Sight` -1 by the pawn, 0 the circle, 1 by
+  sight) the live set is every light within `SightRangeM` (1,200 m, the plan's
+  `tiers.sight_m`, four times the mid tier's) seen from the camera, at the light or where its
+  light lands (a spot's pool, a face's patch, the floor under a point): the street's
+  `SightMax` (512) by distance over reach, the high tier's `MaxHigh` by distance, shadows for
+  the nearest seen within 60 m; near lights out of sight leave it. The fly pawn and the free
+  camera keep AT1's circle. Every light fades in and out over `FadeS` (0.5 s) as it joins and
+  leaves the set, in both modes.
+- **The sight raster** (`atmosgen/sight.py`, the plan's `sight`, `sight.png`): the lux check's
+  occluders (`lux.Occluders`) on 2 m cells, each blocking what all four of its 1 m cells block,
+  every rounding toward seeing (red top, green bottom over the ground, blue ground; row 0 the
+  north). The exporter puts it on the controller as runs (`unreal_atmos.sight_settings`,
+  `SightRuns` and the raster's bounds, cell, steps, skips), `ATMOS_VERSION` `atmos5`.
+- **The sweep** (`FCityGenSight::Visible`, `LaunchSight`, `TakeSight`): every 0.2 s on a
+  worker thread (`Async` on the thread pool) a cell walk through the raster per light; a light
+  stays seen `SightHoldS` (0.6 s) after the last sweep that saw it. Chosen over line traces
+  (no collision past World Partition's loading range, and a trace per light per sweep on the
+  game thread) and the engine's occlusion queries (a light has no primitive to query, a sign's
+  face is its building's mesh, and a query answers only for what is on screen and loaded).
+- **Cells always loaded** (their lights reach past the 768 m loading range); a cell's beacons,
+  beams and plumes are made only within `FixtureRangeM` (832 m) of the view.
+- **Benchmark and check:** each bench segment sets the mode (`bench.SIGHT`: by sight on the
+  walks and the drive, the circle in the flights; the segment's `commands`); the check's
+  `*_sight` and `*_circle` views.
+- **Player start** (`unreal.player_start`, `_start_spot`): the fast-travel point nearest the
+  middle moved to the nearest open (nothing raised within 10 m), lit (a street or wall light
+  within 20 m) sidewalk point, facing along it toward the middle.
+Results: `docs/progress/atmos_visible_lights/`.
+
 ## Life generator (lifegen)
 
 `docs/lifegen_scope.md` (draft v0, its decisions in section 12 still open) is the plan for

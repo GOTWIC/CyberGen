@@ -180,6 +180,34 @@ def test_cells_pack_volumes_and_emitters(build):
     assert "air" in UA.write_atmos(build)["skipped"]
 
 
+def test_sight_rides_on_the_controller(build):
+    """Visible lights: the plan's sight raster on the controller as runs over its rows from
+    the north edge, its bounds in Unreal's frame (Y south), the tiers' range and size; part
+    of the controller's hash, not the cells'."""
+    from atmosgen import sight as SI
+    at = UA.write_atmos(build)
+    ctl = json.loads((build / "unreal" / UA.DATA).read_text())["controller"]
+    plan = json.loads((build / "atmos" / "atmos_plan.json").read_text())
+    s = plan["sight"]
+    w, h = ctl["sight_px"]
+    assert [w, h] == s["px"] and sum(ctl["sight_runs"][0::2]) == w * h
+    x0, y0, x1, y1 = s["bounds"]
+    assert ctl["sight_bounds"] == [x0 * 100.0, -y1 * 100.0, x1 * 100.0, -y0 * 100.0]
+    assert ctl["sight_m"] == P.TIERS["sight"]["radius_m"] == 4 * P.TIERS["mid"]["radius_m"]
+    assert ctl["sight_max"] == plan["tiers"]["sight_max"] and ctl["sight_cell_m"] == SI.CELL_M
+    assert at["sight"]["runs"] == len(ctl["sight_runs"]) // 2
+    # the raster's runs are its cells; the shopfront's building stands in some
+    rgb = SI.load(build / "atmos" / SI.FILE, s)["rgb"]
+    assert ctl["sight_runs"] == SI.runs(rgb) and rgb[..., 0].max() > 0
+    # a plan before the sight raster delivers none, its cells as they were
+    cells = {c["key"]: c["hash"] for c in at["cells"]}
+    del plan["sight"]
+    (build / "atmos" / "atmos_plan.json").write_text(json.dumps(plan))
+    at2 = UA.write_atmos(build)
+    assert at2["sight"] is None and at2["hash"] != at["hash"]
+    assert {c["key"]: c["hash"] for c in at2["cells"]} == cells
+
+
 def test_a_failed_check_is_not_delivered(build):
     p = build / "atmos" / "atmos_plan.json"
     plan = json.loads(p.read_text())

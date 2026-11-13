@@ -88,6 +88,21 @@ def test_lean_route(tmp_path):
     assert w["warm"] and w["segments"] == [3] and m["segments"] == [0, 1, 2]
 
 
+def test_atmos_job_picks_lights_by_sight_on_the_ground(tmp_path):
+    """Visible lights: with atmosgen's passes each segment sets the live set's mode, by sight
+    on the walks and the drive, the circle in the flights; the route itself is unchanged."""
+    _build(tmp_path)
+    rt = B.route(tmp_path, lean=True)
+    want = [p for p in B.ATMOS_PASSES if p[0] == "night_plan_all"]
+    jb = B.job(rt, tmp_path / "run1", want)
+    assert [s["commands"] for s in jb["segments"]] == [
+        ["CityGenAtmos.Sight 1"], ["CityGenAtmos.Sight 1"], ["CityGenAtmos.Sight 0"],
+        ["CityGenAtmos.Sight 0"]]
+    assert all("commands" not in s for s in rt["segments"])
+    # without atmosgen's passes, no command
+    assert all("commands" not in s for s in B.job(rt, tmp_path / "run2")["segments"])
+
+
 def test_job_has_a_warm_pass_first(tmp_path):
     _build(tmp_path)
     jb = B.job(B.route(tmp_path), tmp_path / "run1")

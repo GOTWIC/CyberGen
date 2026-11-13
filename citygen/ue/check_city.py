@@ -1046,6 +1046,11 @@ def play_views(world, a, slug, prefix):
             st0 = atmos_status(world) or {}
             for c in ("CityGenAtmos.Fog 0", "CityGenAtmos.Air 0"):
                 unreal.SystemLibrary.execute_console_command(world, c)
+        # (visible lights: a view named `*_sight` with the live set picked by sight, as round
+        # a walker, `*_circle` by the circle, the same view's before; by the pawn after it)
+        mode = 1 if v["name"].endswith("_sight") else 0 if v["name"].endswith("_circle") else None
+        if mode is not None:
+            unreal.SystemLibrary.execute_console_command(world, f"CityGenAtmos.Sight {mode}")
         eye, tg = ue(*v["eye"]), ue(*v["target"])
         cam.set_actor_location(eye, False, True)
         pc.set_control_rotation(unreal.MathLibrary.find_look_at_rotation(eye, tg))
@@ -1058,13 +1063,22 @@ def play_views(world, a, slug, prefix):
         yield from wait(4.0)
         yield from ui_shot(world, v["name"], "HighResShot 1920x1080", 180)
         at = atmos_status(world)
+        if mode is not None:
+            unreal.SystemLibrary.execute_console_command(world, "CityGenAtmos.Sight -1")
+            if at:
+                RES.setdefault("sight_views", {})[v["name"]] = {
+                    k: at.get(k) for k in ("sight", "live", "live_kinds", "candidates",
+                                           "sight_seen", "sight_tested", "sight_rays",
+                                           "sight_ms", "high", "shadowed", "fading")}
         if clear:
             unreal.SystemLibrary.execute_console_command(world, f"CityGenAtmos.Cover {cover:g}")
         if noair:
             for c in (f"CityGenAtmos.Fog {int(bool(st0.get('fog')))}",
                       f"CityGenAtmos.Air {int(bool(st0.get('air')))}"):
                 unreal.SystemLibrary.execute_console_command(world, c)
-        log(f"play view {v['name']}" + (f": atmos {at['live']} live ({at['live_kinds']}), "
+        log(f"play view {v['name']}" + (f": atmos {at['live']} live"
+                                         + (" by sight" if at.get("sight") else "")
+                                         + f" ({at['live_kinds']}), "
                                          f"{at['shadowed']} shadowed, {at.get('high', 0)} high"
                                          + (f", fog {at.get('fog')}, {at.get('volumes_live', 0)} "
                                             f"fog volumes live, {at.get('plume_cards', 0)} plume "

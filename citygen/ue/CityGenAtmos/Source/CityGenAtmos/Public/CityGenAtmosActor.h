@@ -24,12 +24,20 @@
 // kind's volumetric scattering), the plan's fog volumes (mist, smog, haze: the nearest
 // MaxVolumes as local fog volumes from a pool), its steam and smoke plumes (per cell an
 // instanced component of cards in M_CgSteam, rising by world position offset), the searchlight
-// beams brighter in fog, and the engine settings the air's budget needs while it runs. Frames:
-// Unreal cm, X east, Y south.
+// beams brighter in fog, and the engine settings the air's budget needs while it runs. Visible
+// lights (after AT4; docs/unreal_export.md, "Visible lights"): round a walker (the play
+// features' CityGenWalker) the live set is the lights the walker sees, out to SightRangeM,
+// each pool at its size: a line of sight from the eye to each light (and to where its light
+// lands) marched through the plan's sight raster (the building masses and deck slabs, 2 m
+// cells) on a worker thread, a sweep every LiveEvery; lights near but out of sight leave the
+// set, far ones in sight join it; the fly pawn and the free camera keep the circle. Every
+// light fades in and out over FadeS as it joins and leaves the set. Frames: Unreal cm, X east,
+// Y south.
 
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Async/Future.h"
 #include "GameFramework/Info.h"
 #include "CityGenAtmosActor.generated.h"
 
@@ -75,6 +83,55 @@ struct FCityGenAtmosLight
 	float AnimAmount = 0.f;                 // a blink's on share, a sweep's swing (deg)
 	float AnimPhase = 0.f;                  // 0 to 1
 	uint32 Seed = 0;
+	// visible lights: where its light lands (a sweep's second target), found once
+	FVector3f Land = FVector3f::ZeroVector;
+	bool bLand = false;                     // (a second target apart from the light)
+	bool bLandSet = false;
+};
+
+/** Visible lights: the plan's sight raster (atmosgen/sight.py): per 2 m cell what stands there
+ *  (its top, absolute; its bottom over the ground, 0 on the ground) and the ground. Read only
+ *  once made, so the worker thread's sweeps share it. */
+struct FCityGenSight
+{
+	int32 W = 0;
+	int32 H = 0;
+	double X0 = 0.0;                        // cm: the raster's min X and min Y (row 0)
+	double Y0 = 0.0;
+	double CellCm = 200.0;
+	double TopCm = 200.0;                   // a step of each channel (cm)
+	double BottomCm = 100.0;
+	double GroundCm = 100.0;
+	double SkipEyeCm = 50.0;                // the march leaves out this from the eye ...
+	double SkipLightCm = 100.0;             // ... and this to the light
+	TArray<uint32> Cells;                   // top | bottom << 8 | ground << 16, row-major
+
+	/** Whether the segment from Eye to Light clears the raster (the cells it crosses in plan,
+	 *  its height span in each against the cell's; the eye's own cell left out). */
+	bool Visible(const FVector& Eye, const FVector& Light) const;
+	/** The ground (cm) under a point (0 off the raster). */
+	double GroundAt(const FVector& P) const;
+};
+
+/** Visible lights: one light a sweep tests (its key, where it shines from, where its light
+ *  lands). */
+struct FCityGenSightJob
+{
+	int64 Key = 0;
+	FVector3f A = FVector3f::ZeroVector;
+	FVector3f B = FVector3f::ZeroVector;
+	bool bB = false;
+};
+
+/** ... and a sweep's result. */
+struct FCityGenSightResult
+{
+	TArray<int64> Seen;
+	FVector Eye = FVector::ZeroVector;
+	int32 Rays = 0;
+	int32 Tested = 0;
+	double Ms = 0.0;
+	int32 Generation = 0;
 };
 
 /** AT4: one fog volume of the plan (a local fog volume while live). */
@@ -177,6 +234,79 @@ public:
 	/** ... within this distance (m): World Partition's loading range keeps its cells in. */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Lights")
 	float HighRangeM = 750.f;
+
+	/** How long a light takes to fade in as it joins the live set, and out as it leaves (s). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Lights")
+	float FadeS = 0.5f;
+
+	/** A cell's beacons, beams and plumes are made while its middle is within this (m) of the
+	 *  view: World Partition's loading range and a half cell, as when the cells streamed. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Lights")
+	float FixtureRangeM = 832.f;
+
+	// -- visible lights: round a walker, the lights it sees (docs/unreal_export.md) --
+
+	/** Round a walker (the play features' CityGenWalker; the console variable
+	 *  CityGenAtmos.Sight -1 auto, 0 the circle, 1 the lights in sight), the live set is the
+	 *  lights it sees; the fly pawn and the free camera keep the circle. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sight")
+	bool bSight = true;
+
+	/** ... within this (m) ... */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sight")
+	float SightRangeM = 1200.f;
+
+	/** ... at most this many (the nearest first, by the size of their pools: distance over
+	 *  reach); the high tier's keep their own pool (MaxHigh). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sight")
+	int32 SightMax = 512;
+
+	/** A light stays in sight this long (s) after the last sweep that saw it. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sight")
+	float SightHoldS = 0.6f;
+
+	/** The plan's sight raster (atmosgen/sight.py) as the importer sets it: runs over its rows
+	 *  from the north edge ([count, top | bottom << 8 | ground << 16] pairs), its bounds (cm:
+	 *  min X, min Y, max X, max Y), cell (m), size, the channels' steps and the march's skips
+	 *  (m). */
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "CityGen|Sight")
+	TArray<int32> SightRuns;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sight")
+	TArray<float> SightBounds;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sight")
+	float SightCellM = 2.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sight")
+	int32 SightWidth = 0;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sight")
+	int32 SightHeight = 0;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sight")
+	float SightTopStepM = 2.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sight")
+	float SightBottomStepM = 1.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sight")
+	float SightGroundStepM = 1.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sight")
+	float SightSkipEyeM = 0.5f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Sight")
+	float SightSkipLightM = 1.f;
+
+	/** The live set by sight: -1 by the pawn (a walker), 0 the circle, 1 by sight (under -1:
+	 *  the mode kept, SightRangeM and SightMax taken again). */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	void SetSight(int32 Mode);
+
+	/** Whether the live set is picked by sight now. */
+	UFUNCTION(BlueprintPure, Category = "CityGen")
+	bool IsSighting() const { return bSightPicked; }
 
 	/** AT2: the aviation beacons' and searchlight beams' glow (art direction). */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Lights")
@@ -538,6 +668,16 @@ private:
 		TArray<float> PlumeRate;
 		int32 Emitters = 0;
 		bool bUsed = false;
+		bool bMade = false;                 // its beacons, beams and plumes made (near the view)
+	};
+
+	/** A light the live set picks: its order (distance, or distance over reach by sight), its
+	 *  distance (cm) and key. */
+	struct FPick
+	{
+		double Score = 0.0;
+		double D = 0.0;
+		int64 Key = 0;
 	};
 
 	static int64 LiveKey(int32 Slot, int32 Light) { return (int64(Slot) << 24) | int64(Light); }
@@ -545,7 +685,25 @@ private:
 	FVector ViewLocation(FRotator* OutRot = nullptr) const;
 	FIntPoint CellOf(const FVector& P) const;
 	void UpdateLive();
+	void PickCircle(const FVector& View, TArray<FPick>& Mid, TArray<FPick>& High) const;
 	void UpdateFlicker(double Now);
+	void UpdateFades(float DeltaSeconds, double Now);
+	void SetLevel(ULocalLightComponent* C, int64 Key, const FCityGenAtmosLight& L, double T, uint32 Step) const;
+	void UpdateFixtureCells(const FVector& View);
+	int32 FixtureCells() const
+	{
+		int32 N = 0;
+		for (const FSlot& S : Slots) { N += (S.bUsed && S.bMade) ? 1 : 0; }
+		return N;
+	}
+	// visible lights
+	bool SightWanted() const;
+	bool IsWalker() const;
+	void MakeSight();
+	void LaunchSight(const FVector& View, double Now);
+	bool TakeSight(double Now);
+	void PickSight(const FVector& View, TArray<FPick>& Mid, TArray<FPick>& High) const;
+	void FinishSight();
 	void UpdateBeams(double T);
 	void MakeFixtures(int32 Slot);
 	void DropFixtures(int32 Slot);
@@ -553,11 +711,12 @@ private:
 	FRotator AnimRot(const FCityGenAtmosLight& L, double T) const;
 	float AnimGain(const FCityGenAtmosLight& L, double T) const;
 	double WorldTime() const;
-	void ApplyLight(ULocalLightComponent* C, const FCityGenAtmosLight& L, float Fade, bool bShadowed);
+	void ApplyLight(ULocalLightComponent* C, const FCityGenAtmosLight& L, int64 Key, bool bShadowed);
 	ULocalLightComponent* Take(uint8 Shape);
 	void Release(int64 Key);
 	void ReleaseAll();
 	void SetPlayLamps(bool bOn) const;
+	float LiveRangeM() const { return bSightPicked ? SightRangeM : MidRangeM; }
 	void EnsureFog();
 	void EnsureRain();
 	void EnsureWet();
@@ -587,7 +746,31 @@ private:
 	TArray<TObjectPtr<ULocalLightComponent>> AllLights;
 	TSet<int64> Shadowed;
 	TArray<int64> Flickering;               // (AT2: and the blinking and sweeping)
-	TMap<int64, float> FadeOf;              // (their live set's fade)
+	TSet<int64> FlickerSet;
+	TMap<int64, float> FadeOf;              // (every live light's fade by distance ...)
+	TMap<int64, float> Alpha;               // (... and in time: up to 1 while wanted, down to
+	TSet<int64> Wanted;                     // 0 and released when it left the set)
+	double FixturesAt = -1.0;
+	int32 FadingNow = 0;
+
+	// visible lights: the raster (shared with the worker thread's sweep), the sweep running,
+	// when each light was last seen
+	TSharedPtr<const FCityGenSight, ESPMode::ThreadSafe> Sight;
+	TFuture<FCityGenSightResult> SightTask;
+	bool bSightRunning = false;
+	bool bSightNow = false;                 // the mode wants sight ...
+	bool bSightReady = false;               // ... a sweep has come back since ...
+	bool bSightPicked = false;              // ... so the live set is picked by sight
+	TMap<int64, double> SeenAt;
+	int32 SightGeneration = 0;              // (bumped when a cell leaves: its keys go stale)
+	double SightAt = -1.0;
+	int32 SightRays = 0;
+	int32 SightTested = 0;
+	int32 SightSweeps = 0;
+	int32 SightPickedN = 0;
+	double SightMs = 0.0;
+	double SightMsMax = 0.0;
+	double SightLaunchMs = 0.0;
 	int32 LiveHigh = 0;
 	int32 CandidatesHigh = 0;
 	UPROPERTY(Transient)

@@ -2,6 +2,7 @@
 
 #include "CityGenAtmosCell.h"
 
+#include "Async/Async.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Components/DecalComponent.h"
 #include "Components/DirectionalLightComponent.h"
@@ -22,6 +23,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 #include "HAL/IConsoleManager.h"
 #include "Kismet/KismetMaterialLibrary.h"
@@ -70,6 +72,12 @@ namespace
 	constexpr float VolumeFalloff = 250.f;   // a volume's height fog falloff (Unreal's units)
 	constexpr float PlumeSpeedCm = 120.f;    // steam rises about 1.2 m/s ...
 	constexpr float SmokeSpeedCm = 200.f;    // ... smoke 2 m/s
+	constexpr double FixturesEvery = 0.5;    // s between making and dropping cells' fixtures
+	// visible lights: the walker's class (the play features', by name) and the mode's switch
+	const FName WalkerClass(TEXT("CityGenWalker"));
+	TAutoConsoleVariable<int32> CVarSight(TEXT("CityGenAtmos.Sight"), -1,
+		TEXT("The live set by sight: -1 round a walker (the play features' CityGenWalker), the circle round any other pawn; 0 the circle; 1 the lights in sight"),
+		ECVF_Default);
 
 	uint32 Hash(uint32 A, uint32 B)
 	{
@@ -115,6 +123,8 @@ void ACityGenAtmos::BeginPlay()
 	SteamMaterial = LoadObject<UMaterialInterface>(nullptr, SteamMaterialPath);
 	// AT4: the engine settings the air's budget needs, while the controller runs
 	ApplyCVars(bTuned);
+	// visible lights: the plan's sight raster from its runs
+	MakeSight();
 	// (the cells streamed in before it began play: each later one registers itself)
 	for (TActorIterator<ACityGenAtmosCell> It(GetWorld()); It; ++It)
 	{
@@ -123,8 +133,10 @@ void ACityGenAtmos::BeginPlay()
 			RegisterCell(*It);
 		}
 	}
-	UE_LOG(LogCityGenAtmos, Display, TEXT("CityGen atmos: %s, %d schedules, %d cells with %d lights in at begin play"),
-		*City, ScheduleNames.Num(), SlotOfActor.Num(), RegisteredLights);
+	UE_LOG(LogCityGenAtmos, Display, TEXT("CityGen atmos: %s, %d schedules, %d cells with %d lights in at begin play, sight raster %s"),
+		*City, ScheduleNames.Num(), SlotOfActor.Num(), RegisteredLights,
+		Sight.IsValid() ? *FString::Printf(TEXT("%dx%d"), Sight->W, Sight->H) : TEXT("none"));
+	UpdateFixtureCells(ViewLocation());
 	EnsureVolume();
 	// AT3: the sky and time (the importer's sun, sky light and a sky dome)
 	FindLighting();
@@ -140,6 +152,7 @@ void ACityGenAtmos::BeginPlay()
 
 void ACityGenAtmos::EndPlay(const EEndPlayReason::Type Reason)
 {
+	FinishSight();
 	SetPlayLamps(true);
 	ReleaseAll();
 	ReleaseVolumes();
@@ -244,8 +257,9 @@ void ACityGenAtmos::RegisterCell(ACityGenAtmosCell* Cell)
 		S.Volumes.Add(V);
 	}
 	S.Emitters = NE;
-	MakeFixtures(Slot);
-	MakePlumes(Slot);
+	// (its beacons, beams and plumes when the view comes near it: UpdateFixtureCells)
+	S.bMade = false;
+	FixturesAt = -1.0;
 	SlotsAt.FindOrAdd(S.Key).Add(Slot);
 	SlotOfActor.Add(Cell, Slot);
 	RegisteredVolumes += NV;
@@ -274,6 +288,16 @@ void ACityGenAtmos::UnregisterCell(ACityGenAtmosCell* Cell)
 		}
 	}
 	Flickering.RemoveAll([Slot](int64 K) { return int32(K >> 24) == Slot; });
+	// (visible lights: its keys go stale, so a sweep running now is not taken, nor what it saw)
+	++SightGeneration;
+	for (auto It = SeenAt.CreateIterator(); It; ++It)
+	{
+		if (int32(It.Key() >> 24) == Slot)
+		{
+			It.RemoveCurrent();
+		}
+	}
+	S.bMade = false;
 	if (TArray<int32>* At = SlotsAt.Find(S.Key))
 	{
 		At->Remove(Slot);
@@ -394,6 +418,9 @@ ULocalLightComponent* ACityGenAtmos::Take(uint8 Shape)
 void ACityGenAtmos::Release(int64 Key)
 {
 	TObjectPtr<ULocalLightComponent> C;
+	Alpha.Remove(Key);
+	FadeOf.Remove(Key);
+	FlickerSet.Remove(Key);
 	if (!Live.RemoveAndCopyValue(Key, C) || !C)
 	{
 		return;
@@ -427,12 +454,31 @@ void ACityGenAtmos::ReleaseAll()
 		Release(K);
 	}
 	Flickering.Reset();
+	FlickerSet.Reset();
 	FadeOf.Reset();
+	Alpha.Reset();
+	Wanted.Reset();
 }
 
-void ACityGenAtmos::ApplyLight(ULocalLightComponent* C, const FCityGenAtmosLight& L, float Fade, bool bShadowed)
+void ACityGenAtmos::SetLevel(ULocalLightComponent* C, int64 Key, const FCityGenAtmosLight& L, double T, uint32 Step) const
 {
-	const float K = Scale() * Fade * ScheduleAt(L.Schedule);
+	// a light's intensity now: its own, the exposure's scale, its schedule, its blink, its
+	// flicker's drop (a hash of its seed and the 1/12 s step: no state, the same at any frame
+	// rate), and its fades by distance and in time
+	float Drop = 0.f;
+	if (L.Flicker > 0.f)
+	{
+		const float R = float(Hash(L.Seed, Step) & 0xffff) / 65535.f;
+		Drop = R < 0.18f ? L.Flicker : (R < 0.3f ? 0.3f * L.Flicker : 0.f);
+	}
+	const float* Fade = FadeOf.Find(Key);
+	const float* A = Alpha.Find(Key);
+	C->SetIntensity(L.Intensity * Scale() * ScheduleAt(L.Schedule) * (1.f - Drop) * AnimGain(L, T) *
+		(Fade ? *Fade : 1.f) * (A ? *A : 1.f));
+}
+
+void ACityGenAtmos::ApplyLight(ULocalLightComponent* C, const FCityGenAtmosLight& L, int64 Key, bool bShadowed)
+{
 	C->SetWorldLocationAndRotation(L.Pos, L.Rot);
 	C->SetLightColor(L.Color);
 	C->SetAttenuationRadius(L.ReachCm);
@@ -457,19 +503,12 @@ void ACityGenAtmos::ApplyLight(ULocalLightComponent* C, const FCityGenAtmosLight
 		}
 		CastChecked<UPointLightComponent>(C)->SetSourceRadius(L.SourceCm);
 	}
-	if (L.Anim != 0)
+	const double T = WorldTime();
+	if (L.Anim == 2)
 	{
-		const double T = WorldTime();
-		if (L.Anim == 2)
-		{
-			C->SetWorldRotation(AnimRot(L, T));
-		}
-		C->SetIntensity(L.Intensity * K * AnimGain(L, T));
+		C->SetWorldRotation(AnimRot(L, T));
 	}
-	else
-	{
-		C->SetIntensity(L.Intensity * K);
-	}
+	SetLevel(C, Key, L, T, uint32(FPlatformTime::Seconds() * 12.0));
 	if (bool(C->CastShadows) != bShadowed)
 	{
 		C->SetCastShadows(bShadowed);
@@ -477,15 +516,16 @@ void ACityGenAtmos::ApplyLight(ULocalLightComponent* C, const FCityGenAtmosLight
 	C->SetVisibility(true);
 }
 
-void ACityGenAtmos::UpdateLive()
+void ACityGenAtmos::PickCircle(const FVector& View, TArray<FPick>& Mid, TArray<FPick>& High) const
 {
-	const double T = FPlatformTime::Seconds();
-	const FVector View = ViewLocation();
+	// the nearest MaxLive within MidRangeM (a near-only light within NearRangeM), and AT2's
+	// high tier, a pool of its own: the nearest MaxHigh within HighRangeM
 	const double MidCm = double(MidRangeM) * 100.0;
 	const double NearCm = double(NearRangeM) * 100.0;
-	const int32 Reach = FMath::CeilToInt32(MidCm / FMath::Max(1.0, double(CellM) * 100.0));
+	const double HighCm = double(HighRangeM) * 100.0;
+	const double CellCm = FMath::Max(1.0, double(CellM) * 100.0);
+	const int32 Reach = FMath::CeilToInt32(FMath::Max(MidCm, MaxHigh > 0 ? HighCm : 0.0) / CellCm);
 	const FIntPoint VC = CellOf(View);
-	TArray<TPair<double, int64>> Near;
 	for (int32 dx = -Reach; dx <= Reach; ++dx)
 	{
 		for (int32 dy = -Reach; dy <= Reach; ++dy)
@@ -501,159 +541,587 @@ void ACityGenAtmos::UpdateLive()
 				for (int32 i = 0; i < Ls.Num(); ++i)
 				{
 					const FCityGenAtmosLight& L = Ls[i];
-					// (AT2: the high tier's lights are the high pool's, below)
-					if (L.bHigh || !L.bOn || ScheduleAt(L.Schedule) < 0.05f)
+					if (!L.bOn || ScheduleAt(L.Schedule) < 0.05f)
 					{
 						continue;
 					}
 					const double D = FVector::Dist(L.Pos, View);
+					if (L.bHigh)
+					{
+						// (a searchlight before the floods: its beam reads from afar)
+						if (MaxHigh > 0 && D <= HighCm)
+						{
+							High.Add({L.Anim == 2 ? 0.25 * D : D, D, LiveKey(Slot, i)});
+						}
+						continue;
+					}
 					if (D > MidCm || (L.bNearOnly && D > NearCm))
 					{
 						continue;
 					}
-					Near.Add(TPair<double, int64>(D, LiveKey(Slot, i)));
+					Mid.Add({D, D, LiveKey(Slot, i)});
 				}
 			}
 		}
 	}
-	Candidates = Near.Num();
-	auto ByDist = [](const TPair<double, int64>& A, const TPair<double, int64>& B)
+}
+
+// -- visible lights --
+
+bool FCityGenSight::Visible(const FVector& Eye, const FVector& Light) const
+{
+	const FVector D = Light - Eye;
+	const double Len = D.Size();
+	if (Len <= SkipEyeCm + SkipLightCm || W <= 0 || H <= 0)
 	{
-		return A.Key < B.Key || (A.Key == B.Key && A.Value < B.Value);
-	};
-	Near.Sort(ByDist);
-	const int32 N = FMath::Min(Near.Num(), MaxLive);
-	TSet<int64> Want;
-	Want.Reserve(N + MaxHigh);
-	for (int32 k = 0; k < N; ++k)
-	{
-		Want.Add(Near[k].Value);
+		return true;
 	}
-	// AT2: the high tier, a pool of its own: the nearest MaxHigh within HighRangeM, from the
-	// cells' lists of their high lights
-	TArray<TPair<double, int64>> High;
-	const double HighCm = double(HighRangeM) * 100.0;
-	if (MaxHigh > 0)
+	const double Ta = SkipEyeCm / Len;
+	const double Tb = 1.0 - SkipLightCm / Len;
+	// the cells the segment crosses in plan (row 0 the raster's min Y), from Ta to Tb
+	const double Ua = (Eye.X + Ta * D.X - X0) / CellCm;
+	const double Wa = (Eye.Y + Ta * D.Y - Y0) / CellCm;
+	const double Du = D.X / CellCm;
+	const double Dw = D.Y / CellCm;
+	int32 i = FMath::FloorToInt32(Ua);
+	int32 j = FMath::FloorToInt32(Wa);
+	const int32 Si = Du > 0.0 ? 1 : -1;
+	const int32 Sj = Dw > 0.0 ? 1 : -1;
+	constexpr double Big = 1e30;
+	double Nu = Du != 0.0 ? (double(i + (Du > 0.0 ? 1 : 0)) - Ua) / Du + Ta : Big;
+	double Nw = Dw != 0.0 ? (double(j + (Dw > 0.0 ? 1 : 0)) - Wa) / Dw + Ta : Big;
+	const double StU = Du != 0.0 ? FMath::Abs(1.0 / Du) : Big;
+	const double StW = Dw != 0.0 ? FMath::Abs(1.0 / Dw) : Big;
+	double T = Ta;
+	bool bFirst = true;
+	while (T < Tb)
 	{
-		const int32 HReach = FMath::CeilToInt32(HighCm / FMath::Max(1.0, double(CellM) * 100.0));
-		for (int32 dx = -HReach; dx <= HReach; ++dx)
+		const double Out = FMath::Min3(Nu, Nw, Tb);
+		// (the eye's own cell left out: a camera at a facade or in a doorway stands in it)
+		if (!bFirst && i >= 0 && i < W && j >= 0 && j < H)
 		{
-			for (int32 dy = -HReach; dy <= HReach; ++dy)
+			const uint32 V = Cells[int64(j) * W + i];
+			if (V != 0u)
 			{
-				const TArray<int32>* At = SlotsAt.Find(FIntPoint(VC.X + dx, VC.Y + dy));
-				if (!At)
+				const double Za = Eye.Z + T * D.Z;
+				const double Zb = Eye.Z + Out * D.Z;
+				const double Lo = FMath::Min(Za, Zb);
+				const double Hi = FMath::Max(Za, Zb);
+				const double G = double((V >> 16) & 0xffu) * GroundCm;
+				if (Lo < G)
 				{
-					continue;
+					return false;
 				}
-				for (int32 Slot : *At)
+				const uint32 Top = V & 0xffu;
+				if (Top != 0u)
 				{
-					const FSlot& S = Slots[Slot];
-					for (int32 i : S.High)
+					const uint32 Bq = (V >> 8) & 0xffu;
+					const double Bottom = Bq ? G + double(Bq) * BottomCm : -Big;
+					if (Lo < double(Top) * TopCm && Hi > Bottom)
 					{
-						const FCityGenAtmosLight& L = S.Lights[i];
-						if (!L.bOn || ScheduleAt(L.Schedule) < 0.05f)
-						{
-							continue;
-						}
-						const double D = FVector::Dist(L.Pos, View);
-						if (D <= HighCm)
-						{
-							// (a searchlight before the floods: its beam reads from afar)
-							High.Add(TPair<double, int64>(L.Anim == 2 ? 0.25 * D : D, LiveKey(Slot, i)));
-						}
+						return false;
 					}
 				}
 			}
 		}
+		bFirst = false;
+		if (Out >= Tb)
+		{
+			break;
+		}
+		if (Nu < Nw)
+		{
+			i += Si;
+			Nu += StU;
+		}
+		else
+		{
+			j += Sj;
+			Nw += StW;
+		}
+		T = Out;
 	}
+	return true;
+}
+
+double FCityGenSight::GroundAt(const FVector& P) const
+{
+	const int32 i = FMath::FloorToInt32((P.X - X0) / CellCm);
+	const int32 j = FMath::FloorToInt32((P.Y - Y0) / CellCm);
+	if (i < 0 || i >= W || j < 0 || j >= H)
+	{
+		return 0.0;
+	}
+	return double((Cells[int64(j) * W + i] >> 16) & 0xffu) * GroundCm;
+}
+
+void ACityGenAtmos::MakeSight()
+{
+	Sight.Reset();
+	const int64 N = int64(SightWidth) * int64(SightHeight);
+	if (N <= 0 || SightBounds.Num() < 4 || SightRuns.Num() < 2 || SightCellM <= 0.f)
+	{
+		return;
+	}
+	TSharedPtr<FCityGenSight, ESPMode::ThreadSafe> G = MakeShared<FCityGenSight, ESPMode::ThreadSafe>();
+	G->W = SightWidth;
+	G->H = SightHeight;
+	G->X0 = SightBounds[0];
+	G->Y0 = SightBounds[1];
+	G->CellCm = double(SightCellM) * 100.0;
+	G->TopCm = double(SightTopStepM) * 100.0;
+	G->BottomCm = double(SightBottomStepM) * 100.0;
+	G->GroundCm = double(SightGroundStepM) * 100.0;
+	G->SkipEyeCm = double(SightSkipEyeM) * 100.0;
+	G->SkipLightCm = double(SightSkipLightM) * 100.0;
+	G->Cells.SetNumUninitialized(N);
+	int64 At = 0;
+	for (int32 k = 0; k + 1 < SightRuns.Num(); k += 2)
+	{
+		const int64 C = SightRuns[k];
+		const uint32 V = uint32(SightRuns[k + 1]);
+		if (C <= 0 || At + C > N)
+		{
+			UE_LOG(LogCityGenAtmos, Warning, TEXT("CityGen atmos: the sight raster's runs overrun its %lldx%lld cells; walking keeps the circle"),
+				int64(SightWidth), int64(SightHeight));
+			return;
+		}
+		for (int64 c = 0; c < C; ++c)
+		{
+			G->Cells[At + c] = V;
+		}
+		At += C;
+	}
+	if (At != N)
+	{
+		UE_LOG(LogCityGenAtmos, Warning, TEXT("CityGen atmos: the sight raster's runs cover %lld of %lld cells; walking keeps the circle"), At, N);
+		return;
+	}
+	Sight = G;
+}
+
+bool ACityGenAtmos::IsWalker() const
+{
+	// (the play features' walker by its class's name: no link between the plugins)
+	const UWorld* World = GetWorld();
+	const APlayerController* PC = World ? World->GetFirstPlayerController() : nullptr;
+	const APawn* Pawn = PC ? PC->GetPawn() : nullptr;
+	for (const UClass* C = Pawn ? Pawn->GetClass() : nullptr; C; C = C->GetSuperClass())
+	{
+		if (C->GetFName() == WalkerClass)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+bool ACityGenAtmos::SightWanted() const
+{
+	if (!bSight || !Sight.IsValid() || SightRangeM <= 0.f)
+	{
+		return false;
+	}
+	const int32 Mode = CVarSight.GetValueOnGameThread();
+	return Mode >= 0 ? Mode > 0 : IsWalker();
+}
+
+void ACityGenAtmos::SetSight(int32 Mode)
+{
+	// (under -1: the mode as it is, the range and size taken again)
+	if (Mode >= -1)
+	{
+		CVarSight->Set(FMath::Min(Mode, 1), ECVF_SetByConsole);
+	}
+	LiveAt = -1.0;
+	if (bLights)
+	{
+		SetPlayLamps(!bShowing);
+	}
+}
+
+void ACityGenAtmos::LaunchSight(const FVector& View, double Now)
+{
+	// a sweep: every light on within SightRangeM (a near-only light within NearRangeM) tested
+	// on a worker thread from the eye, at the light and, failing that, where its light lands (a
+	// spot's pool on the ground or along its aim, a face's patch in front of it, the floor
+	// under a point): a lamp round a corner whose pool shows stays
+	if (!Sight.IsValid() || bSightRunning || (SightAt >= 0.0 && Now - SightAt < LiveEvery))
+	{
+		return;
+	}
+	const double T0 = FPlatformTime::Seconds();
+	SightAt = Now;
+	const double RangeCm = double(SightRangeM) * 100.0;
+	const double Range2 = RangeCm * RangeCm;
+	const double NearCm = double(NearRangeM) * 100.0;
+	const double CellCm = FMath::Max(1.0, double(CellM) * 100.0);
+	const int32 Reach = FMath::CeilToInt32(RangeCm / CellCm);
+	const FIntPoint VC = CellOf(View);
+	TArray<FCityGenSightJob> Jobs;
+	Jobs.Reserve(FMath::Max(1024, SightTested));
+	// (each schedule's level at the hour, once a sweep)
+	TArray<float> Level;
+	Level.SetNumUninitialized(256);
+	for (int32 s = 0; s < 256; ++s)
+	{
+		Level[s] = ScheduleAt(uint8(s));
+	}
+	const double Near2 = NearCm * NearCm;
+	for (int32 dx = -Reach; dx <= Reach; ++dx)
+	{
+		for (int32 dy = -Reach; dy <= Reach; ++dy)
+		{
+			const TArray<int32>* At = SlotsAt.Find(FIntPoint(VC.X + dx, VC.Y + dy));
+			if (!At)
+			{
+				continue;
+			}
+			for (int32 Slot : *At)
+			{
+				TArray<FCityGenAtmosLight>& Ls = Slots[Slot].Lights;
+				for (int32 i = 0; i < Ls.Num(); ++i)
+				{
+					FCityGenAtmosLight& L = Ls[i];
+					if (!L.bOn || Level[L.Schedule] < 0.05f)
+					{
+						continue;
+					}
+					const double D2 = FVector::DistSquared(L.Pos, View);
+					if (D2 > Range2 || (L.bNearOnly && D2 > Near2))
+					{
+						continue;
+					}
+					if (!L.bLandSet)
+					{
+						// where its light lands, found once: a spot aimed down its pool on the
+						// ground (at most 0.8 of its reach out), a point the floor under it, a
+						// face, an uplight or a flood a patch along its aim
+						const FVector Dir = L.Rot.Vector();
+						const double Ground = Sight->GroundAt(L.Pos);
+						FVector B = L.Pos;
+						if (L.Shape == 0 && Dir.Z < -0.3)
+						{
+							const double Along = FMath::Min((L.Pos.Z - Ground - 30.0) / -Dir.Z, 0.8 * L.ReachCm);
+							B = L.Pos + Dir * FMath::Max(0.0, Along);
+						}
+						else if (L.Shape == 1)
+						{
+							B = L.Pos - FVector(0.0, 0.0, FMath::Clamp(L.Pos.Z - Ground - 30.0, 0.0, 0.5 * L.ReachCm));
+						}
+						else
+						{
+							B = L.Pos + Dir * FMath::Min(0.5 * L.ReachCm, L.Shape == 2 ? 600.0 : 1500.0);
+						}
+						L.Land = FVector3f(B);
+						L.bLand = FVector::DistSquared(B, L.Pos) > 200.0 * 200.0;
+						L.bLandSet = true;
+					}
+					FCityGenSightJob& J = Jobs.AddDefaulted_GetRef();
+					J.Key = LiveKey(Slot, i);
+					J.A = FVector3f(L.Pos);
+					J.B = L.Land;
+					J.bB = L.bLand;
+				}
+			}
+		}
+	}
+	TSharedPtr<const FCityGenSight, ESPMode::ThreadSafe> G = Sight;
+	const int32 Gen = SightGeneration;
+	bSightRunning = true;
+	SightTask = Async(EAsyncExecution::ThreadPool, [G, Jobs = MoveTemp(Jobs), View, Gen]()
+	{
+		const double S0 = FPlatformTime::Seconds();
+		FCityGenSightResult R;
+		R.Eye = View;
+		R.Generation = Gen;
+		R.Tested = Jobs.Num();
+		for (const FCityGenSightJob& J : Jobs)
+		{
+			++R.Rays;
+			bool bSeen = G->Visible(View, FVector(J.A));
+			if (!bSeen && J.bB)
+			{
+				++R.Rays;
+				bSeen = G->Visible(View, FVector(J.B));
+			}
+			if (bSeen)
+			{
+				R.Seen.Add(J.Key);
+			}
+		}
+		R.Ms = (FPlatformTime::Seconds() - S0) * 1000.0;
+		return R;
+	});
+	SightLaunchMs = (FPlatformTime::Seconds() - T0) * 1000.0;
+}
+
+bool ACityGenAtmos::TakeSight(double Now)
+{
+	// a finished sweep: the lights it saw seen now, those no sweep saw for SightHoldS forgotten
+	if (!bSightRunning || !SightTask.IsReady())
+	{
+		return false;
+	}
+	FCityGenSightResult R = SightTask.Consume();
+	bSightRunning = false;
+	++SightSweeps;
+	SightRays = R.Rays;
+	SightTested = R.Tested;
+	SightMs = R.Ms;
+	SightMsMax = FMath::Max(SightMsMax, R.Ms);
+	if (!bSightNow || R.Generation != SightGeneration)
+	{
+		return false;
+	}
+	for (const int64 K : R.Seen)
+	{
+		SeenAt.Add(K, Now);
+	}
+	for (auto It = SeenAt.CreateIterator(); It; ++It)
+	{
+		if (Now - It.Value() > double(SightHoldS))
+		{
+			It.RemoveCurrent();
+		}
+	}
+	bSightReady = true;
+	return true;
+}
+
+void ACityGenAtmos::FinishSight()
+{
+	if (bSightRunning)
+	{
+		SightTask.Wait();
+		SightTask.Consume();
+		bSightRunning = false;
+	}
+}
+
+void ACityGenAtmos::PickSight(const FVector& View, TArray<FPick>& Mid, TArray<FPick>& High) const
+{
+	// the lights in sight within SightRangeM: the street's by the size of their pools (the
+	// nearest and the farthest reaching first), the high tier's by distance (a searchlight first)
+	const double RangeCm = double(SightRangeM) * 100.0;
+	const double NearCm = double(NearRangeM) * 100.0;
+	for (const TPair<int64, double>& KV : SeenAt)
+	{
+		const FCityGenAtmosLight* L = LightOf(KV.Key);
+		if (!L || !L->bOn || ScheduleAt(L->Schedule) < 0.05f)
+		{
+			continue;
+		}
+		const double D = FVector::Dist(L->Pos, View);
+		if (D > RangeCm || (L->bNearOnly && D > NearCm))
+		{
+			continue;
+		}
+		if (L->bHigh)
+		{
+			High.Add({L->Anim == 2 ? 0.25 * D : D, D, KV.Key});
+		}
+		else
+		{
+			Mid.Add({D / FMath::Max(500.0, double(L->ReachCm)), D, KV.Key});
+		}
+	}
+}
+
+void ACityGenAtmos::UpdateLive()
+{
+	const double T = FPlatformTime::Seconds();
+	const FVector View = ViewLocation();
+	// visible lights: a walker's live set by sight once a sweep has come back, else the circle
+	const bool bWantSight = SightWanted();
+	if (bWantSight != bSightNow)
+	{
+		bSightNow = bWantSight;
+		bSightReady = false;
+		SeenAt.Reset();
+	}
+	if (bSightNow)
+	{
+		TakeSight(T);
+		LaunchSight(View, T);
+	}
+	const bool bBySight = bSightNow && bSightReady;
+	if (bBySight != bSightPicked)
+	{
+		bSightPicked = bBySight;
+		// (the play features' light pools stand past the live range: 1,200 m by sight)
+		SetPlayLamps(!bShowing);
+	}
+	TArray<FPick> Mid, High;
+	if (bBySight)
+	{
+		PickSight(View, Mid, High);
+	}
+	else
+	{
+		PickCircle(View, Mid, High);
+	}
+	Candidates = Mid.Num();
 	CandidatesHigh = High.Num();
-	High.Sort(ByDist);
+	auto ByScore = [](const FPick& A, const FPick& B)
+	{
+		return A.Score < B.Score || (A.Score == B.Score && A.Key < B.Key);
+	};
+	Mid.Sort(ByScore);
+	High.Sort(ByScore);
+	Mid.SetNum(FMath::Min(Mid.Num(), FMath::Max(0, bBySight ? SightMax : MaxLive)));
 	High.SetNum(FMath::Min(High.Num(), FMath::Max(0, MaxHigh)));
 	LiveHigh = High.Num();
-	for (const TPair<double, int64>& H : High)
+	SightPickedN = bBySight ? Mid.Num() + High.Num() : 0;
+	TSet<int64> Want;
+	Want.Reserve(Mid.Num() + High.Num());
+	for (const FPick& P : Mid)
 	{
-		Want.Add(H.Value);
+		Want.Add(P.Key);
 	}
-	TArray<int64> Keys;
-	Live.GetKeys(Keys);
-	for (int64 K : Keys)
+	for (const FPick& P : High)
 	{
-		if (!Want.Contains(K))
+		Want.Add(P.Key);
+	}
+	// the lights that left the set fade out (UpdateFades releases them at 0)
+	Wanted = Want;
+	// the nearest that may cast shadows do, within the near range
+	const double NearCm = double(NearRangeM) * 100.0;
+	TArray<FPick> ByDist = Mid;
+	ByDist.Sort([](const FPick& A, const FPick& B) { return A.D < B.D || (A.D == B.D && A.Key < B.Key); });
+	TSet<int64> Shadow;
+	for (const FPick& P : ByDist)
+	{
+		if (Shadow.Num() >= MaxShadowed || P.D > NearCm)
+		{
+			break;
+		}
+		const FCityGenAtmosLight* L = LightOf(P.Key);
+		if (L && L->bShadow)
+		{
+			Shadow.Add(P.Key);
+		}
+	}
+	// the fades by distance: the farthest share of the range (the circle: of the live set's
+	// reach, so a light entering it at its edge does not pop)
+	const double MidCm = double(bBySight ? SightRangeM : MidRangeM) * 100.0;
+	const double FarCm = bBySight ? MidCm : (ByDist.Num() ? FMath::Min(MidCm, ByDist.Last().D) : MidCm);
+	const double HighCm = double(bBySight ? SightRangeM : HighRangeM) * 100.0;
+	TArray<int64> Leaving;
+	for (const TPair<int64, TObjectPtr<ULocalLightComponent>>& KV : Live)
+	{
+		if (!Want.Contains(KV.Key))
+		{
+			Leaving.Add(KV.Key);
+		}
+	}
+	Flickering.Reset();
+	FlickerSet.Reset();
+	auto Place = [&](const FPick& P, float Fade, bool bShadow)
+	{
+		const FCityGenAtmosLight* L = LightOf(P.Key);
+		if (!L)
+		{
+			return;
+		}
+		TObjectPtr<ULocalLightComponent>* Have = Live.Find(P.Key);
+		ULocalLightComponent* C = Have ? Have->Get() : nullptr;
+		if (!C)
+		{
+			C = Take(L->Shape);
+			Live.Add(P.Key, C);
+			// (a light joining the set fades in)
+			Alpha.Add(P.Key, FadeS > 0.f ? 0.f : 1.f);
+		}
+		FadeOf.Add(P.Key, Fade);
+		ApplyLight(C, *L, P.Key, bShadow);
+		if (bShadow) { Shadowed.Add(P.Key); } else { Shadowed.Remove(P.Key); }
+		if (L->Flicker > 0.f || L->Anim != 0)
+		{
+			Flickering.Add(P.Key);
+			FlickerSet.Add(P.Key);
+		}
+	};
+	for (const FPick& P : Mid)
+	{
+		Place(P, float(FMath::Clamp((FarCm - P.D) / (FadeShare * FarCm), 0.0, 1.0)), Shadow.Contains(P.Key));
+	}
+	// the high pool's: no shadows, the farthest fifth of its range fading
+	for (const FPick& P : High)
+	{
+		Place(P, float(FMath::Clamp((HighCm - P.D) / (FadeShare * HighCm), 0.0, 1.0)), false);
+	}
+	// (a leaving light that flickers, blinks or sweeps goes on doing so while it fades)
+	for (const int64 K : Leaving)
+	{
+		const FCityGenAtmosLight* L = LightOf(K);
+		if (!L)
 		{
 			Release(K);
 		}
-	}
-	// the nearest that may cast shadows do, within the near range
-	TSet<int64> Shadow;
-	for (int32 k = 0; k < N && Shadow.Num() < MaxShadowed; ++k)
-	{
-		const FCityGenAtmosLight* L = LightOf(Near[k].Value);
-		if (L && L->bShadow && Near[k].Key <= NearCm)
+		else if (L->Flicker > 0.f || L->Anim != 0)
 		{
-			Shadow.Add(Near[k].Value);
-		}
-	}
-	const double FarCm = N > 0 ? FMath::Min(MidCm, Near[N - 1].Key) : MidCm;
-	Flickering.Reset();
-	FadeOf.Reset();
-	for (int32 k = 0; k < N; ++k)
-	{
-		const int64 Key = Near[k].Value;
-		const FCityGenAtmosLight* L = LightOf(Key);
-		if (!L)
-		{
-			continue;
-		}
-		// (the farthest share of the live set fades out, so a light entering it does not pop)
-		const float Fade = float(FMath::Clamp((FarCm - Near[k].Key) / (FadeShare * FarCm), 0.0, 1.0));
-		TObjectPtr<ULocalLightComponent>* Have = Live.Find(Key);
-		ULocalLightComponent* C = Have ? Have->Get() : nullptr;
-		if (!C)
-		{
-			C = Take(L->Shape);
-			Live.Add(Key, C);
-		}
-		const bool bShadow = Shadow.Contains(Key);
-		ApplyLight(C, *L, Fade, bShadow);
-		if (bShadow) { Shadowed.Add(Key); } else { Shadowed.Remove(Key); }
-		if (L->Flicker > 0.f || L->Anim != 0)
-		{
-			Flickering.Add(Key);
-			FadeOf.Add(Key, Fade);
-		}
-	}
-	// the high pool's: no shadows, the farthest fifth of its range fading
-	for (const TPair<double, int64>& H : High)
-	{
-		const FCityGenAtmosLight* L = LightOf(H.Value);
-		if (!L)
-		{
-			continue;
-		}
-		const float Fade = float(FMath::Clamp((HighCm - H.Key) / (FadeShare * HighCm), 0.0, 1.0));
-		TObjectPtr<ULocalLightComponent>* Have = Live.Find(H.Value);
-		ULocalLightComponent* C = Have ? Have->Get() : nullptr;
-		if (!C)
-		{
-			C = Take(L->Shape);
-			Live.Add(H.Value, C);
-		}
-		ApplyLight(C, *L, Fade, false);
-		Shadowed.Remove(H.Value);
-		if (L->Flicker > 0.f || L->Anim != 0)
-		{
-			Flickering.Add(H.Value);
-			FadeOf.Add(H.Value, Fade);
+			Flickering.Add(K);
+			FlickerSet.Add(K);
 		}
 	}
 	UpdateMs = (FPlatformTime::Seconds() - T) * 1000.0;
 	UpdateMsMax = FMath::Max(UpdateMsMax, UpdateMs);
 }
 
+void ACityGenAtmos::UpdateFades(float DeltaSeconds, double Now)
+{
+	// every live light toward 1 while wanted and toward 0 when it left the set, released there
+	FadingNow = 0;
+	if (Alpha.IsEmpty())
+	{
+		return;
+	}
+	const float Step = FadeS > 0.f ? DeltaSeconds / FadeS : 1.f;
+	const double T = WorldTime();
+	const uint32 Flick = uint32(Now * 12.0);
+	TArray<int64> Done;
+	for (TPair<int64, float>& KV : Alpha)
+	{
+		const bool bIn = Wanted.Contains(KV.Key);
+		const float Target = bIn ? 1.f : 0.f;
+		if (KV.Value == Target)
+		{
+			if (!bIn)
+			{
+				Done.Add(KV.Key);
+			}
+			continue;
+		}
+		KV.Value = bIn ? FMath::Min(1.f, KV.Value + Step) : FMath::Max(0.f, KV.Value - Step);
+		if (!bIn && KV.Value <= 0.f)
+		{
+			Done.Add(KV.Key);
+			continue;
+		}
+		++FadingNow;
+		// (a flickering light's level is set by UpdateFlicker every frame)
+		if (FlickerSet.Contains(KV.Key))
+		{
+			continue;
+		}
+		const TObjectPtr<ULocalLightComponent>* C = Live.Find(KV.Key);
+		const FCityGenAtmosLight* L = LightOf(KV.Key);
+		if (C && *C && L)
+		{
+			SetLevel(*C, KV.Key, *L, T, Flick);
+		}
+	}
+	for (const int64 K : Done)
+	{
+		Release(K);
+	}
+}
+
 void ACityGenAtmos::UpdateFlicker(double Now)
 {
-	// a flickering light drops for a moment now and then: a hash of its seed and the 1/12 s
-	// step (no state, the same at any frame rate)
+	// a flickering light drops for a moment now and then; AT2: a blink from the world's time,
+	// as the beacon's material blinks; a sweep turns the light (SetLevel)
 	const uint32 Step = uint32(Now * 12.0);
 	const double T = WorldTime();
 	for (int64 Key : Flickering)
@@ -664,21 +1132,42 @@ void ACityGenAtmos::UpdateFlicker(double Now)
 		{
 			continue;
 		}
-		float Drop = 0.f;
-		if (L->Flicker > 0.f)
-		{
-			const float R = float(Hash(L->Seed, Step) & 0xffff) / 65535.f;
-			Drop = R < 0.18f ? L->Flicker : (R < 0.3f ? 0.3f * L->Flicker : 0.f);
-		}
-		// (AT2: a blink from the world's time, as the beacon's material blinks; a sweep turns
-		// the light; the live set's fade kept from its last choice)
 		if (L->Anim == 2)
 		{
 			(*C)->SetWorldRotation(AnimRot(*L, T));
 		}
-		const float* Fade = FadeOf.Find(Key);
-		(*C)->SetIntensity(L->Intensity * Scale() * ScheduleAt(L->Schedule) * (1.f - Drop) *
-			AnimGain(*L, T) * (Fade ? *Fade : 1.f));
+		SetLevel(*C, Key, *L, T, Step);
+	}
+}
+
+void ACityGenAtmos::UpdateFixtureCells(const FVector& View)
+{
+	// a cell's beacons, beams and plumes near the view (the cells are always loaded since the
+	// visible lights: their lights reach past World Partition's loading range, their fixtures
+	// keep to it), made as the view comes within FixtureRangeM and dropped a cell past it
+	const double In = double(FixtureRangeM) * 100.0;
+	const double Out = In + FMath::Max(1.0, double(CellM) * 100.0);
+	for (int32 Slot = 0; Slot < Slots.Num(); ++Slot)
+	{
+		FSlot& S = Slots[Slot];
+		const ACityGenAtmosCell* Cell = S.Actor.Get();
+		if (!S.bUsed || !Cell)
+		{
+			continue;
+		}
+		const double D = FVector::Dist2D(Cell->GetActorLocation(), View);
+		if (!S.bMade && D <= In)
+		{
+			S.bMade = true;
+			MakeFixtures(Slot);
+			MakePlumes(Slot);
+		}
+		else if (S.bMade && D > Out)
+		{
+			S.bMade = false;
+			DropFixtures(Slot);
+			DropPlumes(Slot);
+		}
 	}
 }
 
@@ -695,7 +1184,9 @@ void ACityGenAtmos::SetPlayLamps(bool bOn) const
 	}
 	if (IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(TEXT("CityGen.PlayPoolsFromM")))
 	{
-		V->Set(MidRangeM, ECVF_SetByCode);
+		// (visible lights: past the walker's range, 1,200 m; within it a lamp out of sight is
+		// dark, pool and all)
+		V->Set(LiveRangeM(), ECVF_SetByCode);
 	}
 }
 
@@ -706,6 +1197,8 @@ void ACityGenAtmos::SetLightsOn(bool bOn)
 	{
 		ReleaseAll();
 		bShowing = false;
+		bSightNow = bSightReady = bSightPicked = false;
+		SeenAt.Reset();
 	}
 	SetPlayLamps(!bShowing);
 	LiveAt = -1.0;
@@ -1620,6 +2113,9 @@ void ACityGenAtmos::Tick(float DeltaSeconds)
 		if (!bWant)
 		{
 			ReleaseAll();
+			// (visible lights: picked afresh when the lights come on again)
+			bSightNow = bSightReady = bSightPicked = false;
+			SeenAt.Reset();
 		}
 		SetPlayLamps(!bWant);
 		LiveAt = -1.0;
@@ -1628,13 +2124,22 @@ void ACityGenAtmos::Tick(float DeltaSeconds)
 	{
 		ShowFixtures(bShowing && bFixtures);
 	}
+	// a cell's beacons, beams and plumes near the view, by day too
+	if (FixturesAt < 0.0 || Now - FixturesAt > FixturesEvery)
+	{
+		FixturesAt = Now;
+		UpdateFixtureCells(View);
+	}
 	if (bShowing)
 	{
-		if (LiveAt < 0.0 || Now - LiveAt > LiveEvery)
+		// (visible lights: a sweep come back is picked from at once)
+		const bool bSwept = bSightNow && TakeSight(Now);
+		if (bSwept || LiveAt < 0.0 || Now - LiveAt > LiveEvery)
 		{
 			LiveAt = Now;
 			UpdateLive();
 		}
+		UpdateFades(DeltaSeconds, Now);
 		UpdateFlicker(Now);
 		if (bFixturesShown && BeamCount > 0)
 		{
@@ -1696,7 +2201,10 @@ FString ACityGenAtmos::GetStatus() const
 		"\"cover\": %.2f, \"glow\": %s, \"day_hour\": %.2f, \"dusk_hour\": %.2f, \"night_hour\": %.2f, "
 		"\"air\": %s, \"volumes\": %d, \"volumes_live\": %d, \"candidates_volumes\": %d, \"emitters\": %d, "
 		"\"plume_cards\": %d, \"plumes_shown\": %s, \"fog_share\": %.3f, \"fog_view_m\": %.0f, \"tuned\": %s, "
-		"\"cvars\": %d}"),
+		"\"cvars\": %d, \"sight\": %s, \"sight_wanted\": %s, \"sight_raster\": %s, \"sight_m\": %.0f, "
+		"\"sight_max\": %d, \"sight_seen\": %d, \"sight_picked\": %d, \"sight_tested\": %d, \"sight_rays\": %d, "
+		"\"sight_ms\": %.3f, \"sight_ms_max\": %.3f, \"sight_launch_ms\": %.3f, \"sight_sweeps\": %d, "
+		"\"walker\": %s, \"fading\": %d, \"fade_s\": %.2f, \"fixture_cells\": %d}"),
 		HasPlan() ? TEXT("true") : TEXT("false"), *City, *PlanHash, RegisteredLights, SlotOfActor.Num(),
 		Registrations, bLights ? TEXT("true") : TEXT("false"), Live.Num(), Spots, Points, Rects, *Kinds,
 		Shadowed.Num(), Candidates, MaxLive, MidRangeM, MaxShadowed, UpdateMs, UpdateMsMax, Scale(), Hour,
@@ -1710,7 +2218,11 @@ FString ACityGenAtmos::GetStatus() const
 		SkyGlow ? TEXT("true") : TEXT("false"), DayHour, DuskHour, NightHour,
 		bAir ? TEXT("true") : TEXT("false"), RegisteredVolumes, LiveVolumes.Num(), CandidatesVolumes,
 		RegisteredEmitters, PlumeCards, bPlumesShown ? TEXT("true") : TEXT("false"), FogShare(), FogViewM,
-		bCVarsApplied ? TEXT("true") : TEXT("false"), SavedCVars.Num());
+		bCVarsApplied ? TEXT("true") : TEXT("false"), SavedCVars.Num(),
+		bSightPicked ? TEXT("true") : TEXT("false"), bSightNow ? TEXT("true") : TEXT("false"),
+		Sight.IsValid() ? TEXT("true") : TEXT("false"), SightRangeM, SightMax, SeenAt.Num(), SightPickedN,
+		SightTested, SightRays, SightMs, SightMsMax, SightLaunchMs, SightSweeps,
+		IsWalker() ? TEXT("true") : TEXT("false"), FadingNow, FadeS, FixtureCells());
 }
 
 // -- AT3: the sky and time --

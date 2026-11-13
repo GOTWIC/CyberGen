@@ -144,6 +144,11 @@ bool UCityGenBench::ReadJob()
 			if (O->TryGetNumberField(TEXT("speed_m_s"), X)) { S.Speed = X * 100.0; }
 			O->TryGetNumberField(TEXT("pitch_deg"), S.Pitch);
 			O->TryGetNumberField(TEXT("hold_s"), S.Hold);
+			const TArray<TSharedPtr<FJsonValue>>* SegCmds = nullptr;
+			if (O->TryGetArrayField(TEXT("commands"), SegCmds))
+			{
+				for (const TSharedPtr<FJsonValue>& C : *SegCmds) { S.Commands.Add(C->AsString()); }
+			}
 			for (const TSharedPtr<FJsonValue>& P : O->GetArrayField(TEXT("points")))
 			{
 				S.Points.Add(Cm(P->AsArray()));
@@ -246,6 +251,10 @@ void UCityGenBench::StartPass()
 void UCityGenBench::StartSegment()
 {
 	const FCityGenBenchSegment& S = Segments[SegIndex];
+	for (const FString& C : S.Commands)
+	{
+		GEngine->Exec(GetWorld(), *C);
+	}
 	Event(FString::Printf(TEXT("\"op\": \"segment\", \"name\": \"%s\", \"kind\": \"%s\""), *Esc(S.Name), *S.Kind));
 	StageStart = FPlatformTime::Seconds();
 	Travelled = 0.0;

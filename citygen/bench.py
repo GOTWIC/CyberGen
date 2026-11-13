@@ -150,6 +150,10 @@ LOAD_RADIUS_M = 150.0        # a load waits until the cells within this of the s
 STREAM_RADIUS_M = 100.0      # a moving frame counts as streamed when these are
 ROOT_PAGE_MB = 32768 / 1048576.0     # NANITE_ROOT_PAGE_GPU_SIZE (32 KB)
 GROUPS = ("walk", "drive", "fly", "teleport")
+# visible lights: atmosgen's live set by sight on the ground (the walks and the drive: the
+# player's walker, whom the route moves through the sky as well), the circle in the air (the
+# flights, the warm-up), as the fly pawn and the free camera keep it (`CityGenAtmos.Sight`)
+SIGHT = {"walk": 1, "drive": 1, "teleport": 1}
 
 
 def _line(g: dict, i: int) -> list[tuple[float, float, float]]:
@@ -386,13 +390,15 @@ def job(route_: dict, out_dir: Path, passes=PASSES, warm: bool = True,
             # (windowed fullscreen at the resolution: a window of that size with its
             # borders would not fit a screen of that size)
             "commands": list(COMMANDS) + [f"r.SetRes {resolution[0]}x{resolution[1]}wf"],
+            "segments": [dict(s, commands=[f"CityGenAtmos.Sight {SIGHT.get(s['group'], 0)}"])
+                         if atmos else s for s in route_["segments"]],
             "settle_s": 1.5, "load_timeout_s": 120.0,
             "load_radius_m": LOAD_RADIUS_M, "stream_radius_m": STREAM_RADIUS_M,
             "start_wait_s": 10.0, "stream_every": 5, "memory_every": 15,
             # a screenshot of each segment's start once loaded (`shots/<pass>_<segment>.png`):
             # the same views before and after a change
             "shots": shots,
-            "passes": ps, "segments": route_["segments"]}
+            "passes": ps}
 
 
 # --- running it ---------------------------------------------------------------------------

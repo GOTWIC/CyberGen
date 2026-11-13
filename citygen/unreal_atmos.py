@@ -27,6 +27,12 @@
   controller's air (`air_settings`: the height and volumetric fog by the hour, each light
   kind's volumetric scattering, the live sets of volumes and plumes, the engine settings it
   runs with); a plan whose air check failed is not delivered.
+- Visible lights (after AT4, Swagnik's walk of the packaged Delta, 2026-11-12): the
+  controller's `sight_settings` (the plan's sight raster, `atmosgen/sight.py`, as runs of
+  its cells, `sight_runs`, with its bounds in Unreal's frame, cell, steps and skips; the
+  tiers' `sight_m` and `sight_max`), by which the runtime keeps live round a walker the
+  lights the walker sees out to `sight_m`. The cells are always loaded (the importer's
+  `atmos_cells`): their lights reach past World Partition's loading range (768 m).
 """
 
 from __future__ import annotations
@@ -208,6 +214,35 @@ def air_settings(plan: dict) -> dict:
             "emitters": len(plan.get("emitters") or [])}
 
 
+def sight_settings(plan: dict, pdir: Path) -> dict:
+    """Visible lights: the controller's sight from the plan's `sight` (a plan before it has
+    none: {}): the raster as runs over its rows from the north edge ([count, red | green << 8
+    | blue << 16] pairs, `atmosgen.sight.runs`), its bounds in Unreal's frame (cm: [min X,
+    min Y, max X, max Y], Y south, so row 0 is min Y), its cell (m), size, steps (top,
+    bottom, ground; m), skips (eye, light; m), and the tiers' range and size."""
+    s = plan.get("sight")
+    if not s or not (pdir / s["file"]).is_file():
+        return {}
+    import numpy as np
+    from PIL import Image
+
+    from atmosgen.sight import runs
+    with Image.open(pdir / s["file"]) as im:
+        rgb = np.asarray(im.convert("RGB"), dtype=np.uint8)
+    h, w = rgb.shape[:2]
+    x0, y0, x1, y1 = s["bounds"]
+    t = plan.get("tiers") or {}
+    return {"sight_m": float(t.get("sight_m", 1200.0)),
+            "sight_max": int(t.get("sight_max", 512)),
+            "sight_bounds": [_r(x0 * 100.0, 1), _r(-y1 * 100.0, 1), _r(x1 * 100.0, 1),
+                             _r(-y0 * 100.0, 1)],
+            "sight_cell_m": float(s["cell_m"]), "sight_px": [int(w), int(h)],
+            "sight_steps": [float(s["top_step_m"]), float(s["bottom_step_m"]),
+                            float(s["ground_step_m"])],
+            "sight_skips": [float(s["skip_eye_m"]), float(s["skip_light_m"])],
+            "sight_sha256": s["sha256"], "sight_runs": runs(rgb)}
+
+
 def cell_of(x: float, y: float) -> tuple[int, int]:
     return int(math.floor(x / CELL_M)), int(math.floor(y / CELL_M))
 
@@ -340,6 +375,7 @@ def atmos_data(pdir: Path) -> tuple[dict | None, str]:
            "high_range_m": float(tiers.get("high_m", 750.0)), "cell_m": CELL_M}
     ctl.update(sky_settings(plan))
     ctl.update(air_settings(plan))
+    ctl.update(sight_settings(plan, pdir))
     return {"version": PACK_VERSION, "controller": ctl, "cells": out}, ""
 
 
@@ -377,6 +413,9 @@ def write_atmos(build: str | Path, given: str | Path | None = None) -> dict | No
             "lights": sum(c["count"] for c in data["cells"]),
             "volumes": sum(c.get("volumes", 0) for c in data["cells"]),
             "emitters": sum(c.get("emitters", 0) for c in data["cells"]),
+            "sight": ({"px": ctl["sight_px"], "cell_m": ctl["sight_cell_m"],
+                       "runs": len(ctl["sight_runs"]) // 2, "sha256": ctl["sight_sha256"]}
+                      if ctl.get("sight_runs") is not None else None),
             "cells": [{k: c[k] for k in ("key", "cell", "tile", "center", "count", "hash")}
                       for c in data["cells"]]}
 

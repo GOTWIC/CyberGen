@@ -1729,6 +1729,77 @@ and `emitters`) comes with the cells and the controller:
   no teleport, the warm-up passes flying a third of the flight (segment `warm_fly`, group
   `warm`) and the measured passes the rest.
 
+### Visible lights (after AT4)
+
+Swagnik's walk of the packaged Delta (2026-11-12): round a walker every light in a circle was
+live, those behind the next block as much as those down the street, and none past 300 m. On
+foot the live set is now the lights the walker sees, out to four times the circle's radius;
+the fly pawn and the free camera keep the circle.
+
+- **The plan's sight raster** (`atmosgen/sight.py`, the plan's `sight`, `BUILD/atmos/sight.png`):
+  the lux check's occluders (`lux.Occluders`: the building masses taken 0.5 m inside their
+  footprints and M14's deck slabs, on a 1 m grid) on 2 m cells, a cell blocking the height span
+  all four of its 1 m cells block (the lowest top over the highest bottom), so a line of sight
+  grazing a facade, or reaching a sign stood 0.9 m off it, stays clear. Red the top (absolute,
+  2 m steps rounded down, 0 nothing), green the bottom over the ground (1 m steps rounded up, 0
+  on the ground: a slab's underside or a mass over a passage otherwise), blue the ground (M13's,
+  the lowest of the cell's corners, 1 m steps; 0 on a flat city); row 0 the north edge. Every
+  rounding leans to seeing. Delta's: 1,750 x 1,750 cells, 18% occupied, 182 KB, 145,000 runs.
+  The plan's tiers gain `sight_m` (1,200 m, `presets.TIERS["sight"]`) and `sight_max` (512).
+- **The exporter** (`unreal_atmos.sight_settings`, in the controller's hash): the raster as
+  runs over its rows from the north edge (`sight_runs`: count and value pairs, the value
+  red | green << 8 | blue << 16), its bounds in Unreal's frame (cm, Y south: row 0 is the
+  minimum Y), cell, size, the channels' steps and the march's skips, the tiers' range and size;
+  the importer sets them on the controller (`SightRuns`, `SightBounds`, `SightCellM`,
+  `SightWidth`, `SightHeight`, `SightTopStepM`, `SightBottomStepM`, `SightGroundStepM`,
+  `SightSkipEyeM`, `SightSkipLightM`, `SightRangeM`, `SightMax`). The manifest's `atmos` names
+  the raster (`sight`: size, cell, runs, sha256). **The cells are always loaded**
+  (`ATMOS_VERSION` `atmos5`; 518 data actors on Delta, a few MB): a walker's lights reach past
+  World Partition's loading range (768 m). The controller makes a cell's beacons, beams and
+  plumes only while its middle is within `FixtureRangeM` (832 m: the loading range and half a
+  cell) of the view, and drops them a cell past it, as when the cells streamed.
+- **The runtime** (`ACityGenAtmos`): the mode is the console variable `CityGenAtmos.Sight`
+  (-1, the default: by sight while the player's pawn is the play features' `CityGenWalker`,
+  found by its class's name; 0 the circle; 1 by sight whatever the pawn). By sight, every 0.2 s
+  a sweep runs on a worker thread (`Async` on the thread pool): the lights on within
+  `SightRangeM` (a near-only light within `NearRangeM`) gathered from the cells round the view,
+  each tested from the camera at the light and, failing that, where its light lands (a spot
+  aimed down: its pool on the ground, at most 0.8 of its reach out; a point: the floor under it;
+  a face, an uplight or a flood: a patch along its aim, 6 or 15 m out), so a lamp round a corner
+  whose pool shows stays. `FCityGenSight::Visible` walks the 2 m cells the segment crosses in
+  plan, the segment's height span in each against the cell's, the eye's own cell, the first
+  0.5 m and the last 1 m left out (a camera in a doorway, a light's own wall). A sweep that comes
+  back marks what it saw seen now, and a light stays in sight `SightHoldS` (0.6 s) after the
+  last sweep that saw it. The street's pool is the `SightMax` seen lights with the smallest
+  distance over reach (the nearest, and the ones whose pools reach farthest), the high tier's
+  the `MaxHigh` nearest seen high lights (a searchlight first), both out to `SightRangeM`, the
+  farthest fifth of it fading; shadows for the nearest `MaxShadowed` seen within `NearRangeM`.
+  Until the first sweep after the mode changes, the circle. The play features' light pools
+  stand past the live range: 1,200 m by sight (`CityGen.PlayPoolsFromM`), so a lamp within it
+  out of sight is dark, pool and all.
+- **Fades in time** (both modes): a light joining the live set fades in over `FadeS` (0.5 s),
+  one leaving it fades out and goes back to its pool at 0 (it keeps flickering, blinking or
+  sweeping while it fades); the fade by distance at the range's edge stays.
+- **Console:** `CityGenAtmos.Sight -1|0|1`, `CityGenAtmos.SightRange M [MAX] [FADE_S]`;
+  `.Status` adds `sight` (picked by sight now), `sight_wanted`, `sight_raster`, `sight_m`,
+  `sight_max`, `sight_seen`, `sight_picked`, `sight_tested`, `sight_rays`, `sight_ms` (the
+  last sweep on its thread), `sight_ms_max`, `sight_launch_ms` (gathering it on the game
+  thread), `sight_sweeps`, `walker`, `fading`, `fade_s`, `fixture_cells`.
+- **The benchmark** (`bench.job`): with atmosgen's passes each segment carries console
+  commands its start runs (`commands`, `UCityGenBench::StartSegment`): `CityGenAtmos.Sight 1`
+  on the walks, the drive and the teleport (`bench.SIGHT`), 0 on the flights and the warm-up
+  (the route moves the walker through the sky as well). The route is unchanged.
+- **The check:** a `--view` named `*_sight` renders with the live set by sight, `*_circle` by
+  the circle (the same view's before), the pawn's mode after it; their states in the result's
+  `sight_views`.
+- **The player start** (`unreal.player_start`, `_start_spot`): the fast-travel point nearest
+  the city's middle moved to the nearest sidewalk point (sidewalks, promenades, pedestrian
+  streets, plazas; every 5 m, within 400 m) that is open (no raised road stretch over 3 m, transit
+  deck, tube, beam or canopy, deck slab or skybridge within 10 m) and lit (a street or wall light
+  within 20 m), facing along the sidewalk the way that looks more toward the middle (`spot`
+  `open_lit`, `moved_m`); where there is none, as before. Delta's start stood under the Industrial
+  Port's elevated rail (dark even by day); it is 108 m along the sidewalk past it.
+
 ### A packaged game
 
 A project a city was imported into packages as any Unreal project (UAT's `BuildCookRun`,
