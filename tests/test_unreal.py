@@ -51,8 +51,12 @@ def regenerated(small_built):
 
 
 def _blockout_files(m, out: Path) -> Path:
-    """What `citygen blockout` writes before Blender runs (no glTF tiles)."""
+    """What `citygen blockout` writes before Blender runs (no glTF tiles), beside the city
+    model, as in a build folder (the player start reads the model: since the visible lights
+    it starts on an open lit sidewalk, `unreal._start_spot`; without the model here and with
+    it in `staged`, an import over the blockout updated `player_start`)."""
     out.mkdir(parents=True, exist_ok=True)
+    (out / "city_model.json").write_text(m.to_json() + "\n", encoding="utf-8")
     plan = BO.make_plan(m)
     (out / "blockout_plan.json").write_text(BO.plan_json(plan) + "\n", encoding="utf-8")
     (out / "tiles.json").write_text(json.dumps({"tile_size_m": BO.TILE_M,
@@ -518,7 +522,9 @@ def test_project_cooks_what_the_runtimes_load_by_path(tmp_path):
         b"[/Script/UnrealEd.ProjectPackagingSettings]\r\nBuildConfiguration=PPBC_Development\r\n"
         b'+DirectoriesToAlwaysCook=(Path="/Game/Mine")\r\n'
         b'+DirectoriesToAlwaysCook=(Path="/Game/CityGen/Core/Atmos")\r\n'
-        b'+DirectoriesToAlwaysCook=(Path="/Engine/BasicShapes")\r\n\r\n[Other]\r\nA=1\r\n')
+        b'+DirectoriesToAlwaysCook=(Path="/Engine/BasicShapes")\r\n'
+        b'+DirectoriesToAlwaysCook=(Path="/Engine/EngineResources/FilmGrains")\r\n\r\n'
+        b'[Other]\r\nA=1\r\n')
     assert not U.set_project_ini(up)
     # a project without the section (the templates' DefaultGame.ini) gets it appended
     game.write_bytes(b"[/Script/EngineSettings.GeneralProjectSettings]\nProjectID=X\n")
@@ -526,7 +532,8 @@ def test_project_cooks_what_the_runtimes_load_by_path(tmp_path):
     assert game.read_bytes().endswith(
         b"ProjectID=X\n\n[/Script/UnrealEd.ProjectPackagingSettings]\n"
         b'+DirectoriesToAlwaysCook=(Path="/Game/CityGen/Core/Atmos")\n'
-        b'+DirectoriesToAlwaysCook=(Path="/Engine/BasicShapes")\n')
+        b'+DirectoriesToAlwaysCook=(Path="/Engine/BasicShapes")\n'
+        b'+DirectoriesToAlwaysCook=(Path="/Engine/EngineResources/FilmGrains")\n')
     # every folder a runtime loads from by path is one of them
     import re
     src = Path(U.__file__).parent / "ue"

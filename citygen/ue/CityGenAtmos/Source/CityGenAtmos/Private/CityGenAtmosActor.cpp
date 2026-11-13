@@ -164,6 +164,9 @@ void ACityGenAtmos::BeginPlay()
 	SetWet(bWet);
 	SetMegaLights(bMegaLights);
 	SetLightsOn(bLights);
+	// AT6: the look's post (its district raster from its runs)
+	MakePostRaster();
+	SetPost(bPost);
 }
 
 void ACityGenAtmos::EndPlay(const EEndPlayReason::Type Reason)
@@ -2634,6 +2637,9 @@ void ACityGenAtmos::PushParameters()
 		Set(TEXT("WindX"), FMath::Cos(Heading));
 		Set(TEXT("WindY"), -FMath::Sin(Heading));
 		Set(TEXT("SteamGain"), SteamGain);
+		// (AT6: the plumes' opacity kept far off)
+		Set(TEXT("SteamFar"), SteamFar);
+		Set(TEXT("SteamFarM"), SteamFarM);
 		Set(TEXT("Streak"), bW ? WeatherNow[WStreak] : 1.f);
 		Set(TEXT("Drops"), bW ? WeatherNow[WDrops] : 1.f);
 	}
@@ -2739,6 +2745,8 @@ void ACityGenAtmos::Tick(float DeltaSeconds)
 	}
 	// AT5: the weather (its states blending, the rain's age, splashes and drips near the view)
 	UpdateWeather(DeltaSeconds, View);
+	// AT6: the look's post, the districts' by where the view stands
+	UpdatePost(DeltaSeconds, View, false);
 	if (bWet && Wet)
 	{
 		UpdateWetDecals(View);
@@ -2810,7 +2818,9 @@ FString ACityGenAtmos::GetStatus() const
 			"\"puddles\": %.3f, \"wind_ms\": %.2f, \"cloud_cover\": %.3f, \"volume_gain\": %.3f, "
 			"\"fog_density\": %.4f, \"rain_shown\": %s, \"wet_shown\": %s, \"splashes\": %d, "
 			"\"splashes_live\": %d, \"drips\": %d, \"drip_lines\": %d, \"wet_textures\": %s, "
-			"\"weather_speed\": %.2f"),
+			"\"weather_speed\": %.2f, \"post\": %s, \"post_districts\": %s, \"post_where\": \"%s\", "
+			"\"post_bloom\": %.3f, \"post_grain\": %.3f, \"post_fringe\": %.3f, \"post_saturation\": %.3f, "
+			"\"post_contrast\": %.3f, \"post_sharpen\": %.3f, \"overcast_shift\": %.3f"),
 			HasWeather() ? TEXT("true") : TEXT("false"), *GetWeatherLabel(),
 			WeatherNames.IsValidIndex(WeatherTarget) ? *WeatherNames[WeatherTarget] : TEXT(""),
 			TransitionT, WeatherNow[WRain], WeatherNow[WDrops], WeatherNow[WStreak], WetNow, PuddleNow,
@@ -2818,7 +2828,10 @@ FString ACityGenAtmos::GetStatus() const
 			(Rain && Rain->IsVisible()) ? TEXT("true") : TEXT("false"),
 			(Wet && Wet->IsVisible()) ? TEXT("true") : TEXT("false"),
 			Splashes ? Splashes->GetInstanceCount() : 0, SplashesLive, DripsLive, DripLines,
-			(WetCover && WetSurface) ? TEXT("true") : TEXT("false"), WeatherSpeed));
+			(WetCover && WetSurface) ? TEXT("true") : TEXT("false"), WeatherSpeed,
+			HasPost() ? TEXT("true") : TEXT("false"), bDistrictPost ? TEXT("true") : TEXT("false"),
+			*PostWhere, PostNow[PBloom], PostNow[PGrain], PostNow[PChromatic], PostNow[PSaturation],
+			PostNow[PContrast], PostNow[PSharpen], OvercastShift()));
 }
 
 // -- AT3: the sky and time --
@@ -2955,7 +2968,10 @@ void ACityGenAtmos::ApplyTime()
 	MoonElev = ME;
 	NightNow = FMath::Clamp(CurveAt(CurveNight, E), 0.f, 1.f);
 	SunWeight = FMath::Clamp(CurveAt(CurveSun, E), 0.f, 1.f);
-	EVNow = SceneEV100 + (DayEV100 - SceneEV100) * CurveAt(CurveEV, E);
+	const float DayShare = CurveAt(CurveEV, E);
+	EVNow = SceneEV100 + (DayEV100 - SceneEV100) * DayShare;
+	// (AT6: by day the weather's overcast partly given back)
+	EVNow += DayShare * OvercastShift();
 	const float R0 = MoonRise.Num() >= 2 ? MoonRise[0] : -1.f;
 	const float R1 = MoonRise.Num() >= 2 ? MoonRise[1] : 6.f;
 	const float MoonUp = FMath::SmoothStep(R0, R1, ME);
@@ -2998,6 +3014,12 @@ void ACityGenAtmos::ApplyTime()
 	{
 		UKismetMaterialLibrary::SetScalarParameterValue(this, CityCollection, TEXT("Night"), NightNow);
 		UKismetMaterialLibrary::SetScalarParameterValue(this, CityCollection, TEXT("Hour"), Hour);
+	}
+	// AT6: the plumes lit by the city by night
+	if (AtmosCollection)
+	{
+		UKismetMaterialLibrary::SetScalarParameterValue(this, AtmosCollection, TEXT("SteamGlow"),
+			SteamGlow * NightNow);
 	}
 	if (SkyMID)
 	{
@@ -3051,6 +3073,296 @@ void ACityGenAtmos::SetCloudCover(float Cover)
 {
 	CoverNow = FMath::Clamp(Cover, 0.f, 1.f);
 	ApplyTime();
+}
+
+// -- AT6: the look --
+
+void ACityGenAtmos::MakePostRaster()
+{
+	PostIdx.Reset();
+	const int64 N = int64(PostWidth) * int64(PostHeight);
+	if (N <= 0 || PostBounds.Num() < 4 || PostRuns.Num() < 2 || PostCellM <= 0.f)
+	{
+		return;
+	}
+	PostIdx.SetNumUninitialized(N);
+	int64 At = 0;
+	for (int32 k = 0; k + 1 < PostRuns.Num(); k += 2)
+	{
+		const int64 C = PostRuns[k];
+		if (C <= 0 || At + C > N)
+		{
+			UE_LOG(LogCityGenAtmos, Warning, TEXT("CityGen atmos: the post raster's runs overrun its cells; the look's post alone"));
+			PostIdx.Reset();
+			return;
+		}
+		FMemory::Memset(PostIdx.GetData() + At, uint8(PostRuns[k + 1]), C);
+		At += C;
+	}
+	if (At != N)
+	{
+		PostIdx.Reset();
+	}
+}
+
+void ACityGenAtmos::PostTarget(const FVector& View)
+{
+	// each district's weight where the view stands: the raster sampled on a 5 x 5 grid over
+	// a disc PostBlendM wide round it, a tent from its middle (a cell under no district, or a
+	// view off the raster, counts for the look's own)
+	const int32 ND = PostNames.Num();
+	PostWTarget.Init(0.f, ND + 1);
+	if (!bDistrictPost || PostIdx.Num() == 0 || PostDistricts.Num() < ND * 2 * PostFloats)
+	{
+		PostWTarget[ND] = 1.f;
+		return;
+	}
+	const double Cell = double(PostCellM) * 100.0;
+	const double R = double(PostBlendM) * 100.0;
+	float Sum = 0.f;
+	for (int32 j = -2; j <= 2; ++j)
+	{
+		for (int32 i = -2; i <= 2; ++i)
+		{
+			const double dx = R * i / 2.0, dy = R * j / 2.0;
+			const double r = FMath::Sqrt(dx * dx + dy * dy) / FMath::Max(1.0, R);
+			if (r > 1.0001)
+			{
+				continue;
+			}
+			const float W = float(1.25 - r);
+			const int32 cx = FMath::FloorToInt32((View.X + dx - PostBounds[0]) / Cell);
+			const int32 cy = FMath::FloorToInt32((View.Y + dy - PostBounds[1]) / Cell);
+			int32 D = ND;
+			if (cx >= 0 && cy >= 0 && cx < PostWidth && cy < PostHeight)
+			{
+				const uint8 V = PostIdx[int64(cy) * PostWidth + cx];
+				D = V < ND ? int32(V) : ND;
+			}
+			PostWTarget[D] += W;
+			Sum += W;
+		}
+	}
+	for (float& W : PostWTarget)
+	{
+		W /= FMath::Max(1e-6f, Sum);
+	}
+}
+
+void ACityGenAtmos::UpdatePost(float DeltaSeconds, const FVector& View, bool bNow)
+{
+	if (!HasPost())
+	{
+		return;
+	}
+	const double Now = FPlatformTime::Seconds();
+	if (bNow || PostAt < 0.0 || Now - PostAt > LiveEvery)
+	{
+		PostAt = Now;
+		PostTarget(View);
+	}
+	const int32 ND = PostNames.Num();
+	if (PostW.Num() != ND + 1 || bNow)
+	{
+		PostW = PostWTarget;
+	}
+	else
+	{
+		const float A = 1.f - FMath::Exp(-DeltaSeconds / FMath::Max(0.05f, PostEaseS));
+		for (int32 k = 0; k <= ND; ++k)
+		{
+			PostW[k] += (PostWTarget[k] - PostW[k]) * A;
+		}
+	}
+	// the sets blended: night and day by Night, the districts by their weights
+	const float Nt = FMath::Clamp(NightNow, 0.f, 1.f);
+	float S[PostFloats] = {};
+	float Best = -1.f;
+	for (int32 k = 0; k <= ND; ++k)
+	{
+		const float W = PostW[k];
+		if (W > Best)
+		{
+			Best = W;
+			PostWhere = k < ND ? PostNames[k] : TEXT("");
+		}
+		if (W <= 1e-4f)
+		{
+			continue;
+		}
+		const float* Src = k < ND ? PostDistricts.GetData() + k * 2 * PostFloats : PostBase.GetData();
+		for (int32 f = 0; f < PostFloats; ++f)
+		{
+			S[f] += W * (Nt * Src[f] + (1.f - Nt) * Src[PostFloats + f]);
+		}
+	}
+	// (art direction: a key held at a value for the session, CityGenAtmos.PostSet)
+	for (const TPair<int32, float>& O : PostOverride)
+	{
+		if (O.Key >= 0 && O.Key < PostFloats)
+		{
+			S[O.Key] = O.Value;
+		}
+	}
+	// (applied only when something moved: the volume's settings are read every frame)
+	float Moved = bPostApplied ? 0.f : 1.f;
+	for (int32 f = 0; f < PostFloats; ++f)
+	{
+		Moved = FMath::Max(Moved, FMath::Abs(S[f] - PostNow[f]));
+	}
+	if (Moved > 1e-4f)
+	{
+		FMemory::Memcpy(PostNow, S, sizeof(S));
+		ApplyPostSettings(PostNow);
+	}
+}
+
+void ACityGenAtmos::ApplyPostSettings(const float* S)
+{
+	EnsureVolume();
+	if (!Volume)
+	{
+		return;
+	}
+	FPostProcessSettings& P = Volume->Settings;
+	P.bOverride_BloomIntensity = true;
+	P.BloomIntensity = S[PBloom];
+	P.bOverride_LensFlareIntensity = true;
+	P.LensFlareIntensity = S[PFlare];
+	P.bOverride_LensFlareThreshold = true;
+	P.LensFlareThreshold = S[PFlareThreshold];
+	P.bOverride_FilmGrainIntensity = true;
+	P.FilmGrainIntensity = S[PGrain];
+	P.bOverride_SceneFringeIntensity = true;
+	P.SceneFringeIntensity = S[PChromatic];
+	P.bOverride_ChromaticAberrationStartOffset = true;
+	P.ChromaticAberrationStartOffset = S[PChromaticStart];
+	P.bOverride_VignetteIntensity = true;
+	P.VignetteIntensity = S[PVignette];
+	P.bOverride_Sharpen = true;
+	P.Sharpen = S[PSharpen];
+	P.bOverride_ColorSaturation = true;
+	P.ColorSaturation = FVector4(1.0, 1.0, 1.0, S[PSaturation]);
+	P.bOverride_ColorContrast = true;
+	P.ColorContrast = FVector4(1.0, 1.0, 1.0, S[PContrast]);
+	P.bOverride_ColorSaturationHighlights = true;
+	P.ColorSaturationHighlights = FVector4(1.0, 1.0, 1.0, S[PHighlightSat]);
+	P.bOverride_ColorOffsetShadows = true;
+	P.ColorOffsetShadows = FVector4(0.0, 0.0, 0.0, S[PLift]);
+	P.bOverride_ColorGainShadows = true;
+	P.ColorGainShadows = FVector4(S[PShadowR], S[PShadowG], S[PShadowB], 1.0);
+	P.bOverride_ColorGainHighlights = true;
+	P.ColorGainHighlights = FVector4(S[PHighR], S[PHighG], S[PHighB], 1.0);
+	P.bOverride_LocalExposureShadowContrastScale = true;
+	P.LocalExposureShadowContrastScale = S[PLocalShadows];
+	P.bOverride_LocalExposureHighlightContrastScale = true;
+	P.LocalExposureHighlightContrastScale = S[PLocalHighlights];
+	bPostApplied = true;
+}
+
+void ACityGenAtmos::ClearPostSettings()
+{
+	if (!Volume)
+	{
+		return;
+	}
+	FPostProcessSettings& P = Volume->Settings;
+	P.bOverride_BloomIntensity = P.bOverride_LensFlareIntensity = P.bOverride_LensFlareThreshold = false;
+	P.bOverride_FilmGrainIntensity = P.bOverride_SceneFringeIntensity = false;
+	P.bOverride_ChromaticAberrationStartOffset = P.bOverride_VignetteIntensity = false;
+	P.bOverride_Sharpen = P.bOverride_ColorSaturation = P.bOverride_ColorContrast = false;
+	P.bOverride_ColorSaturationHighlights = P.bOverride_ColorOffsetShadows = false;
+	P.bOverride_ColorGainShadows = P.bOverride_ColorGainHighlights = false;
+	P.bOverride_LocalExposureShadowContrastScale = false;
+	P.bOverride_LocalExposureHighlightContrastScale = false;
+	bPostApplied = false;
+}
+
+void ACityGenAtmos::SetPost(bool bOn)
+{
+	bPost = bOn;
+	if (HasPost())
+	{
+		bPostApplied = false;
+		UpdatePost(0.f, ViewLocation(), true);
+	}
+	else
+	{
+		ClearPostSettings();
+	}
+	ApplyTime();
+}
+
+void ACityGenAtmos::SetPostDistricts(bool bOn)
+{
+	bDistrictPost = bOn;
+	if (HasPost())
+	{
+		UpdatePost(0.f, ViewLocation(), true);
+	}
+}
+
+bool ACityGenAtmos::SetPostValue(const FString& Key, float Value, bool bClear)
+{
+	static const TCHAR* Names[PostFloats] = {TEXT("bloom"), TEXT("flare"), TEXT("flare_threshold"),
+		TEXT("grain"), TEXT("chromatic"), TEXT("chromatic_start"), TEXT("vignette"), TEXT("sharpen"),
+		TEXT("saturation"), TEXT("contrast"), TEXT("highlight_sat"), TEXT("lift"), TEXT("local_shadows"),
+		TEXT("local_highlights"), TEXT("shadows_r"), TEXT("shadows_g"), TEXT("shadows_b"),
+		TEXT("highlights_r"), TEXT("highlights_g"), TEXT("highlights_b")};
+	if (Key == TEXT("clear") || Key == TEXT("all"))
+	{
+		PostOverride.Reset();
+	}
+	else
+	{
+		int32 K = INDEX_NONE;
+		for (int32 k = 0; k < PostFloats; ++k)
+		{
+			K = Key.Equals(Names[k], ESearchCase::IgnoreCase) ? k : K;
+		}
+		if (K == INDEX_NONE)
+		{
+			return false;
+		}
+		if (bClear)
+		{
+			PostOverride.Remove(K);
+		}
+		else
+		{
+			PostOverride.Add(K, Value);
+		}
+	}
+	if (HasPost())
+	{
+		UpdatePost(0.f, ViewLocation(), true);
+	}
+	return true;
+}
+
+void ACityGenAtmos::SetDayEV(float EV)
+{
+	DayEV100 = EV;
+	ApplyTime();
+}
+
+float ACityGenAtmos::OvercastShift() const
+{
+	// AT6: by day the exposure gives back OvercastComp of the light the weather's clouds take
+	// off the sun (AT5's overcast) past the plan's own cover, a day street's light SkyShare
+	// the sky's (in stops: under 0 a brighter exposure)
+	if (!HasPost() || OvercastComp <= 0.f)
+	{
+		return 0.f;
+	}
+	const float C0 = OvercastTake.Num() >= 2 ? OvercastTake[0] : 0.5f;
+	const float Take = OvercastTake.Num() >= 2 ? OvercastTake[1] : 0.75f;
+	auto Light = [&](float Cover)
+	{
+		const float Sun = 1.f - Take * FMath::Clamp((Cover - C0) / FMath::Max(1e-3f, 1.f - C0), 0.f, 1.f);
+		return (1.f - SkyShare) * Sun + SkyShare;
+	};
+	return OvercastComp * FMath::Log2(FMath::Max(1e-3f, Light(CoverNow)) / FMath::Max(1e-3f, Light(RefCover)));
 }
 
 bool ACityGenAtmos::SetNamedHour(const FString& Name)

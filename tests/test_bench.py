@@ -294,6 +294,21 @@ def test_weather_passes():
         assert {"CityGenAtmos.Rain 1", "CityGenAtmos.Wet 1", "CityGenAtmos.Air 1"} <= set(cmds)
 
 
+def test_post_passes():
+    """AT6: every atmos pass sets the look's post (on, so none leaks into the next), the
+    nopost passes off; the passes without atmosgen switch it off with the rest."""
+    by = {p[0]: p for p in B.ATMOS_PASSES}
+    for name, p in by.items():
+        ps = [c for c in p[3] if c.startswith("CityGenAtmos.Post ")]
+        assert len(ps) == 1 and p[3][-1].startswith("CityGenAtmos.Hour"), name
+        assert ps[0] == ("CityGenAtmos.Post 0" if name.endswith("_nopost") else
+                         "CityGenAtmos.Post 1"), name
+    assert set(by["night_plan_nopost"][3]) - set(by["night_plan_all"][3]) == \
+        {"CityGenAtmos.Post 0"}
+    assert by["day_plan_nopost"][1] is False
+    assert "CityGenAtmos.Post 0" in B.ATMOS_OFF
+
+
 def test_others_summary_names_who_took_the_foreground():
     """AT3: the samples say which processes took the game's foreground and how often it was
     taken back; the summary adds them up."""

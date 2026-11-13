@@ -11,7 +11,7 @@ your machine.
 |---|---|---|---|
 | 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M22 done |
 | 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG8, AG10, AG12 to AG17 done, the rest to come |
-| 3 | [atmosgen](#stage-3-atmosgen) | Lighting, sky, weather and atmospherics | AT0 to AT5 done, the rest to come |
+| 3 | [atmosgen](#stage-3-atmosgen) | Lighting, sky, weather and atmospherics | AT0 to AT6 done, AT7 to come |
 | 4 | [lifegen](#stage-4-lifegen) | Traffic, crowds, trains and aircraft, generated | Planned ([draft plan](docs/lifegen_scope.md)) |
 | 5 | [storygen](#stage-5-storygen) | Story, characters and cutscenes | Planned |
 
@@ -610,6 +610,24 @@ rain, fog, smog) that blend into each other, picked from the game's Tab menu:
 |---|---|
 | <img src="docs/progress/AT5/unreal/night_oldtown_low__rain.jpg" width="420"> | <img src="docs/progress/AT5/unreal/night_viaduct__rain.jpg" width="420"> |
 
+The look: each look has its own grade by night and by day (neon rain teal in the shadows and
+magenta in the highlights, with bloom, lens flares, a little grain and fringing), and each
+district its own on top, by how clean or gritty it is: a crisp, cool corporate core, grainy
+old towns and port with lifted blacks and sodium highlights, blended as you walk from one into
+the next. The exposure is held per hour, so a rainy day reads as a grey, wet street rather
+than a dark one. Art-direction rounds compare a round's shots with the last
+(`atmosgen review`), and a Claude Code skill writes the light and look from the city's prompt:
+
+| The Corporate Core by night: crisp and cool | Old Town by night: warm and grainy |
+|---|---|
+| <img src="docs/progress/AT6/unreal/after/night_core.jpg" width="420"> | <img src="docs/progress/AT6/unreal/after/night_oldtown.jpg" width="420"> |
+| An Old Town street by day in rain | Under a viaduct by day in rain |
+| <img src="docs/progress/AT6/unreal/after/pday_oldtown.jpg" width="420"> | <img src="docs/progress/AT6/unreal/after/pday_viaduct.jpg" width="420"> |
+
+```bash
+.venv/bin/python -m atmosgen review out/vesper_bay --spec cities/vesper_bay/atmos_spec.json --shots SHOTS
+```
+
 Its Blender preview renders the same night in Cycles, lit by the plan's lights (and dusk, at an
 hour the sun has just set: `atmosgen preview out/vesper_bay --hour 19.4`):
 
@@ -630,7 +648,7 @@ Plan: [`docs/atmosgen_scope.md`](docs/atmosgen_scope.md); what each milestone di
 | AT3 | Sky and time | Night, dusk and day skies, a cloud deck lit by the city, the moon and stars, time of day driving every light and window, a time-of-day slider in the game | Done |
 | AT4 | Air | Fog and haze by the hour, mist over the water, smog over the port, haze under the decks and in tunnels, light shafts, steam and smoke from manholes, roofs, stalls and chimneys | Done |
 | AT5 | Weather | Rain kept out from under decks and awnings, wet streets and puddles, drips and splashes, rings on the canals, wind, five weather states that blend into each other | Done |
-| AT6 | Looks and art direction | Color grading and post per look and district, art-direction rounds, the prompt-to-look skill | Planned |
+| AT6 | Looks and art direction | Color grading and post per look and district (a crisp corporate core, gritty old towns and port), a day exposure that reads, art-direction rounds, the prompt-to-look skill | Done |
 | AT7 | Far city and release | The skyline glittering at night to the horizon, every sample city lit, checked in Unreal | Planned |
 
 ---

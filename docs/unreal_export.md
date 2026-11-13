@@ -1917,6 +1917,53 @@ cards and wet decal become the real thing:
 - **A plan whose weather check failed** is not delivered (`atmos.skipped`); a plan without a
   weather (AT4's) keeps AT0's prototypes' switches and the menu's rows.
 
+### From AT6: looks
+
+The plan's look (`docs/atmosgen_scope.md` 6.5, `atmosgen/look.py`: the plan's `post`) rides
+on the controller; the controller's own post-process volume (unbound, priority 50, the one
+that holds the exposure since AT3) shows it:
+
+- **The controller's look** (`unreal_atmos.post_settings`, in its hash; no new
+  `ATMOS_VERSION`: an import over AT5's level updates the controller and nothing else):
+  `PostBase` (the look's night and day sets, `POST_FLOATS` = 20 floats each: bloom, lens
+  flares and their threshold, film grain, chromatic aberration and its start, vignette,
+  sharpening, the grade's saturation and contrast, the highlights' saturation, the shadows'
+  lift, local exposure's shadow and highlight contrast, the shadows' and highlights' gains),
+  `PostDistricts` (each district's two sets, in `PostNames` order), the district raster
+  (`PostRuns`: [count, index] runs over its rows from the north edge, `PostBounds` in Unreal's
+  frame, `PostCellM`, `PostWidth`, `PostHeight`), `PostBlendM` and `PostEaseS`, and the day's
+  exposure (`DayEV100`: a clear day's now, replacing the sky's; `OvercastComp`,
+  `OvercastTake`, `SkyShare`, `RefCover`); the manifest's `atmos.post` (the districts' count,
+  the raster's size and sha256). The air gains `SteamGlow`, `SteamFar`, `SteamFarM`.
+- **Runtime** (`ACityGenAtmos::UpdatePost`, every tick): the district raster sampled on a
+  5 x 5 grid over a disc `PostBlendM` (90 m) wide round the view, a tent from its middle, a
+  few times a second; each district's weight eased toward it over `PostEaseS` (1.5 s); the
+  sets blended by those weights and, night against day, by the sky's Night (dusk between);
+  written into the volume's settings only when a value moved (`ApplyPostSettings`). One
+  volume driven from the view, not a volume per district: AG16 found every enabled volume
+  costs the game thread a physics query a frame.
+- **Exposure:** still held per hour (AT3, no eye adaptation pumping); by day it moves by
+  `OvercastComp` of the light the weather's clouds take off the sun (`OvercastShift`: the
+  sun's share less `OvercastTake` past half cover, `SkyShare` of the light kept), so a rainy
+  day is a little darker than a clear one, not three stops (AT5's open item).
+- **Plumes** (`M_CgSteam`, `atmos_assets.py` version 17): lit by the city by night
+  (`MPC_CityGenAtmos`'s `SteamGlow`, the plan's glow times Night) and kept opaque far off
+  (`SteamFar` from 30 m to `SteamFarM`); a stall's cooking 6 cards (the plan's `puffs`).
+- **The wet decals' face normal** from fine derivatives (`ddx_fine`, `ddy_fine`: a pixel and
+  its own neighbor, not its 2 x 2 quad), so a curb's edge is no longer half floor and half
+  wall by quads (AT5's white sawtooth along a curb).
+- **Console commands:** `CityGenAtmos.Post [0|1]` (the look's post; off: the engine's own,
+  the exposure still held), `.PostDistricts [0|1]`, `.PostSet KEY [VALUE]` (a key held over
+  every set for the session, `clear` lets them go: art direction), `.DayEV EV`,
+  `.SteamGlow G [FAR]`. `.Status` adds `post`, `post_districts`, `post_where` (the district
+  with the most weight), `post_bloom`, `post_grain`, `post_fringe`, `post_saturation`,
+  `post_contrast`, `post_sharpen` and `overcast_shift`.
+- **The check:** by night the look applied (`post`, a district under the view); a `--view`
+  named `*_nopost` renders without it (the same view's before); each view's district,
+  exposure and post in the result's `post_views`.
+- **The benchmark** (`bench.ATMOS_PASSES`): every atmos pass sets `CityGenAtmos.Post 1`
+  (so none leaks), `ATMOS_OFF` `Post 0`; `night_plan_nopost` and `day_plan_nopost` without it.
+
 ### A packaged game
 
 A project a city was imported into packages as any Unreal project (UAT's `BuildCookRun`,

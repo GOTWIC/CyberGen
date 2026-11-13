@@ -204,6 +204,12 @@ class Air(_Model):
     steam_gain: float = Field(10.0, description="The plumes' opacity gain.")
     volume_glow: float = Field(0.15, description="The fog volumes' glow by night (their "
                                                  "emissive's scale).")
+    steam_glow: float = Field(0.0, description="AT6: the plumes lit by the city by night "
+                                               "(their emissive, of their albedo, times "
+                                               "Night).")
+    steam_far: list[float] = Field(default_factory=lambda: [0.0, 150.0],
+                                   description="AT6: the plumes' opacity times 1 + a from 30 m "
+                                               "to b m off (they read far off).")
     cvars: dict[str, str] = Field(default_factory=dict,
                                   description="Engine settings the controller applies while "
                                               "it runs (the budget's room, AT4).")
@@ -404,6 +410,28 @@ class Sight(_Model):
     sha256: str
 
 
+class Post(_Model):
+    """AT6: the look's post and grade (scope 6.5, `atmosgen/look.py`): the look's night and
+    day sets, each district's, the exposure, the district raster the runtime blends them by."""
+    keys: list[str] = Field(description="The scalar keys of a set (`presets.POST_KEYS`).")
+    base: dict = Field(description="The look's sets: {night, day}, each its `keys` and "
+                                   "`shadows_gain`, `highlights_gain` (rgb).")
+    districts: dict[str, dict] = Field(default_factory=dict,
+                                       description="Each district's sets by id (its grit "
+                                                   "and tint over the look's).")
+    order: list[str] = Field(default_factory=list, description="The districts in the "
+                                                               "raster's index order.")
+    exposure: dict = Field(description="The night's and the day's exposure (EV100), the "
+                                       "day's bias and the overcast's compensation.")
+    blend_m: float = Field(description="The runtime weighs the districts over a disc this "
+                                       "wide round the view ...")
+    ease_s: float = Field(description="... and eases to them over this (s).")
+    raster: dict | None = Field(None, description="`post_districts.png`: each cell's "
+                                                  "district (an index into `order`), rows "
+                                                  "from the north edge, its bounds, cell, "
+                                                  "size and sha256.")
+
+
 class AtmosPlan(_Model):
     schema_ref: str | None = Field(None, alias="$schema")
     version: Literal[1] = PLAN_VERSION
@@ -434,6 +462,8 @@ class AtmosPlan(_Model):
                                                       "drips.")
     sight: Sight | None = Field(None, description="Visible lights: the sight raster the "
                                                   "runtime picks a walker's lights by.")
+    post: Post | None = Field(None, description="AT6: the look's post and grade, per "
+                                                "district.")
     counts: dict[str, int]
     sources: dict[str, int] = Field(description="Lights by source: derived or assetgen "
                                                 "(the asks met).")

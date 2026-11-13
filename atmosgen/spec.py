@@ -73,6 +73,39 @@ class DistrictMood(_Model):
                                                    "are flooded.")
     searchlights: Annotated[int, Field(ge=0, le=16)] | None = Field(
         None, description="AT2: searchlights on its tallest towers (two to a roof).")
+    shadows: Color | None = Field(None, description="AT6: its post's shadow tint (default "
+                                                    "its archetype's, `presets.DISTRICT_TINT`).")
+    highlights: Color | None = Field(None, description="AT6: its post's highlight tint.")
+    tint: Annotated[float, Field(ge=0.0, le=3.0)] | None = Field(
+        None, description="AT6: a multiplier of its tints' strength (0: the look's alone).")
+
+
+Mul = Annotated[float, Field(ge=0.0, le=3.0)]
+
+
+class PostSpec(_Model):
+    """AT6: art direction on the look's post (scope 6.5). Every field left out is the look's
+    (`presets.POST`); the multipliers scale the night's and the day's values alike."""
+    bloom: Mul | None = Field(None, description="A multiplier of the bloom.")
+    flare: Mul | None = Field(None, description="A multiplier of the lens flares.")
+    grain: Mul | None = Field(None, description="A multiplier of the film grain.")
+    chromatic: Mul | None = Field(None, description="A multiplier of the chromatic "
+                                                    "aberration.")
+    vignette: Mul | None = Field(None, description="A multiplier of the vignette.")
+    saturation: Mul | None = Field(None, description="A multiplier of the grade's saturation.")
+    contrast: Mul | None = Field(None, description="A multiplier of the grade's contrast.")
+    shadows: Color | None = Field(None, description="The grade's shadow tint (neon rain's "
+                                                    "teal).")
+    highlights: Color | None = Field(None, description="The grade's highlight tint (neon "
+                                                       "rain's magenta).")
+    tint: Mul | None = Field(None, description="A multiplier of the grade's tints' strength.")
+    day_ev_bias: Annotated[float, Field(ge=-3.0, le=3.0)] | None = Field(
+        None, description="EV added to the day's exposure (under 0 brighter).")
+    overcast_comp: Share | None = Field(None, description="The share of the sun's light the "
+                                                          "weather's clouds take that the "
+                                                          "day's exposure gives back.")
+    districts: bool = Field(True, description="A post per district (its mood: clean or "
+                                              "gritty), blended by where the view stands.")
 
 
 class LightLevels(_Model):
@@ -148,6 +181,8 @@ class AtmosSpec(_Model):
     budgets: Budgets = Field(default_factory=Budgets)
     sky: SkySpec = Field(default_factory=SkySpec, description="AT3: the sky and the time "
                                                               "of day.")
+    post: PostSpec = Field(default_factory=PostSpec, description="AT6: the look's post and "
+                                                                 "grade.")
     notes: str | None = Field(None, description="What the session inferred from the prompt.")
 
 
@@ -233,7 +268,7 @@ def fill(spec: AtmosSpec, districts: list[dict]) -> dict:
             "landmarks": {k: v.model_dump() for k, v in sorted(spec.landmarks.items())},
             "sky": {k: getattr(spec.sky, k) for k in ("latitude_deg", "day_of_year",
                                                        "moon_phase", "day_hour")},
-            "wind_deg": spec.wind_deg}
+            "wind_deg": spec.wind_deg, "post": spec.post.model_dump()}
 
 
 # ---------------------------------------------------------------------------

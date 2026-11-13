@@ -568,6 +568,7 @@ class Air:
                 "max_volumes": P.AIR_LIVE["volumes"], "volume_range_m": P.AIR_LIVE["volume_m"],
                 "emitter_range_m": P.AIR_LIVE["emitter_m"], "puffs": dict(P.PUFFS),
                 "steam_gain": P.STEAM_GAIN, "volume_glow": P.VOLUME_GLOW,
+                "steam_glow": P.STEAM_GLOW, "steam_far": list(P.STEAM_FAR),
                 "cvars": dict(sorted(P.AIR_CVARS.items())),
                 "counts": dict(sorted(counts.items()))}
 

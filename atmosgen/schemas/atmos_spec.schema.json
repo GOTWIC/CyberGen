@@ -147,6 +147,21 @@
      "description": "A multiplier of the weather's fog here.",
      "title": "Haze"
     },
+    "highlights": {
+     "anyOf": [
+      {
+       "description": "#rrggbb, lowercase.",
+       "pattern": "^#[0-9a-f]{6}$",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "AT6: its post's highlight tint.",
+     "title": "Highlights"
+    },
     "lamp": {
      "anyOf": [
       {
@@ -223,6 +238,21 @@
      "description": "AT2: searchlights on its tallest towers (two to a roof).",
      "title": "Searchlights"
     },
+    "shadows": {
+     "anyOf": [
+      {
+       "description": "#rrggbb, lowercase.",
+       "pattern": "^#[0-9a-f]{6}$",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "AT6: its post's shadow tint (default its archetype's, `presets.DISTRICT_TINT`).",
+     "title": "Shadows"
+    },
     "spill": {
      "anyOf": [
       {
@@ -262,6 +292,21 @@
      "default": null,
      "description": "The street lights' temperature.",
      "title": "Temp"
+    },
+    "tint": {
+     "anyOf": [
+      {
+       "maximum": 3.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "AT6: a multiplier of its tints' strength (0: the look's alone).",
+     "title": "Tint"
     }
    },
    "title": "DistrictMood",
@@ -473,6 +518,200 @@
     }
    },
    "title": "Palette",
+   "type": "object"
+  },
+  "PostSpec": {
+   "additionalProperties": false,
+   "description": "AT6: art direction on the look's post (scope 6.5). Every field left out is the look's\n(`presets.POST`); the multipliers scale the night's and the day's values alike.",
+   "properties": {
+    "bloom": {
+     "anyOf": [
+      {
+       "maximum": 3.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A multiplier of the bloom.",
+     "title": "Bloom"
+    },
+    "chromatic": {
+     "anyOf": [
+      {
+       "maximum": 3.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A multiplier of the chromatic aberration.",
+     "title": "Chromatic"
+    },
+    "contrast": {
+     "anyOf": [
+      {
+       "maximum": 3.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A multiplier of the grade's contrast.",
+     "title": "Contrast"
+    },
+    "day_ev_bias": {
+     "anyOf": [
+      {
+       "maximum": 3.0,
+       "minimum": -3.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "EV added to the day's exposure (under 0 brighter).",
+     "title": "Day Ev Bias"
+    },
+    "districts": {
+     "default": true,
+     "description": "A post per district (its mood: clean or gritty), blended by where the view stands.",
+     "title": "Districts",
+     "type": "boolean"
+    },
+    "flare": {
+     "anyOf": [
+      {
+       "maximum": 3.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A multiplier of the lens flares.",
+     "title": "Flare"
+    },
+    "grain": {
+     "anyOf": [
+      {
+       "maximum": 3.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A multiplier of the film grain.",
+     "title": "Grain"
+    },
+    "highlights": {
+     "anyOf": [
+      {
+       "description": "#rrggbb, lowercase.",
+       "pattern": "^#[0-9a-f]{6}$",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The grade's highlight tint (neon rain's magenta).",
+     "title": "Highlights"
+    },
+    "overcast_comp": {
+     "anyOf": [
+      {
+       "maximum": 1.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The share of the sun's light the weather's clouds take that the day's exposure gives back.",
+     "title": "Overcast Comp"
+    },
+    "saturation": {
+     "anyOf": [
+      {
+       "maximum": 3.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A multiplier of the grade's saturation.",
+     "title": "Saturation"
+    },
+    "shadows": {
+     "anyOf": [
+      {
+       "description": "#rrggbb, lowercase.",
+       "pattern": "^#[0-9a-f]{6}$",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The grade's shadow tint (neon rain's teal).",
+     "title": "Shadows"
+    },
+    "tint": {
+     "anyOf": [
+      {
+       "maximum": 3.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A multiplier of the grade's tints' strength.",
+     "title": "Tint"
+    },
+    "vignette": {
+     "anyOf": [
+      {
+       "maximum": 3.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A multiplier of the vignette.",
+     "title": "Vignette"
+    }
+   },
+   "title": "PostSpec",
    "type": "object"
   },
   "SkySpec": {
@@ -697,6 +936,10 @@
   },
   "palette": {
    "$ref": "#/$defs/Palette"
+  },
+  "post": {
+   "$ref": "#/$defs/PostSpec",
+   "description": "AT6: the look's post and grade."
   },
   "preset": {
    "default": "neon_rain",

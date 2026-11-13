@@ -12,6 +12,10 @@
                                                     preview_air.png) and the weather (AT5,
                                                     preview_weather.png)
     atmosgen preview BUILD [--plan DIR] ...         a Blender night preview from the plan
+    atmosgen review BUILD [--spec S] [--prev P] [--shots DIR] [--prev-shots DIR]
+                                                    AT6: an art-direction round's review.md
+                                                    (checks, numbers, previews, shots)
+    atmosgen spec diff A B                          AT6: what two atmos specs differ in
 """
 
 from __future__ import annotations
@@ -33,6 +37,13 @@ def _write_json(data: dict, out: str | None) -> None:
 
 def cmd_spec(args) -> int:
     from . import spec as S
+    if args.spec_cmd == "diff":
+        from .review import spec_diff
+        a = json.loads(Path(args.a).read_text(encoding="utf-8"))
+        b = json.loads(Path(args.b).read_text(encoding="utf-8"))
+        for line in spec_diff(a, b) or ["(no differences)"]:
+            print(line)
+        return 0
     if args.spec_cmd == "schema":
         _write_json(S.json_schema(), args.out)
         return 0
@@ -88,7 +99,21 @@ def cmd_lux(args) -> int:
     pl = json.loads((pdir / "atmos_plan.json").read_text(encoding="utf-8"))
     if pl.get("weather_plan"):
         rep["weather"] = weather_preview(pdir, pl)
+    # AT6: the districts' post and every district's grade on a test chart
+    if pl.get("post"):
+        from .look import preview as post_preview
+        rep["post"] = post_preview(pl, pdir, json.loads(
+            (Path(args.build) / "city_model.json").read_text(encoding="utf-8")))["image"]
     print(json.dumps({k: v for k, v in rep.items() if k != "grid"}, indent=1))
+    return 0
+
+
+def cmd_review(args) -> int:
+    from .review import review
+    rec = review(args.build, args.spec, args.prev, plan=args.plan, shots=args.shots,
+                 prev_shots=args.prev_shots)
+    print(f"round {rec['round']}: {'checks passed' if rec['passed'] else 'checks failed'}; "
+          f"wrote {rec['out']}")
     return 0
 
 
@@ -111,6 +136,18 @@ def main(argv=None) -> int:
     v.add_argument("--filled", help="write the spec resolved for the city here")
     s = ss.add_parser("schema")
     s.add_argument("out", nargs="?")
+    df = ss.add_parser("diff", help="AT6: the parameters two atmos specs differ in")
+    df.add_argument("a")
+    df.add_argument("b")
+    rv = sub.add_parser("review", help="AT6: an art-direction round's review sheet "
+                                       "(review.md) from the plan, its previews and shots")
+    rv.add_argument("build")
+    rv.add_argument("--plan", help="the plan's folder (default BUILD/atmos)")
+    rv.add_argument("--spec", help="the round's atmos spec (copied beside the review)")
+    rv.add_argument("--prev", help="the previous round's plan folder (its review.json)")
+    rv.add_argument("--shots", help="a folder of the round's Unreal shots (`citygen unreal "
+                                    "--check --shots`)")
+    rv.add_argument("--prev-shots", help="the previous round's shots, side by side")
     pp = sub.add_parser("plan", help="the atmos plan of a built city (or `plan schema`)")
     pp.add_argument("build", help="the build folder, or `schema`")
     pp.add_argument("out_schema", nargs="?", help=argparse.SUPPRESS)
@@ -151,5 +188,5 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
     if args.cmd == "plan" and args.build == "schema" and args.out is None:
         args.out = args.out_schema
-    return {"spec": cmd_spec, "plan": cmd_plan, "lux": cmd_lux,
+    return {"spec": cmd_spec, "plan": cmd_plan, "lux": cmd_lux, "review": cmd_review,
             "preview": cmd_preview}[args.cmd](args)

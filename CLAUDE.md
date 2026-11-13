@@ -2602,6 +2602,39 @@ AT5 (weather) is in place:
   every atmos pass setting its state at once.
 Results: `docs/progress/AT5/`.
 
+AT6 (looks and art direction) is in place:
+- **The look** (`atmosgen/look.py`, `planmodel.Post`; `presets.POST`, `POST_KEYS`,
+  `DISTRICT_TINT`, `DISTRICT_POST`, `POST_EXPOSURE`, `DAY_EV100`, `OVERCAST_TAKE`, `SKY_SHARE`,
+  `POST_CELL_M`, `POST_BLEND_M`, `POST_EASE_S`; the spec's `post` and districts' `shadows`,
+  `highlights`, `tint`): per look a post set by night and one by day (bloom, lens flares and
+  their threshold, film grain, chromatic aberration and its start, vignette, sharpening, the
+  grade's saturation and contrast, shadow and highlight tints as gains over the mean of their
+  linear rgb, `tint_gain`, the highlights' saturation, a black lift, local exposure's shadow
+  and highlight contrast); neon rain teal in the shadows, magenta in the highlights; each
+  district's sets the look's pulled by its grit (`mul`, `add`: clean is crisp, gritty grainy,
+  fringed, flared, with lifted blacks and muted color but for the neon) and tinted by its
+  archetype; the district raster (`post_districts.png`, 32 m, water and the edge the nearest
+  district's); the exposure (the day's a clear day's, `DAY_EV100`, plus `day_bias`; by day
+  moved by `overcast_comp` of the light the weather's clouds take, `overcast_shift`); `grade`
+  (Unreal's ColorCorrectAll in numpy) for `preview_post.png` (`atmosgen lux`). The plumes:
+  `STEAM_GLOW`, `STEAM_FAR` (the air's `steam_glow`, `steam_far`); a stall's cooking 6 cards.
+- **Review and skill:** `atmosgen review BUILD [--plan] [--spec] [--prev] [--shots]
+  [--prev-shots]` (`atmosgen/review.py`: `review.md`, `review.json`, `review_shots.jpg` in the
+  plan's folder; checks, numbers, every shot's exposure in stops from middle grey, `LEVERS`),
+  `atmosgen spec diff A B`; the skill is `atmosgen/skill/SKILL.md` (sessions cannot write
+  `.claude/`: Swagnik copies it into `.claude/skills/atmosgen/`).
+- **Exporter and runtime** (`docs/unreal_export.md`, "From AT6"): `unreal_atmos.post_settings`
+  (`POST_FLOATS`, 20 a set; the raster as runs; the day's exposure replacing the sky's), the
+  manifest's `atmos.post`, no new `ATMOS_VERSION`; the controller's `UpdatePost` (the raster
+  sampled on a 5 x 5 grid over 90 m round the view, eased over 1.5 s, night and day by Night)
+  into its own post-process volume (one volume, not one per district: AG16's game-thread cost
+  of many), `OvercastShift`; `M_CgSteam` lit by night and kept opaque far off, the wet decals'
+  normal from fine derivatives (AT5's curb sawtooth), atmos assets version 17; console
+  `.Post`, `.PostDistricts`, `.PostSet KEY [VALUE]`, `.DayEV`, `.SteamGlow`; the check's
+  `*_nopost` views and `post_views`; bench `Post 1` in every atmos pass, `ATMOS_OFF` `Post 0`,
+  `night_plan_nopost`, `day_plan_nopost`; `unreal.ALWAYS_COOK` adds the engine's film grains.
+Results: `docs/progress/AT6/`.
+
 ## Life generator (lifegen)
 
 `docs/lifegen_scope.md` (draft v0, its decisions in section 12 still open) is the plan for

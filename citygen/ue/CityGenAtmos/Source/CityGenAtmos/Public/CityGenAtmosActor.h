@@ -706,6 +706,103 @@ public:
 
 	bool HasWeather() const { return bWeather && WeatherNames.Num() > 0; }
 
+	// -- AT6: the look (the plan's `post`; docs/unreal_export.md, "From AT6") --
+
+	/** The plan gave a look: the post-process volume the actor owns shows it (bloom, lens
+	 *  flares, film grain, chromatic aberration, vignette, sharpening, the grade, local
+	 *  exposure), the night's and the day's blended by Night, each district's by where the
+	 *  view stands. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	bool bPost = false;
+
+	/** The look's sets: PostFloats a set (the exporter's POST_FLOATS order: bloom, flare,
+	 *  flare threshold, grain, chromatic, its start, vignette, sharpen, saturation, contrast,
+	 *  highlight saturation, lift, local shadows, local highlights, the shadows' gain rgb, the
+	 *  highlights' gain rgb), the night's then the day's. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	TArray<float> PostBase;
+
+	/** Each district's two sets, in PostNames order. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	TArray<float> PostDistricts;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	TArray<FString> PostNames;
+
+	/** The district raster: runs over its rows from the north edge ([count, index] pairs;
+	 *  255 none), its bounds (cm: min X, min Y, max X, max Y), cell (m) and size. */
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "CityGen|Post")
+	TArray<int32> PostRuns;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	TArray<float> PostBounds;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	float PostCellM = 32.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	int32 PostWidth = 0;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	int32 PostHeight = 0;
+
+	/** The districts weighed over a disc this wide round the view (m), eased over PostEaseS. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	float PostBlendM = 90.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	float PostEaseS = 1.5f;
+
+	/** The districts' own post (off: the look's alone). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	bool bDistrictPost = true;
+
+	/** By day, this share of the sun's light the weather's clouds take (OvercastTake: from a
+	 *  cover, this much at full) is given back by the exposure, against the plan's own cover
+	 *  (RefCover), a day street's light SkyShare the sky's. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	float OvercastComp = 0.7f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	TArray<float> OvercastTake;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	float SkyShare = 0.35f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	float RefCover = 0.8f;
+
+	/** AT6: the plumes lit by the city by night (their emissive, of their albedo, times
+	 *  Night) and their opacity kept with distance (times 1 + SteamFar out to SteamFarM). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	float SteamGlow = 0.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	float SteamFar = 0.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	float SteamFarM = 150.f;
+
+	/** AT6: the look's post on or off (off: the engine's defaults, the exposure still held). */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	void SetPost(bool bOn);
+
+	/** AT6: the districts' own post on or off. */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	void SetPostDistricts(bool bOn);
+
+	bool HasPost() const { return bPost && PostBase.Num() >= 2 * PostFloats; }
+
+	/** AT6 (art direction): a post key (the exporter's POST_FLOATS name) held at a value for
+	 *  the session over every set, or let go (bClear; `clear` lets every key go). */
+	bool SetPostValue(const FString& Key, float Value, bool bClear);
+
+	/** AT6 (art direction): the day's exposure (EV100, a clear day's). */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	void SetDayEV(float EV);
+
+	static constexpr int32 PostFloats = 20;
+
 	// -- the cells --
 
 	/** A cell's data actor brings its lights in (CityGenAtmosCell::BeginPlay). */
@@ -1024,4 +1121,23 @@ private:
 	float MoonLux = 0.f;
 	float CoverNow = 0.8f;
 	double TimeAppliedAt = -1.0;
+
+	// AT6: the look
+	enum EPostKey : int32 { PBloom = 0, PFlare, PFlareThreshold, PGrain, PChromatic,
+		PChromaticStart, PVignette, PSharpen, PSaturation, PContrast, PHighlightSat, PLift,
+		PLocalShadows, PLocalHighlights, PShadowR, PShadowG, PShadowB, PHighR, PHighG, PHighB };
+	void MakePostRaster();
+	void PostTarget(const FVector& View);
+	void UpdatePost(float DeltaSeconds, const FVector& View, bool bNow);
+	void ApplyPostSettings(const float* S);
+	void ClearPostSettings();
+	float OvercastShift() const;
+	TArray<uint8> PostIdx;                  // the raster, rows from the north edge
+	TArray<float> PostW;                    // each district's weight now (eased) ...
+	TArray<float> PostWTarget;              // ... and where the view stands
+	TMap<int32, float> PostOverride;        // (keys held by CityGenAtmos.PostSet)
+	float PostNow[PostFloats] = {};
+	bool bPostApplied = false;
+	double PostAt = -1.0;
+	FString PostWhere;                      // the district with the most weight now
 };
