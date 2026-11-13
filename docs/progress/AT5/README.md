@@ -163,6 +163,16 @@ batches):
 - Delta's plan again (every check passes), imported over the visible lights' import in
   CityAG16 and checked by night, dusk and day with the views above; the benchmark once.
 
+## The packaged game
+
+- `C:\Users\swagn\CityGen\builds\packaged\Delta_at5\Windows\CityAG16.exe` (3.0 GB):
+  CityAG16 mirrored into CityPackaged without `Saved`, `Intermediate`, `DerivedDataCache` and
+  the plugins' `Intermediate` and `Binaries`, then cooked and packaged (BUILD SUCCESSFUL in
+  9 min 46 s).
+- Smoke launch with `-userdir` outside the package, 1280 x 720 windowed, twelve selfies: exits
+  cleanly; the log shows the atmos controller (518 cells, 50,300 lights, the sight raster) and
+  "weather rain (now)", no material failed to compile, and the package keeps no `Saved` folder.
+
 ## Open items
 
 - **The trees' sway is off** (`LEAF_SWAY`): 4.5 ms on a tree-lined street. A sway only near the
