@@ -5,8 +5,8 @@ Where it is, in this order: the asset spec's `vehicles.library`; `$ASSETGEN_VEHI
 `$CITYGEN_VEHICLES` (the Unreal exporter's); the packs' cache
 `~/.cache/cybergen/vehicles/game`. `ASSETGEN_VEHICLES=off` (or `none`, `0`, empty) means no
 library: AG8's parked car variants stay, as before AG18. A car is offered when its
-`pack.json` is a version 1 vehicle pack whose four LOD files are present; the Vex cars
-never are (`table.EXCLUDED`).
+`pack.json` is a version 1 vehicle pack whose four LOD files are present; the Vex and
+Aurel cars never are (`table.EXCLUDED`).
 """
 
 from __future__ import annotations

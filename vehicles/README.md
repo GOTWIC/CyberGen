@@ -173,9 +173,15 @@ vehicles/blender.sh vehicles/game.py --car vanta_r --test           # 1024 / 512
   the bakes, the LOD fits and the proof); `--lods` alone 1 to 4 minutes. Packs are 20 to
   51 MB and never go in git.
 - **On another machine.** The built packs are a GitHub release of this repo:
-  `python vehicles/packs.py fetch` downloads the 18 (about 600 MB) into the packs' cache and
+  `python vehicles/packs.py fetch` downloads the 15 (about 550 MB) into the packs' cache and
   checks every file against `vehicles/packs.json`; `publish` uploads new ones (`GAME.md`,
   "Sharing packs between machines").
+- **Out of the cities until redesigned.** The three Vex cars (no packs) and the three Aurels
+  (Swagnik, 2026-11-12: "they look terrible"; their packs were built, but are no longer
+  shared). Their scripts stay in `cars/` and they stay in the line-up; nothing places or
+  imports them: `assetgen/parked/table.EXCLUDED`, `citygen/unreal_vehicles.EXCLUDED`,
+  `packs.py` and `survey.py`'s `EXCLUDED`. A car comes back by taking it out of those lists
+  once it is redesigned and its pack rebuilt.
 
 ## Workflow
 

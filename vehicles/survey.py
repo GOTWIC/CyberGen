@@ -25,7 +25,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 CACHE = Path.home() / ".cache" / "cybergen" / "vehicles" / "survey"
 DOCS = ROOT / "docs" / "progress" / "AG18"
-EXCLUDED = ("vex_",)        # to be redesigned
+EXCLUDED = ("vex_", "aurel_")  # to be redesigned (the Aurels: Swagnik, 2026-11-12)
 CHECKS = ("tires", "ground", "symmetry", "panels", "through", "triangles")
 MARK = {"ok": "ok", "look": "look", "fail": "FAIL"}
 

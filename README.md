@@ -179,10 +179,11 @@ To see the city in Unreal Engine 5.8, import it into a project (on Windows:
 .venv/bin/python -m citygen unreal out/vesper_bay ~/CityTest/CityTest.uproject --new-project
 ```
 
-Open the project and press Play: you fly over the city with a free camera (W, A, S, D to
-move, the mouse to look, E or Space up, Q or C down). `--play walk` walks it with the
-project's own character instead (it swims in the canals, rivers and the sea), and
-`--fly-speed` sets how fast you fly. Each import makes the city the project's startup map (`--no-startup` leaves it
+Open the project and press Play: you walk the city in first person, with a body you see
+when you look down (W, A, S, D to move, the mouse to look, Shift to run, Space to jump; it
+swims in the canals, rivers and the sea, and `.` swaps to a free camera and back).
+`--play fly` flies over it with a free camera instead (E or Space up, Q or C down;
+`--fly-speed` sets how fast), `--play project` uses the project's own character. Each import makes the city the project's startup map (`--no-startup` leaves it
 alone). The import shows the same kind of progress: each stage in Unreal (packs and meshes,
 actors, saving, pruning, the HLOD build, `--check`) with a bar, the time left, and on a first
 import an estimate of the time left in all. Controls, flags and streaming:

@@ -26,9 +26,9 @@ The whole roster at one scale (`vehicles/blender.sh vehicles/lineup.py`).
 | Brakk Industrial | Hauler | crew cab pickup, exposed wheels | 4 | 5.69 m | [brakk_hauler](brakk_hauler/sheet.jpg) | [proof](brakk_hauler/game.jpg) |
 | Brakk Industrial | Bastion | armored utility vehicle | 4 | 5.11 m | [brakk_bastion](brakk_bastion/sheet.jpg) | [proof](brakk_bastion/game.jpg) |
 | Brakk Industrial | Mule | six-wheel cargo van | 2 | 6.65 m | [brakk_mule](brakk_mule/sheet.jpg) | [proof](brakk_mule/game.jpg) |
-| Aurel | Prelate | formal coupe | 2 + 2 | 5.19 m | [aurel_prelate](aurel_prelate/sheet.jpg) | [proof](aurel_prelate/game.jpg) |
-| Aurel | Regent | limousine | 4 | 5.92 m | [aurel_regent](aurel_regent/sheet.jpg) | [proof](aurel_regent/game.jpg) |
-| Aurel | Zenith | hover grand tourer on a skirt of light | 4 | 5.42 m | [aurel_zenith](aurel_zenith/sheet.jpg) | [proof](aurel_zenith/game.jpg) |
+| Aurel | Prelate | formal coupe | 2 + 2 | 5.19 m | [aurel_prelate](aurel_prelate/sheet.jpg) | out of the cities until redesigned ([proof](aurel_prelate/game.jpg)) |
+| Aurel | Regent | limousine | 4 | 5.92 m | [aurel_regent](aurel_regent/sheet.jpg) | out of the cities until redesigned ([proof](aurel_regent/game.jpg)) |
+| Aurel | Zenith | hover grand tourer on a skirt of light | 4 | 5.42 m | [aurel_zenith](aurel_zenith/sheet.jpg) | out of the cities until redesigned ([proof](aurel_zenith/game.jpg)) |
 | Vex | Wraith | open-wheel speedster of four pods | 2 | 4.37 m | [vex_wraith](vex_wraith/sheet.jpg) | to be redesigned, no pack |
 | Vex | Halo | roadster on four hubless ring wheels | 2 | 4.31 m | [vex_halo](vex_halo/sheet.jpg) | to be redesigned, no pack |
 | Vex | Strix | tandem track hypercar, floating fenders | 2 | 4.97 m | [vex_strix](vex_strix/sheet.jpg) | to be redesigned, no pack |

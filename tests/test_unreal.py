@@ -512,16 +512,25 @@ def test_play_flags(tmp_path):
     from citygen.cli import build_parser
     a = build_parser().parse_args(["unreal", "B", "P.uproject"])
     assert (a.play, a.fly_speed, a.view_range, a.no_startup, a.no_hlod, a.no_play) == \
-        ("fly", U.FLY_SPEED_M_S, U.VIEW_M, False, False, False)
-    a = build_parser().parse_args(["unreal", "B", "P.uproject", "--play", "walk",
+        ("walk", U.FLY_SPEED_M_S, U.VIEW_M, False, False, False)
+    assert U.PLAY_MODES == ("walk", "fly", "project")
+    for mode in U.PLAY_MODES:
+        assert build_parser().parse_args(["unreal", "B", "--play", mode]).play == mode
+    a = build_parser().parse_args(["unreal", "B", "P.uproject", "--play", "fly",
                                    "--fly-speed", "80", "--no-startup", "--no-hlod",
                                    "--no-play"])
     assert (a.play, a.fly_speed, a.no_startup, a.no_hlod, a.no_play) == \
-        ("walk", 80.0, True, True, True)
+        ("fly", 80.0, True, True, True)
     with pytest.raises(SystemExit):
         build_parser().parse_args(["unreal", "B", "--play", "swim"])
     with pytest.raises(ValueError):
         U.import_city(tmp_path, tmp_path / "P.uproject", play="swim")
+    # what the import says Play puts you in
+    walker = {"mode": "walk", "walker": True, "body": "/Game/X/BP_Char.BP_Char_C"}
+    assert "first person" in U.play_summary({"play": walker})
+    assert "project's own" in U.play_summary({"play": {"mode": "walk", "walker": False}})
+    assert "project's own" in U.play_summary({"play": {"mode": "project"}})
+    assert "flying" in U.play_summary({"play": {"mode": "fly", "fly_speed_m_s": 50.0}})
 
 
 def test_names():
@@ -1502,8 +1511,12 @@ def test_unreal_import_small_city(small, regenerated, tmp_path):
     assert first["actors"]["created"] == first["actor_count"] == \
         first["counts"]["objects"] + first["counts"]["instance_actors"] + \
         first["counts"].get("swim_volumes", 0) + 4 + int(played)
-    # Play flies by default, the level streams for it, the project opens on the city
-    assert first["play"]["mode"] == "fly" and first["streaming"]["set"]
+    # Play walks by default (the play plugin's walker with the template's body where the
+    # plugin could be built), the level streams for it, the project opens on the city
+    assert first["play"]["mode"] == "walk" and first["streaming"]["set"]
+    assert first["play"]["walker"] == played
+    if played:
+        assert "SKM_Manny" in (first["play"]["body"] or "") or             "FirstPerson" in (first["play"]["body"] or "")
     assert first["startup_map"] == first["level"] and first["startup_map_changed"]
     assert f"GameDefaultMap={first['level']}." in \
         (proj.parent / "Config" / "DefaultEngine.ini").read_text()
@@ -1513,6 +1526,7 @@ def test_unreal_import_small_city(small, regenerated, tmp_path):
         second["actors"]["deleted"] == 0
     assert second["tiles_imported"] == 0 and second["dirty_packages"] == 0
     assert second["streaming"]["changed"] == 0 and not second["play"]["fly_classes_saved"]
+    assert not second["play"]["walk_classes_saved"]
     assert second["startup_map_changed"] is False
     assert (second["actor_digest"], second["asset_digest"]) == \
         (first["actor_digest"], first["asset_digest"])
@@ -1539,8 +1553,12 @@ def test_unreal_import_small_city(small, regenerated, tmp_path):
         fourth["actors"]["deleted"] == fourth["dirty_packages"] == 0
     chk = U.check_city(build2, proj)
     assert chk["ok"], chk
-    # walked with the template's character, then flew with the fly pawn
-    assert "FirstPerson" in chk["pawn"] and chk["checks"]["fly"]["ok"]
+    # walked with the walker (the template's character without the play plugin): on its
+    # feet by the player start, a body it sees, up a curb; then flew with the fly pawn
+    assert ("CityGenWalker" if played else "FirstPerson") in chk["pawn"]
+    assert chk["checks"]["spawn"]["ok"] and chk["checks"]["fly"]["ok"]
+    if played:
+        assert chk["checks"]["spawn"]["visible_body"] and chk["checks"]["curb"]["ok"]
     # the project and the builds take most of a gigabyte: kept only when the test fails
     for d in (proj.parent, build, build2):
         shutil.rmtree(d, ignore_errors=True)

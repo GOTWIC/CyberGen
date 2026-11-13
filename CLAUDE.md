@@ -271,8 +271,8 @@ M5 (transit) is in place: the same build runs `citygen/transit.py` after the bui
 resolved to junctions, nexus platforms or sites; elevated rail and monorail routed on the road
 graph, maglev, sky tubes and metro on a 15 m raster; curves fitted at 1.15 times the mode's
 minimum radius with obstacle-checked arcs; a height profile between lower bounds (water,
-road decks, roofs) and upper bounds (tower portals); stations with stairs, elevators,
-canopies and walkways split onto the sidewalks; decks, tubes and supports in medians or at
+road decks, roofs) and upper bounds (tower portals); stations with stairs, elevators
+and walkways split onto the sidewalks (no canopy over a stair foot since the play fixes); decks, tubes and supports in medians or at
 the curbs) and ten transit checks (`citygen/transit_checks.py`), and writes
 `preview_transit.png`. Route order matters for the fast modes: the spec, not the code, fixes
 a line that turns back. Sample builds: `docs/progress/M5/`.
@@ -646,16 +646,19 @@ absolute heights (`exports.graphs(m, ground)`, `"heights": "absolute"`), which t
 assets, the player start and the walk use; the blockout draws one object per retaining wall,
 so walls, bored tunnels and terrain viaduct columns are keyed by their ids. Each import
 makes the city the project's startup and default map (`unreal.set_startup_map`;
-`--no-startup`) and sets what Play puts you in: the fly pawn (`--play fly`, the default;
+`--no-startup`) and sets what Play puts you in: the walker (`--play walk`, the default since
+the play fixes of 2026-11-12; the play plugin's first-person `ACityGenWalker` as
+`Core/BP_CityGenWalker` wearing the project's own character's body, spawned by
+`GM_CityGenWalk`, the level's game mode override), the fly pawn (`--play fly`;
 `Core/BP_CityGenFlyPawn`, a SpectatorPawn with no collision at `--fly-speed`, spawned by
-`GM_CityGenFly`, the level's game mode override) or the project's own (`--play walk`);
+`GM_CityGenFly`) or the project's own (`--play project`);
 World Partition's main grid is 128 m cells (256 m before AG16) loaded `--view-range` (768 m since AG16) around the
 player and the level's instanced HLOD layer reaches the whole city (its merged parent
 layer cut off; partitions set by C++ property name, `CellSize`, `LoadingRange`; every
 master `used_with_instanced_static_meshes`, or the HLODs draw flat gray), and the HLODs are
 built after the import (the WorldPartitionHLODsBuilder
 commandlet, rebuilding only what changed; `--no-hlod` skips it); `--check` walks with the
-project's pawn, then flies. User guide: `docs/unreal_export.md`, "Import, open and
+walker (its spawn, body and a curb climbed), then flies. User guide: `docs/unreal_export.md`, "Import, open and
 play". citygen makes no network call; the
 official Unreal MCP plugin (`Experimental/ModelContextProtocol`, an HTTP server in the
 editor) is the interactive route for a Claude session. Testing is always in a throwaway
@@ -2248,15 +2251,21 @@ waits for Swagnik's review.
   A pack is the car parked and shut (`CYBERGEN_SHUT`, `SHUT_ENV` in `game.py`).
   `CYBERGEN_GAME_DEBUG=1` logs each far LOD wreck.
 - **Vex** (vex_wraith, vex_halo, vex_strix) is to be redesigned (Swagnik, 2026-11-10): no
-  packs, out of every later step until redone.
+  packs, out of every later step until redone. **The Aurels** (aurel_prelate, aurel_regent,
+  aurel_zenith) likewise since the play fixes (Swagnik, 2026-11-12: "they look terrible"):
+  their scripts stay, their packs are no longer shared (out of `packs.json`), and nothing
+  places or imports them (`assetgen/parked/table.EXCLUDED`, `citygen/unreal_vehicles.EXCLUDED`,
+  `vehicles/packs.py` and `survey.py`'s `EXCLUDED`). 15 cars are in the cities.
 - **In the cities** (step H, 2026-11-11; `assetgen/parked/`, tests
   `tests/assetgen/test_ag_vehicles.py`): `assetgen vehicles BUILD` (also in `assetgen build`
   after the props, `--no-vehicles`) makes every M6 parked car AG8 draws a pack vehicle: a model
   by its district's weights (`parked/table.py`: a row per archetype scaled by wealth and danger
   through the model's class; the spec's `vehicles.weights`), the first in that hashed order
   whose plan box lies on its own road's carriageway faces of M22's map, off the crosswalks,
-  0.5 m from its neighbors and not the fourth of one model in a row, else left out with a
-  reason; paint per placement from its role's palette and the district's colors; hover cars
+  0.5 m from its neighbors and never the third of one model in a row (the play fixes: the
+  model before it on the curb is tried last, so two running happen only where nothing else
+  fits: Delta 1 of 2,848 curb neighbors, 10.7% before; `vehicles_variety` fails on three in a
+  row or a share of 5%), else left out with a reason; paint per placement from its role's palette and the district's colors; hover cars
   set down on their lowest point. `unreal_contribution.vehicles.json` (a placement entry per
   tile replacing `prop.parked_vehicle.<tile>`; the exporter drops what a placement replaces
   from stage 2, `unreal_vehicles.without_replaced`), `vehicles_report.txt` (checks
@@ -2410,7 +2419,9 @@ AT1 (streets at night) is in place:
   project's DefaultGame.ini, so a cook takes them (keep anything loaded by path in one of
   them); the play module opens a game with no saved resolution windowed fullscreen at the
   monitor's native resolution; the Tab menu has Fog, Rain, Wet streets and hour rows driving
-  the atmos controller (found by class name, no link between the plugins).
+  the atmos controller (found by class name, no link between the plugins). A smoke or test
+  launch of a package leaves no `Saved/` folder in it (`-userdir=` outside the package, or
+  delete it after the run): a saved resolution there stops the native start for the player.
 
 AT2 (neon and signs as light) is in place:
 - **Lit faces** (`plan.signs`): billboards, banners and holo-boards as rect lights the size

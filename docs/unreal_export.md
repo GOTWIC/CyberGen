@@ -35,7 +35,8 @@ script, not this exporter.)
 | M16: a water physics volume per box of a water body and tile (the player swims in a canal, a river or the sea instead of falling through it) | `PhysicsVolume` actors, `CityGen/swim` |
 | M20: the large ads (neon billboards and banners on the facades, holo-boards over roofs and in front of facades) as hierarchical instances of a unit prototype per kind (`sign_billboard`, `sign_banner`, `sign_holo`), one actor per kind and tile (`sign.<kind>.<tile>`), scaled to each slot's width and height | `BP_CityGenInstances` actors |
 | a player start, a sun, a sky light and the sky atmosphere | always loaded |
-| a fly pawn and its game mode, the level's game mode override unless `--play walk` | `/Game/CityGen/Core/BP_CityGenFlyPawn`, `GM_CityGenFly` |
+| the walker (the play plugin's first-person character wearing the project's own character's body) and its game mode, the level's game mode override with `--play walk` (the default) | `/Game/CityGen/Core/BP_CityGenWalker`, `GM_CityGenWalk` |
+| a fly pawn and its game mode, the level's game mode override with `--play fly` | `/Game/CityGen/Core/BP_CityGenFlyPawn`, `GM_CityGenFly` |
 | the far view: the level's instanced HLODs, built after the import | World Partition HLOD actors |
 | with stage 2 (AG1, AG7): a static mesh actor per building shell and street piece at its own pivot, in place of the blockout actors it replaces; parts as hierarchical instances per entry and kind; AG4's skybridges by id and roof equipment instanced per tile | `/Game/CityGen/<City>/Assets/<Part>/<tile>/` |
 | stage 2's masters and an instance per part and slot | `/Game/CityGen/Core/M_Cg*`, `/Game/CityGen/<City>/Assets/Materials/` |
@@ -79,17 +80,36 @@ Then open the project: the editor opens on the city, and Play (Alt+P) puts you i
   `GameDefaultMap` (`Config/DefaultEngine.ini`). With several cities in one project the last
   import wins; File > Open Level opens another (`/Game/CityGen/<City>/Maps/<City>`), and
   `--no-startup` leaves the project's maps as they are.
-- **Flying** (the default, `--play fly`): a free camera with no collision, at 50 m/s
+- **Walking** (the default, `--play walk`; since the play fixes of 2026-11-12, flying
+  before): a person in first person, with a body you see when you look down (the play
+  plugin's `ACityGenWalker`, made into `/Game/CityGen/Core/BP_CityGenWalker` wearing the
+  body of the project's own character: its default game mode's pawn's character mesh, its
+  animation and placement; the First Person template's world body, SKM_Manny_Simple with
+  ABP_Unarmed, which that template hides from its own player and shows only arms). The
+  eyes sit 1.64 m up, a little forward of the neck (further forward looking down); in the
+  player's own view the head is hidden (`HiddenBone`, `neck_02`) while a second copy of
+  the body, drawn into shadows only, casts the whole figure's shadow; seen from the free
+  camera the head is back. The body turns with the view. W, A, S and D (or the arrow keys) walk,
+  the mouse looks, Shift runs, Space jumps; a gamepad's left stick walks. It collides with
+  the city and steps up curbs and stairs (45 cm). The play features' `.` swaps it for the
+  free camera and back (it waits where you left it). The console's `ghost` (through
+  walls), `fly` (flying, with collision) and `walk` work as usual. Where the play plugin
+  cannot be built, walking is the project's own game mode and character.
+- **Flying** (`--play fly`): a free camera with no collision, at 50 m/s
   (`--fly-speed`). W, A, S and D (or the arrow keys) move, the mouse looks, E or Space
   rises, Q or C sinks; a gamepad works too. The speed is set at import; in the editor it is
   the Max Speed of `/Game/CityGen/Core/BP_CityGenFlyPawn`'s movement component (in
   centimeters per second) until the next import sets it again.
-- **Walking** (`--play walk`): the project's own game mode and character (the First Person
-  template's with `--new-project`), with collision: W, A, S, D, the mouse, Space to jump.
-  The console's `ghost` (through walls), `fly` (flying, with collision) and `walk` work as
-  usual.
+- **The project's own** (`--play project`): its own game mode and character, as the project
+  sets them (the First Person template's with `--new-project`: arms only).
 - **Switching without importing again:** the level's World Settings, GameMode Override:
-  `GM_CityGenFly` flies, None walks. Shift+F1 frees the mouse while playing, Esc stops.
+  `GM_CityGenWalk` walks, `GM_CityGenFly` flies, None is the project's own. Shift+F1 frees
+  the mouse while playing, Esc stops.
+- **A packaged game's proof:** `-CityGenSelfie=SECONDS` on the game's command line takes a
+  screenshot looking down at the body and one looking ahead that long after the walker
+  spawns, logs `CITYGEN_WALKER` lines (its class, body, place, whether it stands on the
+  ground) and quits. Launch it with `-userdir=` a folder outside the package, so the run leaves
+  no `Saved/` in it (its saved window size would stick for the next player).
 - **Streaming.** The city loads in 128 m cells within 768 m of you (`--view-range`; 256 m cells to 1,500
   m before AG16, which loaded most of a sample city at once and streamed it all the time).
   Beyond that you see the far view, World Partition's HLODs (the city's own meshes and
@@ -103,8 +123,11 @@ Then open the project: the editor opens on the city, and Play (Alt+P) puts you i
   streaming (AG16's benchmark: the 95th percentile frame went from 27 to 49 ms to 9 to 13 ms
   on Delta Megacity with the shorter range and AG16's other fixes).
 - **`--check`** plays the level twice in the editor, without saving it: walking with the
-  project's character whatever `--play` set (streaming, collision, a walk along a sidewalk),
-  then flying with the fly pawn (its speed, no collision, the city loaded where it ends).
+  walker whatever `--play` set (the project's character where the importer made no walker:
+  where it spawned and what it stands on, whether it has a body it sees, streaming,
+  collision, a walk along a sidewalk, off a curb onto the road and back up; with `--shots`
+  `unreal_walk_body.png` and `unreal_walk_ahead.png` by day, standing at the eye of a `--view
+  walk_spot ...` and facing its target when one is given), then flying with the fly pawn (its speed, no collision, the city loaded where it ends).
   The walk and the flight report how long their frames took (median, 95%, longest). With
   `--shots DIR` it renders views of the city (each once small first, so its Nanite pages
   have streamed in) and two from the fly pawn. The views load the whole city in the editor,
@@ -158,7 +181,7 @@ Then open the project: the editor opens on the city, and Play (Alt+P) puts you i
 
 | Flag | Default | |
 |---|---|---|
-| `--play fly` or `walk` | `fly` | what Play puts you in |
+| `--play walk`, `fly` or `project` | `walk` | what Play puts you in |
 | `--fly-speed M_PER_S` | 50 | the fly pawn's top speed |
 | `--view-range M` | 768 | how far around you the city streams in (AG16; 1500 before) |
 | `--no-hlod` | off | skip building the far view (HLODs) after the import |
@@ -1710,7 +1733,11 @@ and `emitters`) comes with the cells and the controller:
 
 A project a city was imported into packages as any Unreal project (UAT's `BuildCookRun`,
 for example Development Win64 with `-cook -stage -pak -archive` and `-map=` the city's
-level). Three fixes made Delta Megacity's packaged game (after AT1) play as the editor's
+level). **A smoke or test launch of a package leaves no `Saved/` folder in it:** launch it
+with `-userdir=` a folder outside the package, or delete `<archive>/Windows/<Project>/Saved`
+after the run. A run's `Saved/Config/Windows/GameUserSettings.ini` keeps its window size
+(the play fixes' smoke run at `-ResX=1920 -ResY=1080` left 1920 x 1080 there), and the
+native start below then never applies for the player who opens it next. Three fixes made Delta Megacity's packaged game (after AT1) play as the editor's
 `-game` does:
 
 - **What the runtimes load by path is cooked.** A cook takes only what the maps reference.
@@ -1836,20 +1863,28 @@ hash changes, by `VEHICLE_MESH_VERSION` or the masters' `VEHICLE_VERSION`):
   with $S$ the pack's `emissive_strength` (`EmissiveStrength`), `GlowDay` 8 and `GlowNight` 2
   (`MPC_CityGen`'s Night, as the other emissive masters: the night's fixed exposure).
 - **`M_CgVehicleGlass`** (`MI_<car>_glass`): thin translucent (Surface per-pixel lighting),
-  black with a coverage of 4% where the glass transmits, its specular from the IOR, its
-  roughness, and the glass color squared as the transmittance (the packs' glass is thick: two
-  sheets a few mm apart, and the proof's ray is tinted at both). A face whose normal points
-  toward `GlassCenter` (the middle of the car's box, set per car) is the inner sheet and is
-  left out: from outside it is the far side's glass seen through the near side, drawn in the
-  same mesh in triangle order, not by depth, and it composited over the near glass in black
-  and bright patches. From inside the cabin it is the other way round (the outer sheets face
-  away and are culled, so the glass was not there from the seats): the inner sheet is drawn
-  while the eye is inside the cabin's box (`CabinCenter`, `CabinHalf`, set per car: the
-  glass's own box from the pack's LOD0, the record's `glass_box`, taken down to the car's
-  floor; the eye in the mesh's own space is the pixel's local position plus the way to the
-  camera turned as the normal is). An eye outside that box but inside it in plan, hugging a
-  window that leans in, sees both sheets; a record without a glass box keeps the inner
-  sheet out, as before. **`M_CgVehicleGlassDark`** (`MI_<car>_glass_dark`): opaque, the glass
+  black with a coverage of the share the glass does not transmit (the pack's transmission
+  times `TransmissionScale` 0.65, plus 4%), more toward grazing angles (`GrazingCover` 0.6
+  of $(1 - N \cdot V)^4$), its specular from the IOR but at least `MinF0` 6% (a coated
+  glass: the domes' IOR of 1.12 to 1.14 reflected almost nothing), its roughness, and the
+  glass color pulled toward a dark teal (`GlassTint`, `TintMix` 0.6) and squared as the
+  transmittance (the packs' glass is thick: two sheets a few mm apart, and the proof's ray
+  is tinted at both). The material is two-sided. A face is left out when, its normal turned
+  outward from `GlassCenter` (the middle of the car's box, set per car), the eye is behind
+  it: from outside that is the far side's glass seen through the near side, drawn in the
+  same mesh in triangle order, not by depth, which composited over the near glass in black
+  and bright patches. Before the play fixes the test was the normal pointing toward
+  `GlassCenter` on a one-sided material, so glass that is one sheet facing in (the
+  Tanager Cab's front side windows) drew no glass at all from outside: its near faces were culled and its far
+  faces left out. From inside the cabin every face is drawn, while the eye is inside the
+  cabin's box (`CabinCenter`, `CabinHalf`, set per car: the glass's own box from the pack's
+  LOD0, the record's `glass_box`, taken down to the car's floor; the eye in the mesh's own
+  space is the pixel's local position plus the way to the camera turned as the normal is); a
+  record without a glass box never counts the eye inside. Since the play fixes (2026-11-12;
+  `VEHICLE_VERSION` 10) the glass reads as glass: the cabin is a dim shape behind
+  reflections, the shading model's own Fresnel darkening and mirroring it toward grazing
+  angles.
+  **`M_CgVehicleGlassDark`** (`MI_<car>_glass_dark`): opaque, the glass
   color times 0.06, as the proof draws LOD2 and LOD3.
 
 **What the importer makes of a placement**: a `BP_CityGenGroup` actor at the entry's pivot
@@ -1967,3 +2002,4 @@ body, and the line-up of the AG18 check where the build has one. Results and sho
 | AG18 pack faults (cabin glass) | "AG18's vehicles" above: a car's record gains `glass_box` (the glass's box at LOD0 in the car's frame, from the glTF's accessor bounds; `unreal_vehicles.glass_box`); `M_CgVehicleGlass` draws the inner sheet while the eye is inside that box taken down to the car's floor (`CabinCenter`, `CabinHalf` on each car's instance; the eye in the mesh's space from the pixel's local position and the way to the camera), `VEHICLE_VERSION` 7; `--check-vehicles` shoots each car from inside its cabin (`cabin_<car>`); `tests/test_unreal_vehicles.py` checks the box | The vehicle line-up in its throwaway project (`docs/progress/AG18/unreal/`): imported over the earlier import (the masters and the seven cars' instances made anew, 12 placements updated), the vehicle check passing, the glass there from the seats in the cabin shots, the heroes from outside as before |
 | AT1 | Layer 3 ("From AT1" above): the manifest's `atmos` (`unreal_atmos.write_atmos`: the controller's key and hash, a cell per 128 m cell, `counts.atmos_cells` and `atmos_lights`; the records in `unreal/atmos.json`; a plan whose lux check failed is named and left out, `--atmos DIR` naming a folder without a plan is an error); `actor_hashes`, `actor_kinds` (`atmos`, `atmos_cell`); the importer's `atmos_cells` (a `CityGenAtmosCell` data actor per cell, spatially loaded, among the offloaded actors) and `atmos_controller` (`CityGenAtmos`, always loaded, the plan's settings), `ATMOS_VERSION`; atmosgen's assets made before the import (`make_assets`); the plugin: cells register their lights as they stream, the controller's pooled live set shows them by night (`MPC_CityGen`'s `Night`), its subsystem and `-CityGenAtmosPlan` gone; the play features without AG15's spot lamps and sign washes (`play.json` 3; `GetStatus` without `lamps_lit`), their pools past the live range; the check reads the controller's status by night; `--atmos`, `--no-atmos`, `--bench-atmos` a flag | Delta in CityAG16 (`docs/progress/AT1/`): imported over AG16's import (the controller and 500 cells created, nothing else touched, under 3 min), the check passing by night with views, the night benchmark before and after (three runs each) |
 | Packaged game (a fix on its own, 2026-11-10) | "A packaged game" above: `unreal.ALWAYS_COOK` written to the project's DefaultGame.ini by every import (`set_project_ini`, `set_engine_ini(..., file, entries)`), so the atmos assets loaded by path are cooked; the play module puts a game with no saved resolution at the monitor's native resolution, windowed fullscreen; the Tab menu's Fog, Rain, Wet streets and hour rows drive the atmos controller. | Delta imported again into the AT1 project, packaged (Development Win64) and played: no missing CityGen package, a 2560 x 1440 window, the weather rows by night. |
+| Play fixes (2026-11-12, after the packaged Delta) | Play's default is walking (`--play walk`; `fly` and `project` the others): the play plugin's `ACityGenWalker` (`CityGenWalker.h`, a character with a camera in front of the face and a body its player sees, keys bound on its own input component, `-CityGenSelfie=SECONDS` for a packaged game's proof), made into `Core/BP_CityGenWalker` wearing the project's own character's body (`import_city.project_body`) and spawned by `Core/GM_CityGenWalk` (`walk_classes`), the level's game mode override; `--check` walks with it (its spawn and body, a curb climbed: checks `spawn` and `curb`); `M_CgVehicleGlass` darker, coated and covered toward grazing angles (`VEHICLE_VERSION` 10, every car made again; two-sided, the far side's faces left out); the Aurels never imported (`unreal_vehicles.EXCLUDED`, a placement naming one refused) | Delta Megacity imported into CityAG16 and checked, a packaged game (`docs/progress/fix_play_cars/`) |

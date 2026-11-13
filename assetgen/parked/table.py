@@ -7,13 +7,13 @@ filled spec values; the archetype's preset where left out) through the model's `
 
 | class | factor | models |
 |---|---|---|
-| luxury | $(0.2 + 1.6\\,w)(1.25 - d)$ | the three Aurels; Halcyon Sable, Vanta-R; Orrin Aria |
+| luxury | $(0.2 + 1.6\\,w)(1.25 - d)$ | Halcyon Sable, Vanta-R; Orrin Aria (the Aurels: never placed) |
 | upscale | $(0.5 + w)(1.2 - 0.5\\,d)$ | Halcyon Ridge; Orrin Lumen, Pebble |
 | everyday | $1.5 - 0.8\\,w$ | Tanager Mino, Cab, Porter |
 | work | $0.7 + 0.6\\,d$ | Brakk Hauler, Bastion, Mule |
 | hover | $(0.3 + w)(1.1 - 0.5\\,d)$ | Kestrel Dart, Meridian, Atlas |
 
-with $w$ the wealth and $d$ the danger, both 0 to 1. So Aurel and Halcyon gather where the
+with $w$ the wealth and $d$ the danger, both 0 to 1. So Halcyon gathers where the
 district is wealthy and safe, Tanager parks everywhere and most where it is poor, Brakk's
 trucks in the industrial port (and its armored Bastion where it is dangerous), Orrin in the
 clean modern districts (corporate core, research campus, residential heights), Kestrel's hover
@@ -35,8 +35,10 @@ from __future__ import annotations
 import hashlib
 
 # the packs' models (vehicles/cars/<car>.py); the Vex cars are to be redesigned and are never
-# placed (scope 14.19)
-EXCLUDED = ("vex_wraith", "vex_halo", "vex_strix")
+# placed (scope 14.19), nor are the three Aurels (Swagnik, 2026-11-12: out until redesigned;
+# their columns stay in the table, their weights never used)
+EXCLUDED = ("vex_wraith", "vex_halo", "vex_strix",
+            "aurel_prelate", "aurel_regent", "aurel_zenith")
 
 CLASS = {
     "aurel_prelate": "luxury", "aurel_regent": "luxury", "aurel_zenith": "luxury",

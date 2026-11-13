@@ -41,7 +41,7 @@ REPO = "GOTWIC/CyberGen"
 FORMAT = "cybergen.vehicle_packs"
 VERSION = 1
 SKIP = {"game.jpg"}
-EXCLUDED = ("vex_",)  # to be redesigned: never shared
+EXCLUDED = ("vex_", "aurel_")  # to be redesigned: never shared (the Aurels: Swagnik, 2026-11-12)
 ZIP_DATE = (1980, 1, 1, 0, 0, 0)
 SOURCES = {"script_sha256": None, "carkit_sha256": "vehicles/carkit.py",
            "game_sha256": "vehicles/game.py"}
@@ -116,7 +116,7 @@ def human(n: int) -> str:
 def cmd_status(a) -> int:
     base = packs_dir(a.dir)
     man = load_manifest()
-    cars = sorted(set(man["cars"]) | set(local_cars(base)))
+    cars = sorted(c for c in set(man["cars"]) | set(local_cars(base)) if not c.startswith(EXCLUDED))
     print(f"packs: {base}")
     print(f"release: {man.get('tag') or 'none yet'} ({man.get('repo', REPO)})")
     bad = 0
@@ -258,7 +258,7 @@ def cmd_fetch(a) -> int:
     if not man.get("tag") or not man["cars"]:
         print("packs.json names no release yet", file=sys.stderr)
         return 1
-    cars = a.cars or sorted(man["cars"])
+    cars = a.cars or sorted(c for c in man["cars"] if not c.startswith(EXCLUDED))
     unknown = [c for c in cars if c not in man["cars"]]
     if unknown:
         print(f"not in the release: {', '.join(unknown)}", file=sys.stderr)

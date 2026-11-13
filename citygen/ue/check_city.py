@@ -49,6 +49,7 @@ WALK_S = 60.0
 MAX_GRADE = 0.3     # steepest leg the walk takes (a road's is at most 12%)
 MAX_STEP_M = 0.6    # highest step where two walkways join
 FLY_MODE = "/Game/CityGen/Core/GM_CityGenFly"     # the importer's (import_city.FLY_MODE)
+WALK_MODE = "/Game/CityGen/Core/GM_CityGenWalk"   # the importer's (import_city.WALK_MODE)
 FLY_S = 8.0         # the flight's straight run
 FLY_Z_M = 40.0      # its height over the player start: through the buildings in its way
 TRACE_RETRY_S = 30.0  # how long a trace down that missed is tried again after settling
@@ -277,20 +278,26 @@ def run():
     # meshes) runs out of them (49,152) in the walk
     if JOB.get("shots") and os.environ.get("CITYGEN_UE_PLAY_SHOTS_ONLY") != "1":
         yield from shots(man)
-    # the walk with the project's own game mode and pawn, whatever the level's Play is (its
-    # game mode override, `--play`), then a flight with the fly pawn; the level is not saved
-    own = game_mode(None)
+    # the walk with the walker (`--play walk`'s game mode; the project's own game mode and
+    # pawn where the importer made none), whatever the level's Play is (its game mode
+    # override, `--play`), then a flight with the fly pawn; the level is not saved
+    own = game_mode(WALK_MODE if unreal.EditorAssetLibrary.does_asset_exist(WALK_MODE)
+                    else None)
     log("play in editor: walking")
     say("begin", label="check_walk")
     world, pawn = yield from begin_play(les)
     RES["pawn"] = pawn.get_class().get_name()
     if os.environ.get("CITYGEN_UE_LAMP_DEBUG") != "1":
+        say("note", text="the player's spawn and body")
+        yield from spawn_and_body(world, pawn, man, slug)
         say("note", text="streaming around the player")
         yield from streaming(world, pawn, man, slug)
         say("note", text="traces onto the ground, roofs and facades")
         yield from collision(world, pawn, man, slug)
         say("note", text="walking the sidewalks")
         yield from walk(world, pawn, man)
+        say("note", text="off a curb and back up")
+        yield from curb(world, pawn, man)
         yield from cheats(world, pawn)
     else:
         yield from settle(world, slug)
@@ -612,7 +619,15 @@ def walk(world, pawn, man):
     travelled, last = 0.0, start
     mark, mark_t, side_until, side, blockers, stops = start, time.time(), 0.0, 1.0, {}, []
     ticks = []
-    while k < len(path) and time.time() - t < WALK_S:
+    # (as long as the path takes at the pawn's walking speed, half again, at least WALK_S:
+    # the walker walks at 4.2 m/s, the template's character ran at 6)
+    length = sum(math.dist(path[j][:2], path[j + 1][:2]) for j in range(len(path) - 1))
+    try:
+        speed = float(mc.get_editor_property("max_walk_speed")) / 100.0
+    except Exception:           # noqa: BLE001 (a pawn without a character's movement)
+        speed = 6.0
+    limit = max(WALK_S, 1.5 * length / max(speed, 1.0))
+    while k < len(path) and time.time() - t < limit:
         ticks.append(time.time())
         loc = pawn.get_actor_location()
         tx, ty = path[k][0] * 100.0, -path[k][1] * 100.0
@@ -662,6 +677,133 @@ def walk(world, pawn, man):
                         f"path in {time.time() - t:.0f} s, {100 * share:.0f}% of frames on "
                         f"the ground, {'reached its end' if reached else 'did not reach its end'}"
                         + stops + frame_line(ticks))
+
+
+def spawn_and_body(world, pawn, man, slug):
+    """Where Play put the player (on its feet beside the player start, which the manifest
+    sets on a sidewalk, and what it stands on) and whether it has a body it sees itself (the
+    walker's `has_visible_body`); with --shots, the walker looking down at itself and ahead
+    (`unreal_walk_body.png`, `unreal_walk_ahead.png`)."""
+    yield from settle(world, slug)
+    mc = pawn.get_movement_component()
+    t = time.time()
+    while time.time() - t < 8.0 and not (mc is not None and mc.is_moving_on_ground()):
+        yield
+    loc = pawn.get_actor_location()
+    sx, sy, sz = man["player_start"]["position"]
+    off = math.hypot(loc.x / 100.0 - sx, -loc.y / 100.0 - sy)
+    down = trace(world, loc, unreal.Vector(loc.x, loc.y, loc.z - 400.0), [pawn])
+    under = ""
+    if down is not None:
+        a = down["actor"]
+        under = (tag(a, "cg.category") or tag(a, "cg.type") or a.get_class().get_name())
+    body = None
+    if hasattr(pawn, "has_visible_body"):
+        body = bool(pawn.has_visible_body())
+        mesh = pawn.get_editor_property("mesh").get_editor_property("skeletal_mesh_asset")
+        RES["body_mesh"] = mesh.get_path_name() if mesh else ""
+    grounded = bool(mc is not None and mc.is_moving_on_ground())
+    ok = grounded and off < 2.0 and body is not False
+    RES["checks"]["spawn"] = {"ok": ok, "pawn": pawn.get_class().get_name(),
+                              "on_ground": grounded, "from_start_m": round(off, 2),
+                              "stands_on": under, "visible_body": body}
+    RES["lines"].append(f"spawn: {pawn.get_class().get_name()} {off:.1f} m from the player "
+                        f"start, {'on its feet' if grounded else 'NOT on the ground'} on "
+                        f"{under or 'nothing'}; "
+                        + ("a body it sees" if body else "no body it sees" if body is False
+                           else "the project's pawn"))
+    if JOB.get("shots") and body:
+        # by day (the play features' Night 0), from the player start or from the eye of a
+        # `--view walk_spot ...` (the player stood there, facing its target)
+        pc = unreal.GameplayStatics.get_player_controller(world, 0)
+        yaw = -float(man["player_start"].get("yaw_deg", 0.0))
+        spot = next((v for v in JOB.get("views", []) if v["name"] == "walk_spot"), None)
+        here = pawn.get_actor_location()
+        if spot is not None:
+            ex, ey, ez = spot["eye"]
+            # (held in the air until the city there has streamed in, then let down)
+            if mc is not None:
+                mc.disable_movement()
+            teleport(pawn, ex, ey, ez + 1.2)
+            yield from settle(world, slug, at=ue(ex, ey, ez))
+            yield from wait(3.0)
+            if mc is not None:
+                mc.set_movement_mode(unreal.MovementMode.MOVE_FALLING)
+            yield from wait(2.0)
+            yaw = unreal.MathLibrary.find_look_at_rotation(ue(*spot["eye"]),
+                                                           ue(*spot["target"])).yaw
+        unreal.SystemLibrary.execute_console_command(world, "CityGen.Night 0")
+        for name, pitch in (("walk_body", -68.0), ("walk_ahead", -8.0)):
+            pc.set_control_rotation(unreal.Rotator(roll=0.0, pitch=pitch, yaw=yaw))
+            yield from wait(2.0)
+            yield from ui_shot(world, name, cmd="shot")
+        if spot is not None:
+            pawn.set_actor_location(here, False, True)
+            yield from wait(1.0)
+
+
+def curb(world, pawn, man):
+    """Off a sidewalk's curb onto the road beside it and back up (the walker's step height
+    climbs it): from the sidewalk points nearest the player start, toward the nearest lane
+    point, until the player has stepped down, then back to where it started. Passes when the
+    player came back up onto the sidewalk on its feet."""
+    g = json.load(open(os.path.join(JOB["build_dir"], "unreal", "graphs.json"),
+                       encoding="utf-8"))
+    sx, sy, _ = man["player_start"]["position"]
+    lanes = g["lanes"]["points"]
+    lane_pts = [(lanes[k], lanes[k + 1], lanes[k + 2]) for k in range(0, len(lanes), 3)]
+    path, _ = sidewalk_path(JOB["build_dir"], (sx, sy), 60.0)
+    mc = pawn.get_movement_component()
+    tries = []
+    for p in path[::4][:6]:
+        near = min(lane_pts, key=lambda q: (q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2)
+        d = math.dist(near[:2], p[:2])
+        if d > 15.0 or d < 1.0:
+            continue
+        teleport(pawn, p[0], p[1], p[2] + 1.2)
+        yield from wait(1.5)
+        z0 = pawn.get_actor_location().z
+        start = pawn.get_actor_location()
+        fx, fy = (near[0] - p[0]) / d, -(near[1] - p[1]) / d
+        low, t, stepped = z0, time.time(), False
+        while time.time() - t < 4.0:
+            loc = pawn.get_actor_location()
+            low = min(low, loc.z)
+            if z0 - low > 5.0 and math.hypot(loc.x - start.x, loc.y - start.y) > 150.0:
+                stepped = True
+                break
+            pawn.add_movement_input(unreal.Vector(fx, fy, 0.0), 1.0, False)
+            yield
+        t, back, ground = time.time(), False, 0
+        frames = 0
+        while time.time() - t < 5.0:
+            loc = pawn.get_actor_location()
+            dx, dy = start.x - loc.x, start.y - loc.y
+            n = math.hypot(dx, dy)
+            if n < 40.0:
+                back = True
+                break
+            pawn.add_movement_input(unreal.Vector(dx / n, dy / n, 0.0), 1.0, False)
+            frames += 1
+            ground += bool(mc is not None and mc.is_moving_on_ground())
+            yield
+        yield from wait(0.5)
+        z1 = pawn.get_actor_location().z
+        rec = {"at": [round(p[0], 2), round(p[1], 2)], "down_m": round((z0 - low) / 100.0, 3),
+               "stepped_down": stepped, "back": back,
+               "back_up_m": round((z1 - low) / 100.0, 3),
+               "on_ground": round(ground / max(frames, 1), 2)}
+        tries.append(rec)
+        rec["climbed"] = stepped and back and abs(z1 - z0) < 3.0
+        if rec["climbed"] and rec["down_m"] >= 0.12:
+            break             # (a full curb; a lower one, a curb ramp's, tries on)
+    # back up on the sidewalk at its height, after stepping down off it
+    ok = any(r["climbed"] for r in tries)
+    RES["checks"]["curb"] = {"ok": ok, "tries": tries}
+    best = max((r for r in tries if r["climbed"]), key=lambda r: r["down_m"], default=None)
+    RES["lines"].append(
+        f"curb: stepped {best['down_m']:.2f} m down onto the road and back up" if best and ok
+        else f"curb: no curb climbed in {len(tries)} tries")
 
 
 def cheats(world, pawn):
