@@ -76,15 +76,15 @@ citygen), then `atmosgen budgets` (`plans/budgets.md`, `budgets.json`; each city
 
 | City | Plan (s) | Lights (near / mid / high) | Far cards (glow / pool / wash) | Most in a tile: lights, volumes, emitters, drips, far cards (budget) | Most near the view: mid 300 m, shadowed 60 m, high 750 m, sight 1,200 m (kept live) |
 |---|---|---|---|---|---|
-| Vesper Bay | 46 | 46,780 (14,717 / 31,275 / 788) | 21,016 (11,151 / 9,148 / 717) | 1,271 / 6,000, 7 / 24, 14 / 400, 877 / 4,000, 375 / 3,000 | 5,130 / 512, 40 / 16, 693 / 48, 22,397 / 512 |
-| Nexus City | 48 | 54,451 (17,084 / 36,257 / 1,110) | 23,379 (12,109 / 10,224 / 1,046) | 1,381, 8, 15, 583, 357 | 5,083, 35, 798, 35,788 |
-| Greyhook | 40 | 26,880 (8,217 / 18,395 / 268) | 14,161 (7,599 / 6,328 / 234) | 1,203, 4, 7, 495, 247 | 4,915, 30, 147, 19,528 |
-| Saltreach Free Port | 34 | 27,505 (8,474 / 18,027 / 1,004) | 14,072 (7,325 / 5,773 / 974) | 1,516, 6, 16, 491, 369 | 5,913, 37, 935, 22,627 |
-| Vesper Bay Pinned | 45 | 47,959 (15,295 / 32,582 / 82) | 19,921 (10,727 / 9,170 / 24) | 1,529, 7, 16, 507, 362 | 5,326, 41, 36, 23,176 |
-| Vesper Bay Stacks | 46 | 48,022 (15,355 / 32,585 / 82) | 19,964 (10,679 / 9,261 / 24) | 1,422, 7, 19, 688, 364 | 5,436, 42, 36, 23,119 |
-| Vesper Bay Decks | 52 | 51,337 (15,840 / 34,709 / 788) | 21,470 (11,378 / 9,375 / 717) | 1,271, 8, 14, 1,115, 375 | 5,130, 40, 693, 25,296 |
-| Cragmouth | 47 | 57,031 (17,681 / 38,535 / 815) | 22,023 (11,460 / 9,770 / 793) | 1,326, 5, 14, 996, 371 | 5,426, 43, 631, 41,955 |
-| Delta Megacity | 64 | 50,300 (15,330 / 33,414 / 1,556) | 22,600 (11,653 / 9,440 / 1,507) | 1,531, 7, 24, 722, 359 | 5,830, 43, 993, 30,368 |
+| Vesper Bay | 54 | 46,780 (14,717 / 31,275 / 788) | 21,016 (11,151 / 9,148 / 717) | 1,271 / 6,000, 7 / 24, 14 / 400, 877 / 4,000, 375 / 3,000 | 5,130 / 512, 40 / 16, 693 / 48, 22,397 / 512 |
+| Nexus City | 52 | 54,451 (17,084 / 36,257 / 1,110) | 23,379 (12,109 / 10,224 / 1,046) | 1,381, 8, 15, 583, 357 | 5,083, 35, 798, 35,788 |
+| Greyhook | 44 | 26,880 (8,217 / 18,395 / 268) | 14,161 (7,599 / 6,328 / 234) | 1,203, 4, 7, 495, 247 | 4,915, 30, 147, 19,528 |
+| Saltreach Free Port | 37 | 27,505 (8,474 / 18,027 / 1,004) | 14,072 (7,325 / 5,773 / 974) | 1,516, 6, 16, 491, 369 | 5,913, 37, 935, 22,627 |
+| Vesper Bay Pinned | 48 | 47,959 (15,295 / 32,582 / 82) | 19,921 (10,727 / 9,170 / 24) | 1,529, 7, 16, 507, 362 | 5,326, 41, 36, 23,176 |
+| Vesper Bay Stacks | 49 | 48,022 (15,355 / 32,585 / 82) | 19,964 (10,679 / 9,261 / 24) | 1,422, 7, 19, 688, 364 | 5,436, 42, 36, 23,119 |
+| Vesper Bay Decks | 54 | 51,337 (15,840 / 34,709 / 788) | 21,470 (11,378 / 9,375 / 717) | 1,271, 8, 14, 1,115, 375 | 5,130, 40, 693, 25,296 |
+| Cragmouth | 50 | 57,031 (17,681 / 38,535 / 815) | 22,023 (11,460 / 9,770 / 793) | 1,326, 5, 14, 996, 371 | 5,426, 43, 631, 41,955 |
+| Delta Megacity | 69 | 50,300 (15,330 / 33,414 / 1,556) | 22,600 (11,653 / 9,440 / 1,507) | 1,531, 7, 24, 722, 359 | 5,830, 43, 993, 30,368 |
 
 - **Per tile** every city is far under every budget: at most 1,531 lights of 6,000, 8 fog
   volumes of 24, 24 emitters of 400, 1,115 drip lines of 4,000, 375 far cards of 3,000.
@@ -93,7 +93,7 @@ citygen), then `atmosgen budgets` (`plans/budgets.md`, `budgets.json`; each city
   that may cast shadows within 60 m against 16, up to 993 high-tier lights within 750 m against
   48, and tens of thousands within a walker's 1,200 m against the 512 it sees. The share of the
   city where each binds is in `budgets.md`.
-- **Plan time:** 34 to 64 s a city (Delta the longest: the weather's masks, 44 s, most of it).
+- **Plan time:** 37 to 69 s a city (Delta the longest: the weather's masks most of it).
 - **Cragmouth failed at first** (the terrain sample): AT4's mist read M16's `surface_m`,
   which a terrain city leaves unset; fixed above. Its plan and every check pass now.
 
@@ -107,9 +107,26 @@ citygen), then `atmosgen budgets` (`plans/budgets.md`, `budgets.json`; each city
   else touched, 3 min 23 s. HLODs untouched (no mesh changed).
 - **Vesper Bay** (the AG16 sample build with stage 2, `builds/ag16/vesper_bay`, copied under
   `builds/at7`) into a fresh throwaway project of its own (`--new-project`, CityAT7Check) with
-  its own plan and the HLODs: VESPER_RESULT
+  its own plan (every check passing, 21,009 far cards) and the HLODs. The first try was
+  stopped by this session's disk watchdog in the actors stage: the editor's memory reached 46
+  GB committed, the pagefile took the disk under 15 GB. Again with `CITYGEN_UE_OFFLOAD=150`
+  (the meshes it had imported kept) it passed: 14,482 actors, 789 HLOD actors built (5 min
+  29 s), 10 min 44 s. Its check passes (streaming, collision, the walk, the play features,
+  the sky, the air, the weather, the look, and the far city: "11130 glows and 9879 pools and
+  washes of 21009 cards in 13 blocks (built in 26 ms), shown True by night"). One lean night
+  run (`bench_vesper_bay/`, not flagged): **14.6 ms p95** over the route (walk 13.3, drive
+  15.6, fly 12.4; GPU 13.6). The project and the build's copy were deleted after.
 - **Not imported:** the other samples and demos (no stage 2 build from main; importing each
   would take hours); their plans and checks above stand for them.
+
+**Vesper Bay** from 150 m over Vess Docks toward its Corporate Core, without the far cards and
+with them:
+
+![](unreal/vesper_bay/cmp_air.jpg)
+
+and from 400 m over its south-west corner:
+
+![](unreal/vesper_bay/cmp_high.jpg)
 
 **Delta's check passes** by night, dusk and day (streaming, collision, the walk, the play
 features, the sky, the air, the weather, the look) and the far city: "11653 glows and 10947

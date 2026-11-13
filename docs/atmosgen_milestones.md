@@ -97,7 +97,7 @@ images: [`docs/progress/AT7/README.md`](progress/AT7/README.md).
   plan is not delivered. `preview_far.png` (from above and from 150 m over the corner).
 - **Budgets on every sample** (`atmosgen/budgets.py`, `atmosgen budgets`): the five samples,
   the pinned, stack and deck demos and Cragmouth planned from main; every check passes; at most
-  1,531 lights, 8 volumes, 24 emitters, 1,115 drip lines and 375 far cards a tile; 34 to 64 s a
+  1,531 lights, 8 volumes, 24 emitters, 1,115 drip lines and 375 far cards a tile; 37 to 69 s a
   plan; near the view the live caps bind (up to 5,900 lights within 300 m for 512 live).
 - **Cragmouth** failed at first: AT4's mist read M16's `surface_m`, unset on a terrain city;
   it stands on M13's water level now (`air._surface_of`, a river's profile).
