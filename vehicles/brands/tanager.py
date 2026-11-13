@@ -394,12 +394,20 @@ def arch_pts(cx, grow=0.0, n=30, *, arch):
     return out
 
 
-def wheel(tag, cx, side, *, R, w, rim, out):
-    """The kit's tire (radius R, width w, rim radius rim, its outer face at y out) on a
-    steel rim under Tanager's slotted cover: six rounded slots, a ring, a cap of the
-    paint's color, a valve."""
+NARROW = dict(grooves=(-0.11, 0.11), gw=(0.009, 0.005), gd=0.008, mod=4, shift=2,
+              inset=(0.002, 0.006), seg=144)
+"""A road tread for a tire under 0.185 m wide: the kit's "road" grooves (a quarter of the
+width out) fall outside such a tire's crown, its profile folds back and its blocks stand
+out of the tire (7 mm under the ground on a 0.165 m tire)."""
+
+
+def wheel(tag, cx, side, *, R, w, rim, out, tread="road"):
+    """The kit's tire (radius R, width w, rim radius rim, its outer face at y out; tread a
+    kit tread or NARROW) on a steel rim under Tanager's slotted cover: six rounded slots, a
+    ring, a cap of the paint's color, a valve."""
     T_R, T_W, T_RIM, T_OUT = R, w, rim, out
-    K.build_wheel(tag, cx, T_R, T_W, T_RIM, T_OUT, side, rim=None, ring=None, caliper=None)
+    K.build_wheel(tag, cx, T_R, T_W, T_RIM, T_OUT, side, rim=None, ring=None, caliper=None,
+                  tread=tread)
     hw, Rr = T_W / 2, T_RIM
     k = Rr / 0.19                           # the Mino's cover, grown with the rim
     flip = side < 0

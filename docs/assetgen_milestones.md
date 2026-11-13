@@ -3126,10 +3126,92 @@ Vanta-R the same).
   breaks the boolean (the whole hull came out empty); the groove now drops such sections,
   and `round` avoids them. A rounded path snapped onto the hull can jump to a mouth's inner
   frame: the Vanta-R's front channel is not rounded.
-- **Next**: a pilot car of each of the other five brands (lamps by `BRANDS.md`, each
-  switching to its `vehicles/brands/` module), shown to Swagnik before the other twelve;
-  step A's street-distance findings (tires in the body, cabin tubs in the wells) on each car
-  as it is redone.
+- **Kestrel Dart** (`docs/progress/AG18/kestrel_dart/`, the Kestrel pilot, now on
+  `vehicles/brands/kestrel.py`): the nose's four lit cells in a slot cut 42 mm in under a
+  clear lens flush in the facet, set back between bright dividers; the chine's knife edge cut
+  away at the prow (0.76 m) and the stern (0.27 m) into channels under clear and red lenses
+  that keep the edge's shape, lit cores and bright liners inside; the stern bar a channel
+  under a red lens with a red core and ribs, narrowing with the band past the mouth's middle;
+  the keel blade's foot a lamp channel with a guide in a sleeve over a reflector under a clear
+  lens; vanes set back in the thruster slots; the shoulder groove, door release and charge
+  flap cut; 3.5 mm shut lines; frit on every pane; the cabin tub off the nose (48 mm out to
+  4.5). 112,558 triangles (72,340). Checks as before or better: panels ok, symmetry `look`
+  (the cabin's yoke and screens, the fin code), the floor's front 4.5 mm in the open; the
+  maker's name on the stern laid on its band (it floated, the band mirrored a ghost of it).
+  Pack rebuilt, every check passing: 74,391, 44,633, 19,921, 5,101 triangles, standard
+  class, texels 372 px/m (5th percentile), LOD3 32.6 of 40 degrees, 0.072 of 0.10 bent,
+  0.039 of 0.04 texture. Not published.
+- **Orrin Lumen** (`docs/progress/AG18/orrin_lumen/`, the Orrin pilot, now on
+  `vehicles/brands/orrin.py`): each light ribbon a channel cut along the widest line round
+  its end, 17 mm wide and drawn out to its tips, 10 to 16 mm deep, a light guide's lit face
+  under a flush lens of its own (clear in front; red behind over 24 mm cells), the pebbles
+  kept on the poles; the door pulls crescent recesses, round charge flaps cut inside the
+  port rings, 3.5 mm shut lines; the crescent slots' outlines told to the checks (six cutter
+  holes before, none now); the canopy keeps its frameless glass (the brand's); room cut
+  beside and over the tires inside the skin (2.8 mm to the well before, 14.6 front and 23.7
+  rear; the front still cannot steer under its lids) and the cabin tub out of the rear wells.
+  356,940 triangles (293,582). For the pack the lit face sits right under the lens and the
+  channels' walls are a 1 mm sheet (bare, they were baked down onto the lit face). Pack
+  rebuilt, every check passing: 144,693, 59,996, 20,358, 5,057 triangles, standard class,
+  texels 404 px/m (5th percentile), LOD3 12.7 of 40 degrees, 0.016 of 0.10 bent, 0.014 of
+  0.04 texture. Not published.
+- **Brakk Hauler** (`docs/progress/AG18/brakk_hauler/`, the Brakk pilot, now on
+  `vehicles/brands/brakk.py`, its wheel bound to the car's sizes as its copy built it): the
+  corner pylons housings of plates sunk 30 mm into the chamfers with two pockets 50 mm deep,
+  an LED bar right under a clear (front) or red (rear) lens in a V of reflector plates and an
+  amber cell on a reflector plate under an amber lens, bolted bezels, a guard of bars over
+  the bar; the roof bar a frame over a pocket, eight cells of three LED modules in reflector
+  cups behind one clear lens, amber end lamps in pockets of bolted end plates; work lamps
+  and the stop lamp as housings with reflectors or LEDs under lenses; a fuel flap cut through
+  each quarter; 3.5 mm shut lines (8 mm before; the plates keep their 8 mm bevel); thick
+  glass frames in `"frame"` mode; the kit's wipers. Street distances: the front upper
+  wishbones' ball joints lower and the tie rods nearer the axle (7.1 mm and no steering to
+  47.8 mm and 20 degrees), the rear dampers inboard and the fender gussets shorter (13.5 mm
+  to 33.1 mm), the cabin tub inside the hull (41% in the open to none). 259,196 triangles
+  (230,460). Every check `ok` (tires, symmetry and through were `look`; the one-sided parts
+  told as meant). The amber cells first stood as reflector bowls whose emitters baked white
+  in the pack; they are lit faces under the lens now. Pack rebuilt, every check passing:
+  139,138, 57,536, 20,230, 8,071 triangles, large class, texels 331 px/m (5th percentile),
+  LOD3 18.4 of 40 degrees, 0.025 of 0.10 bent, 0.0058 of 0.04 texture. Not published.
+- **Tanager Mino** (`docs/progress/AG18/tanager_mino/`, the Tanager pilot, now on
+  `vehicles/brands/tanager.py`, its windows' cutter planes in a subclass): each visor a hole
+  across the nose and the tail face (the paint's 14 mm rim its walls, a gloss black back
+  plate 14 mm in) under a gloss black surround 9.5 mm proud and a clear lens, laid on the
+  uncut skin (the skin cut out as a lens zigzagged at the face's rounded ends); in it a lamp
+  at each end (chrome plate, a light guide ring in a frosted sleeve, red behind, three LED
+  cups on a dark tray), the light bar a guide on a chrome strip, the display's lit dots on a
+  screen under a smoked lens of its own, the lit faces 2 to 4 mm proud of the skin (LOD3
+  draws the nose's flat face across the hole: deeper, in a first build's pocket, they were
+  lost there under a dark lid; no small rings, which LOD3 fills); fog and reverse lamps LED
+  cups in blocks of clear lens, the high stop lamp a lit bar in a block of red lens, amber
+  side repeaters in holes under flush lenses; the charge door cut, door pulls in cups cut
+  14 mm in, washer jets, 3.5 mm shut lines (2.4 before); frit borders on every pane inside
+  the fat seals. The flat end faces' cut triangles shaded in stars: their faces in the
+  plane are flat shaded and the folded slivers taken out. Street distances: the wells'
+  inner walls 5 cm further in inside the skin and the cabin tub shaped round them (0.0 mm
+  and no steering to 51.9 mm and 35 degrees); the tires stood 7 mm in the ground (the kit's
+  road tread folds on a tire under 0.185 m; the brand's `NARROW` tread, the Cab and the
+  Porter keep theirs until redone). A hood service flap was tried and left out (stars on the
+  hood's curve). 276,187 triangles (223,689). Checks: tires `ok` (FAIL before), symmetry
+  `look` (`body.screen` 3.8 mm off at a window corner; the one-sided parts told as meant),
+  the rest `ok`. Pack rebuilt, every check passing: 143,087, 59,994, 20,076, 5,361
+  triangles, standard class, texels 489 px/m (5th percentile), LOD3 15.4 of 40 degrees,
+  0.024 of 0.10 bent, 0.033 of 0.04 texture; LOD3 keeps the lamps and bars lit. Not
+  published.
+- **Pilots' lessons**: a lens cut from a doubly curved skin with `"skin"` keeps the
+  boolean's slivers (its reflections zigzag): build it as its own band or slab along the cut.
+  In the pack, a lit face deep under a lens bakes as dashes, emitters deep in reflector
+  bowls bake white, bare channel walls are baked down onto the lit face (give them a 1 mm
+  solidify); a lamp's pocket cup collapses into a dark lid at LOD3, so a lamp that must read
+  far off stands proud of the skin under its lens. Many thin cuts in one face tear apart in
+  the far LODs. Lettering floating off a leaning face mirrors a ghost: lay it on the face.
+- **Aurel set aside** (Swagnik, 2026-11-12: not in use for now): the Prelate's step B pass
+  (its slot grille tore in the pack's far LODs) is kept on branch
+  `claude/ag18-prelate-step-b-wip`, not merged; the Aurels are left out of the next batches.
+- **Next**: the other cars of the Kestrel, Orrin, Brakk, Halcyon and Tanager brands on the
+  pilots' patterns (Meridian, Atlas, Pebble, Aria, Bastion, Mule, Sable, Ridge, Cab,
+  Porter), each switching to its `vehicles/brands/` module, with step A's street-distance
+  findings fixed as it is redone.
 
 ### Parked in Delta Megacity on the PC (2026-11-12)
 

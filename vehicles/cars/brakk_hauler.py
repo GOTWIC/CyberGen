@@ -12,14 +12,22 @@ heads, real hardware (winch, shackles, rails, a sail frame) and stencilled unit 
 
 Pieces: the hull (nose, hood and cab: seven lines over ten stations, every edge sharp), the
 bed (a tub: its walls are stations of their own), and plates, bars and tubes for the rest.
+The lamps are pockets in housings of plates: an LED bar in a reflector under a lens, an
+amber cell under its own, bolted bezels and a guard on the pylons; LED modules behind one
+lens in the roof bar; the fuel flaps are cut through the quarters (cutters()). The brand's
+helpers (plates, bolts, stencils, stripes, the coil, the wheel) are in
+vehicles/brands/brakk.py.
 """
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import bmesh                                                        # noqa: E402
 import carkit as K                                                  # noqa: E402
-from carkit import Geo, Matrix, V3, cos, hypot, on_body, pi, rad, sin, stud    # noqa: E402
+from functools import partial                                       # noqa: E402
+from brands import brakk                                            # noqa: E402
+from brands.brakk import (bolt, chevrons, coil, on_plane, on_side, plate,   # noqa: E402
+                          stencil, tube)
+from carkit import Geo, Matrix, V3, cos, hypot, on_body, pi, rad, sin   # noqa: E402
 
 # ---------------------------------------------------------------------------------------
 # dimensions
@@ -31,137 +39,27 @@ RAIL, BFLOOR = 1.36, 0.74           # bed rail and bed floor
 BED_Y = 0.72                        # bed half width
 FEN_Z, FEN_T = 1.05, 0.03           # fender plates: top height, thickness
 NUM = "27"
+GAP = 0.00175                       # shut lines 3.5 mm
+FLAP = (-0.88, 1.07, 0.08, 0.11)    # the fuel flap on the quarter: middle x, z, width, height
 
-# ---------------------------------------------------------------------------------------
-# small helpers of this car
-# ---------------------------------------------------------------------------------------
-
-
-def tube(g, a, b, r, n=8, r2=None, phase=0.0):
-    """A straight bar of n sides from a to b (n = 4 with phase pi / 4: a box tube)."""
-    a, b = V3(a), V3(b)
-    t = (b - a).normalized()
-    ref = V3((0, 0, 1)) if abs(t.z) < 0.9 else V3((1, 0, 0))
-    u = t.cross(ref).normalized()
-    v = t.cross(u)
-    r2 = r if r2 is None else r2
-    ring = [(u * cos(phase + 2 * pi * k / n) + v * sin(phase + 2 * pi * k / n)) for k in range(n)]
-    pts = [a + d * r for d in ring] + [b + d * r2 for d in ring]
-    faces = [tuple(range(n)), tuple(range(n, 2 * n))]
-    faces += [(k, (k + 1) % n, n + (k + 1) % n, n + k) for k in range(n)]
-    g.add(pts, faces)
+# the Brakk wheel (vehicles/brands/brakk.py) at this car's sizes, as its own copy built it
+build_wheel = partial(brakk.wheel, motor=False, R=T_R, w=T_W, rim=T_RIM, out=T_OUT, lugs=22,
+                      text="BRAKK  TRAKTOR  M/T    37 X 12.5 R19    ", seg=88,
+                      dish=brakk.DISH_SMALL)
 
 
-def bolt(g, loc, n, r=0.012, h=0.006):
-    """A hex bolt head on a surface point."""
-    stud(g, loc, V3(n).normalized(), [(-0.001, 0.001), (-0.001, r), (h, r), (h, 0.001)], 6)
+def lbox(g, o, R, a, b, z):
+    """A box in a lamp's own frame: o its foot on the body, R its turn, a its range along
+    the way out, b across, z up (absolute)."""
+    c = V3(o) + R @ V3(((a[0] + a[1]) / 2, (b[0] + b[1]) / 2, 0))
+    c.z = (z[0] + z[1]) / 2
+    g.box(c, (a[1] - a[0], b[1] - b[0], z[1] - z[0]), rot=R)
 
 
-def under(pts, th):
-    """An (x, z) polyline running front to rear, moved th toward the wheel under it."""
-    ns = []
-    for a, b in zip(pts, pts[1:]):
-        dx, dz = b[0] - a[0], b[1] - a[1]
-        L = hypot(dx, dz)
-        ns.append((-dz / L, dx / L))
-    out = []
-    for i, p in enumerate(pts):
-        if i == 0:
-            n = ns[0]
-        elif i == len(pts) - 1:
-            n = ns[-1]
-        else:
-            a, b = ns[i - 1], ns[i]
-            k = 1 + a[0] * b[0] + a[1] * b[1]
-            n = ((a[0] + b[0]) / k, (a[1] + b[1]) / k)
-        out.append((p[0] + n[0] * th, p[1] + n[1] * th))
-    return out
-
-
-def plate(g, pts, th, y0, y1):
-    """A bent plate: the (x, z) polyline pts, th thick, from y0 to y1."""
-    lo = under(pts, th)
-    poly = [(x, y0, z) for x, z in pts] + [(x, y0, z) for x, z in lo[::-1]]
-    g.prism(poly, (0, y1 - y0, 0))
-
-
-def on_side(x0, z0, side):
-    """place() for lettering on the body's flank, middle at (x0, z0)."""
-    proj = 'y' if side > 0 else 'Y'
-
-    def place(px, py, lift):
-        loc, n = on_body(x0 - side * px, z0 + py, proj)
-        return None if loc is None else loc + n * lift
-    return place
-
-
-def on_plane(origin, right, up):
-    """place() for lettering on a plane, reading along right."""
-    o, r, u = V3(origin), V3(right), V3(up)
-    n = r.cross(u).normalized()
-    return lambda px, py, lift: o + r * px + u * py + n * lift
-
-
-HCUT = set("TIY1")
-
-
-def cut_glyph(vs, fs, axis, lo, hi):
-    """A flat glyph without the band lo..hi along axis (0 across, 1 up): a stencil's bridge."""
-    out_v, out_f = [], []
-    for low in (True, False):
-        bm = bmesh.new()
-        bv = [bm.verts.new(v) for v in vs]
-        for f in fs:
-            bm.faces.new([bv[i] for i in f])
-        co, no = V3(), V3()
-        co[axis] = lo if low else hi
-        no[axis] = 1.0
-        bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=co,
-                               plane_no=no, clear_outer=low, clear_inner=not low)
-        bm.verts.index_update()
-        o = len(out_v)
-        out_v += [v.co.copy() for v in bm.verts]
-        out_f += [tuple(o + v.index for v in f.verts) for f in bm.faces]
-        bm.free()
-    return out_v, out_f
-
-
-def stencil(g, txt, size, place, gap=0.13, cut=0.085):
-    """Stencilled capitals: every letter is cut through by a bridge of width cut * size
-    (upright, or level for T, I, Y, 1); cut 0 leaves small print whole."""
-    glyphs = []
-    x = 0.0
-    for ch in txt:
-        if ch == " ":
-            x += size * 0.36
-            continue
-        vs, fs = K.text_mesh(ch, size)
-        x0, x1 = min(v.x for v in vs), max(v.x for v in vs)
-        if cut and ch != "-":
-            if ch in HCUT:
-                cy = (min(v.y for v in vs) + max(v.y for v in vs)) / 2
-                vs, fs = cut_glyph(vs, fs, 1, cy - size * cut / 2, cy + size * cut / 2)
-            else:
-                xm, hb = (x0 + x1) / 2, size * cut / 2
-                vs, fs = cut_glyph(vs, fs, 0, xm - hb, xm + hb)
-        glyphs.append((vs, fs, x - x0))
-        x += (x1 - x0) + size * gap
-    W = x - size * gap
-    for vs, fs, dx in glyphs:
-        pts = [place(v.x + dx - W / 2, v.y, 0.0012) for v in vs]
-        if all(p is not None for p in pts):
-            g.add(pts, fs)
-    return W
-
-
-def chevrons(g, place, W, H, n, lean):
-    """Hazard stripes: n leaning bars over a W x H field."""
-    pitch = (W - abs(lean)) / n
-    for k in range(n):
-        u0 = -W / 2 + k * pitch + max(0.0, -lean)
-        q = [(u0, -H / 2), (u0 + pitch / 2, -H / 2), (u0 + pitch / 2 + lean, H / 2),
-             (u0 + lean, H / 2)]
-        g.add([place(u, v, 0.0015) for u, v in q], [(0, 1, 2, 3)])
+def lpt(o, R, a, b, z):
+    p = V3(o) + R @ V3((a, b, 0))
+    p.z = z
+    return p
 
 
 # ---------------------------------------------------------------------------------------
@@ -226,7 +124,7 @@ HULL_MAT = dict(nose_top="paint", nose_corner="paint", hood="paint", nose_side="
                 door_f="paint", brow="paint", glass_f="glass", roof="paint",
                 roof_edge="paint", pillar_b="paint", door_r="paint", glass_r="glass",
                 pillar_c="paint", quarter="paint", sill="cladding", floor="underbody",
-                trim="cladding", nose="cladding", cabback="paint")
+                trim="cladding", nose="cladding", cabback="paint", cut="void")
 
 
 def bed_row(x, yo, top, yi=0.62):
@@ -258,19 +156,30 @@ BED_MAT = dict(floor="underbody", bedsill="cladding", corner="paint", bedside="p
                tailgate="paint")
 
 
+def cutters():
+    """Cut into the hull as it stands uncut: the fuel flap on each quarter, its outline a
+    shut line through the plate (the flap the plate inside it)."""
+    cut = Geo()
+    x, z, w, h = FLAP
+    K.groove(cut, K.rounded(x, z, w, h, 0.012), 'y', closed=True, mirror=True)
+    return [(cut, "cut", "drop")]
+
+
 def build_hull():
     hull = K.build_body(hull_stations(), hull_panel, HULL_MAT, 1.0, 1.0, name="hull",
                         front=dict(kind="flat", panel="nose"),
                         rear=dict(kind="flat", panel="cabback"),
-                        glass=[("glass_ws", 0.055), ("glass_f", 0.05), ("glass_r", 0.05)],
-                        subdiv=2, gap=0.004)
+                        glass=[("glass_ws", 0.055, "trim", "frame"),
+                               ("glass_f", 0.05, "trim", "frame"),
+                               ("glass_r", 0.05, "trim", "frame")],
+                        cutters=cutters, subdiv=2, gap=GAP)
     rows = [bed_row(-1.06, BED_Y, True), bed_row(-1.11, BED_Y, True),
             bed_row(-1.13, BED_Y, False), bed_row(-2.57, BED_Y, False),
             bed_row(-2.60, BED_Y - 0.03, False, 0.59), bed_row(-2.62, BED_Y - 0.05, True, 0.59),
             bed_row(-2.70, BED_Y - 0.13, True, 0.51)]
     bed = K.build_body(rows, bed_panel, BED_MAT, 1.0, 1.0, name="bed",
                        front=dict(kind="flat", panel="bedfront"),
-                       rear=dict(kind="flat", panel="tailgate"), subdiv=2, gap=0.004)
+                       rear=dict(kind="flat", panel="tailgate"), subdiv=2, gap=GAP)
     for body in (hull, bed):                # plates want a broader edge than a sports car
         for ob in body.parts.values():
             md = ob.modifiers.get("bevel")
@@ -304,7 +213,7 @@ def build_fenders():
                     bolt(gb, (x, y, z), n)
         for x in brackets:                              # gussets to the body
             gk.prism([(x - 0.012, y0 - 0.03, FEN_Z - FEN_T), (x - 0.012, y0 + 0.26, FEN_Z - FEN_T),
-                      (x - 0.012, y0 - 0.03, FEN_Z - 0.22)], (0.024, 0, 0))
+                      (x - 0.012, y0 - 0.03, FEN_Z - 0.19)], (0.024, 0, 0))
     sec = [(-0.022, 0.0), (0.022, 0.0), (0.012, 0.01), (-0.012, 0.01)]
     for (xa, xb), ys in (((2.24, 1.56), (0.74, 0.835, 0.93)), ((-1.33, -1.91), (0.86, 0.95))):
         for y in ys:
@@ -327,52 +236,141 @@ def build_fenders():
     g.obj("led.markers_r", "led_rear", mirror=True)
 
 
-def pylon(g, gl, ga, x, y, z0, z1, yaw):
-    """A light pylon on a chamfered corner: a housing, its bar and an amber cell at the
-    bar's foot, facing yaw (degrees)."""
+FACE = 0.05             # a pylon's front: how far its plates stand off the corner
+LENS = 0.044            # its lenses, set back in their windows
+SW = 0.03               # half the width of a pylon's windows
+
+
+def pylon(key, x, y, z0, z1, yaw, lit, lens):
+    """A light pylon on a chamfered corner, facing yaw (degrees): a housing of plates sunk
+    into the corner, a tall window over a row of LED modules on a reflector plate and an
+    amber cell at its foot, each under its own lens in a bolted bezel, a guard of bars over
+    the tall one. Made on the left side and mirrored."""
     R = Matrix.Rotation(rad(yaw), 3, 'Z')
+    o = V3((x, y, 0))
     n = R @ V3((1, 0, 0))
-    c = V3((x, y, (z0 + z1) / 2))
-    g.box(c + n * 0.018, (0.06, 0.10, z1 - z0), rot=R)
-    gl.box(c + n * 0.050 + V3((0, 0, 0.045)), (0.012, 0.05, z1 - z0 - 0.16), rot=R)
-    ga.box(V3((x, y, z0 + 0.07)) + n * 0.050, (0.012, 0.05, 0.06), rot=R)
-    for z in (z0 + 0.018, z1 - 0.018):
-        for s in (-0.03, 0.03):
-            p = c + n * 0.048 + (R @ V3((0, s, 0)))
-            p.z = z
-            bolt(BOLTS, p, n, 0.007, 0.004)
+    wb, wt = z0 + 0.135, z1 - 0.035            # the tall window
+    ab, at = z0 + 0.04, z0 + 0.105             # the amber cell's window
+    g = Geo()                                  # the housing: plates round two pockets
+    lbox(g, o, R, (-0.03, 0.0), (-0.05, 0.05), (z0, z1))
+    for sg in (1, -1):
+        lbox(g, o, R, (0.0, FACE), sorted((sg * SW, sg * 0.05)), (z0, z1))
+    for zz in ((wt, z1), (at, wb), (z0, ab)):
+        lbox(g, o, R, (0.0, FACE), (-SW, SW), zz)
+    g.obj("pylon." + key, "cladding", bevel=0.003, mirror=True)
+    gb, gn = Geo(), Geo()                      # bolted bezels, the guard over the tall window
+    for lo, hi in ((wb, wt), (ab, at)):
+        for sg in (1, -1):
+            lbox(gb, o, R, (FACE, FACE + 0.006), sorted((sg * (SW - 0.005), sg * (SW + 0.012))),
+                 (lo - 0.012, hi + 0.012))
+        for zz in ((hi - 0.005, hi + 0.012), (lo - 0.012, lo + 0.005)):
+            lbox(gb, o, R, (FACE, FACE + 0.006), (-SW + 0.005, SW - 0.005), zz)
+        for zz in (lo - 0.006, hi + 0.006):
+            for b in (-SW - 0.0035, SW + 0.0035):
+                bolt(gn, lpt(o, R, FACE + 0.006, b, zz), n, 0.0045, 0.003)
+    gb.obj("pylon.%s.bezel" % key, "paint2", bevel=0.0015, mirror=True)
+    gn.obj("pylon.%s.bolts" % key, "rim_bright", mirror=True)
+    gg = Geo()
+    k = 4
+    for i in range(k):
+        zz = wb + (wt - wb) * (i + 0.5) / k
+        tube(gg, lpt(o, R, FACE + 0.016, -SW - 0.006, zz), lpt(o, R, FACE + 0.016, SW + 0.006, zz),
+             0.0035, 8)
+    for b in (-SW - 0.006, SW + 0.006):
+        lbox(gg, o, R, (FACE + 0.004, FACE + 0.02), (b - 0.004, b + 0.004), (wb - 0.004, wt + 0.004))
+    gg.obj("pylon.%s.guard" % key, "rim", bevel=0.001, mirror=True)
+    # inside: an LED bar right under the lens in a V of reflector plates, the amber cell on
+    # a reflector plate, the lenses (lit faces near the lens: the game pack bakes them)
+    L = K.Lamp("lamp.pylon_" + key, lit=lit, glass=lens)
+    lbox(L.housing, o, R, (0.0, 0.012), (-SW, SW), (wb, wt))
+    for sg in (1, -1):                         # the reflector's two leaves
+        L.chrome.add([lpt(o, R, 0.012, sg * 0.004, z) for z in (wb, wt)]
+                     + [lpt(o, R, 0.036, sg * SW, z) for z in (wt, wb)]
+                     + [lpt(o, R, 0.012, sg * 0.006, z) for z in (wb, wt)]
+                     + [lpt(o, R, 0.034, sg * SW, z) for z in (wt, wb)],
+                     [(0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3),
+                      (3, 7, 4, 0)])
+    L.bar([lpt(o, R, 0.036, 0, wb + 0.008), lpt(o, R, 0.036, 0, wt - 0.008)], 0.018, 0.008,
+          up=n)
+    lbox(L.housing, o, R, (0.012, 0.032), (-0.006, 0.006), (wb, wt))     # the bar's spine
+    lbox(L.glass, o, R, (LENS - 0.003, LENS), (-SW, SW), (wb, wt))
+    L.obj(mirror=True)
+    A = K.Lamp("lamp.pylon_%s_turn" % key, lit="led_accent", glass="lens_amber")
+    lbox(A.chrome, o, R, (0.0, 0.026), (-SW, SW), (ab, at))
+    A.bar([lpt(o, R, 0.034, -SW + 0.007, (ab + at) / 2), lpt(o, R, 0.034, SW - 0.007, (ab + at) / 2)],
+          0.012, at - ab - 0.016, up=V3((0, 0, 1)))      # the amber cell right under its lens
+    lbox(A.glass, o, R, (LENS - 0.003, LENS), (-SW, SW), (ab, at))
+    A.obj(mirror=True)
 
 
 def build_lights():
-    g, gf, gr, ga = Geo(), Geo(), Geo(), Geo()
-    pylon(g, gf, ga, 2.44, 0.50, 0.71, 1.17, 45)
-    pylon(g, gr, ga, -2.635, BED_Y - 0.065, 0.90, 1.37, 135)
-    ga.obj("led.turn", "led_accent", mirror=True)
-    g.obj("pylons", "cladding", bevel=0.004, mirror=True)
-    gf.obj("led.front", "led_front", mirror=True)
-    gr.obj("led.rear", "led_rear", mirror=True)
-    # the bar over the windshield: a housing on the roof's front edge, eight cells
+    pylon("f", 2.44, 0.50, 0.71, 1.17, 45, "led_front", "lens_clear")
+    pylon("r", -2.635, BED_Y - 0.065, 0.90, 1.37, 135, "led_rear", "lens_red")
+    # the bar over the windshield: a housing on the roof's front edge, eight cells of LED
+    # modules behind one clear lens between dividers, a bolted top, amber lamps at its ends
+    x1, y1, zb, zt = 0.70, 0.655, ROOF + 0.008, ROOF + 0.05
     g = Geo()
-    g.prism([(0.70, -0.70, ROOF - 0.01), (0.70, -0.70, ROOF + 0.065), (0.56, -0.70, ROOF + 0.065),
+    g.prism([(0.675, -0.70, ROOF - 0.01), (0.675, -0.70, ROOF + 0.065), (0.56, -0.70, ROOF + 0.065),
              (0.50, -0.70, ROOF - 0.01)], (0, 1.40, 0))
+    g.box(((0.675 + x1) / 2, 0, (zt + ROOF + 0.065) / 2), (x1 - 0.675, 1.40, ROOF + 0.065 - zt))
+    g.box(((0.675 + x1) / 2, 0, (zb + ROOF - 0.01) / 2), (x1 - 0.675, 1.40, zb - ROOF + 0.01))
+    for sg in (1, -1):
+        g.box(((0.675 + x1) / 2, sg * (y1 + 0.70) / 2, (zb + zt) / 2), (x1 - 0.675, 0.70 - y1, zt - zb))
+    for k in range(1, 8):
+        y = -y1 + 2 * y1 * k / 8
+        g.box(((0.675 + x1) / 2 + 0.003, y, (zb + zt) / 2), (x1 - 0.675 + 0.006, 0.014, zt - zb))
+    g.obj("roofbar", "cladding", bevel=0.003)
+    g = Geo()
     for k in range(9):
         y = -0.64 + 1.28 * k / 8
-        g.box((0.704, y, ROOF + 0.028), (0.012, 0.016, 0.05))
-    g.obj("roofbar", "cladding", bevel=0.004)
+        bolt(g, (0.685, y, ROOF + 0.065), (0, 0, 1), 0.006, 0.0035)
+    g.obj("roofbar.bolts", "rim_bright")
+    L = K.Lamp("lamp.roofbar", lit="led_front")
+    L.chrome.box((0.677, 0, (zb + zt) / 2), (0.004, 2 * y1, zt - zb))
+    for k in range(8):
+        yc = -y1 + 2 * y1 * (k + 0.5) / 8
+        L.leds((0.69, yc - 0.06, (zb + zt) / 2), (0.69, yc + 0.06, (zb + zt) / 2), 3, (1, 0, 0),
+               r=0.015)
+    L.glass.box((0.6955, 0, (zb + zt) / 2), (0.003, 2 * y1, zt - zb))
+    L.obj()
+    # its amber end lamps: a window in a bolted end plate, a reflector in the pocket behind
     g = Geo()
-    g.box((0.701, 0, ROOF + 0.028), (0.006, 1.27, 0.036))
-    g.obj("led.roofbar", "led_front")
-    g = Geo()                                           # amber clearance lamps at its ends
-    g.box((0.63, 0.704, ROOF + 0.03), (0.07, 0.006, 0.03))
-    g.obj("led.clear", "led_accent", mirror=True)
-    # work lamps on the sail frame's crossbar, a stop strip over the rear window
-    g = Geo()
-    for y in (0.34, -0.34):
-        g.box((-1.165, y, ROOF - 0.005), (0.008, 0.13, 0.05))
-    g.obj("led.work", "lamp")
-    g = Geo()
-    g.box((-1.012, 0, 1.795), (0.012, 0.50, 0.022))
-    g.obj("led.stop", "led_rear")
+    xa, xb, za, zc = 0.60, 0.67, ROOF + 0.012, ROOF + 0.046
+    for (x0, x2), (z0, z2) in (((0.56, xa), (ROOF - 0.01, ROOF + 0.065)),
+                               ((xb, x1), (ROOF - 0.01, ROOF + 0.065)),
+                               ((xa, xb), (ROOF - 0.01, za)), ((xa, xb), (zc, ROOF + 0.065))):
+        g.box(((x0 + x2) / 2, 0.711, (z0 + z2) / 2), (x2 - x0, 0.022, z2 - z0))
+    g.obj("roofbar.ends", "paint2", bevel=0.0015, mirror=True)
+    A = K.Lamp("lamp.roofbar_end", lit="led_accent", glass="lens_amber")
+    A.reflector(((xa + xb) / 2, 0.7155, (za + zc) / 2), (0, 1, 0), r=0.016, depth=0.012)
+    A.glass.box(((xa + xb) / 2, 0.7195, (za + zc) / 2), (xb - xa, 0.003, zc - za))
+    A.obj(mirror=True)
+    # work lamps on the sail frame's crossbar, facing the bed: a pocket each, two reflectors
+    g, gg = Geo(), Geo()
+    zc, x0, x2 = ROOF - 0.005, -1.215, -1.158
+    for (y0, y2), (z0, z2) in (((0.26, 0.42), (zc - 0.04, zc - 0.028)),
+                               ((0.26, 0.42), (zc + 0.028, zc + 0.04)),
+                               ((0.26, 0.275), (zc - 0.028, zc + 0.028)),
+                               ((0.405, 0.42), (zc - 0.028, zc + 0.028))):
+        g.box(((x0 + x2) / 2, (y0 + y2) / 2, (z0 + z2) / 2), (x2 - x0, y2 - y0, z2 - z0))
+    g.box(((-1.162 + x2) / 2, 0.34, zc), (x2 + 1.162, 0.16, 0.08))
+    for y in (0.30, 0.38):
+        tube(gg, (x0 - 0.008, y, zc - 0.034), (x0 - 0.008, y, zc + 0.034), 0.003, 8)
+    g.obj("work.lamps", "cladding", bevel=0.002, mirror=True)
+    gg.obj("work.guards", "rim", mirror=True)
+    W = K.Lamp("lamp.work", lit="lamp")
+    for y in (0.307, 0.373):
+        W.reflector((-1.185, y, zc), (-1, 0, 0), r=0.027, depth=0.016)
+    W.glass.box((-1.2075, 0.34, zc), (0.003, 0.13, 0.056))
+    W.obj(mirror=True)
+    # the stop lamp over the rear window: ten LEDs behind a red lens in a slim housing
+    S = K.Lamp("lamp.stop", lit="led_rear", glass="lens_red")
+    for (y0, y2), (z0, z2) in (((-0.27, 0.27), (1.775, 1.785)), ((-0.27, 0.27), (1.81, 1.82)),
+                               ((-0.27, -0.25), (1.785, 1.81)), ((0.25, 0.27), (1.785, 1.81))):
+        S.housing.box((-1.016, (y0 + y2) / 2, (z0 + z2) / 2), (0.028, y2 - y0, z2 - z0))
+    S.leds((-1.014, -0.24, 1.7975), (-1.014, 0.24, 1.7975), 10, (-1, 0, 0), r=0.0105)
+    S.glass.box((-1.0265, 0, 1.7975), (0.003, 0.50, 0.025))
+    S.obj()
 
 
 def build_bumpers():
@@ -507,6 +505,9 @@ def build_cab():
         for z in (0.98, 1.19):
             g.box((x, side_y(z) + 0.008, z), (0.06, 0.022, 0.085))
             tube(g, (x, side_y(z) + 0.02, z - 0.05), (x, side_y(z) + 0.02, z + 0.05), 0.011, 8)
+    x, z, w, h = FLAP                       # the fuel flap's hinge on its front edge
+    tube(g, (x + w / 2 - 0.004, side_y(z) + 0.004, z - 0.03),
+         (x + w / 2 - 0.004, side_y(z) + 0.004, z + 0.03), 0.0055, 8)
     g.obj("door.hardware", "cladding", bevel=0.003, mirror=True)
     # mirrors: a plate on a tube frame
     g = Geo()
@@ -525,20 +526,18 @@ def build_cab():
     g = Geo()
     g.box((-1.014, 0, 1.55), (0.006, 1.10, 0.29))
     g.obj("rearwin.glass", "gloss_black")
-    g = Geo()
+    g, gr = Geo(), Geo()                    # wipers at rest on the glass, both parked left
     for y0 in (0.07, -0.43):
-        blade = []
-        for k in range(7):
-            t = k / 6
-            loc, n = on_body(y0 + 0.40 * t, 1.345 + 0.33 * t, 'x')
-            blade.append(loc + n * 0.016)
-        g.sweep(blade, [(-0.005, -0.009), (0.005, -0.009), (0.005, 0.007), (-0.005, 0.007)],
-                up=(1, 0, 0.5))
-        piv, n = on_body(y0 + 0.02, 1.30, 'x')
-        tube(g, piv + n * 0.012, blade[3] + n * 0.012, 0.006, 6)
+        piv = on_body(y0 + 0.02, 1.30, 'x')[0]
+        a, b = on_body(y0, 1.345, 'x')[0], on_body(y0 + 0.40, 1.675, 'x')[0]
+        if piv is not None and a is not None and b is not None:
+            K.wiper(g, gr, piv, a, b)
+    gr.obj("wiper.blades", "rubber")
+    g.obj("wipers", "cladding", bevel=0.001)
+    g = Geo()                               # the antenna
     tube(g, (-0.70, 0.50, ROOF), (-0.76, 0.50, ROOF + 0.20), 0.006, 6, r2=0.003)
     g.box((-0.70, 0.50, ROOF + 0.008), (0.06, 0.06, 0.02))
-    g.obj("wipers", "cladding", bevel=0.001)
+    g.obj("antenna", "cladding", bevel=0.001)
     # roof ribs
     g = Geo()
     sec = [(-0.03, 0.0), (0.03, 0.0), (0.018, 0.012), (-0.018, 0.012)]
@@ -633,7 +632,7 @@ def build_bolts():
     row([(0.52 - k * 0.205, 0.575) for k in range(8)], 'z')              # roof plate
     row([(-0.94, 0.07 + k * 0.14) for k in range(4)], 'z')
     row([(0.92 - k * 0.152, 0.70) for k in range(13)], 'y')              # sill
-    row([(-0.925, 0.92 + k * 0.10) for k in range(4)], 'y')              # quarter
+    row([(-0.925, 0.92), (-0.925, 1.22)], 'y')                           # quarter
     row([(0.985 - k * 0.012, 0.92 + k * 0.10) for k in range(4)], 'y')   # door's front edge
     row([(0.90 - 0.055 * k, 1.36 + 0.105 * k) for k in range(4)], 'y')   # pillar gusset
     row([(1.22, 0.86), (1.16, 1.00), (1.10, 1.14)], 'y')                 # cowl flare
@@ -677,27 +676,16 @@ def build_lettering():
 # ---------------------------------------------------------------------------------------
 # suspension and driveline
 # ---------------------------------------------------------------------------------------
-def coil(g, gs, a, b, r=0.02):
-    """A damper from a to b with a spring round its upper two thirds."""
-    a, b = V3(a), V3(b)
-    tube(g, a, b, r, 10)
-    tube(g, a.lerp(b, 0.25), a.lerp(b, 0.30), 0.055, 12)
-    tube(g, a.lerp(b, 0.90), a.lerp(b, 0.94), 0.055, 12)
-    for k in range(8):
-        t = 0.32 + 0.57 * k / 8
-        tube(gs, a.lerp(b, t), a.lerp(b, t + 0.035), 0.05, 12)
-
-
 def build_chassis():
     g, gs = Geo(), Geo()
     x = FA_X
     # front: double wishbones, upright, tie rod, half shaft
     for xi in (x - 0.19, x + 0.19):
         tube(g, (xi, 0.38, 0.50), (x, 0.80, 0.33), 0.024, 4, phase=pi / 4)
-        tube(g, (xi - 0.03 * (1 if xi < x else -1), 0.50, 0.86), (x, 0.79, 0.63), 0.02, 4,
-             phase=pi / 4)
-    g.box((x, 0.805, 0.47), (0.10, 0.05, 0.36))
-    tube(g, (x + 0.16, 0.40, 0.60), (x + 0.15, 0.79, 0.52), 0.012)
+        tube(g, (xi - 0.03 * (1 if xi < x else -1), 0.50, 0.78), (x, 0.79, 0.58), 0.02, 4,
+             phase=pi / 4)                  # its ball joint low in the rim, clear of the tire
+    g.box((x, 0.805, 0.455), (0.10, 0.05, 0.33))
+    tube(g, (x + 0.10, 0.40, 0.58), (x + 0.08, 0.77, 0.52), 0.012)      # tie rod
     tube(g, (x, 0.36, 0.50), (x, 0.80, 0.45), 0.026, 10)
     tube(g, (x, 0.42, 0.495), (x, 0.50, 0.485), 0.05, 10, r2=0.03)
     coil(g, gs, (x, 0.66, 0.39), (x, 0.56, 1.0))
@@ -706,7 +694,7 @@ def build_chassis():
     tube(g, (x, 0.0, T_R), (x, 0.80, T_R), 0.055, 10)
     tube(g, (-0.95, 0.52, 0.52), (x, 0.60, 0.40), 0.026, 4, phase=pi / 4)
     tube(g, (-0.95, 0.30, 0.60), (x, 0.24, 0.52), 0.02, 4, phase=pi / 4)
-    coil(g, gs, (x - 0.02, 0.675, 0.43), (x + 0.10, 0.665, 0.99), 0.018)
+    coil(g, gs, (x - 0.02, 0.655, 0.43), (x + 0.10, 0.645, 0.99), 0.018)
     g.obj("chassis", "rim", bevel=0.003, mirror=True)
     gs.obj("springs", "caliper", bevel=0.004, mirror=True)
     g = Geo()
@@ -719,121 +707,15 @@ def build_chassis():
 
 
 # ---------------------------------------------------------------------------------------
-# wheels: a lugged tire on a dished steel rim with a bolted bead ring
-# ---------------------------------------------------------------------------------------
-N_LUG = 22
-TIRE_TEXT = "BRAKK  TRAKTOR  M/T    37 X 12.5 R19    "
-
-
-def build_wheel(tag, cx, side, loc=None, yaw=0.0):
-    R, w, Rr = T_R, T_W, T_RIM
-    hw = w / 2
-    flip = side < 0
-    loc = (cx, side * (T_OUT - hw), R) if loc is None else loc
-    n0 = len(K.CAR.objects)
-    Rb = R - 0.024
-    half = [(0.0, Rb), (hw - 0.035, Rb), (hw - 0.008, Rb - 0.018), (hw + 0.010, R - 0.057),
-            (hw + 0.018, R - 0.08), (hw + 0.018, Rr + 0.07), (hw + 0.010, Rr + 0.032),
-            (hw + 0.004, Rr + 0.012), (hw - 0.010, Rr + 0.004), (hw - 0.03, Rr - 0.006)]
-    g = Geo()
-    g.lathe([(-y, r) for y, r in half[:0:-1]] + half, 88)
-
-    def pt(th, t, y, r):
-        a = th + t / R
-        return (r * cos(a), y, r * sin(a))
-    for k in range(N_LUG):
-        th = 2 * pi * k / N_LUG
-        for sg, off in ((1, 0.0), (-1, 0.5)):                   # shoulder lugs with side biters
-            t0 = (off - 0.30) * 2 * pi * R / N_LUG
-            t1 = t0 + 0.085
-            sk = 0.035
-            yi, yo = sg * 0.042, sg * (hw + 0.006)
-            ys = sg * (hw + 0.024)
-            g.hexa([pt(th, t0, yi, Rb - 0.01), pt(th, t1, yi, Rb - 0.01),
-                    pt(th, t1 - sk, ys, R - 0.085), pt(th, t0 - sk, ys, R - 0.085),
-                    pt(th, t0, yi, R), pt(th, t1, yi, R),
-                    pt(th, t1 - sk, yo, R - 0.012), pt(th, t0 - sk, yo, R - 0.012)])
-        for off in (0.22, 0.72):                                # the middle row
-            t0 = (off - 0.2) * 2 * pi * R / N_LUG
-            t1 = t0 + 0.045
-            g.hexa([pt(th, t0, -0.03, Rb - 0.01), pt(th, t1, -0.03, Rb - 0.01),
-                    pt(th, t1 + 0.012, 0.03, Rb - 0.01), pt(th, t0 + 0.012, 0.03, Rb - 0.01),
-                    pt(th, t0, -0.03, R), pt(th, t1, -0.03, R),
-                    pt(th, t1 + 0.012, 0.03, R), pt(th, t0 + 0.012, 0.03, R)])
-    ob = g.obj("tire." + tag, "rubber", flip_y=flip, loc=loc)
-    ob.data.shade_smooth()
-    ob.data.set_sharp_from_angle(angle=rad(30))
-    # sidewall lettering, reading the right way round on both sides
-    g = Geo()
-    rt = (R - 0.08 + Rr + 0.07) / 2
-    sgn = 1 if not flip else -1
-    a = rad(90) - sgn * 0.5
-    for rep in range(2):
-        for ch in TIRE_TEXT:
-            if ch == " ":
-                a += sgn * 0.022 / rt
-                continue
-            vs, fs = K.text_mesh(ch, 0.062)
-            x0, x1 = min(v.x for v in vs), max(v.x for v in vs)
-            adv = (x1 - x0) + 0.008
-            am = a + sgn * (adv / 2) / rt
-            rad_ = V3((cos(am), 0, sin(am)))
-            rgt = V3((-sin(am), 0, cos(am))) * sgn
-            o = rad_ * rt + V3((0, hw + 0.0195, 0))
-            g.add([o + rgt * (v.x - (x0 + x1) / 2) + rad_ * v.y for v in vs], fs)
-            a += sgn * adv / rt
-        a = rad(270) - sgn * 0.5
-    g.obj("tiretext." + tag, "tiremark", flip_y=flip, loc=loc)
-    # rim: barrel, a deep dish with eight round windows, the hub
-    g = Geo()
-    g.lathe([(-hw + 0.03, Rr), (hw - 0.012, Rr), (hw - 0.012, Rr - 0.014),
-             (-hw + 0.03, Rr - 0.014)], 56)
-    y_a, r_a, y_b, r_b = hw - 0.045, Rr - 0.014, hw - 0.115, 0.105
-    g.lathe([(y_a, r_a), (y_b, r_b), (y_b - 0.014, r_b), (y_a - 0.014, r_a)], 56)
-    g.lathe([(hw - 0.135, 0.004), (hw - 0.135, 0.108), (hw - 0.092, 0.108), (hw - 0.08, 0.092),
-             (hw - 0.08, 0.004)], 16)
-    g.obj("rim." + tag, "rim", bevel=0.004, flip_y=flip, loc=loc)
-    gv, gbr = Geo(), Geo()
-    L = hypot(y_b - y_a, r_b - r_a)
-    ny, nr = -(r_b - r_a) / L, (y_b - y_a) / L                  # the dish's normal, outward
-    for k in range(8):
-        a = 2 * pi * (k + 0.5) / 8
-        s = 0.47
-        y, r = y_a + (y_b - y_a) * s, r_a + (r_b - r_a) * s
-        stud(gv, V3((r * cos(a), y, r * sin(a))), V3((nr * cos(a), ny, nr * sin(a))).normalized(),
-             [(-0.004, 0.001), (-0.004, 0.027), (0.0012, 0.027), (0.0012, 0.001)], 14)
-        an = 2 * pi * k / 8
-        gbr.lathe([(hw - 0.081, 0.002), (hw - 0.081, 0.0125), (hw - 0.06, 0.0125),
-                   (hw - 0.06, 0.002)], 6,
-                  xf=Matrix.Translation((0.07 * cos(an), 0, 0.07 * sin(an))))
-    gv.obj("rimholes." + tag, "void", flip_y=flip, loc=loc)
-    gbr.lathe([(hw - 0.081, 0.004), (hw - 0.081, 0.048), (hw - 0.04, 0.044), (hw - 0.032, 0.03),
-               (hw - 0.032, 0.004)], 8)
-    gbr.lathe([(hw - 0.016, Rr - 0.032), (hw - 0.016, Rr + 0.015), (hw + 0.001, Rr + 0.015),
-               (hw + 0.001, Rr - 0.032)], 56)
-    for k in range(16):
-        a = 2 * pi * (k + 0.5) / 16
-        rr = Rr - 0.009
-        gbr.lathe([(hw, 0.001), (hw, 0.0085), (hw + 0.007, 0.0085), (hw + 0.007, 0.001)], 6,
-                  xf=Matrix.Translation((rr * cos(a), 0, rr * sin(a))))
-    gbr.obj("hub." + tag, "rim_bright", bevel=0.0015, flip_y=flip, loc=loc)
-    g = Geo()
-    g.lathe([(-hw + 0.05, 0.004), (-hw + 0.05, Rr - 0.014), (-hw + 0.035, Rr - 0.014),
-             (-hw + 0.035, 0.004)], 32)
-    g.obj("drum." + tag, "well", flip_y=flip, loc=loc)
-    for ob in list(K.CAR.objects)[n0:]:
-        ob.rotation_euler = (0, 0, yaw)
-
-
-# ---------------------------------------------------------------------------------------
 # interior
 # ---------------------------------------------------------------------------------------
 def build_interior():
     g = Geo()
-    g.box((0.0, 0, 0.535), (1.92, 1.56, 0.04))
-    g.box((-0.955, 0, 1.0), (0.04, 1.6, 0.92))
-    g.prism([(1.02, -0.82, 0.86), (1.02, -0.82, 1.265), (0.80, -0.82, 1.265), (0.68, -0.82, 1.17),
-             (0.72, -0.82, 0.86)], (0, 1.64, 0))
+    g.box((0.0, 0, 0.535), (1.92, 1.44, 0.04))         # inside the floor's slope, out of
+    g.prism([(-0.975, -0.72, 0.54), (-0.975, 0.72, 0.54), (-0.975, 0.85, 0.82),   # the wells
+             (-0.975, 0.80, 1.46), (-0.975, -0.80, 1.46), (-0.975, -0.85, 0.82)], (0.04, 0, 0))
+    g.prism([(0.99, -0.78, 0.86), (0.99, -0.78, 1.25), (0.80, -0.78, 1.265), (0.68, -0.78, 1.17),
+             (0.72, -0.78, 0.86)], (0, 1.56, 0))
     g.box((0.20, 0, 0.72), (0.9, 0.22, 0.36))
     g.obj("interior.tub", "interior", bevel=0.006)
     g = Geo()
@@ -916,6 +798,11 @@ def main():
             [(-0.004, -0.03), (0.004, -0.03), (0.004, 0.03), (-0.004, 0.03)], up=(0, 1, 0))
     g.obj("spare.strap", "mark", bevel=0.001)
     K.log("wheels")
+    # one-sided by design: the driver's wheel and screens on the left, both wipers parked to
+    # the left, the antenna on the left, the winch hook hung off its rollers, the tread
+    # plate's lozenges leaning in turn
+    K.meant("symmetry", "antenna", "wipers", "wiper.blades", "interior.wheel",
+            "interior.screens", "hooks", "winch.rollers", "bed.tread")
     K.shoot()
 
 

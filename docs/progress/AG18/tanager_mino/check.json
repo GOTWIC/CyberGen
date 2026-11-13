@@ -1,12 +1,12 @@
 {
  "car": "tanager_mino",
  "size": [
-  3.43,
+  3.433,
   1.871,
-  1.639
+  1.632
  ],
  "top_z": 1.632,
- "objects": 110,
+ "objects": 141,
  "palette": {
   "paint": [
    0.7,
@@ -22,59 +22,57 @@
   "paint2_finish": "gloss"
  },
  "tires": {
-  "verdict": "fail",
+  "verdict": "ok",
   "wheels": [
    {
     "tag": "fl",
-    "clearance_mm": 0.0,
-    "nearest": "interior.tub",
+    "clearance_mm": 51.9,
+    "nearest": "body.clad",
     "at": [
-     1.1,
-     0.589,
-     0.497
+     1.557,
+     0.708,
+     0.275
     ],
-    "foot_mm": -7.0,
-    "steer_hits": "interior.tub",
-    "steer_deg": 0,
-    "verdict": "fail"
+    "foot_mm": 0.0,
+    "steer_deg": 35,
+    "verdict": "ok"
    },
    {
     "tag": "rl",
-    "clearance_mm": 0.0,
-    "nearest": "interior.tub",
+    "clearance_mm": 54.0,
+    "nearest": "body.clad",
     "at": [
-     -1.1,
-     0.589,
-     0.497
+     -1.559,
+     0.697,
+     0.268
     ],
-    "foot_mm": -7.0,
-    "verdict": "fail"
+    "foot_mm": 0.0,
+    "verdict": "ok"
    },
    {
     "tag": "fr",
-    "clearance_mm": 0.0,
-    "nearest": "interior.tub",
+    "clearance_mm": 51.9,
+    "nearest": "body.clad",
     "at": [
-     1.1,
-     -0.589,
-     0.497
+     1.557,
+     -0.708,
+     0.275
     ],
-    "foot_mm": -7.0,
-    "steer_hits": "interior.tub",
-    "steer_deg": 0,
-    "verdict": "fail"
+    "foot_mm": 0.0,
+    "steer_deg": 35,
+    "verdict": "ok"
    },
    {
     "tag": "rr",
-    "clearance_mm": 0.0,
-    "nearest": "interior.tub",
+    "clearance_mm": 54.0,
+    "nearest": "body.clad",
     "at": [
-     -1.1,
-     -0.589,
-     0.497
+     -1.559,
+     -0.697,
+     0.268
     ],
-    "foot_mm": -7.0,
-    "verdict": "fail"
+    "foot_mm": 0.0,
+    "verdict": "ok"
    }
   ]
  },
@@ -87,7 +85,7 @@
  "symmetry": {
   "verdict": "look",
   "center_off_mm": 0.0,
-  "objects": 9,
+  "objects": 1,
   "asymmetric": [
    {
     "object": "interior.wheel",
@@ -96,7 +94,8 @@
      0.722,
      0.36,
      1.154
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "interior.screens",
@@ -105,7 +104,8 @@
      0.752,
      0.26,
      1.057
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "antenna",
@@ -114,7 +114,8 @@
      -1.367,
      -0.283,
      1.598
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "tow.eye",
@@ -123,7 +124,8 @@
      1.706,
      -0.36,
      0.232
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "wipers",
@@ -132,7 +134,38 @@
      1.128,
      0.145,
      1.118
-    ]
+    ],
+    "meant": true
+   },
+   {
+    "object": "body.fender",
+    "off_mm": 14.0,
+    "at": [
+     1.406,
+     0.74,
+     0.781
+    ],
+    "meant": true
+   },
+   {
+    "object": "display.front",
+    "off_mm": 10.0,
+    "at": [
+     1.696,
+     0.138,
+     0.66
+    ],
+    "meant": true
+   },
+   {
+    "object": "display.rear",
+    "off_mm": 10.0,
+    "at": [
+     -1.636,
+     -0.095,
+     0.882
+    ],
+    "meant": true
    },
    {
     "object": "permit",
@@ -141,24 +174,56 @@
      1.1,
      -0.355,
      1.087
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "permit.text",
     "off_mm": 7.2,
     "at": [
      1.097,
-     -0.387,
+     -0.384,
      1.099
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "permit.mark",
     "off_mm": 7.2,
     "at": [
-     1.078,
+     1.091,
      -0.362,
-     1.134
+     1.109
+    ],
+    "meant": true
+   },
+   {
+    "object": "pixels.front",
+    "off_mm": 4.0,
+    "at": [
+     1.702,
+     0.236,
+     0.672
+    ],
+    "meant": true
+   },
+   {
+    "object": "pixels.rear",
+    "off_mm": 4.0,
+    "at": [
+     -1.643,
+     -0.342,
+     0.874
+    ],
+    "meant": true
+   },
+   {
+    "object": "body.screen",
+    "off_mm": 3.8,
+    "at": [
+     0.936,
+     0.38,
+     1.44
     ]
    },
    {
@@ -168,7 +233,8 @@
      1.715,
      -0.367,
      0.497
-    ]
+    ],
+    "meant": true
    }
   ]
  },
@@ -177,10 +243,11 @@
   "open_edges": [],
   "open_mm": 0,
   "cutter_holes": [],
+  "cut_loops": 10,
   "pieces": {
    "body": {
     "closed": true,
-    "panels": 12
+    "panels": 13
    }
   }
  },
@@ -191,28 +258,28 @@
  },
  "triangles": {
   "verdict": "ok",
-  "total": 223689,
+  "total": 276187,
   "budget": 400000,
   "top": [
    [
     "tire.fl",
-    14384
+    12944
    ],
    [
     "tire.rl",
-    14384
+    12944
    ],
    [
     "tire.fr",
-    14384
+    12944
    ],
    [
     "tire.rr",
-    14384
+    12944
    ],
    [
     "body.clad",
-    11624
+    11828
    ],
    [
     "seal.side",
@@ -223,18 +290,26 @@
     8310
    ],
    [
-    "body.roof",
-    7096
+    "body.nose",
+    8098
    ]
   ],
   "groups": [
    [
-    "tire",
-    57536
+    "body",
+    67538
    ],
    [
-    "body",
-    56700
+    "tire",
+    51776
+   ],
+   [
+    "lamp",
+    31344
+   ],
+   [
+    "visor",
+    25184
    ],
    [
     "seal",
@@ -242,7 +317,7 @@
    ],
    [
     "bumper",
-    11212
+    11628
    ],
    [
     "lettering",
@@ -251,16 +326,8 @@
    [
     "cover",
     10272
-   ],
-   [
-    "led",
-    7052
-   ],
-   [
-    "bump",
-    6920
    ]
   ]
  },
- "verdict": "fail"
+ "verdict": "look"
 }

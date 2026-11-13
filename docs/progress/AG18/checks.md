@@ -8,18 +8,18 @@
 | [aurel_regent](aurel_regent/check.json) | FAIL: 0.1 mm to interior.tub, steers 5 deg | ok: 150.0 mm (body.floor) | look: 2 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 228554 |
 | [aurel_zenith](aurel_zenith/check.json) | ok: none (hover) | ok: 270.3 mm (emitter.crest) | look: 1 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 129135 |
 | [brakk_bastion](brakk_bastion/check.json) | ok: 25.8 mm to fender.gussets, steers 20 deg | ok: 280.0 mm (chassis) | look: 13 objects | ok: 0 open runs, 0 cutter holes | look: 2 parts | ok: 269389 |
-| [brakk_hauler](brakk_hauler/check.json) | look: 7.1 mm to chassis, steers 0 deg | ok: 290.0 mm (chassis) | look: 6 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 230460 |
+| [brakk_hauler](brakk_hauler/check.json) | ok: 33.1 mm to springs, steers 20 deg | ok: 290.0 mm (chassis) | ok: 0 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 259196 |
 | [brakk_mule](brakk_mule/check.json) | look: 22.2 mm to fender.plates, steers 20 deg | ok: 280.0 mm (chassis) | look: 34 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 364552 |
 | [halcyon_ridge](halcyon_ridge/check.json) | look: 14.5 mm to body.well, steers 0 deg | ok: 237.8 mm (skid.front) | look: 4 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 223779 |
 | [halcyon_sable](halcyon_sable/check.json) | look: 4.8 mm to body.well, steers 0 deg | ok: 100.0 mm (splitter) | look: 2 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 250465 |
 | [kestrel_atlas](kestrel_atlas/check.json) | ok: none (hover) | ok: 374.4 mm (pod.skid.r) | look: 19 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 151203 |
-| [kestrel_dart](kestrel_dart/check.json) | ok: none (hover) | ok: 317.0 mm (led.keel) | look: 5 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 72340 |
+| [kestrel_dart](kestrel_dart/check.json) | ok: none (hover) | ok: 325.0 mm (keel) | look: 3 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 112558 |
 | [kestrel_meridian](kestrel_meridian/check.json) | ok: none (hover) | ok: 327.0 mm (led.keel) | look: 9 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 90334 |
 | [orrin_aria](orrin_aria/check.json) | FAIL: 0.0 mm to body.front, steers 0 deg | ok: 131.8 mm (body.floor) | look: 2 objects | look: 0 open runs, 12 cutter holes | ok: 0 parts | look: 501460 |
-| [orrin_lumen](orrin_lumen/check.json) | FAIL: 2.8 mm to body.well, steers 0 deg | ok: 130.0 mm (body.floor) | look: 2 objects | look: 0 open runs, 6 cutter holes | look: 1 parts | ok: 293582 |
+| [orrin_lumen](orrin_lumen/check.json) | look: 14.6 mm to body.well, steers 0 deg | ok: 130.0 mm (body.floor) | look: 2 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 356940 |
 | [orrin_pebble](orrin_pebble/check.json) | FAIL: 0.0 mm to body.well, steers 0 deg | ok: 143.3 mm (body.floor) | look: 5 objects | look: 0 open runs, 10 cutter holes | ok: 0 parts | ok: 266030 |
 | [tanager_cab](tanager_cab/check.json) | FAIL: 0.0 mm to bumper.guards.rear, steers 0 deg | ok: 120.0 mm (mudflaps) | look: 39 objects | FAIL: 4 open runs, 0 cutter holes | look: 1 parts | ok: 285996 |
-| [tanager_mino](tanager_mino/check.json) | FAIL: 0.0 mm to interior.tub, steers 0 deg | ok: 110.0 mm (mudflaps) | look: 9 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 223689 |
+| [tanager_mino](tanager_mino/check.json) | ok: 51.9 mm to body.clad, steers 35 deg | ok: 110.0 mm (mudflaps) | look: 1 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 276187 |
 | [tanager_porter](tanager_porter/check.json) | FAIL: 0.0 mm to interior.tub, steers 0 deg | ok: 120.0 mm (mudflaps) | look: 87 objects | FAIL: 5 open runs, 0 cutter holes | look: 5 parts | ok: 314760 |
 | [vanta_r](vanta_r/check.json) | look: 12.8 mm to body.well, steers 0 deg | ok: 95.0 mm (splitter) | look: 5 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 304992 |
 
@@ -53,14 +53,9 @@
 - cabin part in the open: `interior.seats`, 1% of it, up to 29.9 mm from what would hide it, at (-1.012, -0.636, 1.505)
 - cabin part in the open: `interior.tub`, 5% of it, up to 9.9 mm from what would hide it, at (0.947, -0.607, 0.583)
 
-**brakk_hauler** (look)
+**brakk_hauler** (ok)
 
-- tire `fl`: 7.1 mm to `chassis`, turns 0 degrees before it touches `chassis`
-- tire `rl`: 13.5 mm to `springs`
-- tire `fr`: 7.1 mm to `chassis`, turns 0 degrees before it touches `chassis`
-- tire `rr`: 13.5 mm to `springs`
-- not mirrored: `wipers` 200.5 mm, `interior.wheel` 170.5 mm, `interior.screens` 96.3 mm, `hooks` 37.6 mm, `winch.rollers` 12.2 mm, `bed.tread` 4.0 mm
-- cabin part in the open: `interior.tub`, 41% of it, up to 33.4 mm from what would hide it, at (-0.969, 0.798, 0.542)
+- nothing
 
 **brakk_mule** (look)
 
@@ -97,8 +92,8 @@
 
 **kestrel_dart** (look)
 
-- not mirrored: `interior.yoke` 278.2 mm, `interior.screens` 83.7 mm, `interior.tub` 56.8 mm, `led.name` 5.6 mm, `fin.code` 3.2 mm
-- cabin part in the open: `interior.tub`, 8% of it, up to 48.2 mm from what would hide it, at (0.994, -0.559, 0.552)
+- not mirrored: `interior.yoke` 278.2 mm, `interior.screens` 83.7 mm, `fin.code` 3.2 mm
+- cabin part in the open: `interior.tub`, 2% of it, up to 4.5 mm from what would hide it, at (0.799, -0.394, 0.475)
 
 **kestrel_meridian** (look)
 
@@ -127,21 +122,14 @@
 - a cutter's hole inside `hip.hip`: 284 mm round, at (-1.293, -0.631, 0.777)
 - triangles: 501460 over the 400000 budget; most in `body` 139854, `hip` 105902, `pod` 103052, `tire` 57536
 
-**orrin_lumen** (FAIL)
+**orrin_lumen** (look)
 
-- tire `fl`: 2.8 mm to `body.well`, turns 0 degrees before it touches `body.well`
-- tire `rl`: 2.8 mm to `body.well`
-- tire `fr`: 2.8 mm to `body.well`, turns 0 degrees before it touches `body.well`
-- tire `rr`: 2.8 mm to `body.well`
+- tire `fl`: 14.6 mm to `body.well`, turns 0 degrees before it touches `body.well`
+- tire `rl`: 23.7 mm to `body.well`
+- tire `fr`: 14.6 mm to `body.well`, turns 0 degrees before it touches `body.well`
+- tire `rr`: 23.7 mm to `body.well`
 - not mirrored: `interior.wheel` 161.6 mm, `led.cabin` 8.3 mm
 - open ends of open pieces (meant): `deck.front.deck`, `deck.rear.deck`
-- a cutter's hole inside `body.front`: 801 mm round, at (1.111, 0.984, 0.473)
-- a cutter's hole inside `body.front`: 1169 mm round, at (2.316, -0.63, 0.362)
-- a cutter's hole inside `body.front`: 801 mm round, at (1.111, -0.984, 0.473)
-- a cutter's hole inside `body.front`: 1169 mm round, at (2.316, 0.63, 0.362)
-- a cutter's hole inside `body.rear`: 987 mm round, at (-2.293, -0.562, 0.502)
-- a cutter's hole inside `body.rear`: 987 mm round, at (-2.293, 0.562, 0.502)
-- cabin part in the open: `interior.tub`, 9% of it, up to 10.0 mm from what would hide it, at (-1.06, 0.73, 0.16)
 
 **orrin_pebble** (FAIL)
 
@@ -175,13 +163,9 @@
 - open edge: `body.quarter`, 1110 mm, at (-0.621, 0.878, 1.055)
 - cabin part in the open: `interior.card.l`, 21% of it, up to 37.0 mm from what would hide it, at (-0.656, 0.952, 0.326)
 
-**tanager_mino** (FAIL)
+**tanager_mino** (look)
 
-- tire `fl`: 0.0 mm to `interior.tub`, turns 0 degrees before it touches `interior.tub`, its foot -7.0 mm off the ground
-- tire `rl`: 0.0 mm to `interior.tub`, its foot -7.0 mm off the ground
-- tire `fr`: 0.0 mm to `interior.tub`, turns 0 degrees before it touches `interior.tub`, its foot -7.0 mm off the ground
-- tire `rr`: 0.0 mm to `interior.tub`, its foot -7.0 mm off the ground
-- not mirrored: `interior.wheel` 193.7 mm, `interior.screens` 93.6 mm, `antenna` 58.4 mm, `tow.eye` 48.6 mm, `wipers` 25.8 mm, `permit` 10.0 mm, `permit.text` 7.2 mm, `permit.mark` 7.2 mm, `tow.cover` 3.0 mm
+- not mirrored: `interior.wheel` 193.7 mm, `interior.screens` 93.6 mm, `antenna` 58.4 mm, `tow.eye` 48.6 mm, `wipers` 25.8 mm, `body.fender` 14.0 mm, `permit` 10.0 mm, `permit.text` 7.2 mm, `permit.mark` 7.2 mm, `display.front` 6.2 mm, `display.rear` 6.2 mm, `pixels.front` 4.5 mm
 
 **tanager_porter** (FAIL)
 
