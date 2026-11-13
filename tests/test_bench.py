@@ -73,6 +73,21 @@ def test_route_walks_drive_flight_teleport(tmp_path):
     assert B.route(tmp_path) == rt
 
 
+def test_lean_route(tmp_path):
+    """AT4 (Swagnik, 2026-11-12): the lean route: the first walk, the drive, the flight, no
+    teleport; the warm-up flies a third of the flight alone, the measured passes the rest."""
+    _build(tmp_path)
+    rt = B.route(tmp_path, lean=True)
+    assert [s["name"] for s in rt["segments"]] == ["walk_d02", "drive", "fly_150m", "warm_fly"]
+    fly, warm = rt["segments"][2], rt["segments"][3]
+    assert warm["group"] == "warm" and warm["points"][0] == fly["points"][0]
+    assert math.isclose(B._length(warm["points"]), B._length(fly["points"]) / 3.0, rel_tol=1e-3)
+    want = [p for p in B.ATMOS_PASSES if p[0] == "night_plan_all"]
+    jb = B.job(rt, tmp_path / "run1", want)
+    w, m = jb["passes"]
+    assert w["warm"] and w["segments"] == [3] and m["segments"] == [0, 1, 2]
+
+
 def test_job_has_a_warm_pass_first(tmp_path):
     _build(tmp_path)
     jb = B.job(B.route(tmp_path), tmp_path / "run1")

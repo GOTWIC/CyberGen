@@ -565,6 +565,7 @@ class Air:
                 "scatter": dict(sorted(P.SCATTER.items())), "beam_fog_gain": P.BEAM_FOG_GAIN,
                 "max_volumes": P.AIR_LIVE["volumes"], "volume_range_m": P.AIR_LIVE["volume_m"],
                 "emitter_range_m": P.AIR_LIVE["emitter_m"], "puffs": dict(P.PUFFS),
+                "steam_gain": P.STEAM_GAIN, "volume_glow": P.VOLUME_GLOW,
                 "cvars": dict(sorted(P.AIR_CVARS.items())),
                 "counts": dict(sorted(counts.items()))}
 

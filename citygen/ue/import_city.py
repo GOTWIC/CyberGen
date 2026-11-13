@@ -3894,7 +3894,7 @@ class Importer:
                 sky += [("fog_albedo", unreal.LinearColor(c[0], c[1], c[2], 1.0)),
                         ("fog", True), ("air", True)]
                 for k in ("fog_start_m", "fog_view_m", "fog_phase_g", "beam_fog_gain",
-                          "volume_range_m", "emitter_range_m"):
+                          "volume_range_m", "emitter_range_m", "steam_gain", "volume_glow"):
                     sky.append((k, float(ctl[k])))
                 sky.append(("max_volumes", int(ctl["max_volumes"])))
                 for k in ("fog_hours", "kind_scatter"):

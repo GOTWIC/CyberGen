@@ -1418,8 +1418,20 @@ FString ACityGenAtmos::PlumeDebug(const FString& Material)
 			I->PerInstanceSMCustomData.Num(), X.GetLocation().X, X.GetLocation().Y, X.GetLocation().Z,
 			X.GetScale3D().X, M ? *M->GetPathName() : TEXT("none"));
 	}
-	return FString::Printf(TEXT("{\"components\": %d, \"shown\": %s, \"near\": [%s]}"), PlumeComps.Num(),
-		bPlumesShown ? TEXT("true") : TEXT("false"), *Out);
+	FString First;
+	if (Near.Num() && Near[0].Value->GetInstanceCount() > 0)
+	{
+		const UInstancedStaticMeshComponent* I = Near[0].Value;
+		for (int32 c = 0; c < FMath::Min(I->NumCustomDataFloats, I->PerInstanceSMCustomData.Num()); ++c)
+		{
+			First += FString::Printf(TEXT("%s%.3f"), First.IsEmpty() ? TEXT("") : TEXT(", "), I->PerInstanceSMCustomData[c]);
+		}
+	}
+	const float MPCGain = AtmosCollection ? UKismetMaterialLibrary::GetScalarParameterValue(
+		const_cast<ACityGenAtmos*>(this), AtmosCollection, TEXT("SteamGain")) : -1.f;
+	return FString::Printf(TEXT("{\"components\": %d, \"shown\": %s, \"steam_gain\": %.2f, \"mpc_steam_gain\": %.2f, "
+		"\"first_data\": [%s], \"near\": [%s]}"), PlumeComps.Num(), bPlumesShown ? TEXT("true") : TEXT("false"),
+		SteamGain, MPCGain, *First, *Out);
 }
 
 void ACityGenAtmos::UpdatePlumeRates()

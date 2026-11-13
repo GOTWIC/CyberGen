@@ -95,6 +95,18 @@
      "title": "Scatter",
      "type": "object"
     },
+    "steam_gain": {
+     "default": 10.0,
+     "description": "The plumes' opacity gain.",
+     "title": "Steam Gain",
+     "type": "number"
+    },
+    "volume_glow": {
+     "default": 0.15,
+     "description": "The fog volumes' glow by night (their emissive's scale).",
+     "title": "Volume Glow",
+     "type": "number"
+    },
     "volume_range_m": {
      "title": "Volume Range M",
      "type": "number"
@@ -299,6 +311,13 @@
      "maximum": 1.0,
      "minimum": 0.0,
      "title": "Floor",
+     "type": "number"
+    },
+    "glow": {
+     "default": 0.0,
+     "description": "How much of the city's light it shows where no live light reaches it (its emissive, of its albedo).",
+     "minimum": 0.0,
+     "title": "Glow",
      "type": "number"
     },
     "hash": {

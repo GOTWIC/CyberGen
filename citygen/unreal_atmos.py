@@ -201,6 +201,8 @@ def air_settings(plan: dict) -> dict:
             "emitter_range_m": float(a["emitter_range_m"]),
             "emitter_kinds": list(EMITTER_KINDS),
             "puffs": [int(a["puffs"].get(k, 4)) for k in EMITTER_KINDS],
+            "steam_gain": float(a.get("steam_gain", 10.0)),
+            "volume_glow": float(a.get("volume_glow", 0.15)),
             "cvars": [f"{k}={v}" for k, v in sorted(a.get("cvars", {}).items())],
             "volumes": len(plan.get("volumes") or []),
             "emitters": len(plan.get("emitters") or [])}

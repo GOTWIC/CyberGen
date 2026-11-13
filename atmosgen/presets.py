@@ -603,6 +603,11 @@ STOVE_TYPES = ("shanty_stack",)
 AIR_LIVE = {"volumes": 24, "volume_m": 900.0, "emitter_m": 220.0}
 AIR_BUDGETS = {"volumes_per_tile": 24, "emitters_per_tile": 400}
 PUFFS = {"steam": 4, "exhaust": 4, "cooking": 3, "smoke": 6}      # cards per plume
+# the runtime's art direction (AT4's rounds on Delta): the plumes' opacity gain (a card's
+# opacity is its soft round puff times its life times its rate times this), and the city's
+# light the fog volumes glow with by night (their emissive, of their albedo times their glow)
+STEAM_GAIN = 10.0
+VOLUME_GLOW = 0.15
 # what the fog's mist and smog keep to (24 values: 0 to 23 h); `steam` is stronger in the
 # cool night air, `mist` forms after dusk and lies thickest before dawn
 AIR_SCHEDULES = {

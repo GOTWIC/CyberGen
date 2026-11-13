@@ -201,6 +201,9 @@ class Air(_Model):
     volume_range_m: float
     emitter_range_m: float
     puffs: dict[str, int] = Field(description="Cards per plume by emitter kind.")
+    steam_gain: float = Field(10.0, description="The plumes' opacity gain.")
+    volume_glow: float = Field(0.15, description="The fog volumes' glow by night (their "
+                                                 "emissive's scale).")
     cvars: dict[str, str] = Field(default_factory=dict,
                                   description="Engine settings the controller applies while "
                                               "it runs (the budget's room, AT4).")

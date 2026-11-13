@@ -1701,6 +1701,10 @@ and `emitters`) comes with the cells and the controller:
   air), `night_plan_proto` (AT3's `night_plan_all`: AT0's prototypes, no air, untuned),
   `night_plan_all_untuned`, and the exploring passes `x_*` (`bench._x`: the settings in
   `bench.TUNABLE` set by hand); `ATMOS_OFF` switches the air and the engine settings off too.
+  The lean route (`--bench-route lean`, `bench.route(..., lean=True)`, the default with
+  `--bench-atmos`, one run unless `--bench-runs`): the first walk, the drive and the flight,
+  no teleport, the warm-up passes flying a third of the flight (segment `warm_fly`, group
+  `warm`) and the measured passes the rest.
 
 ### A packaged game
 

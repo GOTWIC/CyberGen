@@ -270,9 +270,12 @@ def _thin(path: list, step_m: float = 2.0) -> list:
     return out
 
 
-def route(build: str | Path, man: dict | None = None) -> dict:
+def route(build: str | Path, man: dict | None = None, lean: bool = False) -> dict:
     """The benchmark's route through the city of `build` (its imported manifest and graphs):
-    segments in citygen meters, z the eye's absolute height."""
+    segments in citygen meters, z the eye's absolute height. `lean` (Swagnik, 2026-11-12:
+    the benchmarks were too slow): the first walk, the drive and the flight, no teleport,
+    and a short warm-up (`warm_fly`, the flight's first third, group `warm`, flown only by
+    the warm-up passes)."""
     build = Path(build)
     out = build / "unreal"
     man = man or json.loads((out / "manifest.json").read_text(encoding="utf-8"))
@@ -290,7 +293,7 @@ def route(build: str | Path, man: dict | None = None) -> dict:
                     b = t["bounds"]
                     by.setdefault(o["district"], []).append(
                         [(b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0, 0.0])
-    order = sorted(by, key=lambda d: (-len(by[d]), d))[:WALK_DISTRICTS]
+    order = sorted(by, key=lambda d: (-len(by[d]), d))[:1 if lean else WALK_DISTRICTS]
     segs = []
     for d in order:
         ps = by[d]
@@ -329,13 +332,20 @@ def route(build: str | Path, man: dict | None = None) -> dict:
                  "pitch_deg": FLY_PITCH,
                  "points": [[round(a[0], 2), round(a[1], 2), FLY_Z_M],
                             [round(b[0], 2), round(b[1], 2), FLY_Z_M]]})
+    if lean:
+        # (the warm-up's flight: the first third of the measured one)
+        w = (a[0] + (b[0] - a[0]) / 3.0, a[1] + (b[1] - a[1]) / 3.0)
+        segs.append({"name": "warm_fly", "group": "warm", "kind": "path",
+                     "speed_m_s": FLY_SPEED, "pitch_deg": FLY_PITCH,
+                     "points": [[round(a[0], 2), round(a[1], 2), FLY_Z_M],
+                                [round(w[0], 2), round(w[1], 2), FLY_Z_M]]})
     # the teleport: from the flight's end back to the first walk's start, on foot
-    if segs and segs[0]["group"] == "walk":
+    elif segs and segs[0]["group"] == "walk":
         p = segs[0]["points"][0]
         segs.append({"name": "teleport", "group": "teleport", "kind": "teleport",
                      "hold_s": HOLD_S, "pitch_deg": 0.0, "points": [p]})
     return {"version": ROUTE_VERSION, "city": man["city"], "districts": order,
-            "segments": segs}
+            "lean": lean, "segments": segs}
 
 
 def job(route_: dict, out_dir: Path, passes=PASSES, warm: bool = True,
@@ -354,6 +364,13 @@ def job(route_: dict, out_dir: Path, passes=PASSES, warm: bool = True,
             e["commands"] = list(p[3]) if len(p) > 3 else list(ATMOS_OFF)
         ps.append(e)
     fly = [i for i, s in enumerate(route_["segments"]) if s["group"] == "fly"]
+    # (a lean route: the warm-up flies its own short segment, the measured passes the rest)
+    short = [i for i, s in enumerate(route_["segments"]) if s["group"] == "warm"]
+    if short:
+        rest = [i for i, s in enumerate(route_["segments"]) if s["group"] != "warm"]
+        for e in ps:
+            e["segments"] = rest
+        fly = short
     if warm:
         nights = sorted({p[1] for p in passes})
         ps[:0] = [{"name": f"warm_{'night' if n else 'day'}", "night": n,
@@ -702,12 +719,13 @@ def run_game(root: Path, uproject: Path, level: str, job_path: Path, log: Path,
 def bench(build_dir: str | Path, uproject: str | Path, engine: str | None = None,
           runs: int = 3, passes=PASSES, label: str = "bench", out: str | Path | None = None,
           resolution=RESOLUTION, wait_idle: bool = True, timeout: float = 3600.0,
-          say=print, atmos: bool = False, rt: bool = False) -> dict:
+          say=print, atmos: bool = False, rt: bool = False, lean: bool = False) -> dict:
     """`citygen unreal --bench`: `runs` game processes over the route, each run's raw frames
     kept in BUILD/unreal/bench/<label>/run<k>, the results (`combine`) written to `out`
     (default docs/progress/AG16/bench/<city>/<label>). `atmos` (AT1): the passes switch the
     level's atmos controller (the import placed it with the city's plan; its assets made
-    first; `ATMOS_PASSES`); `rt` (AT0) hardware ray tracing on in the game."""
+    first; `ATMOS_PASSES`); `rt` (AT0) hardware ray tracing on in the game; `lean` the lean
+    route (`route`: one walk, the drive, the flight, a short warm-up)."""
     from .unreal import find_engine
     build = Path(build_dir).resolve()
     up = Path(uproject).resolve()
@@ -717,7 +735,7 @@ def bench(build_dir: str | Path, uproject: str | Path, engine: str | None = None
     man = json.loads((build / "unreal" / "manifest.json").read_text(encoding="utf-8"))
     level = f"{man['content_root']}/Maps/{man['folder']}"
     use_rt = rt
-    rt = route(build, man)
+    rt = route(build, man, lean=lean)
     raw = build / "unreal" / "bench" / label
     raw.mkdir(parents=True, exist_ok=True)
     # the play plugin drives the route: built as the import builds it (skipped when its

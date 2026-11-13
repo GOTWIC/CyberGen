@@ -51,6 +51,8 @@ def _model():
                                    "z1_m": 14.0}],
                        "roof_items": [{"kind": "mechanical", "position": [130.0, 275.0, 14.0],
                                        "size": [4.0, 3.0, 2.0], "yaw_deg": 0.0}]}],
+        "road_segments": [{"id": "rs.e100n50", "road_class": "street", "width_m": 12.0,
+                           "centerline": [[40.0, 50.0], [250.0, 50.0]]}],
         "props": [{"id": "d01.prop.food_stall.e60n100", "type": "prop.food_stall",
                    "attrs": {}, "position": [60.0, 100.0, 0.0], "yaw_deg": 0.0,
                    "scale": [1.0, 1.0, 1.0]}],
@@ -175,6 +177,17 @@ def test_pack_reader_finds_separate_disks(tmp_path):
     d = AR.disks(got[0][2])
     assert [(round(x, 2), round(y, 2)) for x, y, _ in d] == [(1.0, 2.0), (5.0, 2.0), (5.3, 9.0)]
     assert AR.street_details(tmp_path / "nothing") == {}
+
+
+def test_only_road_pieces_steam(city):
+    """A sidewalk piece's grates are tree pits: only a road segment's manholes and drains
+    steam (the pack read whole, the plan keeping the road pieces)."""
+    _glb(city / "assets" / "streets" / "t+00+01.glb", "rs.e100n50.swl",
+         [(60.0, 300.0, 0.2)])
+    assert "rs.e100n50.swl" in AR.street_details(city)
+    a, _ = _air(city)
+    assert a.report["manholes"] == 8
+    assert all(not e["owner_id"].endswith(".swl") for e in a.emitters)
 
 
 def test_air_check_finds_what_is_misplaced(city):

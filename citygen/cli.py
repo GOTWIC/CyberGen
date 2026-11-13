@@ -356,10 +356,14 @@ def cmd_unreal(args: argparse.Namespace) -> int:
                 print(f"error: --bench-passes: none of {', '.join(p[0] for p in allp)}",
                       file=sys.stderr)
                 return EXIT_USAGE
-            br = B.bench(build, args.uproject, engine=args.engine, runs=args.bench_runs,
+            # (the lean route and one run by default for atmosgen's benchmarks: Swagnik,
+            # 2026-11-12)
+            lean = (args.bench_route or ("lean" if args.bench_atmos else "full")) == "lean"
+            runs = args.bench_runs if args.bench_runs is not None else (1 if lean else 3)
+            br = B.bench(build, args.uproject, engine=args.engine, runs=runs,
                          passes=passes, label=args.bench_label, out=args.bench_out,
                          timeout=args.timeout, atmos=bool(args.bench_atmos),
-                         rt=args.bench_rt)
+                         rt=args.bench_rt, lean=lean)
             print(B.table(br))
             print(f"wrote {br['out']}")
     except (RuntimeError, FileNotFoundError, subprocess.TimeoutExpired) as e:
@@ -719,9 +723,13 @@ def build_parser() -> argparse.ArgumentParser:
                          "by day and night, native and at a 67%% screen percentage with TSR; "
                          "the results as JSON and a table in docs/progress/AG16/bench/<city>")
     ue.add_argument("--bench-only", action="store_true", help="the benchmark without importing")
-    ue.add_argument("--bench-runs", type=int, default=3,
-                    help="game processes over the route (default 3: the spread is the "
-                         "variance)")
+    ue.add_argument("--bench-runs", type=int, default=None,
+                    help="game processes over the route (default 3 on the full route, the "
+                         "spread is the variance; 1 on the lean route)")
+    ue.add_argument("--bench-route", choices=("full", "lean"), default=None,
+                    help="AT4: `lean` the first walk, the drive and the flight, no teleport, a "
+                         "short warm-up (default for --bench-atmos); `full` AG16's route "
+                         "(the default otherwise)")
     ue.add_argument("--bench-label", default="bench",
                     help="the results' folder under docs/progress/AG16/bench/<city> "
                          "(default bench)")

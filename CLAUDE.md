@@ -2313,7 +2313,13 @@ carriageway) and previewed in Blender; layer 3 of the manifest; a C++ runtime pl
 `CityGenAtmos`, beside `CityGenPlay`, that renders it (lights per tile, time of day,
 weather, effects, post) and takes over the play features' lamps, pools, washes, moon and
 night exposure. AG16's benchmark by night is its baseline; the night pass stays at or under
-16.7 ms p95 at native 1440p on the PC (decision 12.6). Package `atmosgen/` beside the
+16.7 ms p95 at native 1440p on the PC (decision 12.6). **Benchmarks** (Swagnik, 2026-11-12):
+the lean route (`--bench-route lean`, the default with `--bench-atmos`: one walk, the drive,
+the flight, no teleport, a short warm-up), only `night_plan_all` and the passes the change
+touches (`dusk_plan` only where it differs by dusk), one run (a second only within 0.3 ms of
+16.7 ms or when the run was flagged: foreground lost, CPU starved), no "before" run (the
+previous milestone's "after"); tune with quick GPU profiles at fixed viewpoints, not route
+runs. Package `atmosgen/` beside the
 others, which it reads only (citygen's model JSON, assetgen's `signs.json`); tests in
 `tests/atmosgen/` (`test_at_*.py`, no `conftest.py`).
 

@@ -321,7 +321,7 @@ its inputs.
   big cities overrun Nanite's root pages there.
 - **Baseline:** AG16's benchmark (`citygen unreal ... --bench`: a fixed route by day and by
   night, frame times p50, p95 and p99, hitches, GPU and VRAM) before AT0 and after every
-  AT milestone. AG16's proposed targets for Delta at 1440p are 16.7 ms p50 and 25 ms p95
+  AT milestone (since AT4 the lean route, one run: decision 12.6). AG16's proposed targets for Delta at 1440p are 16.7 ms p50 and 25 ms p95
   walking; atmosgen's lights, shadows, fog and volumetrics live within what is left.
 - **Many lights:** a night city wants thousands of lights near the view. MegaLights (if it
   is production-ready in 5.8) or the tiers of 6.1, measured in AT0: MegaLights is still
@@ -366,7 +366,14 @@ All six were answered on 2026-11-10, before AT0.
    down by wealth from the archetype's mood in `presets.MOOD`).
 6. **The night's frame budget:** the night pass stays at or under 16.7 ms p95 at native
    1440p on the PC, by AG16's benchmark (Delta's night was 12.6 ms p95 after AG16, so about
-   4 ms for atmosgen), run by night before and after every AT milestone.
+   4 ms for atmosgen), run by night after every AT milestone. How (Swagnik, 2026-11-12: the
+   benchmarks were too slow): the lean route (`--bench-route lean`, the default with
+   `--bench-atmos`: one walk, the drive, the flight, no teleport, a short warm-up), only the
+   worst condition (`night_plan_all`) and the passes the change touches (`dusk_plan` only
+   where the change differs by dusk), one run (a second only when the result is within
+   0.3 ms of 16.7 ms or the run was flagged: the foreground lost, the CPU starved), no
+   "before" run (the previous milestone's "after" is it); tuning by quick GPU profiles at
+   fixed viewpoints, not route runs.
 
 ## 13. Milestones
 
@@ -382,5 +389,7 @@ All six were answered on 2026-11-10, before AT0.
 | AT7 | Far city and release | the skyline at night (HLOD emissive, light cards, cloud glow), budgets on every sample, Unreal checks on the PC, README | AT6 |
 
 Each milestone updates the exporter and the plugin in its own PR and runs AG16's benchmark
-by night, as stages 1 and 2 update the exporter. AT2 and AT3 can run side by side after
+by night after it (the lean route, `night_plan_all` and the passes it touches, one run, the
+previous milestone's "after" as its before: decision 12.6), as stages 1 and 2 update the
+exporter. AT2 and AT3 can run side by side after
 AT1.
