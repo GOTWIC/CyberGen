@@ -65,6 +65,27 @@ def test_lines_of_sight():
     assert SI.visible(r, (41.0, 50.0, 1.7), (10.0, 50.0, 5.0))
 
 
+def test_raised_roads_block_what_is_past_them():
+    """A viaduct (deck top 9 m, 12 m wide) across the map at y 50: a walker under it sees
+    along the street under it, not the lamps on the far side's street over the parapet."""
+    m = {"road_segments": [{"id": "rs.v", "width_m": 12.0,
+                            "centerline": [[0.0, 50.0], [100.0, 50.0]],
+                            "z_profile": [{"s": 0.0, "z": 9.0}, {"s": 100.0, "z": 9.0}]},
+                           {"id": "rs.g", "width_m": 10.0,
+                            "centerline": [[50.0, 0.0], [50.0, 100.0]],
+                            "z_profile": [{"s": 0.0, "z": 0.0}, {"s": 100.0, "z": 0.0}]}]}
+    decks = SI.road_decks(m)
+    assert decks and all(abs(z0 - 7.2) < 1e-6 and abs(z1 - 10.1) < 1e-6 for _, z0, z1 in decks)
+    r = SI.raster(_Occ(), decks=decks)
+    row = r["rgb"][25]                   # (y 50: 25 rows down from the north edge)
+    assert (row[5:45, 0] == 5).all() and (row[5:45, 1] == 8).all()
+    eye = (20.0, 20.0, 1.7)
+    assert not SI.visible(r, eye, (20.0, 80.0, 18.0))     # through the deck's side
+    assert SI.visible(r, eye, (20.0, 80.0, 6.0))          # under it
+    assert SI.visible(r, (50.0, 30.0, 1.7), (50.0, 80.0, 1.0))   # under it, along the street
+    assert SI.visible(r, eye, (20.0, 80.0, 40.0))         # over it
+
+
 def test_runs_cover_the_raster():
     r = _raster()
     runs = SI.runs(r["rgb"])

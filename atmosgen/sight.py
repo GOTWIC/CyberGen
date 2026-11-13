@@ -6,8 +6,10 @@ The raster is the lux check's occluders (`lux.Occluders`: the building masses ta
 `lux.ERODE_M` inside their footprints, and the deck slabs, on a 1 m grid) brought to
 `CELL_M` cells: a cell blocks the height span every one of its four 1 m cells blocks (the
 lowest top over the highest bottom), so a line of sight grazing a facade, or reaching a sign
-stood off it, stays clear; and the ground under it (M13's, the lowest of its corners; 0 on a
-flat city) blocks everything below it. `sight.png` beside the plan, row 0 the north edge:
+stood off it, stays clear; the raised roads (`road_decks`: a viaduct's deck from its
+underside to its parapet, a ramp's foot and M18's embankments from the ground), which the lux
+check leaves out; and the ground under it (M13's, the lowest of its corners; 0 on a flat city)
+blocks everything below it. `sight.png` beside the plan, row 0 the north edge:
 
 - red: the top of what stands in the cell, absolute, in `TOP_STEP_M` steps rounded down
   (0: nothing stands there);
@@ -41,10 +43,77 @@ SKIP_EYE_M = 0.5          # the march leaves out the first this from the eye ...
 SKIP_LIGHT_M = 1.0        # ... and the last this to the light
 
 
-def raster(occ, ground_many=None, cell: float = CELL_M) -> dict:
-    """The sight raster from the lux check's occluders (`lux.Occluders`) and the ground
-    (`City.ground_many`, None on a flat city): {rgb (ny, nx, 3) uint8 with row 0 the north,
-    bounds [x0, y0, x1, y1], cell_m}."""
+RAISED_M = 2.5            # a road stretch this high or more over the ground is a deck ...
+DECK_UNDER_M = 1.8        # ... its underside this far under the road (citygen's ROAD_DECK_M)
+PARAPET_M = 1.1           # ... its parapet this far over it
+DECK_STEP_M = 8.0         # ... drawn in pieces this long
+DECK_INSET_M = 0.5        # ... this far inside its edges
+
+
+def road_decks(m: dict, ground_many=None) -> list:
+    """The raised roads as occluders (not the lux check's: a viaduct's deck blocks a walker's
+    view of what is past it, its parapet included): per raised road stretch of DECK_STEP_M,
+    its corridor (DECK_INSET_M inside its edges) from the deck's underside to its parapet's
+    top, absolute; a stretch whose underside is near the ground (a ramp's foot, M18's
+    embankments) stands on it. [(ring, z0, z1)]."""
+    from shapely.geometry import LineString
+    from shapely.ops import substring
+    out = []
+    for s in m.get("road_segments", []):
+        prof = s.get("z_profile") or []
+        if not prof or max(p["z"] for p in prof) < RAISED_M:
+            continue
+        ln = LineString([q[:2] for q in s["centerline"]])
+        if ln.length <= 0.0:
+            continue
+        ss = np.array([p["s"] for p in prof], dtype=float)
+        zs = np.array([p["z"] for p in prof], dtype=float)
+        half = float(s.get("width_m", 8.0)) / 2.0 - DECK_INSET_M
+        if half <= 0.5:
+            continue
+        n = max(1, int(math.ceil(ln.length / DECK_STEP_M)))
+        for k in range(n):
+            a, b = ln.length * k / n, ln.length * (k + 1) / n
+            z = np.interp(np.linspace(a, b, 5), ss, zs)
+            if z.max() < RAISED_M:
+                continue
+            piece = substring(ln, a, b)
+            if piece.length <= 0.0:
+                continue
+            g = piece.buffer(half, cap_style="flat")
+            if g.is_empty or g.geom_type != "Polygon":
+                continue
+            mid = piece.interpolate(0.5, normalized=True)
+            gz = float(ground_many([mid.x], [mid.y])[0]) if ground_many is not None else 0.0
+            out.append((list(g.exterior.coords), gz + float(z.min()) - DECK_UNDER_M,
+                        gz + float(z.max()) + PARAPET_M))
+    return out
+
+
+def _cells(shape, x0, y0, c, ring):
+    """The cells (rows from the south) whose middle lies in the ring, as a mask over its box:
+    (j0, i0, mask) or None."""
+    from PIL import Image, ImageDraw
+    ny, nx = shape
+    xs = [p[0] for p in ring]
+    ys = [p[1] for p in ring]
+    i0 = max(0, int(math.floor((min(xs) - x0) / c)))
+    j0 = max(0, int(math.floor((min(ys) - y0) / c)))
+    i1 = min(nx, int(math.ceil((max(xs) - x0) / c)) + 1)
+    j1 = min(ny, int(math.ceil((max(ys) - y0) / c)) + 1)
+    if i1 <= i0 or j1 <= j0:
+        return None
+    img = Image.new("L", (i1 - i0, j1 - j0), 0)
+    ImageDraw.Draw(img).polygon([((p[0] - x0) / c - i0 - 0.5, (p[1] - y0) / c - j0 - 0.5)
+                                 for p in ring], fill=1)
+    mask = np.asarray(img, dtype=bool)
+    return (j0, i0, mask) if mask.any() else None
+
+
+def raster(occ, ground_many=None, cell: float = CELL_M, decks=()) -> dict:
+    """The sight raster from the lux check's occluders (`lux.Occluders`), the raised roads
+    (`road_decks`) and the ground (`City.ground_many`, None on a flat city): {rgb (ny, nx, 3)
+    uint8 with row 0 the north, bounds [x0, y0, x1, y1], cell_m}."""
     k = max(1, int(round(cell / occ.cell)))
     ny, nx = occ.top.shape
     ny2, nx2 = (ny + k - 1) // k, (nx + k - 1) // k
@@ -57,6 +126,22 @@ def raster(occ, ground_many=None, cell: float = CELL_M) -> dict:
     b = bot.reshape(ny2, k, nx2, k).max(axis=(1, 3))
     c = occ.cell * k
     x0, y0 = occ.x0, occ.y0
+    # the raised roads, cell by cell (a middle in the corridor): where a cell holds nothing
+    # else, the deck's span; where a building's span meets it, the two as one
+    for ring, z0, z1 in decks:
+        hit = _cells(t.shape, x0, y0, c, ring)
+        if hit is None:
+            continue
+        j0, i0, mask = hit
+        tv = t[j0:j0 + mask.shape[0], i0:i0 + mask.shape[1]]
+        bv = b[j0:j0 + mask.shape[0], i0:i0 + mask.shape[1]]
+        empty = ~(np.isfinite(tv) & np.isfinite(bv) & (tv > bv))
+        meet = ~empty & (bv <= z1 + 0.5) & (tv >= z0 - 0.5)
+        put = mask & empty
+        tv[put], bv[put] = z1, z0
+        both = mask & meet
+        tv[both] = np.maximum(tv[both], z1)
+        bv[both] = np.minimum(bv[both], z0)
     if ground_many is not None:
         xs = x0 + c * np.arange(nx2 + 1)
         ys = y0 + c * np.arange(ny2 + 1)

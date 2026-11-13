@@ -1715,8 +1715,9 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
         (od / SK.GLOW_FILE).unlink()
     # visible lights: the occluders the runtime marches a walker's line of sight through
     from . import sight as SI
+    gm = city.ground_many if city._grid is not None else None
     sight = timed("sight", lambda: SI.write(
-        SI.raster(occ, city.ground_many if city._grid is not None else None), od))
+        SI.raster(occ, gm, decks=SI.road_decks(city.m, gm)), od))
     # AT4: the air: fog and smog volumes, steam and smoke emitters, their check
     from . import air as AR
     air = AR.Air(pl)
