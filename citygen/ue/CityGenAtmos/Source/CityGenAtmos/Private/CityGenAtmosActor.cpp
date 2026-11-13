@@ -2287,7 +2287,8 @@ void ACityGenAtmos::UpdateSplashes(const FVector& View)
 	}
 	if (bAny)
 	{
-		Splashes->MarkRenderStateDirty();
+		// (the changed instances' data alone, not the whole proxy made again: that hitched a frame)
+		Splashes->MarkRenderInstancesDirty();
 		SplashesLive = 0;
 		for (const FVector& S : SplashAt)
 		{

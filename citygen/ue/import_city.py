@@ -1267,7 +1267,8 @@ return Opacity * lerp(1.0, 0.25 + 0.75 * l, Textured);
 # AT5: the trees' crowns in the wind: a sway along the grass's own direction growing with the
 # square of the vertex's height in its tree (LP.z, cm, the variant's frame: its base at 0), a
 # phase by where it stands, and a flutter; within 120 m of the eye (past it still)
-LEAF_SWAY = True
+LEAF_SWAY = False   # (measured: Midtown's tree-lined street 4.5 ms of GPU a frame, the core 0.8;
+                    # Nanite's voxelized leaves with a world position offset: AT5's open items)
 LEAF_WIND = "wind1"         # (M_CgLeaves' version past STAGE2_VERSION with the sway)
 LEAF_WPO_CODE = """
 float h = saturate(LP.z / 1400.0);

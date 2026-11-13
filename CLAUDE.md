@@ -2595,7 +2595,7 @@ AT5 (weather) is in place:
   volumes by state; wet streets as two DBuffer decals (`M_CgWetColor` darkens, `M_CgWetGloss`
   roughness and normal, puddles with rain rings), the rain cut under the covers and leaning in
   the wind, splashes where traces from the sky land, drips along the drip lines, rain rings on
-  `M_CgWater` (its tag `.rain1`), the trees' crowns swaying (`M_CgLeaves`, `.wind1`); atmos
+  `M_CgWater` (its tag `.rain1`), the trees' sway built but off (`LEAF_SWAY`: 4.5 ms on a tree-lined street); atmos
   assets version 14; console `.Weather NAME [now]`, `.WeatherSpeed`, `.Wetness`; the Tab
   menu's Weather row (`weather+`, `weather-`, `weather=NAME`); the check's `*__<state>` and
   `*__<a>2<b>_<n>s` views; bench passes `night_plan_drizzle`, `_clear`, `_fogstate`, `_smog`,

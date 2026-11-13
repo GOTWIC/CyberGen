@@ -1877,9 +1877,11 @@ cards and wet decal become the real thing:
   (`import_city.master_tag`) where the project has atmosgen's collection, so an import with
   an atmos plan rebuilds the water master alone (its instances and every other master kept).
 - **Wind**: the steam and smoke plumes (`M_CgSteam`) drift along the wind's heading, the rain
-  leans in it, the drips drift with it, AG13's grass sways with `MPC_CityGen`'s `Wind`. Trees
-  and flags: see `docs/progress/AT5`'s open items.
-- **Assets** (`atmos_assets.py` version 13): `M_CgWetColor`, `M_CgWetGloss`, `M_CgSplash`,
+  leans in it, the drips drift with it, AG13's grass sways with `MPC_CityGen`'s `Wind`. The trees'
+  sway is built into `M_CgLeaves` (`import_city.LEAF_SWAY`, tag `.wind1`) but off: it cost a
+  tree-lined street 4.5 ms of GPU a frame (Nanite's voxelized leaves with a world position
+  offset). The trees and flags: `docs/progress/AT5`'s open items.
+- **Assets** (`atmos_assets.py` version 14): `M_CgWetColor`, `M_CgWetGloss`, `M_CgSplash`,
   `M_CgDrip` and the new `M_CgRain`; AT0's `M_CgWet` is deleted; `MPC_CityGenAtmos` gains
   `Puddles`, `WindX`, `WindY`, `Streak` and `Drops`. All under `/Game/CityGen/Core/Atmos`
   (cooked always).

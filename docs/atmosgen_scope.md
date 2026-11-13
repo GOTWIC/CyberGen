@@ -290,8 +290,9 @@ stages have); never required to edit. Fields, all with defaults:
   (scope 8). In Unreal the masks city-wide as two textures, the wet streets as two DBuffer
   decals (darker, then glossy with puddles that mirror and the rain's rings in them, the
   markings kept), the rain cut under the covers and leaning in the wind, splashes where a
-  trace from the sky lands, drips along the drip lines, rings on the water, the trees and the
-  grass in the wind, and the states blending into each other (the Tab menu's weather row).
+  trace from the sky lands, drips along the drip lines, rings on the water, the grass and the
+  plumes in the wind (the trees' sway built but off: its cost), and the states blending into
+  each other (the Tab menu's weather row).
 
 ### 6.5 Look
 
