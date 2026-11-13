@@ -81,13 +81,18 @@ SKY = {"latitude_deg": 35.0, "day_of_year": 172, "moon_phase": 0.62, "day_hour":
 
 # The scene's frame (Unreal's, where the plan's light is shown): the importer's sun gives 10 lux
 # by day, the night is held at -3 EV100 (the play features' night, AT0 to AT2), the day at
-# DAY_EV100 (what Unreal's eye adaptation reached on Delta by day, AG16's look, now locked).
+# DAY_EV100 (a clear day's, AT6; the clouds move it), dusk between them.
 # The plan's lights are in physical units and shown at 2^(SCENE_NIGHT_EV100 - reference_ev100)
 # at every hour, so at dusk, under a brighter exposure, they read dimmer as real lamps do.
 SUN_LUX = 10.0
 SCENE_NIGHT_EV100 = -3.0
-DAY_EV100 = 1.6
-OVERCAST_EV = 1.0                 # a closed deck darkens the day's exposure by this much
+# AT6: a clear day's exposure, measured on Delta's streets in Unreal (shots at -1.6 to 0.8
+# EV100, read in stops from middle grey: AT3's 1.6, under neon rain's deck 0.8, put a clear
+# Corporate Core street at -5.3 stops and a rainy one at -6.3, darker than by night; at -0.8
+# a clear street reads -2.1, a rainy Old Town street -1.3 with the overcast's compensation,
+# the street under a viaduct -2.3); the clouds move it (`POST_EXPOSURE`'s `overcast_comp`,
+# `look.overcast_shift`; AT3's OVERCAST_EV is gone)
+DAY_EV100 = -0.8
 # Curves over the sun's elevation (degrees), piecewise linear between their keys, the same in
 # the plan's report, the runtime and the Blender preview:
 #   ev:    the exposure, as a blend from the night's (0) to the day's (1);
@@ -591,7 +596,7 @@ EMITTERS = {
     "roof":    {"kind": "exhaust", "share": (0.2, 0.4), "width_m": 1.6, "rise_m": 12.0,
                 "rate": 0.7, "albedo": "#c8ccd0", "schedule": "steam"},
     "stall":   {"kind": "cooking", "share": (0.7, 0.3), "width_m": 1.6, "rise_m": 5.5,
-                "rate": 1.0, "albedo": "#d8d4cc", "schedule": "food"},
+                "rate": 0.85, "albedo": "#d8d4cc", "schedule": "food"},
     "chimney": {"kind": "smoke", "share": (0.25, 0.5), "width_m": 1.4, "rise_m": 30.0,
                 "rate": 0.8, "albedo": "#6f6a64", "schedule": "always"},
     "stove":   {"kind": "smoke", "share": (0.0, 0.12), "width_m": 0.5, "rise_m": 6.0,
@@ -618,7 +623,7 @@ VOLUME_GLOW = 0.15
 # keeps its opacity with distance (times 1 + `STEAM_FAR[0]` from 30 m to `STEAM_FAR[1]` m: a
 # card far off covers a few pixels, its soft edge faded to nothing)
 STEAM_GLOW = 0.015                # (about middle grey at the night's -3 EV100, of a white)
-STEAM_FAR = (1.5, 150.0)
+STEAM_FAR = (1.0, 150.0)
 # what the fog's mist and smog keep to (24 values: 0 to 23 h); `steam` is stronger in the
 # cool night air, `mist` forms after dusk and lies thickest before dawn
 AIR_SCHEDULES = {
@@ -840,10 +845,10 @@ DISTRICT_POST = {
 # weather's clouds take (the runtime's overcast, AT5) given back by the exposure (an overcast
 # street darker than a sunny one, not as dark as the sun's loss)
 POST_EXPOSURE = {
-    "neon_rain":    {"day_bias": 0.0, "overcast_comp": 0.75},
-    "clear_night":  {"day_bias": 0.0, "overcast_comp": 0.75},
-    "smog_dusk":    {"day_bias": 0.0, "overcast_comp": 0.75},
-    "overcast_day": {"day_bias": 0.0, "overcast_comp": 0.75},
+    "neon_rain":    {"day_bias": 0.0, "overcast_comp": 0.5},
+    "clear_night":  {"day_bias": 0.0, "overcast_comp": 0.5},
+    "smog_dusk":    {"day_bias": 0.0, "overcast_comp": 0.5},
+    "overcast_day": {"day_bias": 0.0, "overcast_comp": 0.5},
 }
 # the overcast the runtime takes off the sun by day (AT5: 0.75 of its light at full cover,
 # from half cover up) and the share of a day street's light that stays (the sky light dims

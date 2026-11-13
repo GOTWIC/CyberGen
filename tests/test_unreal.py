@@ -522,7 +522,9 @@ def test_project_cooks_what_the_runtimes_load_by_path(tmp_path):
         b"[/Script/UnrealEd.ProjectPackagingSettings]\r\nBuildConfiguration=PPBC_Development\r\n"
         b'+DirectoriesToAlwaysCook=(Path="/Game/Mine")\r\n'
         b'+DirectoriesToAlwaysCook=(Path="/Game/CityGen/Core/Atmos")\r\n'
-        b'+DirectoriesToAlwaysCook=(Path="/Engine/BasicShapes")\r\n\r\n[Other]\r\nA=1\r\n')
+        b'+DirectoriesToAlwaysCook=(Path="/Engine/BasicShapes")\r\n'
+        b'+DirectoriesToAlwaysCook=(Path="/Engine/EngineResources/FilmGrains")\r\n\r\n'
+        b'[Other]\r\nA=1\r\n')
     assert not U.set_project_ini(up)
     # a project without the section (the templates' DefaultGame.ini) gets it appended
     game.write_bytes(b"[/Script/EngineSettings.GeneralProjectSettings]\nProjectID=X\n")
@@ -530,7 +532,8 @@ def test_project_cooks_what_the_runtimes_load_by_path(tmp_path):
     assert game.read_bytes().endswith(
         b"ProjectID=X\n\n[/Script/UnrealEd.ProjectPackagingSettings]\n"
         b'+DirectoriesToAlwaysCook=(Path="/Game/CityGen/Core/Atmos")\n'
-        b'+DirectoriesToAlwaysCook=(Path="/Engine/BasicShapes")\n')
+        b'+DirectoriesToAlwaysCook=(Path="/Engine/BasicShapes")\n'
+        b'+DirectoriesToAlwaysCook=(Path="/Engine/EngineResources/FilmGrains")\n')
     # every folder a runtime loads from by path is one of them
     import re
     src = Path(U.__file__).parent / "ue"

@@ -51,7 +51,7 @@ import unreal
 
 JOB = json.load(open(os.environ["CITYGEN_UE_JOB"], encoding="utf-8"))
 FOLDER = "/Game/CityGen/Core/Atmos"
-VERSION = "16"  # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air);
+VERSION = "17"  # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air);
                 # 3 (AT2): M_CgBeacon and M_CgBeam; 4 to 8 (AT3): M_CgSky; 9 to 12 (AT4):
                 # M_CgSteam, MPC_CityGenAtmos's SteamGain; 13 (AT5): the weather (M_CgWet
                 # gone: M_CgWetColor and M_CgWetGloss, M_CgRain cut by the covers and leaning
@@ -60,7 +60,9 @@ VERSION = "16"  # 2: fewer, smaller puddles (1 blotched big paved yards seen fro
                 # square root); 15: every material rebuilt from nothing (clear_material: the
                 # old nodes were left beside the new), the collection's parameters kept (ids);
                 # 16 (AT6): M_CgSteam lit by the city by night (SteamGlow) and kept opaque far
-                # off (SteamFar, SteamFarM)
+                # off (SteamFar, SteamFarM); 17 (AT6): the wet decals' face normal from fine
+                # derivatives (a pixel's own neighbor, not its 2 x 2 quad's: a curb's edge
+                # read as half floor, half wall in quads, AT5's white sawtooth along it)
 # AT5: MPC_CityGenAtmos: the weather now (the controller blends its states): the rain's rate,
 # how wet the open surfaces are and how full the puddles, the fog, the wind (its speed with
 # its gusts, its heading as a unit vector), the plumes' gain, the streaks' length and the
@@ -295,7 +297,7 @@ if (all(uv > 0.0) && all(uv < 1.0)) {
 }
 float cz = Z.x + floor(c + 0.5) * Z.y;
 float dry = (c > 0.5) ? saturate((cz - 20.0 - WP.z) / 40.0) : 0.0;
-float3 n = normalize(cross(ddx(RP), ddy(RP)));
+float3 n = normalize(cross(ddx_fine(RP), ddy_fine(RP)));
 if (dot(n, CV) < 0.0) { n = -n; }
 float up = saturate((n.z - 0.62) / 0.3);
 float down = saturate((-n.z - 0.3) / 0.3);
@@ -378,7 +380,7 @@ def wet_color(c):
 # uneven (the fine noise's slope) with fainter rings, a wall its own face; near the eye only
 # (`RingM`), past it flat
 GLOSS_N = """
-float3 n = normalize(cross(ddx(RP), ddy(RP)));
+float3 n = normalize(cross(ddx_fine(RP), ddy_fine(RP)));
 if (dot(n, CV) < 0.0) { n = -n; }
 float2 g = float2(0.0, 0.0);
 float dist = length(RP);

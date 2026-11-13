@@ -106,6 +106,17 @@ def _crossing(sky: dict, target: float, h0: float, h1: float) -> float | None:
     return None
 
 
+def day_ev(filled: dict, cover: float) -> float:
+    """AT6: the day's exposure (EV100) under a cloud cover: a clear day's (`DAY_EV100` plus the
+    spec's `post.day_ev_bias`) moved by `overcast_comp` of the light the clouds take."""
+    from .look import overcast_shift
+    sp = filled.get("post") or {}
+    ex = P.POST_EXPOSURE.get(filled.get("preset"), {"day_bias": 0.0, "overcast_comp": 0.5})
+    bias = ex["day_bias"] if sp.get("day_ev_bias") is None else float(sp["day_ev_bias"])
+    comp = ex["overcast_comp"] if sp.get("overcast_comp") is None else float(sp["overcast_comp"])
+    return P.DAY_EV100 + bias + overcast_shift(comp, cover)
+
+
 def make(filled: dict, spec_sky: dict | None = None) -> dict:
     """The sky's settings for a city: where and when, the moon, the exposure, the curves,
     the cloud deck, the named hours (day, dusk, night) and a row per hour (the report)."""
@@ -127,7 +138,10 @@ def make(filled: dict, spec_sky: dict | None = None) -> dict:
                     "disk_nits": P.MOON_DISK_NITS, "disk_deg": P.MOON_DEG,
                     "rise": list(P.MOON_RISE), "cloud": P.MOON_CLOUD},
            "sun_lux": P.SUN_LUX, "ev_night": P.SCENE_NIGHT_EV100,
-           "ev_day": r3(P.DAY_EV100 - P.OVERCAST_EV * cover),
+           # (AT6: the day's exposure at the look's own cover, as the runtime holds it: a
+           # clear day's, `DAY_EV100` and the spec's bias, moved by the clouds,
+           # `look.overcast_shift`)
+           "ev_day": r3(day_ev(filled, cover)),
            "curve": {k: list(v) for k, v in P.SUN_CURVE.items()},
            "stars": r3(float(look["stars"])),
            "cloud_deck_m": deck, "cloud_cover": r3(cover),

@@ -1,4 +1,4 @@
-# atmosgen: light, sky, air and weather (scope, v2: decided 2026-11-10, AT0 to AT5 done)
+# atmosgen: light, sky, air and weather (scope, v2: decided 2026-11-10, AT0 to AT6 done)
 
 Stage 3 (atmosgen) of CyberGen's five stages. It takes a built city with its assets and
 makes the city's light and air: every light source that casts light, the sky, fog, smog,
@@ -299,6 +299,20 @@ stages have); never required to edit. Fields, all with defaults:
 - Exposure locked per preset and hour (no pumping at night), bloom, lens flares, a little
   grain and chromatic aberration, a grading table per preset (teal and magenta for neon
   rain), a post volume per district for its mood.
+- AT6 built it (`atmosgen/look.py`, `docs/progress/AT6/`): the plan's `post`, per look a set
+  by night and one by day (`presets.POST`: bloom, lens flares, film grain, chromatic
+  aberration, vignette, sharpening, the grade's saturation and contrast, shadow and highlight
+  tints as gains, the highlights' saturation, a black lift, local exposure), blended by the
+  sky's Night; each district's sets pulled by its grit and tinted by its archetype
+  (`DISTRICT_POST`, `DISTRICT_TINT`: the corporate core crisp, cool and clean, old towns,
+  markets and the port grainy, fringed, flared, with lifted blacks and sodium or magenta
+  tints), blended in the runtime by where the view stands through a district raster, so one
+  post-process volume (the controller's) carries them all; the exposure still held per hour,
+  the day's now a clear day's moved by the weather's clouds (`overcast_comp`); the spec's
+  `post` and the districts' `shadows`, `highlights` and `tint` as art direction; `atmosgen
+  review` (a round's sheet: checks, numbers, every shot's exposure as the eye reads it, a
+  contact sheet against the last round) and the `atmosgen` skill
+  (`atmosgen/skill/SKILL.md`, to be copied into `.claude/skills/atmosgen/`).
 
 ### 6.6 Far city
 

@@ -56,7 +56,7 @@ PASSES = (("day_native", False, 100.0), ("day_tsr67", False, TSR_PERCENT),
 # so passes do not leak into each other.
 ATMOS_OFF = ("CityGenAtmos.Lights 0", "CityGenAtmos.Fog 0", "CityGenAtmos.Rain 0",
              "CityGenAtmos.Wet 0", "CityGenAtmos.MegaLights 0", "CityGenAtmos.Sky 1",
-             "CityGenAtmos.Air 0", "CityGenAtmos.Tuned 0")
+             "CityGenAtmos.Air 0", "CityGenAtmos.Tuned 0", "CityGenAtmos.Post 0")
 # AT4: the engine settings the exploring passes (`x_*`) set themselves, each pass all of them
 # (so none leaks into the next): the volumetric fog's froxels (pixels a side, slices deep),
 # Lumen's reflections' resolution, the non-Nanite meshes' LOD distances (the parked cars)

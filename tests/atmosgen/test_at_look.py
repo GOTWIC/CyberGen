@@ -204,6 +204,22 @@ def test_the_plan_and_the_exporter_carry_the_look(build):
     assert not UA.post_settings(plan, build / "atmos")
 
 
+def test_the_runtime_reads_the_sets_in_the_exporters_order():
+    """The controller's post keys (`EPostKey`, `PostFloats`, the console's names in
+    `SetPostValue`) are the exporter's `POST_FLOATS`, in its order."""
+    import re
+    from pathlib import Path
+    src = Path(UA.__file__).parent / "ue" / "CityGenAtmos" / "Source" / "CityGenAtmos"
+    h = (src / "Public" / "CityGenAtmosActor.h").read_text(encoding="utf-8")
+    cpp = (src / "Private" / "CityGenAtmosActor.cpp").read_text(encoding="utf-8")
+    assert f"PostFloats = {len(UA.POST_FLOATS)};" in h
+    enum = re.search(r"enum EPostKey : int32 \{([^}]*)\}", h).group(1)
+    assert len([k for k in enum.replace("= 0", "").split(",") if k.strip()]) == \
+        len(UA.POST_FLOATS)
+    names = re.search(r"static const TCHAR\* Names\[PostFloats\] = \{(.*?)\};", cpp, re.S)
+    assert re.findall(r'TEXT\("([a-z_]+)"\)', names.group(1)) == list(UA.POST_FLOATS)
+
+
 def test_the_review_sheet(build, tmp_path):
     from PIL import Image
     shots = tmp_path / "shots"
