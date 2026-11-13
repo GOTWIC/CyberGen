@@ -1782,13 +1782,14 @@ class _Mel:
         self.deleted.append(e)
 
 
-def _water_master(pins):
+def _water_master(pins, mpc=None):
     ns = _ue_script("import_city.py", "water_master", "link", "expr", "custom", "sparam",
                     "vparam", "tparam", "cmot", "SAMPLER", "FLOW_UV_CODE", "WAVE_NORMAL_CODE",
-                    "WAVE_CODE", "FOAM_CODE")
+                    "WAVE_CODE", "FOAM_CODE", "RAIN_RING_CODE")
     mel, logged = _Mel(pins), []
+    # (AT5: the rain's rings read atmosgen's collection where the project has it)
     ns.update(unreal=_Unreal(), MEL=mel, log=logged.append, F1="CMOT_FLOAT1",
-              F2="CMOT_FLOAT2", F3="CMOT_FLOAT3", F4="CMOT_FLOAT4")
+              F2="CMOT_FLOAT2", F3="CMOT_FLOAT3", F4="CMOT_FLOAT4", atmos_mpc=lambda: mpc)
     m = _UeObj("M_CgWater")
     ns["water_master"](m, {})
     return m, mel, logged
@@ -1813,6 +1814,12 @@ def test_water_master_links_single_layer_water_by_ue58_names():
     assert m.props["shading_model"] == "MSM_DEFAULT_LIT" and logged
     made = [e for e in mel.made if e.name == slw]
     assert made and made == mel.deleted
+    # AT5: with atmosgen's collection the wave normal takes the rain's rings, else a zero
+    m, mel, logged = _water_master(pins, mpc="MPC_CityGenAtmos")
+    assert m.props["shading_model"] == "MSM_SINGLE_LAYER_WATER" and not logged
+    rain = [e for e in mel.made if e.name == "MaterialExpressionCollectionParameter"]
+    assert len(rain) == 1 and rain[0].props["parameter_name"] == "Rain"
+    assert ("MaterialExpressionCustom", "MaterialExpressionCustom", "Ring") in mel.links
 
 
 def test_glow_set_for_the_night():
