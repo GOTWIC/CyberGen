@@ -493,10 +493,23 @@ def walk_classes():
         want = (("body_mesh", mesh), ("body_anim", anim),
                 ("body_offset", unreal.Vector(0.0, 0.0, z)),
                 ("body_rotation", unreal.Rotator(roll=0.0, pitch=0.0, yaw=yaw)))
+        def key(x):
+            # (what a value is, not its Python wrapper: str() of an object or a struct names
+            # its address, which differs on every read)
+            if x is None:
+                return None
+            if hasattr(x, "get_path_name"):
+                return x.get_path_name()
+            if isinstance(x, unreal.Vector):
+                return tuple(round(c, 3) for c in (x.x, x.y, x.z))
+            if isinstance(x, unreal.Rotator):
+                return tuple(round(c, 3) for c in (x.roll, x.pitch, x.yaw))
+            return str(x)
+
         dirty = False
         for k, v in want:
             have = pawn.get_editor_property(k)
-            if str(have) != str(v):
+            if key(have) != key(v):
                 pawn.set_editor_property(k, v)
                 dirty = True
         if dirty:
