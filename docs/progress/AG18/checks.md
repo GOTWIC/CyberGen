@@ -11,7 +11,7 @@
 | [brakk_hauler](brakk_hauler/check.json) | ok: 33.1 mm to springs, steers 20 deg | ok: 290.0 mm (chassis) | ok: 0 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 259196 |
 | [brakk_mule](brakk_mule/check.json) | look: 22.2 mm to fender.plates, steers 20 deg | ok: 280.0 mm (chassis) | look: 34 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 364552 |
 | [halcyon_ridge](halcyon_ridge/check.json) | look: 14.5 mm to body.well, steers 0 deg | ok: 237.8 mm (skid.front) | look: 4 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 223779 |
-| [halcyon_sable](halcyon_sable/check.json) | look: 4.8 mm to body.well, steers 0 deg | ok: 100.0 mm (splitter) | look: 2 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 250465 |
+| [halcyon_sable](halcyon_sable/check.json) | ok: 31.8 mm to interior.seats, steers 30 deg | ok: 100.0 mm (splitter) | look: 1 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 280675 |
 | [kestrel_atlas](kestrel_atlas/check.json) | ok: none (hover) | ok: 374.4 mm (pod.skid.r) | look: 19 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 151203 |
 | [kestrel_dart](kestrel_dart/check.json) | ok: none (hover) | ok: 325.0 mm (keel) | look: 3 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 112558 |
 | [kestrel_meridian](kestrel_meridian/check.json) | ok: none (hover) | ok: 327.0 mm (led.keel) | look: 9 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 90334 |
@@ -79,11 +79,7 @@
 
 **halcyon_sable** (look)
 
-- tire `fl`: 4.8 mm to `body.well`, turns 0 degrees before it touches `body.floor`
-- tire `rl`: 11.8 mm to `interior.seats`
-- tire `fr`: 4.8 mm to `body.well`, turns 0 degrees before it touches `body.well`
-- tire `rr`: 11.8 mm to `interior.seats`
-- not mirrored: `interior.wheel` 139.3 mm, `body.trim` 8.7 mm
+- not mirrored: `interior.wheel` 139.3 mm, `body.lightband` 4.2 mm
 
 **kestrel_atlas** (look)
 
@@ -165,7 +161,7 @@
 
 **tanager_mino** (look)
 
-- not mirrored: `interior.wheel` 193.7 mm, `interior.screens` 93.6 mm, `antenna` 58.4 mm, `tow.eye` 48.6 mm, `wipers` 25.8 mm, `body.fender` 14.0 mm, `permit` 10.0 mm, `permit.text` 7.2 mm, `permit.mark` 7.2 mm, `display.front` 6.2 mm, `display.rear` 6.2 mm, `pixels.front` 4.5 mm
+- not mirrored: `interior.wheel` 193.7 mm, `interior.screens` 93.6 mm, `antenna` 58.4 mm, `tow.eye` 48.6 mm, `wipers` 25.8 mm, `body.fender` 14.0 mm, `display.front` 10.0 mm, `display.rear` 10.0 mm, `permit` 10.0 mm, `permit.text` 7.2 mm, `permit.mark` 7.2 mm, `pixels.front` 4.0 mm
 
 **tanager_porter** (FAIL)
 

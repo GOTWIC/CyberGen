@@ -3198,6 +3198,24 @@ Vanta-R the same).
   triangles, standard class, texels 489 px/m (5th percentile), LOD3 15.4 of 40 degrees,
   0.024 of 0.10 bent, 0.033 of 0.04 texture; LOD3 keeps the lamps and bars lit. Not
   published.
+- **Halcyon Sable** (`docs/progress/AG18/halcyon_sable/`, on `vehicles/brands/halcyon.py`):
+  the Vanta-R's lamps on its own body: the nose strip a channel 36 by 40 mm in a 56 mm even
+  band under a clear lens, a lit bar right under the lens and three hexagonal projectors; the
+  tail halo one closed channel 46 mm wide round the whole tail under a red lens, a red lit bar
+  over a chrome floor; the handles either side of the pillarless split and the hexagonal
+  charge flaps cut; 3.5 mm shut lines; frit on the side, roof and rear panes, the windshield
+  halves on a mirrored gloss frame; the kit's wipers. Street distances: a lower arch cut inside
+  the skin for the front tires, the rear wells' inner walls, the cabin floor, bulkhead and rear
+  seats in (4.8 mm and no steering to 34.2 mm and 30 degrees in front, 11.8 to 31.8 mm
+  behind). 280,675 triangles (250,465). Checks: tires `ok` (was `look`), symmetry `look` (the
+  lightband 4.2 mm at a corner of the halo; the driver's wheel told as meant), the rest `ok`.
+  For the pack: a 30 mm halo left the band as two thin rings that wrecked LOD3 over the tail,
+  1 mm sheets on the channels' walls became spikes in LOD3, and dense lamp sweeps and ten slot
+  pockets starved it (the slots are strips again). Pack rebuilt, every check passing:
+  148,918, 59,987, 20,187, 5,132 triangles, standard class, texels 346 px/m (5th
+  percentile), LOD3 32.6 of 40 degrees, 0.077 of 0.10 bent, 0.0074 of 0.04 texture (main's
+  LOD3 measured 20.7 degrees and 0.038 bent but reads no better in the sheet's LOD row: its
+  glass shatters, the new one's flanks and fenders hold). Not published.
 - **Pilots' lessons**: a lens cut from a doubly curved skin with `"skin"` keeps the
   boolean's slivers (its reflections zigzag): build it as its own band or slab along the cut.
   In the pack, a lit face deep under a lens bakes as dashes, emitters deep in reflector
