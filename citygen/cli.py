@@ -639,9 +639,11 @@ def build_parser() -> argparse.ArgumentParser:
                                     "city becomes the project's startup and default map "
                                     "(the last import wins; --no-startup opts out), so "
                                     "opening the project and pressing Play puts you in it: "
-                                    "flying by default (WASD to move, E or Space up, Q or C "
-                                    "down, the mouse to look, no collision), or walking "
-                                    "with --play walk (the project's own character).")
+                                    "walking by default, in first person with a body (WASD "
+                                    "to move, the mouse to look, Shift to run, Space to "
+                                    "jump; . the free camera and back), flying with --play "
+                                    "fly, or the project's own game mode with --play "
+                                    "project.")
     ue.add_argument("build_dir", help="a `citygen build --blockout` or `citygen blockout` "
                                       "output")
     ue.add_argument("uproject", nargs="?", help="the project's .uproject")
@@ -657,10 +659,12 @@ def build_parser() -> argparse.ArgumentParser:
                     help="leave out stage 2 (assetgen's BUILD_DIR/assets/"
                          "unreal_contribution.*.json): the blockout's actors alone (stage "
                          "2's meshes stay in the project for the next import with it)")
-    ue.add_argument("--play", choices=("fly", "walk"), default="fly",
-                    help="what Play puts you in: fly (default), a free camera with no "
-                         "collision; walk, the project's own game mode and pawn (the First "
-                         "Person character in a --new-project project)")
+    ue.add_argument("--play", choices=("walk", "fly", "project"), default="walk",
+                    help="what Play puts you in: walk (default), a first-person character "
+                         "with the project's own character's body (the play plugin's; the "
+                         "project's game mode when the plugin cannot be built); fly, a free "
+                         "camera with no collision; project, the project's own game mode "
+                         "and pawn")
     ue.add_argument("--fly-speed", type=float, default=50.0, metavar="M_PER_S",
                     help="the fly pawn's top speed in m/s (default 50)")
     ue.add_argument("--view-range", type=float, default=768.0, metavar="M",
@@ -702,8 +706,9 @@ def build_parser() -> argparse.ArgumentParser:
                          "them by day and night (unreal_vehicles.check)")
     ue.add_argument("--check", action="store_true",
                     help="after the import, play the level in the editor: streaming, "
-                         "ground traces, a walk along a sidewalk (always the walking "
-                         "character, whatever --play is), then a flight with the fly pawn")
+                         "ground traces, a walk along a sidewalk and up a curb (always "
+                         "the walking character, whatever --play is), then a flight with "
+                         "the fly pawn")
     ue.add_argument("--check-only", action="store_true", help="the check without importing")
     ue.add_argument("--shots", metavar="DIR", help="with --check: rendered views into DIR")
     ue.add_argument("--view", nargs="+", action="append", default=[],

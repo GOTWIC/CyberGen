@@ -38,11 +38,13 @@ Runs after M3, on the city with its buildings, so every line sees what it passes
    through; skybridges in a line's way are removed (complex skybridges are obstacles instead).
 5. **Stations** at every stop and at the mode's spacing between them: platforms on the deck
    with stairs and an elevator to the nearest sidewalk, sky stations inside the portal tower
-   (elevator to its main entrance) or on a pylon, metro concourses with two entrance kiosks;
-   elevated walkways from platforms to buildings with a floor at platform level.
+   (elevator to its main entrance) or on a pylon, metro concourses with two entrances
+   (stairs, or an elevator); elevated walkways from platforms to buildings with a floor at
+   platform level. No canopy stands over a stair foot (the play fixes, 2026-11-12: a square
+   on posts, it stood in the road where the foot was near one).
 6. **Structures:** deck, guideway or tube per leg, columns or pylons at the mode's spacing
    (in road medians, at the curbs of streets without one, never in lanes, sidewalk clear paths,
-   buildings or water), station platforms, canopies. A sky tube's supports are plain pylons
+   buildings or water), station platforms. A sky tube's supports are plain pylons
    (#94; `mast`: M19's cable-stayed masts), its rings evenly spaced along the whole line, a
    multiple of its lit ring frequency, each lit or not by its index (#97, `tube_rings`).
 
@@ -4159,9 +4161,6 @@ class Builder:
                     if _d(e0, f) > 0.0:
                         acc.append(self.walk("path", [(e0[0], e0[1], 0.0), (f[0], f[1], 0.0)],
                                              3.0, {"station": sid}))
-                    sq = G.qpoly(Point(f).buffer(2.5, cap_style="square"))
-                    self.struct(f"{sid}.ent{tag}", "canopy", 0.0, 3.2, footprint=sq,
-                                attrs={"station": sid, "role": "metro_entrance"})
                     continue
             acc.append(self.walk("stairs", [(f[0], f[1], 0.0), (e[0], e[1], z)], 3.0,
                                  {"station": sid}))
@@ -4176,9 +4175,8 @@ class Builder:
                 at_k = next((i for i in range(1, len(cum)) if cum[i] > s_e), len(l3) - 1)
                 self.new[k] = (kind, l3[:at_k] + [(q(e[0]), q(e[1]), q(z))] + l3[at_k:], w,
                                at)
-            sq = G.qpoly(Point(f).buffer(2.5, cap_style="square"))
-            self.struct(f"{sid}.ent{tag}", "canopy", 0.0, 3.2, footprint=sq,
-                        attrs={"station": sid, "role": "metro_entrance"})
+            # (no canopy over the stair foot: a 5 m square on four posts, it stood half in the
+            # road at a junction's corner; Swagnik, 2026-11-12, after the packaged Delta)
 
     def _elevated(self, sid, ln, seg, foot, z, bld, gone, acc, pylon: bool) -> None:
         mode = ln.mode
@@ -4215,9 +4213,8 @@ class Builder:
             else:
                 acc.append(self.walk("stairs", [(e[0], e[1], z), (f[0], f[1], 0.0)], 3.0,
                                      {"station": sid}))
-                cnp = G.qpoly(Point(f).buffer(3.0, cap_style="square"))
-                self.struct(f"{sid}.cn{tag}", "canopy", 2.8, 3.2, footprint=cnp,
-                            attrs={"station": sid, "role": "stair_canopy"})
+                # (no canopy over the stair foot, as the metro's: a 6 m square on posts, it
+                # stood in the road where the foot is near one)
         if not pylon and tuple(seg[0][:2]) not in lift_at:
             # the platform's own elevator at its first end (#109: one elevator an end: not
             # where the sidewalk right under that end has one already)

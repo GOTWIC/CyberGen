@@ -512,16 +512,25 @@ def test_play_flags(tmp_path):
     from citygen.cli import build_parser
     a = build_parser().parse_args(["unreal", "B", "P.uproject"])
     assert (a.play, a.fly_speed, a.view_range, a.no_startup, a.no_hlod, a.no_play) == \
-        ("fly", U.FLY_SPEED_M_S, U.VIEW_M, False, False, False)
-    a = build_parser().parse_args(["unreal", "B", "P.uproject", "--play", "walk",
+        ("walk", U.FLY_SPEED_M_S, U.VIEW_M, False, False, False)
+    assert U.PLAY_MODES == ("walk", "fly", "project")
+    for mode in U.PLAY_MODES:
+        assert build_parser().parse_args(["unreal", "B", "--play", mode]).play == mode
+    a = build_parser().parse_args(["unreal", "B", "P.uproject", "--play", "fly",
                                    "--fly-speed", "80", "--no-startup", "--no-hlod",
                                    "--no-play"])
     assert (a.play, a.fly_speed, a.no_startup, a.no_hlod, a.no_play) == \
-        ("walk", 80.0, True, True, True)
+        ("fly", 80.0, True, True, True)
     with pytest.raises(SystemExit):
         build_parser().parse_args(["unreal", "B", "--play", "swim"])
     with pytest.raises(ValueError):
         U.import_city(tmp_path, tmp_path / "P.uproject", play="swim")
+    # what the import says Play puts you in
+    walker = {"mode": "walk", "walker": True, "body": "/Game/X/BP_Char.BP_Char_C"}
+    assert "first person" in U.play_summary({"play": walker})
+    assert "project's own" in U.play_summary({"play": {"mode": "walk", "walker": False}})
+    assert "project's own" in U.play_summary({"play": {"mode": "project"}})
+    assert "flying" in U.play_summary({"play": {"mode": "fly", "fly_speed_m_s": 50.0}})
 
 
 def test_names():

@@ -19,10 +19,11 @@ variants stay, exactly as before AG18. A file is written only when its bytes cha
 
 Checks (`vehicles_report.txt`): `vehicles_coverage` (every parked car placed or left out with a
 reason), `vehicles_clear` (every footprint on its carriageway, off the crosswalks and its
-neighbors, measured again from scratch), `vehicles_variety` (no long run of one model along a
-curb, no two neighbors of one model in one color, several models), `vehicles_replaces` (an
-entry per tile replacing exactly AG8's), `vehicles_library` (every model placed is in the
-library, none of the Vex).
+neighbors, measured again from scratch), `vehicles_variety` (never three of one model in a
+row along a curb, two running in under `place.MAX_PAIR_SHARE` of the curb neighbors, no two
+neighbors of one model in one color, several models), `vehicles_replaces` (an entry per tile
+replacing exactly AG8's), `vehicles_library` (every model placed is in the library, none of
+the Vex or Aurels).
 """
 
 from __future__ import annotations
@@ -223,7 +224,8 @@ def report(model, cars, ag8, res, con) -> dict:
                          f"{'on' if fit.on else 'absent'}), off {len(fit.xwalks)} crosswalks, "
                          f"{PL.GAP_M} m apart; {len(bad)} faults", bad))
     # variety
-    worst_run, worst_at, same_pairs = 0, None, []
+    worst_run, worst_at, same_pairs, runs = 0, None, [], []
+    pairs = model_pairs = 0
     for key, cids in sorted(res["curbs"].items()):
         n, prev = 0, None
         for pid in cids:
@@ -231,17 +233,30 @@ def report(model, cars, ag8, res, con) -> dict:
             n = n + 1 if prev is not None and prev[0] == r["car"] else 1
             if n > worst_run:
                 worst_run, worst_at = n, pid
+            if n > PL.MAX_RUN:
+                runs.append(f"{pid}: {n} of {r['car']} in a row")
+            if prev is not None:
+                pairs += 1
+                model_pairs += prev[0] == r["car"]
             if prev is not None and prev == (r["car"], r["primary"]):
                 same_pairs.append(pid)
             prev = (r["car"], r["primary"])
+    share = model_pairs / pairs if pairs else 0.0
     models = Counter(r["car"] for r in placed.values())
     want = min(MIN_MODELS, len(cars)) if len(placed) >= MIN_MODELS_AT else 1
-    ok = worst_run <= PL.MAX_RUN and not same_pairs and len(models) >= min(want, len(placed))
+    # (the pair share only where the curbs have a choice: a city whose spots one model alone
+    # fits, the test's, has nothing but pairs and runs cut short)
+    many = len(models) >= 4 and pairs >= 20
+    ok = (worst_run <= PL.MAX_RUN and not same_pairs
+          and (share < PL.MAX_PAIR_SHARE or not many)
+          and len(models) >= min(want, len(placed)))
     checks.append(_check("vehicles_variety", ok,
                          f"{len(models)} models; longest run of one model along a curb "
                          f"{worst_run} (at most {PL.MAX_RUN}, at {worst_at}); "
+                         f"{model_pairs} of {pairs} curb neighbors of one model "
+                         f"({100 * share:.2f}%, under {100 * PL.MAX_PAIR_SHARE:.0f}%); "
                          f"{len(same_pairs)} neighbors of one model in one color",
-                         same_pairs))
+                         runs + same_pairs))
     # replaces: one entry per AG8 tile entry, replacing exactly it
     want_keys = {e["tile"]: e["key"] for e in ag8}
     got = {e["tile"]: e["replaces"] for e in con["entries"]}
@@ -278,7 +293,9 @@ def report(model, cars, ag8, res, con) -> dict:
                                    for r in placed.values()),
              "triangles_lod3": sum(cars[r["car"]]["lods"][3]["triangles"]
                                    for r in placed.values()),
-             "longest_model_run": worst_run}
+             "longest_model_run": worst_run, "curb_neighbors": pairs,
+             "same_model_neighbors": model_pairs,
+             "same_model_neighbor_share": round(share, 4)}
     return {"ok": all(c["ok"] for c in checks), "checks": checks, "stats": stats}
 
 
@@ -296,6 +313,9 @@ def report_text(rep: dict) -> str:
     lines += ["", f"parked cars {st['parked']}: placed {st['placed']}, left out "
                   f"{st['left_out']} ({st['hover_set_down']} hover cars set down; "
                   f"{st['colors']} primary colors)",
+              f"curb neighbors {st['curb_neighbors']}: {st['same_model_neighbors']} of one "
+              f"model ({100 * st['same_model_neighbor_share']:.2f}%), longest run "
+              f"{st['longest_model_run']}",
               f"in Unreal: {st['entries']} placement actors, {st['components']} instanced "
               f"components, {st['part_instances']} part instances, {st['meshes']} meshes "
               f"(not Nanite), {st['triangles_lod0']:,} triangles at LOD0 "

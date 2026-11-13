@@ -24,6 +24,7 @@ from assetgen.parked import table as T
 # (length, width, kind, lowest point): the sizes of real packs
 CARS = {"tanager_mino": (3.43, 1.87, "wheeled", -0.007),
         "tanager_porter": (5.33, 2.44, "wheeled", -0.007),
+        "halcyon_sable": (5.4, 2.05, "wheeled", 0.0),
         "aurel_regent": (5.92, 2.08, "wheeled", 0.0),
         "orrin_pebble": (2.82, 1.61, "wheeled", -0.007),
         "orrin_lumen": (5.03, 2.0, "wheeled", 0.0),
@@ -82,9 +83,10 @@ def test_table():
     core = T.weights("corporate_core", 0.9, 0.15, cars)
     old = T.weights("old_town", 0.3, 0.65, cars)
     port = T.weights("industrial_port", 0.35, 0.55, cars)
-    assert "vex_wraith" not in core and "vex_wraith" not in old
+    # the Vex and the Aurels are never placed
+    assert not any(c.startswith(("vex_", "aurel_")) for w in (core, old, port) for c in w)
     share = lambda w, cs: sum(w.get(c, 0) for c in cs) / sum(w.values())  # noqa: E731
-    assert share(core, ["aurel_regent"]) > 3 * share(old, ["aurel_regent"])
+    assert share(core, ["halcyon_sable"]) > 3 * share(old, ["halcyon_sable"])
     assert share(old, ["tanager_mino", "tanager_porter"]) > 0.5
     assert share(port, ["brakk_mule", "tanager_porter"]) > 0.5
     assert share(core, ["kestrel_dart"]) < 0.06
@@ -106,7 +108,8 @@ def test_table():
 def test_library(tmp_path, monkeypatch):
     lib = make_lib(tmp_path / "lib")
     got, cars = LB.load(_doc(lib))
-    assert got == lib and sorted(cars) == sorted(c for c in CARS if not c.startswith("vex"))
+    assert got == lib and sorted(cars) == sorted(
+        c for c in CARS if not c.startswith(("vex", "aurel")))
     assert cars["kestrel_dart"]["kind"] == "hover" and cars["kestrel_dart"]["min"][2] == 0.317
     (lib / "orrin_lumen" / "lod2.glb").unlink()            # a pack missing a LOD is not used
     assert "orrin_lumen" not in LB.load(_doc(lib))[1]
@@ -138,6 +141,10 @@ def test_parked_on_the_small_city():
     assert st["parked"] > 20 and st["placed"] + st["left_out"] == st["parked"]
     assert st["placed"] > st["parked"] * 0.7
     assert "vex_wraith" not in st["by_model"] and len(st["by_model"]) >= 4
+    assert not any(c.startswith("aurel_") for c in st["by_model"])
+    # never three of one model in a row along a curb, two running only where nothing else fits
+    assert st["longest_model_run"] <= 2 and PL.MAX_RUN == 2
+    assert st["same_model_neighbor_share"] < PL.MAX_PAIR_SHARE
     con = json.loads((out / VB.CONTRIB).read_text())
     ag8 = VB.ag8_entries(out)
     assert sorted(e["replaces"][0] for e in con["entries"]) == [e["key"] for e in ag8]
@@ -168,7 +175,32 @@ def test_parked_on_the_small_city():
                for r in rep2["stats"]["left_out_by_reason"])
     assert rep2["stats"]["left_out"] > 0
     assert rep2["stats"]["longest_model_run"] <= PL.MAX_RUN
+    assert not any("in a row" in b for c in rep2["checks"] for b in c.get("bad", []))
+    # two models that both fit almost everywhere: they alternate but where one alone fits
+    w = {c: 0 for c in CARS}
+    w["orrin_pebble"] = w["tanager_mino"] = 1
+    rep3 = VB.build(model, sha, out, _doc(lib, weights=w))
+    assert rep3["stats"]["longest_model_run"] <= 2, rep3["stats"]
+    assert rep3["stats"]["same_model_neighbor_share"] < PL.MAX_PAIR_SHARE, rep3["stats"]
     VB.build(model, sha, out, _doc(lib))
+
+
+def test_variety_check_fails_on_three_in_a_row():
+    """`vehicles_variety` measures the runs again: three of one model running along a curb
+    fails it."""
+    model, sha, out, lib = city()
+    _, cars = LB.load(_doc(lib))
+    ag8 = VB.ag8_entries(out)
+    res = PL.place(model, cars, ag8)
+    key, ids = max(res["curbs"].items(), key=lambda kv: len(kv[1]))
+    assert len(ids) >= 3
+    for pid in ids[:3]:
+        res["placed"][pid] = dict(res["placed"][pid], car="tanager_mino",
+                                  primary=f"#{ids.index(pid):06x}")
+    con = VB.contribution(model, sha, lib, cars, ag8, res, "c")
+    chk = {c["id"]: c for c in VB.report(model, cars, ag8, res, con)["checks"]}
+    assert not chk["vehicles_variety"]["ok"]
+    assert any("3 of tanager_mino in a row" in b for b in chk["vehicles_variety"]["bad"])
 
 
 def test_falls_back_to_variants(monkeypatch):

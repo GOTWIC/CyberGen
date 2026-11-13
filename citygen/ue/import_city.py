@@ -17,10 +17,13 @@ makes, under /Game/CityGen/<City>:
   `cg.hash` metadata;
 - Materials/MI_<material>: instances of /Game/CityGen/Core/M_CityGen;
 - Data/DA_<City>_Lanes, _Walkways, _Transit: BP_CityGenGraph data assets (flat arrays);
-- the level's Play: its game mode override GM_CityGenFly (Core, spawning BP_CityGenFlyPawn,
-  a SpectatorPawn with no collision at the job's speed) with `play` "fly", else none (the
-  project's own game mode and pawn); its World Partition grid sized for flying (`view_m`
-  around the player, the HLOD partitions out to the whole city).
+- the level's Play: its game mode override, GM_CityGenWalk with `play` "walk" (the default:
+  Core, spawning BP_CityGenWalker, the play plugin's first-person character wearing the
+  project's own character's body), GM_CityGenFly with "fly" (spawning BP_CityGenFlyPawn, a
+  SpectatorPawn with no collision at the job's speed), none with "project" (the project's own
+  game mode and pawn; also "walk" when the play plugin is not built); its World Partition
+  grid sized for flying (`view_m` around the player, the HLOD partitions out to the whole
+  city).
 
 With stage 2 in the manifest (assetgen's buildings and streets over the blockout), also:
 
@@ -85,6 +88,8 @@ INSTANCE_VARS = [("Ids", "[name"), ("Kind", "name")]
 PLAY_KEY = "play"                           # citygen.unreal.PLAY_KEY: the play actor's key
 FLY_PAWN = f"{CORE}/BP_CityGenFlyPawn"      # what Play puts you in with `--play fly`
 FLY_MODE = f"{CORE}/GM_CityGenFly"
+WALK_PAWN = f"{CORE}/BP_CityGenWalker"      # with `--play walk` (the default)
+WALK_MODE = f"{CORE}/GM_CityGenWalk"
 VIEW_M = 768.0          # citygen.unreal.VIEW_M: how far the level streams in around the player
 MAIN_CELL_M = 128.0     # World Partition's main cells (AG16; a 256 m tile before)
 # stage 2 (assetgen, layer 2): the masters' version (Core/M_Cg<Master>, rebuilt in place when
@@ -428,6 +433,82 @@ def fly_classes(speed_m_s):
         EAL.save_loaded_asset(unreal.load_asset(FLY_MODE), only_if_is_dirty=False)
         saved = True
     return mode_cls, saved
+
+
+def project_body():
+    """The body of the project's own character (its default game mode's pawn): the skeletal
+    mesh, animation class and placement of its character mesh (the First Person template's
+    world body, SKM_Manny_Simple with ABP_Unarmed, which that template hides from its
+    player), else the template's mannequin by path; (mesh, anim class, z offset, yaw, where
+    it came from) or None."""
+    found = None
+    try:
+        ini = os.path.join(unreal.Paths.project_config_dir(), "DefaultEngine.ini")
+        gm = None
+        with open(ini, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                if line.strip().startswith("GlobalDefaultGameMode="):
+                    gm = line.split("=", 1)[1].strip()
+        mode_cls = unreal.load_object(None, gm) if gm else None
+        if mode_cls is not None:
+            pawn_cls = unreal.get_default_object(mode_cls).get_editor_property(
+                "default_pawn_class")
+            cdo = unreal.get_default_object(pawn_cls) if pawn_cls else None
+            mc = cdo.get_editor_property("mesh") if isinstance(cdo, unreal.Character) else None
+            if mc is not None and mc.get_editor_property("skeletal_mesh_asset") is not None:
+                loc = mc.get_editor_property("relative_location")
+                rot = mc.get_editor_property("relative_rotation")
+                found = (mc.get_editor_property("skeletal_mesh_asset"),
+                         mc.get_editor_property("anim_class"), float(loc.z), float(rot.yaw),
+                         pawn_cls.get_path_name())
+    except Exception as e:
+        log(f"walk: the project's character has no body to take ({e})")
+    if found is None:
+        sk = "/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple"
+        ab = "/Game/Characters/Mannequins/Anims/Unarmed/ABP_Unarmed"
+        if EAL.does_asset_exist(sk):
+            anim = BEL.generated_class(unreal.load_asset(ab)) if EAL.does_asset_exist(ab) \
+                else None
+            found = (unreal.load_asset(sk), anim, -96.0, -90.0, sk)
+    return found
+
+
+def walk_classes():
+    """The walking player (`--play walk`): BP_CityGenWalker, a Blueprint of the play plugin's
+    CityGenWalker (a character the player sees in first person) wearing the project's own
+    character's body (`project_body`), and GM_CityGenWalk, the game mode that spawns it with
+    the engine's player controller. Made once, the body set again when it changes. (the
+    game mode's class or None when the plugin is not built, whether either was saved, the
+    body's source)"""
+    native = getattr(unreal, "CityGenWalker", None)
+    if native is None:
+        return None, False, None
+    pawn_cls = blueprint(WALK_PAWN, native, [])
+    mode_cls = blueprint(WALK_MODE, unreal.GameModeBase, [])
+    pawn = unreal.get_default_object(pawn_cls)
+    body = project_body()
+    saved = False
+    if body is not None:
+        mesh, anim, z, yaw, src = body
+        want = (("body_mesh", mesh), ("body_anim", anim),
+                ("body_offset", unreal.Vector(0.0, 0.0, z)),
+                ("body_rotation", unreal.Rotator(roll=0.0, pitch=0.0, yaw=yaw)))
+        dirty = False
+        for k, v in want:
+            have = pawn.get_editor_property(k)
+            if str(have) != str(v):
+                pawn.set_editor_property(k, v)
+                dirty = True
+        if dirty:
+            EAL.save_loaded_asset(unreal.load_asset(WALK_PAWN), only_if_is_dirty=False)
+            saved = True
+    mode = unreal.get_default_object(mode_cls)
+    have = mode.get_editor_property("default_pawn_class")
+    if have is None or have.get_path_name() != pawn_cls.get_path_name():
+        mode.set_editor_property("default_pawn_class", pawn_cls)
+        EAL.save_loaded_asset(unreal.load_asset(WALK_MODE), only_if_is_dirty=False)
+        saved = True
+    return mode_cls, saved, body[4] if body else None
 
 
 def usage_flags(m):
@@ -1536,7 +1617,7 @@ def stage2_master(master, defaults=None):
 
 # --- AG18's vehicles (citygen/unreal_vehicles.py; the packs' contract: vehicles/GAME.md) ------
 
-VEHICLE_VERSION = "7"        # of the vehicle masters (`cg.vehicle` metadata)
+VEHICLE_VERSION = "8"        # of the vehicle masters (`cg.vehicle` metadata; 8: darker glass)
 VEHICLE_MESH_VERSION = "3"   # of what the importer makes of a car (with its manifest hash)
 VEHICLE_ACTOR_VERSION = "3"  # of the placement actors (2: the glass casts no shadow;
                              # 3, AT4: cull distances by part, the wheels cast no shadow)
@@ -1666,7 +1747,12 @@ def vehicle_master(defaults):
 
 def vehicle_glass_master(opaque):
     """/Game/CityGen/Core/M_CgVehicleGlass (the pack's glass: thin translucent, the glass
-    color squared tinting what shows through it, its reflection by its IOR and roughness;
+    color pulled toward a dark cyberpunk tint (GlassTint, TintMix) and squared tinting what
+    shows through it, a share of it covered (TransmissionScale) and more toward grazing angles
+    (GrazingCover, on top of the Fresnel the shading model takes from the specular), its
+    reflection by its IOR, at least MinF0 (coated glass; the domes' IOR of 1.12 reflected
+    almost nothing), and roughness, so the cabin is a dim shape behind reflections (the play
+    fixes, 2026-11-12: the glass read as no glass at all);
     the packs' glass is thick, two sheets a few mm apart, and a ray through it is tinted
     twice in the proof's Cycles render, while the engine draws only the outer sheet from
     outside, the inner one facing in and culled) and
@@ -1688,10 +1774,14 @@ def vehicle_glass_master(opaque):
     col = vparam(m, "GlassColor", -700, 0, (0.3, 0.33, 0.36))
     rough = sparam(m, "Roughness", -700, 200, 0.0)
     ior = sparam(m, "IOR", -700, 280, 1.5)
-    # (a dielectric's reflectance at normal incidence, as Unreal's Specular: 0.5 is 4%)
-    spec = custom(m, -450, 280, "float f = (I - 1.0) / (I + 1.0); return saturate(f * f / 0.08);",
-                  ["I"], cmot(F1), "CgIorSpecular")
+    f0 = sparam(m, "MinF0", -700, 440, 0.06)
+    # (a dielectric's reflectance at normal incidence, as Unreal's Specular: 0.5 is 4%; at
+    # least MinF0)
+    spec = custom(m, -450, 280, "float f = (I - 1.0) / (I + 1.0); "
+                  "return saturate(max(f * f, F) / 0.08);",
+                  ["I", "F"], cmot(F1), "CgIorSpecular")
     link(ior, "", spec, "I")
+    link(f0, "", spec, "F")
     MEL.connect_material_property(spec, "", MP.MP_SPECULAR)
     if opaque:
         dark = expr(m, unreal.MaterialExpressionMultiply, -450, 0, const_b=0.06)
@@ -1749,11 +1839,23 @@ def vehicle_glass_master(opaque):
         link(eye_l, "", inner, "V")
         link(cab_c, "", inner, "C")
         link(cab_h, "", inner, "H")
-        # the surface: black, a coverage that is the reflection's share only where the glass
-        # does not transmit; what shows through is tinted by the glass color
-        op = custom(m, -450, 360, "return (saturate(1.0 - T) * 0.9 + 0.04) * (1.0 - In);",
-                    ["T", "In"], cmot(F1), "CgGlassCoverage")
+        # the surface: black, a coverage of the share the glass does not transmit (the pack's
+        # transmission times TransmissionScale), more toward grazing angles; what shows
+        # through is tinted by the glass color
+        tsc = sparam(m, "TransmissionScale", -700, 1180, 0.8)
+        graze = sparam(m, "GrazingCover", -700, 1260, 0.6)
+        cv = expr(m, unreal.MaterialExpressionCameraVectorWS, -700, 1340)
+        op = custom(m, -450, 360,
+                    "float nv = saturate(abs(dot(normalize(N), V))); "
+                    "float g = pow(1.0 - nv, 4.0); "
+                    "float c = saturate(1.0 - T * S) * 0.9 + 0.04; "
+                    "return saturate(c + (1.0 - c) * g * G) * (1.0 - In);",
+                    ["T", "S", "G", "N", "V", "In"], cmot(F1), "CgGlassCoverage")
         link(trans, "", op, "T")
+        link(tsc, "", op, "S")
+        link(graze, "", op, "G")
+        link(nw, "", op, "N")
+        link(cv, "", op, "V")
         link(inner, "", op, "In")
         sp2 = custom(m, -300, 280, "return S * (1.0 - In);", ["S", "In"], cmot(F1),
                      "CgGlassSpecular")
@@ -1770,9 +1872,14 @@ def vehicle_glass_master(opaque):
         m.set_editor_property("translucency_lighting_mode",
                               unreal.TranslucencyLightingMode.TLM_SURFACE_PER_PIXEL_LIGHTING)
         tto = expr(m, unreal.MaterialExpressionThinTranslucentMaterialOutput, -150, 0)
-        tint = custom(m, -450, 0, "return lerp(float3(1, 1, 1), C * C, T * (1.0 - In));",
-                      ["C", "T", "In"], cmot(F3), "CgGlassTint")
+        gtint = vparam(m, "GlassTint", -700, 1420, (0.09, 0.14, 0.18))
+        mix = sparam(m, "TintMix", -700, 1540, 0.45)
+        tint = custom(m, -450, 0, "float3 c = lerp(C, K, X); "
+                      "return lerp(float3(1, 1, 1), c * c, T * (1.0 - In));",
+                      ["C", "K", "X", "T", "In"], cmot(F3), "CgGlassTint")
         link(col, "", tint, "C")
+        link(gtint, "", tint, "K")
+        link(mix, "", tint, "X")
         link(trans, "", tint, "T")
         link(inner, "", tint, "In")
         link(tint, "", tto, "Transmittance Color")
@@ -3920,19 +4027,22 @@ class Importer:
             .get_world_settings()
 
     def play(self):
-        """The level's game mode override: the fly pawn's game mode (`fly`), else none, so
-        the project's own game mode and pawn (`walk`). The fly classes are made either way
-        (the check flies the city with them)."""
-        mode = JOB.get("play", "fly")
+        """The level's game mode override: the walker's game mode (`walk`, the default; none
+        when the play plugin is not built), the fly pawn's (`fly`), else none, so the
+        project's own game mode and pawn (`project`). The fly and walk classes are made
+        either way (the check walks and flies the city with them)."""
+        mode = JOB.get("play", "walk")
         fly, saved = fly_classes(JOB.get("fly_speed_m_s", 50.0))
-        want = fly if mode == "fly" else None
+        walk, wsaved, body = walk_classes()
+        want = fly if mode == "fly" else walk if mode == "walk" else None
         ws = self.world_settings()
         have = ws.get_editor_property("default_game_mode")
         if (have.get_path_name() if have else "") != (want.get_path_name() if want else ""):
             ws.set_editor_property("default_game_mode", want)
         self.stats["play"] = {"mode": mode, "fly_speed_m_s": JOB.get("fly_speed_m_s", 50.0),
                               "game_mode": want.get_path_name() if want else "",
-                              "fly_classes_saved": saved}
+                              "fly_classes_saved": saved, "walk_classes_saved": wsaved,
+                              "walker": walk is not None, "body": body}
 
     def streaming(self):
         """World Partition for flying over the city: the main partition's cells half a tile

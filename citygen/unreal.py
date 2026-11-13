@@ -88,9 +88,10 @@ EDITOR_GUI = {"darwin": "Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor",
 # GeometryScripting: stage 2 building collision (convex hulls of the mass pieces)
 PLUGINS = ["PythonScriptPlugin", "EditorScriptingUtilities", "GeometryScripting"]
 UE_DIR = Path(__file__).parent / "ue"
-# what Play puts you in: the fly pawn (free camera, no collision) or the project's own game
-# mode and pawn (the First Person template's character with --new-project)
-PLAY_MODES = ("fly", "walk")
+# what Play puts you in: the walker (the play plugin's first-person character wearing the
+# project's own character's body; the default since the play fixes, 2026-11-12), the fly
+# pawn (free camera, no collision) or the project's own game mode and pawn
+PLAY_MODES = ("walk", "fly", "project")
 FLY_SPEED_M_S = 50.0          # the fly pawn's top speed (a 4 km city in about 80 s)
 # how far the level streams in around the player (AG16: 1,500 m before, most of Delta
 # Megacity loaded at once; past it the instanced HLODs draw the same meshes, materials and
@@ -1730,15 +1731,17 @@ def run_editor(root: Path, uproject: Path, script: Path, job: dict, log: Path,
 
 def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None = None,
                 name: str | None = None, timeout: float = 7200.0,
-                assets: bool = True, play: str = "fly", fly_speed: float = FLY_SPEED_M_S,
+                assets: bool = True, play: str = "walk", fly_speed: float = FLY_SPEED_M_S,
                 startup: bool = True, view_m: float = VIEW_M,
                 play_features: bool = True, atmos: str | Path | bool | None = None,
                 vehicles: str | Path | None = None, all_vehicles: bool = False) -> dict:
     """`citygen unreal`: the manifest, then the headless import; the importer's result
     (created, updated, deleted and unchanged actors and assets, timings). `assets` False
     imports the blockout alone (stage 2's actors, if imported before, go; its meshes
-    stay for the next import with it). `play` is what Play puts you in: "fly" (the fly
-    pawn at `fly_speed` m/s) or "walk" (the project's own game mode and pawn); `view_m` how
+    stay for the next import with it). `play` is what Play puts you in: "walk" (the play
+    plugin's walker in first person with the project's character's body; the project's own
+    game mode when the plugin is not built), "fly" (the fly pawn at `fly_speed` m/s) or
+    "project" (the project's own game mode and pawn); `view_m` how
     far the level streams around the player; `startup` makes the city the project's
     startup and default map. `play_features`: the CityGenPlay plugin built into the project
     first (`unreal_play.build_plugin`), then its actor with the city's map and data; when
@@ -1918,8 +1921,13 @@ def atmos_summary(res: dict) -> str:
 def play_summary(res: dict) -> str:
     """What Play puts you in and where, after an import."""
     p, s = res.get("play") or {}, res.get("streaming") or {}
-    line = ("Play: flying (the fly pawn, {:g} m/s)".format(p.get("fly_speed_m_s", 0.0))
-            if p.get("mode") == "fly" else "Play: walking (the project's own game mode and pawn)")
+    if p.get("mode") == "fly":
+        line = "Play: flying (the fly pawn, {:g} m/s)".format(p.get("fly_speed_m_s", 0.0))
+    elif p.get("mode") == "walk" and p.get("walker"):
+        line = ("Play: walking in first person (BP_CityGenWalker, the body of "
+                f"{p.get('body') or 'none found'})")
+    else:
+        line = "Play: walking (the project's own game mode and pawn)"
     if s.get("set"):
         line += f"; the level streams in {s['loading_ranges_m'][0]:g} m around the player"
     if res.get("startup_map"):

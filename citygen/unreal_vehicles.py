@@ -39,6 +39,9 @@ PACK_FORMAT = "cybergen.vehicle_pack"
 PACK_VERSION = 1
 LIBRARY_ENV = "CITYGEN_VEHICLES"
 DEFAULT_LIBRARY = Path.home() / ".cache" / "cybergen" / "vehicles" / "game"
+# the cars out of every city until they are redesigned (vehicles/README.md): the Vex (no packs)
+# and the Aurels (Swagnik, 2026-11-12); never imported, a placement naming one refused
+EXCLUDED = ("vex_", "aurel_")
 FOLDER = "/Game/CityGen/Vehicles"          # every city's vehicles, imported once a project
 KIND = "vehicles"                           # a placement entry's kind
 VERSION = "1"                               # of what the importer makes of a car (its hash)
@@ -69,10 +72,11 @@ def library_dir(explicit: str | Path | None = None) -> Path:
 
 
 def library_cars(library: Path) -> list[str]:
-    """The cars of a library: its folders holding a pack.json."""
+    """The cars of a library: its folders holding a pack.json (never an `EXCLUDED` car's)."""
     if not library.is_dir():
         return []
-    return sorted(d.name for d in library.iterdir() if (d / "pack.json").is_file())
+    return sorted(d.name for d in library.iterdir() if (d / "pack.json").is_file()
+                  and not d.name.startswith(EXCLUDED))
 
 
 def _sha(path: Path) -> str:
@@ -350,6 +354,9 @@ def section(placements: list, library: Path | None = None, all_cars: bool = Fals
         want |= {v.get("car") for v in e.get("vehicles", [])}
     cars = {}
     for c in sorted(want):
+        if c and c.startswith(EXCLUDED):
+            raise ValueError(f"{c}: out of the cities until it is redesigned (vehicles/README.md;"
+                             " run assetgen vehicles on the build again)")
         if not c or not (lib / c / "pack.json").is_file():
             raise FileNotFoundError(f"{lib / str(c)}: no vehicle pack (make it with "
                                     f"vehicles/blender.sh vehicles/game.py --car {c})")

@@ -16,12 +16,15 @@ left out with a reason:
      `INSET_M`;
    - covers no crosswalk (more than `INSET_M` into one);
    - keeps `GAP_M` from every car placed before it;
-   - and is not the fourth of one model in a row along the curb (`MAX_RUN`).
-   None fits: the car is left out, with the reason its smallest candidate failed on.
+   - and is not the third of one model in a row along the curb (`MAX_RUN`, 2: never three
+     of one model running).
+   The candidates are tried twice: first leaving out the model of the car before it on the
+   curb (so two of one model running is rare: only where no other model fits the spot), then
+   with it. None fits: the car is left out, with the reason its smallest candidate failed on.
 4. **Its paint** (`table.paint`), drawn again while the car before it on the curb is the same
    model in the same primary color.
 
-**Hover cars parked** (Kestrel, the Aurel Zenith) are set down: the pack's lowest point (its
+**Hover cars parked** (Kestrel) are set down: the pack's lowest point (its
 emitter pods or skids, 0.27 to 0.37 m under the hover pose's body) on the road, so they sit on
 the parking lane as the wheeled cars do; a car on its wheels stands `ROAD_DZ_M` over the
 model's height, on the asphalt as AG7 draws it (`streets.pave.ROAD_DZ_MM`).
@@ -42,7 +45,8 @@ from . import table as T
 
 INSET_M = 0.1          # a footprint may reach this far off its carriageway or onto a crosswalk
 GAP_M = 0.5            # bumper to bumper (and side to side) between parked cars
-MAX_RUN = 3            # at most this many of one model in a row along a curb
+MAX_RUN = 2            # at most this many of one model in a row along a curb
+MAX_PAIR_SHARE = 0.05  # the share of curb neighbors of one model the check allows
 ROAD_DZ_M = 0.05       # AG7's carriageway over the pavement map's height
 KIND = "parked_vehicle"
 LANE_KINDS = ("carriageway", "bend")
@@ -215,9 +219,13 @@ def place(model, cars: dict, ag8: list[dict], spec_weights: dict | None = None) 
                 left[pid] = "no model has a weight in its district"
                 continue
             got, why = None, {}
-            for c in order(w, pid):
+            prev = run[-1][0] if run else None
+            cands = order(w, pid)
+            # (first every model but the one before it, then that one too: a pair of one
+            # model only where nothing else fits)
+            for c in [c for c in cands if c != prev] + [c for c in cands if c == prev]:
                 if len(run) >= MAX_RUN and all(r[0] == c for r in run[-MAX_RUN:]):
-                    why[c] = "the fourth of one model in a row"
+                    why[c] = "the third of one model in a row"
                     continue
                 fp = footprint(cars[c], x, y, yaw)
                 if not fit.lane_ok(key[0], fp.buffer(-INSET_M, join_style="mitre")):
