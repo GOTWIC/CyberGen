@@ -170,7 +170,14 @@ streaming), as in AT5.
 
 ## The packaged game
 
-PACKAGE
+- `C:\Users\swagn\CityGen\builds\packaged\Delta_at6\Windows\CityAG16.exe`: CityAG16 mirrored
+  into CityPackaged without `Saved`, `Intermediate`, `DerivedDataCache` and the plugins'
+  `Intermediate` and `Binaries`, then cooked and packaged (BUILD SUCCESSFUL), the engine's film
+  grain textures cooked with it.
+- Smoke launch with `-userdir` outside the package, 1280 x 720 windowed, `-CityGenSelfie=12`:
+  exits cleanly; the log shows the atmos controller (518 cells, 50,300 lights, the sight
+  raster), "weather rain (now)", the walker walking 9 m; no film grain warning, no material
+  failed to compile, and the package keeps no `Saved` folder.
 
 ## Open items
 
