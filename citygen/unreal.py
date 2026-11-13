@@ -1542,7 +1542,10 @@ UI_SETTINGS = [("bAllowHighDPIInGameMode", "True")]
 # level references through its materials and the play actor; CityGenPlay loads nothing by
 # path).
 COOK_SECTION = "[/Script/UnrealEd.ProjectPackagingSettings]"
-ALWAYS_COOK = ["/Game/CityGen/Core/Atmos", "/Engine/BasicShapes"]
+# (AT6: the engine's default film grain texture, which the renderer loads by its config name
+# when the look's post sets a grain: `Engine.DefaultFilmGrainTextureName`)
+ALWAYS_COOK = ["/Game/CityGen/Core/Atmos", "/Engine/BasicShapes",
+               "/Engine/EngineResources/FilmGrains"]
 
 
 def set_project_ini(uproject: str | Path) -> bool:

@@ -429,6 +429,8 @@ class Air:
         """Steam from AG7's manholes and drains, read from the street packs (what stage 2
         drew); a city without packs has none (they are AG7's)."""
         det = street_details(self.c.build)
+        # (AT5's puddles read the drains again: kept on the city)
+        self.c._street_details = det
         # (a road piece's: AG7 draws the manholes on its lanes and the drains at its curbs; a
         # sidewalk piece's grates are tree pits)
         det = {k: v for k, v in det.items() if k in self.c.segments}
@@ -566,6 +568,7 @@ class Air:
                 "max_volumes": P.AIR_LIVE["volumes"], "volume_range_m": P.AIR_LIVE["volume_m"],
                 "emitter_range_m": P.AIR_LIVE["emitter_m"], "puffs": dict(P.PUFFS),
                 "steam_gain": P.STEAM_GAIN, "volume_glow": P.VOLUME_GLOW,
+                "steam_glow": P.STEAM_GLOW, "steam_far": list(P.STEAM_FAR),
                 "cvars": dict(sorted(P.AIR_CVARS.items())),
                 "counts": dict(sorted(counts.items()))}
 

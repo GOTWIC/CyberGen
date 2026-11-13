@@ -7,7 +7,11 @@
 // second), .Cover C (the cloud deck's cover for the session). AT4: .Air [0|1] (the fog volumes
 // and plumes), .Tuned [0|1] (the plan's engine settings), .VolumeGain G, .FogView M. Visible
 // lights: the console variable CityGenAtmos.Sight -1|0|1 (the live set by sight round a walker,
-// the circle, by sight whatever the pawn; the actor's file defines it), .SightRange M [MAX]. AT1: the plan comes with the level (the importer's
+// the circle, by sight whatever the pawn; the actor's file defines it), .SightRange M [MAX]. AT5:
+// .Weather NAME [now] (the weather state, + or - steps it), .WeatherSpeed S (the rain's age),
+// .Wetness W [P] (held for shots); .Rain and .Wet switch the weather's rain (streaks, splashes,
+// drips) and wet streets. AT6: .Post and .PostDistricts [0|1] (the look's post, the districts'
+// own), .SteamGlow G [FAR] (the plumes by night). AT1: the plan comes with the level (the importer's
 // controller and its cells' data actors), no longer from a folder (AT0's .Load and
 // -CityGenAtmosPlan are gone).
 
@@ -50,7 +54,41 @@ namespace
 	CG_ATMOS_TOGGLE(FixturesCmd, "CityGenAtmos.Fixtures", "CityGenAtmos.Fixtures [0|1]: AT2's aviation beacons and searchlight beams", bFixtures, SetFixtures)
 	CG_ATMOS_TOGGLE(AirCmd, "CityGenAtmos.Air", "CityGenAtmos.Air [0|1]: AT4's fog volumes (mist, smog, haze) and steam and smoke plumes", bAir, SetAir)
 	CG_ATMOS_TOGGLE(TunedCmd, "CityGenAtmos.Tuned", "CityGenAtmos.Tuned [0|1]: AT4's engine settings (the plan's cvars) applied, or the project's own", bTuned, SetTuned)
+	CG_ATMOS_TOGGLE(PostCmd, "CityGenAtmos.Post", "CityGenAtmos.Post [0|1]: AT6's look (bloom, flares, grain, fringes, vignette, the grade, local exposure; off: the engine's own, the exposure still held)", bPost, SetPost)
+	CG_ATMOS_TOGGLE(PostDistrictsCmd, "CityGenAtmos.PostDistricts", "CityGenAtmos.PostDistricts [0|1]: AT6's post per district (clean or gritty by place), blended by where the view stands", bDistrictPost, SetPostDistricts)
 #undef CG_ATMOS_TOGGLE
+
+	FAutoConsoleCommandWithWorldAndArgs PostSetCmd(TEXT("CityGenAtmos.PostSet"),
+		TEXT("CityGenAtmos.PostSet KEY [VALUE]: AT6: a post key (bloom, flare, flare_threshold, grain, chromatic, chromatic_start, vignette, sharpen, saturation, contrast, highlight_sat, lift, local_shadows, local_highlights, shadows_r|g|b, highlights_r|g|b) held at VALUE over every set for the session; without a value let go; `clear` lets every key go"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenAtmos* A = AtmosIn(World);
+			if (A && Args.Num() && !A->SetPostValue(Args[0], Args.Num() > 1 ? FCString::Atof(*Args[1]) : 0.f, Args.Num() < 2))
+			{
+				UE_LOG(LogTemp, Warning, TEXT("CityGenAtmos.PostSet: no post key %s"), *Args[0]);
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs DayEVCmd(TEXT("CityGenAtmos.DayEV"),
+		TEXT("CityGenAtmos.DayEV EV: AT6: the day's exposure (EV100, a clear day's; the clouds move it)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenAtmos* A = AtmosIn(World);
+			if (A && Args.Num()) { A->SetDayEV(FCString::Atof(*Args[0])); }
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs SteamGlowCmd(TEXT("CityGenAtmos.SteamGlow"),
+		TEXT("CityGenAtmos.SteamGlow G [FAR]: AT6: the plumes lit by the city by night (their emissive, of their albedo), and their opacity kept far off"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenAtmos* A = AtmosIn(World);
+			if (A && Args.Num())
+			{
+				A->SteamGlow = FCString::Atof(*Args[0]);
+				if (Args.Num() > 1) { A->SteamFar = FCString::Atof(*Args[1]); }
+				A->SetHour(A->Hour);
+			}
+		}));
 
 	FAutoConsoleCommandWithWorldAndArgs VolumeGainCmd(TEXT("CityGenAtmos.VolumeGain"),
 		TEXT("CityGenAtmos.VolumeGain G: AT4: a gain on every fog volume's density"),
@@ -180,6 +218,46 @@ namespace
 			if (ACityGenAtmos* A = AtmosIn(World))
 			{
 				UE_LOG(LogTemp, Display, TEXT("CITYGEN_ATMOS_PLUMES %s"), *A->PlumeDebug(Args.Num() ? Args[0] : FString()));
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs WeatherCmd(TEXT("CityGenAtmos.Weather"),
+		TEXT("CityGenAtmos.Weather NAME [now]: AT5: the weather state (clear, drizzle, rain, fog, smog), blended over the plan's transition, or at once with `now` (the streets as wet as it leaves them); + or - steps it"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenAtmos* A = AtmosIn(World);
+			if (!A || !Args.Num())
+			{
+				return;
+			}
+			if (Args[0] == TEXT("+") || Args[0] == TEXT("-"))
+			{
+				A->StepWeather(Args[0] == TEXT("-") ? -1 : 1);
+				return;
+			}
+			const bool bNow = Args.Num() > 1 && (Args[1] == TEXT("now") || Args[1] == TEXT("1"));
+			if (!A->SetWeatherState(Args[0], bNow))
+			{
+				UE_LOG(LogTemp, Warning, TEXT("CityGenAtmos.Weather: no state %s"), *Args[0]);
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs WeatherSpeedCmd(TEXT("CityGenAtmos.WeatherSpeed"),
+		TEXT("CityGenAtmos.WeatherSpeed S: AT5: how fast the rain's age runs (1 real time): the streets wetting and drying, the puddles, the transitions"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenAtmos* A = AtmosIn(World);
+			if (A && Args.Num()) { A->WeatherSpeed = FMath::Max(0.f, FCString::Atof(*Args[0])); }
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs WetnessCmd(TEXT("CityGenAtmos.Wetness"),
+		TEXT("CityGenAtmos.Wetness W [P]: AT5: the streets' wetness and the puddles' fill held (0 to 1; -1 by the rain's age again)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenAtmos* A = AtmosIn(World);
+			if (A && Args.Num())
+			{
+				A->HoldWetness(FCString::Atof(*Args[0]), Args.Num() > 1 ? FCString::Atof(*Args[1]) : FCString::Atof(*Args[0]));
 			}
 		}));
 

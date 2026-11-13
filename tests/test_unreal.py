@@ -51,8 +51,12 @@ def regenerated(small_built):
 
 
 def _blockout_files(m, out: Path) -> Path:
-    """What `citygen blockout` writes before Blender runs (no glTF tiles)."""
+    """What `citygen blockout` writes before Blender runs (no glTF tiles), beside the city
+    model, as in a build folder (the player start reads the model: since the visible lights
+    it starts on an open lit sidewalk, `unreal._start_spot`; without the model here and with
+    it in `staged`, an import over the blockout updated `player_start`)."""
     out.mkdir(parents=True, exist_ok=True)
+    (out / "city_model.json").write_text(m.to_json() + "\n", encoding="utf-8")
     plan = BO.make_plan(m)
     (out / "blockout_plan.json").write_text(BO.plan_json(plan) + "\n", encoding="utf-8")
     (out / "tiles.json").write_text(json.dumps({"tile_size_m": BO.TILE_M,
@@ -518,7 +522,9 @@ def test_project_cooks_what_the_runtimes_load_by_path(tmp_path):
         b"[/Script/UnrealEd.ProjectPackagingSettings]\r\nBuildConfiguration=PPBC_Development\r\n"
         b'+DirectoriesToAlwaysCook=(Path="/Game/Mine")\r\n'
         b'+DirectoriesToAlwaysCook=(Path="/Game/CityGen/Core/Atmos")\r\n'
-        b'+DirectoriesToAlwaysCook=(Path="/Engine/BasicShapes")\r\n\r\n[Other]\r\nA=1\r\n')
+        b'+DirectoriesToAlwaysCook=(Path="/Engine/BasicShapes")\r\n'
+        b'+DirectoriesToAlwaysCook=(Path="/Engine/EngineResources/FilmGrains")\r\n\r\n'
+        b'[Other]\r\nA=1\r\n')
     assert not U.set_project_ini(up)
     # a project without the section (the templates' DefaultGame.ini) gets it appended
     game.write_bytes(b"[/Script/EngineSettings.GeneralProjectSettings]\nProjectID=X\n")
@@ -526,7 +532,8 @@ def test_project_cooks_what_the_runtimes_load_by_path(tmp_path):
     assert game.read_bytes().endswith(
         b"ProjectID=X\n\n[/Script/UnrealEd.ProjectPackagingSettings]\n"
         b'+DirectoriesToAlwaysCook=(Path="/Game/CityGen/Core/Atmos")\n'
-        b'+DirectoriesToAlwaysCook=(Path="/Engine/BasicShapes")\n')
+        b'+DirectoriesToAlwaysCook=(Path="/Engine/BasicShapes")\n'
+        b'+DirectoriesToAlwaysCook=(Path="/Engine/EngineResources/FilmGrains")\n')
     # every folder a runtime loads from by path is one of them
     import re
     src = Path(U.__file__).parent / "ue"
@@ -1782,13 +1789,14 @@ class _Mel:
         self.deleted.append(e)
 
 
-def _water_master(pins):
+def _water_master(pins, mpc=None):
     ns = _ue_script("import_city.py", "water_master", "link", "expr", "custom", "sparam",
                     "vparam", "tparam", "cmot", "SAMPLER", "FLOW_UV_CODE", "WAVE_NORMAL_CODE",
-                    "WAVE_CODE", "FOAM_CODE")
+                    "WAVE_CODE", "FOAM_CODE", "RAIN_RING_CODE")
     mel, logged = _Mel(pins), []
+    # (AT5: the rain's rings read atmosgen's collection where the project has it)
     ns.update(unreal=_Unreal(), MEL=mel, log=logged.append, F1="CMOT_FLOAT1",
-              F2="CMOT_FLOAT2", F3="CMOT_FLOAT3", F4="CMOT_FLOAT4")
+              F2="CMOT_FLOAT2", F3="CMOT_FLOAT3", F4="CMOT_FLOAT4", atmos_mpc=lambda: mpc)
     m = _UeObj("M_CgWater")
     ns["water_master"](m, {})
     return m, mel, logged
@@ -1813,6 +1821,12 @@ def test_water_master_links_single_layer_water_by_ue58_names():
     assert m.props["shading_model"] == "MSM_DEFAULT_LIT" and logged
     made = [e for e in mel.made if e.name == slw]
     assert made and made == mel.deleted
+    # AT5: with atmosgen's collection the wave normal takes the rain's rings, else a zero
+    m, mel, logged = _water_master(pins, mpc="MPC_CityGenAtmos")
+    assert m.props["shading_model"] == "MSM_SINGLE_LAYER_WATER" and not logged
+    rain = [e for e in mel.made if e.name == "MaterialExpressionCollectionParameter"]
+    assert len(rain) == 1 and rain[0].props["parameter_name"] == "Rain"
+    assert ("MaterialExpressionCustom", "MaterialExpressionCustom", "Ring") in mel.links
 
 
 def test_glow_set_for_the_night():

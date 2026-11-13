@@ -15,8 +15,8 @@ grows here as it lands, as in [`citygen_milestones.md`](citygen_milestones.md) a
 | AT2 | Neon and signs as light: billboards, banners and holo-boards as lit faces stood off their walls (a faces check), neon spill from neon bands and shop signs, crown floods in AG15's LED accents and uplights, blinking aviation lights, sweeping searchlights, port high masts and crane floods, spaceport apron and pad lights, flicker and dying signs by danger, district palettes and grit; the high tier, beacons and beams in the runtime | Done | [`docs/progress/AT2`](progress/AT2) |
 | AT3 | Sky and time: the sun and the moon by latitude, day and phase; the exposure held per hour (night -3 EV100, the day's, dusk between), Night, the sun's light, the sky light and the stars by the sun's elevation; street lights set by the sun; the cloud deck lit from below by the plan's upward light (a glow raster per city); in Unreal a sky dome (sky atmosphere, sun disk, stars, the moon's phase, the deck lit by the sun, the moon and the city), one light as the sun then the moon, and the play features' time-of-day slider replacing their night switch | Done | [`docs/progress/AT3`](progress/AT3) |
 | AT4 | Air: the height and volumetric fog of the look by the hour, light shafts by light kind (none from the small many, searchlights keeping AT2's beams), mist over the water at night, smog over industry and the port, haze under decks and in tunnels (thicker where danger is), steam and smoke plumes from manholes and drains (read from AG7's packs), roof units, stalls, vents and chimneys; the air check; in Unreal pooled local fog volumes and instanced plume cards; the engine settings that keep the night in budget; the parked cars' cull distances | Done | [`docs/progress/AT4`](progress/AT4) |
-| AT5 | Weather: rain and its shadow, wetness, puddles, drips, splashes, rings, wind, states and transitions | Planned | |
-| AT6 | Looks and art direction: post and grading per look and district, `atmosgen review`, the skill | Planned | |
+| AT5 | Weather: the rain shadow of every low cover (moved downwind by the rain's lean), masks per tile (cover, puddles, drip band, gloss when wet), puddles in the worn spots, gutters, sags and round the drains (more where grit is), drip lines under the low covers' edges, five states with their rain, wetness, puddles, fog, clouds and wind, the rain's age; the weather check; in Unreal the masks city-wide, two DBuffer decals for wet streets (darker, then glossy, puddles that mirror with the rain's rings, the markings kept), rain cut under the covers and leaning in the wind, splashes where traces from the sky land, drips, rings on the water, the grass and plumes in the wind, blended states and the Tab menu's weather row | Done | [`docs/progress/AT5`](progress/AT5) |
+| AT6 | Looks and art direction: a post set per look by night and by day (bloom, lens flares, film grain, chromatic aberration, vignette, sharpening, a teal and magenta grade for neon rain, a black lift, local exposure), a post per district pulled by its grit and tinted by its archetype (the corporate core crisp and cool, old towns, markets and the port gritty), blended in the runtime by where the view stands; the day's exposure measured (a clear day's, moved by the weather's clouds); plumes lit by night and readable far off, a stall's cooking denser; the wet decals' curb sawtooth fixed; `atmosgen review`, `atmosgen spec diff` and the `atmosgen` skill | Done | [`docs/progress/AT6`](progress/AT6) |
 | AT7 | Far city and release: the skyline at night, budgets on every sample, Unreal checks | Planned | |
 
 ## AT0: contract and spike
@@ -61,6 +61,87 @@ recommendations: [`docs/progress/AT0/README.md`](progress/AT0/README.md).
 - **Tests:** `tests/atmosgen/test_at_plan.py`; `tests/test_bench.py` (the spike's job,
   `busy`), `tests/test_unreal_play.py` (both plugins installed), `tests/test_no_network.py`
   (atmosgen too).
+
+## AT6: looks and art direction
+
+Built on the Windows PC (2026-11-13), on main after AT5 (#217). Report, measurements and
+images: [`docs/progress/AT6/README.md`](progress/AT6/README.md).
+
+- **The look's post** (`atmosgen/look.py`, `planmodel.Post`; `presets.POST`, `POST_KEYS`): per
+  look a set by night and one by day (bloom, lens flares and their threshold, film grain,
+  chromatic aberration and its start, vignette, sharpening, the grade's saturation and
+  contrast, shadow and highlight tints as gains, the highlights' saturation, a black lift,
+  local exposure); neon rain teal and magenta by night.
+- **A post per district** (`DISTRICT_POST`, `DISTRICT_TINT`): the look's pulled by grit (clean
+  crisp, gritty grainy, fringed, flared, lifted) and tinted by archetype; a 32 m district
+  raster (`post_districts.png`) the runtime blends them by. Delta: the Corporate Core grain
+  0.05 and sharpen 0.6, Old Town and the port grain 0.25 and fringes 0.7.
+- **The exposure** (`DAY_EV100`, `POST_EXPOSURE`, `overcast_shift`): held per hour; the day a
+  clear day's, measured on Delta (-0.8 EV100 for AT3's 1.6: the day street had read -5 to -7
+  stops from middle grey, darker than the night), moved by half the light the weather's
+  clouds take; local exposure lifts a viaduct's underside by day.
+- **Art direction:** the spec's `post` (multipliers, tints, `day_ev_bias`, `overcast_comp`,
+  `districts`) and the districts' `shadows`, `highlights`, `tint`; `atmosgen review` (checks,
+  numbers, every shot's exposure in stops, a contact sheet against the last round, levers),
+  `atmosgen spec diff`; the skill `atmosgen/skill/SKILL.md` (to be copied into
+  `.claude/skills/atmosgen/`).
+- **Notes from AT3 to AT5:** the day's exposure (above); the plumes lit by night and kept
+  opaque far off, a stall's cooking 6 cards, wider and denser; the curb sawtooth: the wet
+  decals' face normal came from coarse (2 x 2 quad) derivatives, so a curb's edge read as
+  floor or wall by quads; fine derivatives draw it as one edge.
+- **Exporter and runtime** (`docs/unreal_export.md`, "From AT6"): `post_settings`
+  (`POST_FLOATS`, 20 a set), no new `ATMOS_VERSION`; `UpdatePost` into the controller's own
+  post-process volume (one volume for every district), `OvercastShift`; atmos assets 17;
+  console `.Post`, `.PostDistricts`, `.PostSet`, `.DayEV`, `.SteamGlow`; the engine's film
+  grains always cooked.
+- **A test fixed:** `test_stage2_from_assetgen`'s blockout folder had no city model, so its
+  player start (since #215 read from the model) differed from the staged copy's.
+- **Benchmark** (the lean route once, AT5's after as the before): Delta's night 15.4 ms p95 over
+  the route (AT5 15.1; walk 15.2, drive 15.2, fly 15.8), dusk 15.2, day 13.8; the post 0.15 to
+  0.24 ms of GPU at fixed viewpoints.
+- **Tests:** `tests/atmosgen/test_at_look.py`; `test_at_sky.py`, `tests/test_bench.py`,
+  `tests/test_unreal.py` (cook folders, the stage 2 test).
+
+## AT5: weather
+
+Built on the Windows PC (2026-11-13), on main after AT4 (#211), the play fixes (#213) and the
+visible lights (#215). Report, measurements and images:
+[`docs/progress/AT5/README.md`](progress/AT5/README.md).
+
+- **The rain shadow** (`atmosgen/weather.py`, `Weather.covers`): every cover within 25 m of
+  the ground (deck slabs, M3's masses where they hang over no mass of their own building that
+  reaches up to them, skybridges, awnings, bus shelters, canopies, transit decks and cap
+  beams, raised roads, tunnel lids), moved downwind by its height times the rain's lean (0.3,
+  at most 3 m; the wind's heading the spec's `wind_deg`, 40 by default). Delta: 16,600 covers,
+  3% of its texels sheltered.
+- **The masks** (`masks/<tile>.png`, 0.5 m, RGBA; `planmodel.Mask`): the cover's underside
+  (absolute, the plan's `weather_plan.cover` datum and step), puddles, the drip band, the gloss
+  when wet by surface. Delta: 196 tiles, 4.5 MB.
+- **Puddles** (`presets.PUDDLE`): a worn-spot noise, the gutter along the curb, a road's sags,
+  AG7's drains; the threshold lowered by grit (decision 12.5); never under a cover, on a roof,
+  a curb, a deck or the water; the deepest fill first. Delta: 2% of its texels.
+- **Drips** (`drips/<tile>.json`, `planmodel.Drip`): the low covers' dripping edges in 8 m
+  pieces. Delta: 19,997.
+- **States** (`presets.WEATHER`, `WEATHER_LOOK`, `WEATHER_TIMES`, `WIND`; the plan's
+  `weather_plan`): clear, drizzle, rain, fog, smog with their rain, streaks, drops, wetness,
+  puddles, clouds, fog (the look's), fog volumes' gain, wind and gusts; the rain's age.
+- **The weather check** (`checks.weather`): masks, covers in their shadow, puddles in place,
+  the drips' budget; a plan failing it is not delivered. `atmosgen lux` writes
+  `preview_weather.png` and `preview_weather_detail.png`.
+- **Exporter and runtime** (`docs/unreal_export.md`, "From AT5"): packing version 4 (drip
+  lines), `ATMOS_VERSION` atmos6, the masks city-wide at 1 m as two textures; the controller's
+  states blended over 20 s, the rain's age, the wind into both collections; wet streets as
+  two DBuffer decals (`M_CgWetColor`, `M_CgWetGloss`: one decal's color, normal and roughness
+  share an opacity, so darkening without painting the markings over and a mirror gloss need
+  two); the rain cut under the covers and leaning; splashes where traces from the sky land;
+  drips; rain rings on `M_CgWater`; the overcast takes the sun's direct light by day; atmos
+  assets 15 (every material rebuilt from nothing, `clear_material`: a rebuild had left half the old nodes and broken `M_CgWater`); the Tab menu's Weather row. **Decision:** the wetness is decals reading the
+  plan's masks, not the masters (AT0's recommendation): a per-pixel rain shadow needs the
+  city's texture, which the shared masters cannot hold, and rebuilding every master recompiles
+  every city material. **The trees' sway** is built but off (`LEAF_SWAY`): 4.5 ms on Midtown's
+  tree-lined street.
+- **Tests:** `tests/atmosgen/test_at_weather.py`; `tests/test_unreal_atmos.py`,
+  `tests/test_bench.py` (the weather passes), `tests/atmosgen/test_at_plan.py`.
 
 ## AT4: air
 

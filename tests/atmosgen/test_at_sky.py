@@ -72,8 +72,13 @@ def test_curves_hold_the_night_and_follow_the_sun():
     evs = [SK.exposure(sky, e) for e in range(-30, 40)]
     assert all(b >= a for a, b in zip(evs, evs[1:]))
     assert SK.exposure(sky, -20.0) == P.SCENE_NIGHT_EV100 == sky["ev_night"]
-    # (neon_rain's closed deck darkens the day)
-    assert SK.exposure(sky, 40.0) == pytest.approx(P.DAY_EV100 - P.OVERCAST_EV * 0.8)
+    # (neon_rain's closed deck darkens the day: AT6, a clear day's exposure moved by the
+    # overcast's compensation of the light it takes, a brighter exposure)
+    from atmosgen.look import overcast_shift
+    comp = P.POST_EXPOSURE["neon_rain"]["overcast_comp"]
+    assert SK.exposure(sky, 40.0) == pytest.approx(P.DAY_EV100 + overcast_shift(comp, 0.8),
+                                                   abs=1e-3)
+    assert SK.exposure(sky, 40.0) < P.DAY_EV100
     assert SK.curve("night", -13.0) == 1.0 and SK.curve("night", 12.0) == 0.0
     assert 0.0 < SK.curve("night", -2.0) < 1.0
     # the stars only in the dark, the sun's light until well under the horizon
@@ -230,7 +235,11 @@ def test_exporter_hands_the_sky_to_the_controller(tmp_path):
     plan = json.loads((b / "atmos" / "atmos_plan.json").read_text())
     ctl, sky = data["controller"], plan["sky"]
     assert ctl["latitude_deg"] == sky["latitude_deg"] and ctl["dusk_hour"] == sky["hours"]["dusk"]
-    assert ctl["scene_ev100"] == sky["ev_night"] and ctl["day_ev100"] == sky["ev_day"]
+    # (AT6: the controller's day exposure is a clear day's, the post's: the runtime moves it by
+    # the clouds there are, as the sky's own `ev_day` is at the look's cover)
+    assert ctl["scene_ev100"] == sky["ev_night"]
+    assert ctl["day_ev100"] == plan["post"]["exposure"]["day_ev100"] == P.DAY_EV100 >= \
+        sky["ev_day"]
     assert len(ctl["curve_elev"]) == len(ctl["curve_ev"]) == len(ctl["curve_night"]) >= 2
     # the glow's bounds in Unreal's frame (cm, Y south), its file beside the manifest
     x0, y0, x1, y1 = sky["glow"]["bounds"]

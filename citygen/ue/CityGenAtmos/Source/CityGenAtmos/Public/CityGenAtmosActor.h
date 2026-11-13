@@ -594,6 +594,215 @@ public:
 	/** AT3: whether the plan gave a sky (an AT2 plan did not). */
 	bool HasSky() const { return CurveElev.Num() >= 2; }
 
+	// -- AT5: the weather (the plan's `weather_plan`; docs/unreal_export.md, "From AT5") --
+
+	/** The plan gave a weather (its states, masks and drips). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	bool bWeather = false;
+
+	/** The states (clear, drizzle, rain, fog, smog) and their values, WeatherKeyCount each in
+	 *  the exporter's WEATHER_KEYS order (rain, streak, drops, wetness, puddles, cover,
+	 *  volumes, gust, wind m/s, fog density, falloff, extinction, albedo r, g, b). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	TArray<FString> WeatherNames;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	TArray<float> WeatherValues;
+
+	/** The state the level starts in (the plan's). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	FString WeatherStart = TEXT("rain");
+
+	/** The rain's age (s): a state change blends over TransitionS; the open surfaces wet over
+	 *  WetS (at full rain) and dry over DryS; the puddles fill over FillS and drain over
+	 *  DrainS. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float TransitionS = 20.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float WetS = 45.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float DryS = 300.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float FillS = 120.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float DrainS = 900.f;
+
+	/** How fast the rain's age runs (1 real time; the console's CityGenAtmos.WeatherSpeed). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float WeatherSpeed = 1.f;
+
+	/** The wind's heading (degrees counterclockwise from citygen's east, the way it blows),
+	 *  the rain's lean in it, and the speed MPC_CityGen's Wind is 1 at (the grass, the trees). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float WindHeadingDeg = 40.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float RainLean = 0.3f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float GaleMS = 15.f;
+
+	/** The plan's masks, city-wide: the cover (the lowest underside over each texel of what
+	 *  shelters it: CoverZ0Cm plus its value times CoverStepCm; 0 open sky) and the surface
+	 *  (gloss when wet, puddles, drips); their bounds (cm: min X, min Y, size; row 0 min Y). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	TObjectPtr<UTexture2D> WetCover;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	TObjectPtr<UTexture2D> WetSurface;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	TArray<float> WetBounds;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float CoverZ0Cm = -800.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float CoverStepCm = 50.f;
+
+	/** Past the textures: how glossy the wet ground is. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float FarGloss = 0.7f;
+
+	/** Splashes: at most this many cards within SplashRangeM, where a trace down from the sky
+	 *  lands (the rain's own landing spots); drips: at most MaxDrips within DripRangeM, one
+	 *  every DripStepM along the plan's drip lines. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	int32 MaxSplashes = 480;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float SplashRangeM = 14.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	int32 MaxDrips = 640;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float DripRangeM = 36.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float DripStepM = 0.55f;
+
+	/** AT5: the weather to `Name` (a state of WeatherNames), blended over TransitionS, or at
+	 *  once with bNow (the rain's age too: the streets as wet as the state leaves them). */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	bool SetWeatherState(const FString& Name, bool bNow);
+
+	/** AT5: the next (Dir 1) or previous (-1) state (the menu's weather row). */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	void StepWeather(int32 Dir);
+
+	/** AT5: the state now, "a > b" while it turns from a to b. */
+	UFUNCTION(BlueprintPure, Category = "CityGen")
+	FString GetWeatherLabel() const;
+
+	/** AT5: the surfaces' wetness and the puddles' fill held (0 to 1; under 0: by the rain's
+	 *  age again). */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	void HoldWetness(float Wet, float Puddles);
+
+	bool HasWeather() const { return bWeather && WeatherNames.Num() > 0; }
+
+	// -- AT6: the look (the plan's `post`; docs/unreal_export.md, "From AT6") --
+
+	/** The plan gave a look: the post-process volume the actor owns shows it (bloom, lens
+	 *  flares, film grain, chromatic aberration, vignette, sharpening, the grade, local
+	 *  exposure), the night's and the day's blended by Night, each district's by where the
+	 *  view stands. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	bool bPost = false;
+
+	/** The look's sets: PostFloats a set (the exporter's POST_FLOATS order: bloom, flare,
+	 *  flare threshold, grain, chromatic, its start, vignette, sharpen, saturation, contrast,
+	 *  highlight saturation, lift, local shadows, local highlights, the shadows' gain rgb, the
+	 *  highlights' gain rgb), the night's then the day's. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	TArray<float> PostBase;
+
+	/** Each district's two sets, in PostNames order. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	TArray<float> PostDistricts;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	TArray<FString> PostNames;
+
+	/** The district raster: runs over its rows from the north edge ([count, index] pairs;
+	 *  255 none), its bounds (cm: min X, min Y, max X, max Y), cell (m) and size. */
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "CityGen|Post")
+	TArray<int32> PostRuns;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	TArray<float> PostBounds;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	float PostCellM = 32.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	int32 PostWidth = 0;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	int32 PostHeight = 0;
+
+	/** The districts weighed over a disc this wide round the view (m), eased over PostEaseS. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	float PostBlendM = 90.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	float PostEaseS = 1.5f;
+
+	/** The districts' own post (off: the look's alone). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	bool bDistrictPost = true;
+
+	/** By day, this share of the sun's light the weather's clouds take (OvercastTake: from a
+	 *  cover, this much at full) is given back by the exposure, against the plan's own cover
+	 *  (RefCover), a day street's light SkyShare the sky's. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	float OvercastComp = 0.7f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	TArray<float> OvercastTake;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	float SkyShare = 0.35f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Post")
+	float RefCover = 0.8f;
+
+	/** AT6: the plumes lit by the city by night (their emissive, of their albedo, times
+	 *  Night) and their opacity kept with distance (times 1 + SteamFar out to SteamFarM). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	float SteamGlow = 0.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	float SteamFar = 0.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	float SteamFarM = 150.f;
+
+	/** AT6: the look's post on or off (off: the engine's defaults, the exposure still held). */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	void SetPost(bool bOn);
+
+	/** AT6: the districts' own post on or off. */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	void SetPostDistricts(bool bOn);
+
+	bool HasPost() const { return bPost && PostBase.Num() >= 2 * PostFloats; }
+
+	/** AT6 (art direction): a post key (the exporter's POST_FLOATS name) held at a value for
+	 *  the session over every set, or let go (bClear; `clear` lets every key go). */
+	bool SetPostValue(const FString& Key, float Value, bool bClear);
+
+	/** AT6 (art direction): the day's exposure (EV100, a clear day's). */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	void SetDayEV(float EV);
+
+	static constexpr int32 PostFloats = 20;
+
 	// -- the cells --
 
 	/** A cell's data actor brings its lights in (CityGenAtmosCell::BeginPlay). */
@@ -667,6 +876,8 @@ private:
 		TArray<uint8> PlumeSchedule;
 		TArray<float> PlumeRate;
 		int32 Emitters = 0;
+		// AT5: its drip lines (CityGenAtmosPack::DripFloats each)
+		TArray<float> Drips;
 		bool bUsed = false;
 		bool bMade = false;                 // its beacons, beams and plumes made (near the view)
 	};
@@ -835,6 +1046,56 @@ private:
 	float PlumeHour = -100.f;
 	bool bShowing = false;                  // the lights live now (on, a plan, by night)
 
+	// AT5: the weather
+	static constexpr int32 WeatherKeyCount = 15;
+	enum EWeatherKey : int32 { WRain = 0, WStreak, WDrops, WWetness, WPuddles, WCover, WVolumes,
+		WGust, WWind, WFogDensity, WFogFalloff, WFogExtinction, WAlbR, WAlbG, WAlbB };
+	int32 WeatherIndex(const FString& Name) const;
+	void StateValues(int32 Index, float* Out) const;
+	void UpdateWeather(float DeltaSeconds, const FVector& View);
+	void ApplyWeather();
+	void EnsureWetDecals();
+	void UpdateWetDecals(const FVector& View);
+	void SetCoverParams(UMaterialInstanceDynamic* M) const;
+	void EnsureSplashes();
+	void UpdateSplashes(const FVector& View);
+	void EnsureDrips();
+	void UpdateDrips(const FVector& View, double Now);
+	float GroundAt(const FVector& P) const;
+	float WeatherNow[WeatherKeyCount] = {0.8f, 1.f, 1.f, 1.f, 1.f, 0.85f, 1.f, 0.35f, 6.f, 0.08f, 0.4f, 3.f, 0.25f, 0.29f, 0.39f};
+	float WeatherFrom[WeatherKeyCount] = {};
+	float WeatherTo[WeatherKeyCount] = {};
+	int32 WeatherCur = -1;                  // the state it is in, or turning from ...
+	int32 WeatherTarget = -1;               // ... and to
+	float TransitionT = 1.f;                // 0 to 1 through a change
+	float WetNow = 1.f;                     // the open surfaces' wetness
+	float PuddleNow = 1.f;                  // the puddles' fill
+	float WindNow = 6.f;                    // the wind's speed with its gust (m/s)
+	float HeldWet = -1.f;
+	float HeldPuddles = -1.f;
+	double WeatherPushedAt = -1.0;
+	float CoverApplied = -1.f;              // (the state's clouds last set: CityGenAtmos.Cover holds till the next)
+	UPROPERTY(Transient)
+	TObjectPtr<UDecalComponent> WetGloss;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> WetColorMID;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> WetGlossMID;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> RainMID;
+	UPROPERTY(Transient)
+	TObjectPtr<UInstancedStaticMeshComponent> Splashes;
+	UPROPERTY(Transient)
+	TObjectPtr<UInstancedStaticMeshComponent> DripCards;
+	TArray<FVector> SplashAt;               // each splash card's spot (Z < -1e8: none)
+	int32 SplashNext = 0;
+	double SplashesAt = -1.0;               // (re-traced in batches 5 times a second)
+	int32 SplashesLive = 0;
+	double DripsAt = -1.0;
+	FVector DripsView = FVector(1e12);
+	int32 DripsLive = 0;
+	int32 DripLines = 0;
+
 	// AT3: the sky and time
 	void FindLighting();
 	void EnsureDome();
@@ -860,4 +1121,23 @@ private:
 	float MoonLux = 0.f;
 	float CoverNow = 0.8f;
 	double TimeAppliedAt = -1.0;
+
+	// AT6: the look
+	enum EPostKey : int32 { PBloom = 0, PFlare, PFlareThreshold, PGrain, PChromatic,
+		PChromaticStart, PVignette, PSharpen, PSaturation, PContrast, PHighlightSat, PLift,
+		PLocalShadows, PLocalHighlights, PShadowR, PShadowG, PShadowB, PHighR, PHighG, PHighB };
+	void MakePostRaster();
+	void PostTarget(const FVector& View);
+	void UpdatePost(float DeltaSeconds, const FVector& View, bool bNow);
+	void ApplyPostSettings(const float* S);
+	void ClearPostSettings();
+	float OvercastShift() const;
+	TArray<uint8> PostIdx;                  // the raster, rows from the north edge
+	TArray<float> PostW;                    // each district's weight now (eased) ...
+	TArray<float> PostWTarget;              // ... and where the view stands
+	TMap<int32, float> PostOverride;        // (keys held by CityGenAtmos.PostSet)
+	float PostNow[PostFloats] = {};
+	bool bPostApplied = false;
+	double PostAt = -1.0;
+	FString PostWhere;                      // the district with the most weight now
 };

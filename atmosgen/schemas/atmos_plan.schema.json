@@ -95,10 +95,24 @@
      "title": "Scatter",
      "type": "object"
     },
+    "steam_far": {
+     "description": "AT6: the plumes' opacity times 1 + a from 30 m to b m off (they read far off).",
+     "items": {
+      "type": "number"
+     },
+     "title": "Steam Far",
+     "type": "array"
+    },
     "steam_gain": {
      "default": 10.0,
      "description": "The plumes' opacity gain.",
      "title": "Steam Gain",
+     "type": "number"
+    },
+    "steam_glow": {
+     "default": 0.0,
+     "description": "AT6: the plumes lit by the city by night (their emissive, of their albedo, times Night).",
+     "title": "Steam Glow",
      "type": "number"
     },
     "volume_glow": {
@@ -129,6 +143,43 @@
     "puffs"
    ],
    "title": "Air",
+   "type": "object"
+  },
+  "DripTile": {
+   "additionalProperties": false,
+   "properties": {
+    "count": {
+     "title": "Count",
+     "type": "integer"
+    },
+    "file": {
+     "title": "File",
+     "type": "string"
+    },
+    "kinds": {
+     "additionalProperties": {
+      "type": "integer"
+     },
+     "title": "Kinds",
+     "type": "object"
+    },
+    "sha256": {
+     "title": "Sha256",
+     "type": "string"
+    },
+    "tile": {
+     "title": "Tile",
+     "type": "string"
+    }
+   },
+   "required": [
+    "tile",
+    "file",
+    "count",
+    "kinds",
+    "sha256"
+   ],
+   "title": "DripTile",
    "type": "object"
   },
   "Emitter": {
@@ -461,7 +512,7 @@
   },
   "Mask": {
    "additionalProperties": false,
-   "description": "AT5: a tile's rain shadow, wetness and puddle mask (0.5 m texels).",
+   "description": "AT5: a tile's mask (`masks/<tile>.png`, 0.5 m texels, row 0 the north edge, RGBA): red\nthe cover (the lowest underside over the texel of what shelters it, absolute: the plan's\n`weather.cover` datum plus red times its step; 0 open sky), green the puddles (0 none to\n255 the deepest), blue the drip band under a low cover's edge, alpha the surface's gloss\nwhen wet.",
    "properties": {
     "file": {
      "title": "File",
@@ -561,6 +612,82 @@
     "cloud"
    ],
    "title": "Moon",
+   "type": "object"
+  },
+  "Post": {
+   "additionalProperties": false,
+   "description": "AT6: the look's post and grade (scope 6.5, `atmosgen/look.py`): the look's night and\nday sets, each district's, the exposure, the district raster the runtime blends them by.",
+   "properties": {
+    "base": {
+     "additionalProperties": true,
+     "description": "The look's sets: {night, day}, each its `keys` and `shadows_gain`, `highlights_gain` (rgb).",
+     "title": "Base",
+     "type": "object"
+    },
+    "blend_m": {
+     "description": "The runtime weighs the districts over a disc this wide round the view ...",
+     "title": "Blend M",
+     "type": "number"
+    },
+    "districts": {
+     "additionalProperties": {
+      "additionalProperties": true,
+      "type": "object"
+     },
+     "description": "Each district's sets by id (its grit and tint over the look's).",
+     "title": "Districts",
+     "type": "object"
+    },
+    "ease_s": {
+     "description": "... and eases to them over this (s).",
+     "title": "Ease S",
+     "type": "number"
+    },
+    "exposure": {
+     "additionalProperties": true,
+     "description": "The night's and the day's exposure (EV100), the day's bias and the overcast's compensation.",
+     "title": "Exposure",
+     "type": "object"
+    },
+    "keys": {
+     "description": "The scalar keys of a set (`presets.POST_KEYS`).",
+     "items": {
+      "type": "string"
+     },
+     "title": "Keys",
+     "type": "array"
+    },
+    "order": {
+     "description": "The districts in the raster's index order.",
+     "items": {
+      "type": "string"
+     },
+     "title": "Order",
+     "type": "array"
+    },
+    "raster": {
+     "anyOf": [
+      {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "`post_districts.png`: each cell's district (an index into `order`), rows from the north edge, its bounds, cell, size and sha256.",
+     "title": "Raster"
+    }
+   },
+   "required": [
+    "keys",
+    "base",
+    "exposure",
+    "blend_m",
+    "ease_s"
+   ],
+   "title": "Post",
    "type": "object"
   },
   "Sight": {
@@ -902,6 +1029,210 @@
    ],
    "title": "TileIndex",
    "type": "object"
+  },
+  "Weather": {
+   "additionalProperties": false,
+   "description": "AT5: the weather (scope 6.4, `weather.py`): the states, the rain's age, the wind, the\nmasks' frame and the drips.",
+   "properties": {
+    "counts": {
+     "additionalProperties": {
+      "type": "integer"
+     },
+     "title": "Counts",
+     "type": "object"
+    },
+    "cover": {
+     "additionalProperties": {
+      "type": "number"
+     },
+     "description": "The cover channel's datum (z0_m) and step (step_m).",
+     "title": "Cover",
+     "type": "object"
+    },
+    "drip_tiles": {
+     "items": {
+      "$ref": "#/$defs/DripTile"
+     },
+     "title": "Drip Tiles",
+     "type": "array"
+    },
+    "extent": {
+     "description": "[x0, y0, x1, y1]: the masks' tiles.",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 4,
+     "minItems": 4,
+     "title": "Extent",
+     "type": "array"
+    },
+    "gloss": {
+     "additionalProperties": {
+      "type": "number"
+     },
+     "description": "The gloss when wet by surface class.",
+     "title": "Gloss",
+     "type": "object"
+    },
+    "live": {
+     "additionalProperties": {
+      "type": "number"
+     },
+     "description": "What the runtime keeps near the view.",
+     "title": "Live",
+     "type": "object"
+    },
+    "start": {
+     "enum": [
+      "clear",
+      "drizzle",
+      "rain",
+      "fog",
+      "smog"
+     ],
+     "title": "Start",
+     "type": "string"
+    },
+    "states": {
+     "additionalProperties": {
+      "$ref": "#/$defs/WeatherState"
+     },
+     "title": "States",
+     "type": "object"
+    },
+    "stats": {
+     "additionalProperties": true,
+     "title": "Stats",
+     "type": "object"
+    },
+    "texel_m": {
+     "title": "Texel M",
+     "type": "number"
+    },
+    "times": {
+     "additionalProperties": {
+      "type": "number"
+     },
+     "description": "transition_s (a state change), wet_s and dry_s (the open surfaces), fill_s and drain_s (the puddles): the runtime's seconds.",
+     "title": "Times",
+     "type": "object"
+    },
+    "wind": {
+     "additionalProperties": {
+      "type": "number"
+     },
+     "description": "heading_deg (counterclockwise from east, the way it blows), lean (the rain's drift over its fall), shift_max_m, cover_max_m, gale_m_s (MPC_CityGen's Wind 1).",
+     "title": "Wind",
+     "type": "object"
+    }
+   },
+   "required": [
+    "start",
+    "states",
+    "times",
+    "wind",
+    "texel_m",
+    "extent",
+    "cover",
+    "gloss",
+    "drip_tiles",
+    "live",
+    "counts",
+    "stats"
+   ],
+   "title": "Weather",
+   "type": "object"
+  },
+  "WeatherState": {
+   "additionalProperties": false,
+   "description": "AT5: one weather state as the runtime blends to it.",
+   "properties": {
+    "cover": {
+     "description": "The cloud deck's cover.",
+     "title": "Cover",
+     "type": "number"
+    },
+    "drops": {
+     "description": "The share of the rain cards that fall.",
+     "title": "Drops",
+     "type": "number"
+    },
+    "fog_albedo": {
+     "description": "Linear RGB, 0 to 1.",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 3,
+     "minItems": 3,
+     "title": "Fog Albedo",
+     "type": "array"
+    },
+    "fog_density": {
+     "description": "The height fog's density (the look's).",
+     "title": "Fog Density",
+     "type": "number"
+    },
+    "fog_extinction": {
+     "description": "The volumetric fog's extinction scale.",
+     "title": "Fog Extinction",
+     "type": "number"
+    },
+    "fog_falloff": {
+     "title": "Fog Falloff",
+     "type": "number"
+    },
+    "gust": {
+     "description": "The wind's gusts, a share of its speed.",
+     "title": "Gust",
+     "type": "number"
+    },
+    "puddles": {
+     "description": "How full the puddles get (a share of their depth).",
+     "title": "Puddles",
+     "type": "number"
+    },
+    "rain": {
+     "description": "The rain's rate (0 to 1).",
+     "title": "Rain",
+     "type": "number"
+    },
+    "streak": {
+     "description": "A streak's length, a share of the rain's (drizzle's short).",
+     "title": "Streak",
+     "type": "number"
+    },
+    "volumes": {
+     "description": "A gain on the fog volumes (mist, smog).",
+     "title": "Volumes",
+     "type": "number"
+    },
+    "wetness": {
+     "description": "How wet the open surfaces get.",
+     "title": "Wetness",
+     "type": "number"
+    },
+    "wind_m_s": {
+     "title": "Wind M S",
+     "type": "number"
+    }
+   },
+   "required": [
+    "rain",
+    "streak",
+    "drops",
+    "wetness",
+    "puddles",
+    "cover",
+    "volumes",
+    "gust",
+    "wind_m_s",
+    "fog_density",
+    "fog_falloff",
+    "fog_extinction",
+    "fog_albedo"
+   ],
+   "title": "WeatherState",
+   "type": "object"
   }
  },
  "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -999,6 +1330,18 @@
    "title": "Night Ev100",
    "type": "number"
   },
+  "post": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/Post"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "description": "AT6: the look's post and grade, per district."
+  },
   "preset": {
    "enum": [
     "neon_rain",
@@ -1082,6 +1425,18 @@
    ],
    "title": "Weather",
    "type": "string"
+  },
+  "weather_plan": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/Weather"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "description": "AT5: the weather states, the rain's age, the wind, the masks' frame, the drips."
   },
   "weather_state": {
    "additionalProperties": true,

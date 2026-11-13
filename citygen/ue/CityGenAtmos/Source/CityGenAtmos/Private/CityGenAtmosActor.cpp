@@ -38,14 +38,25 @@ namespace
 {
 	constexpr double LiveEvery = 0.2;        // s between choosing the live set
 	constexpr float FadeShare = 0.2f;        // the farthest share of the mid range fades out
-	constexpr double WetSnapCm = 4000.0;     // the wet decal follows the view in 40 m steps
-	constexpr float WetHalfCm = 30000.f;     // ... 600 m square
+	// AT5: the wet streets' two decals round the view: recentred every 100 m, 1.2 km square,
+	// their middle 30 m over the ground under the view, 50 m deep either side of it
+	constexpr double WetSnapCm = 10000.0;
+	constexpr float WetHalfCm = 60000.f;
+	constexpr float WetDepthCm = 5000.f;
+	constexpr double WetUpCm = 3000.0;
 	constexpr float RainBoxCm = 2500.f;      // rain cards within 25 m of the view ...
 	constexpr float RainTopCm = 1200.f;      // ... falling from 12 m over it (24 m in all)
 	const TCHAR* AtmosMPC = TEXT("/Game/CityGen/Core/Atmos/MPC_CityGenAtmos.MPC_CityGenAtmos");
 	const TCHAR* CityMPC = TEXT("/Game/CityGen/Core/MPC_CityGen.MPC_CityGen");
 	const TCHAR* RainMaterial = TEXT("/Game/CityGen/Core/Atmos/M_CgRain.M_CgRain");
-	const TCHAR* WetMaterial = TEXT("/Game/CityGen/Core/Atmos/M_CgWet.M_CgWet");
+	const TCHAR* WetColorMaterial = TEXT("/Game/CityGen/Core/Atmos/M_CgWetColor.M_CgWetColor");
+	const TCHAR* WetGlossMaterial = TEXT("/Game/CityGen/Core/Atmos/M_CgWetGloss.M_CgWetGloss");
+	const TCHAR* SplashMaterial = TEXT("/Game/CityGen/Core/Atmos/M_CgSplash.M_CgSplash");
+	const TCHAR* DripMaterial = TEXT("/Game/CityGen/Core/Atmos/M_CgDrip.M_CgDrip");
+	constexpr int32 SplashData = 5;          // a splash card's data: its spot xyz, phase, size
+	constexpr int32 DripData = 6;            // a drip card's: its top xyz, fall, phase, rate
+	constexpr double SplashSkyCm = 4000.0;   // a splash's trace from 40 m over the view ...
+	constexpr double SplashDownCm = 6000.0;  // ... to 60 m under it
 	const TCHAR* RainMesh = TEXT("/Engine/BasicShapes/Plane.Plane");
 	// AT2: the fixtures' stand-ins: a red glow per aviation light, a cone per searchlight's beam
 	const TCHAR* BeaconMaterialPath = TEXT("/Game/CityGen/Core/Atmos/M_CgBeacon.M_CgBeacon");
@@ -142,12 +153,20 @@ void ACityGenAtmos::BeginPlay()
 	FindLighting();
 	EnsureDome();
 	ApplyTime();
+	// AT5: the plan's start weather, settled (the streets as wet as it leaves them)
+	if (HasWeather())
+	{
+		SetWeatherState(WeatherIndex(WeatherStart) != INDEX_NONE ? WeatherStart : WeatherNames[0], true);
+	}
 	SetFog(bFog);
 	SetAir(bAir);
 	SetRain(bRain);
 	SetWet(bWet);
 	SetMegaLights(bMegaLights);
 	SetLightsOn(bLights);
+	// AT6: the look's post (its district raster from its runs)
+	MakePostRaster();
+	SetPost(bPost);
 }
 
 void ACityGenAtmos::EndPlay(const EEndPlayReason::Type Reason)
@@ -190,7 +209,9 @@ void ACityGenAtmos::RegisterCell(ACityGenAtmosCell* Cell)
 	{
 		NE = 0;
 	}
-	if (N <= 0 && NV <= 0 && NE <= 0)
+	// AT5: or only drip lines
+	const int32 ND = Cell->DripFloats.Num() / CityGenAtmosPack::DripFloats;
+	if (N <= 0 && NV <= 0 && NE <= 0 && ND <= 0)
 	{
 		return;
 	}
@@ -257,6 +278,13 @@ void ACityGenAtmos::RegisterCell(ACityGenAtmosCell* Cell)
 		S.Volumes.Add(V);
 	}
 	S.Emitters = NE;
+	S.Drips.Reset();
+	if (ND > 0)
+	{
+		S.Drips.Append(Cell->DripFloats.GetData(), ND * CityGenAtmosPack::DripFloats);
+		DripLines += ND;
+		DripsAt = -1.0;
+	}
 	// (its beacons, beams and plumes when the view comes near it: UpdateFixtureCells)
 	S.bMade = false;
 	FixturesAt = -1.0;
@@ -328,6 +356,9 @@ void ACityGenAtmos::UnregisterCell(ACityGenAtmosCell* Cell)
 	RegisteredEmitters -= S.Emitters;
 	S.Volumes.Reset();
 	S.Emitters = 0;
+	DripLines -= S.Drips.Num() / CityGenAtmosPack::DripFloats;
+	S.Drips.Reset();
+	DripsAt = -1.0;
 	VolumesAt = -1.0;
 	S.Lights.Reset();
 	S.High.Reset();
@@ -1741,7 +1772,8 @@ void ACityGenAtmos::UpdateVolumes()
 			LiveVolumes.Add(N.Value, C);
 		}
 		const float Fade = float(FMath::Clamp((RangeCm - N.Key) / (FadeShare * RangeCm), 0.0, 1.0));
-		const float K = ScheduleAt(V.Schedule) * VolumeGain * Fade;
+		// (AT5: the weather's gain: mist and smog thicker in fog and smog)
+		const float K = ScheduleAt(V.Schedule) * VolumeGain * Fade * (HasWeather() ? WeatherNow[WVolumes] : 1.f);
 		const FTransform Xf(FRotator(0.f, V.Yaw, 0.f), V.Pos, V.Ext / ULocalFogVolumeComponent::GetBaseVolumeSize());
 		if (!C->GetComponentTransform().Equals(Xf, 0.5))
 		{
@@ -1971,10 +2003,16 @@ void ACityGenAtmos::EnsureRain()
 	Rain->SetUsingAbsoluteLocation(true);
 	Rain->SetUsingAbsoluteRotation(true);
 	Rain->SetStaticMesh(Mesh);
-	Rain->SetMaterial(0, Mat);
+	// AT5: an instance of its own, for the covers' texture (the rain kept out of what is covered)
+	RainMID = UMaterialInstanceDynamic::Create(Mat, this);
+	SetCoverParams(RainMID);
+	Rain->SetMaterial(0, RainMID ? static_cast<UMaterialInterface*>(RainMID) : Mat);
 	Rain->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Rain->SetCastShadow(false);
 	Rain->SetMobility(EComponentMobility::Movable);
+	Rain->bAffectDistanceFieldLighting = false;
+	Rain->bAffectDynamicIndirectLighting = false;
+	Rain->bVisibleInRayTracing = false;
 	// (falling by world position offset over the box: bounds that hold it)
 	Rain->SetBoundsScale(4.f);
 	FRandomStream R(1234);
@@ -1997,40 +2035,104 @@ void ACityGenAtmos::SetRain(bool bOn)
 	if (bOn)
 	{
 		EnsureRain();
+		if (HasWeather())
+		{
+			EnsureSplashes();
+			EnsureDrips();
+		}
 	}
+	// (AT5: shown while the weather's rain falls: UpdateWeather)
+	const bool bFalls = bOn && (!HasWeather() || WeatherNow[WRain] * WeatherNow[WDrops] > 0.005f);
 	if (Rain)
 	{
-		Rain->SetVisibility(bOn);
+		Rain->SetVisibility(bFalls);
+	}
+	if (Splashes)
+	{
+		Splashes->SetVisibility(bFalls);
+	}
+	if (DripCards)
+	{
+		DripCards->SetVisibility(bOn && (bFalls || WetNow > 0.3f));
 	}
 	PushParameters();
 }
 
+void ACityGenAtmos::SetCoverParams(UMaterialInstanceDynamic* M) const
+{
+	// AT5: the plan's masks (the cover, the surface) and where they lie, the cover's datum
+	if (!M)
+	{
+		return;
+	}
+	if (WetCover)
+	{
+		M->SetTextureParameterValue(TEXT("WetCover"), WetCover);
+	}
+	if (WetSurface)
+	{
+		M->SetTextureParameterValue(TEXT("WetSurface"), WetSurface);
+	}
+	if (WetBounds.Num() >= 3)
+	{
+		M->SetVectorParameterValue(TEXT("WetBounds"), FLinearColor(WetBounds[0], WetBounds[1], WetBounds[2], 0.f));
+	}
+	else
+	{
+		// (no masks: an empty window, every pixel past it)
+		M->SetVectorParameterValue(TEXT("WetBounds"), FLinearColor(-1e9f, -1e9f, 1.f, 0.f));
+	}
+	M->SetVectorParameterValue(TEXT("CoverZ"), FLinearColor(CoverZ0Cm, CoverStepCm, 0.f, 0.f));
+	M->SetScalarParameterValue(TEXT("FarGloss"), FarGloss);
+}
+
 void ACityGenAtmos::EnsureWet()
 {
-	if (Wet)
+	EnsureWetDecals();
+}
+
+void ACityGenAtmos::EnsureWetDecals()
+{
+	// AT5: two deferred decals round the view reading the plan's masks: one darkens the wet
+	// surfaces (the DBuffer's color), the other makes them glossy and the puddles mirrors with
+	// the rain's rings (its roughness and normal); AT0's single decal painted the markings over
+	if (Wet && WetGloss)
 	{
 		return;
 	}
-	UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, WetMaterial);
-	if (!Mat)
+	UMaterialInterface* MC = LoadObject<UMaterialInterface>(nullptr, WetColorMaterial);
+	UMaterialInterface* MG = LoadObject<UMaterialInterface>(nullptr, WetGlossMaterial);
+	if (!MC || !MG)
 	{
-		UE_LOG(LogCityGenAtmos, Warning, TEXT("CityGen atmos: no wet streets (%s missing: run the atmos assets)"),
-			WetMaterial);
+		UE_LOG(LogCityGenAtmos, Warning, TEXT("CityGen atmos: no wet streets (%s or %s missing: run the atmos assets)"),
+			WetColorMaterial, WetGlossMaterial);
 		return;
 	}
-	Wet = NewObject<UDecalComponent>(this);
-	Wet->SetupAttachment(RootComponent);
-	Wet->SetUsingAbsoluteLocation(true);
-	Wet->SetUsingAbsoluteRotation(true);
-	Wet->SetUsingAbsoluteScale(true);
-	// (a decal projects along its +X: down; 1.4 m deep round the street level, from 0.3 m
-	// under it to 1.1 m over it: roads, sidewalks and curbs, and a splash band on the walls)
-	Wet->SetWorldRotation(FRotator(-90.f, 0.f, 0.f));
-	Wet->DecalSize = FVector(70.f, WetHalfCm, WetHalfCm);
-	Wet->SetDecalMaterial(Mat);
-	Wet->SetFadeScreenSize(0.f);
-	Wet->SetSortOrder(-10);
-	Wet->RegisterComponent();
+	WetColorMID = UMaterialInstanceDynamic::Create(MC, this);
+	WetGlossMID = UMaterialInstanceDynamic::Create(MG, this);
+	SetCoverParams(WetColorMID);
+	SetCoverParams(WetGlossMID);
+	UDecalComponent* D[2] = {nullptr, nullptr};
+	for (int32 k = 0; k < 2; ++k)
+	{
+		UDecalComponent* C = NewObject<UDecalComponent>(this);
+		C->SetupAttachment(RootComponent);
+		C->SetUsingAbsoluteLocation(true);
+		C->SetUsingAbsoluteRotation(true);
+		C->SetUsingAbsoluteScale(true);
+		// (a decal projects along its +X: down; WetDepthCm either side of its middle, which
+		// stands WetUpCm over the ground under the view: the streets, sidewalks, roofs and decks
+		// of the city near the ground, and the walls a share)
+		C->SetWorldRotation(FRotator(-90.f, 0.f, 0.f));
+		C->DecalSize = FVector(WetDepthCm, WetHalfCm, WetHalfCm);
+		C->SetDecalMaterial(k == 0 ? static_cast<UMaterialInterface*>(WetColorMID) : static_cast<UMaterialInterface*>(WetGlossMID));
+		C->SetFadeScreenSize(0.f);
+		C->SetSortOrder(-10 + k);
+		C->RegisterComponent();
+		D[k] = C;
+	}
+	Wet = D[0];
+	WetGloss = D[1];
 }
 
 void ACityGenAtmos::SetWet(bool bOn)
@@ -2040,11 +2142,479 @@ void ACityGenAtmos::SetWet(bool bOn)
 	{
 		EnsureWet();
 	}
+	const bool bShow = bOn && (!HasWeather() || WetNow > 0.003f || PuddleNow > 0.003f);
 	if (Wet)
 	{
-		Wet->SetVisibility(bOn);
+		Wet->SetVisibility(bShow);
+	}
+	if (WetGloss)
+	{
+		WetGloss->SetVisibility(bShow);
 	}
 	WetAt = FVector(1e12);
+	PushParameters();
+}
+
+void ACityGenAtmos::UpdateWetDecals(const FVector& View)
+{
+	if (!Wet || !WetGloss)
+	{
+		return;
+	}
+	// (recentred as the view moves WetSnapCm; its middle WetUpCm over the ground under the view)
+	const FVector Snap(FMath::GridSnap(View.X, WetSnapCm), FMath::GridSnap(View.Y, WetSnapCm),
+		FMath::GridSnap(double(GroundAt(View)), 500.0) + WetUpCm);
+	if (!Snap.Equals(WetAt, 1.0))
+	{
+		WetAt = Snap;
+		Wet->SetWorldLocation(Snap);
+		WetGloss->SetWorldLocation(Snap);
+	}
+}
+
+float ACityGenAtmos::GroundAt(const FVector& P) const
+{
+	return Sight.IsValid() ? float(Sight->GroundAt(P)) : 0.f;
+}
+
+// -- AT5: splashes and drips --
+
+void ACityGenAtmos::EnsureSplashes()
+{
+	if (Splashes || !GetWorld())
+	{
+		return;
+	}
+	UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, RainMesh);
+	UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, SplashMaterial);
+	if (!Mesh || !Mat)
+	{
+		return;
+	}
+	UInstancedStaticMeshComponent* I = NewObject<UInstancedStaticMeshComponent>(this);
+	I->SetupAttachment(RootComponent);
+	I->SetUsingAbsoluteLocation(true);
+	I->SetUsingAbsoluteRotation(true);
+	I->SetUsingAbsoluteScale(true);
+	I->SetStaticMesh(Mesh);
+	I->SetMaterial(0, Mat);
+	I->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	I->SetCastShadow(false);
+	I->SetMobility(EComponentMobility::Movable);
+	I->bAffectDistanceFieldLighting = false;
+	I->bAffectDynamicIndirectLighting = false;
+	I->bVisibleInRayTracing = false;
+	I->NumCustomDataFloats = SplashData;
+	// (the cards follow the view: each one's own spot is in its data; bounds round the range)
+	const float Sc = 2.f * SplashRangeM;
+	TArray<FTransform> Xf;
+	const int32 N = FMath::Clamp(MaxSplashes, 0, 4096);
+	for (int32 k = 0; k < N; ++k)
+	{
+		Xf.Add(FTransform(FRotator::ZeroRotator, FVector::ZeroVector, FVector(Sc, Sc, 1.0)));
+	}
+	I->AddInstances(Xf, false);
+	FRandomStream R(4321);
+	for (int32 k = 0; k < N; ++k)
+	{
+		const float D[SplashData] = {0.f, 0.f, -1e9f, R.FRand(), 0.f};
+		for (int32 c = 0; c < SplashData; ++c)
+		{
+			I->SetCustomDataValue(k, c, D[c], false);
+		}
+	}
+	I->RegisterComponent();
+	Splashes = I;
+	SplashAt.Init(FVector(0.0, 0.0, -1e9), N);
+	SplashNext = 0;
+}
+
+void ACityGenAtmos::UpdateSplashes(const FVector& View)
+{
+	// a few spots a tick, round robin: each one's spot is where a trace down from the sky over
+	// a random point within SplashRangeM lands (the rain's own landing spot: under a cover
+	// there is none, on an awning its top); a spot out of range or not facing up has none
+	UWorld* World = GetWorld();
+	if (!Splashes || !World || SplashAt.Num() == 0)
+	{
+		return;
+	}
+	Splashes->SetWorldLocation(FVector(View.X, View.Y, View.Z - 100.0));
+	// (in batches five times a second: each batch sends the cards' data to the render thread
+	// once; every frame cost the render thread a fraction of a millisecond)
+	const double Now = FPlatformTime::Seconds();
+	if (SplashesAt >= 0.0 && Now - SplashesAt < 0.2)
+	{
+		return;
+	}
+	SplashesAt = Now;
+	const double R = SplashRangeM * 100.0;
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(CityGenSplash), false);
+	if (const APlayerController* PC = World->GetFirstPlayerController())
+	{
+		if (const APawn* Pawn = PC->GetPawn())
+		{
+			Q.AddIgnoredActor(Pawn);
+		}
+	}
+	bool bAny = false;
+	const int32 N = SplashAt.Num();
+	const int32 Per = FMath::Clamp(N / 3, 8, 192);
+	for (int32 n = 0; n < Per; ++n)
+	{
+		const int32 k = SplashNext;
+		SplashNext = (SplashNext + 1) % N;
+		const FVector& At = SplashAt[k];
+		const bool bValid = At.Z > -1e8 && FVector::DistSquared2D(At, View) < R * R;
+		// (a valid spot is kept for a while, then moved: the splashes do not repeat in place)
+		if (bValid && FMath::FRand() < 0.85f)
+		{
+			continue;
+		}
+		const double A = FMath::FRand() * 2.0 * UE_PI;
+		const double D = R * FMath::Sqrt(FMath::Max(0.02, double(FMath::FRand())));
+		const FVector P(View.X + D * FMath::Cos(A), View.Y + D * FMath::Sin(A), View.Z);
+		FHitResult Hit;
+		FVector Spot(0.0, 0.0, -1e9);
+		if (World->LineTraceSingleByChannel(Hit, P + FVector(0.0, 0.0, SplashSkyCm),
+			P - FVector(0.0, 0.0, SplashDownCm), ECC_Visibility, Q) && Hit.ImpactNormal.Z > 0.7)
+		{
+			Spot = Hit.ImpactPoint + FVector(0.0, 0.0, 1.0);
+		}
+		SplashAt[k] = Spot;
+		Splashes->SetCustomDataValue(k, 0, float(Spot.X), false);
+		Splashes->SetCustomDataValue(k, 1, float(Spot.Y), false);
+		Splashes->SetCustomDataValue(k, 2, float(Spot.Z), false);
+		Splashes->SetCustomDataValue(k, 4, Spot.Z > -1e8 ? FMath::FRandRange(9.f, 16.f) : 0.f, false);
+		bAny = true;
+	}
+	if (bAny)
+	{
+		// (the changed instances' data alone, not the whole proxy made again: that hitched a frame)
+		Splashes->MarkRenderInstancesDirty();
+		SplashesLive = 0;
+		for (const FVector& S : SplashAt)
+		{
+			SplashesLive += S.Z > -1e8 ? 1 : 0;
+		}
+	}
+}
+
+void ACityGenAtmos::EnsureDrips()
+{
+	if (DripCards || !GetWorld())
+	{
+		return;
+	}
+	UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, RainMesh);
+	UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, DripMaterial);
+	if (!Mesh || !Mat)
+	{
+		return;
+	}
+	UInstancedStaticMeshComponent* I = NewObject<UInstancedStaticMeshComponent>(this);
+	I->SetupAttachment(RootComponent);
+	I->SetUsingAbsoluteLocation(true);
+	I->SetUsingAbsoluteRotation(true);
+	I->SetUsingAbsoluteScale(true);
+	I->SetStaticMesh(Mesh);
+	I->SetMaterial(0, Mat);
+	I->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	I->SetCastShadow(false);
+	I->SetMobility(EComponentMobility::Movable);
+	I->bAffectDistanceFieldLighting = false;
+	I->bAffectDynamicIndirectLighting = false;
+	I->bVisibleInRayTracing = false;
+	I->NumCustomDataFloats = DripData;
+	I->RegisterComponent();
+	DripCards = I;
+}
+
+void ACityGenAtmos::UpdateDrips(const FVector& View, double Now)
+{
+	// the drip lines near the view: a card every DripStepM along each (a hash of where it is
+	// jitters it and phases it), the nearest MaxDrips within DripRangeM, again every half a
+	// second once the view has moved 4 m
+	if (!DripCards || (Now - DripsAt < 0.5 && DripsAt >= 0.0) ||
+		(DripsAt >= 0.0 && FVector::DistSquared(View, DripsView) < 400.0 * 400.0))
+	{
+		return;
+	}
+	DripsAt = Now;
+	DripsView = View;
+	const double R = DripRangeM * 100.0;
+	const double Step = FMath::Max(10.0, double(DripStepM) * 100.0);
+	struct FDrop { double D; FVector Top; float Fall; float Phase; float Rate; };
+	TArray<FDrop> Drops;
+	const FIntPoint C = CellOf(View);
+	const int32 Reach = FMath::Max(1, FMath::CeilToInt32(DripRangeM / CellM) + 1);
+	for (int32 dx = -Reach; dx <= Reach; ++dx)
+	{
+		for (int32 dy = -Reach; dy <= Reach; ++dy)
+		{
+			const TArray<int32>* At = SlotsAt.Find(FIntPoint(C.X + dx, C.Y + dy));
+			if (!At)
+			{
+				continue;
+			}
+			for (int32 Slot : *At)
+			{
+				const FSlot& S = Slots[Slot];
+				const int32 ND = S.Drips.Num() / CityGenAtmosPack::DripFloats;
+				for (int32 d = 0; d < ND; ++d)
+				{
+					const float* f = S.Drips.GetData() + d * CityGenAtmosPack::DripFloats;
+					const FVector A(f[0], f[1], f[4]), B(f[2], f[3], f[4]);
+					const FVector Mid = (A + B) * 0.5;
+					const double Half = FVector::Dist(A, B) * 0.5;
+					if (FVector::Dist2D(Mid, View) > R + Half)
+					{
+						continue;
+					}
+					const float Rate = FMath::Fmod(f[6], 8.f);
+					const float Fall = FMath::Max(50.f, f[4] - f[5]);
+					const int32 K = FMath::Max(1, FMath::FloorToInt32(2.0 * Half / Step));
+					for (int32 k = 0; k < K; ++k)
+					{
+						const uint32 H = Hash(uint32(Slot * 4096 + d), uint32(k));
+						const double U = (double(k) + 0.25 + 0.5 * double(H & 0xff) / 255.0) / double(K);
+						const FVector Top = FMath::Lerp(A, B, U);
+						const double Dist = FVector::Dist(Top, View);
+						if (Dist > R)
+						{
+							continue;
+						}
+						Drops.Add({Dist, Top, Fall, float((H >> 8) & 0xffff) / 65536.f, Rate});
+					}
+				}
+			}
+		}
+	}
+	Drops.Sort([](const FDrop& X, const FDrop& Y) { return X.D < Y.D; });
+	const int32 N = FMath::Min(Drops.Num(), FMath::Clamp(MaxDrips, 0, 4096));
+	DripCards->ClearInstances();
+	TArray<FTransform> Xf;
+	Xf.Reserve(N);
+	for (int32 k = 0; k < N; ++k)
+	{
+		const FDrop& D = Drops[k];
+		// (the card's bounds hold its fall: stood on its middle, as tall as it)
+		Xf.Add(FTransform(FRotator(0.f, 0.f, 90.f), D.Top - FVector(0.0, 0.0, 0.5 * D.Fall),
+			FVector(0.3, D.Fall / 100.0, 1.0)));
+	}
+	DripCards->AddInstances(Xf, false);
+	for (int32 k = 0; k < N; ++k)
+	{
+		const FDrop& D = Drops[k];
+		const float V[DripData] = {float(D.Top.X), float(D.Top.Y), float(D.Top.Z), D.Fall, D.Phase, D.Rate};
+		for (int32 c = 0; c < DripData; ++c)
+		{
+			DripCards->SetCustomDataValue(k, c, V[c], false);
+		}
+	}
+	DripCards->MarkRenderStateDirty();
+	DripsLive = N;
+}
+
+// -- AT5: the weather's states --
+
+int32 ACityGenAtmos::WeatherIndex(const FString& Name) const
+{
+	for (int32 k = 0; k < WeatherNames.Num(); ++k)
+	{
+		if (WeatherNames[k].Equals(Name, ESearchCase::IgnoreCase))
+		{
+			return k;
+		}
+	}
+	return INDEX_NONE;
+}
+
+void ACityGenAtmos::StateValues(int32 Index, float* Out) const
+{
+	for (int32 k = 0; k < WeatherKeyCount; ++k)
+	{
+		const int32 i = Index * WeatherKeyCount + k;
+		Out[k] = WeatherValues.IsValidIndex(i) ? WeatherValues[i] : WeatherNow[k];
+	}
+}
+
+bool ACityGenAtmos::SetWeatherState(const FString& Name, bool bNow)
+{
+	const int32 Index = WeatherIndex(Name);
+	if (Index == INDEX_NONE || !HasWeather())
+	{
+		return false;
+	}
+	FMemory::Memcpy(WeatherFrom, WeatherNow, sizeof(WeatherNow));
+	StateValues(Index, WeatherTo);
+	WeatherCur = WeatherTarget == INDEX_NONE ? Index : WeatherTarget;
+	WeatherTarget = Index;
+	TransitionT = 0.f;
+	if (bNow || TransitionS <= 0.f)
+	{
+		FMemory::Memcpy(WeatherNow, WeatherTo, sizeof(WeatherNow));
+		WeatherCur = Index;
+		TransitionT = 1.f;
+		WetNow = WeatherTo[WWetness];
+		PuddleNow = WeatherTo[WPuddles];
+	}
+	UE_LOG(LogCityGenAtmos, Display, TEXT("CityGen atmos: weather %s%s"), *WeatherNames[Index],
+		bNow ? TEXT(" (now)") : TEXT(""));
+	ApplyWeather();
+	return true;
+}
+
+void ACityGenAtmos::StepWeather(int32 Dir)
+{
+	if (!HasWeather())
+	{
+		return;
+	}
+	const int32 N = WeatherNames.Num();
+	const int32 From = WeatherTarget == INDEX_NONE ? 0 : WeatherTarget;
+	SetWeatherState(WeatherNames[((From + (Dir < 0 ? -1 : 1)) % N + N) % N], false);
+}
+
+FString ACityGenAtmos::GetWeatherLabel() const
+{
+	if (!HasWeather() || WeatherTarget == INDEX_NONE)
+	{
+		return FString();
+	}
+	if (TransitionT < 1.f && WeatherCur != INDEX_NONE && WeatherCur != WeatherTarget)
+	{
+		return FString::Printf(TEXT("%s > %s"), *WeatherNames[WeatherCur], *WeatherNames[WeatherTarget]);
+	}
+	return WeatherNames[WeatherTarget];
+}
+
+void ACityGenAtmos::HoldWetness(float InWet, float InPuddles)
+{
+	HeldWet = InWet;
+	HeldPuddles = InPuddles;
+	if (InWet >= 0.f)
+	{
+		WetNow = FMath::Clamp(InWet, 0.f, 1.f);
+	}
+	if (InPuddles >= 0.f)
+	{
+		PuddleNow = FMath::Clamp(InPuddles, 0.f, 1.f);
+	}
+	SetWet(bWet);
+}
+
+void ACityGenAtmos::UpdateWeather(float DeltaSeconds, const FVector& View)
+{
+	// the state's values blended through a change, the wind's gusts, the rain's age (the
+	// streets wetting and drying, the puddles filling and draining), pushed to the material
+	// parameter collections 15 times a second, the fog when it changed
+	if (!HasWeather())
+	{
+		return;
+	}
+	const float Dt = DeltaSeconds * FMath::Max(0.f, WeatherSpeed);
+	bool bFog0 = false;
+	if (TransitionT < 1.f)
+	{
+		TransitionT = FMath::Min(1.f, TransitionT + Dt / FMath::Max(0.1f, TransitionS));
+		const float S = FMath::SmoothStep(0.f, 1.f, TransitionT);
+		for (int32 k = 0; k < WeatherKeyCount; ++k)
+		{
+			WeatherNow[k] = FMath::Lerp(WeatherFrom[k], WeatherTo[k], S);
+		}
+		if (TransitionT >= 1.f)
+		{
+			WeatherCur = WeatherTarget;
+		}
+		bFog0 = true;
+	}
+	const double T = WorldTime();
+	const float G = 0.5f * FMath::Sin(float(T) * 0.37f) + 0.3f * FMath::Sin(float(T) * 1.13f + 1.f)
+		+ 0.2f * FMath::Sin(float(T) * 2.9f + 2.f);
+	WindNow = FMath::Max(0.f, WeatherNow[WWind] * (1.f + WeatherNow[WGust] * G));
+	// the rain's age: the open surfaces toward the state's wetness, the puddles toward its fill
+	// (faster in heavy rain, slower to dry and drain)
+	const float RainF = FMath::Max(0.3f, WeatherNow[WRain] / 0.8f);
+	auto Toward = [Dt, RainF](float& V, float Target, float Up, float Down)
+	{
+		if (V < Target)
+		{
+			V = FMath::Min(Target, V + Dt * RainF / FMath::Max(0.1f, Up));
+		}
+		else
+		{
+			V = FMath::Max(Target, V - Dt / FMath::Max(0.1f, Down));
+		}
+	};
+	const bool bWasDry = WetNow <= 0.003f && PuddleNow <= 0.003f;
+	if (HeldWet < 0.f)
+	{
+		Toward(WetNow, WeatherNow[WWetness], WetS, DryS);
+	}
+	if (HeldPuddles < 0.f)
+	{
+		Toward(PuddleNow, WeatherNow[WPuddles], FillS, DrainS);
+	}
+	const double Now = FPlatformTime::Seconds();
+	if (WeatherPushedAt < 0.0 || Now - WeatherPushedAt > TimeEvery || bFog0)
+	{
+		WeatherPushedAt = Now;
+		ApplyWeather();
+	}
+	const bool bDry = WetNow <= 0.003f && PuddleNow <= 0.003f;
+	if (bDry != bWasDry)
+	{
+		SetWet(bWet);
+	}
+	if (bRain)
+	{
+		UpdateSplashes(View);
+		UpdateDrips(View, Now);
+	}
+}
+
+void ACityGenAtmos::ApplyWeather()
+{
+	if (!HasWeather())
+	{
+		return;
+	}
+	// the fog of the state (the look's), the clouds, the fog volumes' gain, the rain shown
+	// while it falls, the parameters
+	const bool bFogChanged = !FMath::IsNearlyEqual(FogDensity, WeatherNow[WFogDensity], 1e-5f) ||
+		!FMath::IsNearlyEqual(FogFalloff, WeatherNow[WFogFalloff], 1e-4f) ||
+		!FMath::IsNearlyEqual(FogVolumetric, WeatherNow[WFogExtinction], 1e-4f);
+	FogDensity = WeatherNow[WFogDensity];
+	FogFalloff = WeatherNow[WFogFalloff];
+	FogVolumetric = WeatherNow[WFogExtinction];
+	FogAlbedo = FLinearColor(WeatherNow[WAlbR], WeatherNow[WAlbG], WeatherNow[WAlbB]);
+	RainRate = WeatherNow[WRain];
+	WindMS = WindNow;
+	if (bFog && bFogChanged)
+	{
+		SetFog(true);
+	}
+	if (!FMath::IsNearlyEqual(CoverApplied, WeatherNow[WCover], 1e-3f))
+	{
+		CoverApplied = WeatherNow[WCover];
+		SetCloudCover(WeatherNow[WCover]);
+	}
+	// (shown, or not, as the rain starts and stops)
+	const bool bFalls = bRain && WeatherNow[WRain] * WeatherNow[WDrops] > 0.005f;
+	if (Rain && Rain->IsVisible() != bFalls)
+	{
+		Rain->SetVisibility(bFalls);
+	}
+	if (Splashes && Splashes->IsVisible() != bFalls)
+	{
+		Splashes->SetVisibility(bFalls);
+	}
+	const bool bDrips = bRain && (bFalls || WetNow > 0.3f);
+	if (DripCards && DripCards->IsVisible() != bDrips)
+	{
+		DripCards->SetVisibility(bDrips);
+	}
 	PushParameters();
 }
 
@@ -2052,15 +2622,36 @@ void ACityGenAtmos::PushParameters()
 {
 	if (AtmosCollection)
 	{
-		UKismetMaterialLibrary::SetScalarParameterValue(this, AtmosCollection, TEXT("Rain"), bRain ? RainRate : 0.f);
-		UKismetMaterialLibrary::SetScalarParameterValue(this, AtmosCollection, TEXT("Wetness"), bWet ? 1.f : 0.f);
-		UKismetMaterialLibrary::SetScalarParameterValue(this, AtmosCollection, TEXT("FogDensity"), bFog ? FogDensity : 0.f);
-		UKismetMaterialLibrary::SetScalarParameterValue(this, AtmosCollection, TEXT("WindMS"), WindMS);
-		UKismetMaterialLibrary::SetScalarParameterValue(this, AtmosCollection, TEXT("SteamGain"), SteamGain);
+		const bool bW = HasWeather();
+		const float Heading = FMath::DegreesToRadians(WindHeadingDeg);
+		auto Set = [this](const TCHAR* Name, float V)
+		{
+			UKismetMaterialLibrary::SetScalarParameterValue(this, AtmosCollection, Name, V);
+		};
+		Set(TEXT("Rain"), bRain ? RainRate : 0.f);
+		Set(TEXT("Wetness"), bWet ? (bW ? WetNow : 1.f) : 0.f);
+		Set(TEXT("Puddles"), bWet ? (bW ? PuddleNow : 1.f) : 0.f);
+		Set(TEXT("FogDensity"), bFog ? FogDensity : 0.f);
+		Set(TEXT("WindMS"), WindMS);
+		// (Unreal's Y is citygen's south: the heading's y turns over)
+		Set(TEXT("WindX"), FMath::Cos(Heading));
+		Set(TEXT("WindY"), -FMath::Sin(Heading));
+		Set(TEXT("SteamGain"), SteamGain);
+		// (AT6: the plumes' opacity kept far off)
+		Set(TEXT("SteamFar"), SteamFar);
+		Set(TEXT("SteamFarM"), SteamFarM);
+		Set(TEXT("Streak"), bW ? WeatherNow[WStreak] : 1.f);
+		Set(TEXT("Drops"), bW ? WeatherNow[WDrops] : 1.f);
 	}
 	if (CityCollection && ((bLights && HasPlan()) || (bSky && HasSky())))
 	{
 		UKismetMaterialLibrary::SetScalarParameterValue(this, CityCollection, TEXT("Hour"), Hour);
+	}
+	// AT5: the wind sways AG13's grass (MPC_CityGen's Wind: 1 a gale)
+	if (CityCollection && HasWeather())
+	{
+		UKismetMaterialLibrary::SetScalarParameterValue(this, CityCollection, TEXT("Wind"),
+			FMath::Clamp(WindMS / FMath::Max(1.f, GaleMS), 0.f, 1.f));
 	}
 }
 
@@ -2152,14 +2743,13 @@ void ACityGenAtmos::Tick(float DeltaSeconds)
 		Rain->SetWorldLocationAndRotation(View - FVector(0.0, 0.0, RainTopCm * 0.25),
 			FRotator(0.0, ViewRot.Yaw + 180.0, 0.0));
 	}
+	// AT5: the weather (its states blending, the rain's age, splashes and drips near the view)
+	UpdateWeather(DeltaSeconds, View);
+	// AT6: the look's post, the districts' by where the view stands
+	UpdatePost(DeltaSeconds, View, false);
 	if (bWet && Wet)
 	{
-		const FVector Snap(FMath::GridSnap(View.X, WetSnapCm), FMath::GridSnap(View.Y, WetSnapCm), 40.0);
-		if (!Snap.Equals(WetAt, 1.0))
-		{
-			WetAt = Snap;
-			Wet->SetWorldLocation(Snap);
-		}
+		UpdateWetDecals(View);
 	}
 }
 
@@ -2204,7 +2794,7 @@ FString ACityGenAtmos::GetStatus() const
 		"\"cvars\": %d, \"sight\": %s, \"sight_wanted\": %s, \"sight_raster\": %s, \"sight_m\": %.0f, "
 		"\"sight_max\": %d, \"sight_seen\": %d, \"sight_picked\": %d, \"sight_tested\": %d, \"sight_rays\": %d, "
 		"\"sight_ms\": %.3f, \"sight_ms_max\": %.3f, \"sight_launch_ms\": %.3f, \"sight_sweeps\": %d, "
-		"\"walker\": %s, \"fading\": %d, \"fade_s\": %.2f, \"fixture_cells\": %d}"),
+		"\"walker\": %s, \"fading\": %d, \"fade_s\": %.2f, \"fixture_cells\": %d, %s}"),
 		HasPlan() ? TEXT("true") : TEXT("false"), *City, *PlanHash, RegisteredLights, SlotOfActor.Num(),
 		Registrations, bLights ? TEXT("true") : TEXT("false"), Live.Num(), Spots, Points, Rects, *Kinds,
 		Shadowed.Num(), Candidates, MaxLive, MidRangeM, MaxShadowed, UpdateMs, UpdateMsMax, Scale(), Hour,
@@ -2222,7 +2812,26 @@ FString ACityGenAtmos::GetStatus() const
 		bSightPicked ? TEXT("true") : TEXT("false"), bSightNow ? TEXT("true") : TEXT("false"),
 		Sight.IsValid() ? TEXT("true") : TEXT("false"), SightRangeM, SightMax, SeenAt.Num(), SightPickedN,
 		SightTested, SightRays, SightMs, SightMsMax, SightLaunchMs, SightSweeps,
-		IsWalker() ? TEXT("true") : TEXT("false"), FadingNow, FadeS, FixtureCells());
+		IsWalker() ? TEXT("true") : TEXT("false"), FadingNow, FadeS, FixtureCells(),
+		*FString::Printf(TEXT("\"weather\": %s, \"weather_now\": \"%s\", \"weather_target\": \"%s\", "
+			"\"transition\": %.3f, \"rain_now\": %.3f, \"drops\": %.3f, \"streak\": %.3f, \"wetness\": %.3f, "
+			"\"puddles\": %.3f, \"wind_ms\": %.2f, \"cloud_cover\": %.3f, \"volume_gain\": %.3f, "
+			"\"fog_density\": %.4f, \"rain_shown\": %s, \"wet_shown\": %s, \"splashes\": %d, "
+			"\"splashes_live\": %d, \"drips\": %d, \"drip_lines\": %d, \"wet_textures\": %s, "
+			"\"weather_speed\": %.2f, \"post\": %s, \"post_districts\": %s, \"post_where\": \"%s\", "
+			"\"post_bloom\": %.3f, \"post_grain\": %.3f, \"post_fringe\": %.3f, \"post_saturation\": %.3f, "
+			"\"post_contrast\": %.3f, \"post_sharpen\": %.3f, \"overcast_shift\": %.3f"),
+			HasWeather() ? TEXT("true") : TEXT("false"), *GetWeatherLabel(),
+			WeatherNames.IsValidIndex(WeatherTarget) ? *WeatherNames[WeatherTarget] : TEXT(""),
+			TransitionT, WeatherNow[WRain], WeatherNow[WDrops], WeatherNow[WStreak], WetNow, PuddleNow,
+			WindNow, CoverNow, WeatherNow[WVolumes], FogDensity,
+			(Rain && Rain->IsVisible()) ? TEXT("true") : TEXT("false"),
+			(Wet && Wet->IsVisible()) ? TEXT("true") : TEXT("false"),
+			Splashes ? Splashes->GetInstanceCount() : 0, SplashesLive, DripsLive, DripLines,
+			(WetCover && WetSurface) ? TEXT("true") : TEXT("false"), WeatherSpeed,
+			HasPost() ? TEXT("true") : TEXT("false"), bDistrictPost ? TEXT("true") : TEXT("false"),
+			*PostWhere, PostNow[PBloom], PostNow[PGrain], PostNow[PChromatic], PostNow[PSaturation],
+			PostNow[PContrast], PostNow[PSharpen], OvercastShift()));
 }
 
 // -- AT3: the sky and time --
@@ -2359,7 +2968,10 @@ void ACityGenAtmos::ApplyTime()
 	MoonElev = ME;
 	NightNow = FMath::Clamp(CurveAt(CurveNight, E), 0.f, 1.f);
 	SunWeight = FMath::Clamp(CurveAt(CurveSun, E), 0.f, 1.f);
-	EVNow = SceneEV100 + (DayEV100 - SceneEV100) * CurveAt(CurveEV, E);
+	const float DayShare = CurveAt(CurveEV, E);
+	EVNow = SceneEV100 + (DayEV100 - SceneEV100) * DayShare;
+	// (AT6: by day the weather's overcast partly given back)
+	EVNow += DayShare * OvercastShift();
 	const float R0 = MoonRise.Num() >= 2 ? MoonRise[0] : -1.f;
 	const float R1 = MoonRise.Num() >= 2 ? MoonRise[1] : 6.f;
 	const float MoonUp = FMath::SmoothStep(R0, R1, ME);
@@ -2372,7 +2984,10 @@ void ACityGenAtmos::ApplyTime()
 		const bool bSunLight = SunWeight > 0.f;
 		const FVector To = bSunLight ? S : M;
 		Sun->SetActorRotation((-To).Rotation());
-		L->SetIntensity(bSunLight ? SunLux * SunWeight : MoonLux);
+		// (AT5: the weather's overcast takes the sun's direct light: a rainy, foggy day's light
+		// comes from the sky, not hard sun shadows; a clear day keeps it all)
+		const float Overcast = HasWeather() ? 1.f - 0.75f * FMath::Clamp((CoverNow - 0.5f) / 0.5f, 0.f, 1.f) : 1.f;
+		L->SetIntensity(bSunLight ? SunLux * SunWeight * Overcast : MoonLux);
 		L->SetLightColor(bSunLight ? DaySunColor : MoonColor);
 	}
 	if (USkyLightComponent* SL = SkyLightActor ? SkyLightActor->GetLightComponent() : nullptr)
@@ -2399,6 +3014,12 @@ void ACityGenAtmos::ApplyTime()
 	{
 		UKismetMaterialLibrary::SetScalarParameterValue(this, CityCollection, TEXT("Night"), NightNow);
 		UKismetMaterialLibrary::SetScalarParameterValue(this, CityCollection, TEXT("Hour"), Hour);
+	}
+	// AT6: the plumes lit by the city by night
+	if (AtmosCollection)
+	{
+		UKismetMaterialLibrary::SetScalarParameterValue(this, AtmosCollection, TEXT("SteamGlow"),
+			SteamGlow * NightNow);
 	}
 	if (SkyMID)
 	{
@@ -2452,6 +3073,296 @@ void ACityGenAtmos::SetCloudCover(float Cover)
 {
 	CoverNow = FMath::Clamp(Cover, 0.f, 1.f);
 	ApplyTime();
+}
+
+// -- AT6: the look --
+
+void ACityGenAtmos::MakePostRaster()
+{
+	PostIdx.Reset();
+	const int64 N = int64(PostWidth) * int64(PostHeight);
+	if (N <= 0 || PostBounds.Num() < 4 || PostRuns.Num() < 2 || PostCellM <= 0.f)
+	{
+		return;
+	}
+	PostIdx.SetNumUninitialized(N);
+	int64 At = 0;
+	for (int32 k = 0; k + 1 < PostRuns.Num(); k += 2)
+	{
+		const int64 C = PostRuns[k];
+		if (C <= 0 || At + C > N)
+		{
+			UE_LOG(LogCityGenAtmos, Warning, TEXT("CityGen atmos: the post raster's runs overrun its cells; the look's post alone"));
+			PostIdx.Reset();
+			return;
+		}
+		FMemory::Memset(PostIdx.GetData() + At, uint8(PostRuns[k + 1]), C);
+		At += C;
+	}
+	if (At != N)
+	{
+		PostIdx.Reset();
+	}
+}
+
+void ACityGenAtmos::PostTarget(const FVector& View)
+{
+	// each district's weight where the view stands: the raster sampled on a 5 x 5 grid over
+	// a disc PostBlendM wide round it, a tent from its middle (a cell under no district, or a
+	// view off the raster, counts for the look's own)
+	const int32 ND = PostNames.Num();
+	PostWTarget.Init(0.f, ND + 1);
+	if (!bDistrictPost || PostIdx.Num() == 0 || PostDistricts.Num() < ND * 2 * PostFloats)
+	{
+		PostWTarget[ND] = 1.f;
+		return;
+	}
+	const double Cell = double(PostCellM) * 100.0;
+	const double R = double(PostBlendM) * 100.0;
+	float Sum = 0.f;
+	for (int32 j = -2; j <= 2; ++j)
+	{
+		for (int32 i = -2; i <= 2; ++i)
+		{
+			const double dx = R * i / 2.0, dy = R * j / 2.0;
+			const double r = FMath::Sqrt(dx * dx + dy * dy) / FMath::Max(1.0, R);
+			if (r > 1.0001)
+			{
+				continue;
+			}
+			const float W = float(1.25 - r);
+			const int32 cx = FMath::FloorToInt32((View.X + dx - PostBounds[0]) / Cell);
+			const int32 cy = FMath::FloorToInt32((View.Y + dy - PostBounds[1]) / Cell);
+			int32 D = ND;
+			if (cx >= 0 && cy >= 0 && cx < PostWidth && cy < PostHeight)
+			{
+				const uint8 V = PostIdx[int64(cy) * PostWidth + cx];
+				D = V < ND ? int32(V) : ND;
+			}
+			PostWTarget[D] += W;
+			Sum += W;
+		}
+	}
+	for (float& W : PostWTarget)
+	{
+		W /= FMath::Max(1e-6f, Sum);
+	}
+}
+
+void ACityGenAtmos::UpdatePost(float DeltaSeconds, const FVector& View, bool bNow)
+{
+	if (!HasPost())
+	{
+		return;
+	}
+	const double Now = FPlatformTime::Seconds();
+	if (bNow || PostAt < 0.0 || Now - PostAt > LiveEvery)
+	{
+		PostAt = Now;
+		PostTarget(View);
+	}
+	const int32 ND = PostNames.Num();
+	if (PostW.Num() != ND + 1 || bNow)
+	{
+		PostW = PostWTarget;
+	}
+	else
+	{
+		const float A = 1.f - FMath::Exp(-DeltaSeconds / FMath::Max(0.05f, PostEaseS));
+		for (int32 k = 0; k <= ND; ++k)
+		{
+			PostW[k] += (PostWTarget[k] - PostW[k]) * A;
+		}
+	}
+	// the sets blended: night and day by Night, the districts by their weights
+	const float Nt = FMath::Clamp(NightNow, 0.f, 1.f);
+	float S[PostFloats] = {};
+	float Best = -1.f;
+	for (int32 k = 0; k <= ND; ++k)
+	{
+		const float W = PostW[k];
+		if (W > Best)
+		{
+			Best = W;
+			PostWhere = k < ND ? PostNames[k] : TEXT("");
+		}
+		if (W <= 1e-4f)
+		{
+			continue;
+		}
+		const float* Src = k < ND ? PostDistricts.GetData() + k * 2 * PostFloats : PostBase.GetData();
+		for (int32 f = 0; f < PostFloats; ++f)
+		{
+			S[f] += W * (Nt * Src[f] + (1.f - Nt) * Src[PostFloats + f]);
+		}
+	}
+	// (art direction: a key held at a value for the session, CityGenAtmos.PostSet)
+	for (const TPair<int32, float>& O : PostOverride)
+	{
+		if (O.Key >= 0 && O.Key < PostFloats)
+		{
+			S[O.Key] = O.Value;
+		}
+	}
+	// (applied only when something moved: the volume's settings are read every frame)
+	float Moved = bPostApplied ? 0.f : 1.f;
+	for (int32 f = 0; f < PostFloats; ++f)
+	{
+		Moved = FMath::Max(Moved, FMath::Abs(S[f] - PostNow[f]));
+	}
+	if (Moved > 1e-4f)
+	{
+		FMemory::Memcpy(PostNow, S, sizeof(S));
+		ApplyPostSettings(PostNow);
+	}
+}
+
+void ACityGenAtmos::ApplyPostSettings(const float* S)
+{
+	EnsureVolume();
+	if (!Volume)
+	{
+		return;
+	}
+	FPostProcessSettings& P = Volume->Settings;
+	P.bOverride_BloomIntensity = true;
+	P.BloomIntensity = S[PBloom];
+	P.bOverride_LensFlareIntensity = true;
+	P.LensFlareIntensity = S[PFlare];
+	P.bOverride_LensFlareThreshold = true;
+	P.LensFlareThreshold = S[PFlareThreshold];
+	P.bOverride_FilmGrainIntensity = true;
+	P.FilmGrainIntensity = S[PGrain];
+	P.bOverride_SceneFringeIntensity = true;
+	P.SceneFringeIntensity = S[PChromatic];
+	P.bOverride_ChromaticAberrationStartOffset = true;
+	P.ChromaticAberrationStartOffset = S[PChromaticStart];
+	P.bOverride_VignetteIntensity = true;
+	P.VignetteIntensity = S[PVignette];
+	P.bOverride_Sharpen = true;
+	P.Sharpen = S[PSharpen];
+	P.bOverride_ColorSaturation = true;
+	P.ColorSaturation = FVector4(1.0, 1.0, 1.0, S[PSaturation]);
+	P.bOverride_ColorContrast = true;
+	P.ColorContrast = FVector4(1.0, 1.0, 1.0, S[PContrast]);
+	P.bOverride_ColorSaturationHighlights = true;
+	P.ColorSaturationHighlights = FVector4(1.0, 1.0, 1.0, S[PHighlightSat]);
+	P.bOverride_ColorOffsetShadows = true;
+	P.ColorOffsetShadows = FVector4(0.0, 0.0, 0.0, S[PLift]);
+	P.bOverride_ColorGainShadows = true;
+	P.ColorGainShadows = FVector4(S[PShadowR], S[PShadowG], S[PShadowB], 1.0);
+	P.bOverride_ColorGainHighlights = true;
+	P.ColorGainHighlights = FVector4(S[PHighR], S[PHighG], S[PHighB], 1.0);
+	P.bOverride_LocalExposureShadowContrastScale = true;
+	P.LocalExposureShadowContrastScale = S[PLocalShadows];
+	P.bOverride_LocalExposureHighlightContrastScale = true;
+	P.LocalExposureHighlightContrastScale = S[PLocalHighlights];
+	bPostApplied = true;
+}
+
+void ACityGenAtmos::ClearPostSettings()
+{
+	if (!Volume)
+	{
+		return;
+	}
+	FPostProcessSettings& P = Volume->Settings;
+	P.bOverride_BloomIntensity = P.bOverride_LensFlareIntensity = P.bOverride_LensFlareThreshold = false;
+	P.bOverride_FilmGrainIntensity = P.bOverride_SceneFringeIntensity = false;
+	P.bOverride_ChromaticAberrationStartOffset = P.bOverride_VignetteIntensity = false;
+	P.bOverride_Sharpen = P.bOverride_ColorSaturation = P.bOverride_ColorContrast = false;
+	P.bOverride_ColorSaturationHighlights = P.bOverride_ColorOffsetShadows = false;
+	P.bOverride_ColorGainShadows = P.bOverride_ColorGainHighlights = false;
+	P.bOverride_LocalExposureShadowContrastScale = false;
+	P.bOverride_LocalExposureHighlightContrastScale = false;
+	bPostApplied = false;
+}
+
+void ACityGenAtmos::SetPost(bool bOn)
+{
+	bPost = bOn;
+	if (HasPost())
+	{
+		bPostApplied = false;
+		UpdatePost(0.f, ViewLocation(), true);
+	}
+	else
+	{
+		ClearPostSettings();
+	}
+	ApplyTime();
+}
+
+void ACityGenAtmos::SetPostDistricts(bool bOn)
+{
+	bDistrictPost = bOn;
+	if (HasPost())
+	{
+		UpdatePost(0.f, ViewLocation(), true);
+	}
+}
+
+bool ACityGenAtmos::SetPostValue(const FString& Key, float Value, bool bClear)
+{
+	static const TCHAR* Names[PostFloats] = {TEXT("bloom"), TEXT("flare"), TEXT("flare_threshold"),
+		TEXT("grain"), TEXT("chromatic"), TEXT("chromatic_start"), TEXT("vignette"), TEXT("sharpen"),
+		TEXT("saturation"), TEXT("contrast"), TEXT("highlight_sat"), TEXT("lift"), TEXT("local_shadows"),
+		TEXT("local_highlights"), TEXT("shadows_r"), TEXT("shadows_g"), TEXT("shadows_b"),
+		TEXT("highlights_r"), TEXT("highlights_g"), TEXT("highlights_b")};
+	if (Key == TEXT("clear") || Key == TEXT("all"))
+	{
+		PostOverride.Reset();
+	}
+	else
+	{
+		int32 K = INDEX_NONE;
+		for (int32 k = 0; k < PostFloats; ++k)
+		{
+			K = Key.Equals(Names[k], ESearchCase::IgnoreCase) ? k : K;
+		}
+		if (K == INDEX_NONE)
+		{
+			return false;
+		}
+		if (bClear)
+		{
+			PostOverride.Remove(K);
+		}
+		else
+		{
+			PostOverride.Add(K, Value);
+		}
+	}
+	if (HasPost())
+	{
+		UpdatePost(0.f, ViewLocation(), true);
+	}
+	return true;
+}
+
+void ACityGenAtmos::SetDayEV(float EV)
+{
+	DayEV100 = EV;
+	ApplyTime();
+}
+
+float ACityGenAtmos::OvercastShift() const
+{
+	// AT6: by day the exposure gives back OvercastComp of the light the weather's clouds take
+	// off the sun (AT5's overcast) past the plan's own cover, a day street's light SkyShare
+	// the sky's (in stops: under 0 a brighter exposure)
+	if (!HasPost() || OvercastComp <= 0.f)
+	{
+		return 0.f;
+	}
+	const float C0 = OvercastTake.Num() >= 2 ? OvercastTake[0] : 0.5f;
+	const float Take = OvercastTake.Num() >= 2 ? OvercastTake[1] : 0.75f;
+	auto Light = [&](float Cover)
+	{
+		const float Sun = 1.f - Take * FMath::Clamp((Cover - C0) / FMath::Max(1e-3f, 1.f - C0), 0.f, 1.f);
+		return (1.f - SkyShare) * Sun + SkyShare;
+	};
+	return OvercastComp * FMath::Log2(FMath::Max(1e-3f, Light(CoverNow)) / FMath::Max(1e-3f, Light(RefCover)));
 }
 
 bool ACityGenAtmos::SetNamedHour(const FString& Name)

@@ -8,8 +8,8 @@ run headless by `citygen.unreal_atmos.make_assets`, the job in $CITYGEN_UE_JOB):
 - `M_CgRain`: rain streaks, translucent and lit by the translucency volume (so the drops take
   the neon's colors), falling by world position offset with a phase per instance, drifting
   with the wind; the actor draws them as instanced cards round the view.
-- `M_CgWet`: wet streets, a deferred (DBuffer) decal darkening the surfaces it covers and
-  making them glossy, with puddles by a value noise on the world's plan.
+- AT0's `M_CgWet` (a single DBuffer decal, puddles by a value noise) is gone since AT5: the
+  wet streets are `M_CgWetColor` and `M_CgWetGloss` (below).
 - AT2: `M_CgBeacon`, an aviation light's red glow (unlit, on the instanced spheres the
   controller places per cell), blinking from its per-instance data as the light does; and
   `M_CgBeam`, a searchlight's beam (additive and unlit on a cone along its aim, its color,
@@ -27,6 +27,16 @@ run headless by `citygen.unreal_atmos.make_assets`, the job in $CITYGEN_UE_JOB):
   position offset, its life, size, opacity and albedo from its per-instance data. The fog
   volumes are the engine's local fog volumes (no asset).
 
+- AT5: the weather. `M_CgWetColor` and `M_CgWetGloss`, two DBuffer decals round the view
+  reading the plan's masks (the city's cover and surface textures, set on their instances by
+  the controller): the wet surfaces darker (the color at an opacity, the markings kept), then
+  glossy with puddles as mirrors and the rain's rings in them (roughness and a world-space
+  normal); `M_CgRain` cut where the pixel is under its texel's cover, leaning and drifting with
+  the wind, drizzle's streaks short; `M_CgSplash` (a crown of droplets where a trace from the
+  sky lands) and `M_CgDrip` (a streak falling from a low cover's edge), both instanced cards
+  the controller places; `MPC_CityGenAtmos` gains `Puddles`, `WindX`, `WindY`, `Streak` and
+  `Drops`.
+
 Niagara is not used: UE 5.8 exposes no API to author a Niagara emitter from code (its
 editor library builds nothing; only an engine template could be duplicated and fed user
 parameters), so the effects are C++ components and these materials (decision for AT4, AT5).
@@ -41,9 +51,26 @@ import unreal
 
 JOB = json.load(open(os.environ["CITYGEN_UE_JOB"], encoding="utf-8"))
 FOLDER = "/Game/CityGen/Core/Atmos"
-VERSION = "12"  # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air);
+VERSION = "17"  # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air);
                 # 3 (AT2): M_CgBeacon and M_CgBeam; 4 to 8 (AT3): M_CgSky; 9 to 12 (AT4):
-                # M_CgSteam, MPC_CityGenAtmos's SteamGain
+                # M_CgSteam, MPC_CityGenAtmos's SteamGain; 13 (AT5): the weather (M_CgWet
+                # gone: M_CgWetColor and M_CgWetGloss, M_CgRain cut by the covers and leaning
+                # in the wind, M_CgSplash, M_CgDrip, the steam drifting with the wind's heading);
+                # 14: a drizzle's streets glossy too (the gloss and darkening by the wetness's
+                # square root); 15: every material rebuilt from nothing (clear_material: the
+                # old nodes were left beside the new), the collection's parameters kept (ids);
+                # 16 (AT6): M_CgSteam lit by the city by night (SteamGlow) and kept opaque far
+                # off (SteamFar, SteamFarM); 17 (AT6): the wet decals' face normal from fine
+                # derivatives (a pixel's own neighbor, not its 2 x 2 quad's: a curb's edge
+                # read as half floor, half wall in quads, AT5's white sawtooth along it)
+# AT5: MPC_CityGenAtmos: the weather now (the controller blends its states): the rain's rate,
+# how wet the open surfaces are and how full the puddles, the fog, the wind (its speed with
+# its gusts, its heading as a unit vector), the plumes' gain, the streaks' length and the
+# share of the rain cards that fall
+COLLECTION = (("Rain", 0.0), ("Wetness", 0.0), ("Puddles", 0.0), ("FogDensity", 0.0),
+              ("WindMS", 4.0), ("WindX", 0.77), ("WindY", -0.64), ("SteamGain", 10.0),
+              ("Streak", 1.0), ("Drops", 1.0), ("SteamGlow", 0.0), ("SteamFar", 0.0),
+              ("SteamFarM", 150.0))
 EAL = unreal.EditorAssetLibrary
 AT = unreal.AssetToolsHelpers.get_asset_tools()
 MEL = unreal.MaterialEditingLibrary
@@ -53,6 +80,17 @@ T0 = time.time()
 
 def meta(asset, key):
     return EAL.get_metadata_tag(asset, key) or ""
+
+
+def clear_material(m):
+    """Every expression of a material deleted, so it is rebuilt from nothing. (AT5:
+    `delete_all_material_expressions` alone leaves about half of them: a rebuilt material
+    kept its old nodes beside its new ones. Called again until none is left.)"""
+    for _ in range(16):
+        MEL.delete_all_material_expressions(m)
+        if MEL.get_num_material_expressions(m) == 0:
+            return
+    raise RuntimeError(f"{m.get_name()}: its expressions could not all be deleted")
 
 
 def expr(m, cls, x, y, **props):
@@ -94,9 +132,15 @@ def collection():
     if c is None:
         c = AT.create_asset("MPC_CityGenAtmos", FOLDER, unreal.MaterialParameterCollection,
                             unreal.MaterialParameterCollectionFactoryNew())
-    have = []
-    for name, v in (("Rain", 0.0), ("Wetness", 0.0), ("FogDensity", 0.0), ("WindMS", 4.0),
-                    ("SteamGain", 10.0)):
+    # (the parameters it has kept as they are, with their ids, the missing ones added: a
+    # material made by another script, AT5's rain rings in the stage 2 water master, keeps
+    # finding its parameter; a list made afresh gave every parameter a new id and that
+    # master's reference went stale)
+    have = list(c.get_editor_property("scalar_parameters"))
+    names = {str(q.get_editor_property("parameter_name")) for q in have}
+    for name, v in COLLECTION:
+        if name in names:
+            continue
         q = unreal.CollectionScalarParameter()
         q.set_editor_property("parameter_name", name)
         q.set_editor_property("default_value", v)
@@ -120,22 +164,57 @@ def material(name):
     if m is None:
         m = AT.create_asset(name, FOLDER, unreal.Material, unreal.MaterialFactoryNew())
     else:
-        MEL.delete_all_material_expressions(m)
+        clear_material(m)
     return m, True
 
 
 RAIN_MASK = """
 float across = saturate(1.0 - abs(UV.y * 2.0 - 1.0));
-float along = saturate((1.0 - abs(UV.x * 2.0 - 1.0)) * 1.6);
+float s = saturate(Streak);
+float a = abs(UV.x * 2.0 - 1.0);
+float along = saturate((1.0 - a / max(s, 0.05)) * 1.6);
 return across * across * along;
 """
-# the card falls `Fall` cm at `Speed` cm/s from its place over the view, its phase per
-# instance, drifting along world X with the wind
+# AT5: the card falls `Fall` cm from its place over the view at its speed (drizzle slower:
+# `Streak`), its phase per instance, drifting downwind as it falls (`WindX`, `WindY`, the
+# wind's speed) and leaning with it: each vertex moved downwind by its height on the card
+# (the card's length is its mesh's X, stood down by the instance's pitch) times the drop's
+# drift over its fall
 RAIN_WPO = """
-float ph = frac(Time * Speed / Fall + Rnd);
-float drift = Wind * 100.0 * ph * Fall / Speed * 0.35;
-return float3(drift, 0.0, -ph * Fall);
+float speed = Speed * (0.35 + 0.65 * saturate(Streak));
+float ph = frac(Time * speed / Fall + Rnd);
+float2 dir = float2(WindX, WindY);
+float lean = Wind * 100.0 / speed;
+float drift = Wind * 100.0 * ph * Fall / speed;
+float h = -LP.x * 0.9;
+return float3(dir * (drift + h * lean), -ph * Fall);
 """
+# AT5: the rain kept out of what is covered: the pixel under its texel's cover (the plan's
+# masks, city-wide: `Cov`, its bounds `B` = min X, min Y, size in cm; `Z` the cover's datum
+# and step in cm), and the share of the cards that fall (`Drops`)
+RAIN_OPACITY = """
+float2 uv = (WP.xy - B.xy) / max(B.z, 1.0);
+float c = 0.0;
+if (all(uv > 0.0) && all(uv < 1.0)) { c = Texture2DSampleLevel(Cov, CovSampler, uv, 0).r * 255.0; }
+float cz = Z.x + floor(c + 0.5) * Z.y;
+float dry = (c > 0.5) ? saturate((cz - WP.z) / 30.0) : 0.0;
+float on = step(Rnd, Drops);
+float near_ = saturate((Depth - 30.0) / 120.0);
+return Mask * Gain * saturate(Rain * 1.25) * (1.0 - dry) * on * near_;
+"""
+
+
+def cover_inputs(m, x, y):
+    """AT5: the city-wide cover texture (its bounds and datum the controller sets on each
+    instance) as a custom node's inputs: (Cov, B, Z)."""
+    black = unreal.load_asset("/Engine/EngineResources/Black.Black")
+    cov = expr(m, unreal.MaterialExpressionTextureObjectParameter, x, y,
+               parameter_name="WetCover", texture=black)
+    b = expr(m, unreal.MaterialExpressionVectorParameter, x, y + 120, parameter_name="WetBounds",
+             default_value=unreal.LinearColor(0.0, 0.0, 1.0, 0.0))
+    z = expr(m, unreal.MaterialExpressionVectorParameter, x, y + 240, parameter_name="CoverZ",
+             default_value=unreal.LinearColor(-800.0, 50.0, 0.0, 0.0))
+    return cov, b, z
 
 
 def rain(c):
@@ -146,30 +225,47 @@ def rain(c):
     m.set_editor_property("two_sided", True)
     m.set_editor_property("translucency_lighting_mode",
                           unreal.TranslucencyLightingMode.TLM_VOLUMETRIC_NON_DIRECTIONAL)
-    uv = expr(m, unreal.MaterialExpressionTextureCoordinate, -900, 0, coordinate_index=0)
-    mask = custom(m, -650, 0, RAIN_MASK, ["UV"], "CMOT_FLOAT1", "CgRainMask")
+    uv = expr(m, unreal.MaterialExpressionTextureCoordinate, -1300, 0, coordinate_index=0)
+    streak = mpc_param(m, c, "Streak", -1300, 100)
+    mask = custom(m, -1000, 0, RAIN_MASK, ["UV", "Streak"], "CMOT_FLOAT1", "CgRainMask")
     link(uv, "", mask, "UV")
-    r = mpc_param(m, c, "Rain", -650, 150)
-    op = custom(m, -400, 100, "return Mask * 0.4 * saturate(Rain * 1.25);", ["Mask", "Rain"],
+    link(streak, "", mask, "Streak")
+    wp = expr(m, unreal.MaterialExpressionWorldPosition, -1300, 250)
+    rnd = expr(m, unreal.MaterialExpressionPerInstanceRandom, -1300, 350)
+    cov, b, z = cover_inputs(m, -1300, 450)
+    gain = expr(m, unreal.MaterialExpressionScalarParameter, -1300, 850,
+                parameter_name="RainOpacity", default_value=0.55)
+    depth = expr(m, unreal.MaterialExpressionPixelDepth, -1300, 950)
+    op = custom(m, -700, 300, RAIN_OPACITY,
+                ["Mask", "WP", "Cov", "B", "Z", "Rnd", "Drops", "Rain", "Gain", "Depth"],
                 "CMOT_FLOAT1", "CgRainOpacity")
-    link(mask, "", op, "Mask")
-    link(r, "", op, "Rain")
-    col = expr(m, unreal.MaterialExpressionConstant3Vector, -400, -150,
-               constant=unreal.LinearColor(0.62, 0.66, 0.72, 1.0))
-    em = custom(m, -400, 250, "return float3(0.55, 0.6, 0.7) * Mask * 0.004;", ["Mask"],
+    for a, n in ((mask, "Mask"), (wp, "WP"), (cov, "Cov"), (b, "B"), (z, "Z"), (rnd, "Rnd"),
+                 (mpc_param(m, c, "Drops", -1300, 1050), "Drops"),
+                 (mpc_param(m, c, "Rain", -1300, 1150), "Rain"), (gain, "Gain"),
+                 (depth, "Depth")):
+        link(a, "", op, n)
+    col = expr(m, unreal.MaterialExpressionConstant3Vector, -700, -150,
+               constant=unreal.LinearColor(0.7, 0.74, 0.8, 1.0))
+    em = custom(m, -700, 100, "return float3(0.55, 0.6, 0.7) * Mask * G;", ["Mask", "G"],
                 "CMOT_FLOAT3", "CgRainGlow")
     link(mask, "", em, "Mask")
-    rough = expr(m, unreal.MaterialExpressionConstant, -400, 350, r=0.1)
-    tm = expr(m, unreal.MaterialExpressionTime, -900, 500)
-    rnd = expr(m, unreal.MaterialExpressionPerInstanceRandom, -900, 600)
-    fall = expr(m, unreal.MaterialExpressionScalarParameter, -900, 700, parameter_name="Fall",
+    link(expr(m, unreal.MaterialExpressionScalarParameter, -1000, 150,
+              parameter_name="RainGlow", default_value=0.006), "", em, "G")
+    rough = expr(m, unreal.MaterialExpressionConstant, -700, 200, r=0.1)
+    tm = expr(m, unreal.MaterialExpressionTime, -1300, 1300)
+    fall = expr(m, unreal.MaterialExpressionScalarParameter, -1300, 1400, parameter_name="Fall",
                 default_value=2400.0)
-    speed = expr(m, unreal.MaterialExpressionScalarParameter, -900, 800, parameter_name="Speed",
-                 default_value=900.0)
-    wind = mpc_param(m, c, "WindMS", -900, 900)
-    wpo = custom(m, -600, 650, RAIN_WPO, ["Time", "Rnd", "Fall", "Speed", "Wind"],
+    speed = expr(m, unreal.MaterialExpressionScalarParameter, -1300, 1500,
+                 parameter_name="Speed", default_value=900.0)
+    lp = expr(m, unreal.MaterialExpressionPreSkinnedPosition, -1300, 1600)
+    wpo = custom(m, -700, 1300, RAIN_WPO,
+                 ["Time", "Rnd", "Fall", "Speed", "Wind", "WindX", "WindY", "Streak", "LP"],
                  "CMOT_FLOAT3", "CgRainFall")
-    for a, n in ((tm, "Time"), (rnd, "Rnd"), (fall, "Fall"), (speed, "Speed"), (wind, "Wind")):
+    for a, n in ((tm, "Time"), (rnd, "Rnd"), (fall, "Fall"), (speed, "Speed"),
+                 (mpc_param(m, c, "WindMS", -1300, 1700), "Wind"),
+                 (mpc_param(m, c, "WindX", -1300, 1800), "WindX"),
+                 (mpc_param(m, c, "WindY", -1300, 1900), "WindY"), (streak, "Streak"),
+                 (lp, "LP")):
         link(a, "", wpo, n)
     MEL.connect_material_property(col, "", MP.MP_BASE_COLOR)
     MEL.connect_material_property(op, "", MP.MP_OPACITY)
@@ -183,57 +279,342 @@ def rain(c):
     return m, True
 
 
-# puddles: a value noise on the plan (4 m and 1.3 m octaves), a puddle where it is high
-WET_PUDDLE = """
-float2 p = WP.xy / 100.0;
-float n = 0.0;
-float amp = 0.65;
-float sc = 0.25;
-for (int k = 0; k < 2; k++) {
-  float2 q = p * sc;
-  float2 i = floor(q);
-  float2 f = frac(q);
-  f = f * f * (3.0 - 2.0 * f);
-  float a = frac(sin(dot(i, float2(127.1, 311.7))) * 43758.5453);
-  float b = frac(sin(dot(i + float2(1, 0), float2(127.1, 311.7))) * 43758.5453);
-  float c = frac(sin(dot(i + float2(0, 1), float2(127.1, 311.7))) * 43758.5453);
-  float d = frac(sin(dot(i + float2(1, 1), float2(127.1, 311.7))) * 43758.5453);
-  n += amp * lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y);
-  amp *= 0.55;
-  sc *= 3.1;
+# AT5: the wet streets, two deferred decals round the view reading the plan's masks (the
+# city-wide cover and surface textures): `WET` gives, for the pixel under the decal, how wet
+# it is (the controller's Wetness where the rain reaches it: under its texel's cover dry, on
+# a wall a share, the drip band under a cover's edge wetter), its puddle (the texel's depth
+# against the puddles' fill now, broken up by a fine noise at its edge), its gloss when wet
+# and how much it faces up. The face's normal comes from the depth (the derivatives of the
+# pixel's camera-relative position), turned to the eye. Past the textures, `Far` gloss and no
+# shelter or puddle.
+WET = """
+float2 uv = (WP.xy - B.xy) / max(B.z, 1.0);
+float c = 0.0;
+float3 s = float3(Far, 0.0, 0.0);
+if (all(uv > 0.0) && all(uv < 1.0)) {
+  c = Texture2DSampleLevel(Cov, CovSampler, uv, 0).r * 255.0;
+  s = Texture2DSample(Srf, SrfSampler, uv).rgb;
 }
-return smoothstep(0.7, 0.76, n);
+float cz = Z.x + floor(c + 0.5) * Z.y;
+float dry = (c > 0.5) ? saturate((cz - 20.0 - WP.z) / 40.0) : 0.0;
+float3 n = normalize(cross(ddx_fine(RP), ddy_fine(RP)));
+if (dot(n, CV) < 0.0) { n = -n; }
+float up = saturate((n.z - 0.62) / 0.3);
+float down = saturate((-n.z - 0.3) / 0.3);
+float wall = (1.0 - up) * (1.0 - down);
+float2 p = WP.xy / 45.0;
+float2 i = floor(p);
+float2 f = frac(p);
+f = f * f * (3.0 - 2.0 * f);
+float h00 = frac(sin(dot(i, float2(127.1, 311.7))) * 43758.5453);
+float h10 = frac(sin(dot(i + float2(1, 0), float2(127.1, 311.7))) * 43758.5453);
+float h01 = frac(sin(dot(i + float2(0, 1), float2(127.1, 311.7))) * 43758.5453);
+float h11 = frac(sin(dot(i + float2(1, 1), float2(127.1, 311.7))) * 43758.5453);
+float fine = lerp(lerp(h00, h10, f.x), lerp(h01, h11, f.x), f.y);
+float open_ = (1.0 - dry) * step(0.01, s.r);   // (the water: gloss 0, its own master)
+float wet = saturate(Wet * open_ * (up + wall * WallShare) + s.b * up * open_ * saturate(Wet * 2.0) * 0.4);
+float depth = s.g + (fine - 0.5) * 0.18;
+float pud = up * open_ * step(0.004, s.g) * saturate((depth - (1.0 - Pud)) * 9.0);
+return float4(wet, pud, s.r, up);
 """
 
 
-def wet(c):
-    m, made = material("M_CgWet")
+def wet_inputs(m, c, x, y):
+    """AT5: the wet decals' common inputs and their WET node."""
+    black = unreal.load_asset("/Engine/EngineResources/Black.Black")
+    cov, b, z = cover_inputs(m, x, y)
+    srf = expr(m, unreal.MaterialExpressionTextureObjectParameter, x, y + 360,
+               parameter_name="WetSurface", texture=black)
+    wp = expr(m, unreal.MaterialExpressionWorldPosition, x, y + 480)
+    rp = expr(m, unreal.MaterialExpressionWorldPosition, x, y + 580,
+              world_position_shader_offset=unreal.WorldPositionIncludedOffsets
+              .WPT_CAMERA_RELATIVE)
+    cv = expr(m, unreal.MaterialExpressionCameraVectorWS, x, y + 680)
+    far = expr(m, unreal.MaterialExpressionScalarParameter, x, y + 780, parameter_name="FarGloss",
+               default_value=0.7)
+    ws = expr(m, unreal.MaterialExpressionScalarParameter, x, y + 860,
+              parameter_name="WallShare", default_value=0.35)
+    w = custom(m, x + 400, y + 300, WET,
+               ["WP", "RP", "CV", "Cov", "Srf", "B", "Z", "Far", "Wet", "Pud", "WallShare"],
+               "CMOT_FLOAT4", "CgWet")
+    for a, n in ((wp, "WP"), (rp, "RP"), (cv, "CV"), (cov, "Cov"), (srf, "Srf"), (b, "B"),
+                 (z, "Z"), (far, "Far"), (mpc_param(m, c, "Wetness", x, y + 940), "Wet"),
+                 (mpc_param(m, c, "Puddles", x, y + 1020), "Pud"), (ws, "WallShare")):
+        link(a, "", w, n)
+    return w, wp
+
+
+def decal_material(name):
+    m, made = material(name)
+    if made:
+        m.set_editor_property("material_domain", unreal.MaterialDomain.MD_DEFERRED_DECAL)
+        m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
+    return m, made
+
+
+def wet_color(c):
+    """AT5: `M_CgWetColor`: the wet surfaces darker (the DBuffer's color, black at an opacity:
+    the surface's own color times one less it, so markings stay, darker)."""
+    m, made = decal_material("M_CgWetColor")
     if not made:
         return m, False
-    m.set_editor_property("material_domain", unreal.MaterialDomain.MD_DEFERRED_DECAL)
-    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
-    wp = expr(m, unreal.MaterialExpressionWorldPosition, -900, 0)
-    pud = custom(m, -650, 0, WET_PUDDLE, ["WP"], "CMOT_FLOAT1", "CgPuddle")
-    link(wp, "", pud, "WP")
-    w = mpc_param(m, c, "Wetness", -650, 200)
-    col = custom(m, -400, -100, "return lerp(0.06, 0.02, Pud).xxx;", ["Pud"], "CMOT_FLOAT3",
-                 "CgWetColor")
-    link(pud, "", col, "Pud")
-    rough = custom(m, -400, 50, "return lerp(0.02, 0.0, Pud);", ["Pud"], "CMOT_FLOAT1",
-                   "CgWetRough")
-    link(pud, "", rough, "Pud")
-    op = custom(m, -400, 200, "return saturate(Wet) * lerp(0.62, 0.95, Pud);", ["Pud", "Wet"],
-                "CMOT_FLOAT1", "CgWetOpacity")
-    link(pud, "", op, "Pud")
-    link(w, "", op, "Wet")
-    MEL.connect_material_property(col, "", MP.MP_BASE_COLOR)
-    MEL.connect_material_property(rough, "", MP.MP_ROUGHNESS)
+    w, _ = wet_inputs(m, c, -1600, 0)
+    dark = expr(m, unreal.MaterialExpressionScalarParameter, -1000, 1200,
+                parameter_name="Darken", default_value=0.55)
+    op = custom(m, -600, 300, "return saturate(sqrt(W.x) * (0.25 + D * W.z) + W.y * 0.42);",
+                ["W", "D"], "CMOT_FLOAT1", "CgWetDarken")
+    link(w, "", op, "W")
+    link(dark, "", op, "D")
+    black = expr(m, unreal.MaterialExpressionConstant3Vector, -600, 0,
+                 constant=unreal.LinearColor(0.0, 0.0, 0.0, 1.0))
+    MEL.connect_material_property(black, "", MP.MP_BASE_COLOR)
     MEL.connect_material_property(op, "", MP.MP_OPACITY)
     MEL.recompile_material(m)
     EAL.set_metadata_tag(m, "cg.atmos", VERSION)
     EAL.save_loaded_asset(m, only_if_is_dirty=False)
     return m, True
 
+
+# AT5: the gloss decal's normal (world space): a puddle flat, rippled by the rain's drops
+# (rings spreading from hashed points in two layers of 28 cm cells), a wet floor a little
+# uneven (the fine noise's slope) with fainter rings, a wall its own face; near the eye only
+# (`RingM`), past it flat
+GLOSS_N = """
+float3 n = normalize(cross(ddx_fine(RP), ddy_fine(RP)));
+if (dot(n, CV) < 0.0) { n = -n; }
+float2 g = float2(0.0, 0.0);
+float dist = length(RP);
+float near_ = saturate(1.0 - dist / (RingM * 100.0));
+if (near_ > 0.0 && Rain > 0.01) {
+  for (int L = 0; L < 2; L++) {
+    float2 q = WP.xy / 28.0 + float2(L * 17.31, L * 9.13);
+    float2 id = floor(q);
+    float2 f = frac(q) - 0.5;
+    float h = frac(sin(dot(id, float2(127.1, 311.7))) * 43758.5453);
+    float h2 = frac(sin(dot(id, float2(269.5, 183.3))) * 43758.5453);
+    f -= (float2(h, h2) - 0.5) * 0.5;
+    float life = frac(Time * (0.9 + 0.5 * h2) + h);
+    float r = length(f);
+    float x = (r - life * 0.42) * 26.0;
+    float ring = (abs(x) < 3.1416) ? sin(x) * (1.0 - life) : 0.0;
+    g += (f / max(r, 1e-3)) * ring * step(h2, 0.35 + 0.6 * Rain);
+  }
+}
+float amp = near_ * Rain * lerp(0.08, 0.55, W.y);
+float3 fl = normalize(float3(-g * amp, 1.0));
+return (W.w > 0.5) ? fl : n;
+"""
+
+
+def wet_gloss(c):
+    """AT5: `M_CgWetGloss`: the wet surfaces glossy (the DBuffer's roughness and normal, at an
+    opacity by how wet they are and their gloss when wet; a puddle a mirror with the rain's
+    rings on it)."""
+    m, made = decal_material("M_CgWetGloss")
+    if not made:
+        return m, False
+    m.set_editor_property("tangent_space_normal", False)
+    w, wp = wet_inputs(m, c, -1600, 0)
+    rp = expr(m, unreal.MaterialExpressionWorldPosition, -1000, 1300,
+              world_position_shader_offset=unreal.WorldPositionIncludedOffsets
+              .WPT_CAMERA_RELATIVE)
+    cv = expr(m, unreal.MaterialExpressionCameraVectorWS, -1000, 1400)
+    tm = expr(m, unreal.MaterialExpressionTime, -1000, 1500)
+    ring = expr(m, unreal.MaterialExpressionScalarParameter, -1000, 1600,
+                parameter_name="RingM", default_value=30.0)
+    nn = custom(m, -600, 900, GLOSS_N, ["W", "WP", "RP", "CV", "Time", "Rain", "RingM"],
+                "CMOT_FLOAT3", "CgWetNormal")
+    for a, n in ((w, "W"), (wp, "WP"), (rp, "RP"), (cv, "CV"), (tm, "Time"),
+                 (mpc_param(m, c, "Rain", -1000, 1700), "Rain"), (ring, "RingM")):
+        link(a, "", nn, n)
+    rough = custom(m, -600, 300, "return lerp(0.16, 0.03, W.y);", ["W"], "CMOT_FLOAT1",
+                   "CgWetRough")
+    link(w, "", rough, "W")
+    op = custom(m, -600, 500, "return saturate(sqrt(W.x) * W.z * 0.85 + W.y);", ["W"], "CMOT_FLOAT1",
+                "CgWetGlossOpacity")
+    link(w, "", op, "W")
+    MEL.connect_material_property(rough, "", MP.MP_ROUGHNESS)
+    MEL.connect_material_property(nn, "", MP.MP_NORMAL)
+    MEL.connect_material_property(op, "", MP.MP_OPACITY)
+    MEL.recompile_material(m)
+    EAL.set_metadata_tag(m, "cg.atmos", VERSION)
+    EAL.save_loaded_asset(m, only_if_is_dirty=False)
+    return m, True
+
+
+# AT5: a splash, a card the controller sets where a trace down from the sky lands near the
+# view (the rain's own landing spots, roofs and awnings too): turned to the eye, a crown of
+# droplets thrown up and falling back over a short life, then nothing until its next drop
+# (per-instance data: phase, size in cm)
+SPLASH_WPO = """
+float3 dir = normalize(C - Cam);
+float3 right = normalize(cross(float3(0.0, 0.0, 1.0), dir) + float3(1e-4, 0.0, 0.0));
+float2 q = LP.xy / 50.0;
+float t = frac(Time * 2.3 + Phase);
+float live = step(t, 0.28) * step(Rnd, Rain * Drops);
+float s = Size * (0.4 + 2.2 * t) * live;
+return C + right * q.x * s + float3(0.0, 0.0, (q.y * 0.5 + 0.5) * s * 0.75) - WP;
+"""
+SPLASH_OP = """
+float t = frac(Time * 2.3 + Phase) / 0.28;
+float2 p = UV * 2.0 - 1.0;
+p.y = -p.y;
+float arc = saturate(1.0 - abs(length(float2(p.x, (p.y + 1.0) * 1.3)) - 0.75) * 5.0);
+float rim = saturate(1.0 - abs(p.y + 0.85) * 6.0) * saturate(1.0 - abs(p.x) * 1.1);
+float drops = saturate(1.0 - length(frac(p * 2.6 + Phase * 7.0) - 0.5) * 3.0) * step(0.0, p.y) * 0.7;
+float a = max(max(arc, rim), drops) * saturate(1.0 - t) * saturate(t * 8.0);
+float near_ = saturate((Depth - 40.0) / 100.0);
+return saturate(a * Gain * near_);
+"""
+
+
+def splash(c):
+    m, made = material("M_CgSplash")
+    if not made:
+        return m, False
+    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
+    m.set_editor_property("two_sided", True)
+    m.set_editor_property("translucency_lighting_mode",
+                          unreal.TranslucencyLightingMode.TLM_VOLUMETRIC_NON_DIRECTIONAL)
+    names, ins = [], []
+    for k, n in enumerate(("CX", "CY", "CZ", "Phase", "Size")):
+        ins.append(expr(m, unreal.MaterialExpressionPerInstanceCustomData, -1300, 90 * k,
+                        data_index=k, const_default_value=(0, 0, 0, 0, 12)[k]))
+        names.append(n)
+    cpos = custom(m, -1000, 0, "return float3(X, Y, Z);", ["X", "Y", "Z"], "CMOT_FLOAT3",
+                  "CgSplashAt")
+    for k, n in enumerate(("X", "Y", "Z")):
+        link(ins[k], "", cpos, n)
+    tm = expr(m, unreal.MaterialExpressionTime, -1300, 600)
+    lp = expr(m, unreal.MaterialExpressionPreSkinnedPosition, -1300, 700)
+    wp = expr(m, unreal.MaterialExpressionWorldPosition, -1300, 800)
+    cam = expr(m, unreal.MaterialExpressionCameraPositionWS, -1300, 900)
+    rnd = expr(m, unreal.MaterialExpressionPerInstanceRandom, -1300, 1000)
+    wpo = custom(m, -700, 600, SPLASH_WPO,
+                 ["C", "Phase", "Size", "Time", "LP", "WP", "Cam", "Rnd", "Rain", "Drops"],
+                 "CMOT_FLOAT3", "CgSplashWPO")
+    for a, n in ((cpos, "C"), (ins[3], "Phase"), (ins[4], "Size"), (tm, "Time"), (lp, "LP"),
+                 (wp, "WP"), (cam, "Cam"), (rnd, "Rnd"),
+                 (mpc_param(m, c, "Rain", -1300, 1100), "Rain"),
+                 (mpc_param(m, c, "Drops", -1300, 1200), "Drops")):
+        link(a, "", wpo, n)
+    uv = expr(m, unreal.MaterialExpressionTextureCoordinate, -1300, 1300, coordinate_index=0)
+    depth = expr(m, unreal.MaterialExpressionPixelDepth, -1300, 1400)
+    gain = expr(m, unreal.MaterialExpressionScalarParameter, -1300, 1500,
+                parameter_name="SplashOpacity", default_value=0.6)
+    op = custom(m, -700, 1200, SPLASH_OP, ["UV", "Phase", "Time", "Depth", "Gain"],
+                "CMOT_FLOAT1", "CgSplashOpacity")
+    for a, n in ((uv, "UV"), (ins[3], "Phase"), (tm, "Time"), (depth, "Depth"), (gain, "Gain")):
+        link(a, "", op, n)
+    col = expr(m, unreal.MaterialExpressionConstant3Vector, -700, 0,
+               constant=unreal.LinearColor(0.75, 0.8, 0.86, 1.0))
+    em = custom(m, -700, 200, "return float3(0.5, 0.55, 0.6) * G;", ["G"], "CMOT_FLOAT3",
+                "CgSplashGlow")
+    link(expr(m, unreal.MaterialExpressionScalarParameter, -1000, 300,
+              parameter_name="SplashGlow", default_value=0.004), "", em, "G")
+    MEL.connect_material_property(col, "", MP.MP_BASE_COLOR)
+    MEL.connect_material_property(em, "", MP.MP_EMISSIVE_COLOR)
+    MEL.connect_material_property(op, "", MP.MP_OPACITY)
+    MEL.connect_material_property(expr(m, unreal.MaterialExpressionConstant, -700, 400, r=0.1),
+                                  "", MP.MP_ROUGHNESS)
+    MEL.connect_material_property(wpo, "", MP.MP_WORLD_POSITION_OFFSET)
+    m.set_editor_property("used_with_instanced_static_meshes", True)
+    MEL.recompile_material(m)
+    EAL.set_metadata_tag(m, "cg.atmos", VERSION)
+    EAL.save_loaded_asset(m, only_if_is_dirty=False)
+    return m, True
+
+
+# AT5: a drip, a card the controller sets along a low cover's dripping edge near the view
+# (per-instance data: its top x, y, z, the fall to the ground in cm, its phase, its rate):
+# turned to the eye about the vertical, a streak falling from the edge to the ground (faster
+# as it falls), drifting downwind, again each period; dripping while the rain falls and a
+# while after (the surfaces' wetness)
+DRIP_WPO = """
+float period = 0.55 + 0.9 / max(Rate, 0.2);
+float t = frac(Time / period + Phase);
+float fallT = sqrt(2.0 * max(Fall, 1.0) / 980.0);
+float tf = t * period;
+float on = step(tf, fallT);
+float d = 0.5 * 980.0 * tf * tf;
+float3 top = float3(X, Y, Z);
+float3 c = top + float3(float2(WindX, WindY) * Wind * 18.0 * tf, -min(d, Fall));
+float3 dir = normalize(c - Cam);
+float3 right = normalize(cross(float3(0.0, 0.0, 1.0), dir) + float3(1e-4, 0.0, 0.0));
+float2 q = LP.xy / 50.0;
+float len_ = clamp(980.0 * tf * 0.035, 3.0, 24.0) * on;
+return c + right * q.x * 0.9 * on + float3(0.0, 0.0, q.y * len_) - WP;
+"""
+DRIP_OP = """
+float across = saturate(1.0 - abs(UV.x * 2.0 - 1.0));
+float along = saturate((1.0 - abs(UV.y * 2.0 - 1.0)) * 2.0);
+float on = saturate(max(Rain * 1.5, Wet - 0.25));
+float near_ = saturate((Depth - 30.0) / 80.0);
+return saturate(across * along * on * Gain * near_);
+"""
+
+
+def drip(c):
+    m, made = material("M_CgDrip")
+    if not made:
+        return m, False
+    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
+    m.set_editor_property("two_sided", True)
+    m.set_editor_property("translucency_lighting_mode",
+                          unreal.TranslucencyLightingMode.TLM_VOLUMETRIC_NON_DIRECTIONAL)
+    names, ins = [], []
+    for k, n in enumerate(("X", "Y", "Z", "Fall", "Phase", "Rate")):
+        ins.append(expr(m, unreal.MaterialExpressionPerInstanceCustomData, -1300, 90 * k,
+                        data_index=k, const_default_value=(0, 0, 0, 300, 0, 1)[k]))
+        names.append(n)
+    tm = expr(m, unreal.MaterialExpressionTime, -1300, 600)
+    lp = expr(m, unreal.MaterialExpressionPreSkinnedPosition, -1300, 700)
+    wp = expr(m, unreal.MaterialExpressionWorldPosition, -1300, 800)
+    cam = expr(m, unreal.MaterialExpressionCameraPositionWS, -1300, 900)
+    wpo = custom(m, -700, 600, DRIP_WPO,
+                 names + ["Time", "LP", "WP", "Cam", "Wind", "WindX", "WindY"],
+                 "CMOT_FLOAT3", "CgDripWPO")
+    for a, n in list(zip(ins, names)) + [
+            (tm, "Time"), (lp, "LP"), (wp, "WP"), (cam, "Cam"),
+            (mpc_param(m, c, "WindMS", -1300, 1000), "Wind"),
+            (mpc_param(m, c, "WindX", -1300, 1100), "WindX"),
+            (mpc_param(m, c, "WindY", -1300, 1200), "WindY")]:
+        link(a, "", wpo, n)
+    uv = expr(m, unreal.MaterialExpressionTextureCoordinate, -1300, 1300, coordinate_index=0)
+    depth = expr(m, unreal.MaterialExpressionPixelDepth, -1300, 1400)
+    gain = expr(m, unreal.MaterialExpressionScalarParameter, -1300, 1500,
+                parameter_name="DripOpacity", default_value=0.7)
+    op = custom(m, -700, 1200, DRIP_OP, ["UV", "Rain", "Wet", "Depth", "Gain"], "CMOT_FLOAT1",
+                "CgDripOpacity")
+    for a, n in ((uv, "UV"), (mpc_param(m, c, "Rain", -1300, 1600), "Rain"),
+                 (mpc_param(m, c, "Wetness", -1300, 1700), "Wet"), (depth, "Depth"),
+                 (gain, "Gain")):
+        link(a, "", op, n)
+    col = expr(m, unreal.MaterialExpressionConstant3Vector, -700, 0,
+               constant=unreal.LinearColor(0.75, 0.8, 0.86, 1.0))
+    em = custom(m, -700, 200, "return float3(0.5, 0.55, 0.6) * G;", ["G"], "CMOT_FLOAT3",
+                "CgDripGlow")
+    link(expr(m, unreal.MaterialExpressionScalarParameter, -1000, 300,
+              parameter_name="DripGlow", default_value=0.005), "", em, "G")
+    MEL.connect_material_property(col, "", MP.MP_BASE_COLOR)
+    MEL.connect_material_property(em, "", MP.MP_EMISSIVE_COLOR)
+    MEL.connect_material_property(op, "", MP.MP_OPACITY)
+    MEL.connect_material_property(expr(m, unreal.MaterialExpressionConstant, -700, 400, r=0.1),
+                                  "", MP.MP_ROUGHNESS)
+    MEL.connect_material_property(wpo, "", MP.MP_WORLD_POSITION_OFFSET)
+    m.set_editor_property("used_with_instanced_static_meshes", True)
+    MEL.recompile_material(m)
+    EAL.set_metadata_tag(m, "cg.atmos", VERSION)
+    EAL.save_loaded_asset(m, only_if_is_dirty=False)
+    return m, True
+
+
+def drop_old():
+    """AT5: AT0's wet decal (M_CgWet) is gone: M_CgWetColor and M_CgWetGloss took its place."""
+    path = f"{FOLDER}/M_CgWet"
+    if EAL.does_asset_exist(path):
+        return bool(EAL.delete_asset(path))
+    return False
 
 # AT2: an aviation light's red glow blinks as its light does (CityGenAtmos's AnimGain: on for
 # the first `Duty` of each `Period`, from `Phase`), from the per-instance data the controller
@@ -474,7 +855,7 @@ STEAM_WPO = """
 float t = frac(Time / max(Period, 0.1) + Phase);
 float up = 1.0 - (1.0 - t) * (1.0 - t);
 float3 c = Foot + float3(0.0, 0.0, Rise * up);
-c.xy += float2(0.8, 0.45) * Wind * 100.0 * t * Period * 0.25;
+c.xy += float2(WindX, WindY) * Wind * 100.0 * t * Period * 0.25;
 float half_ = Width * (0.45 + 1.1 * t) + Rise * 0.05 * t;
 float3 dir = normalize(c - Cam);
 float3 right = normalize(cross(float3(0.0, 0.0, 1.0), dir) + float3(1e-4, 0.0, 0.0));
@@ -509,7 +890,8 @@ n = 0.65 * n + 0.35 * lerp(lerp(a2, b2, f2.x), lerp(c2, d2, f2.x), f2.y);
 float soft = pow(saturate(1.0 - r), 1.4) * saturate(n * 1.6 - 0.3);
 float life = sin(3.14159 * t) * saturate(t * 6.0);
 float near_ = saturate((Depth - 80.0) / 300.0);
-return saturate(soft * life * Rate * Gain * near_ * Fade);
+float far_ = 1.0 + Far * saturate((Depth - 3000.0) / max(100.0, FarM * 100.0 - 3000.0));
+return saturate(soft * life * Rate * Gain * near_ * Fade * far_);
 """
 
 
@@ -542,11 +924,13 @@ def steam(c):
     cam = expr(m, unreal.MaterialExpressionCameraPositionWS, -1300, 1400)
     wind = mpc_param(m, c, "WindMS", -1300, 1500)
     wpo = custom(m, -700, 900, STEAM_WPO,
-                 ["Foot", "Phase", "Period", "Rise", "Width", "Time", "LP", "WP", "Cam", "Wind"],
+                 ["Foot", "Phase", "Period", "Rise", "Width", "Time", "LP", "WP", "Cam", "Wind",
+                  "WindX", "WindY"],
                  "CMOT_FLOAT3", "CgSteamRise")
     for a, n in ((foot, "Foot"), (ins[3], "Phase"), (ins[4], "Period"), (ins[5], "Rise"),
                  (ins[6], "Width"), (tm, "Time"), (lp, "LP"), (wp, "WP"), (cam, "Cam"),
-                 (wind, "Wind")):
+                 (wind, "Wind"), (mpc_param(m, c, "WindX", -1300, 1600), "WindX"),
+                 (mpc_param(m, c, "WindY", -1300, 1650), "WindY")):
         link(a, "", wpo, n)
     uv = expr(m, unreal.MaterialExpressionTextureCoordinate, -1300, 1700, coordinate_index=0)
     depth = expr(m, unreal.MaterialExpressionPixelDepth, -1300, 1800)
@@ -555,12 +939,22 @@ def steam(c):
     link(one, "", fade, "Opacity")
     gain = mpc_param(m, c, "SteamGain", -1300, 2000)
     op = custom(m, -700, 1500, STEAM_OP,
-                ["UV", "Phase", "Period", "Rate", "Time", "Depth", "Fade", "Gain"],
+                ["UV", "Phase", "Period", "Rate", "Time", "Depth", "Fade", "Gain", "Far",
+                 "FarM"],
                 "CMOT_FLOAT1", "CgSteamOpacity")
     for a, n in ((uv, "UV"), (ins[3], "Phase"), (ins[4], "Period"), (ins[7], "Rate"),
-                 (tm, "Time"), (depth, "Depth"), (fade, "Fade"), (gain, "Gain")):
+                 (tm, "Time"), (depth, "Depth"), (fade, "Fade"), (gain, "Gain"),
+                 (mpc_param(m, c, "SteamFar", -1300, 2100), "Far"),
+                 (mpc_param(m, c, "SteamFarM", -1300, 2200), "FarM")):
         link(a, "", op, n)
     rough = expr(m, unreal.MaterialExpressionConstant, -700, 1900, r=1.0)
+    # (AT6: lit by the city round it by night: its albedo times SteamGlow, which the controller
+    # sets to the plan's glow times Night)
+    glow = custom(m, -700, 2100, "return Alb * Glow;", ["Alb", "Glow"], "CMOT_FLOAT3",
+                  "CgSteamGlow")
+    link(alb, "", glow, "Alb")
+    link(mpc_param(m, c, "SteamGlow", -1300, 2300), "", glow, "Glow")
+    MEL.connect_material_property(glow, "", MP.MP_EMISSIVE_COLOR)
     MEL.connect_material_property(alb, "", MP.MP_BASE_COLOR)
     MEL.connect_material_property(op, "", MP.MP_OPACITY)
     MEL.connect_material_property(rough, "", MP.MP_ROUGHNESS)
@@ -579,7 +973,11 @@ def main():
             EAL.make_directory(FOLDER)
         c, res["collection_made"] = collection()
         _, res["rain_made"] = rain(c)
-        _, res["wet_made"] = wet(c)
+        _, res["wet_color_made"] = wet_color(c)
+        _, res["wet_gloss_made"] = wet_gloss(c)
+        _, res["splash_made"] = splash(c)
+        _, res["drip_made"] = drip(c)
+        res["wet_dropped"] = drop_old()
         _, res["beacon_made"] = beacon()
         _, res["beam_made"] = beam()
         _, res["sky_made"] = sky_material()

@@ -1,0 +1,202 @@
+{
+ "core_dclr08": {
+  "frames": 267,
+  "frame_p50": 10.39,
+  "frame_p95": 16.53,
+  "gpu_p50": 9.68,
+  "gpu_p95": 9.85,
+  "draws": 675
+ },
+ "core_dclr00": {
+  "frames": 293,
+  "frame_p50": 10.25,
+  "frame_p95": 10.65,
+  "gpu_p50": 9.59,
+  "gpu_p95": 9.68,
+  "draws": 675
+ },
+ "core_dclrm08": {
+  "frames": 292,
+  "frame_p50": 10.28,
+  "frame_p95": 10.75,
+  "gpu_p50": 9.61,
+  "gpu_p95": 9.69,
+  "draws": 675
+ },
+ "core_dclrm16": {
+  "frames": 292,
+  "frame_p50": 10.27,
+  "frame_p95": 10.64,
+  "gpu_p50": 9.62,
+  "gpu_p95": 9.74,
+  "draws": 674
+ },
+ "core_draim08": {
+  "frames": 275,
+  "frame_p50": 10.9,
+  "frame_p95": 11.23,
+  "gpu_p50": 10.25,
+  "gpu_p95": 10.42,
+  "draws": 676
+ },
+ "core_draim16": {
+  "frames": 275,
+  "frame_p50": 10.92,
+  "frame_p95": 11.41,
+  "gpu_p50": 10.26,
+  "gpu_p95": 10.45,
+  "draws": 676
+ },
+ "viaduct_dclrm08": {
+  "frames": 235,
+  "frame_p50": 9.66,
+  "frame_p95": 23.43,
+  "gpu_p50": 8.44,
+  "gpu_p95": 8.66,
+  "draws": 512
+ },
+ "viaduct_draim08": {
+  "frames": 313,
+  "frame_p50": 9.6,
+  "frame_p95": 10.02,
+  "gpu_p50": 8.88,
+  "gpu_p95": 9.0,
+  "draws": 515
+ },
+ "viaduct_draim16": {
+  "frames": 313,
+  "frame_p50": 9.59,
+  "frame_p95": 9.94,
+  "gpu_p50": 8.89,
+  "gpu_p95": 9.0,
+  "draws": 515
+ },
+ "oldtown_dclrm08": {
+  "frames": 269,
+  "frame_p50": 9.63,
+  "frame_p95": 20.61,
+  "gpu_p50": 8.65,
+  "gpu_p95": 8.77,
+  "draws": 307
+ },
+ "oldtown_draim08": {
+  "frames": 310,
+  "frame_p50": 9.68,
+  "frame_p95": 10.19,
+  "gpu_p50": 8.9,
+  "gpu_p95": 9.01,
+  "draws": 310
+ },
+ "oldtown_draim16": {
+  "frames": 309,
+  "frame_p50": 9.72,
+  "frame_p95": 10.07,
+  "gpu_p50": 8.91,
+  "gpu_p95": 9.04,
+  "draws": 310
+ },
+ "port_draim08": {
+  "frames": 296,
+  "frame_p50": 9.81,
+  "frame_p95": 17.77,
+  "gpu_p50": 9.21,
+  "gpu_p95": 9.42,
+  "draws": 331
+ },
+ "core_night": {
+  "frames": 205,
+  "frame_p50": 14.43,
+  "frame_p95": 17.01,
+  "gpu_p50": 13.62,
+  "gpu_p95": 13.99,
+  "draws": 1412
+ },
+ "core_nightnopost": {
+  "frames": 212,
+  "frame_p50": 14.2,
+  "frame_p95": 14.48,
+  "gpu_p50": 13.47,
+  "gpu_p95": 13.65,
+  "draws": 1394
+ },
+ "oldtown_night": {
+  "frames": 195,
+  "frame_p50": 13.55,
+  "frame_p95": 24.97,
+  "gpu_p50": 11.59,
+  "gpu_p95": 11.79,
+  "draws": 458
+ },
+ "oldtown_nightnopost": {
+  "frames": 250,
+  "frame_p50": 12.04,
+  "frame_p95": 12.43,
+  "gpu_p50": 11.37,
+  "gpu_p95": 11.58,
+  "draws": 441
+ },
+ "port_night": {
+  "frames": 262,
+  "frame_p50": 11.26,
+  "frame_p95": 18.31,
+  "gpu_p50": 10.61,
+  "gpu_p95": 10.81,
+  "draws": 342
+ },
+ "port_nightnopost": {
+  "frames": 273,
+  "frame_p50": 11.03,
+  "frame_p95": 11.31,
+  "gpu_p50": 10.37,
+  "gpu_p95": 10.5,
+  "draws": 325
+ },
+ "stall_night": {
+  "frames": 224,
+  "frame_p50": 12.72,
+  "frame_p95": 17.76,
+  "gpu_p50": 12.03,
+  "gpu_p95": 12.18,
+  "draws": 385
+ },
+ "steam_night": {
+  "frames": 237,
+  "frame_p50": 12.79,
+  "frame_p95": 13.49,
+  "gpu_p50": 12.1,
+  "gpu_p95": 12.29,
+  "draws": 478
+ },
+ "awning_nightwet0": {
+  "frames": 232,
+  "frame_p50": 12.07,
+  "frame_p95": 20.62,
+  "gpu_p50": 11.37,
+  "gpu_p95": 11.57,
+  "draws": 419
+ },
+ "awning_nightwet1": {
+  "frames": 243,
+  "frame_p50": 12.38,
+  "frame_p95": 12.67,
+  "gpu_p50": 11.71,
+  "gpu_p95": 11.91,
+  "draws": 423
+ },
+ "core_dusk": {
+  "frames": 202,
+  "frame_p50": 14.59,
+  "frame_p95": 17.87,
+  "gpu_p50": 13.8,
+  "gpu_p95": 14.21,
+  "draws": 1445
+ },
+ "oldtown_dusk": {
+  "frames": 207,
+  "frame_p50": 13.44,
+  "frame_p95": 23.91,
+  "gpu_p50": 11.5,
+  "gpu_p95": 11.86,
+  "draws": 440
+ }
+}

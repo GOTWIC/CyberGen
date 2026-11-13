@@ -965,6 +965,22 @@ def play_features(world, man, slug):
     if an is not None and an.get("air") is not None and (man.get("atmos") or {}).get("volumes"):
         air_ok = bool(an["fog"]) and an["air"] and an["volumes"] > 0 and an["plume_cards"] >= 0
         lit = lit and air_ok
+    # AT5: with the plan's weather, the start state by night: its textures set, its rain
+    # falling and its streets wet where the state rains (neon rain's), the menu's weather row
+    weather_ok = True
+    if an is not None and an.get("weather"):
+        raining = an.get("rain_now", 0.0) > 0.01
+        weather_ok = bool(an.get("wet_textures")) and (
+            not raining or (an.get("rain_shown") and an.get("wet_shown")))
+        lit = lit and weather_ok
+    # AT6: with the plan's look, its post applied by night (a district under the view where
+    # the plan has some), the day's exposure brighter than the night's still
+    post_ok = True
+    if an is not None and an.get("post") is not None and \
+            (man.get("atmos") or {}).get("post"):
+        post_ok = bool(an["post"]) and an.get("post_bloom", 0.0) > 0.0 and (
+            not (man["atmos"]["post"] or {}).get("districts") or bool(an.get("post_where")))
+        lit = lit and post_ok
     ok = (got["start"]["ready"] and got["start"]["overlay"] and got["start"]["map_texture"]
           and got["map"] and got["menu"] and got["night"]["night"] and lit
           and got["free_cam"]["free_cam"] and got["free_cam"]["pawn"].startswith("CityGenFreeCam")
@@ -995,6 +1011,22 @@ def play_features(world, man, slug):
             f"{an.get('volumes_live', 0)} live, {an.get('emitters', 0)} plumes "
             f"({an.get('plume_cards', 0)} cards), engine settings tuned {an.get('tuned')} "
             + ("(ok)" if air_ok else "(FAIL)"))
+    if an is not None and an.get("weather"):
+        RES["lines"].append(
+            f"weather (AT5): {an.get('weather_now')} (rain {an.get('rain_now', 0):.2f}, wetness "
+            f"{an.get('wetness', 0):.2f}, puddles {an.get('puddles', 0):.2f}, wind "
+            f"{an.get('wind_ms', 0):.1f} m/s, cover {an.get('cloud_cover', 0):.2f}), rain shown "
+            f"{an.get('rain_shown')}, wet streets {an.get('wet_shown')}, "
+            f"{an.get('splashes_live', 0)} splashes, {an.get('drips', 0)} drips of "
+            f"{an.get('drip_lines', 0)} lines, textures {an.get('wet_textures')} "
+            + ("(ok)" if weather_ok else "(FAIL)"))
+    if an is not None and an.get("post") is not None:
+        RES["lines"].append(
+            f"look (AT6): post {an.get('post')}, by the player {an.get('post_where') or '-'} "
+            f"(bloom {an.get('post_bloom', 0):.2f}, grain {an.get('post_grain', 0):.2f}, fringe "
+            f"{an.get('post_fringe', 0):.2f}, saturation {an.get('post_saturation', 0):.2f}, "
+            f"contrast {an.get('post_contrast', 0):.2f}, sharpen {an.get('post_sharpen', 0):.2f}) "
+            + ("(ok)" if post_ok else "(FAIL)"))
     RES["lines"].append(
         f"play features: map, menu, night ({night}, "
         f"{got['night'].get('light_pools', 0)} light pools), free camera "
@@ -1046,11 +1078,25 @@ def play_views(world, a, slug, prefix):
             st0 = atmos_status(world) or {}
             for c in ("CityGenAtmos.Fog 0", "CityGenAtmos.Air 0"):
                 unreal.SystemLibrary.execute_console_command(world, c)
+        # (AT6: a view named `*_nopost` without the look's post, the same view's before for
+        # AT6's pairs; the look again after it)
+        nopost = "_nopost" in v["name"]
+        if nopost:
+            unreal.SystemLibrary.execute_console_command(world, "CityGenAtmos.Post 0")
         # (visible lights: a view named `*_sight` with the live set picked by sight, as round
         # a walker, `*_circle` by the circle, the same view's before; by the pawn after it)
         mode = 1 if v["name"].endswith("_sight") else 0 if v["name"].endswith("_circle") else None
         if mode is not None:
             unreal.SystemLibrary.execute_console_command(world, f"CityGenAtmos.Sight {mode}")
+        # (AT5: a view named `*__<state>` in that weather state, settled; `*__<a>2<b>_<n>s` in
+        # state a, then turning to b for n seconds when the view has streamed in (a frame of
+        # the transition); the plan's start state again after it)
+        wm = re.search(r"__([a-z]+?)(?:2([a-z]+)_(\d+(?:\.\d+)?)s)?$", v["name"])
+        st0w = None
+        if wm:
+            st0w = (atmos_status(world) or {}).get("weather_target") or "rain"
+            unreal.SystemLibrary.execute_console_command(
+                world, f"CityGenAtmos.Weather {wm.group(1)} now")
         eye, tg = ue(*v["eye"]), ue(*v["target"])
         cam.set_actor_location(eye, False, True)
         pc.set_control_rotation(unreal.MathLibrary.find_look_at_rotation(eye, tg))
@@ -1061,8 +1107,29 @@ def play_views(world, a, slug, prefix):
             pass
         yield from settle(world, slug, at=eye)
         yield from wait(4.0)
+        if wm and wm.group(2):
+            unreal.SystemLibrary.execute_console_command(
+                world, f"CityGenAtmos.Weather {wm.group(2)}")
+            yield from wait(float(wm.group(3)))
         yield from ui_shot(world, v["name"], "HighResShot 1920x1080", 180)
         at = atmos_status(world)
+        # (AT6: what the look showed at each view: the district, the exposure, the post)
+        if at and "post" in at:
+            RES.setdefault("post_views", {})[v["name"]] = {
+                k: at.get(k) for k in ("post", "post_where", "ev100", "night_now",
+                                       "overcast_shift", "post_bloom", "post_grain",
+                                       "post_fringe", "post_saturation", "post_contrast",
+                                       "post_sharpen")}
+        if nopost:
+            unreal.SystemLibrary.execute_console_command(world, "CityGenAtmos.Post 1")
+        if wm:
+            if at:
+                RES.setdefault("weather_views", {})[v["name"]] = {
+                    k: at.get(k) for k in ("weather_now", "transition", "rain_now", "wetness",
+                                           "puddles", "wind_ms", "cloud_cover", "fog_density",
+                                           "rain_shown", "wet_shown", "splashes_live", "drips")}
+            unreal.SystemLibrary.execute_console_command(
+                world, f"CityGenAtmos.Weather {st0w} now")
         if mode is not None:
             unreal.SystemLibrary.execute_console_command(world, "CityGenAtmos.Sight -1")
             if at:
