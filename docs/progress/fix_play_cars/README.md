@@ -100,7 +100,7 @@ with 112.
 
 ## 5. Car glass that reads as glass
 
-`M_CgVehicleGlass` (the importer's, so the packs need no rebuild; `VEHICLE_VERSION` 9):
+`M_CgVehicleGlass` (the importer's, so the packs need no rebuild; `VEHICLE_VERSION` 10):
 - the glass color is pulled toward a dark teal (`GlassTint`, `TintMix` 0.6) before it is
   squared as the transmittance;
 - a share of the glass is covered (the pack's transmission times `TransmissionScale` 0.65),
@@ -109,11 +109,24 @@ with 112.
 - the reflectance is at least `MinF0` 6%. The domes' IOR of 1.12 to 1.14 had reflected almost
   nothing.
 
-The cabin is now a dim shape behind reflections.
+- the material is two-sided. A face is left out when, its normal turned outward from the
+  car's middle, the eye is behind it (the far side's glass); it used to be left out when its
+  normal pointed in. The Tanager Cab's front side windows are one sheet facing in, so from outside they drew
+  no glass at all: its near faces were culled and its far faces left out.
+
+The cabin is now a dim shape behind reflections. The street shots below are of version 8 (the
+first round); version 10 is darker again and two-sided (the hero shots under "Checks").
 
 | By day | By night |
 |---|---|
 | ![](glass_lumen_day.jpg) | ![](glass_lumen_night.jpg) |
+
+**Left open: the Tanager Cab.** After version 10 its front side window reads as tinted glass,
+but its windshield and the other side windows still look clear from outside, much as before.
+From inside, its side windows are dark glass and the windshield still has none. Its pack's
+proof shows light, clear glass in those windows (glass color 0.6 to 0.68). Whether those
+openings carry glass faces in the pack's LOD0, and which way they face, is for a look at
+`game.py`'s glass for that car.
 
 ## Delta in Unreal
 
@@ -145,7 +158,8 @@ or delete it after the run).
 ## The night's frame time
 
 The lean benchmark ran once (`--bench-atmos`, `night_plan_all`; `bench/`) with the walker as
-the pawn and the darker glass (`VEHICLE_VERSION` 8). The p95 was 15.5 ms over the route: walk
+the pawn and the first round of darker glass (`VEHICLE_VERSION` 8; version 10's coverage
+and two-sided faces were not benchmarked). The p95 was 15.5 ms over the route: walk
 15.6, drive 15.3, flight 15.7. AT4 left it at 15.6, and the budget is 16.7. Delta's model is
 the branch's here (no station canopies, and main's later model changes). The bench moves the
 pawn itself, so the walker's body is below the view.
@@ -169,3 +183,5 @@ pawn itself, so the walker's body is below the view.
 | ![](glass_hero_tanager_cab_day_before.jpg) | ![](glass_hero_tanager_cab_day_after.jpg) |
 | **An Orrin Pebble's dome, before** | **After** |
 | ![](glass_hero_orrin_pebble_day_before.jpg) | ![](glass_hero_orrin_pebble_day_after.jpg) |
+
+The Tanager Cab from its seats (version 10): ![](glass_cabin_tanager_cab.jpg)

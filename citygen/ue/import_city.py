@@ -1617,7 +1617,7 @@ def stage2_master(master, defaults=None):
 
 # --- AG18's vehicles (citygen/unreal_vehicles.py; the packs' contract: vehicles/GAME.md) ------
 
-VEHICLE_VERSION = "9"        # of the vehicle masters (`cg.vehicle` metadata; 8 and 9: darker glass)
+VEHICLE_VERSION = "10"       # of the vehicle masters (`cg.vehicle` metadata; 8 to 10: the glass)
 VEHICLE_MESH_VERSION = "3"   # of what the importer makes of a car (with its manifest hash)
 VEHICLE_ACTOR_VERSION = "3"  # of the placement actors (2: the glass casts no shadow;
                              # 3, AT4: cull distances by part, the wheels cast no shadow)
@@ -1809,8 +1809,13 @@ def vehicle_glass_master(opaque):
                   transform_type=unreal.MaterialVectorCoordTransform.TRANSFORM_LOCAL)
         link(nw, "", nl, "Input")
         ctr = vparam(m, "GlassCenter", -900, 700, (0.0, 0.0, 100.0))
-        faces_in = custom(m, -600, 520, "return dot(N, P - C) < 0.0 ? 1.0 : 0.0;",
-                          ["N", "P", "C"], cmot(F1), "CgGlassInner")
+        # (the play fixes: a face is the far side's when, its normal turned outward from
+        # GlassCenter, the eye is behind it; the material two-sided, so a pack whose glass is
+        # one sheet facing in, as the Tanager Cab's, draws its near side too: it drew no glass
+        # at all from outside, its near faces culled and its far faces left out)
+        faces_in = custom(m, -600, 520, "float3 n = dot(N, P - C) < 0.0 ? -N : N; "
+                          "return dot(n, V) < 0.0 ? 1.0 : 0.0;",
+                          ["N", "P", "C", "V"], cmot(F1), "CgGlassInner")
         link(nl, "", faces_in, "N")
         link(lp, "", faces_in, "P")
         link(ctr, "", faces_in, "C")
@@ -1826,6 +1831,7 @@ def vehicle_glass_master(opaque):
                      .TRANSFORMSOURCE_WORLD,
                      transform_type=unreal.MaterialVectorCoordTransform.TRANSFORM_LOCAL)
         link(to_eye, "", eye_l, "Input")
+        link(eye_l, "", faces_in, "V")
         cab_c = vparam(m, "CabinCenter", -900, 960, (0.0, 0.0, 100.0))
         cab_h = vparam(m, "CabinHalf", -900, 1080, (0.0, 0.0, 0.0))
         # 1 for the faces left out: the inner sheet while the eye is outside the cabin
@@ -1868,6 +1874,7 @@ def vehicle_glass_master(opaque):
         MEL.connect_material_property(rough, "", MP.MP_ROUGHNESS)
         MEL.connect_material_property(op, "", MP.MP_OPACITY)
         m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
+        m.set_editor_property("two_sided", True)
         m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_THIN_TRANSLUCENT)
         m.set_editor_property("translucency_lighting_mode",
                               unreal.TranslucencyLightingMode.TLM_SURFACE_PER_PIXEL_LIGHTING)
