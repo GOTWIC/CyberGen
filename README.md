@@ -11,7 +11,7 @@ your machine.
 |---|---|---|---|
 | 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M22 done |
 | 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG8, AG10, AG12 to AG17 done, the rest to come |
-| 3 | [atmosgen](#stage-3-atmosgen) | Lighting, sky, weather and atmospherics | AT0 to AT3 done, the rest to come |
+| 3 | [atmosgen](#stage-3-atmosgen) | Lighting, sky, weather and atmospherics | AT0 to AT4 done, the rest to come |
 | 4 | [lifegen](#stage-4-lifegen) | Traffic, crowds, trains and aircraft, generated | Planned ([draft plan](docs/lifegen_scope.md)) |
 | 5 | [storygen](#stage-5-storygen) | Story, characters and cutscenes | Planned |
 
@@ -611,7 +611,7 @@ Plan: [`docs/atmosgen_scope.md`](docs/atmosgen_scope.md); what each milestone di
 | AT1 | Streets at night | Street and wall lights that light sidewalks and roads, lit junctions, highways and alleys, shop light spilling onto the street, deck, tunnel and station lights, a check that every street is lit, the lights in the Unreal level | Done |
 | AT2 | Neon and signs as light | Billboards, banners and holo-boards lighting the street and facades they face, neon spill, crown floods, aviation lights, searchlights, port and spaceport lights, flicker, district palettes | Done |
 | AT3 | Sky and time | Night, dusk and day skies, a cloud deck lit by the city, the moon and stars, time of day driving every light and window, a time-of-day slider in the game | Done |
-| AT4 | Air | Fog, haze, smog and mist over the water, light shafts, steam from manholes and vents | Planned |
+| AT4 | Air | Fog and haze by the hour, mist over the water, smog over the port, haze under the decks and in tunnels, light shafts, steam and smoke from manholes, roofs, stalls and chimneys | Done |
 | AT5 | Weather | Rain kept out from under decks and awnings, wet streets and puddles, drips and splashes, wind, changing weather | Planned |
 | AT6 | Looks and art direction | Color grading and post per look and district, art-direction rounds, the prompt-to-look skill | Planned |
 | AT7 | Far city and release | The skyline glittering at night to the horizon, every sample city lit, checked in Unreal | Planned |

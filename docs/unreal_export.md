@@ -1660,7 +1660,7 @@ and `emitters`) comes with the cells and the controller:
   street lights, high masts and floods; none from the neon spill, shop signs and shopfronts),
   the searchlight beams' fog gain (`BeamFogGain`), the live sets (`MaxVolumes` within
   `VolumeRangeM`, plumes within `EmitterRangeM`), cards per plume by kind (`Puffs`,
-  `EmitterKinds`) and the engine settings it runs with (`RenderCVars`, "name=value"). With an
+  `EmitterKinds`) and the engine settings it runs with (`TunedSettings`, "name=value"). With an
   air the import turns the fog and the air on (`bFog`, `bAir`); a plan without one (AT3's)
   keeps the fog off, as before.
 - **The runtime** (`ACityGenAtmos`): the height fog follows the hour (its density times
@@ -1681,7 +1681,7 @@ and `emitters`) comes with the cells and the controller:
   and out, lit by the translucency volume (the street's and the neon's colors); culled past
   `EmitterRangeM`. **Searchlights** keep AT2's beams (decision: a beam reaches 400 m into the
   sky, the volumetric fog `FogViewM`; its spot light scatters none), their glow times
-  1 + `BeamFogGain` times the fog's share. **Engine settings:** `RenderCVars` applied at begin
+  1 + `BeamFogGain` times the fog's share. **Engine settings:** `TunedSettings` applied at begin
   play (each one's value before kept and put back at its end, `CityGenAtmos.Tuned 0`).
 - **Assets** (`atmos_assets.py` version 9): `M_CgSteam` beside AT0 to AT3's (under
   `/Game/CityGen/Core/Atmos`, cooked always). The fog volumes are the engine's local fog

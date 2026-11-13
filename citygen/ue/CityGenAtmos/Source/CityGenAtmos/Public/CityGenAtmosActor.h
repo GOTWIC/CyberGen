@@ -406,9 +406,9 @@ public:
 	/** Engine settings applied while the controller runs ("name=value"; restored at its end):
 	 *  the room the air's budget needs (AT4). */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
-	TArray<FString> RenderCVars;
+	TArray<FString> TunedSettings;
 
-	/** Whether RenderCVars are applied. */
+	/** Whether TunedSettings are applied. */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
 	bool bTuned = true;
 
@@ -433,7 +433,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "CityGen")
 	void SetAir(bool bOn);
 
-	/** AT4: the engine settings (RenderCVars) applied, or the project's own. */
+	/** AT4: the engine settings (TunedSettings) applied, or the project's own. */
 	UFUNCTION(BlueprintCallable, Category = "CityGen")
 	void SetTuned(bool bOn);
 

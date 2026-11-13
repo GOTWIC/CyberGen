@@ -1093,7 +1093,7 @@ void ACityGenAtmos::ApplyCVars(bool bOn)
 	// the project's, kept to put back)
 	if (bOn && !bCVarsApplied)
 	{
-		for (const FString& Line : RenderCVars)
+		for (const FString& Line : TunedSettings)
 		{
 			FString Name, Value;
 			if (!Line.Split(TEXT("="), &Name, &Value))
@@ -1107,6 +1107,12 @@ void ACityGenAtmos::ApplyCVars(bool bOn)
 					SavedCVars.Add(Name, V->GetString());
 				}
 				V->Set(*Value, ECVF_SetByCode);
+				UE_LOG(LogCityGenAtmos, Display, TEXT("CityGen atmos: %s %s (was %s)"), *Name, *V->GetString(),
+					*SavedCVars[Name]);
+			}
+			else
+			{
+				UE_LOG(LogCityGenAtmos, Warning, TEXT("CityGen atmos: no console variable %s"), *Name);
 			}
 		}
 		bCVarsApplied = true;

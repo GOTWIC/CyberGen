@@ -617,7 +617,12 @@ AIR_SCHEDULES = {
 # roof item's footprint, a stall), a volume's middle over its water or in its district
 EMITTER_ON_M = 0.6
 # the tuned engine settings that make room for the air within the night's budget (decision
-# 12.6), applied by the controller while it runs (`cvars`); measured in docs/progress/AT4
+# 12.6), applied by the controller while it runs (`cvars`); measured on Delta's night with the
+# air, rain and wet streets (docs/progress/AT4, `bench/explore`): the volumetric fog's froxels
+# 12 px a side and 96 slices deep (its pass 0.92 to 0.30 ms; 16 px gains little more and
+# blocks the halos), Lumen's reflections at half resolution (2.80 to 1.60 ms walking: the wet
+# streets' glossy ground), 1.5 ms of the frame in all; the cars' LOD distances gave nothing
+# (their cull distances, the exporter's, did)
 AIR_CVARS = {"r.VolumetricFog.GridPixelSize": "12", "r.VolumetricFog.GridSizeZ": "96",
              "r.Lumen.Reflections.DownsampleFactor": "2",
              # (the engine clamps a local fog volume's density in the volumetric fog to 0.01,

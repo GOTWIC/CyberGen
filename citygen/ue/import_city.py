@@ -3901,7 +3901,7 @@ class Importer:
                     sky.append((k, [float(x) for x in ctl[k]]))
                 sky.append(("puffs", [int(x) for x in ctl["puffs"]]))
                 sky.append(("emitter_kinds", list(ctl["emitter_kinds"])))
-                sky.append(("render_cvars", list(ctl["cvars"])))
+                sky.append(("tuned_settings", list(ctl["cvars"])))
             for k, v in sky:
                 try:
                     a.set_editor_property(k, v)
