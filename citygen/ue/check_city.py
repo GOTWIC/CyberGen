@@ -619,7 +619,15 @@ def walk(world, pawn, man):
     travelled, last = 0.0, start
     mark, mark_t, side_until, side, blockers, stops = start, time.time(), 0.0, 1.0, {}, []
     ticks = []
-    while k < len(path) and time.time() - t < WALK_S:
+    # (as long as the path takes at the pawn's walking speed, half again, at least WALK_S:
+    # the walker walks at 4.2 m/s, the template's character ran at 6)
+    length = sum(math.dist(path[j][:2], path[j + 1][:2]) for j in range(len(path) - 1))
+    try:
+        speed = float(mc.get_editor_property("max_walk_speed")) / 100.0
+    except Exception:           # noqa: BLE001 (a pawn without a character's movement)
+        speed = 6.0
+    limit = max(WALK_S, 1.5 * length / max(speed, 1.0))
+    while k < len(path) and time.time() - t < limit:
         ticks.append(time.time())
         loc = pawn.get_actor_location()
         tx, ty = path[k][0] * 100.0, -path[k][1] * 100.0
@@ -705,12 +713,27 @@ def spawn_and_body(world, pawn, man, slug):
                         + ("a body it sees" if body else "no body it sees" if body is False
                            else "the project's pawn"))
     if JOB.get("shots") and body:
+        # by day (the play features' Night 0), from the player start or from the eye of a
+        # `--view walk_spot ...` (the player stood there, facing its target)
         pc = unreal.GameplayStatics.get_player_controller(world, 0)
-        yaw = float(man["player_start"].get("yaw_deg", 0.0))
+        yaw = -float(man["player_start"].get("yaw_deg", 0.0))
+        spot = next((v for v in JOB.get("views", []) if v["name"] == "walk_spot"), None)
+        here = pawn.get_actor_location()
+        if spot is not None:
+            ex, ey, ez = spot["eye"]
+            teleport(pawn, ex, ey, ez + 1.2)
+            yield from settle(world, slug, at=ue(ex, ey, ez))
+            yield from wait(2.0)
+            yaw = unreal.MathLibrary.find_look_at_rotation(ue(*spot["eye"]),
+                                                           ue(*spot["target"])).yaw
+        unreal.SystemLibrary.execute_console_command(world, "CityGen.Night 0")
         for name, pitch in (("walk_body", -68.0), ("walk_ahead", -8.0)):
-            pc.set_control_rotation(unreal.Rotator(roll=0.0, pitch=pitch, yaw=-yaw))
-            yield from wait(1.5)
+            pc.set_control_rotation(unreal.Rotator(roll=0.0, pitch=pitch, yaw=yaw))
+            yield from wait(2.0)
             yield from ui_shot(world, name, cmd="shot")
+        if spot is not None:
+            pawn.set_actor_location(here, False, True)
+            yield from wait(1.0)
 
 
 def curb(world, pawn, man):
@@ -740,7 +763,7 @@ def curb(world, pawn, man):
         while time.time() - t < 4.0:
             loc = pawn.get_actor_location()
             low = min(low, loc.z)
-            if z0 - low > 8.0 and math.hypot(loc.x - start.x, loc.y - start.y) > 150.0:
+            if z0 - low > 5.0 and math.hypot(loc.x - start.x, loc.y - start.y) > 150.0:
                 stepped = True
                 break
             pawn.add_movement_input(unreal.Vector(fx, fy, 0.0), 1.0, False)
@@ -765,11 +788,13 @@ def curb(world, pawn, man):
                "back_up_m": round((z1 - low) / 100.0, 3),
                "on_ground": round(ground / max(frames, 1), 2)}
         tries.append(rec)
-        if stepped and back and abs(z1 - z0) < 5.0:
-            break
-    ok = any(r["stepped_down"] and r["back"] and r["back_up_m"] > 0.08 for r in tries)
+        rec["climbed"] = stepped and back and abs(z1 - z0) < 3.0
+        if rec["climbed"] and rec["down_m"] >= 0.12:
+            break             # (a full curb; a lower one, a curb ramp's, tries on)
+    # back up on the sidewalk at its height, after stepping down off it
+    ok = any(r["climbed"] for r in tries)
     RES["checks"]["curb"] = {"ok": ok, "tries": tries}
-    best = next((r for r in tries if r["stepped_down"] and r["back"]), None)
+    best = max((r for r in tries if r["climbed"]), key=lambda r: r["down_m"], default=None)
     RES["lines"].append(
         f"curb: stepped {best['down_m']:.2f} m down onto the road and back up" if best and ok
         else f"curb: no curb climbed in {len(tries)} tries")

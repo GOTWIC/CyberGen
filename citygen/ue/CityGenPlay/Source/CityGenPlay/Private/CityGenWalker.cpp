@@ -175,6 +175,10 @@ void ACityGenWalker::SelfieStep()
 		return;
 	}
 	static const float Pitch[] = {-68.f, -8.f};
+	if (SelfieShot == 0 && !SelfieAimed)
+	{
+		PC->ConsoleCommand(TEXT("CityGen.Night 0"));       // (by day: the play features')
+	}
 	if (SelfieShot < 2)
 	{
 		if (SelfieAimed)
