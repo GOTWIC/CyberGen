@@ -51,7 +51,7 @@ import unreal
 
 JOB = json.load(open(os.environ["CITYGEN_UE_JOB"], encoding="utf-8"))
 FOLDER = "/Game/CityGen/Core/Atmos"
-VERSION = "18"  # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air);
+VERSION = "19"  # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air);
                 # 3 (AT2): M_CgBeacon and M_CgBeam; 4 to 8 (AT3): M_CgSky; 9 to 12 (AT4):
                 # M_CgSteam, MPC_CityGenAtmos's SteamGain; 13 (AT5): the weather (M_CgWet
                 # gone: M_CgWetColor and M_CgWetGloss, M_CgRain cut by the covers and leaning
@@ -65,7 +65,8 @@ VERSION = "18"  # 2: fewer, smaller puddles (1 blotched big paved yards seen fro
                 # read as half floor, half wall in quads, AT5's white sawtooth along it);
                 # 18 (AT7): M_CgFarGlow and M_CgFarFlat, the far city's cards, and their
                 # parameters in MPC_CityGenAtmos (FarScale, FarMidM, FarHighM, FarFixM,
-                # FarFade, FarPx, FarSpread)
+                # FarFade, FarPx, FarSpread); 19: a wash soft to its edges ((1 - u^2)^2 a
+                # side: 18's (1 - u^4)^2 drew the far crowns as blocks)
 # AT5: MPC_CityGenAtmos: the weather now (the controller blends its states): the rain's rate,
 # how wet the open surfaces are and how full the puddles, the fog, the wind (its speed with
 # its gusts, its heading as a unit vector), the plumes' gain, the streaks' length and the
@@ -1027,7 +1028,7 @@ if (Type < 1.5)
 }
 else
 {
-    float2 a = saturate(1.0 - p * p * p * p);
+    float2 a = saturate(1.0 - p * p);
     prof = a.x * a.x * a.y * a.y;
 }
 return float3(R, G, B) * (Level * Scale * Where * prof);

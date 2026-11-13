@@ -894,7 +894,9 @@ FAR = {
     "crown_flood": {"wash": True},
     "facade_flood": {"wash": True},
 }
-FAR_ALBEDO = {"pool": 0.15, "wash": 0.35}   # wet asphalt and paving; a tower's facade
+# wet asphalt and paving; a tower's facade (mostly glass and dark panels: AT7's first 0.35 drew
+# the far crowns as white blocks over their own LEDs and windows)
+FAR_ALBEDO = {"pool": 0.15, "wash": 0.08}
 FAR_POOL_DEG = 70.0                         # a pool's radius: h tan(this), at most the reach
 FAR_POOL_MIN_H = 1.5                        # (a light lower over its surface: no pool)
 FAR_POOL_UP_M = 0.25                        # a pool card this far over its surface
