@@ -83,6 +83,10 @@ struct FCityGenAtmosLight
 	float AnimAmount = 0.f;                 // a blink's on share, a sweep's swing (deg)
 	float AnimPhase = 0.f;                  // 0 to 1
 	uint32 Seed = 0;
+	// visible lights: where its light lands (a sweep's second target), found once
+	FVector3f Land = FVector3f::ZeroVector;
+	bool bLand = false;                     // (a second target apart from the light)
+	bool bLandSet = false;
 };
 
 /** Visible lights: the plan's sight raster (atmosgen/sight.py): per 2 m cell what stands there

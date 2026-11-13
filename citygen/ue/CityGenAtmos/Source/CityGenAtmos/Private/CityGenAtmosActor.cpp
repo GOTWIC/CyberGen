@@ -760,6 +760,14 @@ void ACityGenAtmos::LaunchSight(const FVector& View, double Now)
 	const FIntPoint VC = CellOf(View);
 	TArray<FCityGenSightJob> Jobs;
 	Jobs.Reserve(FMath::Max(1024, SightTested));
+	// (each schedule's level at the hour, once a sweep)
+	TArray<float> Level;
+	Level.SetNumUninitialized(256);
+	for (int32 s = 0; s < 256; ++s)
+	{
+		Level[s] = ScheduleAt(uint8(s));
+	}
+	const double Near2 = NearCm * NearCm;
 	for (int32 dx = -Reach; dx <= Reach; ++dx)
 	{
 		for (int32 dy = -Reach; dy <= Reach; ++dy)
@@ -771,43 +779,49 @@ void ACityGenAtmos::LaunchSight(const FVector& View, double Now)
 			}
 			for (int32 Slot : *At)
 			{
-				const TArray<FCityGenAtmosLight>& Ls = Slots[Slot].Lights;
+				TArray<FCityGenAtmosLight>& Ls = Slots[Slot].Lights;
 				for (int32 i = 0; i < Ls.Num(); ++i)
 				{
-					const FCityGenAtmosLight& L = Ls[i];
-					if (!L.bOn || ScheduleAt(L.Schedule) < 0.05f)
+					FCityGenAtmosLight& L = Ls[i];
+					if (!L.bOn || Level[L.Schedule] < 0.05f)
 					{
 						continue;
 					}
 					const double D2 = FVector::DistSquared(L.Pos, View);
-					if (D2 > Range2 || (L.bNearOnly && D2 > NearCm * NearCm))
+					if (D2 > Range2 || (L.bNearOnly && D2 > Near2))
 					{
 						continue;
 					}
-					FCityGenSightJob J;
+					if (!L.bLandSet)
+					{
+						// where its light lands, found once: a spot aimed down its pool on the
+						// ground (at most 0.8 of its reach out), a point the floor under it, a
+						// face, an uplight or a flood a patch along its aim
+						const FVector Dir = L.Rot.Vector();
+						const double Ground = Sight->GroundAt(L.Pos);
+						FVector B = L.Pos;
+						if (L.Shape == 0 && Dir.Z < -0.3)
+						{
+							const double Along = FMath::Min((L.Pos.Z - Ground - 30.0) / -Dir.Z, 0.8 * L.ReachCm);
+							B = L.Pos + Dir * FMath::Max(0.0, Along);
+						}
+						else if (L.Shape == 1)
+						{
+							B = L.Pos - FVector(0.0, 0.0, FMath::Clamp(L.Pos.Z - Ground - 30.0, 0.0, 0.5 * L.ReachCm));
+						}
+						else
+						{
+							B = L.Pos + Dir * FMath::Min(0.5 * L.ReachCm, L.Shape == 2 ? 600.0 : 1500.0);
+						}
+						L.Land = FVector3f(B);
+						L.bLand = FVector::DistSquared(B, L.Pos) > 200.0 * 200.0;
+						L.bLandSet = true;
+					}
+					FCityGenSightJob& J = Jobs.AddDefaulted_GetRef();
 					J.Key = LiveKey(Slot, i);
 					J.A = FVector3f(L.Pos);
-					const FVector Dir = L.Rot.Vector();
-					const double Ground = Sight->GroundAt(L.Pos);
-					FVector B = L.Pos;
-					if (L.Shape == 0 && Dir.Z < -0.3)
-					{
-						// (a spot aimed down: its pool on the ground, at most 0.8 of its reach out)
-						const double Along = FMath::Min((L.Pos.Z - Ground - 30.0) / -Dir.Z, 0.8 * L.ReachCm);
-						B = L.Pos + Dir * FMath::Max(0.0, Along);
-					}
-					else if (L.Shape == 1)
-					{
-						B = L.Pos - FVector(0.0, 0.0, FMath::Clamp(L.Pos.Z - Ground - 30.0, 0.0, 0.5 * L.ReachCm));
-					}
-					else
-					{
-						// (a face, an uplight, a flood: a patch along its aim)
-						B = L.Pos + Dir * FMath::Min(0.5 * L.ReachCm, L.Shape == 2 ? 600.0 : 1500.0);
-					}
-					J.B = FVector3f(B);
-					J.bB = FVector::DistSquared(B, L.Pos) > 200.0 * 200.0;
-					Jobs.Add(J);
+					J.B = L.Land;
+					J.bB = L.bLand;
 				}
 			}
 		}
