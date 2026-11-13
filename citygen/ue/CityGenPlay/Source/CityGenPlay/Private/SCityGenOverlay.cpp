@@ -24,7 +24,9 @@ namespace
 		// atmosgen's weather prototypes, shown when the level has its controller
 		RowFog = 5, RowRain = 6, RowWet = 7, RowHour = 8, RowHourDown = 9, RowHourUp = 10,
 		// AT3: the time-of-day slider under the time row (its own drag, not a click row)
-		RowTimeBar = 11 };
+		RowTimeBar = 11,
+		// AT5: the weather row (its states; a click the next) and its arrows
+		RowWeather = 12, RowWeatherDown = 13, RowWeatherUp = 14 };
 
 	/** A row's name for ACityGenPlay::ClickMenuRow (the console's CityGen.MenuRow). */
 	const TCHAR* RowName(int32 Row)
@@ -40,6 +42,9 @@ namespace
 		case RowWet: return TEXT("wet");
 		case RowHour: return TEXT("night");     // (AT3: the time row itself swaps day and night)
 		case RowHourDown: return TEXT("hour-");
+		case RowWeather: return TEXT("weather+");
+		case RowWeatherUp: return TEXT("weather+");
+		case RowWeatherDown: return TEXT("weather-");
 		default: return TEXT("hour+");    // the hour row and its > arrow
 		}
 	}
@@ -304,10 +309,20 @@ int32 SCityGenOverlay::PaintMenu(FSlateWindowElementList& Out, int32 Layer, cons
 		{RowMessages, TEXT("Engine messages"), EngineMessages() ? TEXT("On") : TEXT("Off")}};
 	if (P->GetAtmos())
 	{
-		auto OnOff = [P](const TCHAR* Flag) { return FString(P->GetAtmosFlag(Flag) ? TEXT("On") : TEXT("Off")); };
-		Rows.Add({RowFog, TEXT("Fog"), OnOff(TEXT("bFog"))});
-		Rows.Add({RowRain, TEXT("Rain"), OnOff(TEXT("bRain"))});
-		Rows.Add({RowWet, TEXT("Wet streets"), OnOff(TEXT("bWet"))});
+		// AT5: with a weather, one row of its states (clear, drizzle, rain, fog, smog: the rain,
+		// the wet streets, the fog and the clouds together, blended); else AT0's switches
+		const FString Weather = P->GetAtmosWeather();
+		if (!Weather.IsEmpty())
+		{
+			Rows.Add({RowWeather, TEXT("Weather"), Weather});
+		}
+		else
+		{
+			auto OnOff = [P](const TCHAR* Flag) { return FString(P->GetAtmosFlag(Flag) ? TEXT("On") : TEXT("Off")); };
+			Rows.Add({RowFog, TEXT("Fog"), OnOff(TEXT("bFog"))});
+			Rows.Add({RowRain, TEXT("Rain"), OnOff(TEXT("bRain"))});
+			Rows.Add({RowWet, TEXT("Wet streets"), OnOff(TEXT("bWet"))});
+		}
 	}
 	constexpr double BarH = 30.0;
 	const double Extra = bAtmos ? BarH : 0.0;
@@ -324,6 +339,15 @@ int32 SCityGenOverlay::PaintMenu(FSlateWindowElementList& Out, int32 Layer, cons
 		const FVector2D R0(Min.X + 8.0, Y0), R1(Max.X - 8.0, R0.Y + RowH - 4.0);
 		const FSlateRect Rect(F(R0), F(R1));
 		const bool bHour = Rows[i].Id == RowHour;
+		const bool bWeatherRow = Rows[i].Id == RowWeather;
+		if (bWeatherRow)
+		{
+			// AT5: the weather steps back and on: its arrows first, so a click there is theirs
+			MenuRows.Add(TPair<FSlateRect, int32>(FSlateRect(F(FVector2D(R1.X - 150.0, R0.Y)),
+				F(FVector2D(R1.X - 126.0, R1.Y))), RowWeatherDown));
+			MenuRows.Add(TPair<FSlateRect, int32>(FSlateRect(F(FVector2D(R1.X - 26.0, R0.Y)), F(R1)),
+				RowWeatherUp));
+		}
 		if (bHour)
 		{
 			// the hour steps back and on by an hour: its arrows first, so a click there is theirs
@@ -337,7 +361,17 @@ int32 SCityGenOverlay::PaintMenu(FSlateWindowElementList& Out, int32 Layer, cons
 		DrawRect(Out, Layer + 1, Geometry, R0, R1, bOver ? FLinearColor(0.2f, 0.45f, 0.6f, 0.55f)
 			: FLinearColor(1.f, 1.f, 1.f, 0.05f));
 		DrawText(Out, Layer + 2, Geometry, Rows[i].Label, R0 + FVector2D(10.0, 7.0), 12, Ink);
-		DrawText(Out, Layer + 2, Geometry, Rows[i].Value, FVector2D(R1.X - 70.0, R0.Y + 7.0), 12, Accent, true);
+		if (bWeatherRow)
+		{
+			// (a state's name, "a > b" while it turns, between its arrows)
+			DrawText(Out, Layer + 2, Geometry, TEXT("<"), FVector2D(R1.X - 138.0, R0.Y + 15.0), 12, Accent, true, true);
+			DrawText(Out, Layer + 2, Geometry, TEXT(">"), FVector2D(R1.X - 13.0, R0.Y + 15.0), 12, Accent, true, true);
+			DrawText(Out, Layer + 2, Geometry, Rows[i].Value, FVector2D(R1.X - 76.0, R0.Y + 15.0), 12, Accent, true, true);
+		}
+		else
+		{
+			DrawText(Out, Layer + 2, Geometry, Rows[i].Value, FVector2D(R1.X - 70.0, R0.Y + 7.0), 12, Accent, true);
+		}
 		if (bHour)
 		{
 			DrawText(Out, Layer + 2, Geometry, TEXT("<"), FVector2D(R1.X - 92.0, R0.Y + 15.0), 12, Accent, true, true);

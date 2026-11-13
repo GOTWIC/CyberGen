@@ -68,18 +68,24 @@ UNTUNED = ("8", "128", "1", "1")
 def _atmos(lights: bool = True, fog: bool = False, rain: bool = False, wet: bool = False,
            mega: bool = False, live: int = 512, range_m: float = 300.0,
            shadowed: int = 16, hour: str = "23", sky: bool = True, air: bool = False,
-           tuned: bool = True, cvars: tuple | None = None) -> tuple[str, ...]:
+           tuned: bool = True, cvars: tuple | None = None,
+           weather: str | None = None) -> tuple[str, ...]:
     """AT3: `hour` a number or the plan's named hour (day, dusk, night); `sky` the sky and
     time (a game with an earlier plugin warns of the unknown command and runs the same).
     AT4: `air` the fog volumes and plumes; `tuned` the plan's engine settings (the
     controller's `RenderCVars`); `cvars` the TUNABLE values set by hand (an exploring pass:
-    the plan's settings off first)."""
+    the plan's settings off first). AT5: `weather` a state set at once (the streets as wet
+    as it leaves them, its fog the fog's; rain, neon rain's, by default, so no pass leaks its
+    state into the next; a game with an earlier plugin warns of the unknown command and runs
+    the same)."""
+    weather = weather or "rain"
     out = (f"CityGenAtmos.Tiers {live} {range_m:g} {shadowed}",
            f"CityGenAtmos.Lights {int(lights)}", f"CityGenAtmos.Fog {int(fog)}",
            f"CityGenAtmos.Rain {int(rain)}", f"CityGenAtmos.Wet {int(wet)}",
            f"CityGenAtmos.MegaLights {int(mega)}", f"CityGenAtmos.Sky {int(sky)}",
            f"CityGenAtmos.Air {int(air)}",
-           f"CityGenAtmos.Tuned {int(tuned and cvars is None)}")
+           f"CityGenAtmos.Tuned {int(tuned and cvars is None)}",
+           f"CityGenAtmos.Weather {weather} now")
     if cvars is not None:
         out += tuple(f"{k} {v}" for k, v in zip(TUNABLE, cvars))
     return out + (f"CityGenAtmos.Hour {hour}",)
@@ -125,6 +131,18 @@ ATMOS_PASSES = (
     ("night_plan_proto", True, 100.0, _atmos(fog=True, rain=True, wet=True, tuned=False)),
     ("night_plan_all_untuned", True, 100.0, _atmos(fog=True, air=True, rain=True, wet=True,
                                                    tuned=False)),
+    # AT5: the weather's states by night, each settled (`night_plan_all` is the rain: its
+    # streaks, splashes and drips, the wet streets' decals with their puddles, the rain's fog):
+    # drizzle (finer rain, fewer puddles), clear (the streets dry, no rain), fog and smog (no
+    # rain, their thicker fog and fog volumes; the streets damp)
+    ("night_plan_drizzle", True, 100.0, _atmos(fog=True, air=True, rain=True, wet=True,
+                                               weather="drizzle")),
+    ("night_plan_clear", True, 100.0, _atmos(fog=True, air=True, rain=True, wet=True,
+                                             weather="clear")),
+    ("night_plan_fogstate", True, 100.0, _atmos(fog=True, air=True, rain=True, wet=True,
+                                                weather="fog")),
+    ("night_plan_smog", True, 100.0, _atmos(fog=True, air=True, rain=True, wet=True,
+                                            weather="smog")),
     # AT4's exploring passes: what each engine setting gives back (TUNABLE, by hand)
     ("x_base", True, 100.0, _x()),
     ("x_grid12", True, 100.0, _x(grid=12, z=96)),

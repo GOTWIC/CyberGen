@@ -739,6 +739,21 @@
    "default": null,
    "description": "The start weather (default the look's).",
    "title": "Weather"
+  },
+  "wind_deg": {
+   "anyOf": [
+    {
+     "maximum": 360.0,
+     "minimum": -360.0,
+     "type": "number"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "description": "AT5: the wind's heading, degrees counterclockwise from east, the way it blows (default 40: from the south-west); the rain leans with it and its shadow lies downwind of every cover.",
+   "title": "Wind Deg"
   }
  },
  "title": "atmosgen atmos spec",

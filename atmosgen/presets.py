@@ -637,3 +637,90 @@ AIR_CVARS = {"r.VolumetricFog.GridPixelSize": "12", "r.VolumetricFog.GridSizeZ":
              # (the engine clamps a local fog volume's density in the volumetric fog to 0.01,
              # against its temporal reprojection's leaks: a canal's mist reads at 0.05)
              "r.LocalFogVolume.MaxDensityIntoVolumetricFog": "0.05"}
+
+# --- weather (AT5, scope 6.4) ---------------------------------------------------------------------
+
+# What each weather state does past WEATHER's fog (AT4 reads that): the rain's look (`streak`
+# the length of a streak as a share of the rain's: drizzle's are short and fine; `drops` the
+# share of the runtime's rain cards that fall), the puddles it fills (the share of the
+# plan's puddle depth that stands water once it has rained long enough: drizzle wets the
+# streets, only rain fills their low spots), the cloud deck's cover (a clear night opens it
+# for the moon and the stars), the fog volumes' gain (mist and smog thicken in fog and smog)
+# and the wind's gusts (a share of its speed). `wetness` (WEATHER) is how wet the streets get.
+WEATHER_LOOK = {
+    "clear":   {"streak": 1.0, "drops": 0.0, "puddles": 0.0, "cover": 0.15, "volumes": 1.0,
+                "gust": 0.25},
+    "drizzle": {"streak": 0.4, "drops": 0.75, "puddles": 0.35, "cover": 0.9, "volumes": 1.1,
+                "gust": 0.2},
+    "rain":    {"streak": 1.0, "drops": 1.0, "puddles": 1.0, "cover": 0.85, "volumes": 1.0,
+                "gust": 0.35},
+    "fog":     {"streak": 1.0, "drops": 0.0, "puddles": 0.0, "cover": 1.0, "volumes": 1.8,
+                "gust": 0.1},
+    "smog":    {"streak": 1.0, "drops": 0.0, "puddles": 0.0, "cover": 0.6, "volumes": 1.5,
+                "gust": 0.1},
+}
+# the rain's age (the runtime's seconds; the city's game time does not run while the hour is
+# held, so the weather keeps its own): a state change blends the rain, fog, wind and clouds
+# over `transition_s`; the streets wet toward their state's wetness over `wet_s` (at the
+# state's full rain; slower in drizzle), dry over `dry_s`; the puddles fill over `fill_s`
+# and drain over `drain_s` (they outlast the rain: a clear night after rain keeps its wet
+# streets and puddles a while)
+WEATHER_TIMES = {"transition_s": 20.0, "wet_s": 45.0, "dry_s": 300.0, "fill_s": 120.0,
+                 "drain_s": 900.0}
+# the wind: its heading (degrees counterclockwise from east, the way it blows: from the
+# south-west by default, toward the north-east) and the rain's lean in it (a drop's drift
+# over its fall at the wind's design speed: the rain shadow lies this far downwind of a cover
+# per meter of its height, at most `shift_max_m`); a cover higher than `cover_max_m` over the
+# ground shelters nothing (the rain blows in under it); `gale_m_s` is MPC_CityGen's Wind 1
+# (AG13's grass, the trees)
+WIND = {"heading_deg": 40.0, "lean": 0.3, "shift_max_m": 3.0, "cover_max_m": 25.0,
+        "gale_m_s": 15.0}
+# the masks (scope 4.2: masks/<tile>.png per 256 m tile, `texel_m` texels, row 0 the north
+# edge, RGBA): red the cover (the lowest underside over the texel of what shelters it,
+# absolute, in `step_m` steps over the plan's cover datum, `below_m` under its lowest ground:
+# 0 open sky; a city whose covers do not fit in 255 steps takes 1 m steps), green the puddles
+# (how deep water stands in a low spot: 0 none, 255 the deepest), blue the drips (the band
+# under a cover's edge the rain drips onto from it), alpha the surface's gloss when wet
+# (asphalt mirrors, grass does not)
+MASK = {"texel_m": 0.5, "step_m": 0.5, "below_m": 8.0}
+# a surface's gloss when wet (the alpha channel, 0 to 1) by what it is: the pavement map's
+# faces (M22), the ground cover (M16), building roofs, the raised roads' decks, the water
+SURFACE_GLOSS = {"road": 1.0, "walk": 0.85, "curb": 0.7, "paving": 0.8, "soil": 0.35,
+                 "lawn": 0.15, "roof": 0.6, "deck": 0.95, "open": 0.45, "water": 0.0}
+PAVEMENT_CLASS = {"carriageway": "road", "junction": "road", "bend": "road", "bulb": "road",
+                  "median": "walk", "sidewalk": "walk", "corner": "walk", "walk": "walk",
+                  "curb": "curb"}
+COVER_CLASS = {"paving": "paving", "overgrown_paving": "paving", "bare_dirt": "soil",
+               "gravel": "soil", "wasteland": "soil", "marsh": "soil", "mown_lawn": "lawn",
+               "park_lawn": "lawn", "meadow": "lawn", "planted_bed": "lawn"}
+OPEN_SPACE_CLASS = {"plaza": "paving", "market": "paving", "promenade": "paving",
+                    "courtyard": "paving"}
+# where water stands (scope 6.4: the low spots of the streets, the grade lines, the road
+# crown, near the drains): per surface class its share of the puddle potential; a value noise
+# on the plan (`noise_m`: two scales, `noise_w` their weights) for the worn spots, the gutter
+# along the curb (the crown sheds the water to it: full within `gutter_m[0]` of the curb,
+# none past `gutter_m[1]`), a road's sags (a low point of its grade line, lower than the road
+# `sag_reach_m` either side by `sag_min_m`; a pond `sag_r_m` round it), the drains (a pool
+# `drain_r_m` round each of AG7's drains, `drain_w` + `drain_grit` times the district's grit:
+# a gritty district's drains clog); a puddle where the potential passes `threshold` less
+# `grit_drop` times its district's grit (clean districts few, gritty ones many), as deep as
+# it passes it over `depth` (the deepest fill first: a drizzle fills only those)
+PUDDLE_CLASS = {"road": 1.0, "walk": 0.85, "paving": 0.85, "soil": 0.95, "lawn": 0.2,
+                "open": 0.6, "curb": 0.0, "roof": 0.0, "deck": 0.0, "water": 0.0}
+PUDDLE = {"noise_m": (5.5, 1.8), "noise_w": (0.72, 0.28), "gutter_m": (0.6, 1.6),
+          "gutter_w": 0.2, "sag_reach_m": 15.0, "sag_min_m": 0.04, "sag_r_m": 7.0,
+          "sag_w": 0.45, "drain_r_m": 2.6, "drain_w": 0.12, "drain_grit": 0.4,
+          "threshold": 0.8, "grit_drop": 0.1, "depth": 0.25}
+# drips (scope 6.4): a line under each low cover's edge, its drops falling from the edge to
+# the ground; covers at most `max_m` over the ground (an awning, a deck's slab, a raised road,
+# a canopy, a bus shelter: higher, the rain blows the drips apart), lines cut to `step_m`
+# pieces, none shorter than `min_m`; the mask's blue band is `band_m` wide outside the cover's
+# rain shadow
+DRIPS = {"max_m": 12.0, "step_m": 8.0, "band_m": 1.0, "min_m": 0.8}
+WEATHER_BUDGETS = {"drips_per_tile": 4000}
+# what the runtime keeps near the view (the controller): splashes within `splash_m` (cards
+# on the surfaces a trace down from the sky finds: the rain's own landing spots), drips
+# within `drip_m`, at most `drips` of them, one every `drip_step_m` along a line; the rain
+# cards round the view
+WEATHER_LIVE = {"splashes": 480, "splash_m": 14.0, "drips": 640, "drip_m": 36.0,
+                "drip_step_m": 0.55, "rain_cards": 6000}

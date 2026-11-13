@@ -1,4 +1,4 @@
-# atmosgen: light, sky, air and weather (scope, v2: decided 2026-11-10, AT0 to AT4 done)
+# atmosgen: light, sky, air and weather (scope, v2: decided 2026-11-10, AT0 to AT5 done)
 
 Stage 3 (atmosgen) of CyberGen's five stages. It takes a built city with its assets and
 makes the city's light and air: every light source that casts light, the sky, fog, smog,
@@ -279,6 +279,20 @@ stages have); never required to edit. Fields, all with defaults:
   rings on AG12's water.
 - Wind for the rain's angle, steam, flags, AG13's grass and the trees.
 - Weather states and their transitions (clear, drizzle, rain, fog, smog).
+- AT5 built it (`atmosgen/weather.py`, `docs/progress/AT5/`): the rain shadow of every cover
+  within 25 m of the ground (deck slabs, overhanging masses, skybridges, awnings, bus
+  shelters, canopies, transit decks, raised roads, tunnel lids) moved downwind by its height
+  times the rain's lean; masks per tile (`masks/<tile>.png`, 0.5 m: the cover's underside,
+  puddles, the drip band, the gloss when wet by surface), the puddles from a worn-spot noise,
+  the gutters along the curbs, the roads' sags and AG7's drains, more where grit is; drip lines
+  under the low covers' edges (`drips/<tile>.json`); the five states (rain, streaks, puddles,
+  wetness, clouds, fog, fog volumes, wind and gusts) and the rain's age; the weather check
+  (scope 8). In Unreal the masks city-wide as two textures, the wet streets as two DBuffer
+  decals (darker, then glossy with puddles that mirror and the rain's rings in them, the
+  markings kept), the rain cut under the covers and leaning in the wind, splashes where a
+  trace from the sky lands, drips along the drip lines, rings on the water, the grass and the
+  plumes in the wind (the trees' sway built but off: its cost), and the states blending into
+  each other (the Tab menu's weather row).
 
 ### 6.5 Look
 

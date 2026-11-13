@@ -228,3 +228,53 @@ def test_a_failed_check_is_not_delivered(build):
     # a folder named for the plan that holds none is an error, not a city without one
     with pytest.raises(FileNotFoundError):
         UA.write_atmos(build, build.parent / "nowhere")
+
+
+def test_weather_rides_on_the_controller(build):
+    """AT5: the controller has the weather (its states' values in WEATHER_KEYS order, the start
+    state, the rain's age, the wind, the cover's datum and step), the masks stitched city-wide
+    into two textures beside the manifest (a power of two a side, row 0 the north edge), a
+    cell its drip lines; a plan whose weather check failed is not delivered."""
+    from PIL import Image
+    at = UA.write_atmos(build)
+    data = json.loads((build / "unreal" / UA.DATA).read_text())
+    plan = json.loads((build / "atmos" / "atmos_plan.json").read_text())
+    ctl = data["controller"]
+    wp = plan["weather_plan"]
+    assert ctl["weather"] and ctl["weather_names"] == list(wp["states"])
+    assert len(ctl["weather_values"]) == len(UA.WEATHER_KEYS) * len(ctl["weather_names"])
+    k = ctl["weather_names"].index("rain")
+    row = ctl["weather_values"][k * len(UA.WEATHER_KEYS):(k + 1) * len(UA.WEATHER_KEYS)]
+    assert row[UA.WEATHER_KEYS.index("rain")] == wp["states"]["rain"]["rain"]
+    assert row[UA.WEATHER_KEYS.index("fog_albedo_b")] == wp["states"]["rain"]["fog_albedo"][2]
+    assert ctl["weather_start"] == "rain" and ctl["cover_step_cm"] == wp["cover"]["step_m"] * 100
+    # the textures: 1 m texels over the masks' extent, padded to a power of two
+    w = at["weather"]["wet"]
+    with Image.open(build / w["cover"]["file"]) as im:
+        assert im.mode == "L" and im.size == (w["px"], w["px"])
+    with Image.open(build / w["surface"]["file"]) as im:
+        assert im.mode == "RGB"
+    x0, y0, x1, y1 = wp["extent"]
+    assert w["px"] >= (x1 - x0) / UA.WET_TEXEL_M and w["px"] & (w["px"] - 1) == 0
+    assert w["bounds"][0] == x0 * 100.0 and w["bounds"][2] == w["px"] * UA.WET_TEXEL_M * 100.0
+    # a drip line in a cell of its own: packed, the cell made, its hash following it
+    D = {"id": "d01.prop.awning.e200n20.drip00", "owner_id": "d01.prop.awning.e200n20",
+         "kind": "awning", "tile": "t+00+00", "a": [200.0, 20.0], "b": [206.0, 20.0],
+         "z_m": 3.2, "ground_m": 0.0, "rate": 0.75, "hash": "00112233aabbccdd"}
+    f = UA.pack_drip(D)
+    assert f == [20000.0, -2000.0, 20600.0, -2000.0, 320.0, 0.0, 0.75]
+    (build / "atmos" / "drips").mkdir(exist_ok=True)
+    (build / "atmos" / "drips" / "t+00+00.json").write_text(json.dumps(
+        {"version": 1, "city": plan["city"], "tile": "t+00+00", "drips": [D]}))
+    plan["weather_plan"]["drip_tiles"] = [{"tile": "t+00+00", "file": "drips/t+00+00.json",
+                                           "count": 1, "kinds": {"awning": 1}, "sha256": "x"}]
+    (build / "atmos" / "atmos_plan.json").write_text(json.dumps(plan))
+    at2 = UA.write_atmos(build)
+    data2 = json.loads((build / "unreal" / UA.DATA).read_text())
+    cell = next(c for c in data2["cells"] if c.get("drips"))
+    assert cell["drip_floats"] == f and at2["weather"]["drips"] == 1
+    assert UA.actor_hashes(at2)[cell["key"]] != UA.actor_hashes(at).get(cell["key"])
+    # a failed weather check: not delivered
+    plan["checks"]["weather"]["ok"] = False
+    (build / "atmos" / "atmos_plan.json").write_text(json.dumps(plan))
+    assert "weather" in UA.write_atmos(build)["skipped"]

@@ -75,10 +75,11 @@ HASH_TAG = "cg.hash"
 # unchanged build applies the change (stored hashes are "<version>.<content hash>")
 MESH_VERSION = "3"
 ACTOR_VERSION = "1"
-ATMOS_VERSION = "atmos5"  # the atmos controller's and cells' actors (2, AT2: the high tier,
+ATMOS_VERSION = "atmos6"  # the atmos controller's and cells' actors (2, AT2: the high tier,
                           # blinks and sweeps in the packed lights; 3, AT3: the sky and time;
                           # 4, AT4: the air, a cell's fog volumes and emitters; 5, the visible
-                          # lights: the controller's sight raster, the cells always loaded)
+                          # lights: the controller's sight raster, the cells always loaded; 6,
+                          # AT5: the weather, its textures, a cell's drip lines)
 SWIM_BRUSH_CM = 200.0   # the cube brush a volume spawned from its class gets (CubeBuilder)
 SWIM_FRICTION = 0.3
 GRAPH_VARS = [("City", "string"), ("Graph", "name"), ("Hash", "string"), ("Ids", "[name"),
@@ -323,6 +324,18 @@ def sha16(data) -> str:
 
 def meta(asset, key):
     return EAL.get_metadata_tag(asset, key) or ""
+
+
+def clear_material(m):
+    """Every expression of a material deleted, so it is rebuilt from nothing. (AT5:
+    `delete_all_material_expressions` alone leaves about half of them: a rebuilt master kept
+    its old nodes beside its new ones, M_CgWater two Single Layer Water outputs, and failed to
+    compile. Called again until none is left.)"""
+    for _ in range(16):
+        MEL.delete_all_material_expressions(m)
+        if MEL.get_num_material_expressions(m) == 0:
+            return
+    raise RuntimeError(f"{m.get_name()}: its expressions could not all be deleted")
 
 
 # --- core assets (shared by every city) ---------------------------------------------------------
@@ -798,8 +811,32 @@ for (int i = 0; i < 4; i++) {
 }
 // two ripple samples along the current (a flow map's two phases), and the waves' slope
 float3 r = normalize(lerp(N0, N1, Blend));
-float3 n = float3(r.xy * Ripple - float2(g.x, -g.y), r.z);
+float3 n = float3(r.xy * Ripple - float2(g.x, -g.y) + Ring, r.z);
 return normalize(n);
+"""
+# AT5: rain on the water: rings spreading from drops (hashed points in two layers of 35 cm
+# cells, each ring a short wave packet that widens and fades, a share of the cells a drop at a
+# time by the rain's rate), near the eye only; their slope in the surface's tangent frame (the
+# water's tangent is the world's x, its binormal the world's -y)
+RAIN_RING_CODE = """
+float2 g = float2(0.0, 0.0);
+float near_ = saturate(1.0 - length(WP - CamPos) / 4000.0);
+if (Rain > 0.01 && near_ > 0.0) {
+  for (int L = 0; L < 2; L++) {
+    float2 q = WP.xy / 35.0 + float2(L * 17.31, L * 9.13);
+    float2 id = floor(q);
+    float2 f = frac(q) - 0.5;
+    float h = frac(sin(dot(id, float2(127.1, 311.7))) * 43758.5453);
+    float h2 = frac(sin(dot(id, float2(269.5, 183.3))) * 43758.5453);
+    f -= (float2(h, h2) - 0.5) * 0.5;
+    float life = frac(T * (0.8 + 0.4 * h2) + h);
+    float r = length(f);
+    float x = (r - life * 0.45) * 24.0;
+    float ring = (abs(x) < 3.1416) ? sin(x) * (1.0 - life) * (1.0 - life) : 0.0;
+    g += (f / max(r, 1e-3)) * ring * step(h2, 0.3 + 0.6 * Rain);
+  }
+}
+return float2(g.x, -g.y) * near_ * Rain * 0.6;
 """
 FLOW_UV_CODE = """
 float2 v = Flow * Scale;
@@ -872,11 +909,23 @@ def water_master(m, defaults):
     link(vc, "", wmask, "Input")
     ripple = sparam(m, "RippleStrength", -2600, 1240, 0.6)
     wn = custom(m, -1300, 300, WAVE_NORMAL_CODE, ["WP", "CamPos", "T", "Height", "Length",
-                                                  "W", "N0", "N1", "Blend", "Ripple"],
+                                                  "W", "N0", "N1", "Blend", "Ripple", "Ring"],
                 cmot(F3), "CgWaveNormal")
+    # AT5: the rain's rings where the project has atmosgen's collection (its Rain), else none
+    amc = atmos_mpc()
+    if amc is not None:
+        rain = expr(m, unreal.MaterialExpressionCollectionParameter, -1800, 1300, collection=amc,
+                    parameter_name="Rain")
+        ring = custom(m, -1550, 1300, RAIN_RING_CODE, ["WP", "CamPos", "T", "Rain"], cmot(F2),
+                      "CgRainRings")
+        for a, b in ((wp, "WP"), (cam, "CamPos"), (tm, "T"), (rain, "Rain")):
+            link(a, "", ring, b)
+    else:
+        ring = expr(m, unreal.MaterialExpressionConstant2Vector, -1550, 1300, r=0.0, g=0.0)
     for a, out, b in ((wp, "", "WP"), (cam, "", "CamPos"), (tm, "", "T"), (height, "", "Height"),
                       (length, "", "Length"), (wmask, "", "W"), (n0, "RGB", "N0"),
-                      (n1, "RGB", "N1"), (blend, "", "Blend"), (ripple, "", "Ripple")):
+                      (n1, "RGB", "N1"), (blend, "", "Blend"), (ripple, "", "Ripple"),
+                      (ring, "", "Ring")):
         link(a, out, wn, b)
     wpo = custom(m, -1300, 900, WAVE_CODE, ["WP", "CamPos", "T", "Height", "Length", "W"],
                  cmot(F3), "CgWaves")
@@ -1038,7 +1087,7 @@ def light_pool_material():
     if m is None:
         m = AT.create_asset("M_CgLightPool", CORE, unreal.Material, unreal.MaterialFactoryNew())
     else:
-        MEL.delete_all_material_expressions(m)
+        clear_material(m)
     m.set_editor_property("material_domain", unreal.MaterialDomain.MD_DEFERRED_DECAL)
     m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
     MP = unreal.MaterialProperty
@@ -1227,6 +1276,22 @@ return Opacity * lerp(1.0, 0.25 + 0.75 * l, Textured);
 """
 
 
+# AT5: the trees' crowns in the wind: a sway along the grass's own direction growing with the
+# square of the vertex's height in its tree (LP.z, cm, the variant's frame: its base at 0), a
+# phase by where it stands, and a flutter; within 120 m of the eye (past it still)
+LEAF_SWAY = False   # (measured: Midtown's tree-lined street 4.5 ms of GPU a frame, the core 0.8;
+                    # Nanite's voxelized leaves with a world position offset: AT5's open items)
+LEAF_WIND = "wind1"         # (M_CgLeaves' version past STAGE2_VERSION with the sway)
+LEAF_WPO_CODE = """
+float h = saturate(LP.z / 1400.0);
+float k = h * h * Wind * saturate(1.0 - length(WP - Cam) / 12000.0);
+float ph = WP.x * 0.0013 + WP.y * 0.0017;
+float s = sin(T * 1.05 + ph) * 0.7 + sin(T * 2.2 + ph * 1.9) * 0.3 + 0.45;
+float f = sin(T * 6.5 + dot(WP, float3(0.031, 0.027, 0.043)));
+return float3(0.92, 0.38, 0.0) * s * k * 45.0 + float3(-0.38, 0.92, 0.6) * f * k * 4.0;
+"""
+
+
 def leaves_master(m, defaults):
     """AG8's leaf cards: a leaf clump tile on UV0 / TileM, the tint over its leaves, cut
     where the tile has no leaf (the tint mask, ORM alpha), two-sided."""
@@ -1249,6 +1314,19 @@ def leaves_master(m, defaults):
     MEL.connect_material_property(orm, "G", MP.MP_ROUGHNESS)
     MEL.connect_material_property(nrm, "RGB", MP.MP_NORMAL)
     MEL.connect_material_property(orm, "A", MP.MP_OPACITY_MASK)
+    if LEAF_SWAY:
+        # AT5: the crowns sway in the wind (MPC_CityGen's Wind, which atmosgen's weather
+        # drives), more toward their tops (the vertex's height in the tree's own frame)
+        lp = expr(m, unreal.MaterialExpressionPreSkinnedPosition, -1400, 1100)
+        wp = expr(m, unreal.MaterialExpressionWorldPosition, -1400, 1200)
+        cam = expr(m, unreal.MaterialExpressionCameraPositionWS, -1400, 1300)
+        tm = expr(m, unreal.MaterialExpressionTime, -1400, 1400)
+        sw = custom(m, -1000, 1100, LEAF_WPO_CODE, ["LP", "WP", "Cam", "T", "Wind"], cmot(F3),
+                    "CgLeafSway")
+        for a, b in ((lp, "LP"), (wp, "WP"), (cam, "Cam"), (tm, "T"),
+                     (wind(m, -1400, 1500), "Wind")):
+            link(a, "", sw, b)
+        MEL.connect_material_property(sw, "", MP.MP_WORLD_POSITION_OFFSET)
     m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
     m.set_editor_property("opacity_mask_clip_value", 0.5)      # as the Blender preview cuts
     m.set_editor_property("two_sided", True)
@@ -1485,6 +1563,35 @@ def grass_master(m, defaults):
     m.set_editor_property("two_sided", True)
 
 
+ATMOS_MPC = "/Game/CityGen/Core/Atmos/MPC_CityGenAtmos"
+WATER_RAIN = "rain2"        # AT5: M_CgWater's rain rings (its own version past STAGE2_VERSION;
+                            # 2: rebuilt from nothing, clear_material)
+
+
+def atmos_mpc():
+    """AT5: atmosgen's MPC_CityGenAtmos (its `Rain`) when the project has atmosgen's assets
+    (made before an import with an atmos plan), else None."""
+    if not EAL.does_asset_exist(ATMOS_MPC):
+        return None
+    c = unreal.load_asset(ATMOS_MPC)
+    names = {str(q.get_editor_property("parameter_name"))
+             for q in c.get_editor_property("scalar_parameters")} if c else set()
+    return c if "Rain" in names else None
+
+
+def master_tag(master):
+    """A stage 2 master's version tag: STAGE2_VERSION, and AT5's rain rings on the water where
+    the project has atmosgen's collection (a later import with it rebuilds the water master
+    alone; its instances, and every other master, are kept)."""
+    if master == "water" and atmos_mpc() is not None:
+        return f"{STAGE2_VERSION}.{WATER_RAIN}"
+    if master == "leaves":
+        # (without the sway `still1`: a project whose leaves had it, or a rebuild that left
+        # its nodes behind, gets them rebuilt from nothing)
+        return f"{STAGE2_VERSION}.{LEAF_WIND if LEAF_SWAY else 'still1'}"
+    return STAGE2_VERSION
+
+
 def stage2_master(master, defaults=None):
     """/Game/CityGen/Core/M_Cg<Master>. AG6's textured masters: `facade`, `metal`,
     `concrete`, `foliage`, `road` (textured_surface), `glass` (interior mapping), `neon`
@@ -1502,12 +1609,12 @@ def stage2_master(master, defaults=None):
     name = "M_Cg" + "".join(w.capitalize() for w in master.split("_"))
     path = f"{CORE}/{name}"
     m = unreal.load_asset(path) if EAL.does_asset_exist(path) else None
-    if m is not None and meta(m, "cg.core2") == STAGE2_VERSION:
+    if m is not None and meta(m, "cg.core2") == master_tag(master):
         return instanced(m)
     if m is None:
         m = AT.create_asset(name, CORE, unreal.Material, unreal.MaterialFactoryNew())
     else:
-        MEL.delete_all_material_expressions(m)
+        clear_material(m)
     MP = unreal.MaterialProperty
     if master in ("facade", "metal", "concrete", "foliage", "road", "bed"):
         textured_surface(m, master, defaults)
@@ -1624,7 +1731,7 @@ def stage2_master(master, defaults=None):
     for f in usage_flags(m):
         m.set_editor_property(f, True)        # (HLODs, HISMs, Nanite)
     MEL.recompile_material(m)
-    EAL.set_metadata_tag(m, "cg.core2", STAGE2_VERSION)
+    EAL.set_metadata_tag(m, "cg.core2", master_tag(master))
     EAL.save_loaded_asset(m, only_if_is_dirty=False)
     return m
 
@@ -1694,7 +1801,7 @@ def vehicle_master(defaults):
     if m is None:
         m = AT.create_asset("M_CgVehicle", CORE, unreal.Material, unreal.MaterialFactoryNew())
     else:
-        MEL.delete_all_material_expressions(m)
+        clear_material(m)
     uv = expr(m, unreal.MaterialExpressionTextureCoordinate, -1600, 0, coordinate_index=0)
     tex = {}
     for k, (name, mp) in enumerate((("BaseTex", "base_color"), ("NormalTex", "normal"),
@@ -3912,7 +4019,8 @@ class Importer:
                 # AT4: its fog volumes and steam and smoke emitters (a plugin before AT4 has
                 # none of them)
                 for k, conv in (("volume_floats", float), ("volume_ints", int),
-                                ("emitter_floats", float), ("emitter_ints", int)):
+                                ("emitter_floats", float), ("emitter_ints", int),
+                                ("drip_floats", float)):
                     try:
                         a.set_editor_property(k, [conv(v) for v in d.get(k, [])])
                     except Exception as e:
@@ -3964,6 +4072,45 @@ class Importer:
         EAL.save_loaded_asset(tex, only_if_is_dirty=False)
         return tex
 
+    def atmos_wet(self, info, which):
+        """AT5: Atmos/T_<City>_WetCover (the plan's cover channel, city-wide: grayscale,
+        uncompressed, its heights exact) or T_<City>_WetSurface (gloss, puddles, drips:
+        compressed), imported again only when its bytes change; linear, clamped, with mips,
+        never streamed. None without one."""
+        w = ((info.get("weather") or {}).get("wet") or {}).get(which)
+        if not w:
+            return None
+        folder = f"{self.root}/Atmos"
+        name = f"T_{self.man['folder']}_Wet{which.capitalize()}"
+        path = f"{folder}/{name}"
+        h = f"{TEXTURE_VERSION}.{w['sha256'][:16]}"
+        if EAL.does_asset_exist(path):
+            tex = unreal.load_asset(path)
+            if meta(tex, HASH_TAG) == h:
+                return tex
+        task = unreal.AssetImportTask()
+        for k, v in (("filename", os.path.join(self.build, w["file"])),
+                     ("destination_path", folder), ("destination_name", name),
+                     ("automated", True), ("replace_existing", True), ("save", False)):
+            task.set_editor_property(k, v)
+        AT.import_asset_tasks([task])
+        tex = unreal.load_asset(path)
+        if tex is None:
+            raise RuntimeError(f"wet {which}: import of {w['file']} failed")
+        tex.set_editor_property("srgb", False)
+        tex.set_editor_property("compression_settings",
+                                unreal.TextureCompressionSettings.TC_GRAYSCALE if which == "cover"
+                                else unreal.TextureCompressionSettings.TC_DEFAULT)
+        tex.set_editor_property("compression_no_alpha", True)
+        tex.set_editor_property("lod_group", unreal.TextureGroup.TEXTUREGROUP_WORLD)
+        tex.set_editor_property("never_stream", True)
+        tex.set_editor_property("address_x", unreal.TextureAddress.TA_CLAMP)
+        tex.set_editor_property("address_y", unreal.TextureAddress.TA_CLAMP)
+        tex.set_editor_property("filter", unreal.TextureFilter.TF_BILINEAR)
+        EAL.set_metadata_tag(tex, HASH_TAG, h)
+        EAL.save_loaded_asset(tex, only_if_is_dirty=False)
+        return tex
+
     def atmos_controller(self, have):
         """The controller (CityGenAtmos), always loaded, with the plan's settings: its
         schedules, light kinds, exposure, hour, weather and tiers; AT3: the sky and time (the
@@ -3975,6 +4122,7 @@ class Importer:
         info = self.man["atmos"]
         ctl = self.atmos_data()["controller"]
         glow = self.atmos_glow(info)
+        wet = (self.atmos_wet(info, "cover"), self.atmos_wet(info, "surface"))
 
         def make():
             return self.eas.spawn_actor_from_class(cls, unreal.Vector(0.0, 0.0, 0.0))
@@ -4048,6 +4196,24 @@ class Importer:
                         ("sight_skip_eye_m", float(sk[0])),
                         ("sight_skip_light_m", float(sk[1])),
                         ("sight_runs", [int(x) for x in ctl["sight_runs"]])]
+            # AT5: the weather (its states, the rain's age, the wind, the masks' textures and
+            # where they lie, what it keeps near the view); with a weather the rain and the wet
+            # streets are on (each shown by the state: none in a clear night)
+            if ctl.get("weather"):
+                sky += [("weather", True), ("weather_names", list(ctl["weather_names"])),
+                        ("weather_values", [float(x) for x in ctl["weather_values"]]),
+                        ("weather_start", ctl["weather_start"]), ("rain", True), ("wet", True),
+                        ("max_splashes", int(ctl["max_splashes"])),
+                        ("max_drips", int(ctl["max_drips"])),
+                        ("rain_cards", int(ctl["rain_cards"]))]
+                for k in ("transition_s", "wet_s", "dry_s", "fill_s", "drain_s",
+                          "wind_heading_deg", "rain_lean", "gale_m_s", "cover_z0_cm",
+                          "cover_step_cm", "splash_range_m", "drip_range_m", "drip_step_m"):
+                    # (GaleMS is gale_ms in Unreal's Python)
+                    sky.append(("gale_ms" if k == "gale_m_s" else k, float(ctl[k])))
+                if ctl.get("wet_bounds"):
+                    sky += [("wet_bounds", [float(x) for x in ctl["wet_bounds"]]),
+                            ("wet_cover", wet[0]), ("wet_surface", wet[1])]
             for k, v in sky:
                 try:
                     a.set_editor_property(k, v)

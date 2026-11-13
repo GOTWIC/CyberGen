@@ -159,8 +159,10 @@ public:
 
 	/** What a click on a developer menu row does, by the row's name: night, freecam,
 	 *  minimap, messages, and with an atmos controller fog, rain, wet, hour+ and hour-, and
-	 *  AT3's time slider as hour=H (a number, or day, dusk or night) (the overlay's clicks
-	 *  and the console's CityGen.MenuRow). False for a row the menu does not show. */
+	 *  AT3's time slider as hour=H (a number, or day, dusk or night); AT5's weather row,
+	 *  weather+ and weather- (the next or the previous state, blended) and weather=NAME
+	 *  (`weather=rain!` at once) (the overlay's clicks and the console's CityGen.MenuRow).
+	 *  False for a row the menu does not show. */
 	UFUNCTION(BlueprintCallable, Category = "CityGen")
 	bool ClickMenuRow(const FString& Row);
 
@@ -172,6 +174,10 @@ public:
 
 	/** Calls SetFog, SetRain or SetWet on the controller. */
 	void SetAtmosFlag(FName Function, bool bOn);
+
+	/** AT5: the controller's weather now ("rain", "clear > rain" while it turns), "" without a
+	 *  weather (the menu then shows AT0's fog, rain and wet rows). */
+	FString GetAtmosWeather() const;
 
 	/** The controller's hour (0 to 24), and SetHour. */
 	float GetAtmosHour() const;

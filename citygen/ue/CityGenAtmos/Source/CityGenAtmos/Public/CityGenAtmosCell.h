@@ -38,6 +38,9 @@ namespace CityGenAtmosPack
 	// mount: manhole, drain, vent, roof, stall, chimney, stove), seed
 	constexpr int32 EmitFloats = 9;
 	constexpr int32 EmitInts = 2;
+	// AT5: a drip line's floats: its ends' x, y (cm), its edge's z and the ground's under it
+	// (cm), its rate plus 8 times its kind's index (awning, deck, road, canopy, shelter)
+	constexpr int32 DripFloats = 7;
 }
 
 UCLASS(HideCategories = (Input, Replication, Rendering, Collision, HLOD, Physics, Networking,
@@ -78,6 +81,10 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
 	TArray<int32> EmitterInts;
+
+	/** AT5: its drip lines, packed (CityGenAtmosPack::DripFloats each). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	TArray<float> DripFloats;
 
 protected:
 	virtual void BeginPlay() override;

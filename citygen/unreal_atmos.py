@@ -33,6 +33,14 @@
   tiers' `sight_m` and `sight_max`), by which the runtime keeps live round a walker the
   lights the walker sees out to `sight_m`. The cells are always loaded (the importer's
   `atmos_cells`): their lights reach past World Partition's loading range (768 m).
+- AT5 (weather): the packing's version 4: a cell also holds its drip lines (`pack_drip`, a
+  cell made where any lie); the controller's weather (`weather_settings`: the states' values
+  in `WEATHER_KEYS` order, the start state, the rain's age, the wind, the cover channel's
+  datum and step, what the runtime keeps near the view); the plan's masks stitched into two
+  city-wide textures at `WET_TEXEL_M` beside the manifest (`wet_textures`:
+  `atmos_wet_cover.png`, the cover channel, and `atmos_wet_surface.png`, gloss, puddles and
+  drips), which the import makes textures the wet streets' decals and the rain read; a plan
+  whose weather check failed is not delivered.
 """
 
 from __future__ import annotations
@@ -50,8 +58,21 @@ DATA = "atmos.json"                         # BUILD/unreal/atmos.json
 GLOW = "atmos_sky_glow.png"                 # BUILD/unreal/atmos_sky_glow.png (AT3)
 CONTROLLER_KEY = "atmos"
 CELL_M = 128.0                              # World Partition's main cells (unreal.MAIN_CELL_M)
-PACK_VERSION = 3                            # 2 (AT2): the high tier, a blink or a sweep;
-                                            # 3 (AT4): a cell's fog volumes and emitters
+PACK_VERSION = 4                            # 2 (AT2): the high tier, a blink or a sweep;
+                                            # 3 (AT4): a cell's fog volumes and emitters;
+                                            # 4 (AT5): its drip lines
+DFLOATS = 7                                 # AT5: a drip line (CityGenAtmosPack::DripFloats)
+DRIP_KINDS = ("awning", "deck", "road", "canopy", "shelter")
+# AT5: the weather states' values as the controller holds them (`WeatherValues`: these per
+# state, in `WeatherNames` order)
+WEATHER_KEYS = ("rain", "streak", "drops", "wetness", "puddles", "cover", "volumes", "gust",
+                "wind_m_s", "fog_density", "fog_falloff", "fog_extinction", "fog_albedo_r",
+                "fog_albedo_g", "fog_albedo_b")
+WET_COVER = "atmos_wet_cover.png"           # BUILD/unreal/: the cover channel, city-wide
+WET_SURFACE = "atmos_wet_surface.png"       # ... gloss, puddles, drips
+WET_TEXEL_M = 1.0                           # the textures' texels (the plan's 0.5 m masks,
+                                            # two by two: 22 MB of video memory for Delta
+                                            # against 89 at 0.5 m)
 FLOATS = 19                                 # CityGenAtmosCell.h, CityGenAtmosPack
 INTS = 2
 VFLOATS = 14                                # AT4: a fog volume (CityGenAtmosPack::VolFloats)
@@ -186,6 +207,108 @@ def pack_emitter(E: dict, schedules: list[str]):
     return f, [flags, seed]
 
 
+def pack_drip(D: dict) -> list[float]:
+    """AT5: a drip line as the cell actor holds it (CityGenAtmosCell.h): DFLOATS floats in
+    Unreal's frame (its ends' x and y in cm, its edge's and the ground's z in cm, its rate
+    times 8 plus its kind's index)."""
+    (ax, ay), (bx, by) = D["a"], D["b"]
+    return [_r(ax * 100.0, 1), _r(-ay * 100.0, 1), _r(bx * 100.0, 1), _r(-by * 100.0, 1),
+            _r(D["z_m"] * 100.0, 1), _r(D["ground_m"] * 100.0, 1),
+            _r(round(float(D["rate"]), 3) + 8.0 * DRIP_KINDS.index(D["kind"]), 3)]
+
+
+def weather_settings(plan: dict) -> dict:
+    """AT5: the controller's weather from the plan's `weather_plan` (a plan before AT5 has
+    none: {}): the states' values (`WEATHER_KEYS` per state), the start state, the rain's age,
+    the wind, the cover channel's datum and step (cm), what it keeps near the view."""
+    w = plan.get("weather_plan")
+    if not w:
+        return {}
+    names = list(w["states"])
+    vals = []
+    for n in names:
+        s = w["states"][n]
+        a = s["fog_albedo"]
+        row = dict(s, fog_albedo_r=a[0], fog_albedo_g=a[1], fog_albedo_b=a[2])
+        vals += [float(row[k]) for k in WEATHER_KEYS]
+    t, wd, lv = w["times"], w["wind"], w["live"]
+    return {"weather": True, "weather_names": names, "weather_values": vals,
+            "weather_start": w["start"], "weather_keys": list(WEATHER_KEYS),
+            "transition_s": float(t["transition_s"]), "wet_s": float(t["wet_s"]),
+            "dry_s": float(t["dry_s"]), "fill_s": float(t["fill_s"]),
+            "drain_s": float(t["drain_s"]), "wind_heading_deg": float(wd["heading_deg"]),
+            "rain_lean": float(wd["lean"]), "gale_m_s": float(wd["gale_m_s"]),
+            "cover_z0_cm": _r(float(w["cover"]["z0_m"]) * 100.0, 1),
+            "cover_step_cm": _r(float(w["cover"]["step_m"]) * 100.0, 1),
+            "max_splashes": int(lv["splashes"]), "splash_range_m": float(lv["splash_m"]),
+            "max_drips": int(lv["drips"]), "drip_range_m": float(lv["drip_m"]),
+            "drip_step_m": float(lv["drip_step_m"]), "rain_cards": int(lv["rain_cards"])}
+
+
+def wet_textures(plan: dict, pdir: Path, dest: Path) -> dict | None:
+    """AT5: the plan's masks stitched into two city-wide images at `WET_TEXEL_M` (a power of
+    two a side, so the texture has its mips; row 0 the north edge): `atmos_wet_cover.png`
+    (grey: the cover channel, the lowest of a texel's covered masks' undersides, 0 where
+    fewer than two of its four are covered) and `atmos_wet_surface.png` (red the gloss, green
+    the puddles, their means; blue the drips, their most), written beside the manifest only
+    when their bytes change. Their bounds in Unreal's frame (cm: min X, min Y, size; row 0 the
+    minimum Y, the north edge). None without masks."""
+    import io
+
+    import numpy as np
+    from PIL import Image
+    w = plan.get("weather_plan")
+    masks = plan.get("masks") or []
+    if not w or not masks:
+        return None
+    t = float(w["texel_m"])
+    k = max(1, int(round(WET_TEXEL_M / t)))
+    x0, y0, x1, y1 = (float(v) for v in w["extent"])
+    span = max(x1 - x0, y1 - y0)
+    n = 1
+    while n * WET_TEXEL_M < span:
+        n *= 2
+    cover = np.zeros((n, n), dtype=np.uint8)
+    surf = np.zeros((n, n, 3), dtype=np.uint8)
+    top = y0 + n * WET_TEXEL_M
+    for mk in masks:
+        name = mk["tile"]
+        ix, iy = int(name[1:4]), int(name[4:7])
+        with Image.open(pdir / mk["file"]) as im:
+            a = np.asarray(im.convert("RGBA"), dtype=np.uint8)
+        h, wd = a.shape[0] // k, a.shape[1] // k
+        b = a[:h * k, :wd * k].reshape(h, k, wd, k, 4)
+        c = b[..., 0].astype(np.int32)
+        cov = c > 0
+        many = cov.sum(axis=(1, 3)) >= (k * k + 1) // 2
+        low = np.where(cov, c, 999).min(axis=(1, 3))
+        cq = np.where(many, low, 0).astype(np.uint8)
+        gl = b[..., 3].astype(np.float64).mean(axis=(1, 3))
+        pu = b[..., 1].astype(np.float64).mean(axis=(1, 3))
+        dr = b[..., 2].max(axis=(1, 3))
+        ci = int(round((ix * 256.0 - x0) / WET_TEXEL_M))
+        cj = int(round((top - (iy + 1) * 256.0) / WET_TEXEL_M))
+        cover[cj:cj + h, ci:ci + wd] = cq
+        surf[cj:cj + h, ci:ci + wd, 0] = np.round(gl).astype(np.uint8)
+        surf[cj:cj + h, ci:ci + wd, 1] = np.round(pu).astype(np.uint8)
+        surf[cj:cj + h, ci:ci + wd, 2] = dr
+    out = {}
+    dest.mkdir(parents=True, exist_ok=True)
+    for fname, arr, mode in ((WET_COVER, cover, "L"), (WET_SURFACE, surf, "RGB")):
+        buf = io.BytesIO()
+        Image.fromarray(np.ascontiguousarray(arr), mode).save(buf, format="PNG",
+                                                             compress_level=9)
+        data = buf.getvalue()
+        f = dest / fname
+        if not f.is_file() or f.read_bytes() != data:
+            f.write_bytes(data)
+        out[fname] = hashlib.sha256(data).hexdigest()
+    return {"cover": {"file": f"unreal/{WET_COVER}", "sha256": out[WET_COVER]},
+            "surface": {"file": f"unreal/{WET_SURFACE}", "sha256": out[WET_SURFACE]},
+            "px": n, "texel_m": WET_TEXEL_M,
+            "bounds": [_r(x0 * 100.0, 1), _r(-top * 100.0, 1), _r(n * WET_TEXEL_M * 100.0, 1)]}
+
+
 def air_settings(plan: dict) -> dict:
     """AT4: the controller's air from the plan's `air` (an AT3 plan has none: {}): the height
     and volumetric fog of the look and weather (over the weather's own), the fog by the hour,
@@ -295,8 +418,10 @@ def sky_settings(plan: dict) -> dict:
     return out
 
 
-def atmos_data(pdir: Path) -> tuple[dict | None, str]:
-    """The plan in the importer's form ({controller, cells}), or (None, why not)."""
+def atmos_data(pdir: Path, dest: Path | None = None) -> tuple[dict | None, str]:
+    """The plan in the importer's form ({controller, cells}), or (None, why not). AT5: with
+    `dest` (BUILD/unreal) the weather's textures are written there (`wet_textures`) and named
+    in the controller."""
     text = (pdir / "atmos_plan.json").read_text(encoding="utf-8")
     plan = json.loads(text)
     lux = (plan.get("checks") or {}).get("lux")
@@ -311,6 +436,11 @@ def atmos_data(pdir: Path) -> tuple[dict | None, str]:
     if air is not None and not air.get("ok"):
         return None, "the plan's air check failed (AT4: an emitter off its source, a volume " \
                      "off its water or district, or a tile over its budget)"
+    wck = (plan.get("checks") or {}).get("weather")
+    if wck is not None and not wck.get("ok"):
+        return None, "the plan's weather check failed (AT5: a cover out of its rain shadow, " \
+                     "a puddle under a cover, in a building or on the water, a tile without " \
+                     "its mask or over its drips' budget)"
     schedules = sorted(plan["schedules"])
     kinds, mounts = _kinds(), _mounts()
     cells: dict[tuple[int, int], list[dict]] = {}
@@ -324,11 +454,21 @@ def atmos_data(pdir: Path) -> tuple[dict | None, str]:
         vols.setdefault(cell_of(V["center"][0], V["center"][1]), []).append(V)
     for E in plan.get("emitters") or []:
         emits.setdefault(cell_of(E["pos"][0], E["pos"][1]), []).append(E)
+    # AT5: a cell's drip lines (by their middle)
+    drips: dict[tuple[int, int], list[dict]] = {}
+    for dt in ((plan.get("weather_plan") or {}).get("drip_tiles") or []):
+        if not (pdir / dt["file"]).is_file():
+            continue
+        for D in json.loads((pdir / dt["file"]).read_text(encoding="utf-8"))["drips"]:
+            mx = (D["a"][0] + D["b"][0]) / 2.0
+            my = (D["a"][1] + D["b"][1]) / 2.0
+            drips.setdefault(cell_of(mx, my), []).append(D)
     out = []
-    for (ix, iy) in sorted(set(cells) | set(vols) | set(emits)):
+    for (ix, iy) in sorted(set(cells) | set(vols) | set(emits) | set(drips)):
         ls = sorted(cells.get((ix, iy), []), key=lambda r: r["id"])
         vs = sorted(vols.get((ix, iy), []), key=lambda r: r["id"])
         es = sorted(emits.get((ix, iy), []), key=lambda r: r["id"])
+        ds = sorted(drips.get((ix, iy), []), key=lambda r: r["id"])
         fl, it = [], []
         for L in ls:
             f, i = pack(L, schedules, kinds, mounts)
@@ -349,11 +489,14 @@ def atmos_data(pdir: Path) -> tuple[dict | None, str]:
                "count": len(ls),
                "hash": _sha16([PACK_VERSION, [L["hash"] for L in ls]] +
                               ([[V["hash"] for V in vs], [E["hash"] for E in es]]
-                               if vs or es else [])),
+                               if vs or es else []) +
+                              ([[D["hash"] for D in ds]] if ds else [])),
                "floats": fl, "ints": it}
         if vs or es:
             rec.update({"volumes": len(vs), "emitters": len(es), "volume_floats": vf,
                         "volume_ints": vi, "emitter_floats": ef, "emitter_ints": ei})
+        if ds:
+            rec.update({"drips": len(ds), "drip_floats": [v for D in ds for v in pack_drip(D)]})
         out.append(rec)
     ws = plan.get("weather_state") or {}
     tiers = plan.get("tiers") or {}
@@ -376,6 +519,13 @@ def atmos_data(pdir: Path) -> tuple[dict | None, str]:
     ctl.update(sky_settings(plan))
     ctl.update(air_settings(plan))
     ctl.update(sight_settings(plan, pdir))
+    ctl.update(weather_settings(plan))
+    if dest is not None and ctl.get("weather"):
+        wt = wet_textures(plan, pdir, dest)
+        if wt:
+            ctl.update({"wet_bounds": wt["bounds"], "wet_px": wt["px"],
+                        "wet_cover_sha256": wt["cover"]["sha256"],
+                        "wet_surface_sha256": wt["surface"]["sha256"]})
     return {"version": PACK_VERSION, "controller": ctl, "cells": out}, ""
 
 
@@ -387,7 +537,7 @@ def write_atmos(build: str | Path, given: str | Path | None = None) -> dict | No
         if given:
             raise FileNotFoundError(f"{given}: no atmos_plan.json (run atmosgen plan)")
         return None
-    data, why = atmos_data(pdir)
+    data, why = atmos_data(pdir, Path(build) / "unreal")
     if data is None:
         return {"skipped": why, "plan": str(pdir)}
     text = json.dumps(data, separators=(",", ":"), ensure_ascii=False) + "\n"
@@ -416,6 +566,16 @@ def write_atmos(build: str | Path, given: str | Path | None = None) -> dict | No
             "sight": ({"px": ctl["sight_px"], "cell_m": ctl["sight_cell_m"],
                        "runs": len(ctl["sight_runs"]) // 2, "sha256": ctl["sight_sha256"]}
                       if ctl.get("sight_runs") is not None else None),
+            # AT5: the weather's states and textures, the drip lines
+            "weather": ({"states": ctl["weather_names"], "start": ctl["weather_start"],
+                         "drips": sum(c.get("drips", 0) for c in data["cells"]),
+                         "wet": ({"cover": {"file": f"unreal/{WET_COVER}",
+                                            "sha256": ctl["wet_cover_sha256"]},
+                                  "surface": {"file": f"unreal/{WET_SURFACE}",
+                                              "sha256": ctl["wet_surface_sha256"]},
+                                  "px": ctl["wet_px"], "bounds": ctl["wet_bounds"]}
+                                 if ctl.get("wet_px") else None)}
+                        if ctl.get("weather") else None),
             "cells": [{k: c[k] for k in ("key", "cell", "tile", "center", "count", "hash")}
                       for c in data["cells"]]}
 

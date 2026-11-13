@@ -429,6 +429,8 @@ class Air:
         """Steam from AG7's manholes and drains, read from the street packs (what stage 2
         drew); a city without packs has none (they are AG7's)."""
         det = street_details(self.c.build)
+        # (AT5's puddles read the drains again: kept on the city)
+        self.c._street_details = det
         # (a road piece's: AG7 draws the manholes on its lanes and the drains at its curbs; a
         # sidewalk piece's grates are tree pits)
         det = {k: v for k, v in det.items() if k in self.c.segments}

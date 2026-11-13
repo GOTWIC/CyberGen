@@ -2563,6 +2563,45 @@ packaged Delta, 2026-11-12; `docs/unreal_export.md`, "Visible lights"):
   within 20 m) sidewalk point, facing along it toward the middle.
 Results: `docs/progress/atmos_visible_lights/`.
 
+AT5 (weather) is in place:
+- **The plan's weather** (`atmosgen/weather.py`, `planmodel.Weather`, `Mask`, `Drip`,
+  `TileDrips`; `presets.WEATHER_LOOK`, `WEATHER_TIMES`, `WIND`, `MASK`, `SURFACE_GLOSS`,
+  `PUDDLE`, `DRIPS`, `WEATHER_LIVE`; the spec's `wind_deg`): the rain shadow of every cover
+  within `cover_max_m` (25 m) of the ground (M14's slabs, M3's masses where they hang over no
+  mass of their own building that reaches up to them, skybridges, M6's awnings and bus
+  shelters, canopies, transit decks and cap beams, the raised roads as `sight.road_decks` takes
+  them, road tunnels' lids), each moved downwind by its height times the rain's `lean` (at most
+  3 m); masks per 256 m tile (`masks/<tile>.png`, 0.5 m, RGBA: red the cover's underside in
+  the plan's `cover` datum and steps, green the puddles, blue the drip band past the low covers'
+  dripping edges, alpha the gloss when wet by surface: the pavement map's faces, M16's ground
+  cover, roofs, raised decks, water none); puddles where a value noise, the gutter along the
+  curb, a road's sags and AG7's drains (read from the street packs, `City._street_details`)
+  pass a threshold lowered by the district's grit (decision 12.5), never under a cover, on a
+  roof, curb, deck or the water; drip lines in 8 m pieces (`drips/<tile>.json`: awnings' street
+  edges, deck slabs, raised roads' sides, canopies, bus shelters); the five states with their
+  rain, streaks, puddles, wetness, clouds, fog (the look's), fog volumes' gain, wind and gusts,
+  the rain's age (`transition_s`, `wet_s`, `dry_s`, `fill_s`, `drain_s`); the plan's
+  `weather_plan` and `masks`; the weather check (`checks.weather`: every tile's mask, every low
+  cover in its shadow, no puddle under a cover, in a building or on the water, the drips'
+  budget), a plan failing it not delivered; `atmosgen lux` adds `preview_weather.png` and
+  `preview_weather_detail.png`.
+- **Exporter and runtime** (`docs/unreal_export.md`, "From AT5"): packing version 4 (a cell's
+  drip lines, `pack_drip`), `unreal_atmos.weather_settings`, the masks stitched city-wide at
+  1 m (`wet_textures`: `atmos_wet_cover.png` grey, `atmos_wet_surface.png` RGB; imported as
+  `T_<City>_WetCover`, `_WetSurface`), `ATMOS_VERSION` atmos6; the controller's states blended
+  over `TransitionS`, the rain's age (`WetNow`, `PuddleNow`), the wind with gusts into
+  `MPC_CityGenAtmos` (`Rain`, `Wetness`, `Puddles`, `WindMS`, `WindX`, `WindY`, `Streak`,
+  `Drops`) and `MPC_CityGen`'s `Wind`, the fog, clouds (and the sun under them by day) and fog
+  volumes by state; wet streets as two DBuffer decals (`M_CgWetColor` darkens, `M_CgWetGloss`
+  roughness and normal, puddles with rain rings), the rain cut under the covers and leaning in
+  the wind, splashes where traces from the sky land, drips along the drip lines, rain rings on
+  `M_CgWater` (its tag `.rain2`; masters rebuilt from nothing, `clear_material`), the trees' sway built but off (`LEAF_SWAY`: 4.5 ms on a tree-lined street); atmos
+  assets version 15; console `.Weather NAME [now]`, `.WeatherSpeed`, `.Wetness`; the Tab
+  menu's Weather row (`weather+`, `weather-`, `weather=NAME`); the check's `*__<state>` and
+  `*__<a>2<b>_<n>s` views; bench passes `night_plan_drizzle`, `_clear`, `_fogstate`, `_smog`,
+  every atmos pass setting its state at once.
+Results: `docs/progress/AT5/`.
+
 ## Life generator (lifegen)
 
 `docs/lifegen_scope.md` (draft v0, its decisions in section 12 still open) is the plan for
