@@ -602,6 +602,14 @@ rising from manholes, roofs, stalls and chimneys:
 |---|---|
 | <img src="docs/progress/AT4/unreal/night_oldtown_fog.jpg" width="420"> | <img src="docs/progress/AT4/unreal/night_canal_mist.jpg" width="420"> |
 
+The weather: rain kept out from under awnings, decks and viaducts, wet streets whose puddles
+mirror the neon, drips, splashes and rings, the wind, and five weather states (clear, drizzle,
+rain, fog, smog) that blend into each other, picked from the game's Tab menu:
+
+| Puddles on an Old Town street in rain | Dry under a viaduct, wet past it |
+|---|---|
+| <img src="docs/progress/AT5/unreal/night_oldtown_low__rain.jpg" width="420"> | <img src="docs/progress/AT5/unreal/night_viaduct__rain.jpg" width="420"> |
+
 Its Blender preview renders the same night in Cycles, lit by the plan's lights (and dusk, at an
 hour the sun has just set: `atmosgen preview out/vesper_bay --hour 19.4`):
 

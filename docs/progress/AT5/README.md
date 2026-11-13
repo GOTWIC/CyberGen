@@ -106,3 +106,81 @@ By day (16:00, the overcast takes the sun's direct light in rain):
 The Tab menu's weather row (its arrows step the state, a click the next):
 
 ![](unreal/play_menu.jpg)
+
+## The night's frame time
+
+The lean benchmark once (`--bench-atmos`, decision 12.6; `bench/`): the walk, the drive and the
+flight at 2560 x 1440, the walk and the drive by sight. Not flagged: the game held the
+foreground, the other processes 0.4 cores. No rerun: every pass is over 0.3 ms under the
+budget. **Before** is the visible lights' after (#215, `docs/progress/atmos_visible_lights`:
+`night_plan_all` with AT0's rain cards and wet decal).
+
+| Pass | What is on | p95 all | walk | drive | fly | GPU p95 |
+|---|---|---|---|---|---|---|
+| `night_plan_all` before (#215) | AT0's rain cards and wet decal | 14.9 | 14.6 | 14.9 | 15.1 | 13.3 |
+| **`night_plan_all`** | **the rain: streaks, splashes, drips, the wet streets with full puddles and rings, rings on the water, the rain's fog** | **15.1** | **14.8** | **15.0** | **15.3** | **13.2** |
+| `night_plan_drizzle` | drizzle: finer streaks, damp streets, a third of the puddles | 14.9 | 15.5 | 14.8 | 14.8 | 13.0 |
+| `night_plan_clear` | clear: no rain, the streets dry (the decals hidden), the deck open | 14.5 | 14.9 | 14.4 | 14.6 | 12.8 |
+
+(ms.) **The rain's night is 15.1 ms p95 over the route, 1.6 ms under decision 12.6's 16.7 ms**,
+0.2 ms over #215's with AT0's prototypes; against a clear night the rain's effects cost 0.6 ms
+over the route (the GPU 0.4). The drizzle's walk was bound by the game thread (its p95 15.1 ms,
+the GPU's 13.3): the walk's spread, not the drizzle.
+
+**Viewpoint profiles** (`builds/at5/viewprof.py`: one standalone game at 2560 x 1440 by night,
+each view a 3 m walk at 0.5 m/s by sight in each mode; GPU ms, median): the rain with
+everything, the same without the rain and the wet streets (dry), and the drizzle. The first
+round (a) with the trees' sway off; the second (b) with it on (and the splash cards sent in
+batches):
+
+| View | rain (a) | dry (a) | drizzle (a) | rain (b) | dry (b) |
+|---|---|---|---|---|---|
+| Old Town street | 11.45 | 10.96 | 11.16 | 11.68 | 11.16 |
+| Corporate Core street | 12.99 | 12.18 | 12.39 | 13.80 | 13.00 |
+| Midtown street (tree-lined) | 13.53 | 12.38 | 12.83 | 18.07 | 16.95 |
+| Avenue west through Old Town | 10.94 | 10.25 | 10.65 | 11.22 | 10.60 |
+| Old Town canal | 11.02 | 10.49 | 10.79 | 11.11 | 10.67 |
+
+- **The rain and wet streets cost 0.5 to 1.2 ms of GPU** at street level (the two decals over
+  the screen, the glossier ground's reflections, the cards); the drizzle about half.
+- **The trees' sway cost 4.5 ms** on Midtown's tree-lined street (dry b against dry a) and 0.8
+  ms in the Corporate Core: it is off (`LEAF_SWAY`).
+- **The splashes' data every frame** hitched the frame (a's canal: frame p95 19.5 ms against a
+  GPU's 11.2: the instanced component's render state made again each frame); they are re-traced
+  in batches five times a second and their instances updated in place (`MarkRenderInstancesDirty`).
+- (These profiles ran before the water master's fix: `M_CgWater` drew the default material;
+  the benchmark above ran after it.)
+
+## Validation
+
+- Tests (logged, `-v -rfE --durations=25`): `tests/atmosgen/test_at_weather.py` (new: covers and
+  their shadow downwind, the masks' channels, gritty streets holding more water, the drips, the
+  states, the check finding a misplaced puddle, the wind from the spec, the plan's record and
+  the previews), `tests/atmosgen/test_at_plan.py`, `tests/atmosgen/test_at_air.py`,
+  `tests/test_unreal_atmos.py` (the weather on the controller, the textures, the drips' packing,
+  a failed weather check not delivered), `tests/test_bench.py` (the weather passes),
+  `tests/test_unreal_play.py`, `tests/test_unreal.py` but its Unreal imports.
+- Delta's plan again (every check passes), imported over the visible lights' import in
+  CityAG16 and checked by night, dusk and day with the views above; the benchmark once.
+
+## Open items
+
+- **The trees' sway is off** (`LEAF_SWAY`): 4.5 ms on a tree-lined street. A sway only near the
+  view needs each tree component's world position offset disable distance (the stage 2 actors
+  re-placed), or a cheaper sway; AT6 or AT7.
+- **Flags:** citygen has no flag props for the wind to move; a flag (or banner cloth) kind is a
+  fixture to ask of stages 1 and 2.
+- **The masks know one wind:** the rain shadow is moved downwind by the plan's heading and one
+  lean; the runtime's gusts and states change the rain's lean but not where the shadow lies.
+- **Rain on the water ignores the covers:** the rings in `M_CgWater` fall under a bridge too
+  (the water master is shared and cannot read the city's cover texture).
+- **Puddles on a flat city** come from the worn-spot noise, the gutters and the drains: Delta's
+  roads have no grade-line sags (4 sags in all, on its raised roads). Cragmouth (terrain) would
+  show the sags.
+- **Day under rain is dark:** the overcast takes 0.75 of the sun's direct light at a rain's
+  cover; under a viaduct by day the street is very dark. The day's exposure under an overcast is
+  AT6's art direction.
+- **A puddle's edge** follows the 1 m texture with a 45 cm noise: at the eye's feet the edge of a
+  dry strip under a viaduct reads as a soft, slightly wavy line.
+- **The wet decals apply to everything near the ground**, the parked cars and the walker's body
+  too (their up-facing parts wet, which reads right in rain).
