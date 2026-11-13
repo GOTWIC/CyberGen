@@ -56,7 +56,12 @@ Every other car passes (2,970 of 2,970 side traces on the Tanager Cab, for one).
 
 ## The night's frame time with the cars
 
-BENCH_RESULT
+Measured in AT4 (`docs/progress/AT4/bench/before`, three runs, against AT3's after): every
+night pass 0.6 to 0.9 ms p95 slower, the night without atmosgen 11.2 to 13.1 ms (walking 10.8 to
+13.3), nearly all of it on the render thread (the draw calls walking 860 to 1,843: 4,354
+instanced components). AT4 gave the cars' parts cull distances (bodies 450 m, glass 250, wheels
+120; the wheels cast no shadow): the draws walking 1,197, the night without atmosgen 11.6 ms
+(`docs/progress/AT4/README.md`).
 
 ## Open items
 

@@ -62,6 +62,43 @@ recommendations: [`docs/progress/AT0/README.md`](progress/AT0/README.md).
   `busy`), `tests/test_unreal_play.py` (both plugins installed), `tests/test_no_network.py`
   (atmosgen too).
 
+## AT4: air
+
+Built on the Windows PC (2026-11-12), on main after AT3 (#207) and the parked cars (#209). Report,
+measurements and images: [`docs/progress/AT4/README.md`](progress/AT4/README.md).
+
+- **The fog of the look** (`presets.AIR_LOOK`, the plan's `air`): the weather's height fog times
+  the look's density (neon rain 4.4) and falloff (0.4: the haze keeps to the street canyons),
+  the volumetric extinction times 3, phase g 0.72, volumetric to 160 m; 1.25 by night, 0.8 by
+  day (`fog_hours` from the sky's Night).
+- **Light shafts** (`presets.SCATTER`): each light kind's volumetric scattering; none from the
+  neon spill, shop signs and shopfronts, none from searchlights. **Decision:** AT2's beam
+  meshes stay (400 m into the sky against the volumetric fog's 160 m), brighter in fog
+  (`BEAM_FOG_GAIN`).
+- **Volumes** (`atmosgen/air.py`, `planmodel.FogVolume`): mist along the canals, basins, rivers
+  and channels after dusk, smog over industrial and spaceport districts and their megasites,
+  haze under decks and in road tunnels and underpasses; times the district's haze and danger;
+  a glow of the city's light. Delta: 169.
+- **Emitters** (`planmodel.Emitter`): steam from AG7's manholes and drains read from the street
+  packs (road pieces only), M9's vents; exhaust from M3's roof units; cooking from M6's stalls
+  and kiosks; smoke from chimneys and stove pipes (the fifth emitter ask); the share by grit.
+  Delta: 732.
+- **The air check** (`checks.air`): plumes on their sources and out of the masses, volumes over
+  their water, district, deck or tunnel, budgets per tile; a plan failing it is not delivered.
+- **Exporter and runtime** (`docs/unreal_export.md`, "From AT4"): packing version 3,
+  `ATMOS_VERSION` atmos4, the controller's air; pooled local fog volumes (24 nearest), plume
+  cards (`M_CgSteam`, atmos assets 12), the engine settings the budget needs (`TunedSettings`:
+  volumetric fog froxels 12 px and 96 slices, Lumen reflections at half resolution, the local
+  fog volumes' density cap 0.05); the parked cars' cull distances by part.
+- **Effects from code**, settled: local fog volume components and instanced cards, no Niagara.
+- **Benchmark** (one run after; Swagnik, 2026-11-12: the lean route, one run, the previous
+  "after" as the before): Delta's night 15.0 ms p95 over the route (15.2 walking), with AT0's
+  rain and wet streets 15.6 (15.8), dusk 14.9, day 11.8; the parked cars had cost 0.6 to 1.9 ms
+  (draw calls on the render thread), their cull distances gave it back; the tuned settings 1.5
+  ms. The lean route (`--bench-route lean`) is the default for atmos benchmarks.
+- **Tests:** `tests/atmosgen/test_at_air.py`; `tests/test_unreal_atmos.py`,
+  `tests/test_bench.py` (the air passes, the lean route).
+
 ## AT3: sky and time
 
 Built on the Windows PC (2026-11-12), on main after AT2 (#203). Report, measurements and images:

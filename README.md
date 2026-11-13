@@ -593,6 +593,14 @@ the developer menu (Tab) has a time-of-day slider:
 | The moon over the bay, the deck opened | The Corporate Core by day |
 | <img src="docs/progress/AT3/unreal/night_moon_east_clear.jpg" width="420"> | <img src="docs/progress/AT3/unreal/pday_core_skyline.jpg" width="420"> |
 
+The air: a haze by the hour that takes every lamp and sign into a halo, mist on the canals and
+rivers after dusk, smog over the port, haze under the decks and in tunnels, and steam and smoke
+rising from manholes, roofs, stalls and chimneys:
+
+| Old Town's neon in the haze | Mist on a canal at night |
+|---|---|
+| <img src="docs/progress/AT4/unreal/night_oldtown_fog.jpg" width="420"> | <img src="docs/progress/AT4/unreal/night_canal_mist.jpg" width="420"> |
+
 Its Blender preview renders the same night in Cycles, lit by the plan's lights (and dusk, at an
 hour the sun has just set: `atmosgen preview out/vesper_bay --hour 19.4`):
 
