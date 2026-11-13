@@ -272,7 +272,7 @@ class Air:
                 g = _strip(g.buffer(0))
             if g.is_empty or g.area < P.MIST_MIN_AREA_M2:
                 continue
-            surf = float((w.get("bed") or {}).get("surface_m", 0.0))
+            surf = self._surface_of(w)
             ln = self.PL.Line(line)
             if ln.L < v["step_m"] * 0.5:
                 continue
@@ -306,11 +306,30 @@ class Air:
                         continue
                     did = self.c.district_at(cx, cy) or w.get("district_id")
                     self.vol(owner=w["id"], kind="mist", k=k, did=did,
-                             center=(cx, cy, surf),
+                             center=(cx, cy, surf(st * (i + 0.5))),
                              extent=(0.75 * st, 0.55 * pw, v["height_m"]), yaw=yaw)
                     k += 1
             n_bodies += 1 if k else 0
         self.report["mist_bodies"] = n_bodies
+
+    def _surface_of(self, w: dict):
+        """A water body's surface along its centerline, s -> z: M16's `surface_m` on a flat
+        city; on a terrain city (M13, where M16 leaves `surface_m` unset) the terrain's
+        water level, along its profile where it has one (a river falling to its mouth). AT7:
+        Cragmouth's plan failed on the unset surface."""
+        s = (w.get("bed") or {}).get("surface_m")
+        if s is not None:
+            return lambda _s, z=float(s): z
+        wl = next((r for r in (self.c.m.get("terrain") or {}).get("water_levels") or []
+                   if r.get("water_id") == w["id"]), None)
+        if wl is None:
+            return lambda _s: 0.0
+        prof = wl.get("profile") or []
+        if len(prof) < 2:
+            return lambda _s, z=float(wl.get("level_m", 0.0)): z
+        ss = np.array([float(q["s"]) for q in prof])
+        zz = np.array([float(q["z"]) for q in prof])
+        return lambda _s: self.PL.mm(float(np.interp(_s, ss, zz)))
 
     def _grid(self, g, cell: float):
         """The cells of a `cell` grid (aligned on the city's origin) a polygon covers by a

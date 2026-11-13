@@ -41,6 +41,13 @@ namespace CityGenAtmosPack
 	// AT5: a drip line's floats: its ends' x, y (cm), its edge's z and the ground's under it
 	// (cm), its rate plus 8 times its kind's index (awning, deck, road, canopy, shelter)
 	constexpr int32 DripFloats = 7;
+	// AT7: a far card's floats: its middle x, y, z (cm), its color times its value r, g, b (a
+	// glow's intensity in cd, a pool's or wash's luminance at its middle in nits; the plan's
+	// frame), its size (cm: a glow's near, a pool's radius, a wash's half width), a pool's
+	// falloff or a wash's half height (cm), a wash's yaw (deg), a blink's period (s), on share
+	// and phase; an int: flags (bits 0-1 type: 0 glow, 1 pool, 2 wash; 2-3 tier: 0 mid, 1
+	// high, 2 fixture; 4 blinking; 8-15 schedule index)
+	constexpr int32 FarFloats = 12;
 }
 
 UCLASS(HideCategories = (Input, Replication, Rendering, Collision, HLOD, Physics, Networking,
@@ -85,6 +92,13 @@ public:
 	/** AT5: its drip lines, packed (CityGenAtmosPack::DripFloats each). */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
 	TArray<float> DripFloats;
+
+	/** AT7: its far cards, packed (CityGenAtmosPack::FarFloats and one int each). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Far")
+	TArray<float> FarFloats;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Far")
+	TArray<int32> FarInts;
 
 protected:
 	virtual void BeginPlay() override;

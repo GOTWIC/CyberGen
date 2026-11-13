@@ -309,6 +309,19 @@ def test_post_passes():
     assert "CityGenAtmos.Post 0" in B.ATMOS_OFF
 
 
+def test_far_passes():
+    """AT7: every atmos pass sets the far city's cards (on, so none leaks into the next), the
+    nofar pass off; the passes without atmosgen switch them off with the rest."""
+    by = {p[0]: p for p in B.ATMOS_PASSES}
+    for name, p in by.items():
+        fs = [c for c in p[3] if c.startswith("CityGenAtmos.Far ")]
+        assert fs == ["CityGenAtmos.Far 0" if name.endswith("_nofar") else
+                      "CityGenAtmos.Far 1"], name
+    assert set(by["night_plan_nofar"][3]) - set(by["night_plan_all"][3]) == \
+        {"CityGenAtmos.Far 0"}
+    assert "CityGenAtmos.Far 0" in B.ATMOS_OFF
+
+
 def test_others_summary_names_who_took_the_foreground():
     """AT3: the samples say which processes took the game's foreground and how often it was
     taken back; the summary adds them up."""

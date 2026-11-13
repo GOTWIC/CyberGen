@@ -11,7 +11,8 @@
 // .Weather NAME [now] (the weather state, + or - steps it), .WeatherSpeed S (the rain's age),
 // .Wetness W [P] (held for shots); .Rain and .Wet switch the weather's rain (streaks, splashes,
 // drips) and wet streets. AT6: .Post and .PostDistricts [0|1] (the look's post, the districts'
-// own), .SteamGlow G [FAR] (the plumes by night). AT1: the plan comes with the level (the importer's
+// own), .SteamGlow G [FAR] (the plumes by night). AT7: .Far [0|1] (the far city's cards), .FarGain
+// G [PX]. AT1: the plan comes with the level (the importer's
 // controller and its cells' data actors), no longer from a folder (AT0's .Load and
 // -CityGenAtmosPlan are gone).
 
@@ -56,7 +57,17 @@ namespace
 	CG_ATMOS_TOGGLE(TunedCmd, "CityGenAtmos.Tuned", "CityGenAtmos.Tuned [0|1]: AT4's engine settings (the plan's cvars) applied, or the project's own", bTuned, SetTuned)
 	CG_ATMOS_TOGGLE(PostCmd, "CityGenAtmos.Post", "CityGenAtmos.Post [0|1]: AT6's look (bloom, flares, grain, fringes, vignette, the grade, local exposure; off: the engine's own, the exposure still held)", bPost, SetPost)
 	CG_ATMOS_TOGGLE(PostDistrictsCmd, "CityGenAtmos.PostDistricts", "CityGenAtmos.PostDistricts [0|1]: AT6's post per district (clean or gritty by place), blended by where the view stands", bDistrictPost, SetPostDistricts)
+	CG_ATMOS_TOGGLE(FarCmd, "CityGenAtmos.Far", "CityGenAtmos.Far [0|1]: AT7's far city (the plan's lights past the live set as glows, pools and washes; off: the play features' light pools)", bFar, SetFar)
 #undef CG_ATMOS_TOGGLE
+
+	FAutoConsoleCommandWithWorldAndArgs FarGainCmd(TEXT("CityGenAtmos.FarGain"),
+		TEXT("CityGenAtmos.FarGain G [PX]: AT7: a gain on the far city's cards, and a glow's least width (pixels)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenAtmos* A = AtmosIn(World);
+			if (A && Args.Num()) { A->FarGain = FCString::Atof(*Args[0]); }
+			if (A && Args.Num() > 1) { A->FarPx = FCString::Atof(*Args[1]); }
+		}));
 
 	FAutoConsoleCommandWithWorldAndArgs PostSetCmd(TEXT("CityGenAtmos.PostSet"),
 		TEXT("CityGenAtmos.PostSet KEY [VALUE]: AT6: a post key (bloom, flare, flare_threshold, grain, chromatic, chromatic_start, vignette, sharpen, saturation, contrast, highlight_sat, lift, local_shadows, local_highlights, shadows_r|g|b, highlights_r|g|b) held at VALUE over every set for the session; without a value let go; `clear` lets every key go"),

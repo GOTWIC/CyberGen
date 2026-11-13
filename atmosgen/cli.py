@@ -16,6 +16,8 @@
                                                     AT6: an art-direction round's review.md
                                                     (checks, numbers, previews, shots)
     atmosgen spec diff A B                          AT6: what two atmos specs differ in
+    atmosgen budgets PLAN... --out DIR              AT7: the plans' budgets across cities
+                                                    (budgets.md, budgets.json)
 """
 
 from __future__ import annotations
@@ -72,8 +74,8 @@ def cmd_plan(args) -> int:
     sys.stdout.write(report_text(rep))
     print(f"{len(rep['wrote'])} files written to {rep['out']} in {rep['seconds']} s")
     if not rep["ok"]:
-        print("FAIL: a check failed (lux, faces, air or weather); the plan is not delivered (the "
-              "exporter leaves it out)", file=sys.stderr)
+        print("FAIL: a check failed (lux, faces, air, weather or far); the plan is not "
+              "delivered (the exporter leaves it out)", file=sys.stderr)
         return 1
     return 0
 
@@ -103,6 +105,11 @@ def cmd_lux(args) -> int:
     if pl.get("post"):
         from .look import preview as post_preview
         rep["post"] = post_preview(pl, pdir, json.loads(
+            (Path(args.build) / "city_model.json").read_text(encoding="utf-8")))["image"]
+    # AT7: the far city's cards from above and from 150 m over its corner
+    if pl.get("far"):
+        from .far import preview as far_preview
+        rep["far"] = far_preview(pdir, pl, json.loads(
             (Path(args.build) / "city_model.json").read_text(encoding="utf-8")))["image"]
     print(json.dumps({k: v for k, v in rep.items() if k != "grid"}, indent=1))
     return 0
@@ -155,7 +162,8 @@ def main(argv=None) -> int:
     pp.add_argument("--out", help="the plan's folder (default BUILD/atmos; with `schema` the "
                                   "file)")
     pp.add_argument("--which", default="atmos_plan",
-                    choices=("atmos_plan", "tile_lights", "tile_drips", "contribution"))
+                    choices=("atmos_plan", "tile_lights", "tile_drips", "tile_far",
+                             "contribution"))
     lx = sub.add_parser("lux", help="the plan's lux map round the corporate core, with "
                                     "occlusion")
     lx.add_argument("build")
@@ -185,8 +193,23 @@ def main(argv=None) -> int:
     pv.add_argument("--eye", nargs=3, type=float, action="append", default=[])
     pv.add_argument("--target", nargs=3, type=float, action="append", default=[])
     pv.add_argument("--lens", type=float, default=28.0)
+    bg = sub.add_parser("budgets", help="AT7: the plans' budgets across cities (budgets.md, "
+                                        "budgets.json)")
+    bg.add_argument("plans", nargs="+", help="plan folders (`atmosgen plan`'s output)")
+    bg.add_argument("--out", required=True, help="the table's folder")
     args = ap.parse_args(argv)
     if args.cmd == "plan" and args.build == "schema" and args.out is None:
         args.out = args.out_schema
     return {"spec": cmd_spec, "plan": cmd_plan, "lux": cmd_lux, "review": cmd_review,
-            "preview": cmd_preview}[args.cmd](args)
+            "preview": cmd_preview, "budgets": cmd_budgets}[args.cmd](args)
+
+
+def cmd_budgets(args) -> int:
+    from .budgets import write
+    rep = write(args.plans, args.out)
+    print((Path(args.out) / "budgets.md").read_text(encoding="utf-8"))
+    bad = [r["city"] for r in rep["rows"] if not all(r["checks"].values())]
+    if bad:
+        print("FAIL: a check failed in " + ", ".join(bad), file=sys.stderr)
+        return 1
+    return 0

@@ -1964,6 +1964,66 @@ that holds the exposure since AT3) shows it:
 - **The benchmark** (`bench.ATMOS_PASSES`): every atmos pass sets `CityGenAtmos.Post 1`
   (so none leaks), `ATMOS_OFF` `Post 0`; `night_plan_nopost` and `day_plan_nopost` without it.
 
+### From AT7: the far city
+
+The plan's far cards (`docs/atmosgen_scope.md` 6.6, `atmosgen/far.py`: the plan's `far`,
+`far/<tile>.json`) ride in the cells; the controller draws them past the live set, where a
+light is no light at all, so the far city's streets, aviation lights and lit crowns show by
+night to the horizon. What glows already (lit windows, signs, neon, LED strips, logos) needs
+nothing: the instanced HLODs past World Partition's loading range draw the city's own meshes
+and materials with each building's Custom Primitive Data as per-instance data (AG16), so the
+far skyline keeps its emissive; and the cloud deck glows from the plan's upward light (AT3).
+
+- **Packing version 5** (`unreal_atmos.PACK_VERSION`, `pack_far`, `CityGenAtmosPack::
+  FarFloats`): a cell also holds the far cards whose middle lies in it, 12 floats each (the
+  middle in cm; the color times the value: a glow's intensity in cd, a pool's or wash's
+  luminance at its middle in nits, the plan's frame; the size in cm: a glow's near size, a
+  pool's radius, a wash's half width; a pool's falloff or a wash's half height in cm; a wash's
+  yaw; a blink's period, on share and phase) and an int (flags: the type, glow 0, pool 1, wash
+  2; the tier << 2, mid 0, high 1, fixture 2; blinking << 4; the schedule << 8), as the cell
+  actor's `FarFloats` and `FarInts`; a cell is made wherever any lie. `ATMOS_VERSION` is
+  `atmos7`: an import over AT6's level re-packs the cells and sets the controller, and touches
+  nothing else. The manifest's `atmos.far` (cards, gain, least width). A plan whose far check
+  failed is not delivered.
+- **The controller's far city** (`unreal_atmos.far_settings`, in its hash): `bFar`,
+  `FarGain` (art direction), `FarPx` (a glow's least width, 2 pixels), `FarFade` (0.2: the
+  share of each live range the cards fade in over, as the live lights fade out there),
+  `FarSpread` (a glow's gaussian over its square).
+- **Runtime** (`ACityGenAtmos::RebuildFar`, `UpdateFarParams`, `UpdateFarLevels`): once the
+  cells rest (they are always loaded since the visible lights) every card goes into an
+  instanced component per 1 km block, the glows in `M_CgFarGlow`, the pools and washes in
+  `M_CgFarFlat`, on the engine's plane (a pool lying on its surface scaled to its disc, a wash
+  standing on its facade turned to its yaw), each instance's per-instance data its middle,
+  color, size, tier and level; Delta's 26,000 cards in 30 blocks build in about 20 ms. They
+  show while the plan's lights do (by night); each instance's level is its schedule's share at
+  the hour (set when the hour moves a twentieth of an hour); `MPC_CityGenAtmos` gets
+  `FarScale` (the lights' own scale, $2^{EV_{scene} - EV_{plan}}$ times the gains, 0 by day),
+  `FarMidM` (the live range now: a walker's 1,200 m by sight, else the circle's 300 m),
+  `FarHighM` (the high tier's: 1,200 m by sight, else 750 m), `FarFixM` (the beacons' 832 m
+  while they are drawn), `FarFade`, `FarPx` (two pixels' width per distance at the camera's
+  field of view and the viewport's width) and `FarSpread`. With the cards on, the play
+  features' light pools go (`CityGen.PlayLamps 0` past the live range): the cards are the far
+  tier.
+- **The materials** (`atmos_assets.py` version 18): additive and unlit, on instanced static
+  meshes. Each fades in over the farthest `FarFade` of its tier's range ($f = \mathrm{sat}((d -
+  S(1 - F)) / (S F))$) and, faded out, off by its schedule or by day, collapses its quad to a
+  point by world position offset, so it costs no pixel. `M_CgFarGlow` turns its quad to the eye
+  at its middle pulled toward the eye by half its size (clear of its own fixture and wall),
+  $s = \max(s_0, d\,p)$ wide, a gaussian $e^{-8r^2}$ whose peak luminance is $I / (0.0982\,s^2)$
+  (its intensity held as it grows), blinking from its per-instance data as its light does.
+  `M_CgFarFlat` draws a pool's falloff, $L_0 (1 + (r/h)^2)^{-3/2}$ to its radius, or a wash
+  soft at its edges.
+- **Console commands:** `CityGenAtmos.Far [0|1]` (off: the play features' light pools past the
+  live range, as before AT7), `.FarGain G [PX]`. `.Status` adds `far`, `far_cards`,
+  `far_glows`, `far_flats`, `far_blocks`, `far_shown`, `far_build_ms`, `far_px`, `far_gain`,
+  `far_mid_m`, `far_high_m`, `far_fix_m`.
+- **The check:** by night every card drawn and shown, none by day; a `--view` named `*_nofar`
+  renders without them (the same view's before); each view's far city in the result's
+  `far_views`.
+- **The benchmark** (`bench.ATMOS_PASSES`): every atmos pass sets `CityGenAtmos.Far 1` (so
+  none leaks), `ATMOS_OFF` `Far 0`; `night_plan_nofar` without them (the play features' pools
+  instead: what the cards cost).
+
 ### A packaged game
 
 A project a city was imported into packages as any Unreal project (UAT's `BuildCookRun`,

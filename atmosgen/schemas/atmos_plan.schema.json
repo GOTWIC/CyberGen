@@ -305,6 +305,71 @@
    "title": "Emitter",
    "type": "object"
   },
+  "Far": {
+   "additionalProperties": false,
+   "description": "AT7: the far city's cards (scope 6.6, `far.py`): their tiles, counts and the runtime's\nsettings.",
+   "properties": {
+    "albedo": {
+     "additionalProperties": {
+      "type": "number"
+     },
+     "title": "Albedo",
+     "type": "object"
+    },
+    "counts": {
+     "additionalProperties": {
+      "type": "integer"
+     },
+     "title": "Counts",
+     "type": "object"
+    },
+    "fade": {
+     "description": "Cards fade in over this share of each live range, as the live lights fade out there.",
+     "title": "Fade",
+     "type": "number"
+    },
+    "gain": {
+     "description": "The runtime's gain on every card (art direction).",
+     "title": "Gain",
+     "type": "number"
+    },
+    "pool_up_m": {
+     "title": "Pool Up M",
+     "type": "number"
+    },
+    "px": {
+     "description": "A glow's least width on screen (pixels).",
+     "title": "Px",
+     "type": "number"
+    },
+    "spread": {
+     "description": "A card's gaussian over its square: its peak luminance is its intensity over this times its size squared.",
+     "title": "Spread",
+     "type": "number"
+    },
+    "tiles": {
+     "description": "{tile, file, count, sha256} per tile.",
+     "items": {
+      "additionalProperties": true,
+      "type": "object"
+     },
+     "title": "Tiles",
+     "type": "array"
+    }
+   },
+   "required": [
+    "tiles",
+    "counts",
+    "gain",
+    "px",
+    "spread",
+    "fade",
+    "pool_up_m",
+    "albedo"
+   ],
+   "title": "Far",
+   "type": "object"
+  },
   "FogVolume": {
    "additionalProperties": false,
    "description": "AT4: a fog or smog volume (mist over water, smog over industry, haze under decks and\nin tunnels): an ellipsoid (Unreal's local fog volume), its half sizes along its yaw.",
@@ -1304,6 +1369,18 @@
    },
    "title": "Emitters",
    "type": "array"
+  },
+  "far": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/Far"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "description": "AT7: the far city's light cards past the live set."
   },
   "hour": {
    "title": "Hour",
