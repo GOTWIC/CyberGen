@@ -76,7 +76,7 @@ visible lights (#215). Report, measurements and images:
   3% of its texels sheltered.
 - **The masks** (`masks/<tile>.png`, 0.5 m, RGBA; `planmodel.Mask`): the cover's underside
   (absolute, the plan's `weather_plan.cover` datum and step), puddles, the drip band, the gloss
-  when wet by surface. Delta: 196 tiles, 9.4 MB.
+  when wet by surface. Delta: 196 tiles, 4.5 MB.
 - **Puddles** (`presets.PUDDLE`): a worn-spot noise, the gutter along the curb, a road's sags,
   AG7's drains; the threshold lowered by grit (decision 12.5); never under a cover, on a roof,
   a curb, a deck or the water; the deepest fill first. Delta: 2% of its texels.
