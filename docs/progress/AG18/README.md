@@ -44,7 +44,7 @@ Blender and Unreal: [`city/`](city/README.md).
 
 **Lamps, cut lines and glass** (step B, in progress): lamps in channels and housings under
 lenses, shut lines, handles and flaps cut through the skin, black frit borders on the glass;
-the Vanta-R first ([`vanta_r`](vanta_r/README.md)), then the [Dart](kestrel_dart/README.md), [Lumen](orrin_lumen/README.md), [Hauler](brakk_hauler/README.md) and [Mino](tanager_mino/README.md), the [Sable](halcyon_sable/README.md), [Ridge](halcyon_ridge/README.md), [Meridian](kestrel_meridian/README.md) and [Atlas](kestrel_atlas/README.md); the other six next (the Aurels are set aside for now).
+the Vanta-R first ([`vanta_r`](vanta_r/README.md)), then the [Dart](kestrel_dart/README.md), [Lumen](orrin_lumen/README.md), [Hauler](brakk_hauler/README.md) and [Mino](tanager_mino/README.md), the [Sable](halcyon_sable/README.md), [Ridge](halcyon_ridge/README.md), [Meridian](kestrel_meridian/README.md), [Atlas](kestrel_atlas/README.md), [Pebble](orrin_pebble/README.md) and [Aria](orrin_aria/README.md); the other four next (the Aurels are set aside for now).
 
 **What the kit's checks find** (step A): [`checks.md`](checks.md), a table of every car's
 tire and ground clearances, symmetry, panel edges, cabin parts in the open and triangles,

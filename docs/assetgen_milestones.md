@@ -3333,8 +3333,8 @@ Vanta-R the same).
   triangles, standard class, texels 393 px/m (5th percentile), LOD3 15.8 of 40 degrees,
   0.023 of 0.10 bent, 0.010 of 0.04 texture (main 15.0, 0.022, 0.010); its LOD row reads as
   main's. Not published.
-- **Next**: the other cars of the Orrin, Brakk and Tanager brands on the
-  pilots' patterns (Pebble, Aria, Bastion, Mule, Cab, Porter), each switching to its `vehicles/brands/` module, with step A's street-distance
+- **Next**: the other cars of the Brakk and Tanager brands on the
+  pilots' patterns (Bastion, Mule, Cab, Porter), each switching to its `vehicles/brands/` module, with step A's street-distance
   findings fixed as it is redone.
 
 ### Parked in Delta Megacity on the PC (2026-11-12)
