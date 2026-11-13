@@ -707,7 +707,7 @@ def spawn_and_body(world, pawn, man, slug):
     if JOB.get("shots") and body:
         pc = unreal.GameplayStatics.get_player_controller(world, 0)
         yaw = float(man["player_start"].get("yaw_deg", 0.0))
-        for name, pitch in (("walk_body", -62.0), ("walk_ahead", -8.0)):
+        for name, pitch in (("walk_body", -68.0), ("walk_ahead", -8.0)):
             pc.set_control_rotation(unreal.Rotator(roll=0.0, pitch=pitch, yaw=-yaw))
             yield from wait(1.5)
             yield from ui_shot(world, name, cmd="shot")

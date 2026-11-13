@@ -14,6 +14,7 @@
 class UCameraComponent;
 class UAnimInstance;
 class USkeletalMesh;
+class USkeletalMeshComponent;
 
 UCLASS(Blueprintable)
 class CITYGENPLAY_API ACityGenWalker : public ACharacter
@@ -38,17 +39,17 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "CityGen")
 	FRotator BodyRotation = FRotator(0.f, -90.f, 0.f);
 
-	/** The eyes over the capsule's middle and in front of the face (cm): the head stays
-	 *  behind the near plane, the chest, arms and feet in view looking down. */
+	/** The eyes over the capsule's middle and forward of it (cm): with the head hidden in
+	 *  the player's own view, the chest, arms and feet are in view looking down. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "CityGen")
 	float EyeHeightCm = 68.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "CityGen")
-	float EyeForwardCm = 16.f;
+	float EyeForwardCm = 9.f;
 
 	/** How much further forward the eyes go looking straight down (cm). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "CityGen")
-	float EyeForwardDownCm = 14.f;
+	float EyeForwardDownCm = 8.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "CityGen")
 	float WalkSpeedCmS = 420.f;
@@ -56,8 +57,16 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "CityGen")
 	float RunSpeedCmS = 850.f;
 
+	/** The bone (and what hangs off it) hidden in the player's own view: the head. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "CityGen")
+	FName HiddenBone = FName(TEXT("neck_02"));
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "CityGen")
 	TObjectPtr<UCameraComponent> Camera;
+
+	/** The whole body again, drawn into shadows only (the visible one has no head). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "CityGen")
+	TObjectPtr<USkeletalMeshComponent> ShadowBody;
 
 	/** Whether the player sees a body (a mesh drawn for its owner). */
 	UFUNCTION(BlueprintCallable, Category = "CityGen")
@@ -66,6 +75,8 @@ public:
 	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void PostInitializeComponents() override;
 	virtual void BeginPlay() override;
+	virtual void PossessedBy(AController* NewController) override;
+	virtual void UnPossessed() override;
 	virtual void Tick(float DeltaSeconds) override;
 
 protected:
@@ -73,6 +84,7 @@ protected:
 
 private:
 	void ApplyBody();
+	void SetFirstPerson(bool bOn);
 	void Forward(float V);
 	void Back(float V);
 	void Right(float V);

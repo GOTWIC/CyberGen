@@ -35,12 +35,23 @@ ACityGenWalker::ACityGenWalker(const FObjectInitializer& ObjectInitializer)
 	Camera->SetFieldOfView(90.f);
 
 	USkeletalMeshComponent* Body = GetMesh();
-	Body->SetOwnerNoSee(false);           // the player sees its own body
+	Body->SetOwnerNoSee(false);           // the player sees its own body (its head hidden)
 	Body->SetOnlyOwnerSee(false);
-	Body->SetCastShadow(true);
+	Body->SetCastShadow(false);           // the shadow is the whole body's, below
 	Body->SetRelativeLocationAndRotation(BodyOffset, BodyRotation);
 	Body->SetCollisionProfileName(TEXT("CharacterMesh"));
 	Body->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+
+	// the body's shadow, head and all: the same mesh and animation, drawn into shadows only
+	ShadowBody = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("ShadowBody"));
+	ShadowBody->SetupAttachment(GetCapsuleComponent());
+	ShadowBody->SetRelativeLocationAndRotation(BodyOffset, BodyRotation);
+	ShadowBody->SetRenderInMainPass(false);
+	ShadowBody->SetRenderInDepthPass(false);
+	ShadowBody->SetCastShadow(true);
+	ShadowBody->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	ShadowBody->SetGenerateOverlapEvents(false);
+	ShadowBody->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 
 	UCharacterMovementComponent* M = GetCharacterMovement();
 	M->MaxWalkSpeed = WalkSpeedCmS;
@@ -54,26 +65,31 @@ ACityGenWalker::ACityGenWalker(const FObjectInitializer& ObjectInitializer)
 
 void ACityGenWalker::ApplyBody()
 {
-	USkeletalMeshComponent* Body = GetMesh();
-	if (!Body)
+	for (USkeletalMeshComponent* Body : {GetMesh(), ShadowBody.Get()})
 	{
-		return;
-	}
-	if (BodyMesh && Body->GetSkeletalMeshAsset() != BodyMesh)
-	{
-		Body->SetSkeletalMeshAsset(BodyMesh);
-	}
-	if (BodyAnim)
-	{
-		Body->SetAnimationMode(EAnimationMode::AnimationBlueprint);
-		if (Body->GetAnimClass() != BodyAnim)
+		if (!Body)
 		{
-			Body->SetAnimInstanceClass(BodyAnim);
+			continue;
 		}
+		if (BodyMesh && Body->GetSkeletalMeshAsset() != BodyMesh)
+		{
+			Body->SetSkeletalMeshAsset(BodyMesh);
+		}
+		if (BodyAnim)
+		{
+			Body->SetAnimationMode(EAnimationMode::AnimationBlueprint);
+			if (Body->GetAnimClass() != BodyAnim)
+			{
+				Body->SetAnimInstanceClass(BodyAnim);
+			}
+		}
+		Body->SetRelativeLocationAndRotation(BodyOffset, BodyRotation);
 	}
-	Body->SetRelativeLocationAndRotation(BodyOffset, BodyRotation);
-	Body->SetOwnerNoSee(false);
-	Body->SetOnlyOwnerSee(false);
+	if (USkeletalMeshComponent* Body = GetMesh())
+	{
+		Body->SetOwnerNoSee(false);
+		Body->SetOnlyOwnerSee(false);
+	}
 	BaseEyeHeight = EyeHeightCm;
 	if (Camera)
 	{
@@ -97,9 +113,42 @@ void ACityGenWalker::PostInitializeComponents()
 	ApplyBody();
 }
 
+void ACityGenWalker::SetFirstPerson(bool bOn)
+{
+	USkeletalMeshComponent* Body = GetMesh();
+	if (!Body || !Body->GetSkeletalMeshAsset() || HiddenBone.IsNone() ||
+		Body->GetBoneIndex(HiddenBone) == INDEX_NONE)
+	{
+		return;
+	}
+	// the head out of its own view (the camera sits at the eyes); seen from elsewhere (the
+	// free camera) it is whole
+	if (bOn)
+	{
+		Body->HideBoneByName(HiddenBone, PBO_None);
+	}
+	else
+	{
+		Body->UnHideBoneByName(HiddenBone);
+	}
+}
+
+void ACityGenWalker::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+	SetFirstPerson(NewController && NewController->IsLocalPlayerController());
+}
+
+void ACityGenWalker::UnPossessed()
+{
+	Super::UnPossessed();
+	SetFirstPerson(false);
+}
+
 void ACityGenWalker::BeginPlay()
 {
 	Super::BeginPlay();
+	SetFirstPerson(IsLocallyControlled() && IsPlayerControlled());
 	const USkeletalMeshComponent* Body = GetMesh();
 	const FVector L = GetActorLocation();
 	UE_LOG(LogCityGenWalker, Display,
@@ -125,7 +174,7 @@ void ACityGenWalker::SelfieStep()
 	{
 		return;
 	}
-	static const float Pitch[] = {-62.f, -8.f};
+	static const float Pitch[] = {-68.f, -8.f};
 	if (SelfieShot < 2)
 	{
 		if (SelfieAimed)

@@ -86,8 +86,10 @@ Then open the project: the editor opens on the city, and Play (Alt+P) puts you i
   body of the project's own character: its default game mode's pawn's character mesh, its
   animation and placement; the First Person template's world body, SKM_Manny_Simple with
   ABP_Unarmed, which that template hides from its own player and shows only arms). The
-  eyes sit 1.64 m up and in front of the face (further forward looking down, so the head
-  stays behind them), the body turns with the view. W, A, S and D (or the arrow keys) walk,
+  eyes sit 1.64 m up, a little forward of the neck (further forward looking down); in the
+  player's own view the head is hidden (`HiddenBone`, `neck_02`) while a second copy of
+  the body, drawn into shadows only, casts the whole figure's shadow; seen from the free
+  camera the head is back. The body turns with the view. W, A, S and D (or the arrow keys) walk,
   the mouse looks, Shift runs, Space jumps; a gamepad's left stick walks. It collides with
   the city and steps up curbs and stairs (45 cm). The play features' `.` swaps it for the
   free camera and back (it waits where you left it). The console's `ghost` (through
