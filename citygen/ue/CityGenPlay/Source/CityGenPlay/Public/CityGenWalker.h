@@ -9,6 +9,7 @@
 #include "CoreMinimal.h"
 #include "Engine/TimerHandle.h"
 #include "GameFramework/Character.h"
+#include "InputCoreTypes.h"
 #include "CityGenWalker.generated.h"
 
 class UCameraComponent;
@@ -85,10 +86,8 @@ protected:
 private:
 	void ApplyBody();
 	void SetFirstPerson(bool bOn);
-	void Forward(float V);
-	void Back(float V);
-	void Right(float V);
-	void Left(float V);
+	void KeyDown(FKey Key);
+	void KeyUp(FKey Key);
 	void StickForward(float V);
 	void StickRight(float V);
 	void Turn(float V);
@@ -100,7 +99,9 @@ private:
 	void Move(const FVector& Axis, float V);
 	void SelfieStep();
 
+	TSet<FKey> Keys;
 	FTimerHandle SelfieTimer;
+	FVector SelfieFrom = FVector::ZeroVector;
 	int32 SelfieShot = 0;
 	bool SelfieAimed = false;
 };

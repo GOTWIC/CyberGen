@@ -143,6 +143,7 @@ void ACityGenWalker::UnPossessed()
 {
 	Super::UnPossessed();
 	SetFirstPerson(false);
+	Keys.Reset();
 }
 
 void ACityGenWalker::BeginPlay()
@@ -201,6 +202,18 @@ void ACityGenWalker::SelfieStep()
 		GetWorldTimerManager().SetTimer(SelfieTimer, this, &ACityGenWalker::SelfieStep, 2.f, false);
 		return;
 	}
+	if (SelfieShot == 2)
+	{
+		// then W held for 2 s, as the key's press and release do (the walk's own path)
+		SelfieFrom = GetActorLocation();
+		KeyDown(EKeys::W);
+		++SelfieShot;
+		GetWorldTimerManager().SetTimer(SelfieTimer, this, &ACityGenWalker::SelfieStep, 2.f, false);
+		return;
+	}
+	KeyUp(EKeys::W);
+	UE_LOG(LogCityGenWalker, Display, TEXT("CITYGEN_WALKER walked %.2f m in 2 s with W held"),
+		FVector::Dist2D(SelfieFrom, GetActorLocation()) / 100.0);
 	UE_LOG(LogCityGenWalker, Display, TEXT("CITYGEN_WALKER selfies done"));
 	FPlatformMisc::RequestExit(false, TEXT("CityGenSelfie"));
 }
@@ -223,6 +236,25 @@ void ACityGenWalker::Tick(float DeltaSeconds)
 		Camera->SetRelativeLocation(FVector(EyeForwardCm + EyeForwardDownCm * Down, 0.f,
 			EyeHeightCm));
 	}
+	// the keys held (W A S D, the arrows): a key is no axis, so it is tracked by its press
+	// and release and walked here every frame
+	auto Held = [this](const FKey& A, const FKey& B) { return Keys.Contains(A) || Keys.Contains(B); };
+	const float F = float(Held(EKeys::W, EKeys::Up)) - float(Held(EKeys::S, EKeys::Down));
+	const float R = float(Held(EKeys::D, EKeys::Right)) - float(Held(EKeys::A, EKeys::Left));
+	if (F != 0.f || R != 0.f)
+	{
+		Move(FVector(F, R, 0.f).GetSafeNormal(), 1.f);
+	}
+}
+
+void ACityGenWalker::KeyDown(FKey Key)
+{
+	Keys.Add(Key);
+}
+
+void ACityGenWalker::KeyUp(FKey Key)
+{
+	Keys.Remove(Key);
 }
 
 void ACityGenWalker::SetupPlayerInputComponent(UInputComponent* Input)
@@ -234,14 +266,12 @@ void ACityGenWalker::SetupPlayerInputComponent(UInputComponent* Input)
 	}
 	// key bindings of the input component itself (no project input settings needed, as the
 	// play features' keys)
-	Input->BindAxisKey(EKeys::W, this, &ACityGenWalker::Forward);
-	Input->BindAxisKey(EKeys::Up, this, &ACityGenWalker::Forward);
-	Input->BindAxisKey(EKeys::S, this, &ACityGenWalker::Back);
-	Input->BindAxisKey(EKeys::Down, this, &ACityGenWalker::Back);
-	Input->BindAxisKey(EKeys::D, this, &ACityGenWalker::Right);
-	Input->BindAxisKey(EKeys::Right, this, &ACityGenWalker::Right);
-	Input->BindAxisKey(EKeys::A, this, &ACityGenWalker::Left);
-	Input->BindAxisKey(EKeys::Left, this, &ACityGenWalker::Left);
+	for (const FKey& K : {EKeys::W, EKeys::A, EKeys::S, EKeys::D, EKeys::Up, EKeys::Down,
+		EKeys::Left, EKeys::Right})
+	{
+		Input->BindKey(K, IE_Pressed, this, &ACityGenWalker::KeyDown);
+		Input->BindKey(K, IE_Released, this, &ACityGenWalker::KeyUp);
+	}
 	Input->BindAxisKey(EKeys::Gamepad_LeftY, this, &ACityGenWalker::StickForward);
 	Input->BindAxisKey(EKeys::Gamepad_LeftX, this, &ACityGenWalker::StickRight);
 	Input->BindAxisKey(EKeys::MouseX, this, &ACityGenWalker::Turn);
@@ -264,10 +294,6 @@ void ACityGenWalker::Move(const FVector& Axis, float V)
 	AddMovementInput(Yaw.RotateVector(Axis), V);
 }
 
-void ACityGenWalker::Forward(float V) { Move(FVector::ForwardVector, V); }
-void ACityGenWalker::Back(float V) { Move(FVector::ForwardVector, -V); }
-void ACityGenWalker::Right(float V) { Move(FVector::RightVector, V); }
-void ACityGenWalker::Left(float V) { Move(FVector::RightVector, -V); }
 void ACityGenWalker::StickForward(float V) { Move(FVector::ForwardVector, V); }
 void ACityGenWalker::StickRight(float V) { Move(FVector::RightVector, V); }
 
