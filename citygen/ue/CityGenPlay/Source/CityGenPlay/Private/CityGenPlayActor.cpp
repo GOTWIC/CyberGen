@@ -708,6 +708,34 @@ bool ACityGenPlay::ClickMenuRow(const FString& Row)
 		const FString Name = R.Left(1).ToUpper() + R.Mid(1);
 		SetAtmosFlag(FName(TEXT("Set") + Name), !GetAtmosFlag(FName(TEXT("b") + Name)));
 	}
+	else if (R == TEXT("weather+") || R == TEXT("weather-") || R == TEXT("weather"))
+	{
+		// AT5: the weather row and its arrows: the next or the previous state, blended
+		AActor* A = GetAtmos();
+		UFunction* F = A ? A->FindFunction(TEXT("StepWeather")) : nullptr;
+		if (!F)
+		{
+			return false;
+		}
+		struct { int32 Dir; } Parms{R == TEXT("weather-") ? -1 : 1};
+		A->ProcessEvent(F, &Parms);
+	}
+	else if (R.StartsWith(TEXT("weather=")))
+	{
+		// AT5: a state by its name (`weather=rain`, `weather=clear!` at once)
+		FString V = R.Mid(8);
+		const bool bNow = V.EndsWith(TEXT("!"));
+		V.RemoveFromEnd(TEXT("!"));
+		AActor* A = GetAtmos();
+		UFunction* F = A ? A->FindFunction(TEXT("SetWeatherState")) : nullptr;
+		struct { FString Name; bool bNow; bool Ret = false; } Parms{V, bNow};
+		if (!F)
+		{
+			return false;
+		}
+		A->ProcessEvent(F, &Parms);
+		return Parms.Ret;
+	}
 	else if (R == TEXT("hour+") || R == TEXT("hour-"))
 	{
 		const int32 Step = R == TEXT("hour-") ? 23 : 1;
@@ -753,6 +781,20 @@ bool ACityGenPlay::GetAtmosFlag(FName Property) const
 	const AActor* A = GetAtmos();
 	const FBoolProperty* P = A ? FindFProperty<FBoolProperty>(A->GetClass(), Property) : nullptr;
 	return P && P->GetPropertyValue_InContainer(A);
+}
+
+FString ACityGenPlay::GetAtmosWeather() const
+{
+	// AT5: the controller's weather now ("rain", "clear > rain" while it turns), "" without one
+	AActor* A = GetAtmos();
+	UFunction* F = A ? A->FindFunction(TEXT("GetWeatherLabel")) : nullptr;
+	if (!F)
+	{
+		return FString();
+	}
+	struct { FString Ret; } Parms;
+	A->ProcessEvent(F, &Parms);
+	return Parms.Ret;
 }
 
 float ACityGenPlay::GetAtmosHour() const
@@ -843,7 +885,7 @@ FString ACityGenPlay::GetStatus() const
 		"\"free_cam\": %s, \"waiting\": %s, \"pawn\": \"%s\", \"x\": %.2f, \"y\": %.2f, \"z\": %.2f, "
 		"\"light_pools\": %d, "
 		"\"lamp_points\": %d, \"walk_points\": %d, \"map_texture\": %s, "
-		"\"overlay\": %s, \"atmos\": %s, \"fog\": %s, \"rain\": %s, \"wet\": %s, \"hour\": %.2f}"),
+		"\"overlay\": %s, \"atmos\": %s, \"fog\": %s, \"rain\": %s, \"wet\": %s, \"hour\": %.2f, \"weather\": \"%s\"}"),
 		bReady ? TEXT("true") : TEXT("false"), IsNight() ? TEXT("true") : TEXT("false"),
 		bMapOpen ? TEXT("true") : TEXT("false"), bDevOpen ? TEXT("true") : TEXT("false"),
 		IsFreeCam() ? TEXT("true") : TEXT("false"), bWaiting ? TEXT("true") : TEXT("false"),
@@ -852,5 +894,5 @@ FString ACityGenPlay::GetStatus() const
 		Overlay.IsValid() ? TEXT("true") : TEXT("false"), GetAtmos() ? TEXT("true") : TEXT("false"),
 		GetAtmosFlag(TEXT("bFog")) ? TEXT("true") : TEXT("false"),
 		GetAtmosFlag(TEXT("bRain")) ? TEXT("true") : TEXT("false"),
-		GetAtmosFlag(TEXT("bWet")) ? TEXT("true") : TEXT("false"), GetAtmosHour());
+		GetAtmosFlag(TEXT("bWet")) ? TEXT("true") : TEXT("false"), GetAtmosHour(), *GetAtmosWeather());
 }

@@ -7,7 +7,10 @@
 // second), .Cover C (the cloud deck's cover for the session). AT4: .Air [0|1] (the fog volumes
 // and plumes), .Tuned [0|1] (the plan's engine settings), .VolumeGain G, .FogView M. Visible
 // lights: the console variable CityGenAtmos.Sight -1|0|1 (the live set by sight round a walker,
-// the circle, by sight whatever the pawn; the actor's file defines it), .SightRange M [MAX]. AT1: the plan comes with the level (the importer's
+// the circle, by sight whatever the pawn; the actor's file defines it), .SightRange M [MAX]. AT5:
+// .Weather NAME [now] (the weather state, + or - steps it), .WeatherSpeed S (the rain's age),
+// .Wetness W [P] (held for shots); .Rain and .Wet switch the weather's rain (streaks, splashes,
+// drips) and wet streets. AT1: the plan comes with the level (the importer's
 // controller and its cells' data actors), no longer from a folder (AT0's .Load and
 // -CityGenAtmosPlan are gone).
 
@@ -180,6 +183,46 @@ namespace
 			if (ACityGenAtmos* A = AtmosIn(World))
 			{
 				UE_LOG(LogTemp, Display, TEXT("CITYGEN_ATMOS_PLUMES %s"), *A->PlumeDebug(Args.Num() ? Args[0] : FString()));
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs WeatherCmd(TEXT("CityGenAtmos.Weather"),
+		TEXT("CityGenAtmos.Weather NAME [now]: AT5: the weather state (clear, drizzle, rain, fog, smog), blended over the plan's transition, or at once with `now` (the streets as wet as it leaves them); + or - steps it"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenAtmos* A = AtmosIn(World);
+			if (!A || !Args.Num())
+			{
+				return;
+			}
+			if (Args[0] == TEXT("+") || Args[0] == TEXT("-"))
+			{
+				A->StepWeather(Args[0] == TEXT("-") ? -1 : 1);
+				return;
+			}
+			const bool bNow = Args.Num() > 1 && (Args[1] == TEXT("now") || Args[1] == TEXT("1"));
+			if (!A->SetWeatherState(Args[0], bNow))
+			{
+				UE_LOG(LogTemp, Warning, TEXT("CityGenAtmos.Weather: no state %s"), *Args[0]);
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs WeatherSpeedCmd(TEXT("CityGenAtmos.WeatherSpeed"),
+		TEXT("CityGenAtmos.WeatherSpeed S: AT5: how fast the rain's age runs (1 real time): the streets wetting and drying, the puddles, the transitions"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenAtmos* A = AtmosIn(World);
+			if (A && Args.Num()) { A->WeatherSpeed = FMath::Max(0.f, FCString::Atof(*Args[0])); }
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs WetnessCmd(TEXT("CityGenAtmos.Wetness"),
+		TEXT("CityGenAtmos.Wetness W [P]: AT5: the streets' wetness and the puddles' fill held (0 to 1; -1 by the rain's age again)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenAtmos* A = AtmosIn(World);
+			if (A && Args.Num())
+			{
+				A->HoldWetness(FCString::Atof(*Args[0]), Args.Num() > 1 ? FCString::Atof(*Args[1]) : FCString::Atof(*Args[0]));
 			}
 		}));
 

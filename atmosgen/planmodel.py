@@ -211,11 +211,90 @@ class Air(_Model):
 
 
 class Mask(_Model):
-    """AT5: a tile's rain shadow, wetness and puddle mask (0.5 m texels)."""
+    """AT5: a tile's mask (`masks/<tile>.png`, 0.5 m texels, row 0 the north edge, RGBA): red
+    the cover (the lowest underside over the texel of what shelters it, absolute: the plan's
+    `weather.cover` datum plus red times its step; 0 open sky), green the puddles (0 none to
+    255 the deepest), blue the drip band under a low cover's edge, alpha the surface's gloss
+    when wet."""
     tile: str
     file: str
     px: int
     sha256: str
+
+
+class Drip(_Model):
+    """AT5: a piece of a low cover's dripping edge (`drips/<tile>.json`): the runtime's drip
+    streaks fall from it to the ground."""
+    id: str = Field(description="`<cover id>.drip<k>`.")
+    owner_id: str = Field(description="Its cover: an M6 awning or bus shelter, an M14 deck, a "
+                                      "raised road's piece, a canopy.")
+    kind: Literal["awning", "deck", "road", "canopy", "shelter"]
+    tile: str
+    a: Vec2
+    b: Vec2
+    z_m: float = Field(description="The edge's height (absolute).")
+    ground_m: float = Field(description="The ground under its middle (absolute).")
+    rate: float = Field(description="How fast it drips, a share of the rain's.")
+    hash: str
+
+
+class TileDrips(_Model):
+    """AT5: `drips/<tile>.json`: a tile's drip lines."""
+    version: Literal[1] = 1
+    city: str
+    tile: str
+    drips: list[Drip]
+
+
+class DripTile(_Model):
+    tile: str
+    file: str
+    count: int
+    kinds: dict[str, int]
+    sha256: str
+
+
+class WeatherState(_Model):
+    """AT5: one weather state as the runtime blends to it."""
+    rain: float = Field(description="The rain's rate (0 to 1).")
+    streak: float = Field(description="A streak's length, a share of the rain's (drizzle's "
+                                      "short).")
+    drops: float = Field(description="The share of the rain cards that fall.")
+    wetness: float = Field(description="How wet the open surfaces get.")
+    puddles: float = Field(description="How full the puddles get (a share of their depth).")
+    cover: float = Field(description="The cloud deck's cover.")
+    volumes: float = Field(description="A gain on the fog volumes (mist, smog).")
+    gust: float = Field(description="The wind's gusts, a share of its speed.")
+    wind_m_s: float
+    fog_density: float = Field(description="The height fog's density (the look's).")
+    fog_falloff: float
+    fog_extinction: float = Field(description="The volumetric fog's extinction scale.")
+    fog_albedo: RGB
+
+
+class Weather(_Model):
+    """AT5: the weather (scope 6.4, `weather.py`): the states, the rain's age, the wind, the
+    masks' frame and the drips."""
+    start: Literal[P.WEATHERS]
+    states: dict[str, WeatherState]
+    times: dict[str, float] = Field(description="transition_s (a state change), wet_s and "
+                                                "dry_s (the open surfaces), fill_s and "
+                                                "drain_s (the puddles): the runtime's "
+                                                "seconds.")
+    wind: dict[str, float] = Field(description="heading_deg (counterclockwise from east, the "
+                                               "way it blows), lean (the rain's drift over "
+                                               "its fall), shift_max_m, cover_max_m, "
+                                               "gale_m_s (MPC_CityGen's Wind 1).")
+    texel_m: float
+    extent: Annotated[list[float], Field(min_length=4, max_length=4,
+                                         description="[x0, y0, x1, y1]: the masks' tiles.")]
+    cover: dict[str, float] = Field(description="The cover channel's datum (z0_m) and step "
+                                                "(step_m).")
+    gloss: dict[str, float] = Field(description="The gloss when wet by surface class.")
+    drip_tiles: list[DripTile]
+    live: dict[str, float] = Field(description="What the runtime keeps near the view.")
+    counts: dict[str, int]
+    stats: dict
 
 
 class Moon(_Model):
@@ -350,6 +429,9 @@ class AtmosPlan(_Model):
     volumes: list[FogVolume] = Field(default_factory=list)
     emitters: list[Emitter] = Field(default_factory=list)
     masks: list[Mask] = Field(default_factory=list)
+    weather_plan: Weather | None = Field(None, description="AT5: the weather states, the rain's "
+                                                      "age, the wind, the masks' frame, the "
+                                                      "drips.")
     sight: Sight | None = Field(None, description="Visible lights: the sight raster the "
                                                   "runtime picks a walker's lights by.")
     counts: dict[str, int]
@@ -367,7 +449,7 @@ class ContributionEntry(_Model):
     key: str = Field(description="`atmos` (the controller, which AT3 has drive the "
                                  "importer's `lighting.sun`, `lighting.sky` and the sky by "
                                  "the hour), `atmos.lights.<tile>` (a tile's lights).")
-    kind: Literal["controller", "tile_lights", "volume", "emitter"]
+    kind: Literal["controller", "tile_lights", "volume", "emitter", "weather"]
     tile: str | None = None
     file: str
     hash: str
@@ -396,4 +478,5 @@ def json_schema(model=AtmosPlan, title: str = "atmosgen atmos plan") -> dict:
 
 SCHEMAS = {"atmos_plan": (AtmosPlan, "atmosgen atmos plan"),
            "tile_lights": (TileLights, "atmosgen tile lights"),
+           "tile_drips": (TileDrips, "atmosgen tile drips"),
            "contribution": (Contribution, "atmosgen unreal contribution")}

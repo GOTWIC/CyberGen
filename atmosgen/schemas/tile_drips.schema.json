@@ -1,0 +1,119 @@
+{
+ "$defs": {
+  "Drip": {
+   "additionalProperties": false,
+   "description": "AT5: a piece of a low cover's dripping edge (`drips/<tile>.json`): the runtime's drip\nstreaks fall from it to the ground.",
+   "properties": {
+    "a": {
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 2,
+     "minItems": 2,
+     "title": "A",
+     "type": "array"
+    },
+    "b": {
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 2,
+     "minItems": 2,
+     "title": "B",
+     "type": "array"
+    },
+    "ground_m": {
+     "description": "The ground under its middle (absolute).",
+     "title": "Ground M",
+     "type": "number"
+    },
+    "hash": {
+     "title": "Hash",
+     "type": "string"
+    },
+    "id": {
+     "description": "`<cover id>.drip<k>`.",
+     "title": "Id",
+     "type": "string"
+    },
+    "kind": {
+     "enum": [
+      "awning",
+      "deck",
+      "road",
+      "canopy",
+      "shelter"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "owner_id": {
+     "description": "Its cover: an M6 awning or bus shelter, an M14 deck, a raised road's piece, a canopy.",
+     "title": "Owner Id",
+     "type": "string"
+    },
+    "rate": {
+     "description": "How fast it drips, a share of the rain's.",
+     "title": "Rate",
+     "type": "number"
+    },
+    "tile": {
+     "title": "Tile",
+     "type": "string"
+    },
+    "z_m": {
+     "description": "The edge's height (absolute).",
+     "title": "Z M",
+     "type": "number"
+    }
+   },
+   "required": [
+    "id",
+    "owner_id",
+    "kind",
+    "tile",
+    "a",
+    "b",
+    "z_m",
+    "ground_m",
+    "rate",
+    "hash"
+   ],
+   "title": "Drip",
+   "type": "object"
+  }
+ },
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": false,
+ "description": "AT5: `drips/<tile>.json`: a tile's drip lines.",
+ "properties": {
+  "city": {
+   "title": "City",
+   "type": "string"
+  },
+  "drips": {
+   "items": {
+    "$ref": "#/$defs/Drip"
+   },
+   "title": "Drips",
+   "type": "array"
+  },
+  "tile": {
+   "title": "Tile",
+   "type": "string"
+  },
+  "version": {
+   "const": 1,
+   "default": 1,
+   "title": "Version",
+   "type": "integer"
+  }
+ },
+ "required": [
+  "city",
+  "tile",
+  "drips"
+ ],
+ "title": "atmosgen tile drips",
+ "type": "object"
+}

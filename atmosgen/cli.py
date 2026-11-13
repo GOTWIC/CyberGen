@@ -8,8 +8,9 @@
                                                     not delivered)
     atmosgen lux BUILD [--plan DIR]                 the lux map of the core (preview_lux.png),
                                                     the plan's map (preview_plan.png), the sky
-                                                    (preview_sky.png) and the air (AT4,
-                                                    preview_air.png)
+                                                    (preview_sky.png), the air (AT4,
+                                                    preview_air.png) and the weather (AT5,
+                                                    preview_weather.png)
     atmosgen preview BUILD [--plan DIR] ...         a Blender night preview from the plan
 """
 
@@ -60,7 +61,7 @@ def cmd_plan(args) -> int:
     sys.stdout.write(report_text(rep))
     print(f"{len(rep['wrote'])} files written to {rep['out']} in {rep['seconds']} s")
     if not rep["ok"]:
-        print("FAIL: a check failed (lux, faces or air); the plan is not delivered (the "
+        print("FAIL: a check failed (lux, faces, air or weather); the plan is not delivered (the "
               "exporter leaves it out)", file=sys.stderr)
         return 1
     return 0
@@ -82,6 +83,11 @@ def cmd_lux(args) -> int:
     # AT4: the air's volumes and emitters over the city
     from .air import air_map
     rep["air"] = air_map(args.build, args.plan)["image"]
+    # AT5: the weather's masks over the city and its busiest tile up close
+    from .weather import preview as weather_preview
+    pl = json.loads((pdir / "atmos_plan.json").read_text(encoding="utf-8"))
+    if pl.get("weather_plan"):
+        rep["weather"] = weather_preview(pdir, pl)
     print(json.dumps({k: v for k, v in rep.items() if k != "grid"}, indent=1))
     return 0
 
@@ -112,7 +118,7 @@ def main(argv=None) -> int:
     pp.add_argument("--out", help="the plan's folder (default BUILD/atmos; with `schema` the "
                                   "file)")
     pp.add_argument("--which", default="atmos_plan",
-                    choices=("atmos_plan", "tile_lights", "contribution"))
+                    choices=("atmos_plan", "tile_lights", "tile_drips", "contribution"))
     lx = sub.add_parser("lux", help="the plan's lux map round the corporate core, with "
                                     "occlusion")
     lx.add_argument("build")

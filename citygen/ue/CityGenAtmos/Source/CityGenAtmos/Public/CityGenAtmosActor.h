@@ -594,6 +594,118 @@ public:
 	/** AT3: whether the plan gave a sky (an AT2 plan did not). */
 	bool HasSky() const { return CurveElev.Num() >= 2; }
 
+	// -- AT5: the weather (the plan's `weather_plan`; docs/unreal_export.md, "From AT5") --
+
+	/** The plan gave a weather (its states, masks and drips). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	bool bWeather = false;
+
+	/** The states (clear, drizzle, rain, fog, smog) and their values, WeatherKeyCount each in
+	 *  the exporter's WEATHER_KEYS order (rain, streak, drops, wetness, puddles, cover,
+	 *  volumes, gust, wind m/s, fog density, falloff, extinction, albedo r, g, b). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	TArray<FString> WeatherNames;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	TArray<float> WeatherValues;
+
+	/** The state the level starts in (the plan's). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	FString WeatherStart = TEXT("rain");
+
+	/** The rain's age (s): a state change blends over TransitionS; the open surfaces wet over
+	 *  WetS (at full rain) and dry over DryS; the puddles fill over FillS and drain over
+	 *  DrainS. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float TransitionS = 20.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float WetS = 45.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float DryS = 300.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float FillS = 120.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float DrainS = 900.f;
+
+	/** How fast the rain's age runs (1 real time; the console's CityGenAtmos.WeatherSpeed). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float WeatherSpeed = 1.f;
+
+	/** The wind's heading (degrees counterclockwise from citygen's east, the way it blows),
+	 *  the rain's lean in it, and the speed MPC_CityGen's Wind is 1 at (the grass, the trees). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float WindHeadingDeg = 40.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float RainLean = 0.3f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float GaleMS = 15.f;
+
+	/** The plan's masks, city-wide: the cover (the lowest underside over each texel of what
+	 *  shelters it: CoverZ0Cm plus its value times CoverStepCm; 0 open sky) and the surface
+	 *  (gloss when wet, puddles, drips); their bounds (cm: min X, min Y, size; row 0 min Y). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	TObjectPtr<UTexture2D> WetCover;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	TObjectPtr<UTexture2D> WetSurface;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	TArray<float> WetBounds;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float CoverZ0Cm = -800.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float CoverStepCm = 50.f;
+
+	/** Past the textures: how glossy the wet ground is. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float FarGloss = 0.7f;
+
+	/** Splashes: at most this many cards within SplashRangeM, where a trace down from the sky
+	 *  lands (the rain's own landing spots); drips: at most MaxDrips within DripRangeM, one
+	 *  every DripStepM along the plan's drip lines. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	int32 MaxSplashes = 480;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float SplashRangeM = 14.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	int32 MaxDrips = 640;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float DripRangeM = 36.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather")
+	float DripStepM = 0.55f;
+
+	/** AT5: the weather to `Name` (a state of WeatherNames), blended over TransitionS, or at
+	 *  once with bNow (the rain's age too: the streets as wet as the state leaves them). */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	bool SetWeatherState(const FString& Name, bool bNow);
+
+	/** AT5: the next (Dir 1) or previous (-1) state (the menu's weather row). */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	void StepWeather(int32 Dir);
+
+	/** AT5: the state now, "a > b" while it turns from a to b. */
+	UFUNCTION(BlueprintPure, Category = "CityGen")
+	FString GetWeatherLabel() const;
+
+	/** AT5: the surfaces' wetness and the puddles' fill held (0 to 1; under 0: by the rain's
+	 *  age again). */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	void HoldWetness(float Wet, float Puddles);
+
+	bool HasWeather() const { return bWeather && WeatherNames.Num() > 0; }
+
 	// -- the cells --
 
 	/** A cell's data actor brings its lights in (CityGenAtmosCell::BeginPlay). */
@@ -667,6 +779,8 @@ private:
 		TArray<uint8> PlumeSchedule;
 		TArray<float> PlumeRate;
 		int32 Emitters = 0;
+		// AT5: its drip lines (CityGenAtmosPack::DripFloats each)
+		TArray<float> Drips;
 		bool bUsed = false;
 		bool bMade = false;                 // its beacons, beams and plumes made (near the view)
 	};
@@ -834,6 +948,55 @@ private:
 	double VolumesAt = -1.0;
 	float PlumeHour = -100.f;
 	bool bShowing = false;                  // the lights live now (on, a plan, by night)
+
+	// AT5: the weather
+	static constexpr int32 WeatherKeyCount = 15;
+	enum EWeatherKey : int32 { WRain = 0, WStreak, WDrops, WWetness, WPuddles, WCover, WVolumes,
+		WGust, WWind, WFogDensity, WFogFalloff, WFogExtinction, WAlbR, WAlbG, WAlbB };
+	int32 WeatherIndex(const FString& Name) const;
+	void StateValues(int32 Index, float* Out) const;
+	void UpdateWeather(float DeltaSeconds, const FVector& View);
+	void ApplyWeather();
+	void EnsureWetDecals();
+	void UpdateWetDecals(const FVector& View);
+	void SetCoverParams(UMaterialInstanceDynamic* M) const;
+	void EnsureSplashes();
+	void UpdateSplashes(const FVector& View);
+	void EnsureDrips();
+	void UpdateDrips(const FVector& View, double Now);
+	float GroundAt(const FVector& P) const;
+	float WeatherNow[WeatherKeyCount] = {0.8f, 1.f, 1.f, 1.f, 1.f, 0.85f, 1.f, 0.35f, 6.f, 0.08f, 0.4f, 3.f, 0.25f, 0.29f, 0.39f};
+	float WeatherFrom[WeatherKeyCount] = {};
+	float WeatherTo[WeatherKeyCount] = {};
+	int32 WeatherCur = -1;                  // the state it is in, or turning from ...
+	int32 WeatherTarget = -1;               // ... and to
+	float TransitionT = 1.f;                // 0 to 1 through a change
+	float WetNow = 1.f;                     // the open surfaces' wetness
+	float PuddleNow = 1.f;                  // the puddles' fill
+	float WindNow = 6.f;                    // the wind's speed with its gust (m/s)
+	float HeldWet = -1.f;
+	float HeldPuddles = -1.f;
+	double WeatherPushedAt = -1.0;
+	float CoverApplied = -1.f;              // (the state's clouds last set: CityGenAtmos.Cover holds till the next)
+	UPROPERTY(Transient)
+	TObjectPtr<UDecalComponent> WetGloss;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> WetColorMID;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> WetGlossMID;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> RainMID;
+	UPROPERTY(Transient)
+	TObjectPtr<UInstancedStaticMeshComponent> Splashes;
+	UPROPERTY(Transient)
+	TObjectPtr<UInstancedStaticMeshComponent> DripCards;
+	TArray<FVector> SplashAt;               // each splash card's spot (Z < -1e8: none)
+	int32 SplashNext = 0;
+	int32 SplashesLive = 0;
+	double DripsAt = -1.0;
+	FVector DripsView = FVector(1e12);
+	int32 DripsLive = 0;
+	int32 DripLines = 0;
 
 	// AT3: the sky and time
 	void FindLighting();

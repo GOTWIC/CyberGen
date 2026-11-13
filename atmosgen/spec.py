@@ -137,6 +137,10 @@ class AtmosSpec(_Model):
         None, description="The start hour (default the look's).")
     weather: Weather | None = Field(None, description="The start weather (default the "
                                                       "look's).")
+    wind_deg: Annotated[float, Field(ge=-360.0, le=360.0)] | None = Field(
+        None, description="AT5: the wind's heading, degrees counterclockwise from east, the "
+                          "way it blows (default 40: from the south-west); the rain leans "
+                          "with it and its shadow lies downwind of every cover.")
     palette: Palette = Field(default_factory=Palette)
     districts: dict[str, DistrictMood] = Field(default_factory=dict)
     light_levels: LightLevels = Field(default_factory=LightLevels)
@@ -228,7 +232,8 @@ def fill(spec: AtmosSpec, districts: list[dict]) -> dict:
             "light_levels": spec.light_levels.model_dump(exclude={"night_ev100"}),
             "landmarks": {k: v.model_dump() for k, v in sorted(spec.landmarks.items())},
             "sky": {k: getattr(spec.sky, k) for k in ("latitude_deg", "day_of_year",
-                                                       "moon_phase", "day_hour")}}
+                                                       "moon_phase", "day_hour")},
+            "wind_deg": spec.wind_deg}
 
 
 # ---------------------------------------------------------------------------

@@ -49,7 +49,7 @@ from . import sky as SK
 from . import spec as S
 
 CODE_FILES = ("presets.py", "spec.py", "planmodel.py", "emitters.py", "plan.py", "lux.py",
-              "sky.py", "air.py", "sight.py")
+              "sky.py", "air.py", "sight.py", "weather.py")
 OUT = "atmos"
 TILE_M = 256.0
 
@@ -70,7 +70,7 @@ def code_hash() -> str:
     here = Path(__file__).parent
     for name in CODE_FILES:
         h.update(name.encode() + b"\0" + (here / name).read_bytes().replace(b"\r\n", b"\n"))
-    return f"at4.{h.hexdigest()[:12]}"
+    return f"at5.{h.hexdigest()[:12]}"
 
 
 def u(*key) -> float:
@@ -1731,6 +1731,16 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
             raise RuntimeError(f"atmos plan: duplicate {what} ids")
     air_check = timed("air.check", air.check)
     air_set = air.settings(filled, sky)
+    # AT5: the weather: the rain shadow, wetness and puddles (the masks), the drips, the states
+    from . import weather as WE
+    we = WE.Weather(pl, filled)
+    timed("weather.covers", we.covers)
+    timed("weather.surfaces", we.surfaces)
+    timed("weather.spots", we.spots)
+    timed("weather.masks", we.masks_of, od)
+    timed("weather.drips", we.drips_of, od)
+    we_check = timed("weather.check", we.check, od)
+    we_set = we.settings()
     by_tile: dict[str, list[dict]] = {}
     for L in sorted(pl.lights, key=lambda r: r["id"]):
         by_tile.setdefault(L["tile"], []).append(L)
@@ -1790,7 +1800,9 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
         volumes=[PM.FogVolume(**v) for v in air.volumes],
         emitters=[PM.Emitter(**e) for e in air.emitters],
         sight=PM.Sight(**sight),
-        checks={"lux": lux, "faces": faces, "air": air_check})
+        masks=[PM.Mask(**mk) for mk in we.masks],
+        weather_plan=PM.Weather(**we_set),
+        checks={"lux": lux, "faces": faces, "air": air_check, "weather": we_check})
     ptext = json.dumps(json.loads(plan.model_dump_json(by_alias=True, exclude={"schema_ref"})),
                        indent=1, sort_keys=True) + "\n"
     if _write(od / "atmos_plan.json", ptext):
@@ -1801,7 +1813,12 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
                                       hash=sha(ptext)[:16])] +
         [PM.ContributionEntry(key=f"atmos.lights.{i.tile}", kind="tile_lights", tile=i.tile,
                               file=i.file, hash=i.sha256[:16], count=i.count)
-         for i in index])
+         for i in index] +
+        [PM.ContributionEntry(key=f"atmos.weather.{mk['tile']}", kind="weather",
+                              tile=mk["tile"], file=mk["file"], hash=mk["sha256"][:16],
+                              count=next((d["count"] for d in we.drip_tiles
+                                          if d["tile"] == mk["tile"]), 0))
+         for mk in we.masks])
     ctext = json.dumps(json.loads(contrib.model_dump_json()), indent=1, sort_keys=True) + "\n"
     if _write(od / "unreal_contribution.atmos.json", ctext):
         wrote.append(str(od / "unreal_contribution.atmos.json"))
@@ -1819,7 +1836,11 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
            "air_counts": air_set["counts"],
            "air_sources": {k: v for k, v in air.report.items() if k != "skipped"},
            "air_skipped": dict(sorted(air.report["skipped"].items())),
-           "ok": lux["ok"] and faces["ok"] and air_check["ok"],
+           "ok": lux["ok"] and faces["ok"] and air_check["ok"] and we_check["ok"],
+           "weather": we_check, "weather_counts": we_set["counts"],
+           "weather_stats": we_set["stats"],
+           "weather_covers": dict(sorted(we.report["covers"].items())),
+           "weather_skipped": dict(sorted(we.report["skipped"].items())),
            "floods": pl.flood_report, "aviation": pl.aviation_report,
            "megasites": dict(sorted(pl.site_report.items())),
            "tiers": {k: sum(1 for L in pl.lights if L["tier"] == k)
@@ -1888,6 +1909,13 @@ def report_text(rep: dict) -> str:
             lines.append("  from: " + ", ".join(f"{k} {v}" for k, v in
                                                 sorted(rep["air_sources"].items())))
         lines.append(air_text(rep["air"]).rstrip())
+    if rep.get("weather"):
+        from .weather import check_text as we_text
+        lines.append("weather: covers " + ", ".join(
+            f"{k} {v}" for k, v in sorted((rep.get("weather_covers") or {}).items())) +
+            "; " + ", ".join(f"{k} {v}" for k, v in sorted((rep.get("weather_stats") or {})
+                                                           .items())))
+        lines.append(we_text(rep["weather"]).rstrip())
     if rep.get("floods"):
         f = rep["floods"]
         lines.append(f"towers and landmarks: {f['towers']}, crowns flooded {f['crowns']} "
