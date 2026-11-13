@@ -19,7 +19,7 @@
 | [orrin_lumen](orrin_lumen/check.json) | look: 14.6 mm to body.well, steers 0 deg | ok: 130.0 mm (body.floor) | look: 2 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 356940 |
 | [orrin_pebble](orrin_pebble/check.json) | FAIL: 0.0 mm to body.well, steers 0 deg | ok: 143.3 mm (body.floor) | look: 5 objects | look: 0 open runs, 10 cutter holes | ok: 0 parts | ok: 266030 |
 | [tanager_cab](tanager_cab/check.json) | FAIL: 0.0 mm to bumper.guards.rear, steers 0 deg | ok: 120.0 mm (mudflaps) | look: 39 objects | FAIL: 4 open runs, 0 cutter holes | look: 1 parts | ok: 285996 |
-| [tanager_mino](tanager_mino/check.json) | FAIL: 0.0 mm to interior.tub, steers 0 deg | ok: 110.0 mm (mudflaps) | look: 9 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 223689 |
+| [tanager_mino](tanager_mino/check.json) | ok: 51.9 mm to body.clad, steers 35 deg | ok: 110.0 mm (mudflaps) | look: 1 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 277367 |
 | [tanager_porter](tanager_porter/check.json) | FAIL: 0.0 mm to interior.tub, steers 0 deg | ok: 120.0 mm (mudflaps) | look: 87 objects | FAIL: 5 open runs, 0 cutter holes | look: 5 parts | ok: 314760 |
 | [vanta_r](vanta_r/check.json) | look: 12.8 mm to body.well, steers 0 deg | ok: 95.0 mm (splitter) | look: 5 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 304992 |
 
@@ -163,13 +163,9 @@
 - open edge: `body.quarter`, 1110 mm, at (-0.621, 0.878, 1.055)
 - cabin part in the open: `interior.card.l`, 21% of it, up to 37.0 mm from what would hide it, at (-0.656, 0.952, 0.326)
 
-**tanager_mino** (FAIL)
+**tanager_mino** (look)
 
-- tire `fl`: 0.0 mm to `interior.tub`, turns 0 degrees before it touches `interior.tub`, its foot -7.0 mm off the ground
-- tire `rl`: 0.0 mm to `interior.tub`, its foot -7.0 mm off the ground
-- tire `fr`: 0.0 mm to `interior.tub`, turns 0 degrees before it touches `interior.tub`, its foot -7.0 mm off the ground
-- tire `rr`: 0.0 mm to `interior.tub`, its foot -7.0 mm off the ground
-- not mirrored: `interior.wheel` 193.7 mm, `interior.screens` 93.6 mm, `antenna` 58.4 mm, `tow.eye` 48.6 mm, `wipers` 25.8 mm, `permit` 10.0 mm, `permit.text` 7.2 mm, `permit.mark` 7.2 mm, `tow.cover` 3.0 mm
+- not mirrored: `interior.wheel` 193.7 mm, `interior.screens` 93.6 mm, `antenna` 58.4 mm, `tow.eye` 48.6 mm, `wipers` 25.8 mm, `body.fender` 14.0 mm, `permit` 10.0 mm, `permit.text` 7.2 mm, `permit.mark` 7.2 mm, `display.front` 6.2 mm, `display.rear` 6.2 mm, `pixels.front` 4.5 mm
 
 **tanager_porter** (FAIL)
 

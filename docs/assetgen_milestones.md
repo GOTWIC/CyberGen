@@ -3173,6 +3173,27 @@ Vanta-R the same).
   in the pack; they are lit faces under the lens now. Pack rebuilt, every check passing:
   139,138, 57,536, 20,230, 8,071 triangles, large class, texels 331 px/m (5th percentile),
   LOD3 18.4 of 40 degrees, 0.025 of 0.10 bent, 0.0058 of 0.04 texture. Not published.
+- **Tanager Mino** (`docs/progress/AG18/tanager_mino/`, the Tanager pilot, now on
+  `vehicles/brands/tanager.py`, its windows' cutter planes in a subclass): each visor a pocket
+  cut 30 mm and more into the nose and the tail under one flush clear lens (a slab laid on
+  the uncut skin: the skin cut out as a lens zigzagged at the face's rounded ends), inside on
+  a gloss black back plate a lamp at each end (chrome bezel, a light guide ring in a frosted
+  sleeve, red behind, three LED cups on a dark tray), the light bar a guide on a chrome strip,
+  the display's lit dots on a screen under a smoked lens of its own, every lit face 5 to 7 mm
+  under the lens; fog and reverse lamps as bezels with LED cups under clear lenses, the high
+  stop lamp a slim housing with a lit bar under a red lens, amber side repeaters in pockets;
+  the charge door cut, door pulls in cups cut 14 mm in, washer jets, 3.5 mm shut lines (2.4
+  before); frit borders on every pane inside the fat seals. The flat end faces' cut triangles
+  shaded in stars: their faces in the plane are flat shaded and the folded slivers taken
+  out. Street distances: the wells' inner walls 5 cm further in inside the skin and the
+  cabin tub shaped round them (0.0 mm and no steering to 51.9 mm and 35 degrees); the tires
+  stood 7 mm in the ground (the kit's road tread folds on a tire under 0.185 m; the brand's
+  `NARROW` tread, the Cab and the Porter keep theirs until redone). A hood service flap was
+  tried and left out (stars on the hood's curve). 277,367 triangles (223,689). Checks: tires
+  `ok` (FAIL before), symmetry `look` (`body.screen` 3.8 mm off at a window corner; the
+  one-sided parts told as meant), the rest `ok`. Pack rebuilt, every check passing: 145,419,
+  59,987, 20,116, 4,713 triangles, standard class, texels 470 px/m (5th percentile), LOD3
+  18.4 of 40 degrees, 0.035 of 0.10 bent, 0.022 of 0.04 texture. Not published.
 - **Next**: a pilot car of each of the other five brands (lamps by `BRANDS.md`, each
   switching to its `vehicles/brands/` module), shown to Swagnik before the other twelve;
   step A's street-distance findings (tires in the body, cabin tubs in the wells) on each car
