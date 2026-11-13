@@ -18,7 +18,11 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from functools import partial                                       # noqa: E402
+
 import carkit as K                                                  # noqa: E402
+from brands import kestrel                                          # noqa: E402
+from brands.kestrel import chine, plate, rib                        # noqa: E402
 from carkit import (Geo, Matrix, V3, band_point, cos, on_body, pi, rad,    # noqa: E402
                     ribbon, sin, stud, text_flat, text_on_body)
 
@@ -69,9 +73,20 @@ PMAT = dict(nose="paint", fender="paint", door="paint", flank_f="paint", flank_r
             bedfloor="bedliner", railin="paint2", railtop="paint2", lower="paint2",
             belly="bellyplate", glass_ws="glass_coat", glass_rear="glass_smoke",
             glass_sf="glass", glass_s="glass",
-            trim="gloss_black", visor="visor", lightband="gloss_black",
+            trim="frit", visor="visor", lightband="gloss_black",
             prow_frame="cladding", prow_in="visor",
-            tail_frame="cladding", tail="void", vent="void")
+            tail_frame="cladding", tail="void", vent="void", lamp_n="lamp_housing",
+            lamp_c="lamp_housing", lens_c="lens_clear",
+            lamp_cr="lamp_housing", lens_cr="lens_red", lamp_t="lamp_housing",
+            lens_t="lens_red", cut="void")
+GAP = 0.00175                       # 3.5 mm shut lines
+LAMP = {}                           # the lamps' pockets and channels on the skin
+CH_F = (2.70, 1.92)                 # the chine's front light channel, from x to x
+CH_R = (-2.03, -2.33)               # and its rear one
+CH_W, CH_D = 0.018, 0.022           # their width (up the knife edge) and depth
+NOSE_Y = (0.075, 0.193, 0.311, 0.429)   # the work lamps' cells across the prow's slot
+NOSE_Z = 0.895                          # and their height
+NOSE_C, NOSE_W, NOSE_H = 0.252, 0.47, 0.068     # the slot cut for them: middle, width, height
 
 
 def panel_of(i, j):
@@ -98,6 +113,69 @@ def station_crease(i, j):
     return 1.0 if j <= 2 else 0.0           # folds between the top facets; flanks flow
 
 
+def band_mid(names, w=BAND_W * 0.5):
+    """The stern's lip points (lines of P8) moved w in, square to the lip, as the even
+    band is drawn: the middle of the band at each."""
+    ring = [PT["P8"][n] for n in "LKSMRC"]
+    ring.append(V3((ring[-1].x, -ring[-2].y, ring[-2].z)))      # past the middle, mirrored
+    out = {}
+    for i, n in enumerate("LKSMRC"):
+        if n not in names:
+            continue
+        ns = []
+        for a, b in ((ring[i - 1], ring[i]), (ring[i], ring[i + 1])):
+            ey, ez = b.y - a.y, b.z - a.z
+            ln = (ey * ey + ez * ez) ** 0.5 or 1.0
+            ny, nz = -ez / ln, ey / ln
+            if ny * (REAR_C.y - (a.y + b.y) / 2) + nz * (REAR_C.z - (a.z + b.z) / 2) < 0:
+                ny, nz = -ny, -nz
+            ns.append((ny, nz))
+        d = max(0.3, 1 + ns[0][0] * ns[1][0] + ns[0][1] * ns[1][1])
+        out[n] = ring[i] + V3((0, (ns[0][0] + ns[1][0]) / d * w, (ns[0][1] + ns[1][1]) / d * w))
+    return out
+
+
+def rear_paths():
+    """The stern bar's two runs in the middle of the band: round the outer corner (from the
+    chine to the rail's end) and along the top of the mouth under the bed's edge."""
+    m = band_mid("KSRC")
+    return ([m["K"], m["S"]], [m["R"], m["R"].lerp(m["C"], 0.80)])
+
+
+def cutters():
+    """Everything cut into the hull, laid on it while it stands uncut: the work lamps' slot
+    in the prow's mouth, the light channels along the chine's knife edge and round the
+    stern's lip, the line under the shoulder along the bed, the door release and the charge
+    flap."""
+    # work lamps: a slot across each half of the mouth's back wall (its lens and surround
+    # stand proud of the wall: build_lamps)
+    nose = Geo()
+    LAMP["nose"] = K.pocket(nose, K.rounded(NOSE_C, NOSE_Z, NOSE_W, NOSE_H, 0.012), 'x',
+                            depth=0.04, mirror=True)
+    # the chine's light channels: cut into the knife edge itself, so the lens is the edge
+    chf, chr_ = Geo(), Geo()
+    for g, (x0, x1), key in ((chf, CH_F, "chine_f"), (chr_, CH_R, "chine_r")):
+        n = int(abs(x1 - x0) / 0.02)
+        pts = [chine(x0 + (x1 - x0) * k / n) for k in range(n + 1)]
+        LAMP[key] = K.groove(g, [p for p in pts if p is not None], width=CH_W, depth=CH_D,
+                             up=(0, 1, 0), step=0.02, mirror=True)
+    # the stern's light bar: a channel round the top of the mouth, in the band
+    tail = Geo()
+    for k, path in enumerate(rear_paths()):
+        LAMP["tail%d" % k] = K.groove(tail, path, width=0.014, depth=0.024, up=(-1, 0, 0),
+                                      step=0.01, mirror=True)
+    # shut lines: the line under the shoulder along the bed (a point every 4 cm, the flank
+    # is flat there), the door's flush release, the six-sided charge flap
+    cut = Geo()
+    K.groove(cut, [(0.60, 1.30), (-2.05, 1.30)], 'y', width=0.0035, step=0.04, mirror=True)
+    K.groove(cut, K.rounded(1.02, 1.232, 0.20, 0.018), 'y', closed=True, mirror=True)
+    K.groove(cut, [(0.30 + 0.05 * cos(rad(a)), 1.13 + 0.038 * sin(rad(a)))
+                   for a in range(0, 360, 60)], 'y', closed=True, mirror=True)
+    return [(nose, "lamp_n"), (chf, "lamp_c", "skin", "lens_c"),
+            (chr_, "lamp_cr", "skin", "lens_cr"), (tail, "lamp_t", "skin", "lens_t"),
+            (cut, "cut", "drop")]
+
+
 def build_hull():
     S = K.fill([T[k] for k in ORDER])
     PT.update(K.table(ORDER, LINES, S))
@@ -106,77 +184,17 @@ def build_hull():
         front=dict(center=FRONT_C, depth=FRONT_D, band=0.026, frame="prow_frame",
                    inner="prow_in", reach=0.06),
         rear=dict(center=REAR_C, depth=TAIL_D, band=BAND_W, band_panel="lightband",
-                  band_lines=4, frame="tail_frame", inner="tail"),
-        glass=[("glass_ws", 0.036), ("glass_sf", 0.028), ("glass_s", 0.028),
-               ("glass_rear", 0.034)],
-        subdiv=SUBDIV)
+                  band_lines=4, frame="tail_frame", inner="tail", even=True),
+        glass=[(p, i, "trim", "frit") for p, i in (
+            ("glass_ws", 0.036), ("glass_sf", 0.028), ("glass_s", 0.028),
+            ("glass_rear", 0.034))],
+        cutters=cutters, subdiv=SUBDIV, gap=GAP)
 
 
 # ---------------------------------------------------------------------------------------
-# helpers of this car (chine, rib, plate and build_pod are the Dart's: the family's parts)
+# helpers of this car (chine, rib, plate, the fin plane and the pods are the family's:
+# vehicles/brands/kestrel.py)
 # ---------------------------------------------------------------------------------------
-_CH = {}
-
-
-def chine(x):
-    """The chine as built at x: the widest point of the hull seen from above."""
-    key = round(x, 4)
-    if key not in _CH:
-        lo, hi = 0.0, 1.3
-        for _ in range(18):
-            mid = (lo + hi) / 2
-            if on_body(x, mid, 'z')[0] is not None:
-                lo = mid
-            else:
-                hi = mid
-        loc = on_body(x, lo - 0.0015, 'z')[0]
-        _CH[key] = V3((x, lo, loc.z)) if loc is not None else None
-    return _CH[key]
-
-
-def rib(g, pts, proj, w, h, objs=None):
-    """A raised rib on the body (or on objs) along a path given in projection."""
-    P, N = [], []
-    for q in pts:
-        loc, n = on_body(q[0], q[1], proj, objs)
-        if loc is not None:
-            P.append(loc)
-            N.append(n)
-    if len(P) < 2:
-        return
-    vs = []
-    for i in range(len(P)):
-        t = (P[min(i + 1, len(P) - 1)] - P[max(i - 1, 0)]).normalized()
-        sd = N[i].cross(t).normalized()
-        b = P[i] - N[i] * 0.003
-        vs += [b + sd * w / 2, b - sd * w / 2, P[i] + N[i] * h - sd * w * 0.28,
-               P[i] + N[i] * h + sd * w * 0.28]
-    k = len(P) - 1
-    faces = [(0, 1, 2, 3), tuple(4 * k + j for j in range(4))]
-    for i in range(k):
-        faces += [(4 * i + j, 4 * i + (j + 1) % 4, 4 * i + 4 + (j + 1) % 4, 4 * i + 4 + j)
-                  for j in range(4)]
-    g.add(vs, faces)
-
-
-def plate(g, base, along, up, poly, th0, th1=None, tmax=1.0):
-    """A flat blade: poly as (a, t) in the plane through base spanned by along and up,
-    th0 thick at t = 0 and th1 at t = tmax."""
-    base, along, up = V3(base), V3(along).normalized(), V3(up).normalized()
-    n = along.cross(up).normalized()
-    th1 = th0 if th1 is None else th1
-    lo, hi = [], []
-    for (a, t) in poly:
-        p = base + along * a + up * t
-        th = th0 + (th1 - th0) * min(1.0, max(0.0, t / tmax))
-        lo.append(p - n * th / 2)
-        hi.append(p + n * th / 2)
-    m = len(poly)
-    g.add(lo + hi, [tuple(range(m)), tuple(range(m, 2 * m))]
-          + [(i, (i + 1) % m, m + (i + 1) % m, m + i) for i in range(m)])
-    return n
-
-
 STRAP = [(-0.002, -0.024), (0.002, -0.024), (0.002, 0.024), (-0.002, 0.024)]
 
 
@@ -194,8 +212,6 @@ def strap(g, gr, x, pts, ratchet=1):
 # ---------------------------------------------------------------------------------------
 # emitter pods: the family's nacelle, six of them, on ribbed outriggers, with heavy skids
 # ---------------------------------------------------------------------------------------
-POD_SEC = [(-.11, .14), (.09, .14), (.19, .05), (.19, -.06), (.13, -.14), (-.13, -.14),
-           (-.19, -.06), (-.19, .05)]
 PODS = dict(f=dict(xc=1.74, yc=0.895, zc=0.585, L=1.00, s=0.88),
             m=dict(xc=-0.02, yc=0.908, zc=0.590, L=1.16, s=1.02),
             r=dict(xc=-1.62, yc=0.915, zc=0.600, L=1.34, s=1.14))
@@ -203,124 +219,6 @@ POD_MAT = dict(pod_top="paint", pod_side="paint2", pod_low="cladding", pod_belly
                pod_nose="paint", tip_f="led_front", tip_m="led_accent", tip_r="led_accent",
                vent="void", pod_frame="cladding", pod_end="void")
 
-
-def build_pod(tag, xc, yc, zc, L, s):
-    def sec(x, ky=1.0, kz=1.0, dz=0.0):
-        return [(x, yc + y * s * ky, zc + dz + z * s * kz) for (y, z) in POD_SEC]
-    h = L / 2
-    S = [sec(xc + h, 0.13, 0.40, 0.025 * s), sec(xc + h - 0.34 * s), sec(xc + 0.28 * s),
-         sec(xc - 0.28 * s), sec(xc - h + 0.14 * s, 0.97, 0.97), sec(xc - h, 0.80, 0.78, 0.012 * s)]
-
-    def pod_panel(i, j):
-        if i == 0:
-            return "pod_nose" if j in (7, 0, 1, 2, 6) else "pod_low"
-        if j == 4:
-            return "pod_belly"
-        if j in (3, 5):
-            return "pod_low"
-        return "pod_side" if j in (2, 6) else "pod_top"
-
-    K.build_body(S, pod_panel, POD_MAT, 1.0, 1.0, name="pod." + tag,
-                 front=dict(kind="flat", panel="tip_" + tag),
-                 rear=dict(center=(xc - h, yc, zc + 0.012 * s), depth=0.08 * s, band=0.022 * s,
-                           frame="pod_frame", inner="pod_end", reach=0.05 * s),
-                 recesses=[(2, 4, 0.022 * s, 0.03, "vent", "pod_belly")],
-                 subdiv=1, wrap=True, project=False)
-    zb = zc - 0.14 * s
-
-    # the emitter: a collar under the pod, a glowing ring on its lip, vanes over a core
-    ring = [(xc + 0.25 * s, yc, zb), (xc + 0.17 * s, yc + 0.098 * s, zb),
-            (xc - 0.17 * s, yc + 0.098 * s, zb), (xc - 0.25 * s, yc, zb),
-            (xc - 0.17 * s, yc - 0.098 * s, zb), (xc + 0.17 * s, yc - 0.098 * s, zb)]
-    g = Geo()
-    g.sweep(ring, [(-0.013, -0.030), (0.013, -0.030), (0.013, 0.004), (-0.013, 0.004)],
-            closed=True)
-    for k in range(6):                                  # clamps on the collar
-        a, b = V3(ring[k]), V3(ring[(k + 1) % 6])
-        c = a.lerp(b, 0.5)
-        d = (b - a).normalized()
-        o = V3((d.y, -d.x, 0))
-        g.box(c + V3((0, 0, -0.012)), (0.05, 0.034, 0.03),
-              rot=Matrix(((d.x, o.x, 0), (d.y, o.y, 0), (0, 0, 1))))
-    g.obj("pod.collar." + tag, "rim", bevel=0.003, mirror=True)
-    g = Geo()
-    g.sweep(ring, [(-0.017, -0.048), (0.017, -0.048), (0.017, -0.030), (-0.017, -0.030)],
-            closed=True)
-    g.obj("pod.ring." + tag, "emitter", mirror=True)
-    g = Geo()
-    g.box((xc, yc, zb + 0.024), (0.47 * s, 0.17 * s, 0.004))
-    g.obj("pod.core." + tag, "emitter_core", mirror=True)
-    g = Geo()
-    zv = zb + 0.004
-    g.louvers((xc + 0.225 * s, yc - 0.085 * s, zv), (xc - 0.225 * s, yc - 0.085 * s, zv),
-              (xc - 0.225 * s, yc + 0.085 * s, zv), (xc + 0.225 * s, yc + 0.085 * s, zv),
-              9, 0.03, 0.004, rad(32), out=(0, 0, -1), margin=0.03)
-    g.box((xc, yc, zv - 0.004), (0.50 * s, 0.014, 0.022))
-    g.obj("pod.vanes." + tag, "grille", bevel=0.0015, mirror=True)
-
-    # the skid: a heavy sled outboard of the emitter on two braced legs, a pad at each end
-    ys = yc + 0.172 * s
-    zs = zb - 0.045
-    g = Geo()
-    g.sweep([(xc + 0.47 * s, ys, zb + 0.06), (xc + 0.38 * s, ys, zs),
-             (xc - 0.38 * s, ys, zs), (xc - 0.47 * s, ys, zb + 0.06)],
-            [(-0.021, -0.013), (0.021, -0.013), (0.021, 0.013), (-0.021, 0.013)],
-            up=(0, 1, 0))
-    for x in (xc + 0.22 * s, xc - 0.22 * s):
-        g.box((x, ys - 0.012, (zs + zb + 0.05) / 2), (0.05, 0.03, zb + 0.05 - zs))
-        g.lathe([(-0.03, 0.002), (-0.03, 0.022), (0.03, 0.022), (0.03, 0.002)], 8,
-                xf=Matrix.Translation((x, ys - 0.012, zb + 0.05)))
-        g.box((x, ys, zs - 0.012), (0.16, 0.06, 0.014))
-    g.obj("pod.skid." + tag, "rim_bright", bevel=0.003, mirror=True)
-
-    # the outrigger: a ribbed arm from the lower hull over the pod's back
-    zt = zc + 0.14 * s
-    g = Geo()
-    g.hexa([(xc + 0.27 * s, 0.60, zt - 0.05), (xc - 0.27 * s, 0.60, zt - 0.05),
-            (xc - 0.22 * s, yc + 0.02, zt - 0.02), (xc + 0.22 * s, yc + 0.02, zt - 0.02),
-            (xc + 0.27 * s, 0.60, zt + 0.075), (xc - 0.27 * s, 0.60, zt + 0.075),
-            (xc - 0.22 * s, yc + 0.02, zt + 0.028), (xc + 0.22 * s, yc + 0.02, zt + 0.028)])
-    g.obj("pod.arm." + tag, "paint2", bevel=0.004, mirror=True)
-    g = Geo()
-    for k in range(7):
-        x = xc + (0.18 - 0.06 * k) * s
-        g.hexa([(x + 0.008, 0.66, zt + 0.062), (x - 0.008, 0.66, zt + 0.062),
-                (x - 0.008, yc + 0.01, zt + 0.024), (x + 0.008, yc + 0.01, zt + 0.024),
-                (x + 0.005, 0.66, zt + 0.078), (x - 0.005, 0.66, zt + 0.078),
-                (x - 0.005, yc + 0.01, zt + 0.036), (x + 0.005, yc + 0.01, zt + 0.036)])
-    g.obj("pod.armribs." + tag, "cladding", mirror=True)
-
-    # thruster in the pod's stern
-    g = Geo()
-    g.box((xc - h + 0.07 * s, yc, zc + 0.012 * s), (0.006, 0.20 * s, 0.045 * s))
-    g.obj("pod.jet." + tag, "thrust", mirror=True)
-    g = Geo()
-    for k in (-1, 0, 1):
-        g.box((xc - h + 0.045 * s, yc + k * 0.075 * s, zc + 0.012 * s), (0.06 * s, 0.008, 0.11 * s))
-    g.obj("pod.jetvanes." + tag, "grille", mirror=True)
-
-
-def pod_ribs():
-    """Fine ribbing on the housings: on the pods as built, seen from the side."""
-    parts = [ob for ob in K.CAR.objects if ob.name.startswith("pod.") and ob.type == 'MESH'
-             and ob.name.split(".")[1] in PODS]
-    g = Geo()
-    for tag, p in PODS.items():
-        xc, zc, L, s = p["xc"], p["zc"], p["L"], p["s"]
-        x0, x1 = xc + L / 2 - 0.36 * s, xc - L / 2 + 0.16 * s
-        n = int((x0 - x1) / 0.05)
-        for k in range(7):
-            z = zc + (0.038 - k * 0.0215) * s
-            rib(g, [(x0 + (x1 - x0) * i / n - 0.03 * k * s * (1 if i == 0 else 0), z)
-                    for i in range(n + 1)], 'y', 0.009, 0.005, parts)
-    g.obj("pod.ribs", "cladding", mirror=True)
-    g = Geo()                                           # emitter numbers on the pods' noses
-    for side in (1, -1):
-        for k, p in enumerate(PODS.values()):
-            text_on_body(g, "E%d" % (2 * k + (1 if side > 0 else 2)), 0.062 * p["s"],
-                         p["xc"] + p["L"] / 2 - 0.235 * p["s"], p["zc"] + 0.012 * p["s"], side,
-                         objs=parts)
-    g.obj("pod.stencils", "stencil")
 
 
 # ---------------------------------------------------------------------------------------
@@ -334,11 +232,7 @@ FIN = [(-1.30, 0.0), (-2.22, FIN_T), (-2.80, FIN_T), (-2.84, FIN_T - 0.10), (-2.
 BEAM_A, BEAM_T = -2.42, 0.60
 
 
-def fin_pt(a, t, off=0.0, side=1):
-    """A point of the fin's plane, off toward the outside."""
-    n = V3((1, 0, 0)).cross(FIN_UP).normalized()        # inboard and up
-    p = FIN_BASE + V3((a, 0, 0)) + FIN_UP * t - n * off
-    return V3((p.x, side * p.y, p.z))
+fin_pt = partial(kestrel.fin_pt, base=FIN_BASE, up=FIN_UP)
 
 
 def fin_half(t):
@@ -390,7 +284,7 @@ def build_fins():
     g.prism([(BEAM_A + 0.075, -yb, zb - 0.045), (BEAM_A + 0.055, -yb, zb + 0.05),
              (BEAM_A - 0.055, -yb, zb + 0.05), (BEAM_A - 0.075, -yb, zb - 0.045)],
             (0, 2 * yb, 0))
-    g.obj("hoist.beam", "paint2", bevel=0.004)
+    beam = g.obj("hoist.beam", "paint2", bevel=0.004)
     g = Geo()
     for sy in (1, -1):                                  # shoes where it meets the fins
         g.box((BEAM_A, sy * (yb - 0.035), zb), (0.20, 0.07, 0.125))
@@ -417,12 +311,21 @@ def build_fins():
     for sy in (1, -1):
         g.box((BEAM_A, sy * 0.58, zb - 0.048), (0.05, 0.62, 0.008))
     g.obj("led.hoist.work", "lamp")
-    g = Geo()                                           # the high tail light, the maker's name
-    for sy in (1, -1):
-        g.box((BEAM_A - 0.068, sy * 0.60, zb), (0.008, 0.66, 0.026))
-    text_flat(g, "K E S T R E L", 0.030, (BEAM_A - 0.0665, 0, zb - 0.012), (0, -1, 0),
-              (0, 0, 1), spacing=1.2)
-    g.obj("led.rear.beam", "led_rear")
+    # the high tail light: a lamp each side of the maker's name, standing proud of the
+    # beam's rear face, three red cells behind a red lens in a dark rim
+    L = K.Lamp("lamp.beam", lit="led_rear", glass="lens_red")
+    xf = BEAM_A - 0.0655                                # the beam's rear face at its middle
+    strip_lamp(L, xf, -1, 0.27, 0.93, zb, 0.040, cells=3)
+    L.obj(mirror=True)
+    g = Geo()
+    if not text_on_body(g, "K E S T R E L", 0.030, 0.0, zb - 0.012, 1, proj='X', spacing=1.2,
+                        objs=[beam]):                   # seated on the beam, not floating
+        text_flat(g, "K E S T R E L", 0.030, (xf - 0.001, 0, zb - 0.012), (0, -1, 0),
+                  (0, 0, 1), spacing=1.2)
+    ob = g.obj("led.name", "led_rear")
+    md = ob.modifiers.new("solid", 'SOLIDIFY')  # letters 5 mm proud: a game pack keeps them
+    md.thickness = 0.008                        # as they are (laid flat, they are baked
+    md.offset = 0.0                             # down and lose strokes)
     g = Geo()
     text_flat(g, "HOIST 600 KG", 0.026, (BEAM_A + 0.067, 0.52, zb - 0.012), (0, 1, 0),
               (0, 0, 1), spacing=1.15)
@@ -593,35 +496,134 @@ def build_load():
 # ---------------------------------------------------------------------------------------
 # details
 # ---------------------------------------------------------------------------------------
+KEEL_X, KEEL_H = (1.98, -1.72), 0.024    # the keel lamp's channel: from x to x, its height
+KEEL_Z = 0.41                            # the keel blade's foot
+
+
+def along(tr, s0=0.0, s1=None, step=0.03):
+    """Frames every step along a traced path between the lengths s0 and s1:
+    [(point, normal, tangent, side)], side = tangent x normal."""
+    P = [q for q, _ in tr]
+    S = [0.0]
+    for a, b in zip(P, P[1:]):
+        S.append(S[-1] + (b - a).length)
+    s1 = S[-1] if s1 is None else min(s1, S[-1])
+    n = max(1, int(round((s1 - s0) / step)))
+    out, i = [], 0
+    for k in range(n + 1):
+        s = s0 + (s1 - s0) * k / n
+        while i < len(S) - 2 and S[i + 1] < s:
+            i += 1
+        t = (s - S[i]) / max(S[i + 1] - S[i], 1e-9)
+        tg = (P[i + 1] - P[i]).normalized()
+        nn = tr[i][1].lerp(tr[i + 1][1], t).normalized()
+        out.append((P[i].lerp(P[i + 1], t), nn, tg, tg.cross(nn).normalized()))
+    return out
+
+
+def length(tr):
+    return sum((b[0] - a[0]).length for a, b in zip(tr, tr[1:]))
+
+
+def strip_lamp(L, x0, sgn, y0, y1, zc, h, cells=1):
+    """A lamp standing proud of a face at x = x0 that looks along sgn x (-1: astern), from
+    y0 to y1 and h high about zc: a dark back plate and rim, bright dividers between its
+    cells, the lit face right under a lens set in the rim."""
+    ym, ly = (y0 + y1) / 2, y1 - y0
+
+    def bx(geo, a, b, y, w, z, hh):                 # a box from a to b out of the face
+        geo.box((x0 + sgn * (a + b) / 2, y, z), (b - a, w, hh))
+    bx(L.housing, -0.006, 0.003, ym, ly, zc, h)                     # the back plate
+    for z in (zc - h / 2 + 0.002, zc + h / 2 - 0.002):              # the rim
+        bx(L.housing, 0.003, 0.011, ym, ly, z, 0.004)
+    for y in (y0 + 0.002, y1 - 0.002):
+        bx(L.housing, 0.003, 0.011, y, 0.004, zc, h)
+    for k in range(1, cells):                                       # dividers
+        bx(L.chrome, 0.003, 0.0075, y0 + ly * k / cells, 0.003, zc, h - 0.008)
+    bx(L.emit(), 0.003, 0.0055, ym, ly - 0.008, zc, h - 0.012)      # the lit face
+    bx(L.glass, 0.0075, 0.0105, ym, ly - 0.008, zc, h - 0.008)      # the lens
+
+
+def build_lamps():
+    """What stands in the lamps' pockets and channels, under their lenses."""
+    # prow: four work lamp cells across each half of the slot, standing a little proud of
+    # its back wall between bright dividers that run to the slot's floor, under a clear lens
+    # in a dark surround that stands proud round the slot (the game pack's far LOD draws the
+    # wall across the slot: lamps behind it would be lost there)
+    pk = LAMP["nose"]
+    if pk is not None:
+        out = -pk.d
+
+        def wall(y, z, off=0.0):                        # the back wall's plane at (y, z)
+            q = V3((pk.c.x, y, z))
+            return q - out * (q - pk.c).dot(out) + out * off
+
+        def floor(q):
+            return q + pk.d * ((pk._c0 - q.dot(pk.b)) / pk.d.dot(pk.b))
+        L = K.Lamp("lamp.nose", lit="lamp")
+        for y in NOSE_Y:
+            L.bar([wall(y - 0.046, NOSE_Z, 0.003), wall(y + 0.046, NOSE_Z, 0.003)], 0.046,
+                  0.004, up=out)
+        for y in (0.022, 0.134, 0.252, 0.370, 0.482):   # dividers from the lens to the floor
+            q = wall(y, NOSE_Z, 0.009)
+            L.chrome.sweep([q, floor(q)], [(-0.0015, -0.029), (0.0015, -0.029),
+                                           (0.0015, 0.029), (-0.0015, 0.029)],
+                           up=V3((0, 0, 1)))
+        rim = [wall(y, z) for y, z in K.rounded(NOSE_C, NOSE_Z, NOSE_W + 0.008,
+                                                 NOSE_H + 0.008, 0.016)]
+        L.housing.sweep(rim, [(-0.004, -0.004), (0.004, -0.004), (0.004, 0.012),
+                              (-0.004, 0.012)], up=out, closed=True)
+        lens = [wall(y, z, 0.0095) for y, z in K.rounded(NOSE_C, NOSE_Z, NOSE_W + 0.002,
+                                                          NOSE_H + 0.002, 0.013)]
+        L.glass.prism(lens, out * 0.002)
+        L.obj(mirror=True)
+    # the chine's channels: a light guide down each, bright liners on the floor
+    for key, lit in (("chine_f", "led_front"), ("chine_r", "led_rear")):
+        tr = LAMP[key]
+        if len(tr) < 2:
+            continue
+        fr = along(tr, 0.008, length(tr) - 0.008, 0.02)
+        ups = [n for _, n, _, _ in fr]
+        L = K.Lamp("lamp." + key, lit=lit)
+        L.chrome.sweep([q - n * (CH_D - 0.003) for q, n, _, _ in fr],
+                       [(-0.0065, -0.0005), (0.0065, -0.0005), (0.0065, 0.0005),
+                        (-0.0065, 0.0005)], up=ups)
+        L.guide([q - n * 0.008 for q, n, _, _ in fr], r=0.0045, sleeve=0, up=ups)
+        L.obj(mirror=True)
+    # the stern's bar: a red guide behind bright ribs, in two runs
+    for key in ("tail0", "tail1"):
+        tr = LAMP[key]
+        if len(tr) < 2:
+            continue
+        rr = along(tr, 0.008, length(tr) - 0.008, 0.01)
+        ups = [n for _, n, _, _ in rr]
+        L = K.Lamp("lamp." + key, lit="led_rear")
+        L.chrome.sweep([q - n * 0.021 for q, n, _, _ in rr],
+                       [(-0.005, -0.0005), (0.005, -0.0005), (0.005, 0.0005),
+                        (-0.005, 0.0005)], up=ups)
+        L.guide([q - n * 0.009 for q, n, _, _ in rr], r=0.004, sleeve=0, up=ups)
+        for q, n, tg, sd in along(tr, 0.02, length(tr) - 0.02, 0.028):
+            L.chrome.box(q - n * 0.015, (0.002, 0.005, 0.010),
+                         rot=Matrix((tg, sd, n)).transposed())
+        L.obj(mirror=True)
+
+
 def build_details():
-    P = PT
-    # ---- the chine blade: a bright knife edge from the prow to the stern, lit at both ends
-    xs = [2.72 - 0.05 * k for k in range(102)]
-    pts = [chine(x) for x in xs]
+    # ---- the chine blade: a bright knife edge between the light channels at its ends
+    x0, x1 = CH_F[1] - 0.012, CH_R[0] + 0.012
+    n = int((x0 - x1) / 0.05)
+    pts = [chine(x0 + (x1 - x0) * k / n) for k in range(n + 1)]
     pts = [p + V3((0, 0.003, -0.004)) for p in pts if p is not None]
     sec = [(-0.007, -0.004), (0.007, -0.004), (0.007, 0.004), (-0.007, 0.004)]
-    nf = 17
     g = Geo()
-    g.sweep(pts[nf - 1:-6], sec, up=(0, 1, 0))
+    g.sweep(pts, sec, up=(0, 1, 0))
     g.obj("chine.blade", "rim_bright", mirror=True)
-    g = Geo()
-    lit = [(-0.009, -0.005), (0.009, -0.005), (0.009, 0.005), (-0.009, 0.005)]
-    g.sweep(pts[:nf], lit, up=(0, 1, 0))
-    g.obj("led.front", "led_front", mirror=True)
-    g = Geo()
-    g.sweep(pts[-7:], sec, up=(0, 1, 0))
-    g.obj("led.chine.rear", "led_rear", mirror=True)
+    build_lamps()
 
-    # ---- the prow: work lamps in the slot, a sensor slit over them, two mooring horns
+    # ---- the prow: a sensor slit over the work lamps' slot, two mooring horns
     xm = FRONT_C.x - FRONT_D
-    g, gl, gs = Geo(), Geo(), Geo()
-    for k in range(4):
-        y = 0.075 + 0.118 * k
-        g.box((xm + 0.012, y, 0.895), (0.03, 0.104, 0.062))
-        gl.box((xm + 0.029, y, 0.895), (0.006, 0.086, 0.044))
+    gs = Geo()
     gs.box((xm + 0.006, 0.26, 0.952), (0.012, 0.40, 0.010))
-    g.obj("prow.cells", "gloss_black", bevel=0.003, mirror=True)
-    gl.obj("prow.lamps", "lamp", mirror=True)
     gs.obj("prow.sensor", "keel_led", mirror=True)
     g = Geo()
     for y in (0.30,):                                   # tow horns under the slot
@@ -640,14 +642,26 @@ def build_details():
     g.obj("hull.ribs", "cladding", mirror=True)
 
     # ---- keel blade and its light
+    # the blade's foot is a lamp: a channel up into it, a light guide in a frosted sleeve
+    # over a bright reflector strip, flush under a clear lens
     g = Geo()
-    keel = [(2.52, 0.625), (2.05, 0.41), (-1.80, 0.41), (-2.15, 0.575), (-1.4, 0.535),
-            (1.6, 0.535)]
+    kz = KEEL_Z
+    keel = [(2.52, 0.625), (2.05, kz), (KEEL_X[0], kz), (KEEL_X[0], kz + KEEL_H),
+            (KEEL_X[1], kz + KEEL_H), (KEEL_X[1], kz), (-1.80, kz), (-2.15, 0.575),
+            (-1.4, 0.535), (1.6, 0.535)]
     g.prism([(x, -0.016, z) for (x, z) in keel], (0, 0.032, 0))
     g.obj("keel", "paint2", bevel=0.004)
-    g = Geo()
-    g.box((0.125, 0, 0.4065), (3.75, 0.02, 0.009))
-    g.obj("led.keel", "keel_led")
+    L = K.Lamp("lamp.keel", lit="keel_led")
+    x0, x1 = KEEL_X[0] - 0.0015, KEEL_X[1] + 0.0015
+    xk, lx = (x0 + x1) / 2, x0 - x1
+    for sy in (1, -1):                                  # the channel's dark walls
+        L.housing.box((xk, sy * 0.0145, kz + KEEL_H / 2), (lx, 0.003, KEEL_H))
+    L.housing.box((xk, 0, kz + KEEL_H - 0.0015), (lx, 0.026, 0.003))
+    L.chrome.box((xk, 0, kz + KEEL_H - 0.0035), (lx - 0.004, 0.020, 0.001))
+    L.guide([(x0 - 0.006, 0, kz + 0.010), (x1 + 0.006, 0, kz + 0.010)], r=0.0035, sleeve=1.6,
+            up=(0, 0, 1))
+    L.glass.box((xk, 0, kz + 0.0015), (lx - 2 * GAP, 0.026, 0.003))
+    L.obj()
     # ---- strakes under the stern's kick-up
     g = Geo()
     for y, dz in ((0.18, 0.0), (0.40, 0.03)):
@@ -676,18 +690,12 @@ def build_details():
             g.box((x, 0.30, belly(0.30) - 0.02), (0.07, 0.03, 0.05))
     g.obj("belly.conduits", "rim", bevel=0.003, mirror=True)
 
-    # ---- stern: a light bar round the top of the mouth, six slanted slot thrusters, a
-    # stern post between the banks
-    half = [P["P8"][n] for n in "KSMR"]
-    hp = [band_point(p, REAR_C, BAND_W * 0.5, 0.0) for p in half]
-    path = hp + [hp[-1].lerp(band_point(P["P8"]["C"], REAR_C, BAND_W * 0.5, 0.0), 0.80)]
-    g = Geo()
-    g.sweep(path, [(-0.007, -0.006), (0.007, -0.006), (0.007, 0.004), (-0.007, 0.004)],
-            up=(-1, 0, 0))
-    g.obj("led.rear", "led_rear", mirror=True)
+    # ---- stern: six slanted slot thrusters, a stern post between the banks (the light
+    # bar round the top of the mouth is a lamp)
     xt = REAR_C.x + TAIL_D
     g = Geo()
     gg = Geo()
+    gv = Geo()
     for k in range(3):
         y = 0.20 + 0.165 * k
         sh = Matrix.Identity(4)
@@ -698,8 +706,12 @@ def build_details():
                 4, a0=pi / 4, a1=pi / 4 + 2 * pi, xf=xf)
         gg.lathe([(0.035, 0.002), (0.035, 0.066), (0.04, 0.066), (0.04, 0.002)],
                  4, a0=pi / 4, a1=pi / 4 + 2 * pi, xf=xf)
+        for kz in (-1, 0, 1):                           # vanes across the slot, set back
+            gv.box((0, 0.068, kz * 0.024), (0.096, 0.05, 0.0035), xf=xf)
+        gv.box((0, 0.068, 0), (0.0035, 0.05, 0.096), xf=xf)
     g.obj("thrusters", "rim", bevel=0.003, mirror=True)
     gg.obj("thruster.glow", "thrust", mirror=True)
+    gv.obj("thruster.vanes", "grille", mirror=True)
     g = Geo()
     g.hexa([(xt + 0.01, -0.085, 0.72), (xt + 0.01, 0.085, 0.72), (-2.425, 0.025, 0.75),
             (-2.425, -0.025, 0.75), (xt + 0.01, -0.085, 0.95), (xt + 0.01, 0.085, 0.95),
@@ -730,14 +742,8 @@ def build_surface_details():
         x = -1.64 - 0.07 * k
         ribbon(g, [(x, 1.265), (x - 0.11, 1.03)], 'y', 0.030)
     g.obj("hazard.stripes", "hazard", mirror=True)
-    # ---- grooves: the door's release slot and step notch, a line under the shoulder along
-    # the bed, a charge port
-    g = Geo()
-    ribbon(g, [(0.60, 1.30), (-0.80, 1.30), (-2.05, 1.30)], 'y', 0.007)
-    ribbon(g, [(0.92, 1.235), (1.12, 1.23)], 'y', 0.018)
-    hexa = [(0.30 + 0.05 * cos(rad(a)), 1.13 + 0.038 * sin(rad(a))) for a in range(0, 360, 60)]
-    ribbon(g, hexa, 'y', 0.004, closed=True)
-    g.obj("lines", "void", mirror=True)
+    # (the line under the shoulder along the bed, the door's release and the charge flap
+    # are cut into the hull: cutters())
     # ---- the visor: sensor slits and a status light at its front edge
     g = Geo()
     for k in range(3):
@@ -767,10 +773,11 @@ def build_surface_details():
     g.lathe([(0.022, 0.004), (0.022, 0.052), (0.085, 0.052), (0.105, 0.036), (0.105, 0.004)], 12,
             xf=Matrix.Translation((0.98, 0.34, zr - 0.012)) @ up)
     g.obj("led.beacon", "beacon")
-    g = Geo()
+    L = K.Lamp("lamp.work", lit="lamp")                 # work lamps over the bed
     for sy in (1, -1):
-        g.box((0.738, sy * 0.36, zr + 0.016), (0.006, 0.20, 0.034))
-    g.obj("led.worklamps", "lamp")
+        strip_lamp(L, 0.740, -1, sy * 0.36 - 0.11, sy * 0.36 + 0.11, zr + 0.016, 0.044,
+                   cells=2)
+    L.obj()
     # ---- pitot pins, studs on the panels
     g = Geo()
     gp = Geo()
@@ -778,7 +785,7 @@ def build_surface_details():
         loc, n = on_body(x, y, 'z')
         if loc is not None:
             stud(gp, loc, n, [(-0.002, 0.001), (-0.002, 0.008), (0.002, 0.008), (0.002, 0.001)], 6)
-    for k in range(8):                                  # a row of fasteners down each flank
+    for k in range(7):                                  # a row of fasteners down each flank
         loc, n = on_body(0.40 - 0.36 * k, 0.98, 'y')
         if loc is not None:
             stud(gp, loc, n, [(-0.002, 0.001), (-0.002, 0.009), (0.002, 0.009), (0.002, 0.001)], 6)
@@ -816,16 +823,28 @@ def build_surface_details():
 # interior: two seats, a yoke, a screen across the dash
 # ---------------------------------------------------------------------------------------
 def build_interior():
+    # the tub follows the hull's flare: narrow at the floor, as wide as the cab at the
+    # shoulder (step A found the dash and the floor's front corners out under the prow)
     g = Geo()
-    g.box((1.50, 0, 0.60), (1.60, 1.22, 0.02))
-    g.prism([(2.24, -0.74, 0.60), (2.24, -0.74, 1.12), (1.96, -0.74, 1.17),
-             (1.78, -0.74, 1.10), (1.84, -0.74, 0.84), (1.84, -0.74, 0.60)], (0, 1.48, 0))
+    g.prism([(0.70, -0.60, 0.59), (1.60, -0.60, 0.59), (1.84, -0.56, 0.59), (2.12, -0.40, 0.59),
+             (2.12, 0.40, 0.59), (1.84, 0.56, 0.59), (1.60, 0.60, 0.59), (0.70, 0.60, 0.59)],
+            (0, 0, 0.02))
+
+    def dash_w(z):                                      # the hull's half width less 3 cm
+        return min(0.72, 0.50 + (z - 0.61) * 0.95)
+    dash = [(2.14, 0.61), (2.14, 1.12), (1.96, 1.17), (1.78, 1.10), (1.84, 0.84), (1.84, 0.61)]
+    n = len(dash)
+    g.add([(x, -dash_w(z), z) for x, z in dash] + [(x, dash_w(z), z) for x, z in dash],
+          [tuple(range(n)), tuple(range(n, 2 * n))]
+          + [(i, (i + 1) % n, n + (i + 1) % n, n + i) for i in range(n)])
     g.box((1.30, 0, 0.71), (1.00, 0.17, 0.22))
-    g.box((0.80, 0, 1.02), (0.05, 1.50, 0.86))          # the cab's back wall, inside
+    g.prism([(0.775, -0.58, 0.59), (0.775, 0.58, 0.59), (0.775, 0.87, 0.90),
+             (0.775, 0.84, 1.45), (0.775, -0.84, 1.45), (0.775, -0.87, 0.90)],
+            (0.05, 0, 0))                               # the cab's back wall, inside
     for sy in (1, -1):                                  # door cards under the glass
-        g.prism([(1.9, sy * 0.63, 0.60), (1.9, sy * 0.69, 0.60), (1.9, sy * 0.84, 0.80),
-                 (1.9, sy * 0.86, 1.26), (1.9, sy * 0.78, 1.26), (1.9, sy * 0.74, 0.86)],
-                (-1.10, 0, 0))
+        g.prism([(1.84, sy * 0.55, 0.61), (1.84, sy * 0.59, 0.61), (1.84, sy * 0.80, 0.80),
+                 (1.84, sy * 0.82, 1.26), (1.84, sy * 0.75, 1.26), (1.84, sy * 0.70, 0.86)],
+                (-1.04, 0, 0))
     g.obj("interior.tub", "interior", bevel=0.006)
     g = Geo()
     tilt = Matrix.Rotation(rad(-14), 3, 'Y')
@@ -897,14 +916,18 @@ def main():
     build_hull()
     K.log("hull")
     for tag, p in PODS.items():
-        build_pod(tag, **p)
-    pod_ribs()
+        kestrel.build_pod(tag, mat=POD_MAT, heavy=True, **p)
+    kestrel.pod_ribs(PODS)
     K.log("pods")
     build_details()
     build_fins()
     build_bed()
     build_interior()
     K.log("details")
+    # the load stands where it was strapped, the beacon and the roof's sensor blade on one
+    # side of the roof, the yoke is the pilot's
+    K.meant("symmetry", "cases", "case.*", "straps", "strap.ratchets", "led.beacon",
+            "roof.gear", "interior.yoke")
     K.shoot(extra=dict(view="top", size=(1040, 420)))
 
 

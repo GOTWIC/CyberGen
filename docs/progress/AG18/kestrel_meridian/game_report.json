@@ -3,25 +3,25 @@
  "title": "Kestrel Aerodyne Meridian",
  "ok": true,
  "triangles": {
-  "original": 90334,
+  "original": 119902,
   "lods": [
-   63539,
-   38119,
-   19997,
-   5079
+   82363,
+   49417,
+   20381,
+   5109
   ],
   "lod0_parts": {
-   "body": 62275,
+   "body": 81099,
    "glass": 1264
   }
  },
  "objects": {
-  "original": 110,
+  "original": 129,
   "parts": 2
  },
  "size_class": {
   "name": "standard",
-  "exterior_m2": 33.78,
+  "exterior_m2": 35.6,
   "rule": "large when the body's exterior is 55 m2 or more",
   "lod_budgets": [
    150000,
@@ -37,26 +37,29 @@
  "textures": {
   "body": 4096
  },
- "pack_bytes": 28819982,
- "seconds": 663.4,
+ "pack_bytes": 32356075,
+ "seconds": 1189.6,
  "stage_seconds": {
-  "build": 0.2,
-  "render_original": 60.5,
-  "parts": 21.9,
+  "build": 1.5,
+  "render_original": 246.8,
+  "parts": 24.5,
   "nodes": 0.0,
-  "uv": 318.0,
-  "bake": 131.0,
-  "lods_export": 13.0,
-  "textures": 6.136171579360962,
-  "proof": 112.32888388633728
+  "uv": 254.8,
+  "bake": 207.1,
+  "lods_export": 39.8,
+  "textures": 7.150516033172607,
+  "proof": 407.57733607292175
  },
  "baked_down": {
   "relief": {
-   "pieces": 8,
-   "triangles": 3116,
+   "pieces": 11,
+   "triangles": 4040,
    "names": [
     "decals",
     "fasteners",
+    "lamp.chine_f.chrome",
+    "lamp.chine_r.chrome",
+    "lamp.keel.chrome",
     "led.marker",
     "led.visor",
     "lettering",
@@ -69,36 +72,36 @@
  "texel_px_per_m": {
   "body": {
    "exterior": {
-    "area_m2": 33.78,
-    "p5": 359.5,
-    "median": 370.7
+    "area_m2": 35.601,
+    "p5": 374.0,
+    "median": 388.3
    },
    "cabin": {
-    "area_m2": 25.508,
-    "p5": 147.0,
-    "median": 148.3
+    "area_m2": 23.056,
+    "p5": 154.5,
+    "median": 156.3
    },
    "underside": {
-    "area_m2": 7.855,
-    "p5": 129.6,
-    "median": 370.8
+    "area_m2": 8.207,
+    "p5": 135.8,
+    "median": 388.5
    },
    "lamp_in_gaps": {
-    "area_m2": 6.645,
-    "p5": 129.7,
-    "median": 129.7
+    "area_m2": 2.96,
+    "p5": 135.8,
+    "median": 388.3
    }
   }
  },
- "lights": 55,
- "collision_hulls": 12,
+ "lights": 56,
+ "collision_hulls": 11,
  "source": {
   "script": "vehicles/cars/kestrel_meridian.py",
-  "script_sha256": "6721720365425c67d736f7c0f951ba020838111e61bba54331fb01a228c46cf1",
-  "carkit_sha256": "86fc2281f799baae0c26b3ac0a61705bd4f58e4eb5e5443afa1c08342131b5e3",
-  "game_sha256": "34e41ae8a9f23206b0f9a1a8a1ceacc883c53bb9a1fad19ee54fee8ef83d570f",
-  "original_triangles": 90334,
-  "original_objects": 110
+  "script_sha256": "ffc653efe2269632287343e5b465ec2fb78cfce3ec8edf5e6dc54dccf38cb149",
+  "carkit_sha256": "4a1b9a9a1c4472c37227e0b9171ff94263a6d3d320dd4d13ad55783936af1832",
+  "game_sha256": "32271c5b2195e75c93509022799b7dd770add377d59cc906b924e040e27ff1db",
+  "original_triangles": 119902,
+  "original_objects": 129
  },
  "test": false,
  "checks": [
@@ -117,25 +120,25 @@
    "detail": [
     {
      "lod": 0,
-     "triangles": 63539,
+     "triangles": 82363,
      "budget": 150000,
      "ok": true
     },
     {
      "lod": 1,
-     "triangles": 38119,
+     "triangles": 49417,
      "budget": 60000,
      "ok": true
     },
     {
      "lod": 2,
-     "triangles": 19997,
+     "triangles": 20381,
      "budget": 20000,
      "ok": true
     },
     {
      "lod": 3,
-     "triangles": 5079,
+     "triangles": 5109,
      "budget": 5000,
      "ok": true
     }
@@ -148,8 +151,8 @@
     "limit": 0.005,
     "slots": {
      "body": {
-      "overlap": 0.00046,
-      "coverage": 0.475,
+      "overlap": 0.00098,
+      "coverage": 0.4951,
       "outside_unit": 0.0
      }
     }
@@ -160,8 +163,8 @@
    "ok": true,
    "detail": {
     "body": {
-     "p5": 359.5,
-     "median": 370.7,
+     "p5": 374.0,
+     "median": 388.3,
      "floor": 300.0,
      "ok": true
     }
@@ -181,12 +184,12 @@
      "deviation_m": [
       0.0,
       0.0,
-      0.0
+      0.0001
      ],
      "tolerance_m": [
       0.0797,
       0.0311,
-      0.0209
+      0.0207
      ],
      "ok": true
     },
@@ -194,27 +197,27 @@
      "lod": 2,
      "deviation_m": [
       0.0,
-      0.0,
+      0.0005,
       0.0005
      ],
      "tolerance_m": [
       0.0797,
       0.0311,
-      0.0209
+      0.0207
      ],
      "ok": true
     },
     {
      "lod": 3,
      "deviation_m": [
-      0.0055,
+      0.0037,
       0.0,
       0.0
      ],
      "tolerance_m": [
       0.0797,
       0.0311,
-      0.0209
+      0.0207
      ],
      "ok": true
     }
@@ -225,10 +228,10 @@
    "ok": true,
    "detail": [
     {
-     "normal_p95_deg": 1.28,
-     "bent_share": 0.0035,
-     "texture_share": 0.0017,
-     "miss_share": 0.0023,
+     "normal_p95_deg": 1.05,
+     "bent_share": 0.0029,
+     "texture_share": 0.0009,
+     "miss_share": 0.0036,
      "lod": 1,
      "limits": {
       "p95": 12.0,
@@ -238,10 +241,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 6.94,
-     "bent_share": 0.0062,
-     "texture_share": 0.0049,
-     "miss_share": 0.0033,
+     "normal_p95_deg": 12.5,
+     "bent_share": 0.0101,
+     "texture_share": 0.0053,
+     "miss_share": 0.0073,
      "lod": 2,
      "limits": {
       "p95": 25.0,
@@ -251,10 +254,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 30.96,
-     "bent_share": 0.0654,
-     "texture_share": 0.0397,
-     "miss_share": 0.0378,
+     "normal_p95_deg": 25.34,
+     "bent_share": 0.0507,
+     "texture_share": 0.0334,
+     "miss_share": 0.0191,
      "lod": 3,
      "limits": {
       "p95": 40.0,
@@ -269,20 +272,19 @@
    "check": "collision",
    "ok": true,
    "detail": {
-    "hulls": 12,
+    "hulls": 11,
     "vertices": [
-     292,
-     216,
-     330,
-     170,
-     284,
-     176,
-     224,
-     158,
-     358,
-     140,
-     252,
-     132
+     238,
+     192,
+     320,
+     184,
+     228,
+     178,
+     238,
+     156,
+     364,
+     174,
+     266
     ]
    }
   }

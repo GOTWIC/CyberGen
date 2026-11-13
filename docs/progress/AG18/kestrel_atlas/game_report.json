@@ -3,25 +3,25 @@
  "title": "Kestrel Aerodyne Atlas",
  "ok": true,
  "triangles": {
-  "original": 151203,
+  "original": 181915,
   "lods": [
-   101852,
-   59999,
-   20122,
-   8120
+   118747,
+   59998,
+   20293,
+   8210
   ],
   "lod0_parts": {
-   "body": 101116,
+   "body": 118011,
    "glass": 736
   }
  },
  "objects": {
-  "original": 155,
+  "original": 180,
   "parts": 2
  },
  "size_class": {
   "name": "large",
-  "exterior_m2": 72.29,
+  "exterior_m2": 68.36,
   "rule": "large when the body's exterior is 55 m2 or more",
   "lod_budgets": [
    150000,
@@ -37,32 +37,36 @@
  "textures": {
   "body": 4096
  },
- "pack_bytes": 40042384,
- "seconds": 864.9,
+ "pack_bytes": 41121354,
+ "seconds": 1122.1,
  "stage_seconds": {
-  "build": 0.3,
-  "render_original": 55.7,
-  "parts": 31.1,
+  "build": 1.6,
+  "render_original": 253.4,
+  "parts": 35.4,
   "nodes": 0.0,
-  "uv": 473.5,
-  "bake": 178.6,
-  "lods_export": 26.3,
-  "textures": 6.583182096481323,
-  "proof": 92.24397087097168
+  "uv": 121.9,
+  "bake": 243.9,
+  "lods_export": 30.9,
+  "textures": 7.220249176025391,
+  "proof": 427.11061096191406
  },
  "baked_down": {
   "relief": {
-   "pieces": 10,
-   "triangles": 20915,
+   "pieces": 14,
+   "triangles": 19927,
    "names": [
     "case.stencil",
     "fasteners",
     "gate.hazard",
     "gate.name",
     "hazard.stripes",
+    "lamp.beam.chrome",
+    "lamp.beam.lit",
+    "lamp.keel.chrome",
+    "lamp.work.chrome",
+    "lamp.work.lit",
     "led.visor",
     "lettering",
-    "lines",
     "pod.stencils",
     "visor.slits"
    ]
@@ -78,36 +82,36 @@
  "texel_px_per_m": {
   "body": {
    "exterior": {
-    "area_m2": 72.291,
-    "p5": 316.8,
-    "median": 327.5
+    "area_m2": 68.365,
+    "p5": 321.5,
+    "median": 332.5
    },
    "cabin": {
-    "area_m2": 14.024,
-    "p5": 130.9,
-    "median": 327.5
+    "area_m2": 15.373,
+    "p5": 129.2,
+    "median": 133.0
    },
    "underside": {
-    "area_m2": 5.214,
-    "p5": 113.7,
-    "median": 114.6
+    "area_m2": 5.378,
+    "p5": 115.0,
+    "median": 116.6
    },
    "lamp_in_gaps": {
-    "area_m2": 5.136,
-    "p5": 114.6,
-    "median": 327.4
+    "area_m2": 4.926,
+    "p5": 116.3,
+    "median": 116.3
    }
   }
  },
- "lights": 73,
+ "lights": 69,
  "collision_hulls": 11,
  "source": {
   "script": "vehicles/cars/kestrel_atlas.py",
-  "script_sha256": "7233b4fec97c51f6005241ffd298f5cf884b3e91b7fa31da5207297cea6c4ae4",
-  "carkit_sha256": "86fc2281f799baae0c26b3ac0a61705bd4f58e4eb5e5443afa1c08342131b5e3",
-  "game_sha256": "ac27f7dab3eb8522bd38e910dcf6fb19a322ef1ddc91ecb329ca4dd13073d991",
-  "original_triangles": 151203,
-  "original_objects": 155
+  "script_sha256": "03a3f38b3d4fa8f9bf7f8168aee4af5d0b9a57d661ac1cb7319b032f15e5808a",
+  "carkit_sha256": "4a1b9a9a1c4472c37227e0b9171ff94263a6d3d320dd4d13ad55783936af1832",
+  "game_sha256": "32271c5b2195e75c93509022799b7dd770add377d59cc906b924e040e27ff1db",
+  "original_triangles": 181915,
+  "original_objects": 180
  },
  "test": false,
  "checks": [
@@ -126,25 +130,25 @@
    "detail": [
     {
      "lod": 0,
-     "triangles": 101852,
+     "triangles": 118747,
      "budget": 150000,
      "ok": true
     },
     {
      "lod": 1,
-     "triangles": 59999,
+     "triangles": 59998,
      "budget": 60000,
      "ok": true
     },
     {
      "lod": 2,
-     "triangles": 20122,
+     "triangles": 20293,
      "budget": 20000,
      "ok": true
     },
     {
      "lod": 3,
-     "triangles": 8120,
+     "triangles": 8210,
      "budget": 8000,
      "ok": true
     }
@@ -157,8 +161,8 @@
     "limit": 0.005,
     "slots": {
      "body": {
-      "overlap": 5e-05,
-      "coverage": 0.5598,
+      "overlap": 0.00086,
+      "coverage": 0.5152,
       "outside_unit": 0.0
      }
     }
@@ -169,8 +173,8 @@
    "ok": true,
    "detail": {
     "body": {
-     "p5": 316.8,
-     "median": 327.5,
+     "p5": 321.5,
+     "median": 332.5,
      "floor": 240.0,
      "ok": true
     }
@@ -234,10 +238,10 @@
    "ok": true,
    "detail": [
     {
-     "normal_p95_deg": 0.76,
-     "bent_share": 0.0055,
-     "texture_share": 0.0022,
-     "miss_share": 0.0035,
+     "normal_p95_deg": 2.28,
+     "bent_share": 0.0082,
+     "texture_share": 0.0031,
+     "miss_share": 0.0052,
      "lod": 1,
      "limits": {
       "p95": 12.0,
@@ -247,10 +251,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 22.43,
-     "bent_share": 0.0372,
-     "texture_share": 0.0139,
-     "miss_share": 0.0057,
+     "normal_p95_deg": 22.94,
+     "bent_share": 0.0394,
+     "texture_share": 0.0149,
+     "miss_share": 0.0084,
      "lod": 2,
      "limits": {
       "p95": 25.0,
@@ -261,9 +265,9 @@
     },
     {
      "normal_p95_deg": 37.31,
-     "bent_share": 0.0801,
-     "texture_share": 0.0298,
-     "miss_share": 0.054,
+     "bent_share": 0.0909,
+     "texture_share": 0.0256,
+     "miss_share": 0.0512,
      "lod": 3,
      "limits": {
       "p95": 40.0,
@@ -282,15 +286,15 @@
     "vertices": [
      314,
      366,
-     194,
-     238,
-     212,
-     268,
-     224,
-     314,
-     198,
-     232,
-     108
+     208,
+     260,
+     168,
+     266,
+     272,
+     316,
+     171,
+     220,
+     128
     ]
    }
   }

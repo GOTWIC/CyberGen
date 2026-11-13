@@ -6,7 +6,7 @@
   1.739
  ],
  "top_z": 2.114,
- "objects": 155,
+ "objects": 180,
  "palette": {
   "paint": [
    0.165,
@@ -36,16 +36,17 @@
  "symmetry": {
   "verdict": "look",
   "center_off_mm": 0.0,
-  "objects": 19,
+  "objects": 11,
   "asymmetric": [
    {
     "object": "interior.yoke",
     "off_mm": 242.0,
     "at": [
      1.561,
-     0.236,
+     0.263,
      1.197
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "case.bands",
@@ -54,7 +55,8 @@
      -0.244,
      -0.608,
      1.635
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "cases",
@@ -63,7 +65,8 @@
      -0.228,
      -0.614,
      1.632
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "straps",
@@ -72,7 +75,8 @@
      0.146,
      -0.628,
      1.64
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "case.stencil",
@@ -81,7 +85,8 @@
      0.16,
      -0.353,
      1.635
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "case.latches",
@@ -90,7 +95,8 @@
      -0.244,
      -0.458,
      1.365
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "led.beacon",
@@ -99,7 +105,8 @@
      1.011,
      0.358,
      2.114
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "strap.ratchets",
@@ -108,7 +115,8 @@
      0.142,
      0.682,
      1.444
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "roof.gear",
@@ -117,7 +125,8 @@
      1.04,
      0.374,
      2.031
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "pod.f.pod_side",
@@ -174,6 +183,15 @@
     ]
    },
    {
+    "object": "body.lightband",
+    "off_mm": 9.0,
+    "at": [
+     -2.377,
+     -0.874,
+     0.962
+    ]
+   },
+   {
     "object": "pod.r.pod_low",
     "off_mm": 7.4,
     "at": [
@@ -183,21 +201,21 @@
     ]
    },
    {
+    "object": "led.name",
+    "off_mm": 5.2,
+    "at": [
+     -2.492,
+     0.075,
+     1.901
+    ]
+   },
+   {
     "object": "fin.code",
     "off_mm": 3.4,
     "at": [
      -2.237,
      0.898,
      1.659
-    ]
-   },
-   {
-    "object": "led.rear.beam",
-    "off_mm": 3.1,
-    "at": [
-     -2.487,
-     0.063,
-     1.884
     ]
    },
    {
@@ -216,10 +234,11 @@
   "open_edges": [],
   "open_mm": 0,
   "cutter_holes": [],
+  "cut_loops": 18,
   "pieces": {
    "body": {
     "closed": true,
-    "panels": 25
+    "panels": 32
    },
    "pod.f": {
     "closed": true,
@@ -236,25 +255,13 @@
   }
  },
  "through": {
-  "verdict": "look",
-  "parts": [
-   {
-    "object": "interior.tub",
-    "out_mm": 125.3,
-    "share": 0.35,
-    "at": [
-     2.24,
-     -0.734,
-     0.606
-    ],
-    "meant": false
-   }
-  ],
-  "count": 1
+  "verdict": "ok",
+  "parts": [],
+  "count": 0
  },
  "triangles": {
   "verdict": "ok",
-  "total": 151203,
+  "total": 181915,
   "budget": 400000,
   "top": [
    [
@@ -282,12 +289,12 @@
     4592
    ],
    [
-    "pod.ribs",
-    4200
+    "body.lightband",
+    4358
    ],
    [
-    "body.trim",
-    4120
+    "pod.ribs",
+    4200
    ]
   ],
   "groups": [
@@ -297,7 +304,7 @@
    ],
    [
     "body",
-    20222
+    41658
    ],
    [
     "lettering",
@@ -306,6 +313,10 @@
    [
     "drum",
     10834
+   ],
+   [
+    "lamp",
+    10252
    ],
    [
     "hull",
@@ -318,10 +329,6 @@
    [
     "hoist",
     6076
-   ],
-   [
-    "rail",
-    5504
    ]
   ]
  },

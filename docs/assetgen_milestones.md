@@ -3245,8 +3245,51 @@ Vanta-R the same).
 - **Aurel set aside** (Swagnik, 2026-11-12: not in use for now): the Prelate's step B pass
   (its slot grille tore in the pack's far LODs) is kept on branch
   `claude/ag18-prelate-step-b-wip`, not merged; the Aurels are left out of the next batches.
-- **Next**: the other cars of the Kestrel, Orrin, Brakk and Tanager brands on the
-  pilots' patterns (Meridian, Atlas, Pebble, Aria, Bastion, Mule, Cab, Porter), each switching to its `vehicles/brands/` module, with step A's street-distance
+- **Kestrel Meridian** (`docs/progress/AG18/kestrel_meridian/`, now on
+  `vehicles/brands/kestrel.py`): the Dart's family on the sedan's hull. The mouth's three
+  lamp cells each side in a slot cut 40 mm into its back wall, 3 mm proud of it between
+  bright dividers, under a clear lens in a dark surround standing 12 mm proud (a lens flush
+  with the wall went dark in the pack's LOD3, the wall drawn across the slot); the chine's
+  knife edge cut into lit channels under clear and red lenses at the prow (0.80 m, the light
+  blade over the mouth now leaving from it) and the stern (0.29 m); the stern bar a channel
+  under a red lens with a red core and ribs; the keel blade's foot a lamp channel along
+  3.30 m; vanes in the six thruster slots; the shoulder groove (traced every 4 cm), both door
+  releases and the charge flap cut; 3.5 mm shut lines; frit on every pane; the maker's name
+  laid on its band in letters 5 mm proud (flat, the pack baked them and lost strokes). Step
+  A's cabin tub in the open (16.8 mm under the rear floor's corner) fixed locally: the
+  floor's rear corners cut in, a step up under the rear bench, the dash and door cards
+  narrower at their foot (`through` ok). The one-sided boarding step and the yoke told as
+  meant. 119,902 triangles (90,334). Checks: through `ok` (was `look`), symmetry `look` (the
+  pod, fin code and stern name, 3 to 11 mm, as before), the rest `ok`. Pack rebuilt, every
+  check passing: 82,363, 49,417, 20,381, 5,109 triangles, standard class, texels 374 px/m
+  (5th percentile), LOD3 25.3 of 40 degrees, 0.051 of 0.10 bent, 0.033 of 0.04 texture (main
+  31.0, 0.065, 0.0397). Its far LOD starved at first and dropped the prow's stem: the
+  shoulder groove and the chine channels traced less densely and the stem's foot 38 mm
+  lower, its LOD row reads as main's. Not published.
+- **Kestrel Atlas** (`docs/progress/AG18/kestrel_atlas/`, now on `vehicles/brands/kestrel.py`
+  with the heavy pods): the family's lamps on the hauler. The prow's four work lamp cells each
+  side in a slot cut 40 mm into the mouth's back wall, 3 mm proud of it between bright
+  dividers, under a clear lens in a dark surround 12 mm proud; the chine's knife edge cut into
+  lit channels under clear and red lenses at the prow (0.78 m) and the stern (0.30 m); the
+  stern band made even (35 mm all round; under the bed's edge it had narrowed to about 10 mm)
+  and the stern bar two channels in it under a red lens (an unbroken path over the rail ends'
+  step folded and emptied the hull); the hoist beam's high tail light two lamps of three red
+  cells under a red lens standing proud of the beam, the maker's name laid on the beam in
+  letters 5 mm proud; the keel blade's foot a lamp channel along 3.70 m; the roof's work lamps
+  cells behind a clear lens in a rim; vanes in the six thruster slots; the line under the
+  shoulder, the door release and the charge flap cut; 3.5 mm shut lines; frit on every pane.
+  Step A's cabin tub in the open (35%, up to 125 mm, under the prow) fixed locally: the dash
+  follows the hull's flare and stops 100 mm further back, the floor's front corners cut in,
+  the back wall and the door cards follow the flanks (`through` ok). The load, the roof's
+  beacon and gear and the yoke told as meant. 181,915 triangles (151,203). Checks: through
+  `ok` (was `look`), symmetry `look` (the pods, drum stencil and fin code as before, the even
+  band 9.0 mm and the name 5.2 mm), the rest `ok`. Pack rebuilt, every check passing:
+  118,747, 59,998, 20,293, 8,210 triangles, large class, texels 322 px/m (5th percentile),
+  LOD3 37.3 of 40 degrees, 0.091 of 0.10 bent, 0.026 of 0.04 texture (main 37.3, 0.080,
+  0.030); its LOD row reads as main's, the prow's cells lit at LOD3, the charge flap a dark
+  dot there. Not published.
+- **Next**: the other cars of the Orrin, Brakk and Tanager brands on the
+  pilots' patterns (Pebble, Aria, Bastion, Mule, Cab, Porter), each switching to its `vehicles/brands/` module, with step A's street-distance
   findings fixed as it is redone.
 
 ### Parked in Delta Megacity on the PC (2026-11-12)
