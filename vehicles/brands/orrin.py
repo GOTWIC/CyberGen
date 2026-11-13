@@ -23,6 +23,9 @@ build_disc). Differences kept by parameters:
   hub (three radii of the hub's face), sweep (the vanes' turn, degrees) and cap (the
   center ring) set the face, size=DISC_SMALL the Pebble's slimmer face throughout.
 
+Added for the Pebble's step B: lune_cut (the Lumen's lune_cut, slots told to the checks),
+NARROW (a narrow tire's tread, disc(tread=NARROW)).
+
 Covered by the kit: spline is carkit's spline() (the same code), re-exported. The kit's
 snap() and strip() are newer, more general ones (objs, out), but snap's turn of the normal
 differs from both Orrin rules, so the Orrin pair stays here.
@@ -152,6 +155,33 @@ def lune(g, a, b, d, toward, far, near, out=0.2, depth=0.04, flare=0.02, n=16):
         g.add([p + dd * out for p in rim] + [p - dd * depth for p in rim2], faces)
 
 
+def lune_cut(g, a, b, d, toward, far, near, n=16, **kw):
+    """lune(), and its outline on the skin told to the checks (K.CUTS: a slot cut on purpose,
+    not a hole). Call it from build_body's cutters function, while the hull stands uncut.
+    (The Lumen keeps a copy of its own.)"""
+    lune(g, a, b, d, toward, far, near, n=n, **kw)
+    a, b, d = V3(a), V3(b), V3(d).normalized()
+    u = b - a
+    ln = u.length
+    u.normalize()
+    d = (d - u * d.dot(u)).normalized()
+    v = d.cross(u).normalized()
+    if v.dot(V3(toward)) < 0:
+        v = -v
+    ts = [k / n for k in range(n + 1)]
+    rim = ([a + u * ln * t + v * far * 4 * t * (1 - t) for t in ts]
+           + [a + u * ln * t + v * near * 4 * t * (1 - t) for t in ts[-2:0:-1]])
+    tree = K._tree(None)
+    for sgn in (1, -1):
+        dd = V3((d.x, sgn * d.y, d.z))
+        Q = []
+        for p in rim:
+            p = V3((p.x, sgn * p.y, p.z))
+            hit = tree.ray_cast(p + dd * 0.2, -dd, 0.4)[0]
+            Q.append(hit if hit is not None else p)
+        K.CUTS.append(Q + [Q[0]])
+
+
 def pebble(g, at, a, b, h, seg=40, up=(0, 0, 1)):
     """A low oval bead on the surface at the point nearest `at`: a wide, b high, h proud."""
     loc, n = snap(at)
@@ -256,6 +286,13 @@ def rim_at(x, tree=None, *, pt, order, line="S", at=0.35, push=(0, 0.03, 0.03), 
     raise ValueError(x)
 
 
+NARROW = dict(grooves=(-0.11, 0.11), gw=(0.009, 0.005), gd=0.008, mod=4, shift=2,
+              inset=(0.002, 0.006), seg=144)
+"""A road tread for a narrow tire (the Pebble's 0.185 m): the kit's "road" grooves fall
+outside such a tire's crown, its profile folds back and its blocks stand 7 mm under the
+ground. The same as Tanager's NARROW."""
+
+
 # the disc's face: the profile's offsets (from the rim and from the tire's half width:
 # rim1, out1, rim2, out2, rim3, out3, hub_out, back, back_rim, rim_end), the vanes' outer
 # radius under the rim, their offset and half section, the rings' offsets
@@ -267,12 +304,14 @@ DISC_SMALL = dict(face=(0.006, 0.011, 0.014, 0.032, 0.018, 0.034, 0.013, 0.07, 0
 
 
 def disc(tag, cx, out_y, side, vanes=60, *, R, W, rim, r_in=0.118, hub=(0.102, 0.072, 0.040),
-         sweep=40, cap=(0.026, 0.035), size=DISC):
+         sweep=40, cap=(0.026, 0.035), size=DISC, tread="road"):
     """The Orrin turbine disc on the kit's tire (radius R, width W, rim radius rim, its outer
     face at y out_y): a smooth face, vanes curved sweep degrees from r_in out to the rim, a
-    lit ring at each end of them. The kit's rim and hub are taken away."""
+    lit ring at each end of them. The kit's rim and hub are taken away. tread: a kit tread
+    or NARROW."""
     RIM = rim
-    K.build_wheel(tag, cx, R, W, RIM, out_y, side, style="disc", ring=None, caliper=None)
+    K.build_wheel(tag, cx, R, W, RIM, out_y, side, style="disc", ring=None, caliper=None,
+                  tread=tread)
     for part in ("rim.", "hub."):
         ob = bpy.data.objects[part + tag]
         me = ob.data

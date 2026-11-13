@@ -17,7 +17,7 @@
 | [kestrel_meridian](kestrel_meridian/check.json) | ok: none (hover) | ok: 335.0 mm (lamp.keel.glass) | look: 3 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 119902 |
 | [orrin_aria](orrin_aria/check.json) | FAIL: 0.0 mm to body.front, steers 0 deg | ok: 131.8 mm (body.floor) | look: 2 objects | look: 0 open runs, 12 cutter holes | ok: 0 parts | look: 501460 |
 | [orrin_lumen](orrin_lumen/check.json) | look: 14.6 mm to body.well, steers 0 deg | ok: 130.0 mm (body.floor) | look: 2 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 356940 |
-| [orrin_pebble](orrin_pebble/check.json) | FAIL: 0.0 mm to body.well, steers 0 deg | ok: 143.3 mm (body.floor) | look: 5 objects | look: 0 open runs, 10 cutter holes | ok: 0 parts | ok: 266030 |
+| [orrin_pebble](orrin_pebble/check.json) | look: 15.9 mm to body.rear, steers 0 deg | ok: 143.3 mm (body.floor) | look: 5 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 326370 |
 | [tanager_cab](tanager_cab/check.json) | FAIL: 0.0 mm to bumper.guards.rear, steers 0 deg | ok: 120.0 mm (mudflaps) | look: 39 objects | FAIL: 4 open runs, 0 cutter holes | look: 1 parts | ok: 285996 |
 | [tanager_mino](tanager_mino/check.json) | ok: 51.9 mm to body.clad, steers 35 deg | ok: 110.0 mm (mudflaps) | look: 1 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 276187 |
 | [tanager_porter](tanager_porter/check.json) | FAIL: 0.0 mm to interior.tub, steers 0 deg | ok: 120.0 mm (mudflaps) | look: 87 objects | FAIL: 5 open runs, 0 cutter holes | look: 5 parts | ok: 314760 |
@@ -120,24 +120,14 @@
 - not mirrored: `interior.wheel` 161.6 mm, `led.cabin` 8.3 mm
 - open ends of open pieces (meant): `deck.front.deck`, `deck.rear.deck`
 
-**orrin_pebble** (FAIL)
+**orrin_pebble** (look)
 
-- tire `fl`: 0.0 mm to `body.well`, turns 0 degrees before it touches `body.well`, its foot -7.0 mm off the ground
-- tire `rl`: 0.0 mm to `body.well`, its foot -7.0 mm off the ground
-- tire `fr`: 0.0 mm to `body.well`, turns 0 degrees before it touches `body.well`, its foot -7.0 mm off the ground
-- tire `rr`: 0.0 mm to `body.well`, its foot -7.0 mm off the ground
+- tire `fl`: 16.6 mm to `body.front`, turns 0 degrees before it touches `body.well`
+- tire `rl`: 15.9 mm to `body.rear`
+- tire `fr`: 16.7 mm to `body.front`, turns 0 degrees before it touches `body.well`
+- tire `rr`: 15.9 mm to `body.rear`
 - not mirrored: `interior.fittings` 160.0 mm, `luggage.case` 113.6 mm, `luggage.straps` 99.7 mm, `luggage.bag` 74.3 mm, `led.cabin` 5.4 mm
 - open ends of open pieces (meant): `liner.liner`
-- a cutter's hole inside `body.front`: 751 mm round, at (1.357, -0.332, 0.439)
-- a cutter's hole inside `body.front`: 559 mm round, at (0.519, 0.772, 0.352)
-- a cutter's hole inside `body.front`: 751 mm round, at (1.357, 0.332, 0.439)
-- a cutter's hole inside `body.front`: 559 mm round, at (0.519, -0.772, 0.352)
-- a cutter's hole inside `body.petal`: 503 mm round, at (0.18, -0.793, 0.623)
-- a cutter's hole inside `body.petal`: 503 mm round, at (0.18, 0.793, 0.623)
-- a cutter's hole inside `body.rear`: 751 mm round, at (-1.358, -0.331, 0.489)
-- a cutter's hole inside `body.rear`: 751 mm round, at (-1.358, 0.331, 0.489)
-- a cutter's hole inside `body.rear`: 559 mm round, at (-0.498, -0.771, 0.351)
-- a cutter's hole inside `body.rear`: 559 mm round, at (-0.498, 0.771, 0.351)
 
 **tanager_cab** (FAIL)
 
