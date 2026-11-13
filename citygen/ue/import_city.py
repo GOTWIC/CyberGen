@@ -326,6 +326,18 @@ def meta(asset, key):
     return EAL.get_metadata_tag(asset, key) or ""
 
 
+def clear_material(m):
+    """Every expression of a material deleted, so it is rebuilt from nothing. (AT5:
+    `delete_all_material_expressions` alone leaves about half of them: a rebuilt master kept
+    its old nodes beside its new ones, M_CgWater two Single Layer Water outputs, and failed to
+    compile. Called again until none is left.)"""
+    for _ in range(16):
+        MEL.delete_all_material_expressions(m)
+        if MEL.get_num_material_expressions(m) == 0:
+            return
+    raise RuntimeError(f"{m.get_name()}: its expressions could not all be deleted")
+
+
 # --- core assets (shared by every city) ---------------------------------------------------------
 
 def pin_type(spec):
@@ -1075,7 +1087,7 @@ def light_pool_material():
     if m is None:
         m = AT.create_asset("M_CgLightPool", CORE, unreal.Material, unreal.MaterialFactoryNew())
     else:
-        MEL.delete_all_material_expressions(m)
+        clear_material(m)
     m.set_editor_property("material_domain", unreal.MaterialDomain.MD_DEFERRED_DECAL)
     m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
     MP = unreal.MaterialProperty
@@ -1552,7 +1564,8 @@ def grass_master(m, defaults):
 
 
 ATMOS_MPC = "/Game/CityGen/Core/Atmos/MPC_CityGenAtmos"
-WATER_RAIN = "rain1"        # AT5: M_CgWater's rain rings (its own version past STAGE2_VERSION)
+WATER_RAIN = "rain2"        # AT5: M_CgWater's rain rings (its own version past STAGE2_VERSION;
+                            # 2: rebuilt from nothing, clear_material)
 
 
 def atmos_mpc():
@@ -1572,8 +1585,10 @@ def master_tag(master):
     alone; its instances, and every other master, are kept)."""
     if master == "water" and atmos_mpc() is not None:
         return f"{STAGE2_VERSION}.{WATER_RAIN}"
-    if master == "leaves" and LEAF_SWAY:
-        return f"{STAGE2_VERSION}.{LEAF_WIND}"
+    if master == "leaves":
+        # (without the sway `still1`: a project whose leaves had it, or a rebuild that left
+        # its nodes behind, gets them rebuilt from nothing)
+        return f"{STAGE2_VERSION}.{LEAF_WIND if LEAF_SWAY else 'still1'}"
     return STAGE2_VERSION
 
 
@@ -1599,7 +1614,7 @@ def stage2_master(master, defaults=None):
     if m is None:
         m = AT.create_asset(name, CORE, unreal.Material, unreal.MaterialFactoryNew())
     else:
-        MEL.delete_all_material_expressions(m)
+        clear_material(m)
     MP = unreal.MaterialProperty
     if master in ("facade", "metal", "concrete", "foliage", "road", "bed"):
         textured_surface(m, master, defaults)
@@ -1786,7 +1801,7 @@ def vehicle_master(defaults):
     if m is None:
         m = AT.create_asset("M_CgVehicle", CORE, unreal.Material, unreal.MaterialFactoryNew())
     else:
-        MEL.delete_all_material_expressions(m)
+        clear_material(m)
     uv = expr(m, unreal.MaterialExpressionTextureCoordinate, -1600, 0, coordinate_index=0)
     tex = {}
     for k, (name, mp) in enumerate((("BaseTex", "base_color"), ("NormalTex", "normal"),

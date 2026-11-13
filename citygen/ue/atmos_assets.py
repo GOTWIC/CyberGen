@@ -51,13 +51,14 @@ import unreal
 
 JOB = json.load(open(os.environ["CITYGEN_UE_JOB"], encoding="utf-8"))
 FOLDER = "/Game/CityGen/Core/Atmos"
-VERSION = "14"  # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air);
+VERSION = "15"  # 2: fewer, smaller puddles (1 blotched big paved yards seen from the air);
                 # 3 (AT2): M_CgBeacon and M_CgBeam; 4 to 8 (AT3): M_CgSky; 9 to 12 (AT4):
                 # M_CgSteam, MPC_CityGenAtmos's SteamGain; 13 (AT5): the weather (M_CgWet
                 # gone: M_CgWetColor and M_CgWetGloss, M_CgRain cut by the covers and leaning
                 # in the wind, M_CgSplash, M_CgDrip, the steam drifting with the wind's heading);
                 # 14: a drizzle's streets glossy too (the gloss and darkening by the wetness's
-                # square root)
+                # square root); 15: every material rebuilt from nothing (clear_material: the
+                # old nodes were left beside the new), the collection's parameters kept (ids)
 # AT5: MPC_CityGenAtmos: the weather now (the controller blends its states): the rain's rate,
 # how wet the open surfaces are and how full the puddles, the fog, the wind (its speed with
 # its gusts, its heading as a unit vector), the plumes' gain, the streaks' length and the
@@ -74,6 +75,17 @@ T0 = time.time()
 
 def meta(asset, key):
     return EAL.get_metadata_tag(asset, key) or ""
+
+
+def clear_material(m):
+    """Every expression of a material deleted, so it is rebuilt from nothing. (AT5:
+    `delete_all_material_expressions` alone leaves about half of them: a rebuilt material
+    kept its old nodes beside its new ones. Called again until none is left.)"""
+    for _ in range(16):
+        MEL.delete_all_material_expressions(m)
+        if MEL.get_num_material_expressions(m) == 0:
+            return
+    raise RuntimeError(f"{m.get_name()}: its expressions could not all be deleted")
 
 
 def expr(m, cls, x, y, **props):
@@ -115,8 +127,15 @@ def collection():
     if c is None:
         c = AT.create_asset("MPC_CityGenAtmos", FOLDER, unreal.MaterialParameterCollection,
                             unreal.MaterialParameterCollectionFactoryNew())
-    have = []
+    # (the parameters it has kept as they are, with their ids, the missing ones added: a
+    # material made by another script, AT5's rain rings in the stage 2 water master, keeps
+    # finding its parameter; a list made afresh gave every parameter a new id and that
+    # master's reference went stale)
+    have = list(c.get_editor_property("scalar_parameters"))
+    names = {str(q.get_editor_property("parameter_name")) for q in have}
     for name, v in COLLECTION:
+        if name in names:
+            continue
         q = unreal.CollectionScalarParameter()
         q.set_editor_property("parameter_name", name)
         q.set_editor_property("default_value", v)
@@ -140,7 +159,7 @@ def material(name):
     if m is None:
         m = AT.create_asset(name, FOLDER, unreal.Material, unreal.MaterialFactoryNew())
     else:
-        MEL.delete_all_material_expressions(m)
+        clear_material(m)
     return m, True
 
 

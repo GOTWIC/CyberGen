@@ -1873,15 +1873,22 @@ cards and wet decal become the real thing:
   under gravity, drifting downwind; dripping while it rains and a while after (the wetness).
 - **Rain on the water** (`M_CgWater`, the importer's stage 2 master): rings spreading from
   drops (hashed points in two layers of 35 cm cells) added to its normal by
-  `MPC_CityGenAtmos`'s `Rain`, within 40 m of the eye. The master's version tag gains `.rain1`
+  `MPC_CityGenAtmos`'s `Rain`, within 40 m of the eye. The master's version tag gains `.rain2`
   (`import_city.master_tag`) where the project has atmosgen's collection, so an import with
   an atmos plan rebuilds the water master alone (its instances and every other master kept).
+  atmosgen's assets keep the collection's parameters (their ids) when they add new ones, so
+  that reference never goes stale.
+- **Masters rebuilt from nothing** (`import_city.clear_material`, `atmos_assets.clear_material`):
+  `delete_all_material_expressions` left about half of a material's nodes, so a rebuilt master
+  kept its old graph beside its new one; harmless until two Single Layer Water outputs or a
+  stale custom node stopped `M_CgWater` and `M_CgLeaves` from compiling (the default material
+  in the game). Both now delete until none is left; `M_CgLeaves`' tag is `.still1` (rebuilt once).
 - **Wind**: the steam and smoke plumes (`M_CgSteam`) drift along the wind's heading, the rain
   leans in it, the drips drift with it, AG13's grass sways with `MPC_CityGen`'s `Wind`. The trees'
   sway is built into `M_CgLeaves` (`import_city.LEAF_SWAY`, tag `.wind1`) but off: it cost a
   tree-lined street 4.5 ms of GPU a frame (Nanite's voxelized leaves with a world position
   offset). The trees and flags: `docs/progress/AT5`'s open items.
-- **Assets** (`atmos_assets.py` version 14): `M_CgWetColor`, `M_CgWetGloss`, `M_CgSplash`,
+- **Assets** (`atmos_assets.py` version 15): `M_CgWetColor`, `M_CgWetGloss`, `M_CgSplash`,
   `M_CgDrip` and the new `M_CgRain`; AT0's `M_CgWet` is deleted; `MPC_CityGenAtmos` gains
   `Puddles`, `WindX`, `WindY`, `Streak` and `Drops`. All under `/Game/CityGen/Core/Atmos`
   (cooked always).

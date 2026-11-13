@@ -95,7 +95,7 @@ visible lights (#215). Report, measurements and images:
   share an opacity, so darkening without painting the markings over and a mirror gloss need
   two); the rain cut under the covers and leaning; splashes where traces from the sky land;
   drips; rain rings on `M_CgWater`; the overcast takes the sun's direct light by day; atmos
-  assets 14; the Tab menu's Weather row. **Decision:** the wetness is decals reading the
+  assets 15 (every material rebuilt from nothing, `clear_material`: a rebuild had left half the old nodes and broken `M_CgWater`); the Tab menu's Weather row. **Decision:** the wetness is decals reading the
   plan's masks, not the masters (AT0's recommendation): a per-pixel rain shadow needs the
   city's texture, which the shared masters cannot hold, and rebuilding every master recompiles
   every city material. **The trees' sway** is built but off (`LEAF_SWAY`): 4.5 ms on Midtown's
