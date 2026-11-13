@@ -3216,6 +3216,25 @@ Vanta-R the same).
   percentile), LOD3 32.6 of 40 degrees, 0.077 of 0.10 bent, 0.0074 of 0.04 texture (main's
   LOD3 measured 20.7 degrees and 0.038 bent but reads no better in the sheet's LOD row: its
   glass shatters, the new one's flanks and fenders hold). Not published.
+- **Halcyon Ridge** (`docs/progress/AG18/halcyon_ridge/`, on `vehicles/brands/halcyon.py`):
+  the Sable's lamps on the crossover: the nose strip a channel 36 by 40 mm in a 56 mm even
+  band under a clear lens, a lit bar right under the lens (the intakes' hexagonal pods stay
+  the main beams); the tail ring one closed channel 42 mm wide under a red lens built apart
+  on the skin's normals (cut from the band, the skin's lens broke into shards; the trace's
+  normals at the bottom's middle had snapped onto a face inside and had to be turned out),
+  a red lit bar over a chrome floor; the door handles and the hexagonal charge flap cut
+  (the flap lower, off the crease into the spine's arm: an outline across it emptied the
+  hull); 3.5 mm shut lines; frit on the side and hatch panes, the windshield on a mirrored
+  gloss frame; the kit's wipers. Street distances: a lower arch cut inside the skin for the
+  front tires and the rear wells' inner walls 25 mm in (14.5 mm and no steering to 45.7 mm
+  and 25 degrees in front, 39.5 mm behind), the cabin floor between the rear wells shorter
+  and higher (`through` ok). 250,007 triangles (223,779). Checks: tires `ok` (was `look`),
+  through `ok` (was `look`), symmetry `look` (the lightband 12.5 mm at a lower corner of the
+  ring; the driver's wheel and the keel's lettering told as meant), the rest `ok`. Pack
+  rebuilt, every check passing: 147,737, 59,992, 20,364, 5,118 triangles, standard class,
+  texels 375 px/m (5th percentile), LOD3 21.6 of 40 degrees, 0.041 of 0.10 bent, 0.010 of
+  0.04 texture (main 24.5, 0.048, 0.007); its LOD row reads as main's, the tail ring baked
+  lit. Not published.
 - **Pilots' lessons**: a lens cut from a doubly curved skin with `"skin"` keeps the
   boolean's slivers (its reflections zigzag): build it as its own band or slab along the cut.
   In the pack, a lit face deep under a lens bakes as dashes, emitters deep in reflector

@@ -14,14 +14,18 @@ arches as rings of bolted armor plates with a hand's width of air to the tire; a
 twice the family's height; step blades; tow eyes; all-terrain tires.
 
 The body is ten character lines over twelve stations, cut by the wheel wells and split
-into panels. Everything else hangs on the same station points.
+into panels. Everything else hangs on the same station points. Since step B the nose strip
+and the tail ring are light channels cut into the bands under lenses, with lamps inside
+(the Vanta-R's and the Sable's family), and the handles and the charge flap are cut
+through the skin.
 """
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import carkit as K                                                  # noqa: E402
-from carkit import (Geo, Matrix, V3, band_point, cos, my, on_body, pi, rad,    # noqa: E402
+from brands import halcyon                                          # noqa: E402
+from carkit import (Geo, Matrix, V3, cos, my, on_body, pi, rad,    # noqa: E402
                     ribbon, shr, sin, stud, text_flat, text_on_body)
 
 # ---------------------------------------------------------------------------------------
@@ -34,6 +38,8 @@ ARCH = 0.52                         # wheel arch radius at its corners
 ARCH_ANG = (-15, 22.5, 67.5, 112.5, 157.5, 195)     # half an octagon, its top flat
 RING_W = 0.10                       # the armor ring's width
 RING_IN, RING_OUT = 0.90, 1.027     # its inner and outer face (y)
+WELL_F, WELL_R = 0.66, 0.635        # the wells' inner walls (y)
+ROOM_R, ROOM_Y = 0.47, 0.53         # the front tires' steering room inside the skin
 SUBDIV = 3
 
 # ---------------------------------------------------------------------------------------
@@ -45,6 +51,7 @@ LINES = "CPHGSUMRFB"
 #        R rocker, F floor edge, B floor
 ORDER = ["N0", "N1", "A2", "A3", "W0", "RF", "BP", "D2", "SC", "RA", "RB", "T1"]
 PT = {}
+STATIONS = []
 
 
 def stations():
@@ -90,18 +97,27 @@ def stations():
         T["SC"][j] = V3(T["D2"][j]).lerp(V3(T["RA"][j]), 0.12)
     S = K.fill([T[k] for k in ORDER])
     PT.update(K.table(ORDER, LINES, S))
+    STATIONS[:] = S
     return S
 
 
 PMAT = dict(spine="carbon_dry", hood="paint", roof="paint2", bumper_f="paint", fender_f="paint",
             door_f="paint", door_r="paint", quarter="paint", bumper_r="paint",
             glass_ws="glass", glass_rear="glass", glass_side="glass",
-            trim="gloss_black", sill="cladding", floor="underbody", skid="cladding",
-            mouth="void", mouth_frame="cladding", lightband="gloss_black", tail="void",
-            tail_frame="cladding", scoop="void", vent="void", well="well")
+            trim="frit", wstrim="gloss_black", sill="cladding", floor="underbody",
+            skid="cladding", mouth="void", mouth_frame="cladding", lightband="gloss_black",
+            tail="void", tail_frame="cladding", scoop="void", vent="void", well="well",
+            lamp_f="lamp_housing", lens_f="lens_clear", lamp_r="lamp_housing",
+            lens_r="lens_red", cut="void")
 FRONT_C = V3((2.36, 0, 0.625))      # middle of the mouth
 REAR_C = V3((-2.36, 0, 0.76))       # middle of the tail panel
-BAND_W = 0.05
+BAND_W = 0.056                      # the light bands round the mouth and the tail
+GAP = 0.00175                       # 3.5 mm shut lines
+LAMP_F_W, LAMP_F_D = 0.036, 0.040   # the front light channel: width, depth
+LAMP_R_W, LAMP_R_D = 0.042, 0.026   # the tail ring's channel: most of the band's width
+LAMP = {}                           # the light channels' paths on the skin
+CHAN_STEP = 0.02                    # their sections' spacing
+LAMP_STEP = 0.08                    # the lamps' sections in them
 MOUTH_D, TAIL_D = 0.20, 0.14
 CAPS = {}
 
@@ -171,26 +187,68 @@ def station_crease(i, j):
     return 0.0
 
 
-def build_hull():
+def band_mid(i, center):
+    """The middle line of the light band round an end of the body (station i), line by
+    line: the band is BAND_W wide all round, square to the lip."""
+    ring = [type("P", (), dict(co=V3(p)))() for p in STATIONS[i]]
+    off = K._even_band(ring, center, BAND_W, True, False)
+    return [V3(p) + o * 0.5 for p, o in zip(STATIONS[i], off)]
+
+
+def cutters():
+    """Everything cut into the hull, laid on it while it stands uncut: the wheel wells and
+    the room the front tires steer in, the light channels under their lenses, the handles'
+    and the charge flap's shut lines."""
     wells = Geo()
-    K.well_cutter(wells, FA_X, T_R, ARCH, 0.66, ARCH_ANG)
-    K.well_cutter(wells, RA_X, T_R, ARCH, 0.66, ARCH_ANG)
+    K.well_cutter(wells, FA_X, T_R, ARCH, WELL_F, ARCH_ANG)
+    K.well_cutter(wells, RA_X, T_R, ARCH, WELL_R, ARCH_ANG)
+    # room inside the skin for the front tires to steer: a lower arch further in
+    room = Geo()
+    K.well_cutter(room, FA_X, T_R, ROOM_R, ROOM_Y, ARCH_ANG, depth=WELL_F + 0.04 - ROOM_Y)
+    # front: a channel in the band under the nose lip, from the spine's edge out, turning
+    # down the corner
+    mid = band_mid(0, FRONT_C)
+    front = Geo()
+    LAMP["front"] = K.groove(front, [mid[1].lerp(mid[2], 0.15)] + mid[2:6]
+                             + [mid[5].lerp(mid[6], 0.9)],
+                             width=LAMP_F_W, depth=LAMP_F_D, mirror=True, step=CHAN_STEP)
+    # rear: the ring, one channel round the whole tail, rounded first and traced on its own
+    # points (both sides take the same sections), its way out held aft; its lens is built
+    # apart on the skin's normals there (cut from this curved band, the skin's lens kept the
+    # boolean's slivers and its reflections broke into shards)
+    mid = band_mid(-1, REAR_C)
+    path = K.chaikin((mid[0:10] + [my(p) for p in mid[8:0:-1]])[::-1], 3, closed=True)
+    LAMP["rear.skin"] = [(q, n if n.x < 0 else -n)      # (snapped by the bottom's middle
+                         for q, n in K.trace(path, None, True, 1.0)]   # onto a face within)
+    rear = Geo()
+    LAMP["rear"] = K.groove(rear, path, width=LAMP_R_W, depth=LAMP_R_D, closed=True,
+                            up=(-1, 0, 0), step=1.0)
+    # shut lines: flush handles on both doors, the hexagonal charge flap
+    cut = Geo()
+    K.groove(cut, K.rounded(-0.04, 0.976, 0.12, 0.018), 'y', closed=True, mirror=True)
+    K.groove(cut, K.rounded(-0.575, 0.991, 0.11, 0.018, n=8), 'y', closed=True, mirror=True)
+    K.groove(cut, K.ngon(-1.70, 1.245, 0.05, 6), 'y', closed=True, mirror=True)
+    return [(wells, "well"), (room, "well"), (front, "lamp_f", "skin", "lens_f"),
+            (rear, "lamp_r"), (cut, "cut", "drop")]
+
+
+def build_hull():
     body = K.build_body(
         stations(), panel_of, PMAT, line_crease, station_crease,
         front=dict(center=FRONT_C, depth=MOUTH_D, band=BAND_W, band_panel="lightband",
-                   band_lines=6, frame="mouth_frame", inner="mouth"),
+                   band_lines=6, frame="mouth_frame", inner="mouth", even=True),
         rear=dict(center=REAR_C, depth=TAIL_D, band=BAND_W, band_panel="lightband",
-                  band_lines=9, frame="tail_frame", inner="tail"),
+                  band_lines=9, frame="tail_frame", inner="tail", even=True),
         recesses=[(2, 1, 0.085, 0.03)],     # hood extractors, one each side of the spine
-        glass=[("glass_ws", 0.022), ("glass_rear", 0.022), ("glass_side", 0.02)],
-        cutters=[(wells, "well")], subdiv=SUBDIV)
+        glass=[("glass_ws", 0.026, "wstrim", "frame"), ("glass_rear", 0.026, "trim", "frit"),
+               ("glass_side", 0.024, "trim", "frit")],
+        cutters=cutters, subdiv=SUBDIV, gap=GAP)
     CAPS["mouth"], CAPS["tail"] = body.caps["front"], body.caps["rear"]
 
 
 # ---------------------------------------------------------------------------------------
 # helpers of this car
 # ---------------------------------------------------------------------------------------
-STRIP = [(-0.009, -0.004), (0.009, -0.004), (0.009, 0.006), (-0.009, 0.006)]
 BOLT = [(-0.003, 0.002), (-0.003, 0.0115), (0.0045, 0.0115), (0.0045, 0.002)]
 
 
@@ -254,13 +312,7 @@ def armor_ring(g, gb, cx):
 # details on the body
 # ---------------------------------------------------------------------------------------
 def build_front():
-    P = PT
-    # ---- lights: a strip under the nose lip from the spine out, turning down the corner
-    top = [P["N0"]["P"].lerp(P["N0"]["H"], 0.10)] + [P["N0"][n] for n in "HGSU"]
-    top.append(P["N0"]["U"].lerp(P["N0"]["M"], 0.95))
-    g = Geo()
-    g.sweep([band_point(p, FRONT_C, BAND_W * 0.5, 0.0) for p in top], STRIP, up=(1, 0, 0))
-    g.obj("led.front", "led_front", mirror=True)
+    build_lamps()
 
     # ---- the spine comes down the nose as a keel and ends in the skid plate
     xb = FRONT_C.x - MOUTH_D
@@ -331,14 +383,6 @@ def build_front():
 
 def build_rear():
     P = PT
-    # ---- lights: a closed ring round the whole tail
-    half = [band_point(P["T1"][n], REAR_C, BAND_W * 0.5, 0.0) for n in "PHGSUMRF"]
-    path = (half + [band_point(P["T1"]["B"], REAR_C, BAND_W * 0.5, 0.0)]
-            + [my(p) for p in half[::-1]])
-    g = Geo()
-    g.sweep(path, [(-0.008, -0.006), (0.008, -0.006), (0.008, 0.004), (-0.008, 0.004)],
-            up=(-1, 0, 0), closed=True)
-    g.obj("led.rear", "led_rear")
     xt = REAR_C.x + TAIL_D
     # ---- honeycomb, the beam with the maker's name, plate, two flat outlets
     g = Geo()
@@ -552,33 +596,21 @@ def build_surface_details():
     g = Geo()
     for side in (1, -1):
         text_on_body(g, "RIDGE", 0.06, 0.30, 0.655, side, spacing=1.3)
-        text_on_body(g, "HR 4X", 0.02, -1.70, 1.215, side, spacing=1.2)
+        text_on_body(g, "HR 4X", 0.02, -1.70, 1.16, side, spacing=1.2)
         text_on_body(g, "4", 0.07, -0.42, 0.66, side)
     g.obj("lettering", "decal")
-    # ---- the doors: flush handles, the pillar between them on the glass, a charge flap
-    g = Geo()
-    ribbon(g, [(0.02, 0.975), (-0.10, 0.978)], 'y', 0.018)
-    ribbon(g, [(-0.52, 0.99), (-0.63, 0.993)], 'y', 0.018)
-    hexa = [(-1.70 + 0.058 * cos(rad(a)), 1.30 + 0.058 * sin(rad(a))) for a in range(0, 360, 60)]
-    ribbon(g, hexa, 'y', 0.004, closed=True)
-    g.obj("lines", "void", mirror=True)
+    # ---- the pillar between the doors on the glass (the handles and the charge flap are
+    # cut, in cutters())
     g = Geo()
     hg, hh = P["BP"]["G"], P["BP"]["H"]
     ribbon(g, [(hg.x - 0.01, hg.z + 0.012), (hh.x + 0.03, hh.z - 0.03)], 'y', 0.07, lift=0.002)
     g.obj("pillar.b", "gloss_black", mirror=True)
-    # ---- wipers
-    g = Geo()
-    blade = []
-    for k in range(9):
-        t = k / 8
-        loc, n = on_body(0.80 - 0.05 * t, 0.06 + 0.52 * t, 'z')
-        blade.append(loc + n * 0.014)
-    g.sweep(blade, [(-0.004, -0.008), (0.004, -0.008), (0.004, 0.006), (-0.004, 0.006)],
-            up=(0, 0, 1))
-    piv, _ = on_body(0.875, 0.30, 'z')
-    g.sweep([piv + V3((0, 0, 0.012)), blade[4] + V3((0, 0, 0.012))],
-            [(-0.006, -0.004), (0.006, -0.004), (0.006, 0.004), (-0.006, 0.004)], up=(0, 0, 1))
-    g.obj("wiper", "cladding", bevel=0.0015, mirror=True)
+    # ---- wipers, parked on the glass
+    g, gb = Geo(), Geo()
+    K.wiper(g, gb, on_body(0.875, 0.30, 'z')[0], on_body(0.80, 0.06, 'z')[0],
+            on_body(0.75, 0.58, 'z')[0])
+    g.obj("wiper", "cladding", bevel=0.0012, mirror=True)
+    gb.obj("wiper.blade", "rubber", mirror=True)
     # ---- markers and decals
     g = Geo()
     ribbon(g, [(2.215, 0.745), (2.14, 0.765)], 'y', 0.012)
@@ -595,12 +627,65 @@ def build_surface_details():
 
 def on_spine_edge(x):
     """y of the spine's edge at x (the P line as drawn)."""
-    pts = [PT[s]["P"] for s in ORDER]
-    for a, b in zip(pts, pts[1:]):
-        if b.x <= x <= a.x:
-            t = (a.x - x) / max(a.x - b.x, 1e-6)
-            return a.y + (b.y - a.y) * t
-    return 0.2
+    return halcyon.on_spine_edge(x, pt=PT, order=ORDER, inset=0.0, miss=0.2)
+
+
+def along(tr, s0=0.0, s1=None, step=0.03):
+    """Frames every step along a traced path between the lengths s0 and s1:
+    [(point, normal, tangent, side)], side = tangent x normal."""
+    P = [q for q, _ in tr]
+    S = [0.0]
+    for a, b in zip(P, P[1:]):
+        S.append(S[-1] + (b - a).length)
+    s1 = S[-1] if s1 is None else min(s1, S[-1])
+    n = max(1, int(round((s1 - s0) / step)))
+    out, i = [], 0
+    for k in range(n + 1):
+        s = s0 + (s1 - s0) * k / n
+        while i < len(S) - 2 and S[i + 1] < s:
+            i += 1
+        t = (s - S[i]) / max(S[i + 1] - S[i], 1e-9)
+        tg = (P[i + 1] - P[i]).normalized()
+        nn = tr[i][1].lerp(tr[i + 1][1], t).normalized()
+        out.append((P[i].lerp(P[i + 1], t), nn, tg, tg.cross(nn).normalized()))
+    return out
+
+
+def run_len(tr):
+    return sum((b[0] - a[0]).length for a, b in zip(tr, tr[1:]))
+
+
+def build_lamps():
+    """What stands in the light channels, under their lenses. The lit faces lie right under
+    the lenses (a game pack bakes what is behind a lens, and a lit face set deep bakes as
+    dashes), swept on sparse sections so a pack's far LOD keeps them whole."""
+    # front: a lit bar along the upper side of the whole channel (the main beams are the
+    # hexagonal pods in the intakes; projectors in the channel read as bolts beside them)
+    fr = along(LAMP["front"], 0.012, run_len(LAMP["front"]) - 0.012, LAMP_STEP)
+    L = K.Lamp("lamp.front", lit="led_front")
+    L.bar([q - n * 0.006 - sd * 0.0105 for q, n, _, sd in fr], 0.012, 0.003,
+          up=[n for _, n, _, _ in fr])
+    L.obj(mirror=True)
+    # rear: the ring, a red bar round the whole tail right under the lens over a chrome
+    # floor, built on the left half from the top's middle round to the bottom's, mirrored
+    def left_half(tr):
+        rr = along(tr, 0.0, run_len(tr), LAMP_STEP)
+        i0 = next(i for i in range(len(rr)) if rr[i][0].y >= 0 > rr[i - 1][0].y)
+        rr = rr[i0:] + rr[:i0]
+        rr = rr[:next(i for i in range(len(rr)) if rr[i][0].y < 0)]
+        ends = [V3((q.x, 0.0, q.z)) for q in (rr[0][0], rr[-1][0])]
+        return ([ends[0]] + [q for q, _, _, _ in rr] + [ends[1]],
+                [rr[0][1]] + [n for _, n, _, _ in rr] + [rr[-1][1]])
+    P, ups = left_half(LAMP["rear"])
+    S, sn = left_half(LAMP["rear.skin"])
+    L = K.Lamp("lamp.rear", lit="led_rear", glass="lens_red")
+    hw = LAMP_R_W / 2 - GAP
+    L.glass.sweep(S, [(-hw, -0.003), (hw, -0.003), (hw, 0.0), (-hw, 0.0)], up=sn)
+    L.chrome.sweep([q - n * (LAMP_R_D - 0.003) for q, n in zip(P, ups)],
+                   [(-0.018, -0.001), (0.018, -0.001), (0.018, 0.001), (-0.018, 0.001)],
+                   up=ups)
+    L.bar([q - n * 0.006 for q, n in zip(P, ups)], 0.024, 0.003, up=ups)
+    L.obj(mirror=True)
 
 
 # ---------------------------------------------------------------------------------------
@@ -611,7 +696,7 @@ def build_interior():
     g.prism([(0.76, -.82, 1.0), (0.76, -.78, 1.0), (0.76, -.72, .30), (0.76, .72, .30),
              (0.76, .78, 1.0), (0.76, .82, 1.0), (0.76, .82, .26), (0.76, -.82, .26)],
             (-1.66, 0, 0))                                      # floor and door cards
-    g.box((-1.45, 0, 0.285), (1.10, 1.24, 0.04))                # floor between the wells
+    g.box((-1.37, 0, 0.315), (0.94, 1.20, 0.04))                # floor between the wells
     g.box((-1.66, 0, 0.62), (0.86, 1.24, 0.04))                 # the load floor
     g.prism([(-1.20, -0.62, 0.27), (-1.20, 0.62, 0.27), (-1.26, 0.64, 1.02),
              (-1.26, -0.64, 1.02)], (-0.04, 0, 0))              # behind the rear seats
@@ -763,6 +848,7 @@ def main():
             K.build_wheel(tag, cx, T_R, T_W, T_RIM, T_OUT, side, spokes=7, tire=None)
             at_tire(tag, cx, side)
     K.log("wheels")
+    K.meant("symmetry", "interior.wheel", "keel.glyphs")    # the driver's wheel; lettering
     K.shoot(extra="top")
 
 
