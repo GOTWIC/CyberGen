@@ -1994,7 +1994,7 @@ far skyline keeps its emissive; and the cloud deck glows from the plan's upward 
   instanced component per 1 km block, the glows in `M_CgFarGlow`, the pools and washes in
   `M_CgFarFlat`, on the engine's plane (a pool lying on its surface scaled to its disc, a wash
   standing on its facade turned to its yaw), each instance's per-instance data its middle,
-  color, size, tier and level; Delta's 26,000 cards in 30 blocks build in about 20 ms. They
+  color, size, tier and level; Delta's 22,600 cards in 13 blocks build in about 27 ms. They
   show while the plan's lights do (by night); each instance's level is its schedule's share at
   the hour (set when the hour moves a twentieth of an hour); `MPC_CityGenAtmos` gets
   `FarScale` (the lights' own scale, $2^{EV_{scene} - EV_{plan}}$ times the gains, 0 by day),
@@ -2004,15 +2004,16 @@ far skyline keeps its emissive; and the cloud deck glows from the plan's upward 
   field of view and the viewport's width) and `FarSpread`. With the cards on, the play
   features' light pools go (`CityGen.PlayLamps 0` past the live range): the cards are the far
   tier.
-- **The materials** (`atmos_assets.py` version 18): additive and unlit, on instanced static
-  meshes. Each fades in over the farthest `FarFade` of its tier's range ($f = \mathrm{sat}((d -
+- **The materials** (`atmos_assets.py` versions 18 and 19): additive and unlit, on instanced
+  static meshes. Each fades in over the farthest `FarFade` of its tier's range ($f = \mathrm{sat}((d -
   S(1 - F)) / (S F))$) and, faded out, off by its schedule or by day, collapses its quad to a
   point by world position offset, so it costs no pixel. `M_CgFarGlow` turns its quad to the eye
   at its middle pulled toward the eye by half its size (clear of its own fixture and wall),
   $s = \max(s_0, d\,p)$ wide, a gaussian $e^{-8r^2}$ whose peak luminance is $I / (0.0982\,s^2)$
   (its intensity held as it grows), blinking from its per-instance data as its light does.
   `M_CgFarFlat` draws a pool's falloff, $L_0 (1 + (r/h)^2)^{-3/2}$ to its radius, or a wash
-  soft at its edges.
+  soft to its edges, $(1 - u^2)^2 (1 - v^2)^2$ over its half width and height (version 18's
+  $(1 - u^4)^2$ a side drew the far crowns as blocks).
 - **Console commands:** `CityGenAtmos.Far [0|1]` (off: the play features' light pools past the
   live range, as before AT7), `.FarGain G [PX]`. `.Status` adds `far`, `far_cards`,
   `far_glows`, `far_flats`, `far_blocks`, `far_shown`, `far_build_ms`, `far_px`, `far_gain`,
