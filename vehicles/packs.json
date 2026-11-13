@@ -2,7 +2,7 @@
  "format": "cybergen.vehicle_packs",
  "version": 1,
  "repo": "GOTWIC/CyberGen",
- "tag": "vehicle-packs-2026-11-13a",
+ "tag": "vehicle-packs-2026-11-13b",
  "cars": {
   "aurel_prelate": {
    "asset": "aurel_prelate.zip",
@@ -241,27 +241,27 @@
   },
   "kestrel_atlas": {
    "asset": "kestrel_atlas.zip",
-   "sha256": "a7d23fccedf1dadbe968f298f0b198b224251f5110c781e17ff30078ce103d43",
-   "bytes": 25501815,
+   "sha256": "ff1fbb7027ab6581cc0d131f40623e215862cce76cfef8cd21138eb7e9a46f82",
+   "bytes": 25845849,
    "files": {
-    "body_base_color.png": "033c3880b5fc84c43a9bc6040196979c297ca013c6713fda702cbdd52f5a8747",
-    "body_emissive.png": "9060af5382638f1307635e7e20b24665d4d82219f2ae13ec348c2eb67e34e16a",
-    "body_mask.png": "b9e9b75f7208786f585dc1c078a379173ebb1a3a7c5aa5da00c4a226fe6236eb",
-    "body_normal.png": "6d84d677f283e34b2c00db8ce30ea7da03a995ecd36069e3a9b8e833e6faf5be",
-    "body_orm.png": "abd25d3d263ec994d8a9bfaa0976a5c9eba28ee381774f395ac8a1616e52b726",
-    "collision.glb": "33f1145d5d6d1d1ecb615fefc51f4a12ede9c4fa126d9b9a72e4c3164c580a62",
-    "game_report.json": "de874120d193f8ceefe5188533ff67fc73ee19227fab6dc846b5beaf090cb4fe",
-    "lod0.glb": "52226c04016ad760b83632f148dbdcb45aa8a44fb436972772f3218b399dbd0a",
-    "lod1.glb": "b2a3fb290f18943fbefa2a08f329286c7e0045a9416dfec994faa378cc2caf6e",
-    "lod2.glb": "6a1174a0652d0fc68c0d8d55fcd2f0543ae9f4df2e0d4033bcd624805311d471",
-    "lod3.glb": "341eb7163bf707745fc5235c15358612921c5ade3cde6a621fdf64ad991d658e",
-    "pack.json": "98feef40ce9fd8388d50c05de2feefe25e96f7115f57242b165925de24f84408"
+    "body_base_color.png": "8751317e648927b650724f96884747599dc166f4ec6de71197e7d8d632729c0b",
+    "body_emissive.png": "06576d0a8b519b6768bb80fb09916fd5554709f47c83ff9b8c9badb9e6f0d166",
+    "body_mask.png": "e93077a440196b3deb07bcbf6ef7136cdcdf944f8fbc3cb105b7afa45ee46b58",
+    "body_normal.png": "5ea6e8049212f572ded727ea4cb59b0d74775bef4bf83fcb677ff2ae7ae50ea2",
+    "body_orm.png": "29307c95b4ed2155d2d0f4c568e4b3198740f608071f430b52c2de617077d61d",
+    "collision.glb": "4f1eaaf793cc870aed88f391cec615a8529695b7b784d028275bb6850f7cb234",
+    "game_report.json": "afef7ab7afde4835d23529fd9ea9fd42f266eccaa5a73f0dd9abbd4d728fc777",
+    "lod0.glb": "5fcc4258a8e0d60e8c43a40a67290c6cdb906d2dbd00335dca9faeaa52de1f29",
+    "lod1.glb": "1d3c54353b17e902ad49550f6df964dc110c8eeedbbf2ee4a2ddc90d4b90c00a",
+    "lod2.glb": "9816be9dfdae9b0dd08bda817c3ba51fd19748f49b393ca0816fb3b7f7e1774f",
+    "lod3.glb": "fde79c8ad8f7a135189cf384c8b898bdefb9e76461298d6a700ba21f4a8820ac",
+    "pack.json": "c4b6b5a574e35f96b21c18f31115f2b33647e9682d97790628774c4a8005c5ab"
    },
    "source": {
     "script": "vehicles/cars/kestrel_atlas.py",
-    "script_sha256": "7233b4fec97c51f6005241ffd298f5cf884b3e91b7fa31da5207297cea6c4ae4",
-    "carkit_sha256": "86fc2281f799baae0c26b3ac0a61705bd4f58e4eb5e5443afa1c08342131b5e3",
-    "game_sha256": "ac27f7dab3eb8522bd38e910dcf6fb19a322ef1ddc91ecb329ca4dd13073d991"
+    "script_sha256": "03a3f38b3d4fa8f9bf7f8168aee4af5d0b9a57d661ac1cb7319b032f15e5808a",
+    "carkit_sha256": "4a1b9a9a1c4472c37227e0b9171ff94263a6d3d320dd4d13ad55783936af1832",
+    "game_sha256": "32271c5b2195e75c93509022799b7dd770add377d59cc906b924e040e27ff1db"
    }
   },
   "kestrel_dart": {
@@ -291,27 +291,27 @@
   },
   "kestrel_meridian": {
    "asset": "kestrel_meridian.zip",
-   "sha256": "046cb17d6d28f671c35d095187d95d5382342cf14f405f4de05cad295c7616b3",
-   "bytes": 20072218,
+   "sha256": "644a5183ee39953962f2cae63a9459ec0b178d7163878ab713807fc041269310",
+   "bytes": 21639576,
    "files": {
-    "body_base_color.png": "65f0e6557dddb8c9ff88a31e3dbbae76368f6f3f84a7926e34522497c2aaea8c",
-    "body_emissive.png": "d76690b1e7579924096fa0ec88c9805b4c6584c41c48bb66d915f55340508e13",
-    "body_mask.png": "777aecb8ea70d6b7ba32cf0e7e738b9879ba0490d5c9ce471d3c7d6ac5eb1df3",
-    "body_normal.png": "be8d77c58282cd999dc09cd7a5a76006a5b1abd02afdaa05dc0bdcab56f68f9b",
-    "body_orm.png": "fe6b0d88219e2d3487a746466115e3a4fe7faa236991115d79472e55b383504e",
-    "collision.glb": "5cb7fa868f597fe30a870817214a5be10b04a429946bce52b60c0d9a2ca75743",
-    "game_report.json": "1a66cfe130c80106b396fa0b611653e79132c6fd47dbf0889b6493b9b6d1bbb9",
-    "lod0.glb": "29535a8f11639b78d0a8bb1901ed4cc7ea3a46158e0ab212baf97a2b4921cf46",
-    "lod1.glb": "0a86c885473a383b2d5857613fc741023e7790f60a6d1234cc1f45efe0742e3f",
-    "lod2.glb": "1a33a211296ccede79e067f1b15017a05730f3faaec7e5bb9a732fc5cc4a2e41",
-    "lod3.glb": "257f89eca92a9c4ffdf619128e40d4d5f8db82c76816fb851b34be94fcff04a3",
-    "pack.json": "025e9138bbc1710aec71155061307f204632e0df90469460d6e1b0a9a5565c64"
+    "body_base_color.png": "30a4e5758fbdc6c483288247570c041e2de70695ce3016e8a44f314c27d6434b",
+    "body_emissive.png": "6bd05f40da2d634844a7928c1eeef71ba96ef6f1465c750070d1845460ee19f6",
+    "body_mask.png": "1390d2a1e82e1d50a648d3720dc6e0e6c2896752cd83009d2a8aa6fd61309c00",
+    "body_normal.png": "263553349f992f6762f2835842a9bacfda0f71a88f7a5972e43c889fde05b518",
+    "body_orm.png": "154b659c32ab791eabc71e8f808f2b8df8c27be4b43cfc5f56815116c1285007",
+    "collision.glb": "2b86c4d85952e830d256e1531e92d968c97f97e8ec8b2460c3c7c9e8e949d156",
+    "game_report.json": "49be896ce17b7f33e39e891b7de5ed3e3107eab3598f23fa9c0c95fe418d2086",
+    "lod0.glb": "b923f41db16410a1c3afe4087adb5eb55a19c754ff44f1920c1c8a4b7f19aedc",
+    "lod1.glb": "81cd7d2ba24b011677054394c91121d0a3a7be8d668b637f33b4205a2eb47f5b",
+    "lod2.glb": "2241ddbedc36b45a4cf62b88f33803dff900ddd5e95de8e0a5792bef014b6ce2",
+    "lod3.glb": "a8c9b22d63a3eef0d508a2dfd24ef6bedb37fe0810fcfb80b390e0338f71f860",
+    "pack.json": "b5de90293d15f8d21363457154aede9575f5ebfa54103aff065e14cbae3820ae"
    },
    "source": {
     "script": "vehicles/cars/kestrel_meridian.py",
-    "script_sha256": "6721720365425c67d736f7c0f951ba020838111e61bba54331fb01a228c46cf1",
-    "carkit_sha256": "86fc2281f799baae0c26b3ac0a61705bd4f58e4eb5e5443afa1c08342131b5e3",
-    "game_sha256": "34e41ae8a9f23206b0f9a1a8a1ceacc883c53bb9a1fad19ee54fee8ef83d570f"
+    "script_sha256": "ffc653efe2269632287343e5b465ec2fb78cfce3ec8edf5e6dc54dccf38cb149",
+    "carkit_sha256": "4a1b9a9a1c4472c37227e0b9171ff94263a6d3d320dd4d13ad55783936af1832",
+    "game_sha256": "32271c5b2195e75c93509022799b7dd770add377d59cc906b924e040e27ff1db"
    }
   },
   "orrin_aria": {
