@@ -742,12 +742,12 @@ def spawn_and_body(world, pawn, man, slug):
             unreal.SystemLibrary.execute_console_command(
                 world, f"CityGenAtmos.Weather {state} now")
             yield from wait(4.0)
-        # (CITYGEN_UE_VIEW_RES: a HighResShot of that size, as the play views; else the
-        # play window as drawn)
+        # (CITYGEN_UE_VIEW_RES: a HighResShot of that size, as the play views, each after the
+        # exposure has settled on its view; else the play window as drawn)
         res = os.environ.get("CITYGEN_UE_VIEW_RES")
         for name, pitch in (("walk_body", -68.0), ("walk_ahead", -8.0)):
             pc.set_control_rotation(unreal.Rotator(roll=0.0, pitch=pitch, yaw=yaw))
-            yield from wait(2.0)
+            yield from wait(8.0 if res else 2.0)
             yield from ui_shot(world, name, cmd=f"HighResShot {res}" if res else "shot",
                                timeout=600 if res else 30)
         if st0w:
