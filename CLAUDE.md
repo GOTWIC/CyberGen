@@ -2287,8 +2287,9 @@ waits for Swagnik's review.
   frit glass and mirrored trim frames (`glass` modes `"frit"`, `"frame"`), even cap bands,
   `wiper()`, lazy materials (`need()`: lenses, chrome, frit). The game pack leaves lenses out
   (`game.LENS_MATS`), baking the lamp behind them. Done: the kit and the Vanta-R (its pack
-  rebuilt). Next: a pilot car of each other brand, shown to Swagnik, then the other twelve,
-  each switching to its `vehicles/brands/` module.
+  rebuilt), then the Dart, Lumen, Hauler and Mino as brand pilots. The Aurels are set aside
+  (Swagnik, 2026-11-12; the Prelate's attempt on branch `claude/ag18-prelate-step-b-wip`).
+  Next: the other ten non-Aurel cars, each switching to its `vehicles/brands/` module.
 - The other phases (improvements, AG8's parked vehicles and
   stage 4's fleet drawing on them) are listed in the scope with their plan.
 

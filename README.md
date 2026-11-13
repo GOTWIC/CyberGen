@@ -518,7 +518,7 @@ brings them in ([`docs/progress/AG18/city`](docs/progress/AG18/city)).
 | AG15 | Cyberpunk facades and night | Seven new facade styles and window patterns beyond grids, two or three finishes a building, neighboring towers never alike; every building lit its own way at night with crown lights and logos; lamps that light the streets in Unreal | Done |
 | AG16 | Performance | A benchmark through each city in Unreal (`citygen unreal --bench`), and the fixes that make a whole city run smoothly walking, driving and flying, by day and night: meshes shared, far fewer actors, streaming and HLODs tuned, the far city as it looks up close | Done |
 | AG17 | Road surfaces | Roads, junctions, sidewalks, medians and barriers drawn from the pavement map, joined seamlessly | Done |
-| AG18 | Hero vehicles | Cars, trucks and hover vehicles designed by hand in Blender, seven made-up brands; not a generator | In progress: 21 designs done, game packs for 18 (the three Vex to be redesigned), parked in the cities; the kit's clay and zebra renders and checks done; lamps under lenses, cut shut lines and frit glass in the kit and on the Vanta-R, the other cars next |
+| AG18 | Hero vehicles | Cars, trucks and hover vehicles designed by hand in Blender, seven made-up brands; not a generator | In progress: 21 designs done, game packs for 18 (the three Vex to be redesigned), parked in the cities; the kit's clay and zebra renders and checks done; lamps under lenses, cut shut lines and frit glass on five cars, the rest next |
 
 ---
 
