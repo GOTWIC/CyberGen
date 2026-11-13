@@ -174,7 +174,7 @@ leave those out as well.
 - Tests (logged, `-v -rfE --durations=25`): `tests/atmosgen/test_at_sight.py` (new),
   `tests/atmosgen/test_at_plan.py`, `tests/test_unreal_atmos.py`, `tests/test_bench.py`, and in
   `tests/test_unreal.py` the new `test_player_start_on_an_open_lit_sidewalk` and
-  `test_inside_concave`: 38 passed.
+  `test_inside_concave`: 37 passed.
 - Delta's plan again (its sight raster; its lights, lux, faces and air checks as they were) and
   imported over the play fixes' import in CityAG16 (the controller and the 518 cells updated,
   nothing else); the city check by night passes (spawn on the ground at the new start, streaming,
