@@ -3,15 +3,15 @@
  "title": "Halcyon Ridge",
  "ok": true,
  "triangles": {
-  "original": 223779,
+  "original": 250007,
   "lods": [
-   133443,
+   147737,
    59992,
-   20172,
-   5099
+   20364,
+   5118
   ],
   "lod0_parts": {
-   "body": 85331,
+   "body": 99625,
    "glass": 4160,
    "wheel_fl": 10784,
    "wheel_fr": 10784,
@@ -24,12 +24,12 @@
   }
  },
  "objects": {
-  "original": 114,
+  "original": 120,
   "parts": 10
  },
  "size_class": {
   "name": "standard",
-  "exterior_m2": 41.77,
+  "exterior_m2": 39.27,
   "rule": "large when the body's exterior is 55 m2 or more",
   "lod_budgets": [
    150000,
@@ -46,23 +46,23 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 34891700,
- "seconds": 790.4,
+ "pack_bytes": 36240511,
+ "seconds": 1167.6,
  "stage_seconds": {
-  "build": 0.8,
-  "render_original": 23.3,
-  "parts": 25.3,
+  "build": 1.4,
+  "render_original": 217.1,
+  "parts": 14.0,
   "nodes": 0.0,
-  "uv": 337.0,
-  "bake": 303.6,
-  "lods_export": 18.9,
-  "textures": 7.818819761276245,
-  "proof": 73.1696388721466
+  "uv": 207.8,
+  "bake": 242.4,
+  "lods_export": 39.1,
+  "textures": 8.125725030899048,
+  "proof": 436.8765552043915
  },
  "baked_down": {
   "relief": {
-   "pieces": 13,
-   "triangles": 23807,
+   "pieces": 12,
+   "triangles": 23643,
    "names": [
     "decals",
     "keel.slots",
@@ -70,7 +70,6 @@
     "led.name",
     "led.step",
     "lettering",
-    "lines",
     "plate.glyphs",
     "sensors",
     "tiretext.fl",
@@ -91,24 +90,24 @@
  "texel_px_per_m": {
   "body": {
    "exterior": {
-    "area_m2": 41.773,
-    "p5": 370.8,
-    "median": 382.8
+    "area_m2": 39.266,
+    "p5": 374.7,
+    "median": 389.9
    },
    "cabin": {
-    "area_m2": 20.869,
-    "p5": 153.0,
-    "median": 153.2
+    "area_m2": 21.72,
+    "p5": 155.8,
+    "median": 156.0
    },
    "underside": {
-    "area_m2": 0.252,
-    "p5": 145.3,
-    "median": 386.4
+    "area_m2": 0.39,
+    "p5": 148.5,
+    "median": 397.3
    },
    "lamp_in_gaps": {
-    "area_m2": 1.77,
-    "p5": 147.1,
-    "median": 153.1
+    "area_m2": 2.896,
+    "p5": 136.8,
+    "median": 155.9
    }
   },
   "wheels": {
@@ -133,11 +132,11 @@
  "collision_hulls": 9,
  "source": {
   "script": "vehicles/cars/halcyon_ridge.py",
-  "script_sha256": "a63e014a23e9dcdfeccf56b51741f16b261be1ddbfacb8b7e615021dc1c94f90",
-  "carkit_sha256": "86fc2281f799baae0c26b3ac0a61705bd4f58e4eb5e5443afa1c08342131b5e3",
-  "game_sha256": "9f14193bfa1a5692614bd58ee2196f52e11cb24b8159b4eb325b1ab704877169",
-  "original_triangles": 223779,
-  "original_objects": 114
+  "script_sha256": "a81a1c0dbb0a003c400d0985275e055c0421524645ff51971d222a0b225e6651",
+  "carkit_sha256": "4a1b9a9a1c4472c37227e0b9171ff94263a6d3d320dd4d13ad55783936af1832",
+  "game_sha256": "32271c5b2195e75c93509022799b7dd770add377d59cc906b924e040e27ff1db",
+  "original_triangles": 250007,
+  "original_objects": 120
  },
  "test": false,
  "checks": [
@@ -156,7 +155,7 @@
    "detail": [
     {
      "lod": 0,
-     "triangles": 133443,
+     "triangles": 147737,
      "budget": 150000,
      "ok": true
     },
@@ -168,13 +167,13 @@
     },
     {
      "lod": 2,
-     "triangles": 20172,
+     "triangles": 20364,
      "budget": 20000,
      "ok": true
     },
     {
      "lod": 3,
-     "triangles": 5099,
+     "triangles": 5118,
      "budget": 5000,
      "ok": true
     }
@@ -187,8 +186,8 @@
     "limit": 0.005,
     "slots": {
      "body": {
-      "overlap": 5e-05,
-      "coverage": 0.5254,
+      "overlap": 0.00095,
+      "coverage": 0.5179,
       "outside_unit": 0.0
      },
      "wheels": {
@@ -204,8 +203,8 @@
    "ok": true,
    "detail": {
     "body": {
-     "p5": 370.8,
-     "median": 382.8,
+     "p5": 374.7,
+     "median": 389.9,
      "floor": 300.0,
      "ok": true
     },
@@ -314,9 +313,9 @@
     {
      "lod": 1,
      "deviation_m": [
+      0.0002,
       0.0,
-      0.0,
-      0.0002
+      0.0006
      ],
      "tolerance_m": [
       0.0733,
@@ -328,7 +327,7 @@
     {
      "lod": 2,
      "deviation_m": [
-      0.0004,
+      0.0031,
       0.0006,
       0.0071
      ],
@@ -360,10 +359,10 @@
    "ok": true,
    "detail": [
     {
-     "normal_p95_deg": 2.22,
-     "bent_share": 0.0018,
-     "texture_share": 0.0003,
-     "miss_share": 0.0029,
+     "normal_p95_deg": 3.71,
+     "bent_share": 0.0048,
+     "texture_share": 0.0017,
+     "miss_share": 0.0025,
      "lod": 1,
      "limits": {
       "p95": 12.0,
@@ -373,10 +372,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 14.91,
-     "bent_share": 0.017,
-     "texture_share": 0.0018,
-     "miss_share": 0.003,
+     "normal_p95_deg": 17.16,
+     "bent_share": 0.026,
+     "texture_share": 0.0055,
+     "miss_share": 0.0038,
      "lod": 2,
      "limits": {
       "p95": 25.0,
@@ -386,10 +385,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 24.49,
-     "bent_share": 0.0482,
-     "texture_share": 0.0073,
-     "miss_share": 0.074,
+     "normal_p95_deg": 21.63,
+     "bent_share": 0.0406,
+     "texture_share": 0.0102,
+     "miss_share": 0.0331,
      "lod": 3,
      "limits": {
       "p95": 40.0,
@@ -406,15 +405,15 @@
    "detail": {
     "hulls": 9,
     "vertices": [
-     328,
+     298,
      186,
-     260,
-     161,
-     201,
+     246,
+     179,
+     174,
      198,
-     200,
-     132,
-     338
+     224,
+     188,
+     326
     ]
    }
   }
