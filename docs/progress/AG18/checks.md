@@ -14,7 +14,7 @@
 | [halcyon_sable](halcyon_sable/check.json) | ok: 31.8 mm to interior.seats, steers 30 deg | ok: 100.0 mm (splitter) | look: 1 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 280675 |
 | [kestrel_atlas](kestrel_atlas/check.json) | ok: none (hover) | ok: 374.4 mm (pod.skid.r) | look: 19 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 151203 |
 | [kestrel_dart](kestrel_dart/check.json) | ok: none (hover) | ok: 325.0 mm (keel) | look: 3 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 112558 |
-| [kestrel_meridian](kestrel_meridian/check.json) | ok: none (hover) | ok: 327.0 mm (led.keel) | look: 9 objects | ok: 0 open runs, 0 cutter holes | look: 1 parts | ok: 90334 |
+| [kestrel_meridian](kestrel_meridian/check.json) | ok: none (hover) | ok: 335.0 mm (lamp.keel.glass) | look: 3 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 119902 |
 | [orrin_aria](orrin_aria/check.json) | FAIL: 0.0 mm to body.front, steers 0 deg | ok: 131.8 mm (body.floor) | look: 2 objects | look: 0 open runs, 12 cutter holes | ok: 0 parts | look: 501460 |
 | [orrin_lumen](orrin_lumen/check.json) | look: 14.6 mm to body.well, steers 0 deg | ok: 130.0 mm (body.floor) | look: 2 objects | ok: 0 open runs, 0 cutter holes | ok: 0 parts | ok: 356940 |
 | [orrin_pebble](orrin_pebble/check.json) | FAIL: 0.0 mm to body.well, steers 0 deg | ok: 143.3 mm (body.floor) | look: 5 objects | look: 0 open runs, 10 cutter holes | ok: 0 parts | ok: 266030 |
@@ -88,8 +88,7 @@
 
 **kestrel_meridian** (look)
 
-- not mirrored: `led.step` 236.8 mm, `step.tread` 234.2 mm, `interior.yoke` 219.6 mm, `step.links` 198.5 mm, `step.grip` 197.6 mm, `step.bay` 16.1 mm, `pod.f.pod_low` 11.0 mm, `led.name` 5.6 mm, `fin.code` 3.3 mm
-- cabin part in the open: `interior.tub`, 13% of it, up to 16.8 mm from what would hide it, at (-1.444, 0.644, 0.485)
+- not mirrored: `led.step` 236.8 mm, `step.tread` 234.2 mm, `interior.yoke` 219.6 mm, `step.links` 198.5 mm, `step.grip` 197.6 mm, `step.bay` 16.1 mm, `pod.f.pod_low` 11.0 mm, `led.name` 5.2 mm, `fin.code` 3.3 mm
 
 **orrin_aria** (FAIL)
 

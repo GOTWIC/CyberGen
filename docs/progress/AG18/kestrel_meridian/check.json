@@ -3,10 +3,10 @@
  "size": [
   5.316,
   2.076,
-  1.391
+  1.383
  ],
  "top_z": 1.718,
- "objects": 110,
+ "objects": 129,
  "palette": {
   "paint": [
    0.006,
@@ -28,15 +28,15 @@
  },
  "ground": {
   "verdict": "ok",
-  "clearance_mm": 327.0,
-  "lowest": "led.keel",
+  "clearance_mm": 335.0,
+  "lowest": "lamp.keel.glass",
   "under_floor": [],
-  "note": "floats 327 mm over the ground"
+  "note": "floats 335 mm over the ground"
  },
  "symmetry": {
   "verdict": "look",
   "center_off_mm": 3.0,
-  "objects": 9,
+  "objects": 3,
   "asymmetric": [
    {
     "object": "led.step",
@@ -45,7 +45,8 @@
      0.64,
      1.041,
      0.502
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "step.tread",
@@ -54,7 +55,8 @@
      0.656,
      1.034,
      0.499
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "interior.yoke",
@@ -63,7 +65,8 @@
      0.601,
      0.197,
      1.057
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "step.links",
@@ -72,7 +75,8 @@
      -0.221,
      1.005,
      0.52
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "step.grip",
@@ -81,7 +85,8 @@
      0.629,
      1.004,
      0.52
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "step.bay",
@@ -90,7 +95,8 @@
      -0.83,
      0.933,
      0.772
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "pod.f.pod_low",
@@ -103,11 +109,11 @@
    },
    {
     "object": "led.name",
-    "off_mm": 5.6,
+    "off_mm": 5.2,
     "at": [
-     -2.509,
+     -2.502,
      0.065,
-     1.15
+     1.149
     ]
    },
    {
@@ -126,10 +132,11 @@
   "open_edges": [],
   "open_mm": 0,
   "cutter_holes": [],
+  "cut_loops": 23,
   "pieces": {
    "body": {
     "closed": true,
-    "panels": 24
+    "panels": 31
    },
    "pod.f": {
     "closed": true,
@@ -142,25 +149,13 @@
   }
  },
  "through": {
-  "verdict": "look",
-  "parts": [
-   {
-    "object": "interior.tub",
-    "out_mm": 16.8,
-    "share": 0.13,
-    "at": [
-     -1.444,
-     0.644,
-     0.485
-    ],
-    "meant": false
-   }
-  ],
-  "count": 1
+  "verdict": "ok",
+  "parts": [],
+  "count": 0
  },
  "triangles": {
   "verdict": "ok",
-  "total": 90334,
+  "total": 119902,
   "budget": 400000,
   "top": [
    [
@@ -168,42 +163,46 @@
     7448
    ],
    [
-    "body.trim",
-    7004
-   ],
-   [
     "interior.seats",
     5264
+   ],
+   [
+    "body.lightband",
+    4396
    ],
    [
     "step.links",
     3904
    ],
    [
-    "pod.ribs",
-    3136
+    "body.door_r",
+    3756
    ],
    [
-    "belly.conduits",
-    3072
+    "body.door_f",
+    3708
    ],
    [
-    "pod.skid.f",
-    2664
+    "body.quarter",
+    3644
    ],
    [
-    "pod.skid.r",
-    2664
+    "body.trim",
+    3360
    ]
   ],
   "groups": [
+   [
+    "body",
+    42756
+   ],
    [
     "pod",
     30804
    ],
    [
-    "body",
-    20620
+    "lamp",
+    8204
    ],
    [
     "hull",
@@ -211,7 +210,7 @@
    ],
    [
     "interior",
-    6780
+    6912
    ],
    [
     "step",
@@ -222,12 +221,8 @@
     3792
    ],
    [
-    "fin",
-    1648
-   ],
-   [
-    "deck",
-    1632
+    "led",
+    1730
    ]
   ]
  },

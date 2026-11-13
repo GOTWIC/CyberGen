@@ -3245,6 +3245,27 @@ Vanta-R the same).
 - **Aurel set aside** (Swagnik, 2026-11-12: not in use for now): the Prelate's step B pass
   (its slot grille tore in the pack's far LODs) is kept on branch
   `claude/ag18-prelate-step-b-wip`, not merged; the Aurels are left out of the next batches.
+- **Kestrel Meridian** (`docs/progress/AG18/kestrel_meridian/`, now on
+  `vehicles/brands/kestrel.py`): the Dart's family on the sedan's hull. The mouth's three
+  lamp cells each side in a slot cut 40 mm into its back wall, 3 mm proud of it between
+  bright dividers, under a clear lens in a dark surround standing 12 mm proud (a lens flush
+  with the wall went dark in the pack's LOD3, the wall drawn across the slot); the chine's
+  knife edge cut into lit channels under clear and red lenses at the prow (0.80 m, the light
+  blade over the mouth now leaving from it) and the stern (0.29 m); the stern bar a channel
+  under a red lens with a red core and ribs; the keel blade's foot a lamp channel along
+  3.30 m; vanes in the six thruster slots; the shoulder groove (traced every 4 cm), both door
+  releases and the charge flap cut; 3.5 mm shut lines; frit on every pane; the maker's name
+  laid on its band in letters 5 mm proud (flat, the pack baked them and lost strokes). Step
+  A's cabin tub in the open (16.8 mm under the rear floor's corner) fixed locally: the
+  floor's rear corners cut in, a step up under the rear bench, the dash and door cards
+  narrower at their foot (`through` ok). The one-sided boarding step and the yoke told as
+  meant. 119,902 triangles (90,334). Checks: through `ok` (was `look`), symmetry `look` (the
+  pod, fin code and stern name, 3 to 11 mm, as before), the rest `ok`. Pack rebuilt, every
+  check passing: 82,363, 49,417, 20,381, 5,109 triangles, standard class, texels 374 px/m
+  (5th percentile), LOD3 25.3 of 40 degrees, 0.051 of 0.10 bent, 0.033 of 0.04 texture (main
+  31.0, 0.065, 0.0397). Its far LOD starved at first and dropped the prow's stem: the
+  shoulder groove and the chine channels traced less densely and the stem's foot 38 mm
+  lower, its LOD row reads as main's. Not published.
 - **Next**: the other cars of the Kestrel, Orrin, Brakk and Tanager brands on the
   pilots' patterns (Meridian, Atlas, Pebble, Aria, Bastion, Mule, Cab, Porter), each switching to its `vehicles/brands/` module, with step A's street-distance
   findings fixed as it is redone.
