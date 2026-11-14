@@ -119,9 +119,20 @@ streaming, collision, the walk, the flight, the atmos and life status).
 | ![](unreal/pday_people_street_0.jpg) | ![](unreal/walk_ahead.jpg) |
 | **Mid people (baked walks, 40 to 80 m), enlarged** | **By night down a lit street** |
 | ![](unreal/mid_people_crop.jpg) | ![](unreal/night_people_street_2.jpg) |
+| **The far crowd from 7 m up, by day** | **The same by night** |
+| ![](unreal/pday_people_far.jpg) | ![](unreal/night_people_far.jpg) |
+| **Far people (cards, 90 to 180 m), enlarged** | **By night** |
+| ![](unreal/far_people_crop.jpg) | ![](unreal/far_people_crop_night.jpg) |
 
-More: `unreal/` (close by day and night, the street from both ends, the walker's body, the
-crowd from 30 m up, `pday_people_far.jpg`, where roofs hide most of the street).
+More: `unreal/` (close by day and night, the street from both ends, the walker's body).
+
+The first import's cards drew the engine's default material: the card material did not
+compile (its mask's default texture had the other gamma than its sampler, and an earlier
+build's graph emptied in place left an unlinked node the compile still read). The library
+now makes the material afresh per library hash, with its samplers by the sheets' own gamma
+and every link checked; the far shots above are after the fix (the benchmark was run
+before it, with the cards on the default material: the same instances and draws, without
+the turning to the view).
 
 ## Benchmark
 
@@ -161,7 +172,11 @@ left out: its flight hitched 146 times while the session deleted old builds.)
 
 ## Package
 
-`builds/packaged/Delta_lg1/Windows/CityAG16.exe` (PACKAGE_NOTE).
+`C:/Users/swagn/CityGen/builds/packaged/Delta_lg1/Windows/CityAG16.exe` (Development, Win64,
+5.0 GB; `builds/packaged/package_lg1.cmd` from a copy of `CityAG16` without the MetaHuman
+Character sources, cooked in 10 minutes). Its smoke launch (`-userdir=` outside the package)
+loads the level and the life controller with the library's 24 characters, no material
+error; the superseded `Delta_cars` package was deleted.
 
 ## What Swagnik still has to do
 
@@ -189,5 +204,6 @@ left out: its flight hitched 146 times while the session deleted old builds.)
 - **Clips:** two walks and two idles; the idles are retargeted but not yet played (people
   only walk until LG3's stops and LG4's places).
 - **Draw calls:** the mid mesh's sections (above); the near people's faces at LOD 0.
-- **The far view:** the check's view from 30 m up sees the roofs more than the crowd; a view
-  down a long street would show the cards better.
+- **The cards' lighting:** the sheet's colors carry the shading of the one light that was
+  turned with its camera, under the scene's own light on the card (a flat normal toward the
+  view); an albedo sheet with a normal sheet would light them as the street is lit.
