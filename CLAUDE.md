@@ -2718,6 +2718,14 @@ LG0 (groundwork and spike) is in place:
   MetaHuman Creator, Mutable and retargeting from Python in a throwaway project,
   `cmu_style.py` a CMU-skeleton walk made in Blender) and the **garment test**
   (`lifegen/blender/garment_test.py`: a tee from two panels sewn and draped headless).
+- **Spike** (Delta's Old Town, 2,000 stand-ins and 40 cars): `night_plan_all` 15.1 to
+  16.6 ms p95 on the lean route (walk 14.9 to 16.6), mostly game thread; people and cars
+  stay out of Lumen's scene and are moved without recreating render state (both cost 9 ms
+  of GPU when on). The benchmark's `night_life*` passes (`bench.LIFE_PASSES`).
+- **Probes' findings:** MetaHuman bodies are scriptable up to the build, which needs Epic's
+  cloud rigging (the user's sign-in and EULA) and the engine's optional MetaHuman content
+  for skin; MetaHuman Crowd (experimental) is Epic's Mass crowd of MetaHumans, LG1's and
+  LG3's starting point; retargeting runs by script.
 - Results, the benchmark, the probes' findings and the recommendations for LG1 to LG8:
   `docs/progress/LG0/README.md`.
 

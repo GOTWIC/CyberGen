@@ -63,12 +63,24 @@ Built on the Windows PC (2026-11-13), on main after AT7, the play fixes and the 
   `--life DIR`, `--no-life`): the manifest's `life`, `BUILD/unreal/life.json`, the
   controller placed with the spike, the stand-in material made by the import;
   `docs/unreal_export.md`, "lifegen's runtime (LG0)".
-- **Spike** (Delta's Old Town at 23:00, 2,000 stand-ins within 450 m of its middle, 40 cars
-  of nine models): see the report for the benchmark before and after, the game thread's and
-  the GPU's cost.
-- **Probes** (`lifegen/probes/`): the engine pieces' maturity in 5.8, MetaHuman Creator and
-  Mutable from Python, a CMU-style clip retargeted onto the template's mannequin by script.
+- **Spike** (Delta's Old Town at 23:00, 2,000 stand-ins within 450 m of its middle and
+  densest round it, 40 cars of nine models; 11,340 ZoneGraph lanes built in 14 to 30 ms):
+  the lean benchmark's `night_plan_all` 15.1 to **16.6 ms p95** (walk 14.9 to 16.6), under
+  the 20 ms budget; the game thread about +2.5 ms at the walk's p95 (the controller's own
+  tick 1.0 to 1.8 ms), the GPU +0.6 ms. The first build recreated the instances' render
+  state every frame and left them in Lumen's scene: walk 26.3 ms, 8 to 9 ms of it Lumen's
+  scene update; both are off now (`bInLumen`, `bRebuildRenderState`), with the benchmark's
+  `night_life*` passes to measure them. The package `builds/packaged/Delta_lg0` launches
+  with the spike.
+- **Probes** (`lifegen/probes/`): the engine pieces' maturity in 5.8 (ZoneGraph, Mass
+  Gameplay, Mass Crowd, MetaHuman Crowd, AnimToTexture, Chaos Vehicles experimental; Mutable
+  and MetaHuman Creator beta; Smart Objects, StateTree, Pose Search, IK Rig, Chaos Cloth
+  released); MetaHuman Creator creates and edits bodies from Python but cannot build one
+  without Epic's cloud rigging (sign-in and EULA) and its skin without the optional
+  content; Mutable has no Python graph editing; a CMU-style clip retargets onto the
+  mannequin by script (its chains set by script).
 - **Garment test** (`lifegen/blender/garment_test.py`): a tee of two flat panels sewn and
-  draped on a plain body headless, baked and rendered.
+  draped on a plain body headless in 13.5 s, its seams closed to 0.9 cm on average, baked
+  and rendered.
 - **Tests** (`tests/lifegen/test_lg_plan.py`; `test_no_network.py` reads lifegen;
   `test_unreal_play.py` the third plugin).

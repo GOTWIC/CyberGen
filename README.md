@@ -662,7 +662,11 @@ garages, taxi stands) and the places they use (benches, bus stops, stalls, kiosk
 turns the city's walkways and lanes into Unreal's ZoneGraph lanes and walks plain stand-ins
 and drives a few cars on one district.
 
-<!-- LG0_IMAGES -->
+| Plain stand-ins walking an Old Town street (the first test) | People on the streets by hour, as planned |
+|---|---|
+| <img src="docs/progress/LG0/unreal/pday_street_eye.jpg" width="420"> | <img src="docs/progress/LG0/plan/preview_crowds.png" width="420"> |
+| A tee sewn from flat panels and draped in Blender (the clothing test) | |
+| <img src="docs/progress/LG0/garment/garment_34.jpg" width="200"> | |
 
 ```bash
 .venv/bin/python -m lifegen plan out/vesper_bay                   # BUILD/life: the plan and its checks
