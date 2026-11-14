@@ -1,0 +1,1 @@
+First import of the city crowd on Delta (shots1): people live round the view on every walkway, Old Town at 0.29 of its density (the pool), signals and doors working; view placement fixed after.

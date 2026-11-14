@@ -75,8 +75,8 @@ HASH_TAG = "cg.hash"
 # unchanged build applies the change (stored hashes are "<version>.<content hash>")
 MESH_VERSION = "3"
 ACTOR_VERSION = "1"
-LIFE_VERSION = "life2"   # LG0: lifegen's controller (CityGenLife) and its stand-in material;
-                         # LG1: the people library's properties
+LIFE_VERSION = "life3"   # LG0: lifegen's controller (CityGenLife) and its stand-in material;
+                         # LG1: the people library's properties; LG3: the city's crowd
 ATMOS_VERSION = "atmos7"  # the atmos controller's and cells' actors (2, AT2: the high tier,
                           # blinks and sweeps in the packed lights; 3, AT3: the sky and time;
                           # 4, AT4: the air, a cell's fog volumes and emitters; 5, the visible
@@ -1178,6 +1178,36 @@ def people_assets(d, missing):
                     ("far_m", "far_m")):
         if k in t:
             out[prop] = int(t[k]) if k == "near_max" else float(t[k])
+    return out
+
+
+def crowd_props(d):
+    """LG3: the life controller's crowd properties from its packed data (`unreal_life.
+    pack_crowd`): every walkway's kind, district, people per hour band and signal window; the
+    districts' days, dangers and palettes; the doors; the pool's tints; the settings. All
+    empty (LG1's spike) for a plan before LG3."""
+    fl = lambda k: [float(v) for v in d.get(k) or []]     # noqa: E731
+    it = lambda k: [int(v) for v in d.get(k) or []]       # noqa: E731
+    out = {"walk_kinds": it("walk_kinds"), "walk_district": it("walk_district"),
+           "walk_people": fl("walk_people"), "walk_signal": it("walk_signal"),
+           "signal_windows": fl("signal_windows"), "district_shape": fl("district_shape"),
+           "district_danger": fl("district_danger"),
+           "district_palettes": fl("district_palettes"),
+           "person_tint_index": it("person_tint_index"), "door_lanes": it("door_lanes"),
+           "door_dists_m": fl("door_dists"), "door_points": fl("door_points"),
+           "door_rates": fl("door_rates")}
+    c = d.get("crowd")
+    if c:
+        out.update({"palette_size": int(d.get("palette_size") or 24), "hour": int(c["hour"]),
+                    "live_m": float(c["live_m"]), "trip_s": float(c["trip_s"]),
+                    "group_shares": [float(v) for v in c["groups"]],
+                    "group_gap_m": float(c["group_gap_m"]),
+                    "jaywalk": unreal.Vector2D(*[float(v) for v in c["jaywalk"]]),
+                    "reach_m": float(c["reach_m"]), "personal_m": float(c["personal_m"]),
+                    "player_m": float(c["player_m"]), "avoid_m": float(c["avoid_m"]),
+                    "stairs_share": float(c["stairs"]),
+                    "escalator": unreal.Vector2D(*[float(v) for v in c["escalator"]]),
+                    "elevator_ms": float(c["elevator"]), "crowd_scale": 1.0})
     return out
 
 
@@ -4412,6 +4442,9 @@ class Importer:
             people = people_assets(d, missing)
             for k, v in people.items():
                 a.set_editor_property(k, v)
+            # (LG3: the city's crowd; empty for a plan before it, which walks LG1's spike)
+            for k, v in crowd_props(d).items():
+                a.set_editor_property(k, v)
             a.tags = self.tags(info["key"], hv, [], "life", "life", "", d["district"])
 
         self.place(have, info["key"], info["hash"], cls.static_class(), make, update,
@@ -4421,7 +4454,12 @@ class Importer:
                               "drive_lanes": len(d["drive_starts"]) - 1,
                               "models": d["models"], "missing_meshes": missing,
                               "library": len(d.get("mid_meshes") or []),
-                              "tiers": d.get("tiers")}
+                              "tiers": d.get("tiers"),
+                              "crowd": ({"doors": len(d.get("door_lanes") or []),
+                                         "signals": len(d.get("signal_windows") or []) // 8,
+                                         "hour": d["crowd"]["hour"],
+                                         "pool": d["crowd"]["pool"]}
+                                        if d.get("crowd") else None)}
 
     # -- what Play puts you in, and how far the level streams around you --
 

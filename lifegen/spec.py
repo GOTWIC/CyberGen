@@ -115,6 +115,15 @@ class Spike(_Model):
     cars: Annotated[int, Field(ge=0, le=2000)] = P.SPIKE["cars"]
 
 
+class Crowd(_Model):
+    """LG3: the city's crowd (scope 6.3): the runtime's hour, how many people it simulates
+    at once round the view, how much busier or quieter than M11's densities."""
+    hour: Hour = P.CROWD["hour"]
+    pool: Annotated[int, Field(ge=0, le=20000)] = P.CROWD["pool"]
+    scale: Annotated[float, Field(ge=0.0, le=10.0)] = 1.0
+    trip_s: Annotated[float, Field(gt=0.0, le=7200.0)] = P.CROWD["trip_s"]
+
+
 class LifeSpec(_Model):
     schema_ref: str | None = Field(None, alias="$schema")
     version: Literal[1] = SPEC_VERSION
@@ -128,6 +137,7 @@ class LifeSpec(_Model):
     budgets: Budgets = Field(default_factory=Budgets)
     reactions: Reactions = Field(default_factory=Reactions)
     spike: Spike = Field(default_factory=Spike)
+    crowd: Crowd = Field(default_factory=Crowd)
     notes: str | None = Field(None, description="What the session inferred from the prompt.")
 
 
@@ -203,7 +213,8 @@ def fill(spec: LifeSpec, districts: list[dict], cars: list[str]) -> dict:
             "water_busy": _r(spec.water.busy),
             "transit": {k: [_r(x) for x in v] for k, v in sorted(spec.transit.headway_min
                                                                    .items())},
-            "palette": list(spec.styles.palette), "spike": spec.spike.model_dump()}
+            "palette": list(spec.styles.palette), "spike": spec.spike.model_dump(),
+            "crowd": spec.crowd.model_dump()}
 
 
 def dump(spec: LifeSpec) -> dict:

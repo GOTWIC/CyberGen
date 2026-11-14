@@ -181,6 +181,98 @@ public:
 	/** The state as one JSON line (lanes, entities, the game thread's time in the actor). */
 	UFUNCTION(BlueprintCallable, Category = "CityGen") FString GetStatus() const;
 
+	// --- LG3: the city's crowd (set by the importer from the plan's crowd) --------------------
+	// Every walkway of the city is a lane (WalkPoints ... as above, the whole walkway graph,
+	// every kind and level). The plan gives each its people per hour band (WalkPeople, 5 a lane)
+	// and its district (WalkDistrict), whose day shapes the hours within a band
+	// (DistrictShape, 24 a district). Round the view every walkway within LiveM is live: it
+	// gets its people when it comes alive (past the far tier, so never in sight), loses them
+	// when it goes; the rest of the city is a number per walkway. At most People (the pool,
+	// each slot a person of the plan's draws) live at once: past that the density is scaled
+	// down evenly. People come out of doors and go in at them (Door*), walk in groups, wait
+	// at the signals of the crosswalks (WalkSignal, SignalWindows), keep right and out of
+	// each other's way and the player's.
+
+	/** Per walkway lane its kind (lifegen's WALK_KIND_CODES), district (-1 none), people per
+	 *  hour band (5 floats) and signal window (-1 none; 4 floats each in SignalWindows: the
+	 *  cycle, its offset, when people may start crossing, from and to, s). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") TArray<uint8> WalkKinds;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") TArray<int32> WalkDistrict;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") TArray<float> WalkPeople;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") TArray<int32> WalkSignal;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") TArray<float> SignalWindows;
+	/** Per district its day (24 floats, each band's hours averaging 1), danger (0 to 1) and
+	 *  clothes' colors (PaletteSize linear RGB colors). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") TArray<float> DistrictShape;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") TArray<float> DistrictDanger;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") TArray<float> DistrictPalettes;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") int32 PaletteSize = 24;
+	/** Per pool slot its tint's index into its district's palette (where it comes out). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") TArray<int32> PersonTintIndex;
+	/** The doors (spawn and sink points: AG3's doors, station stairs, garages, taxi stands):
+	 *  per door its walkway lane, distance along it (m), point (citygen m, on the facade) and
+	 *  people a hour coming out at the plan's hour. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") TArray<int32> DoorLanes;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") TArray<float> DoorDistsM;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") TArray<float> DoorPoints;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") TArray<float> DoorRates;
+	/** The hour (0 to 23) the crowd lives at; the live radius (m from the view, 3D). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") int32 Hour = 23;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") float LiveM = 340.f;
+	/** A trip's mean length out of doors (s); the shares of groups of 1 to 5; their spacing. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") float TripS = 600.f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") TArray<float> GroupShares;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") float GroupGapM = 0.9f;
+	/** The share crossing against the signal at danger 0 and 1. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") FVector2D Jaywalk = FVector2D(0.01, 0.30);
+	/** Avoidance (m): who is ahead, how far a person keeps, from the player, how far from the
+	 *  view people avoid at all. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") float ReachM = 4.f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") float PersonalM = 0.75f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") float PlayerM = 2.5f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") float AvoidM = 90.f;
+	/** Stairs (share of the pace), escalators (share, plus m/s), elevators (m/s, hidden). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") float StairsShare = 0.6f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") FVector2D Escalator = FVector2D(0.3, 0.5);
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") float ElevatorMS = 0.6f;
+	/** A multiplier on the plan's density (CityGenLife.Crowd SCALE). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") float CrowdScale = 1.f;
+
+	/** Whether this is LG3's city crowd (else LG0's and LG1's spike). */
+	bool IsCity() const { return WalkLaneCount > 0 && WalkPeople.Num() == 5 * WalkLaneCount; }
+	/** The crowd's hour (CityGenLife.Hour H): the live walkways filled again at once. */
+	UFUNCTION(BlueprintCallable, Category = "CityGen") void SetHour(int32 InHour);
+	/** The density's multiplier (CityGenLife.Crowd SCALE): filled again at once. */
+	UFUNCTION(BlueprintCallable, Category = "CityGen") void SetCrowdScale(float InScale);
+
+private:
+	// (LG3, CityGenLifeCrowd.cpp)
+	void BuildCrowd();
+	void SpawnPool();
+	void UpdateLive(float Dt, bool bRefill);
+	int32 SpawnGroup(int32 Lane, float Dist, float Dir, int32 Size, int32 Door, FRandomStream& Rng);
+	void DoorSpawns(float Dt);
+	void TakeFreed();
+	void FreeOnDeadLanes();
+	float Want(int32 Lane) const;
+	int32 GroupSize(FRandomStream& Rng) const;
+	void ApplyLook(int32 Person, bool bStill);
+	FString CrowdStatus() const;
+
+	TArray<uint8> LaneKindArr;
+	TArray<int32> LaneSignalArr, LaneDistrictArr, LaneDoorStarts, LaneHave, FreeSlots, Freed;
+	TArray<float> HoldA, HoldB, DoorDists, DoorCum, LaneHalf;
+	TArray<int32> DoorLive, DoorLanesSorted;
+	TArray<float> DoorRatesSorted;
+	TArray<FVector> LaneMid, DoorStreet, DoorInside;
+	TArray<uint8> WalkState, PersonStill;
+	FVector LastLiveView = FVector(1.0e12);
+	float LiveClock = 0.f, DoorAcc = 0.f, LiveScale = 1.f, WantLive = 0.f;
+	int32 LiveLanes = 0, ActiveNow = 0, GroupCounter = 0, Spawned = 0, DoorOut = 0, DoorIn = 0, Lost = 0;
+	int32 WaitingNow = 0, JaywalkTotal = 0;
+	int64 Frames = 0;
+	FRandomStream CrowdRng;
+
 private:
 	void BuildLanes();
 	void SpawnAll();
@@ -206,7 +298,9 @@ private:
 		int32 Person = INDEX_NONE;
 		int32 Char = INDEX_NONE;
 		int32 Gait = INDEX_NONE;
+		bool bIdle = false;        // (LG3: playing an idle, standing)
 	};
+	TArray<uint8> MidSeen, FarSeen;
 	TArray<FNearSlot> NearSlots;
 	UPROPERTY(Transient) TArray<TObjectPtr<USkeletalMeshComponent>> NearComps;
 	UPROPERTY(Transient) TArray<TObjectPtr<UStaticMeshComponent>> HairComps;

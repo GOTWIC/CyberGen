@@ -74,6 +74,13 @@ def _length(line) -> float:
     return sum(math.dist(a[:2], b[:2]) for a, b in zip(line, line[1:]))
 
 
+def _length3(line) -> float:
+    """A polyline's length in 3D (points without a z at 0)."""
+    def p3(p):
+        return (float(p[0]), float(p[1]), float(p[2]) if len(p) > 2 else 0.0)
+    return sum(math.dist(p3(a), p3(b)) for a, b in zip(line, line[1:]))
+
+
 def _u(*parts) -> float:
     """A uniform draw in [0, 1) from a hash of ids (blake2b, as citygen's props._u)."""
     h = hashlib.blake2b("|".join(str(p) for p in parts).encode("utf-8"), digest_size=8)
@@ -143,10 +150,11 @@ def _ground_end(line) -> list[float]:
     return [float(p[0]), float(p[1]), float(p[2]) if len(p) > 2 else 0.0]
 
 
-def spawn_points(model: dict, walk_by: dict) -> list[dict]:
-    """Every spawn point without its rates: (record, weight)."""
-    out = []
-    for b in model.get("buildings", []):
+def spawn_points(model: dict, walk_by: dict, doors: list | None = None) -> list[dict]:
+    """Every spawn point without its rates: (record, weight). LG3: `doors` (AG3's, from
+    `door_points`) in place of M3's entrances where the build has them."""
+    out = list(doors) if doors is not None else []
+    for b in ([] if doors is not None else model.get("buildings", [])):
         for k, e in enumerate(b.get("entrances") or []):
             if not e.get("walkway_id"):
                 continue
@@ -194,6 +202,43 @@ def spawn_points(model: dict, walk_by: dict) -> list[dict]:
     return out
 
 
+def door_points(build: Path, model: dict, walk_by: dict) -> list | None:
+    """LG3: every AG3 door (the street fronts' entries in the build's
+    `assets/unreal_contribution.buildings.json`: a door per entrance and shop unit, on the
+    facade, with the walkway it opens to) as a spawn point without its rates: (record,
+    weight). None when the build has no stage 2 buildings (M3's entrances then)."""
+    path = build / "assets" / "unreal_contribution.buildings.json"
+    if not path.is_file():
+        return None
+    con = json.loads(path.read_text(encoding="utf-8"))
+    bld = {b["id"]: b for b in model.get("buildings", [])}
+    out = []
+    for e in con.get("entries", []):
+        doors = e.get("doors") or []
+        if not doors:
+            continue
+        px, py, pz = (float(v) for v in e.get("pivot", [0.0, 0.0, 0.0]))
+        bid = (e.get("ids") or [e["key"]])[0]
+        b = bld.get(bid) or {}
+        floors = 1.0 + min(40, int(b.get("floors") or 1)) / 10.0
+        for d in doors:
+            wid = d.get("walkway_id")
+            if not wid or wid not in walk_by:
+                continue
+            x, y, z = (float(v) for v in d["position"])
+            nx, ny = (float(v) for v in d.get("normal") or [1.0, 0.0])
+            kind = d["kind"] if d["kind"] != "shop" else f"shop.{d.get('use') or 'unit'}"
+            w = P.DOOR_WEIGHT.get(kind) or P.SPAWN_WEIGHT.get(kind) or (
+                P.SPAWN_WEIGHT["unit"] if kind.startswith("shop.") else 1.0)
+            out.append(({"id": f"spawn.{d['id']}", "owner_id": bid, "kind": "door",
+                         "sub": kind, "district_id": b.get("district_id"),
+                         "pos": [_r(px + x, 2), _r(py + y, 2), _r(pz + z, 2)],
+                         "level": int(e.get("level") or 0), "walkway_id": wid,
+                         "lane_id": None,
+                         "yaw_deg": _r(math.degrees(math.atan2(ny, nx)), 2)}, w * floors))
+    return out
+
+
 def _district_at(polys: list, x: float, y: float) -> str | None:
     import shapely
     pt = shapely.Point(x, y)
@@ -224,6 +269,343 @@ def slots(model: dict) -> list[dict]:
         out.append({"id": f"slot.{t['id']}", "owner_id": t["id"], "kind": kind,
                     "behavior": beh, "capacity": cap, "district_id": t.get("district_id"),
                     "pos": [_r(pos[0], 2), _r(pos[1], 2), 0.0], "yaw_deg": 0.0})
+    return out
+
+
+# ---------------------------------------------------------------------------
+# LG3: the city's crowd and the signals
+# ---------------------------------------------------------------------------
+
+def _heading(a, b) -> float:
+    return math.degrees(math.atan2(b[1] - a[1], b[0] - a[0]))
+
+
+def _line_diff(a: float, b: float) -> float:
+    """The angle (degrees, 0 to 90) between two lines (headings taken mod 180)."""
+    d = abs((a - b) % 180.0)
+    return min(d, 180.0 - d)
+
+
+def _mid(line) -> tuple[float, float]:
+    """The middle of a polyline by length (its middle point when it has no length)."""
+    L = _length(line)
+    if L <= 0.0:
+        return float(line[0][0]), float(line[0][1])
+    half, run = L / 2.0, 0.0
+    for a, b in zip(line, line[1:]):
+        d = math.dist(a[:2], b[:2])
+        if run + d >= half and d > 0.0:
+            t = (half - run) / d
+            return a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t
+        run += d
+    return float(line[-1][0]), float(line[-1][1])
+
+
+def signals(model: dict) -> tuple[list[dict], dict[str, tuple[str, int]]]:
+    """The derived signal phases of every signalized junction (`presets.SIGNAL`; the ask
+    `signal_phases`), and each signalized crosswalk walkway's (signal id, phase)."""
+    sg = P.SIGNAL
+    segs = {s["id"]: s for s in model.get("road_segments", [])}
+    cws = {c["id"]: c for c in model.get("crosswalks", [])}
+    walks_at = defaultdict(list)
+    for w in model.get("walkways", []):
+        if w.get("kind") == "crosswalk" and (w.get("attrs") or {}).get("junction"):
+            walks_at[w["attrs"]["junction"]].append(w)
+    out, of = [], {}
+    for j in sorted(model.get("junctions", []), key=lambda j: j["id"]):
+        if not j.get("signalized"):
+            continue
+        legs = []
+        for cut in (j.get("attrs") or {}).get("cuts") or []:
+            s = segs.get(cut[0])
+            cl = (s or {}).get("centerline") or []
+            if len(cl) < 2:
+                continue
+            a, b = (cl[0], cl[1]) if cut[1] == "a" else (cl[-1], cl[-2])
+            legs.append((cut[0], _heading(a, b)))
+        legs.sort()
+        axis = legs[0][1] if legs else 0.0
+        phase_of = {sid: 0 if _line_diff(h, axis) <= 45.0 else 1 for sid, h in legs}
+        cross = [[], []]
+        for cid in sorted(j.get("crosswalk_ids") or []):
+            c = cws.get(cid)
+            if c is None or not c.get("signalized"):
+                continue
+            # (people cross a leg while it is stopped: in the other phase)
+            cross[1 - phase_of.get(c.get("segment_id"), 0)].append(cid)
+        # (each crosswalk walkway is the crosswalk nearest its middle stretch)
+        cw_mid = {cid: _mid(cws[cid]["line"]) for p in cross for cid in p}
+        ways = [[], []]
+        for w in sorted(walks_at.get(j["id"], []), key=lambda w: w["id"]):
+            ln = w["line"]
+            core = ln[1:-1] if len(ln) >= 4 else ln
+            m = _mid(core)
+            best = min(cw_mid, key=lambda c: (math.dist(m, cw_mid[c]), c), default=None)
+            if best is None or math.dist(m, cw_mid[best]) > 6.0:
+                continue
+            k = 0 if best in cross[0] else 1
+            ways[k].append(w["id"])
+        half = sg["cycle_s"] / 2.0
+        sid = f"sig.{j['id']}"
+        phases = []
+        for k in (0, 1):
+            phases.append({"index": k, "legs": sorted(s for s, p in phase_of.items() if p == k),
+                           "crosswalks": cross[k], "walkways": ways[k],
+                           "start_s": _r(k * half, 2),
+                           "green_s": _r(half - sg["amber_s"] - sg["all_red_s"], 2),
+                           "amber_s": sg["amber_s"], "all_red_s": sg["all_red_s"],
+                           "walk_s": sg["walk_s"]})
+            for wid in ways[k]:
+                of[wid] = (sid, k)
+        out.append(hashed({"id": sid, "junction_id": j["id"], "cycle_s": sg["cycle_s"],
+                           "offset_s": _r(int(_u("lg3.signal", j["id"]) * sg["cycle_s"] * 10)
+                                          / 10.0, 1),
+                           "phases": phases}))
+    return out, of
+
+
+def district_palette(model: dict, filled: dict, did: str, tag: str = "lg0") -> list[str]:
+    """A district's clothes' colors: its style's groups by weight, each a color of its
+    group's, a gang's its faction's color (`presets.SPIKE_PALETTE` of them)."""
+    style = filled["districts"][did]["style"]["groups"]
+    gang = next((f.get("color") for f in model.get("factions", [])
+                 if f.get("kind") == "gang" and f.get("home_district_id") == did), None)
+    palette = []
+    for k in range(P.SPIKE_PALETTE):
+        g = _pick(style, f"{tag}.palette.group", did, k)
+        cols = (gang,) if g == "gang" and gang else P.GROUP_COLORS[g]
+        palette.append(cols[int(_u(f"{tag}.palette.color", did, k) * len(cols))])
+    return palette
+
+
+def crowd_walks(model: dict, filled: dict, polys: list, sig_of: dict,
+                spawn_walks: set[str]) -> tuple[list[dict], dict]:
+    """Every walkway's people per hour band (scope 6.3): a road segment's people (M11's
+    crowd per 100 m over its length, the district's busy, the crowd's scale) on its own
+    walkways by length; every other walkway its district's mean street density (people a
+    meter) times its kind's `presets.OFFSTREET`; none on a walkway no spawn point's walkway
+    reaches (nobody gets there). Returns the rows and what was left out."""
+    scale = float(filled["crowd"]["scale"])
+    seg_len = {s["id"]: float((s.get("attrs") or {}).get("length_m") or
+                              _length(s.get("centerline") or []))
+               for s in model.get("road_segments", [])}
+    dens = {}
+    for row in model.get("densities", []):
+        d = row.get("district_id")
+        if d in filled["districts"]:
+            dens[row["segment_id"]] = (d, [float(v) * seg_len.get(row["segment_id"], 0.0)
+                                           / 100.0 * filled["districts"][d]["busy"] * scale
+                                           for v in (row.get("crowd_per_100m") or [0.0] * 5)])
+    walks = model.get("walkways", [])
+    on_seg = defaultdict(float)
+    for w in walks:
+        s = (w.get("attrs") or {}).get("segment")
+        if s in dens:
+            on_seg[s] += _length3(w["line"])
+    comp = walk_components(walks)
+    reach = {comp[w] for w in spawn_walks if w in comp}
+    rows = []
+    street_m = defaultdict(float)
+    street_p = defaultdict(lambda: [0.0] * 5)
+    for w in walks:
+        # (along its slope: a stair's or an elevator's length is its rise)
+        L = _length3(w["line"])
+        s = (w.get("attrs") or {}).get("segment")
+        mx, my = _mid(w["line"])
+        if s in dens and on_seg[s] > 0.0:
+            d, band = dens[s]
+            ppl = [v * L / on_seg[s] for v in band]
+            street = True
+            # (the mean street density: its sidewalks', not the promenades' and pedestrian
+            # streets', which are many times as busy)
+            if w.get("kind") == "sidewalk":
+                street_m[d] += L
+                for i in range(5):
+                    street_p[d][i] += ppl[i]
+        else:
+            d = _district_at(polys, mx, my)
+            ppl, street = None, False
+        rows.append({"id": w["id"], "kind": w.get("kind") or "path", "district_id": d,
+                     "level": int(w.get("level") or (w.get("attrs") or {}).get("level") or 0),
+                     "length_m": _r(L, 2), "street": street, "people": ppl,
+                     "tile": tile_of(mx, my), "_comp": comp.get(w["id"])})
+    mean = {d: [street_p[d][i] / street_m[d] if street_m[d] > 0 else 0.0 for i in range(5)]
+            for d in street_m}
+    left = {"walkways": 0, "people": [0.0] * 5, "street": {}, "segments": 0}
+    # (a segment with people and no walkway of its own: its people go nowhere, said so)
+    for s, (d, band) in sorted(dens.items()):
+        if on_seg[s] <= 0.0 and any(v > 0.0 for v in band):
+            left["segments"] += 1
+            st = left["street"].setdefault(d, [0.0] * 5)
+            for i in range(5):
+                st[i] += band[i]
+    for r in rows:
+        if r["people"] is None:
+            k = P.OFFSTREET.get(r["kind"], P.OFFSTREET_DEFAULT)
+            m = mean.get(r["district_id"]) or [0.0] * 5
+            r["people"] = [k * v * r["length_m"] for v in m]
+        if r["_comp"] not in reach and any(v > 0.0 for v in r["people"]):
+            left["walkways"] += 1
+            for i in range(5):
+                left["people"][i] += r["people"][i]
+            if r["street"]:
+                st = left["street"].setdefault(r["district_id"], [0.0] * 5)
+                for i in range(5):
+                    st[i] += r["people"][i]
+            r["people"] = [0.0] * 5
+        r["people"] = [_r(v, 4) for v in r["people"]]
+        sig = sig_of.get(r["id"])
+        r["signal"], r["phase"] = (sig[0], sig[1]) if sig else (None, None)
+    left["people"] = [_r(v, 2) for v in left["people"]]
+    left["street"] = {d: [_r(v, 3) for v in vs] for d, vs in sorted(left["street"].items())}
+    for r in rows:
+        del r["_comp"]
+    return rows, left
+
+
+CROWD_COLUMNS = PERSON_COLUMNS
+
+
+def crowd_plan(model: dict, filled: dict, rows: list[dict], sigs: list[dict],
+               left: dict) -> dict:
+    """The crowd's record in the plan: its settings, the pool's people by their seeds, the
+    districts' palettes, its totals by hour."""
+    cr = filled["crowd"]
+    n = L.CHARACTERS
+    pool = int(cr["pool"])
+    cols = {k: [] for k in CROWD_COLUMNS}
+    for k in range(pool):
+        p = L.person(("lg3.person", k), n, palette=[0] * P.SPIKE_PALETTE)
+        for c in CROWD_COLUMNS:
+            cols[c].append(p[c])
+    shapes = {d: fd["shape"] for d, fd in filled["districts"].items()}
+    street = [0.0] * P.HOURS
+    off = [0.0] * P.HOURS
+    levels = set()
+    with_people = 0
+    for r in rows:
+        if any(v > 0.0 for v in r["people"]):
+            with_people += 1
+            levels.add(r["level"])
+        shp = shapes.get(r["district_id"]) or [1.0] * P.HOURS
+        for h in range(P.HOURS):
+            v = r["people"][P.band_of(h)] * shp[h]
+            if r["street"]:
+                street[h] += v
+            else:
+                off[h] += v
+    c = P.CROWD
+    return hashed({
+        "hour": int(cr["hour"]), "pool": pool, "live_m": c["live_m"],
+        "trip_s": float(cr["trip_s"]), "scale": float(cr["scale"]),
+        "groups": list(c["groups"]), "group_gap_m": c["group_gap_m"],
+        "jaywalk": list(c["jaywalk"]),
+        "avoid": {k: c[k] for k in ("reach_m", "personal_m", "player_m", "avoid_m")},
+        "speeds": {"stairs": c["stairs"], "escalator": list(c["escalator"]),
+                   "elevator": c["elevator"]},
+        "kinds": list(P.WALK_KIND_CODES),
+        "palettes": {d: district_palette(model, filled, d) for d in filled["districts"]},
+        "library": {"version": L.LIB_VERSION, "characters": n, "walks": list(L.WALKS),
+                    "tiers": dict(sorted(L.TIERS.items()))},
+        "persons": cols,
+        "totals": {"walkways": len(rows), "with_people": with_people,
+                   "levels": sorted(levels), "signals": len(sigs),
+                   "street_people": [_r(v, 1) for v in street],
+                   "offstreet_people": [_r(v, 1) for v in off],
+                   "left_out": left}})
+
+
+def crowd_checks(model: dict, rows: list[dict], hours: dict, filled: dict, sigs: list[dict],
+                 crowd: dict, spawns: list[dict]) -> dict:
+    """LG3's checks: the walkways' people keep M11's densities per district and band, every
+    level with people reachable from the ground, the signals' phases, the pool within the
+    budget."""
+    out = {}
+    scale = float(filled["crowd"]["scale"])
+    got = defaultdict(lambda: [0.0] * 5)
+    for r in rows:
+        if r["street"]:
+            for i in range(5):
+                got[r["district_id"]][i] += r["people"][i]
+    lost = crowd["totals"]["left_out"]
+    bad = []
+    for d, h in hours.items():
+        fd = filled["districts"][d]
+        for i in range(5):
+            want = h["band"]["crowd"][i] * fd["busy"] * scale
+            # (people on walkways nobody reaches are left out and said so)
+            have = got[d][i] + (lost["street"].get(d) or [0.0] * 5)[i]
+            if abs(have - want) > max(0.5, 0.01 * want):
+                bad.append(f"{d} {P.BANDS[i]} {have:.1f} != {want:.1f}")
+    out["crowd_densities"] = {"ok": not bad, "detail": (
+        f"every district's sidewalks carry M11's people per hour band (times its busy and "
+        f"the crowd's scale) within 1%; off-street walkways "
+        f"{max(crowd['totals']['offstreet_people']):.0f} more at the most; "
+        f"{lost['walkways']} walkways no spawn reaches left empty "
+        f"({max(lost['people']):.1f} people)" if not bad else "; ".join(bad[:5]))}
+    # every level with people: its walkways meet the ground's largest walkway component
+    comp = walk_components(model.get("walkways", []))
+    size = defaultdict(int)
+    for c in comp.values():
+        size[c] += 1
+    main = max(size, key=lambda c: (size[c], -c)) if size else None
+    lv = defaultdict(lambda: [0, 0])
+    for r in rows:
+        if any(v > 0.0 for v in r["people"]):
+            lv[r["level"]][0] += 1
+            lv[r["level"]][1] += int(comp.get(r["id"]) == main)
+    cut = [lvl for lvl, (n, m) in lv.items() if m == 0]
+    out["crowd_levels"] = {"ok": not cut, "detail": (
+        "levels " + ", ".join(f"{lvl}: {m} of {n} walkways with people on the main walkway "
+                              f"graph" for lvl, (n, m) in sorted(lv.items()))
+        if not cut else f"levels {cut} have no walkway on the main walkway graph")}
+    # signals: every leg in one phase, a crosswalk never walking while its leg moves,
+    # the phases filling the cycle
+    segs_of = {}
+    for c in model.get("crosswalks", []):
+        segs_of[c["id"]] = c.get("segment_id")
+    sbad = []
+    for s in sigs:
+        legs = [leg for p in s["phases"] for leg in p["legs"]]
+        if len(legs) != len(set(legs)):
+            sbad.append(f"{s['id']}: a leg in two phases")
+        for p in s["phases"]:
+            if set(segs_of.get(c) for c in p["crosswalks"]) & set(p["legs"]):
+                sbad.append(f"{s['id']}: a crosswalk walks across a moving leg")
+        tot = sum(p["green_s"] + p["amber_s"] + p["all_red_s"] for p in s["phases"])
+        if abs(tot - s["cycle_s"]) > 0.05 or not 30.0 <= s["cycle_s"] <= 150.0:
+            sbad.append(f"{s['id']}: phases {tot:.1f} s in a {s['cycle_s']:.0f} s cycle")
+    nsig = sum(1 for j in model.get("junctions", []) if j.get("signalized"))
+    served = sum(len(p["walkways"]) for s in sigs for p in s["phases"])
+    out["signals"] = {"ok": not sbad and len(sigs) == nsig, "detail": (
+        f"{len(sigs)} signalized junctions, two phases each (derived: the ask), no crosswalk "
+        f"walking across a moving leg, the phases filling each cycle; {served} crosswalk "
+        f"walkways served" if not sbad and len(sigs) == nsig else "; ".join(sbad[:5]) or
+        f"{len(sigs)} signals for {nsig} signalized junctions")}
+    bud = filled["budgets"]
+    pool, live = crowd["pool"], crowd["live_m"]
+    in_view = pool * min(1.0, (bud["view_m"] / live) ** 2)
+    ok = in_view <= bud["people_view"] + 0.5
+    out["crowd_budget"] = {"ok": ok, "detail": (
+        f"a pool of {pool} people live within {live:.0f} m of the view, about "
+        f"{in_view:.0f} within {bud['view_m']:.0f} m (the budget's {bud['people_view']})")}
+    # (LG1's rule on the pool: every character among its people, none more than
+    # PEOPLE_SHARE_MAX of them)
+    chars = crowd["persons"].get("character") or []
+    n = crowd["library"].get("characters") or 0
+    if chars and n:
+        cnt = [chars.count(k) for k in range(n)]
+        ok = len(chars) < 10 * n or (min(cnt) > 0 and max(cnt) / len(chars) <= PEOPLE_SHARE_MAX)
+        out["people_draws"] = {"ok": ok, "detail": (
+            f"the crowd's pool of {len(chars)} people drawn from {n} characters, each "
+            f"{min(cnt)} to {max(cnt)} of them (at most {PEOPLE_SHARE_MAX:.0%}), "
+            f"{len(set(crowd['persons'].get('seed') or []))} distinct seeds")}
+    # every spawn point's walkway a walkway of the crowd
+    ids = {r["id"] for r in rows}
+    off = [s["id"] for s in spawns if s["walkway_id"] not in ids]
+    out["crowd_spawns"] = {"ok": not off, "detail": (
+        f"{len(spawns)} spawn points open to the crowd's walkways" if not off else
+        f"{len(off)} spawn points on no walkway of the crowd, first {off[:3]}")}
     return out
 
 
@@ -368,11 +750,9 @@ def spike_plan(model: dict, filled: dict, hours: dict) -> dict | None:
             if b.get("district_id") in ds:
                 count[b["district_id"]] += 1
         did = min(ds, key=lambda d: (-count[d], d))
-    bud = filled["budgets"]
-    people = sp.get("people")
-    if people is None:
-        people = min(P.SPIKE["people_max"], bud["people_view"],
-                     int(round(hours[did]["people"][sp["hour"]])))
+    # (LG3: the city's crowd walks every street; the spike keeps its cars until LG5's
+    # traffic, and people only when the spec asks for them)
+    people = int(sp.get("people") or 0)
     fleet = filled["districts"][did]["fleet"]
     models = sorted(fleet.items(), key=lambda kv: (-kv[1], kv[0]))
     ring = (ds[did].get("polygon") or {}).get("exterior") or []
@@ -390,14 +770,7 @@ def spike_plan(model: dict, filled: dict, hours: dict) -> dict | None:
                max(1, len(ring)))
     # (the stand-ins' clothes: the district's style's groups by weight, each a color of its
     # group's, a gang's its faction's color)
-    style = filled["districts"][did]["style"]["groups"]
-    gang = next((f.get("color") for f in model.get("factions", [])
-                 if f.get("kind") == "gang" and f.get("home_district_id") == did), None)
-    palette = []
-    for k in range(P.SPIKE_PALETTE):
-        g = _pick(style, "lg0.palette.group", did, k)
-        cols = (gang,) if g == "gang" and gang else P.GROUP_COLORS[g]
-        palette.append(cols[int(_u("lg0.palette.color", did, k) * len(cols))])
+    palette = district_palette(model, filled, did)
     # (LG1: who each of them is, by their seed: a character of the people library, a height
     # scale, a gait, a pace, the outfit's tint from the palette)
     n = L.CHARACTERS
@@ -450,7 +823,7 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
                                        [h for h in d["polygon"].get("holes", [])]))
              for d in sorted(model.get("districts", []), key=lambda d: d["id"])
              if d.get("polygon")]
-    raw_spawns = spawn_points(model, walk_by)
+    raw_spawns = spawn_points(model, walk_by, door_points(build, model, walk_by))
     for rec, _ in raw_spawns:
         if rec["district_id"] is None:
             rec["district_id"] = _district_at(polys, rec["pos"][0], rec["pos"][1])
@@ -476,12 +849,20 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
         s["tile"] = tile_of(s["pos"][0], s["pos"][1])
         slot_rows.append(hashed(s))
 
+    # LG3: the signals, every walkway's people, the crowd
+    sigs, sig_of = signals(model)
+    rows, left = crowd_walks(model, filled, polys, sig_of, {s["walkway_id"] for s in spawns})
+    walk_rows = [hashed({k: v for k, v in r.items() if k != "tile"}) for r in rows]
+    crowd = crowd_plan(model, filled, rows, sigs, left)
+
     # per tile
-    by_tile = defaultdict(lambda: {"spawns": [], "slots": []})
+    by_tile = defaultdict(lambda: {"spawns": [], "slots": [], "walks": []})
     for s in spawns:
         by_tile[s["tile"]]["spawns"].append(s)
     for s in slot_rows:
         by_tile[s["tile"]]["slots"].append(s)
+    for r, w in sorted(zip(rows, walk_rows), key=lambda rw: rw[1]["id"]):
+        by_tile[r["tile"]]["walks"].append(w)
     tiles = []
     keep = set()
     for t in sorted(by_tile):
@@ -491,7 +872,7 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
         keep.add(f.name)
         write(f, text, wrote)
         tiles.append({"tile": t, "file": f"spawns/{t}.json", "spawns": len(by_tile[t]["spawns"]),
-                      "slots": len(by_tile[t]["slots"]),
+                      "slots": len(by_tile[t]["slots"]), "walks": len(by_tile[t]["walks"]),
                       "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()})
     if (out / "spawns").is_dir():
         for f in sorted((out / "spawns").glob("*.json")):
@@ -517,6 +898,9 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
                                  "police": h["police"], "spawns": nsp[d], "slots": nsl[d]}))
     spike = spike_plan(model, filled, hours)
     checks = run_checks(model, spawns, slot_rows, hours, filled, spike)
+    checks.update(crowd_checks(model, rows, hours, filled, sigs, crowd, spawns))
+    sdata = PM.Signals(city=city, derived=True, signals=sigs)
+    write(out / "signals.json", canon(json.loads(sdata.model_dump_json())), wrote)
     asks = A.status(model, {"doors": (build / "assets" / "unreal_contribution.buildings.json")
                             .is_file()})
     totals = {"spawns": len(spawns), "slots": len(slot_rows), "tiles": len(tiles),
@@ -524,13 +908,16 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
                                     for k in range(P.HOURS)), 1),
               "vehicles_peak": _r(max(sum(h["vehicles"][k] for h in hours.values())
                                       for k in range(P.HOURS)), 1),
-              "spawns_without_walkway": 0}
+              "spawns_without_walkway": 0,
+              "doors": sum(1 for s in spawns if s["kind"] == "door"),
+              "walkways": len(rows), "signals": len(sigs)}
     body = {"city": city, "model_sha256": hashlib.sha256(raw).hexdigest(),
             "spec": {k: v for k, v in filled.items() if k != "districts"},
             "bands": list(P.BANDS), "districts": districts, "tiles": tiles, "asks": asks,
-            "spike": spike, "checks": checks, "totals": totals}
+            "spike": spike, "crowd": crowd, "checks": checks, "totals": totals}
     plan_hash = _sha([body["spec"], [d["hash"] for d in districts],
-                      [t["sha256"] for t in tiles], spike and spike["hash"]])
+                      [t["sha256"] for t in tiles], spike and spike["hash"], crowd["hash"],
+                      sdata.model_dump(mode="json")])
     plan = PM.LifePlan(plan_hash=plan_hash, **body)
     pdata = json.loads(plan.model_dump_json())
     write(out / "life_plan.json", canon(pdata), wrote)
@@ -538,7 +925,8 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     entries = []
     if spike is not None:
         entries.append({"key": "life", "kind": "life_controller", "hash": _sha([plan_hash]),
-                        "tile": None, "count": spike["people"] + spike["cars"]})
+                        "tile": None,
+                        "count": spike["people"] + spike["cars"] + crowd["pool"]})
     for t in tiles:
         entries.append({"key": f"life.spawns.{t['tile']}", "kind": "spawner",
                         "hash": t["sha256"][:16], "tile": t["tile"], "count": t["spawns"]})
@@ -555,6 +943,14 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
                          for d in districts},
            "spike": spike and {k: spike[k] for k in ("district_id", "name", "hour", "people",
                                                      "cars")},
+           "crowd": {"hour": crowd["hour"], "pool": crowd["pool"],
+                     "live_m": crowd["live_m"],
+                     **{k: crowd["totals"][k] for k in ("walkways", "with_people", "levels",
+                                                        "signals")},
+                     "people_at_hour": _r(crowd["totals"]["street_people"][crowd["hour"]] +
+                                          crowd["totals"]["offstreet_people"][crowd["hour"]],
+                                          1),
+                     "left_out": crowd["totals"]["left_out"]},
            "asks": {a["id"]: a["status"] for a in asks}}
     write(out / "life_report.json", canon(rep), wrote)
     write(out / "life_report.txt", report_text(rep), wrote)
@@ -579,6 +975,14 @@ def report_text(rep: dict) -> str:
     for d, r in rep["districts"].items():
         L.append(f"{d:8}  {r['people_23']:9.0f}  {r['people_peak']:11.0f}  "
                  f"{r['vehicles_peak']:13.0f}  {r['spawns']:6}  {r['slots']:5}  {r['name']}")
+    if rep.get("crowd"):
+        c = rep["crowd"]
+        lo = c["left_out"]
+        L += ["", f"crowd: {c['people_at_hour']:.0f} people on {c['with_people']} of "
+                  f"{c['walkways']} walkways at {c['hour']}:00 (levels {c['levels']}), a pool "
+                  f"of {c['pool']} live within {c['live_m']:.0f} m of the view; "
+                  f"{c['signals']} signals; left out: {lo['walkways']} walkways no spawn "
+                  f"reaches, {lo['segments']} segments without a walkway"]
     if rep.get("spike"):
         s = rep["spike"]
         L += ["", f"spike: {s['name']} ({s['district_id']}) at {s['hour']}:00, {s['people']} "

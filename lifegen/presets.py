@@ -162,3 +162,53 @@ DRIVE = {"junction": 0.7, "lateral": 2.0, "brake": 2.5, "crawl": 2.0, "vary": [0
 # walkway kinds the stand-ins walk (not elevators, skybridges or stairs in LG0)
 SPIKE_WALK_KINDS = ("sidewalk", "crossing", "crosswalk", "alley", "promenade",
                     "pedestrian_street", "path", "footbridge")
+
+# --- LG3: crowds on the streets (scope 6.3) --------------------------------------------------
+
+# the city's crowd: people on every walkway at its street's density by hour (M11's per
+# segment and band, on its sidewalks; the off-street walkways at their district's mean
+# street density times `OFFSTREET`), simulated round the view only: every walkway within
+# `live_m` of the view is live (past the far tier's 300 m and its fade, so a walkway coming
+# alive or going is never seen), the rest a number per walkway and hour; at most `pool`
+# people at once (the budget's 2,000 within 300 m: pool (300 / live_m)^2 of them); trips
+# from and to doors, stations, garages and taxi stands lasting `trip_s` on average
+CROWD = {
+    "hour": 23,                    # the runtime's hour until LG8 reads atmosgen's
+    "pool": 2400,                  # people simulated at once (the budget's 2,000 in 300 m)
+    "live_m": 340.0,               # walkways within this of the view (3D) are live
+    "trip_s": 600.0,               # a trip's mean length out of doors (s)
+    # groups of 1 to 5 people walking together (shares)
+    "groups": [0.56, 0.26, 0.11, 0.05, 0.02],
+    "group_gap_m": 0.9,            # a group's members this far apart along the walkway
+    # the share crossing a signalized crosswalk against the signal: at danger 0 and 1
+    "jaywalk": [0.01, 0.30],
+    # local avoidance: a person reacts to others within `reach_m` ahead on its walkway, keeps
+    # `personal_m` from them, and steps aside from the player within `player_m`; people
+    # farther than `avoid_m` from the view are not tested (too far to see it)
+    "reach_m": 4.0, "personal_m": 0.75, "player_m": 2.5, "avoid_m": 90.0,
+    # speeds: stairs (a share of the pace), an escalator (a share of the pace plus its own
+    # m/s), an elevator (m/s along its shaft, the waiting folded in; hidden inside)
+    "stairs": 0.6, "escalator": [0.3, 0.5], "elevator": 0.6,
+}
+# a walkway kind's people per meter relative to its district's mean sidewalk density (the
+# walkways that belong to no road segment: a junction's corners and crossings, crosswalks,
+# park and door paths, skybridges, platforms, stairs; people pass through a junction, so
+# fewer stand in it; elevators carry people through, none stand in them)
+OFFSTREET = {"crossing": 0.6, "crosswalk": 0.4, "path": 0.3, "skybridge": 0.25,
+             "elevated": 0.6, "stairs": 0.4, "escalator": 0.4, "elevator": 0.0,
+             "footbridge": 0.5, "underpass": 0.4, "concourse": 0.6}
+OFFSTREET_DEFAULT = 0.3
+# every walkway kind the runtime knows (its code: an index here; unknown kinds as "path")
+WALK_KIND_CODES = ("sidewalk", "crossing", "crosswalk", "path", "alley", "promenade",
+                   "pedestrian_street", "footbridge", "stairs", "escalator", "elevator",
+                   "skybridge", "elevated", "underpass", "concourse")
+# a door's weight among a district's spawn points by AG3's door kind (a shop's unit door,
+# `shop.<use>`, as a unit); the rest as `SPAWN_WEIGHT`
+DOOR_WEIGHT = {"shop.lobby": 3.0, "shop.bar": 2.0, "shop.club": 2.5, "shop.food": 1.8}
+
+# signal phases (the ask `signal_phases`, derived until citygen records them): two phases per
+# signalized junction from its legs' angles (legs within 45 degrees of the first leg's line
+# move in phase 0, the rest in phase 1), each crosswalk walking in the phase its crossed leg
+# is stopped; the cycle, its amber and all-red; people start crossing in the first `walk_s`
+# of their phase and not after (the flashing hand); a junction's offset by its id's hash
+SIGNAL = {"cycle_s": 60.0, "amber_s": 3.0, "all_red_s": 2.0, "walk_s": 12.0}

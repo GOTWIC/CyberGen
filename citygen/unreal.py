@@ -2108,6 +2108,18 @@ def dlss_summary(res: dict) -> str:
 def life_summary(res: dict) -> str:
     """What the import did with the city's life plan (LG0)."""
     lp, st = res.get("life_plan") or {}, res.get("life") or {}
+    if st.get("made") and st.get("crowd"):
+        # (LG3: the city's crowd)
+        c, t = st["crowd"], st.get("tiers") or {}
+        who = (f"the library's {st['library']} characters (near within {t.get('near_m')} m, "
+               f"at most {t.get('near_max')}, baked walks to {t.get('mid_m')} m, impostors to "
+               f"{t.get('far_m')} m)" if st.get("library") else "stand-ins")
+        return (f"Life (stage 4): the city's crowd, a pool of {c['pool']} people live round "
+                f"the view on {st.get('walk_lanes', 0)} walkways at {c['hour']}:00, "
+                f"{c['doors']} doors, {c['signals']} signals; {who}; the spike's "
+                f"{st.get('cars', 0)} cars on {st.get('district')}, from {lp.get('plan')}"
+                + (f"; {len(st.get('missing_meshes') or [])} assets missing"
+                   if st.get("missing_meshes") else ""))
     if st.get("made") and st.get("library"):
         miss = st.get("missing_meshes") or []
         t = st.get("tiers") or {}

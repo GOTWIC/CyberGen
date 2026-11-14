@@ -1144,6 +1144,10 @@ def play_views(world, a, slug, prefix):
             pass
         yield from settle(world, slug, at=eye)
         yield from wait(4.0)
+        # (LG3: a view named `*_wait*` waits half a signal cycle more, so the crowd that
+        # came alive round it has walked to its crosswalks and waits at their curbs)
+        if "_wait" in v["name"]:
+            yield from wait(30.0)
         if wm and wm.group(2):
             unreal.SystemLibrary.execute_console_command(
                 world, f"CityGenAtmos.Weather {wm.group(2)}")
@@ -1151,6 +1155,10 @@ def play_views(world, a, slug, prefix):
         # (AT7: CITYGEN_UE_VIEW_RES sets the views' size, 7680x4320 for an 8K shot)
         res = os.environ.get("CITYGEN_UE_VIEW_RES") or "1920x1080"
         yield from ui_shot(world, v["name"], f"HighResShot {res}", 600)
+        # (LG3: lifegen's crowd at each view, in the log: CITYGEN_LIFE_STATUS after the view's
+        # name; a level without the CityGenLife plugin only warns)
+        log(f"life at view {v['name']}")
+        unreal.SystemLibrary.execute_console_command(world, "CityGenLife.Status")
         at = atmos_status(world)
         # (AT6: what the look showed at each view: the district, the exposure, the post)
         if at and "post" in at:

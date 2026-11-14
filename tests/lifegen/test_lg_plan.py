@@ -24,15 +24,24 @@ def _sq(x0, y0, x1, y1):
 def _model() -> dict:
     walks = [
         {"id": "wk.a", "kind": "sidewalk", "line": [[0.0, -6.0, 0.0], [100.0, -6.0, 0.0]],
-         "width_m": 3.0, "neighbors": ["wk.b"], "attrs": {}},
+         "width_m": 3.0, "neighbors": ["wk.b"], "attrs": {"segment": "rs.a"}},
         {"id": "wk.b", "kind": "sidewalk", "line": [[100.0, -6.0, 0.0], [200.0, -6.0, 0.0]],
-         "width_m": 3.0, "neighbors": ["wk.a", "wk.s"], "attrs": {}},
+         "width_m": 3.0, "neighbors": ["wk.a", "wk.s"], "attrs": {"segment": "rs.a"}},
         {"id": "wk.s", "kind": "stairs", "line": [[150.0, -6.0, 0.0], [150.0, -6.0, -8.0]],
          "width_m": 2.0, "neighbors": ["wk.b"], "attrs": {"station": "stn.x"}},
         {"id": "wk.c", "kind": "sidewalk", "line": [[300.0, -6.0, 0.0], [400.0, -6.0, 0.0]],
-         "width_m": 3.0, "neighbors": ["wk.b"], "attrs": {}},
+         "width_m": 3.0, "neighbors": ["wk.b"], "attrs": {"segment": "rs.c"}},
+        # (LG3: the crosswalks of a signalized junction at rs.a's end, where rs.n leaves north)
+        {"id": "wk.xa", "kind": "crosswalk",
+         "line": [[192.0, -6.0, 0.0], [195.0, -5.0, 0.0], [195.0, 5.0, 0.0], [192.0, 6.0, 0.0]],
+         "width_m": 3.0, "neighbors": ["wk.b", "wk.xn"],
+         "attrs": {"junction": "jn.x", "crosswalk": True}},
+        {"id": "wk.xn", "kind": "crosswalk",
+         "line": [[193.0, 7.0, 0.0], [195.0, 5.0, 0.0], [205.0, 5.0, 0.0], [207.0, 7.0, 0.0]],
+         "width_m": 3.0, "neighbors": ["wk.xa"],
+         "attrs": {"junction": "jn.x", "crosswalk": True}},
     ]
-    walks[1]["neighbors"].append("wk.c")
+    walks[1]["neighbors"] += ["wk.c", "wk.xa"]
     return {
         "name": "Test Bay", "bounds": [-512.0, -512.0, 512.0, 512.0],
         "districts": [
@@ -44,7 +53,18 @@ def _model() -> dict:
             {"id": "rs.a", "road_class": "street", "centerline": [[0.0, 0.0], [200.0, 0.0]],
              "attrs": {"length_m": 200.0}},
             {"id": "rs.c", "road_class": "street", "centerline": [[300.0, 0.0], [400.0, 0.0]],
+             "attrs": {}},
+            {"id": "rs.n", "road_class": "street", "centerline": [[200.0, 0.0], [200.0, 90.0]],
              "attrs": {}}],
+        "junctions": [
+            {"id": "jn.x", "signalized": True, "crosswalk_ids": ["cw.a", "cw.n"],
+             "attrs": {"cuts": [["rs.a", "b", 5.0], ["rs.n", "a", 5.0]]}},
+            {"id": "jn.y", "signalized": False, "crosswalk_ids": [], "attrs": {"cuts": []}}],
+        "crosswalks": [
+            {"id": "cw.a", "junction_id": "jn.x", "segment_id": "rs.a", "signalized": True,
+             "line": [[195.0, -5.0], [195.0, 5.0]], "width_m": 3.0},
+            {"id": "cw.n", "junction_id": "jn.x", "segment_id": "rs.n", "signalized": True,
+             "line": [[195.0, 5.0], [205.0, 5.0]], "width_m": 3.0}],
         "densities": [
             {"id": "rs.a.density", "segment_id": "rs.a", "district_id": "d01",
              "crowd_per_100m": [2.0, 10.0, 8.0, 12.0, 4.0],
@@ -184,7 +204,8 @@ def test_plan_on_a_small_city(build: Path):
     # the spike: the district with the most buildings, its palette with the gang's color
     assert plan.spike.district_id == "d02" and plan.spike.cars == P.SPIKE["cars"]
     assert len(plan.spike.palette) == P.SPIKE_PALETTE
-    assert plan.spike.people == min(2000, round(by["d02"].people[23]))
+    # (LG3: the city's crowd walks every street; the spike keeps only its cars)
+    assert plan.spike.people == 0 and plan.crowd.pool == P.CROWD["pool"]
     # the asks: what the model lacks
     asks = {a.id: a.status for a in plan.asks}
     assert asks["bus_routes"] == "missing" and asks["signal_phases"] == "derived"
@@ -243,8 +264,9 @@ def test_exporter_packs_the_spike(build: Path):
     assert lf["key"] == "life" and lf["models"] == ["tanager_mino"]
     data = json.loads((build / "unreal" / "life.json").read_text(encoding="utf-8"))
     c = data["controller"]
-    # (the stairs are not a spike walk kind; wk.a meets wk.b at its end, wk.b wk.a at its start)
-    assert len(c["walk_starts"]) - 1 == 3
+    # (LG3: every walkway of the city, the stairs and crosswalks too; wk.a meets wk.b at its
+    # end, wk.b wk.a at its start)
+    assert len(c["walk_starts"]) - 1 == 6
     la = c["walk_links"][c["walk_link_starts"][0]:c["walk_link_starts"][1]]
     lb = c["walk_links"][c["walk_link_starts"][1]:c["walk_link_starts"][2]]
     assert la == [2 * 1 + 1] and 2 * 0 in lb
@@ -324,3 +346,159 @@ def test_drive_lanes_smooth_and_slow_by_class():
     old = UL.pack_lanes({"walkways": flat([]), "lanes": lanes},
                         {k: spike[k] for k in ("center", "radius_m", "walk_kinds")})
     assert set(old["drive_vmax"]) == {0.0}
+
+
+# --- LG3: crowds on the streets ---------------------------------------------------------------
+
+def _walks(out: Path, plan) -> dict:
+    return {w.id: w for t in plan.tiles for w in PM.TileSpawns.model_validate_json(
+        (out / t.file).read_text(encoding="utf-8")).walks}
+
+
+def test_crowd_on_every_walkway(build: Path):
+    """Every walkway's people per hour band: a segment's M11 people on its own walkways by
+    length (its district's busy in), the rest at the district's mean sidewalk density times
+    their kind's share; the checks pass; the crowd's pool drawn from the library."""
+    rep = PL.build_plan(build, preview=False)
+    assert rep["ok"], {k: c for k, c in rep["checks"].items() if not c["ok"]}
+    for k in ("crowd_densities", "crowd_levels", "signals", "crowd_budget", "crowd_spawns",
+              "people_draws"):
+        assert rep["checks"][k]["ok"], k
+    out = build / "life"
+    plan = PM.LifePlan.model_validate_json((out / "life_plan.json").read_text(encoding="utf-8"))
+    w = _walks(out, plan)
+    assert set(w) == {"wk.a", "wk.b", "wk.s", "wk.c", "wk.xa", "wk.xn"}
+    # (rs.a: 200 m at 10 per 100 m by morning, 20 people on its two sidewalks by length)
+    assert w["wk.a"].street and w["wk.a"].people[1] == pytest.approx(10.0, abs=1e-3)
+    assert w["wk.a"].people[1] + w["wk.b"].people[1] == pytest.approx(20.0, abs=1e-3)
+    assert w["wk.c"].district_id == "d02" and w["wk.c"].people[4] == pytest.approx(12.0, abs=1e-3)
+    # (off-street: the stairs along their rise, the crosswalks; d01's sidewalks 0.1 a meter)
+    dens = 20.0 / 200.0
+    assert not w["wk.s"].street and w["wk.s"].length_m == pytest.approx(8.0)
+    assert w["wk.s"].people[1] == pytest.approx(P.OFFSTREET["stairs"] * dens * 8.0, abs=1e-3)
+    assert w["wk.xa"].people[1] == pytest.approx(
+        P.OFFSTREET["crosswalk"] * dens * w["wk.xa"].length_m, abs=1e-3)
+    c = plan.crowd
+    assert c.pool == P.CROWD["pool"] and len(c.persons["character"]) == c.pool
+    assert set(c.palettes) == {"d01", "d02"} and len(c.palettes["d02"]) == P.SPIKE_PALETTE
+    assert max(c.persons["tint"]) < P.SPIKE_PALETTE
+    assert c.totals["levels"] == [0] and c.totals["signals"] == 1
+    # (the hours within a band shaped by the district's day; the street people keep M11's)
+    by = {d.id: d for d in plan.districts}
+    assert c.totals["street_people"][8] == pytest.approx(by["d01"].people[8] + by["d02"].people[8],
+                                                         abs=0.2)
+
+
+def test_signals_two_phases(build: Path):
+    """A signalized junction's phases: legs by their lines (rs.a and rs.n square, apart),
+    each crosswalk walking while the leg it crosses is stopped, the phases filling the
+    cycle; its crosswalk walkways in their phase."""
+    PL.build_plan(build, preview=False)
+    out = build / "life"
+    sg = PM.Signals.model_validate_json((out / "signals.json").read_text(encoding="utf-8"))
+    assert sg.derived and [s.id for s in sg.signals] == ["sig.jn.x"]
+    s = sg.signals[0]
+    p0, p1 = s.phases
+    assert p0.legs == ["rs.a"] and p1.legs == ["rs.n"]
+    assert p0.crosswalks == ["cw.n"] and p1.crosswalks == ["cw.a"]
+    assert p0.walkways == ["wk.xn"] and p1.walkways == ["wk.xa"]
+    assert 0.0 <= s.offset_s < s.cycle_s == P.SIGNAL["cycle_s"]
+    assert sum(p.green_s + p.amber_s + p.all_red_s for p in s.phases) == pytest.approx(s.cycle_s)
+    plan = PM.LifePlan.model_validate_json((out / "life_plan.json").read_text(encoding="utf-8"))
+    w = _walks(out, plan)
+    assert (w["wk.xa"].signal, w["wk.xa"].phase) == ("sig.jn.x", 1)
+    assert w["wk.a"].signal is None
+
+
+def test_a_walkway_nobody_reaches_is_left_empty(build: Path):
+    m = _model()
+    m["walkways"].append({"id": "wk.lone", "kind": "sidewalk", "width_m": 3.0, "neighbors": [],
+                          "line": [[0.0, 60.0, 0.0], [50.0, 60.0, 0.0]],
+                          "attrs": {"segment": "rs.a"}})
+    (build / "city_model.json").write_text(json.dumps(m), encoding="utf-8")
+    rep = PL.build_plan(build, preview=False)
+    assert rep["ok"] and rep["crowd"]["left_out"]["walkways"] == 1
+    plan = PM.LifePlan.model_validate_json(
+        (build / "life" / "life_plan.json").read_text(encoding="utf-8"))
+    assert _walks(build / "life", plan)["wk.lone"].people == [0.0] * 5
+
+
+def test_ag3_doors_are_the_spawn_points(build: Path):
+    """With stage 2's buildings, AG3's doors (a door per entrance and shop unit, on the
+    facade, opening to its walkway) are the spawn points in place of M3's entrances."""
+    con = {"entries": [{"key": "d01.lot.e50n20.bld", "ids": ["d01.lot.e50n20.bld"],
+                        "pivot": [50.0, 25.0, 0.0],
+                        "doors": [{"id": "d01.lot.e50n20.bld.door.e0", "kind": "main",
+                                   "walkway_id": "wk.a", "position": [0.0, -15.0, 0.0],
+                                   "normal": [0.0, -1.0], "width_m": 2.0, "height_m": 2.4},
+                                  {"id": "d01.lot.e50n20.bld.door.u0", "kind": "shop",
+                                   "use": "bar", "walkway_id": "wk.a",
+                                   "position": [8.0, -15.0, 0.0], "normal": [0.0, -1.0],
+                                   "width_m": 1.1, "height_m": 2.3},
+                                  {"id": "d01.lot.e50n20.bld.door.u1", "kind": "shop",
+                                   "use": "food", "walkway_id": None,
+                                   "position": [-8.0, -15.0, 0.0], "normal": [0.0, -1.0],
+                                   "width_m": 1.1, "height_m": 2.3}]}]}
+    (build / "assets").mkdir()
+    (build / "assets" / "unreal_contribution.buildings.json").write_text(json.dumps(con),
+                                                                        encoding="utf-8")
+    rep = PL.build_plan(build, preview=False)
+    assert rep["ok"] and rep["totals"]["doors"] == 2
+    out = build / "life"
+    plan = PM.LifePlan.model_validate_json((out / "life_plan.json").read_text(encoding="utf-8"))
+    spawns = {s.id: s for t in plan.tiles for s in PM.TileSpawns.model_validate_json(
+        (out / t.file).read_text(encoding="utf-8")).spawns}
+    door = spawns["spawn.d01.lot.e50n20.bld.door.u0"]
+    assert door.sub == "shop.bar" and door.pos == [58.0, 10.0, 0.0] and door.yaw_deg == -90.0
+    assert door.district_id == "d01" and door.walkway_id == "wk.a"
+    # (no M3 entrance any more; the station, garage and taxi stand stay)
+    assert "spawn.d01.lot.e50n20.bld.e0" not in spawns and "spawn.stn.x.a0" in spawns
+    assert {a.id: a.status for a in plan.asks}["doors"] == "met"
+
+
+def test_exporter_packs_the_crowd(build: Path):
+    """The exporter packs every walkway with its kind, district, people per band and signal
+    window; the doors on their walkways; the districts' days and palettes; the pool."""
+    from citygen import unreal_life as UL
+    PL.build_plan(build, preview=False)
+    m = _model()
+    walks = [{"id": w["id"], "kind": w["kind"], "width": w["width_m"], "points": w["line"],
+              "links": w["neighbors"]} for w in m["walkways"]]
+    lanes = [{"id": "l1", "kind": "lane", "width": 3.6, "points": [[0, -2, 0], [50, -2, 0]],
+              "links": []}]
+    graphs = {"walkways": _flat(walks), "lanes": _flat(lanes)}
+    data, why = UL.life_data(build / "life", graphs, None, None)
+    assert why == ""
+    c = data["controller"]
+    ids = [w["id"] for w in m["walkways"]]
+    k = {i: n for n, i in enumerate(ids)}
+    codes = list(P.WALK_KIND_CODES)
+    assert c["walk_kinds"] == [codes.index(w["kind"]) for w in m["walkways"]]
+    assert c["walk_district"][k["wk.c"]] == 1 and c["walk_district"][k["wk.a"]] == 0
+    assert c["walk_people"][5 * k["wk.a"] + 1] == pytest.approx(10.0, abs=1e-3)
+    # (the signal windows: cycle, offset, walk from, walk to; wk.xa walks in phase 1)
+    win = c["signal_windows"]
+    assert len(win) == 8 and c["walk_signal"][k["wk.a"]] == -1
+    s = c["walk_signal"][k["wk.xa"]]
+    assert win[4 * s:4 * s + 4][2:] == [P.SIGNAL["cycle_s"] / 2,
+                                        P.SIGNAL["cycle_s"] / 2 + P.SIGNAL["walk_s"]]
+    # (the doors: every spawn point on its walkway lane, at its distance along it)
+    assert len(c["door_lanes"]) == 8 and len(c["door_points"]) == 24
+    pts = c["door_points"]
+    j = next(n for n in range(0, len(pts), 3) if pts[n:n + 2] == [150.0, -6.0])  # (the station)
+    assert c["door_lanes"][j // 3] == k["wk.s"] and c["door_dists"][j // 3] == 0.0
+    assert len(c["district_shape"]) == 48 and c["palette_size"] == P.SPIKE_PALETTE
+    assert len(c["district_palettes"]) == 2 * 3 * P.SPIKE_PALETTE
+    assert len(c["person_char"]) == P.CROWD["pool"] == c["people"]
+    assert len(c["person_tint_index"]) == P.CROWD["pool"]
+    assert c["crowd"]["hour"] == P.CROWD["hour"] and c["crowd"]["live_m"] == P.CROWD["live_m"]
+    # (the spike's cars keep their drive lanes)
+    assert c["drive_startable"] == [1]
+    # (the import's summary line names the crowd)
+    from citygen.unreal import life_summary
+    line = life_summary({"life_plan": {"plan": "x"},
+                         "life": {"made": True, "people": c["people"], "cars": 0,
+                                  "district": "d02", "walk_lanes": 6, "library": 0,
+                                  "crowd": {"pool": c["people"], "hour": 23, "doors": 8,
+                                            "signals": 1}}})
+    assert "the city's crowd, a pool of 2400" in line and "stand-ins" in line

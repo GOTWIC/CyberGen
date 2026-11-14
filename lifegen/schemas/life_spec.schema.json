@@ -58,6 +58,42 @@
    "title": "Busy",
    "type": "object"
   },
+  "Crowd": {
+   "additionalProperties": false,
+   "description": "LG3: the city's crowd (scope 6.3): the runtime's hour, how many people it simulates\nat once round the view, how much busier or quieter than M11's densities.",
+   "properties": {
+    "hour": {
+     "default": 23,
+     "exclusiveMaximum": 24,
+     "minimum": 0,
+     "title": "Hour",
+     "type": "integer"
+    },
+    "pool": {
+     "default": 2400,
+     "maximum": 20000,
+     "minimum": 0,
+     "title": "Pool",
+     "type": "integer"
+    },
+    "scale": {
+     "default": 1.0,
+     "maximum": 10.0,
+     "minimum": 0.0,
+     "title": "Scale",
+     "type": "number"
+    },
+    "trip_s": {
+     "default": 600.0,
+     "exclusiveMinimum": 0.0,
+     "maximum": 7200.0,
+     "title": "Trip S",
+     "type": "number"
+    }
+   },
+   "title": "Crowd",
+   "type": "object"
+  },
   "DistrictPopulation": {
    "additionalProperties": false,
    "description": "A district's people, by its name in the city model. Every field left out is its\narchetype's (`presets.MIX`, `DAY_SHAPE`).",
@@ -372,6 +408,9 @@
    "default": null,
    "description": "City name (checked against the model).",
    "title": "City"
+  },
+  "crowd": {
+   "$ref": "#/$defs/Crowd"
   },
   "fleet": {
    "$ref": "#/$defs/Fleet"

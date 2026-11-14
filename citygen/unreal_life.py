@@ -28,7 +28,8 @@ import json
 import math
 from pathlib import Path
 
-PACK_VERSION = 2            # 2 (cars_steam): smoothed drive lanes, their speeds
+PACK_VERSION = 3            # 2 (cars_steam): smoothed drive lanes, their speeds; 3 (LG3): the
+                            # city's crowd (every walkway, doors, signals, the pool)
 DATA = "life.json"
 CONTROLLER_KEY = "life"
 MARGIN_M = 60.0             # lanes this far past the live radius come along (links out of it)
@@ -77,6 +78,14 @@ def pack_lanes(graphs: dict, spike: dict) -> dict:
     kinds = set(spike["walk_kinds"])
     walk = [e for e in _elements(graphs["walkways"])
             if e[1] in kinds and len(e[2]) >= 2 and _near(e[2], cx, cy, reach)]
+    out = pack_walks(graphs, walk)
+    out.update(pack_drive(graphs, spike))
+    return out
+
+
+def pack_walks(graphs: dict, walk: list) -> dict:
+    """Walkway lanes (`_elements` of the walkway graph), flat: points, widths, links (each
+    `2 * lane + 1` where the other walkway meets this one's end, `2 * lane` at its start)."""
     wmap = {e[0]: k for k, e in enumerate(walk)}
     out = {"walk_points": [], "walk_starts": [0], "walk_widths": [], "walk_links": [],
            "walk_link_starts": [0]}
@@ -97,12 +106,20 @@ def pack_lanes(graphs: dict, spike: dict) -> dict:
             db = min(math.dist(b[:2], qa[:2]), math.dist(b[:2], qb[:2]))
             out["walk_links"].append(2 * wmap[j] + (1 if db < da else 0))
         out["walk_link_starts"].append(len(out["walk_links"]))
+    return out
+
+
+def pack_drive(graphs: dict, spike: dict) -> dict:
+    """The spike's drive lanes (lanes and junction connectors within its reach), flat, with
+    their speeds (cars_steam)."""
+    cx, cy = spike["center"]
+    reach = float(spike["radius_m"]) + MARGIN_M
     drive = [e for e in _elements(graphs["lanes"])
              if len(e[2]) >= 2 and _near(e[2], cx, cy, reach)]
     dmap = {e[0]: k for k, e in enumerate(drive)}
-    out.update({"drive_points": [], "drive_starts": [0], "drive_widths": [],
-                "drive_links": [], "drive_link_starts": [0], "drive_startable": [],
-                "drive_vmax": [], "drive_cruise": []})
+    out = {"drive_points": [], "drive_starts": [0], "drive_widths": [],
+           "drive_links": [], "drive_link_starts": [0], "drive_startable": [],
+           "drive_vmax": [], "drive_cruise": []}
     refs = graphs["lanes"].get("refs") or [""] * graphs["lanes"]["count"]
     succ = [[dmap[j] for j in e[4] if j in dmap] for e in drive]
     pred: list[list[int]] = [[] for _ in drive]
@@ -382,6 +399,101 @@ def people_library(lib: dict | None, spike: dict) -> dict:
             "tiers": tiers, "library_hash": lib.get("hash")}
 
 
+def _along(line, x: float, y: float) -> float:
+    """The distance along a polyline (plan) of its point nearest (x, y)."""
+    best, at, run = None, 0.0, 0.0
+    for a, b in zip(line, line[1:]):
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        L2 = dx * dx + dy * dy
+        t = 0.0 if L2 <= 0.0 else max(0.0, min(1.0, ((x - a[0]) * dx + (y - a[1]) * dy) / L2))
+        px, py = a[0] + dx * t, a[1] + dy * t
+        d = (px - x) ** 2 + (py - y) ** 2
+        if best is None or d < best:
+            best, at = d, run + math.sqrt(L2) * t
+        run += math.sqrt(L2)
+    return at
+
+
+def pack_crowd(plan: dict, pdir: Path, graphs: dict) -> dict:
+    """LG3: the city's crowd, flat: every walkway of the city a lane (`pack_walks`) with its
+    kind, district, people per hour band and signal window; the districts' days, dangers and
+    palettes (linear RGB); the signals' walk windows; the doors (every spawn point: its
+    walkway lane, distance along it, point, people a hour out at the crowd's hour); the pool's
+    people (`persons`, the tint an index into the district's palette); the settings."""
+    crowd = plan["crowd"]
+    walk = [e for e in _elements(graphs["walkways"]) if len(e[2]) >= 2]
+    gids = graphs["walkways"].get("ids") or [str(e[0]) for e in walk]
+    lane_of = {gids[e[0]]: k for k, e in enumerate(walk)}
+    out = pack_walks(graphs, walk)
+    rows, doors = {}, []
+    for t in plan["tiles"]:
+        tile = json.loads((pdir / t["file"]).read_text(encoding="utf-8"))
+        for w in tile.get("walks") or []:
+            rows[w["id"]] = w
+        doors += tile.get("spawns") or []
+    dids = [d["id"] for d in plan["districts"]]
+    didx = {d: k for k, d in enumerate(dids)}
+    codes = {k: i for i, k in enumerate(crowd["kinds"])}
+    path = codes.get("path", 0)
+    sigs = []
+    sfile = pdir / "signals.json"
+    if sfile.is_file():
+        sigs = json.loads(sfile.read_text(encoding="utf-8")).get("signals") or []
+    win, windows = {}, []
+    for s in sigs:
+        for p in s["phases"]:
+            win[(s["id"], p["index"])] = len(windows) // 4
+            windows += [float(s["cycle_s"]), float(s["offset_s"]), float(p["start_s"]),
+                        round(float(p["start_s"]) + float(p["walk_s"]), 3)]
+    kinds, dist, ppl, sig = [], [], [], []
+    for e in walk:
+        r = rows.get(gids[e[0]]) or {}
+        kinds.append(codes.get(e[1], path))
+        dist.append(didx.get(r.get("district_id"), -1))
+        ppl += [round(float(v), 4) for v in (r.get("people") or [0.0] * 5)]
+        sig.append(win.get((r.get("signal"), r.get("phase")), -1))
+    hour = int(crowd["hour"])
+    dl, dd, dp, dr = [], [], [], []
+    for s in sorted(doors, key=lambda s: s["id"]):
+        k = lane_of.get(s.get("walkway_id"))
+        if k is None:
+            continue
+        e = walk[k]
+        dl.append(k)
+        dd.append(round(_along(e[2], s["pos"][0], s["pos"][1]), 3))
+        dp += [round(float(v), 3) for v in s["pos"]]
+        dr.append(round(float(s["rates"][hour]), 4))
+    shape, danger, pal = [], [], []
+    size = max((len(v) for v in crowd["palettes"].values()), default=0)
+    for d in plan["districts"]:
+        shape += [float(v) for v in d["shape"]]
+        danger.append(float(d["danger"]))
+        cols = crowd["palettes"].get(d["id"]) or ["#808080"]
+        for k in range(size):
+            pal += _lin(cols[k % len(cols)])
+    av, sp = crowd["avoid"], crowd["speeds"]
+    ps = persons({"palette": [], "persons": crowd["persons"]})
+    ps["person_tint"] = [0.5] * (3 * len(ps.get("person_char") or []))
+    ps["person_tint_index"] = [int(v) for v in crowd["persons"].get("tint") or []]
+    out.update({"walk_kinds": kinds, "walk_district": dist, "walk_people": ppl,
+                "walk_signal": sig, "signal_windows": windows,
+                "district_ids": dids, "district_shape": shape, "district_danger": danger,
+                "district_palettes": pal, "palette_size": size,
+                "door_lanes": dl, "door_dists": dd, "door_points": dp, "door_rates": dr,
+                "crowd": {"hour": hour, "pool": int(crowd["pool"]),
+                          "live_m": float(crowd["live_m"]), "trip_s": float(crowd["trip_s"]),
+                          "groups": [float(v) for v in crowd["groups"]],
+                          "group_gap_m": float(crowd["group_gap_m"]),
+                          "jaywalk": [float(v) for v in crowd["jaywalk"]],
+                          "reach_m": float(av["reach_m"]), "personal_m": float(av["personal_m"]),
+                          "player_m": float(av["player_m"]), "avoid_m": float(av["avoid_m"]),
+                          "stairs": float(sp["stairs"]),
+                          "escalator": [float(v) for v in sp["escalator"]],
+                          "elevator": float(sp["elevator"])},
+                **ps})
+    return out
+
+
 def life_data(pdir: Path, graphs: dict | None, veh: dict | None,
               lib: dict | None = None) -> tuple[dict | None, str]:
     plan = json.loads((pdir / "life_plan.json").read_text(encoding="utf-8"))
@@ -395,7 +507,17 @@ def life_data(pdir: Path, graphs: dict | None, veh: dict | None,
         return None, "no graphs (graphs.json) to build lanes from"
     arch = next((d["archetype"] for d in plan["districts"] if d["id"] == spike["district_id"]),
                 None)
-    lanes = pack_lanes(graphs, spike)
+    if plan.get("crowd"):
+        # (LG3: every walkway of the city, the crowd's pool; the spike's drive lanes and cars)
+        lanes = pack_crowd(plan, pdir, graphs)
+        lanes.update(pack_drive(graphs, spike))
+        crowd = plan["crowd"]
+        spike = {**spike, "people": int(crowd["pool"]), "library": crowd.get("library") or {},
+                 "persons": {}}
+        lib_spike = {"library": crowd.get("library") or {}}
+    else:
+        lanes = pack_lanes(graphs, spike)
+        lib_spike = spike
     cs = cars(spike, arch, veh)
     ctl = {"city": plan["city"], "plan_hash": plan["plan_hash"],
            "district": spike["district_id"], "hour": spike["hour"],
@@ -405,8 +527,8 @@ def life_data(pdir: Path, graphs: dict | None, veh: dict | None,
            "car_gap_m": spike["car_gap_m"],
            "drive_vary": (spike.get("drive") or {}).get("vary") or [0.9, 1.08],
            "palette": [v for c in spike["palette"] for v in _lin(c)],
-           "paint_floats": PAINT_FLOATS, **lanes, **cs, **persons(spike),
-           **people_library(lib, spike)}
+           "paint_floats": PAINT_FLOATS, **cs, **persons(spike), **lanes,
+           **people_library(lib, lib_spike)}
     return {"version": PACK_VERSION, "controller": ctl}, ""
 
 
@@ -435,6 +557,10 @@ def write_life(build: str | Path, given: str | Path | None = None,
             "district": c["district"], "people": c["people"], "cars": c["cars"],
             "walk_lanes": len(c["walk_starts"]) - 1, "drive_lanes": len(c["drive_starts"]) - 1,
             "models": c["models"],
+            **({"crowd": {"walkways": len(c["walk_starts"]) - 1, "doors": len(c["door_lanes"]),
+                          "signals": len(c["signal_windows"]) // 8,
+                          "hour": c["crowd"]["hour"], "pool": c["crowd"]["pool"]}}
+               if c.get("crowd") else {}),
             "library": ({"characters": len(c["mid_meshes"]), "hash": c.get("library_hash"),
                         "tiers": c.get("tiers")} if c.get("mid_meshes") else
                        {"stand_ins": True, "why": c.get("people_skipped") or

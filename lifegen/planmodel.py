@@ -50,6 +50,8 @@ class Spawn(_Model):
     seed: int | None = Field(None, description="LG1: the seed the people it sends out are "
                                                "drawn from (its k-th person: "
                                                "`library.person((seed, k), ...)`).")
+    yaw_deg: float | None = Field(None, description="LG3: an AG3 door's outward facing "
+                                                    "(degrees counterclockwise from east).")
     hash: str
 
 
@@ -68,6 +70,27 @@ class Slot(_Model):
     hash: str
 
 
+class Walk(_Model):
+    """LG3: a walkway's crowd (scope 6.3): how many people are on it in each of M11's hour
+    bands (the district's day shapes the hours within a band), and the signal it waits for."""
+    id: str = Field(description="The walkway's id (M2's walkway graph).")
+    kind: str
+    district_id: str | None = None
+    level: int = 0
+    length_m: float
+    street: bool = Field(description="On a road segment with M11's density (its sidewalks, "
+                                     "alleys, promenades, pedestrian streets), else "
+                                     "off-street (`presets.OFFSTREET`).")
+    people: Annotated[list[float], Field(min_length=5, max_length=5,
+                                         description="People on it per hour band (M11's "
+                                                     "bands, the district's busy and the "
+                                                     "crowd's scale in).")]
+    signal: str | None = Field(None, description="A signalized crosswalk's signal "
+                                                 "(`sig.<junction id>`).")
+    phase: int | None = Field(None, description="The phase it walks in.")
+    hash: str
+
+
 class TileSpawns(_Model):
     version: Literal[1] = PLAN_VERSION
     city: str
@@ -75,6 +98,63 @@ class TileSpawns(_Model):
     bounds: Annotated[list[float], Field(min_length=4, max_length=4)]
     spawns: list[Spawn]
     slots: list[Slot]
+    walks: list[Walk] = Field(default_factory=list, description="LG3: the walkways whose "
+                                                                "middle is in the tile.")
+
+
+class Phase(_Model):
+    index: int
+    legs: list[str] = Field(description="Road segments moving (the junction's legs).")
+    crosswalks: list[str] = Field(description="Crosswalks walking (M18's ids).")
+    walkways: list[str] = Field(description="Their walkways (the walkway graph's).")
+    start_s: float = Field(description="Its start in the cycle (s).")
+    green_s: float
+    amber_s: float
+    all_red_s: float
+    walk_s: float = Field(description="People start crossing in its first walk_s.")
+
+
+class Signal(_Model):
+    """LG3: a signalized junction's phases (the ask `signal_phases`, derived)."""
+    id: str = Field(description="`sig.<junction id>`.")
+    junction_id: str
+    cycle_s: float
+    offset_s: float
+    phases: list[Phase]
+    hash: str
+
+
+class Signals(_Model):
+    version: Literal[1] = PLAN_VERSION
+    city: str
+    derived: bool = Field(description="True while citygen records no phases (the ask).")
+    signals: list[Signal]
+
+
+class CrowdPlan(_Model):
+    """LG3: the city's crowd (scope 6.3): who walks (a pool of people the runtime simulates
+    round the view, each drawn from the library by their seed), how it lives (the hour, the
+    live radius, trips, groups, jaywalking, avoidance, speeds), the districts' palettes."""
+    hour: int
+    pool: int
+    live_m: float
+    trip_s: float
+    scale: float
+    groups: list[float]
+    group_gap_m: float
+    jaywalk: list[float]
+    avoid: dict[str, float]
+    speeds: dict[str, float | list[float]]
+    kinds: list[str] = Field(description="Walkway kinds by the runtime's code.")
+    palettes: dict[str, list[str]] = Field(description="Per district its clothes' colors "
+                                                       "(sRGB, by its style).")
+    library: dict = Field(default_factory=dict)
+    persons: dict[str, list[float]] = Field(
+        default_factory=dict, description="Per pool slot its draws (seed, character, scale, "
+                                          "gait, pace, tint: an index into the district's "
+                                          "palette where it comes out).")
+    totals: dict
+    hash: str
 
 
 class TileIndex(_Model):
@@ -82,6 +162,7 @@ class TileIndex(_Model):
     file: str = Field(description="`spawns/<tile>.json`, relative to the plan.")
     spawns: int
     slots: int
+    walks: int = 0
     sha256: str = Field(description="sha256 of the tile file's bytes.")
 
 
@@ -180,6 +261,7 @@ class LifePlan(_Model):
     tiles: list[TileIndex]
     asks: list[Ask]
     spike: SpikePlan | None = None
+    crowd: CrowdPlan | None = Field(None, description="LG3: the city's crowd.")
     checks: dict[str, Check]
     totals: dict
 
@@ -204,6 +286,7 @@ class Contribution(_Model):
 
 SCHEMAS = {"life_plan": (LifePlan, "lifegen life plan"),
            "tile_spawns": (TileSpawns, "lifegen tile spawns"),
+           "signals": (Signals, "lifegen signal phases"),
            "contribution": (Contribution, "lifegen layer 4 contribution")}
 
 
