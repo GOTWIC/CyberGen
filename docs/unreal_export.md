@@ -2111,7 +2111,8 @@ they look real: the atmos spec's `steam` (default false, `presets.STEAM_ON`) is 
 `air.steam` and the controller's `bSteam` (set by the import); the plan places the emitters
 either way. In the game the Tab menu's **Steam and smoke** row (shown when the controller has
 `bSteam`) and `CityGenAtmos.Steam [0|1]` switch them (`ACityGenAtmos::SetSteam`); the fog
-volumes stay with `CityGenAtmos.Air`.
+volumes stay with `CityGenAtmos.Air`. The menu's **Clothing** row, under it, switches
+lifegen's people's clothes (`CityGenLife.Clothing`, "From LG3: crowds on the streets").
 
 ### A packaged game
 
@@ -2560,6 +2561,20 @@ drive lanes and cars until LG5. A plan before LG3 packs and walks LG1's spike as
   adds `crowd` (hour, pool, live walkways, the live people wanted and the scale, active, free,
   waiting, standing, in elevators, spawned, out of doors, in at doors, gone with their
   walkway, jaywalked, groups, doors live, signals). The check logs it at each play view.
+- **Clothing switch** (lifegen_clothing_toggle, a debug switch until LG2's garments; on by
+  default): the Tab menu's **Clothing** row (shown when the level has a life controller with
+  `bClothing`, found by its class name; `CityGen.MenuRow clothing`, `clothing=0|1`) and
+  `CityGenLife.Clothing [0|1]` (`ACityGenLife::SetClothing`). The creator's assembled bodies,
+  and the mid meshes baked from them, have no triangles under the garments, so off: near, each
+  person's body and outfit are hidden and MetaHuman's whole template body
+  (`/MetaHumanCharacter/Body/IdentityTemplate/SKM_Body`, the controller's `WholeBody`, read by
+  path from the engine's MetaHuman plugin) follows its pose in the character's own skin
+  material, face and hair kept, and the near tier reaches out to `MidM` (at most `NearMax`);
+  mid, past that cap, the baked mesh's garment slots (the outfit's materials) are drawn with
+  `Core/Life/M_CgLifeHidden` (masked, draws nothing; `HiddenMaterial`), which leaves holes;
+  far, the cards keep the clothes their sheets were captured in. `LIFE_VERSION` life4; the
+  status's `library` adds `clothing`, `hidden_material`, `whole_body`; the check shoots a view
+  named `*_noclothes` twice, clothed (`*_clothes`) and not, the world's time held between.
 
 ## Milestones and checks
 

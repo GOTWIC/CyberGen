@@ -12,6 +12,9 @@
 // - far (within FarM): an instance of the impostor card in its character's sheet, which the
 //   material turns to the view and steps through the walk (time offset, cycles a second).
 // A person's walk keeps its phase from tier to tier (one time offset, one rate).
+// The clothing switch (bClothing, lifegen_clothing_toggle), off: near, out to MidM, MetaHuman's
+// whole body in place of each person's body and outfit; mid, the garment slots hidden; far as it
+// was (ApplyClothing says why).
 
 #include "CityGenLifeActor.h"
 #include "CityGenLifeTypes.h"
@@ -41,8 +44,93 @@ namespace
 		X ^= X >> 16; X *= 0x7feb352du; X ^= X >> 15; X *= 0x846ca68bu; X ^= X >> 16;
 		return X;
 	}
+
+	// lifegen_clothing_toggle: the mid mesh's garment slots: the instances the library set to
+	// take the person's own tint (`UseInstanceTint` 1, people_library.mid_mesh), or a slot named
+	// after a material of the character's outfit (the mid mesh's slots keep their source
+	// materials' names: `MI_WI_DefaultGarment_...`, `bodytype2_short`)
+	bool IsMidGarment(const FStaticMaterial& S, const TSet<FString>& Outfit)
+	{
+		const UMaterialInterface* M = S.MaterialInterface;
+		float Use = 0.f;
+		if (M && M->GetScalarParameterValue(FHashedMaterialParameterInfo(TEXT("UseInstanceTint")), Use) && Use > 0.5f)
+		{
+			return true;
+		}
+		const FString Slot = S.MaterialSlotName.ToString();
+		return Outfit.Contains(Slot) || Slot.Contains(TEXT("Garment"));
+	}
 }
 
+void ACityGenLife::SetClothing(bool bOn)
+{
+	bClothing = bOn;
+	ApplyClothing();
+}
+
+void ACityGenLife::ApplyClothing()
+{
+	// The creator's assembled bodies (near) and the mid meshes baked from them have their
+	// triangles under the garments taken out, so hiding the garments alone leaves holes.
+	// Unclothed, a near person's body and outfit are hidden and MetaHuman's whole template
+	// body (WholeBody) follows its pose in the character's skin material (SlotClothing), and
+	// the near tier reaches out to MidM (UpdatePeople; at most NearMax people); mid, past that
+	// cap, the garment slots are drawn with HiddenMaterial (the holes stay: no whole body is
+	// baked); the far cards keep the clothes their sheets were captured in.
+	if (!bClothing && !HiddenMaterial && !bHiddenWarned)
+	{
+		bHiddenWarned = true;
+		UE_LOG(LogTemp, Warning, TEXT("CityGenLife: no HiddenMaterial (an import before lifegen_clothing_toggle): the clothing switch does nothing"));
+	}
+	const bool bOff = Unclothed();
+	for (FNearSlot& Slot : NearSlots)
+	{
+		if (Slot.Person != INDEX_NONE)
+		{
+			SlotClothing(Slot);
+		}
+	}
+	for (int32 K = 0; K < MidComps.Num(); ++K)
+	{
+		UInstancedStaticMeshComponent* C = MidComps[K];
+		if (!C || !MidGarment.IsValidIndex(K))
+		{
+			continue;
+		}
+		for (const int32 M : MidGarment[K])
+		{
+			C->SetMaterial(M, bOff ? HiddenMaterial.Get() : nullptr);
+		}
+	}
+}
+
+void ACityGenLife::SlotClothing(FNearSlot& Slot)
+{
+	const bool bOff = Unclothed() && WholeBody && Slot.Whole;
+	for (int32 K = 0; K < Slot.Comps.Num(); ++K)
+	{
+		USkeletalMeshComponent* C = Slot.Comps[K];
+		if (!C)
+		{
+			continue;
+		}
+		const bool bMesh = C->GetSkeletalMeshAsset() != nullptr;
+		// (the face, with the hair on it, stays; the body leads the pose even when hidden)
+		const bool bOn = bMesh && (!bOff || K == HairOn);
+		C->SetVisibility(bOn);
+		C->SetComponentTickEnabled(bMesh && (bOn || K == 0));
+		if (K == 0)
+		{
+			C->VisibilityBasedAnimTickOption = bOff ? EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones
+				: EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
+		}
+	}
+	if (Slot.Whole)
+	{
+		Slot.Whole->SetVisibility(bOff);
+		Slot.Whole->SetComponentTickEnabled(bOff);
+	}
+}
 void ACityGenLife::SetTiers(float InNearM, int32 InNearMax, float InMidM, float InFarM)
 {
 	NearM = FMath::Max(0.f, InNearM);
@@ -96,6 +184,8 @@ void ACityGenLife::MakePeople()
 		C->RegisterComponent();
 		return C;
 	};
+	MidGarment.Reset();
+	MidGarment.SetNum(NC);
 	for (int32 K = 0; K < NC; ++K)
 	{
 		// (the mid tier casts no shadow: a mid mesh has a section per creator slot, and its
@@ -103,7 +193,39 @@ void ACityGenLife::MakePeople()
 		MidComps.Add(MidMeshes[K] ? Make(FString::Printf(TEXT("PeopleMid%d"), K), MidMeshes[K], nullptr, MidFloats, false, MidM + 20.f) : nullptr);
 		UMaterialInterface* Card = CardMaterials.IsValidIndex(K) ? CardMaterials[K].Get() : nullptr;
 		FarComps.Add(CardMesh ? Make(FString::Printf(TEXT("PeopleFar%d"), K), CardMesh, Card, FarFloats, false, FarM + 20.f) : nullptr);
+		// (lifegen_clothing_toggle: which of its slots are garments: by the materials of its
+		// near meshes past the body and the face, its outfit)
+		TSet<FString> Outfit;
+		const int32 A = NearMeshStarts.IsValidIndex(K) ? NearMeshStarts[K] : 0;
+		const int32 B = NearMeshStarts.IsValidIndex(K + 1) ? NearMeshStarts[K + 1] : A;
+		for (int32 I = A + 1; I < B; ++I)
+		{
+			const USkeletalMesh* Sk = NearMeshes.IsValidIndex(I) ? NearMeshes[I].Get() : nullptr;
+			if (!Sk || I - A == HairOn)
+			{
+				continue;
+			}
+			for (const FSkeletalMaterial& Sm : Sk->GetMaterials())
+			{
+				if (Sm.MaterialInterface)
+				{
+					Outfit.Add(Sm.MaterialInterface->GetName());
+				}
+			}
+		}
+		if (const UStaticMesh* Mesh = MidMeshes[K].Get())
+		{
+			const TArray<FStaticMaterial>& Mats = Mesh->GetStaticMaterials();
+			for (int32 M = 0; M < Mats.Num(); ++M)
+			{
+				if (IsMidGarment(Mats[M], Outfit))
+				{
+					MidGarment[K].Add(M);
+				}
+			}
+		}
 	}
+	ApplyClothing();
 }
 
 void ACityGenLife::SpawnPeople(const int32 NP)
@@ -196,6 +318,11 @@ void ACityGenLife::Release(const int32 S)
 	if (Slot.Hair)
 	{
 		Slot.Hair->SetVisibility(false);
+	}
+	if (Slot.Whole)
+	{
+		Slot.Whole->SetVisibility(false);
+		Slot.Whole->SetComponentTickEnabled(false);
 	}
 }
 
@@ -329,12 +456,34 @@ void ACityGenLife::Assign(const int32 S, const int32 P)
 		const float T = (float)GetWorld()->GetTimeSeconds() + PhaseOffset(P);
 		Lead->SetPosition(FMath::Fmod(T * Rate, Len), false);
 	}
-	for (USkeletalMeshComponent* Comp : Slot.Comps)
+	// (lifegen_clothing_toggle: the whole body, made once a slot, in the character's skin)
+	if (WholeBody && !Slot.Whole)
 	{
-		const bool bOn = Comp->GetSkeletalMeshAsset() != nullptr;
-		Comp->SetVisibility(bOn);
-		Comp->SetComponentTickEnabled(bOn);
+		Slot.Whole = NewObject<USkeletalMeshComponent>(this, *FString::Printf(TEXT("PeopleWhole%d"), S));
+		Slot.Whole->SetMobility(EComponentMobility::Movable);
+		Slot.Whole->SetupAttachment(Lead);
+		Slot.Whole->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Slot.Whole->SetCanEverAffectNavigation(false);
+		Slot.Whole->SetGenerateOverlapEvents(false);
+		Slot.Whole->bAffectDistanceFieldLighting = false;
+		Slot.Whole->SetAffectDynamicIndirectLighting(false);
+		Slot.Whole->SetCastShadow(bShadows);
+		Slot.Whole->SetDisablePostProcessBlueprint(true);
+		Slot.Whole->SetSkeletalMesh(WholeBody, false);
+		Slot.Whole->SetLeaderPoseComponent(Lead);
+		Slot.Whole->SetVisibility(false);
+		Slot.Whole->RegisterComponent();
+		WholeComps.Add(Slot.Whole);
 	}
+	if (Slot.Whole)
+	{
+		UMaterialInterface* Skin = Lead->GetSkeletalMeshAsset() ? Lead->GetMaterial(0) : nullptr;
+		for (int32 M = 0; Skin && M < Slot.Whole->GetNumMaterials(); ++M)
+		{
+			Slot.Whole->SetMaterial(M, Skin);
+		}
+	}
+	SlotClothing(Slot);
 	if (Slot.Hair)
 	{
 		Slot.Hair->SetVisibility(Slot.Hair->GetStaticMesh() != nullptr);
@@ -373,7 +522,9 @@ void ACityGenLife::UpdatePeople()
 	{
 		View = FVector(Center.X * 100.0, -Center.Y * 100.0, 0.0);
 	}
-	const float Near2 = FMath::Square(NearM * 100.f);
+	// (lifegen_clothing_toggle: unclothed, the near tier reaches out to MidM, at most NearMax
+	// people, so the whole body stands in for the mid meshes' holes too)
+	const float Near2 = FMath::Square((Unclothed() && WholeBody ? MidM : NearM) * 100.f);
 	const float Mid2 = FMath::Square(MidM * 100.f);
 	const float Far2 = FMath::Square(FarM * 100.f);
 	// (who is near: the NearMax nearest within NearM; a person already near keeps its slot

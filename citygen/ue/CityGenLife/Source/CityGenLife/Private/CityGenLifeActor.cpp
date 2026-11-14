@@ -913,8 +913,9 @@ FString ACityGenLife::GetStatus() const
 		Slots += S.Person != INDEX_NONE ? 1 : 0;
 	}
 	const FString Lib = HasPeople()
-		? FString::Printf(TEXT(",\"library\":{\"characters\":%d,\"near\":%d,\"mid\":%d,\"far\":%d,\"slots\":%d,\"slots_made\":%d,\"near_m\":%.0f,\"near_max\":%d,\"mid_m\":%.0f,\"far_m\":%.0f,\"people_ms\":%.3f}"),
-			MidMeshes.Num(), NearNow, MidNow, FarNow, Slots, NearSlots.Num(), NearM, NearMax, MidM, FarM, PeopleMs)
+		? FString::Printf(TEXT(",\"library\":{\"characters\":%d,\"near\":%d,\"mid\":%d,\"far\":%d,\"slots\":%d,\"slots_made\":%d,\"near_m\":%.0f,\"near_max\":%d,\"mid_m\":%.0f,\"far_m\":%.0f,\"people_ms\":%.3f,\"clothing\":%s,\"hidden_material\":%s,\"whole_body\":%s}"),
+			MidMeshes.Num(), NearNow, MidNow, FarNow, Slots, NearSlots.Num(), NearM, NearMax, MidM, FarM, PeopleMs,
+			bClothing ? TEXT("true") : TEXT("false"), HiddenMaterial ? TEXT("true") : TEXT("false"), WholeBody ? TEXT("true") : TEXT("false"))
 		: FString(TEXT(",\"library\":null"));
 	return FString::Printf(TEXT("{\"enabled\":%s,\"built\":%s,\"district\":\"%s\",\"walk_lanes\":%d,\"drive_lanes\":%d,\"car_starts\":%d,\"people\":%d,\"cars\":%d,\"entities\":%d,\"placed\":%d,\"bodies\":%d,\"car_parts\":%d,\"person0\":[%.1f,%.1f,%.1f],\"car0\":[%.1f,%.1f,%.1f],\"tick_ms\":%.3f,\"tick_ms_max\":%.3f,\"ticks\":%lld%s}"),
 		bEnabled ? TEXT("true") : TEXT("false"), bBuilt ? TEXT("true") : TEXT("false"), *DistrictId,

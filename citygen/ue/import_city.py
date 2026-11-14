@@ -75,8 +75,10 @@ HASH_TAG = "cg.hash"
 # unchanged build applies the change (stored hashes are "<version>.<content hash>")
 MESH_VERSION = "3"
 ACTOR_VERSION = "1"
-LIFE_VERSION = "life3"   # LG0: lifegen's controller (CityGenLife) and its stand-in material;
-                         # LG1: the people library's properties; LG3: the city's crowd
+LIFE_VERSION = "life4"   # LG0: lifegen's controller (CityGenLife) and its stand-in material;
+                         # LG1: the people library's properties; LG3: the city's crowd;
+                         # 4, lifegen_clothing_toggle: the clothing switch's hidden material
+                         # and whole body
 ATMOS_VERSION = "atmos7"  # the atmos controller's and cells' actors (2, AT2: the high tier,
                           # blinks and sweeps in the packed lights; 3, AT3: the sky and time;
                           # 4, AT4: the air, a cell's fog volumes and emitters; 5, the visible
@@ -1140,6 +1142,37 @@ def stand_in_material():
     MEL.connect_material_property(col, "", MP.MP_BASE_COLOR)
     MEL.connect_material_property(rough, "", MP.MP_ROUGHNESS)
     m.set_editor_property("used_with_instanced_static_meshes", True)
+    MEL.recompile_material(m)
+    EAL.set_metadata_tag(m, "cg.life", LIFE_VERSION)
+    EAL.save_loaded_asset(m, only_if_is_dirty=False)
+    return m
+
+
+# lifegen_clothing_toggle: MetaHuman's whole body (the creator's assembled bodies have no
+# triangles under their garments), drawn near while the clothing switch is off
+WHOLE_BODY = "/MetaHumanCharacter/Body/IdentityTemplate/SKM_Body"
+
+
+def hidden_material():
+    """lifegen_clothing_toggle: /Game/CityGen/Core/Life/M_CgLifeHidden, a material that draws
+    nothing (masked, its mask 0): the life controller puts it on the mid mesh's garment slots
+    while its clothing switch is off (a debug switch until LG2's garments)."""
+    folder = f"{CORE}/Life"
+    path = f"{folder}/M_CgLifeHidden"
+    m = unreal.load_asset(path) if EAL.does_asset_exist(path) else None
+    if m is not None and meta(m, "cg.life") == LIFE_VERSION:
+        return m
+    if m is None:
+        m = AT.create_asset("M_CgLifeHidden", folder, unreal.Material,
+                            unreal.MaterialFactoryNew())
+    else:
+        clear_material(m)
+    MP = unreal.MaterialProperty
+    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
+    zero = expr(m, unreal.MaterialExpressionConstant, -300, 0, r=0.0)
+    MEL.connect_material_property(zero, "", MP.MP_OPACITY_MASK)
+    m.set_editor_property("used_with_instanced_static_meshes", True)
+    m.set_editor_property("used_with_skeletal_mesh", True)
     MEL.recompile_material(m)
     EAL.set_metadata_tag(m, "cg.life", LIFE_VERSION)
     EAL.save_loaded_asset(m, only_if_is_dirty=False)
@@ -4384,6 +4417,7 @@ class Importer:
         info = self.man["life"]
         d = json.load(open(os.path.join(self.build, info["file"]), encoding="utf-8"))["controller"]
         mat = stand_in_material()
+        hidden = hidden_material()
         body = unreal.load_asset("/Engine/BasicShapes/Cylinder")
         head = unreal.load_asset("/Engine/BasicShapes/Sphere")
         meshes, missing = [], []
@@ -4442,6 +4476,19 @@ class Importer:
             people = people_assets(d, missing)
             for k, v in people.items():
                 a.set_editor_property(k, v)
+            # (lifegen_clothing_toggle: the material the clothing switch puts on the mid
+            # mesh's garment slots and the whole body it draws near, MetaHuman's template body
+            # from the engine's MetaHuman plugin, read by path, never copied; the switch itself
+            # on, as in the game's default)
+            lib = bool(people.get("mid_meshes"))
+            a.set_editor_property("hidden_material", hidden if lib else None)
+            # (load_asset, not does_asset_exist: the registry does not list the plugin's
+            # content in the importer's editor, which loads it all the same)
+            whole = unreal.load_asset(WHOLE_BODY) if lib else None
+            if lib and whole is None:
+                missing.append(WHOLE_BODY)
+            a.set_editor_property("whole_body", whole)
+            a.set_editor_property("clothing", True)
             # (LG3: the city's crowd; empty for a plan before it, which walks LG1's spike)
             for k, v in crowd_props(d).items():
                 a.set_editor_property(k, v)

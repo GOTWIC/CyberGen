@@ -163,7 +163,8 @@ public:
 	 *  weather+ and weather- (the next or the previous state, blended) and weather=NAME
 	 *  (`weather=rain!` at once); dlss_lamps_flicker's upscaler+, upscaler- and
 	 *  upscaler=NAME (default, native, tsr, dlss_quality, dlss_balanced, dlss_performance) and
-	 *  framegen (framegen=1 or 0) (the overlay's clicks and the console's CityGen.MenuRow).
+	 *  framegen (framegen=1 or 0); lifegen_clothing_toggle's clothing (clothing=1 or 0) with a
+	 *  life controller (the overlay's clicks and the console's CityGen.MenuRow).
 	 *  False for a row the menu does not show. */
 	UFUNCTION(BlueprintCallable, Category = "CityGen")
 	bool ClickMenuRow(const FString& Row);
@@ -187,6 +188,14 @@ public:
 	/** AT5: the controller's weather now ("rain", "clear > rain" while it turns), "" without a
 	 *  weather (the menu then shows AT0's fog, rain and wet rows). */
 	FString GetAtmosWeather() const;
+
+	/** lifegen_clothing_toggle: the level's life controller (CityGenLife, found by its class
+	 *  name like the atmos controller, no link to that plugin), else null; whether it has the
+	 *  clothing switch (bClothing), its state, and SetClothing on it. */
+	AActor* GetLife() const;
+	bool HasLifeClothing() const;
+	bool GetLifeClothing() const;
+	void SetLifeClothing(bool bOn);
 
 	/** The controller's hour (0 to 24), and SetHour. */
 	float GetAtmosHour() const;
@@ -267,6 +276,8 @@ private:
 	double ToastUntil = 0.0;
 	mutable TWeakObjectPtr<AActor> Atmos;
 	mutable double AtmosLookAt = -1.0;
+	mutable TWeakObjectPtr<AActor> Life;
+	mutable double LifeLookAt = -1.0;
 
 	// the day's lighting, kept to go back to it
 	bool bDaySaved = false;

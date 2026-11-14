@@ -2827,6 +2827,12 @@ LG3 (crowds on the streets, built before LG2 at Swagnik's ask) is in place:
   Old Town walks at about a third of its density (the pool), the rest at full. Open items
   (crosswalk and crossing walkways along the carriageway, Old Town's density, the hour until
   LG8): `docs/progress/LG3/README.md`.
+- **Clothing switch** (lifegen_clothing_toggle, a debug switch until LG2, on by default): the
+  Tab menu's Clothing row and `CityGenLife.Clothing [0|1]`; off, near people (out to the mid
+  tier's 90 m, at most 160) are MetaHuman's whole template body in their own skin (the
+  creator's bodies have no triangles under the garments), mid past that cap their garment
+  slots drawn with `M_CgLifeHidden` (holes), far cards unchanged (`LIFE_VERSION` life4):
+  `docs/progress/lifegen_clothing_toggle/README.md`.
 
 ## Gallery site (GitHub Pages)
 
