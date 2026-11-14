@@ -121,8 +121,13 @@ Swagnik, 2026-11-14):
 
 ## Package
 
-`C:/Users/swagn/CityGen/builds/packaged/Delta_lg3/Windows/CityAG16.exe` (see below for its
-smoke launch).
+`C:/Users/swagn/CityGen/builds/packaged/Delta_lg3/Windows/CityAG16.exe` (Development, Win64,
+4.9 GB; `builds/packaged/package_lg3.cmd` from a copy of `CityAG16` without the MetaHuman
+Character sources, cooked in 12 minutes). Its smoke launch (`-userdir=` outside the package,
+no `Saved/` left in it) loads the level and the crowd: 20,245 lanes built in 47 ms, 602
+people live round the player start at once (110 walkways, 153 doors live), 630 a minute
+later with 31 out of doors, the controller's tick 0.5 ms. The superseded `Delta_lg1`
+package, the packaging copy and LG1's scratch builds were deleted.
 
 ## Open items
 
