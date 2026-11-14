@@ -161,7 +161,9 @@ public:
 	 *  minimap, messages, and with an atmos controller fog, rain, wet, hour+ and hour-, and
 	 *  AT3's time slider as hour=H (a number, or day, dusk or night); AT5's weather row,
 	 *  weather+ and weather- (the next or the previous state, blended) and weather=NAME
-	 *  (`weather=rain!` at once) (the overlay's clicks and the console's CityGen.MenuRow).
+	 *  (`weather=rain!` at once); dlss_lamps_flicker's upscaler+, upscaler- and
+	 *  upscaler=NAME (default, native, tsr, dlss_quality, dlss_balanced, dlss_performance) and
+	 *  framegen (framegen=1 or 0) (the overlay's clicks and the console's CityGen.MenuRow).
 	 *  False for a row the menu does not show. */
 	UFUNCTION(BlueprintCallable, Category = "CityGen")
 	bool ClickMenuRow(const FString& Row);
