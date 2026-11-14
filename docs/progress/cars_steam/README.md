@@ -98,4 +98,30 @@ plan's `air.steam`, the controller's `bSteam` set by the import. The plan still 
 emitter. In the game the Tab menu's **Steam and smoke** row and `CityGenAtmos.Steam [0|1]` turn
 them on and off; the fog volumes stay with `CityGenAtmos.Air`.
 
-RESULTS_IMPORT
+## Delta in Unreal
+
+Delta's atmos and life plans made again (the atmos plan's checks all pass; its only change is
+`air.steam`), imported over its import in a throwaway project with NVIDIA's DLSS plugin: the
+life and atmos controllers updated (2 actors of 14,689), the plugins rebuilt.
+
+- **The check by night passes** (walk, curb, flight, sky and time, air, weather, look, far
+  city, play features; the controller's 731 plumes registered, hidden).
+- **Shots** (`shots/`, the play window's free camera 14 m over a leg of four Old Town junctions
+  near the spike's middle, 400 cars respawned with `CityGenLife.Respawn 2000 400` since the
+  plan's 40 are few to the eye): by day [`pday_cars_turn_0`](shots/pday_cars_turn_0.jpg) to
+  [`3`](shots/pday_cars_turn_3.jpg), by night [`night_cars_turn_0`](shots/night_cars_turn_0.jpg)
+  to [`3`](shots/night_cars_turn_3.jpg): cars at their street's speed and angled through the
+  junctions (a still shows a car's pose, not its motion: the smoothness is the lanes' numbers
+  above). The Tab menu with its **Steam and smoke: Off** row:
+  [`play_menu`](shots/play_menu.jpg).
+- **The lean benchmark** (`bench/native`, the night as delivered at native 2560 x 1440, one
+  run): 18.7 ms p95 over the route (walk 19.0, drive 18.9, fly 18.6), game-thread bound, within
+  the 20 ms budget (dlss_lamps_flicker: 18.8 to 20.0 ms on the same route).
+
+## The packaged game
+
+`builds/packaged/Delta_cars/Windows/CityAG16.exe` (Development, Win64, 3.3 GB, outside the
+repo), cooked from a mirror of the project in 11.5 minutes. A smoke launch with a user folder of
+its own ran 120 s with no fatal error: DLSS and Streamline supported, the world up, the play
+features ready by night, the life controller placing its 2,000 people and 40 cars on d04's 5,509
+drive lanes (1.0 to 1.1 ms of game thread a frame).
