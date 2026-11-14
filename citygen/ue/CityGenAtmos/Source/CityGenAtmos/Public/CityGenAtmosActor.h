@@ -941,6 +941,9 @@ private:
 	void UpdateFlicker(double Now);
 	void UpdateFades(float DeltaSeconds, double Now);
 	void SetLevel(ULocalLightComponent* C, int64 Key, const FCityGenAtmosLight& L, double T, uint32 Step) const;
+	/** Whether a flickering light is in one of its bursts at world time T (between them it
+	 *  burns steady). */
+	static bool InBurst(const FCityGenAtmosLight& L, double T);
 	void UpdateFixtureCells(const FVector& View);
 	int32 FixtureCells() const
 	{

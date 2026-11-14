@@ -2,6 +2,7 @@
 
 #include "Camera/PlayerCameraManager.h"
 #include "CityGenFreeCam.h"
+#include "CityGenUpscaler.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/DecalComponent.h"
 #include "Components/DirectionalLightComponent.h"
@@ -9,6 +10,7 @@
 #include "Components/SkyLightComponent.h"
 #include "CoreGlobals.h"
 #include "Engine/DirectionalLight.h"
+#include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/PostProcessVolume.h"
 #include "Engine/SkyLight.h"
@@ -699,6 +701,27 @@ bool ACityGenPlay::ClickMenuRow(const FString& Row)
 	{
 		GAreScreenMessagesEnabled = !GAreScreenMessagesEnabled;
 	}
+	else if (R == TEXT("upscaler+") || R == TEXT("upscaler-") || R == TEXT("upscaler"))
+	{
+		// dlss_lamps_flicker: the next or previous upscaler (native, TSR, DLSS's modes where
+		// it runs here), the output at the window's size
+		const bool bDlss = CityGenUpscaler::DLSSSupported();
+		const int32 N = bDlss ? int32(CityGenUpscaler::Count) : int32(CityGenUpscaler::DlssQuality);
+		int32 M = CityGenUpscaler::Current();
+		M = M == CityGenUpscaler::Default ? (R == TEXT("upscaler-") ? N - 1 : 0)
+			: (M + (R == TEXT("upscaler-") ? N - 1 : 1)) % N;
+		return CityGenUpscaler::Apply(M, OutputSize());
+	}
+	else if (R.StartsWith(TEXT("upscaler=")))
+	{
+		const int32 M = CityGenUpscaler::FromName(R.Mid(9));
+		return CityGenUpscaler::Apply(M, OutputSize());
+	}
+	else if (R == TEXT("framegen") || R.StartsWith(TEXT("framegen=")))
+	{
+		const bool bOn = R == TEXT("framegen") ? !CityGenUpscaler::FrameGenOn() : R.EndsWith(TEXT("1"));
+		return CityGenUpscaler::SetFrameGen(bOn);
+	}
 	else if (!GetAtmos())
 	{
 		return false;                           // (the weather rows are hidden)
@@ -885,7 +908,8 @@ FString ACityGenPlay::GetStatus() const
 		"\"free_cam\": %s, \"waiting\": %s, \"pawn\": \"%s\", \"x\": %.2f, \"y\": %.2f, \"z\": %.2f, "
 		"\"light_pools\": %d, "
 		"\"lamp_points\": %d, \"walk_points\": %d, \"map_texture\": %s, "
-		"\"overlay\": %s, \"atmos\": %s, \"fog\": %s, \"rain\": %s, \"wet\": %s, \"hour\": %.2f, \"weather\": \"%s\"}"),
+		"\"overlay\": %s, \"atmos\": %s, \"fog\": %s, \"rain\": %s, \"wet\": %s, \"hour\": %.2f, \"weather\": \"%s\", "
+		"\"upscaler\": %s}"),
 		bReady ? TEXT("true") : TEXT("false"), IsNight() ? TEXT("true") : TEXT("false"),
 		bMapOpen ? TEXT("true") : TEXT("false"), bDevOpen ? TEXT("true") : TEXT("false"),
 		IsFreeCam() ? TEXT("true") : TEXT("false"), bWaiting ? TEXT("true") : TEXT("false"),
@@ -894,5 +918,20 @@ FString ACityGenPlay::GetStatus() const
 		Overlay.IsValid() ? TEXT("true") : TEXT("false"), GetAtmos() ? TEXT("true") : TEXT("false"),
 		GetAtmosFlag(TEXT("bFog")) ? TEXT("true") : TEXT("false"),
 		GetAtmosFlag(TEXT("bRain")) ? TEXT("true") : TEXT("false"),
-		GetAtmosFlag(TEXT("bWet")) ? TEXT("true") : TEXT("false"), GetAtmosHour(), *GetAtmosWeather());
+		GetAtmosFlag(TEXT("bWet")) ? TEXT("true") : TEXT("false"), GetAtmosHour(), *GetAtmosWeather(),
+		*CityGenUpscaler::StatusJson(OutputSize()));
+}
+
+FIntPoint ACityGenPlay::OutputSize() const
+{
+	// (the game viewport's size: the output the upscaler renders to)
+	if (GEngine && GEngine->GameViewport && GEngine->GameViewport->Viewport)
+	{
+		const FIntPoint S = GEngine->GameViewport->Viewport->GetSizeXY();
+		if (S.X > 0 && S.Y > 0)
+		{
+			return S;
+		}
+	}
+	return FIntPoint(2560, 1440);
 }

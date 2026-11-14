@@ -1,6 +1,7 @@
 #include "SCityGenOverlay.h"
 
 #include "CityGenPlayActor.h"
+#include "CityGenUpscaler.h"
 #include "CoreGlobals.h"
 #include "Engine/Texture2D.h"
 #include "Fonts/FontMeasure.h"
@@ -26,7 +27,10 @@ namespace
 		// AT3: the time-of-day slider under the time row (its own drag, not a click row)
 		RowTimeBar = 11,
 		// AT5: the weather row (its states; a click the next) and its arrows
-		RowWeather = 12, RowWeatherDown = 13, RowWeatherUp = 14 };
+		RowWeather = 12, RowWeatherDown = 13, RowWeatherUp = 14,
+		// dlss_lamps_flicker: the upscaler (native, TSR, DLSS's modes) and its arrows, and
+		// DLSS Frame Generation where the plugin offers it
+		RowUpscaler = 15, RowUpscalerDown = 16, RowUpscalerUp = 17, RowFrameGen = 18 };
 
 	/** A row's name for ACityGenPlay::ClickMenuRow (the console's CityGen.MenuRow). */
 	const TCHAR* RowName(int32 Row)
@@ -45,6 +49,10 @@ namespace
 		case RowWeather: return TEXT("weather+");
 		case RowWeatherUp: return TEXT("weather+");
 		case RowWeatherDown: return TEXT("weather-");
+		case RowUpscaler: return TEXT("upscaler+");
+		case RowUpscalerUp: return TEXT("upscaler+");
+		case RowUpscalerDown: return TEXT("upscaler-");
+		case RowFrameGen: return TEXT("framegen");
 		default: return TEXT("hour+");    // the hour row and its > arrow
 		}
 	}
@@ -306,7 +314,15 @@ int32 SCityGenOverlay::PaintMenu(FSlateWindowElementList& Out, int32 Layer, cons
 			: FString(P->IsNight() ? TEXT("Night") : TEXT("Day"))},
 		{RowFreeCam, TEXT("Free camera  ( . )"), P->IsFreeCam() ? TEXT("On") : TEXT("Off")},
 		{RowMinimap, TEXT("Minimap"), P->bShowMinimap ? TEXT("On") : TEXT("Off")},
-		{RowMessages, TEXT("Engine messages"), EngineMessages() ? TEXT("On") : TEXT("Off")}};
+		{RowMessages, TEXT("Engine messages"), EngineMessages() ? TEXT("On") : TEXT("Off")},
+		// (dlss_lamps_flicker: the output stays at the window's size; DLSS's modes only where
+		// the plugin is in the game and runs here)
+		{RowUpscaler, TEXT("Upscaler"), CityGenUpscaler::Label(CityGenUpscaler::Current())}};
+	if (CityGenUpscaler::HasFrameGen())
+	{
+		Rows.Add({RowFrameGen, TEXT("Frame generation"), !CityGenUpscaler::FrameGenSupported()
+			? TEXT("n/a") : (CityGenUpscaler::FrameGenOn() ? TEXT("On") : TEXT("Off"))});
+	}
 	if (P->GetAtmos())
 	{
 		// AT5: with a weather, one row of its states (clear, drizzle, rain, fog, smog: the rain,
@@ -339,14 +355,16 @@ int32 SCityGenOverlay::PaintMenu(FSlateWindowElementList& Out, int32 Layer, cons
 		const FVector2D R0(Min.X + 8.0, Y0), R1(Max.X - 8.0, R0.Y + RowH - 4.0);
 		const FSlateRect Rect(F(R0), F(R1));
 		const bool bHour = Rows[i].Id == RowHour;
-		const bool bWeatherRow = Rows[i].Id == RowWeather;
+		const bool bWeatherRow = Rows[i].Id == RowWeather || Rows[i].Id == RowUpscaler;
 		if (bWeatherRow)
 		{
 			// AT5: the weather steps back and on: its arrows first, so a click there is theirs
+			// (and the upscaler's, dlss_lamps_flicker)
+			const bool bUp = Rows[i].Id == RowUpscaler;
 			MenuRows.Add(TPair<FSlateRect, int32>(FSlateRect(F(FVector2D(R1.X - 150.0, R0.Y)),
-				F(FVector2D(R1.X - 126.0, R1.Y))), RowWeatherDown));
+				F(FVector2D(R1.X - 126.0, R1.Y))), bUp ? RowUpscalerDown : RowWeatherDown));
 			MenuRows.Add(TPair<FSlateRect, int32>(FSlateRect(F(FVector2D(R1.X - 26.0, R0.Y)), F(R1)),
-				RowWeatherUp));
+				bUp ? RowUpscalerUp : RowWeatherUp));
 		}
 		if (bHour)
 		{

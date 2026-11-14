@@ -2663,6 +2663,31 @@ AT6 (looks and art direction) is in place:
   `night_plan_nopost`, `day_plan_nopost`; `unreal.ALWAYS_COOK` adds the engine's film grains.
 Results: `docs/progress/AT6/`.
 
+The DLSS, ghost lamps and flicker fixes (after LG0, Swagnik's walk of Delta) are in place:
+- **Fixtures under the asked lights** (`atmosgen/fixtures.py`): every light on a mount stage
+  2 never drew (`pole`, `mast_arm`, `wall`, `mast`, a `roof` flood off its facade) gets one of
+  AG8's own variants in the district's style (a street light at the pole's foot scaled to the
+  head's height, its arm stretched at most `ARM_STRETCH`; at a signal's foot for a mast arm; a
+  wall light on the facade within `WALL_REACH_M` behind an alley's wall pack, else a pole off
+  the alley; the heavy mast form; a flood head on its setback or on an outrigger, AG8's
+  bracket), clear of carriageways, junctions and crosswalks as AG8's props (`gather._Fit`, the
+  pavement map; `_RawFit` on a partial model), the light moved onto its lens (`spot(...,
+  foot=)` hints, `_fx`), the lux check run on the moved lights. `fixtures.json`,
+  `unreal_contribution.fixtures.json` (layer 3, AG8's `props` part, an entry per 128 m cell),
+  which `citygen unreal` layers with stage 2's (`unreal_atmos.fixtures_contribution`); the
+  plan's `checks.fixtures` (every light on something at its height; a failing plan is not
+  delivered). AT2's beacons and searchlights on a curved or odd footprint now stand on it
+  (`plan.corners_on`).
+- **Fewer flickers:** `presets.FLICKER_SCALE` 0.1 on the moods' flicker shares (still pulled
+  by danger) and on dying signs; the runtime flickers in bursts (`ACityGenAtmos::InBurst`).
+- **DLSS** (`citygen unreal --dlss DIR`, `$CITYGEN_DLSS`; `citygen/unreal_dlss.py`): NVIDIA's
+  plugins copied into the project (never into the repo), enabled, set up; the play menu's
+  Upscaler and Frame generation rows (`CityGenUpscaler`, by reflection, no link); bench passes
+  `night_plan_all_dlss_{q,b,p}` and `_fg`; `bench.busy` counts the Epic Games Launcher while it
+  downloads. Docs: `docs/unreal_export.md` ("DLSS", "The lights' fixtures"). Delta's night
+  (game-thread bound): native 18.8 to 20.0 ms p95, TSR 67% 16.2, DLSS Quality 16.1, Performance
+  15.8, Frame Generation 163 to 177 shown fps. Results: `docs/progress/dlss_lamps_flicker/`.
+
 ## Life generator (lifegen)
 
 `docs/lifegen_scope.md` (v1, Swagnik's decisions of 2026-11-13 in section 12) is the spec

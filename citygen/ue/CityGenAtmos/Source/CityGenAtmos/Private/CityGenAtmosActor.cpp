@@ -531,13 +531,34 @@ void ACityGenAtmos::ReleaseAll()
 	Wanted.Reset();
 }
 
+bool ACityGenAtmos::InBurst(const FCityGenAtmosLight& L, double T)
+{
+	// a flickering light flickers in bursts, steady between them (dlss_lamps_flicker: it
+	// flickered a third of every second before): a burst of BurstS[0] to [1] s once every
+	// CycleS[0] to [1] s, its cycle and length from the light's seed, the burst's place in
+	// each cycle from the cycle's hash; a dying tube (flicker 0.8 and deeper) every
+	// DyingCycleS, longer. Stateless: the same at any frame rate and on every machine.
+	const bool bDying = L.Flicker >= 0.8f;
+	const float U0 = float(Hash(L.Seed, 101u) & 0xffff) / 65536.f;
+	const float U1 = float(Hash(L.Seed, 103u) & 0xffff) / 65536.f;
+	const float U2 = float(Hash(L.Seed, 107u) & 0xffff) / 65536.f;
+	const double Cycle = bDying ? 4.0 + 6.0 * U0 : 9.0 + 17.0 * U0;
+	const double Burst = bDying ? 0.8 + 1.2 * U1 : 0.35 + 0.65 * U1;
+	const double Tc = T / Cycle + U2;
+	const double C = FMath::FloorToDouble(Tc);
+	const uint32 Ci = uint32(int64(C) & 0x7fffffff);
+	const double Start = (float(Hash(L.Seed ^ 0x5bd1e995u, Ci) & 0xffff) / 65536.f) * (Cycle - Burst);
+	const double Off = (Tc - C) * Cycle;
+	return Off >= Start && Off < Start + Burst;
+}
+
 void ACityGenAtmos::SetLevel(ULocalLightComponent* C, int64 Key, const FCityGenAtmosLight& L, double T, uint32 Step) const
 {
 	// a light's intensity now: its own, the exposure's scale, its schedule, its blink, its
 	// flicker's drop (a hash of its seed and the 1/12 s step: no state, the same at any frame
 	// rate), and its fades by distance and in time
 	float Drop = 0.f;
-	if (L.Flicker > 0.f)
+	if (L.Flicker > 0.f && InBurst(L, T))
 	{
 		const float R = float(Hash(L.Seed, Step) & 0xffff) / 65535.f;
 		Drop = R < 0.18f ? L.Flicker : (R < 0.3f ? 0.3f * L.Flicker : 0.f);

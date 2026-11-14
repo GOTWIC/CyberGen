@@ -65,6 +65,7 @@ STAMP = "citygen_atmos_assets.txt"          # in PROJECT/Saved
 PLAN_DIR = "atmos"                          # BUILD/atmos: `atmosgen plan`'s default
 DATA = "atmos.json"                         # BUILD/unreal/atmos.json
 GLOW = "atmos_sky_glow.png"                 # BUILD/unreal/atmos_sky_glow.png (AT3)
+FIXTURES = "unreal_contribution.fixtures.json"    # the plan's fixtures (dlss_lamps_flicker)
 CONTROLLER_KEY = "atmos"
 CELL_M = 128.0                              # World Partition's main cells (unreal.MAIN_CELL_M)
 PACK_VERSION = 5                            # 2 (AT2): the high tier, a blink or a sweep;
@@ -515,33 +516,57 @@ def sky_settings(plan: dict) -> dict:
     return out
 
 
+def undelivered(plan: dict) -> str:
+    """Why a plan is not delivered (scope 8: a check of its failed), else ""."""
+    ck = plan.get("checks") or {}
+    lux = ck.get("lux")
+    if lux is None:
+        return "the plan has no lux check (an AT0 plan: run atmosgen plan again)"
+    if not lux.get("ok"):
+        return "the plan's lux check failed (scope 8: not delivered)"
+    why = {"faces": "the plan's faces check failed (AT2: a lit face floods its wall)",
+           "air": "the plan's air check failed (AT4: an emitter off its source, a volume off "
+                  "its water or district, or a tile over its budget)",
+           "weather": "the plan's weather check failed (AT5: a cover out of its rain shadow, "
+                      "a puddle under a cover, in a building or on the water, a tile without "
+                      "its mask or over its drips' budget)",
+           "far": "the plan's far check failed (AT7: a lamp without its far card, a card with "
+                  "bad numbers, or a tile over its budget)",
+           "fixtures": "the plan's fixtures check failed (dlss_lamps_flicker: a light standing "
+                       "on nothing, or a fixture on a carriageway)"}
+    for k, msg in why.items():
+        c = ck.get(k)
+        if c is not None and not c.get("ok"):
+            return msg
+    return ""
+
+
+def fixtures_contribution(build: str | Path, given: str | Path | None = None):
+    """dlss_lamps_flicker: the fixtures under the plan's asked lights (AG8's own variants,
+    the plan's `unreal_contribution.fixtures.json`, atmosgen/fixtures.py) as one more of stage
+    2's contributions: (its path, the contribution, its sha256), where the plan is delivered;
+    else None."""
+    pdir = plan_dir(build, given)
+    if pdir is None or not (pdir / FIXTURES).is_file():
+        return None
+    if undelivered(json.loads((pdir / "atmos_plan.json").read_text(encoding="utf-8"))):
+        return None
+    data = (pdir / FIXTURES).read_bytes()
+    c = json.loads(data)
+    if c.get("version") != 1 or not c.get("entries"):
+        return None
+    return ((pdir / FIXTURES).as_posix(), c, hashlib.sha256(data).hexdigest())
+
+
 def atmos_data(pdir: Path, dest: Path | None = None) -> tuple[dict | None, str]:
     """The plan in the importer's form ({controller, cells}), or (None, why not). AT5: with
     `dest` (BUILD/unreal) the weather's textures are written there (`wet_textures`) and named
     in the controller."""
     text = (pdir / "atmos_plan.json").read_text(encoding="utf-8")
     plan = json.loads(text)
-    lux = (plan.get("checks") or {}).get("lux")
-    if lux is None:
-        return None, "the plan has no lux check (an AT0 plan: run atmosgen plan again)"
-    if not lux.get("ok"):
-        return None, "the plan's lux check failed (scope 8: not delivered)"
-    faces = (plan.get("checks") or {}).get("faces")
-    if faces is not None and not faces.get("ok"):
-        return None, "the plan's faces check failed (AT2: a lit face floods its wall)"
-    air = (plan.get("checks") or {}).get("air")
-    if air is not None and not air.get("ok"):
-        return None, "the plan's air check failed (AT4: an emitter off its source, a volume " \
-                     "off its water or district, or a tile over its budget)"
-    wck = (plan.get("checks") or {}).get("weather")
-    if wck is not None and not wck.get("ok"):
-        return None, "the plan's weather check failed (AT5: a cover out of its rain shadow, " \
-                     "a puddle under a cover, in a building or on the water, a tile without " \
-                     "its mask or over its drips' budget)"
-    fck = (plan.get("checks") or {}).get("far")
-    if fck is not None and not fck.get("ok"):
-        return None, "the plan's far check failed (AT7: a lamp without its far card, a card " \
-                     "with bad numbers, or a tile over its budget)"
+    why = undelivered(plan)
+    if why:
+        return None, why
     schedules = sorted(plan["schedules"])
     kinds, mounts = _kinds(), _mounts()
     cells: dict[tuple[int, int], list[dict]] = {}

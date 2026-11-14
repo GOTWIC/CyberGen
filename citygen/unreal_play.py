@@ -412,8 +412,12 @@ def build_plugin(root: Path, uproject: Path, log: Path, timeout: float = 3600.0)
         return {"ok": False, "built": False, "error": f"install: {e}", "seconds": 0.0}
     dest = Path(inst["dir"])
     stamp = dest / "Binaries" / BUILT_STAMP
-    # (the engine too: binaries built against another engine would not load)
+    # (the engine too: binaries built against another engine would not load; and NVIDIA's
+    # DLSS plugins where `--dlss` put them in the project, which the build compiles too)
+    from .unreal_dlss import installed
     want = f"{plugin_hash()} {Path(root).resolve().as_posix()}"
+    if installed(uproject):
+        want += f" dlss {installed(uproject)}"
     if stamp.is_file() and stamp.read_text(encoding="utf-8").strip() == want:
         return {"ok": True, "built": False, "seconds": round(time.time() - t, 1),
                 "hash": want, **inst}

@@ -49,7 +49,7 @@ from . import sky as SK
 from . import spec as S
 
 CODE_FILES = ("presets.py", "spec.py", "planmodel.py", "emitters.py", "plan.py", "lux.py",
-              "sky.py", "air.py", "sight.py", "weather.py", "look.py", "far.py")
+              "sky.py", "air.py", "sight.py", "weather.py", "look.py", "far.py", "fixtures.py")
 OUT = "atmos"
 TILE_M = 256.0
 
@@ -338,6 +338,38 @@ def corners(g, inset: float) -> list[tuple[float, float]]:
     return out
 
 
+def corners_on(g, inset: float) -> list[tuple[float, float]]:
+    """`corners`, each on the footprint itself (dlss_lamps_flicker: the oriented box's corner
+    of a curved or odd footprint lies off it, and a beacon or a searchlight there stood on
+    nothing): `inset` > 0 the nearest point `inset` inside it where the box's is not; < 0
+    (out on a facade's corner) the nearest point of its outline, `-inset` out."""
+    from shapely.geometry import Point
+    from shapely.ops import nearest_points
+    out = []
+    core = g.buffer(-inset, join_style="mitre") if inset > 0 else None
+    for x, y in corners(g, inset):
+        p = Point(x, y)
+        if inset > 0:
+            if core is None or core.is_empty:
+                q = g.representative_point()
+            elif core.contains(p):
+                q = p
+            else:
+                q = nearest_points(core, p)[0]
+            out.append((round(q.x, 3), round(q.y, 3)))
+            continue
+        d = g.exterior.distance(p)
+        if not g.contains(p) and d <= -inset + 0.05:
+            out.append((x, y))
+            continue
+        q = nearest_points(g.exterior, p)[0]
+        c = g.centroid
+        vx, vy = q.x - c.x, q.y - c.y
+        n = math.hypot(vx, vy) or 1.0
+        out.append((round(q.x - inset * vx / n, 3), round(q.y - inset * vy / n, 3)))
+    return out
+
+
 class Shape:
     """A building's (or a megasite structure's) masses for its night lights (AT2): their
     footprints with their spans over its base, its body's top (M21's thin parts, masts,
@@ -439,9 +471,12 @@ class Plan:
             u(lid, "broken") < md["broken"] * P.BROKEN_BY_KIND.get(kind, 1.0)
         depth = r3(0.35 + 0.5 * u(lid, "depth")) if u(lid, "flicker") < flick else 0.0
         if broken and kind in P.DYING_KINDS:
-            # (a sign's face stays lit as assetgen draws it: its light dies flickering)
+            # (a sign's face stays lit as assetgen draws it: its light dies flickering, at
+            # `FLICKER_SCALE` of them since dlss_lamps_flicker; the rest burn on steady)
             lo, hi = P.DYING_DEPTH
-            depth, broken = r3(lo + (hi - lo) * u(lid, "dying")), False
+            if u(lid, "dies") < P.FLICKER_SCALE:
+                depth = r3(lo + (hi - lo) * u(lid, "dying"))
+            broken = False
         # grit (decision 12.5): a gritty district's lamps of mixed temperatures and aged
         # output; a clean one's uniform (AT2)
         past = max(0.0, float(md.get("grit", 0.0)) - P.MIX_FROM)
@@ -492,10 +527,12 @@ class Plan:
     def spot(self, cls: str, *, owner: str, suffix: str, kind: str, did: str | None, x: float,
              y: float, z: float, yaw: float, mount: str, schedule: str = "dusk_dawn",
              tilt: float | None = None, cd_scale: float = 1.0, temp_key: str = "temp",
-             commit: bool = True) -> dict:
+             commit: bool = True, foot=None, deck: bool = False) -> dict:
         """A light of class `cls` (spot or point) whose fixture's lens is at (x, y, z), its
         aim turned `tilt` (default its class's) off straight down toward the heading `yaw`;
-        `commit` False makes the record without adding it (a corner pole tried)."""
+        `commit` False makes the record without adding it (a corner pole tried). `foot`
+        (dlss_lamps_flicker): where its pole stands (x, y, z of the surface), for the fixture
+        `fixtures.py` draws under it (the record's private `_fx`, dropped when written)."""
         ph = P.PHOTOMETRY[cls]
         t = ph.get("tilt", 0.0) if tilt is None else tilt
         temp = P.TEMPS[self.mood(did)[temp_key]]
@@ -505,6 +542,8 @@ class Plan:
                   color=kelvin_linear(temp), temp_k=temp, cd=ph["cd"] * cd_scale,
                   schedule=schedule, mount=mount)
         rec = self.add(**kw)
+        if foot is not None:
+            rec["_fx"] = {"foot": [float(v) for v in foot], "deck": deck}
         if not commit:
             self.lights.pop()
         return rec
@@ -576,7 +615,8 @@ class Plan:
             self.spot("cobra_head", owner=p["id"], suffix="light", kind="signal", did=did,
                       x=px + ux * arm, y=py + uy * arm,
                       z=self.c.ground(px, py) + pz + P.SIGNAL_HEAD_Z_M,
-                      yaw=math.degrees(math.atan2(uy, ux)), mount="mast_arm")
+                      yaw=math.degrees(math.atan2(uy, ux)), mount="mast_arm",
+                      foot=(px, py, self.c.ground(px, py) + pz))
 
     # -- roads M6 gives no lamps: highways and ramps, service roads, footbridges --
 
@@ -628,15 +668,21 @@ class Plan:
                         self.spot(cls, owner=sid, suffix=f"light{k:03d}{sfx}", kind="road",
                                   did=did, x=x + nx * o, y=y + ny * o, z=z,
                                   yaw=math.degrees(math.atan2(ny * side, nx * side)),
-                                  mount="pole")
+                                  mount="pole", foot=(x, y, z - h), deck=True)
+                    # (deck: the twin column stands in the median, on its barrier)
                 else:
-                    # one column at an edge, its arm over the road, from side to side
+                    # one column at an edge, its arm over the road, from side to side (its
+                    # foot `POLE_OUT_M` past the edge)
                     side = 1.0 if k % 2 == 0 else -1.0
                     o = side * max(0.0, half - arm)
+                    # (on a raised road its parapet line, on the deck's edge)
+                    raised = seg_z(s, sv) > 1.0
+                    fo = side * (half + (0.0 if raised else P.POLE_OUT_M))
                     self.spot(cls, owner=sid, suffix=f"light{k:03d}", kind="road", did=did,
                               x=x + nx * o, y=y + ny * o, z=z,
                               yaw=math.degrees(math.atan2(-ny * side, -nx * side)),
-                              mount="pole")
+                              mount="pole", foot=(x + nx * fo, y + ny * fo, z - h),
+                              deck=raised)
                 k += 1
 
     def _posts(self, s: dict) -> None:
@@ -654,9 +700,10 @@ class Plan:
             x, y, _, tx, ty = ln.at(sv)
             side = 1.0 if (k + flip) % 2 == 0 else -1.0
             z = self.c.ground(x, y) + seg_z(s, sv) + P.PED_POST_Z_M
+            px, py = x - ty * side * half, y + tx * side * half
             self.spot("post_top", owner=s["id"], suffix=f"light{k:02d}", kind="road", did=did,
-                      x=x - ty * side * half, y=y + tx * side * half, z=z, yaw=0.0,
-                      mount="pole")
+                      x=px, y=py, z=z, yaw=0.0, mount="pole",
+                      foot=(px, py, z - P.PED_POST_Z_M))
 
     def _rail_posts(self, s: dict) -> None:
         """A footbridge's lights: posts on its railings every 12 m, from side to side."""
@@ -671,9 +718,10 @@ class Plan:
             x, y, _, tx, ty = ln.at(sv)
             side = 1.0 if k % 2 == 0 else -1.0
             z = self.c.ground(x, y) + seg_z(s, sv) + 3.2
+            px, py = x - ty * side * half, y + tx * side * half
             self.spot("post_top", owner=s["id"], suffix=f"light{k:02d}", kind="road", did=did,
-                      x=x - ty * side * half, y=y + tx * side * half, z=z, yaw=0.0,
-                      mount="pole", cd_scale=0.5)
+                      x=px, y=py, z=z, yaw=0.0, mount="pole", cd_scale=0.5,
+                      foot=(px, py, z - 3.2))
 
     # -- alleys: wall packs over them --
 
@@ -1012,6 +1060,7 @@ class Plan:
         tl = (t0 + t1) / 2.0 if tl is None else tl
         o = out
         x = y = 0.0
+        raised = False
         for _ in range(6):
             x = c[0] + n[0] * (e_n + o) + t[0] * tl
             y = c[1] + n[1] * (e_n + o) + t[1] * tl
@@ -1020,6 +1069,7 @@ class Plan:
                 break
             if hit[2] + sh.base < z0 - 3.0:
                 z_light = hit[2] + sh.base + 0.5          # (on the setback's roof)
+                raised = True
             else:
                 o += 3.0
         else:
@@ -1041,11 +1091,19 @@ class Plan:
         outer = min(60.0, max(14.0, max(lat, vert) + 4.0))
         cd = min(4.0e5, ph["lux"] * d ** 3 / max(dh, 0.5))
         reach = 1.15 * math.hypot(dh + 1.0, z1 - z_light) + 2.0
-        return self.add(owner=owner, suffix=suffix, kind="flood", cls=cls, did=did,
-                        pos=(x, y, z_light), aim=(math.degrees(math.atan2(fy - y, fx - x)),
-                                                  math.degrees(math.atan2(dz, dh))),
-                        color=color, temp_k=temp_k, cd=cd, schedule="late", mount="roof",
-                        reach=reach, cone=(0.6 * outer, outer))
+        rec = self.add(owner=owner, suffix=suffix, kind="flood", cls=cls, did=did,
+                       pos=(x, y, z_light), aim=(math.degrees(math.atan2(fy - y, fx - x)),
+                                                 math.degrees(math.atan2(dz, dh))),
+                       color=color, temp_k=temp_k, cd=cd, schedule="late", mount="roof",
+                       reach=reach, cone=(0.6 * outer, outer))
+        # (dlss_lamps_flicker: its fixture; a flood on a setback's roof, a podium's or the
+        # ground stands there (0.5 m under it), else an outrigger reaches it from the facade)
+        under = sh.top_under(x, y, z_light - sh.base + 0.01)
+        on = raised or (under is not None and z_light - (sh.base + under) <= 0.6) or \
+            z_light - self.c.ground(x, y) <= 0.6
+        rec["_fx"] = {"flood": True, "stand": z_light - 0.5} if on else \
+            {"flood": True, "wall": [fx, fy]}
+        return rec
 
     def floods(self) -> None:
         """Crown floods on towers and landmarks, facade uplights on landmarks and some
@@ -1166,7 +1224,7 @@ class Plan:
                 c = g.representative_point()
                 pts.append((c.x, c.y, sh.base + z1 + 0.3))
             else:
-                pts += [(x, y, sh.base + z1 + 0.4) for x, y in corners(g, 0.4)]
+                pts += [(x, y, sh.base + z1 + 0.4) for x, y in corners_on(g, 0.4)]
             for x, y, z in pts:
                 self.add(owner=oid, suffix=f"aviation{k}", kind="aviation", cls="aviation",
                          did=did, pos=(x, y, z), aim=(0.0, -90.0), color=red,
@@ -1179,7 +1237,7 @@ class Plan:
             while zl >= 45.0:
                 lv = sh.at(zl)
                 if lv is not None:
-                    for x, y in corners(lv[0], -0.4):
+                    for x, y in corners_on(lv[0], -0.4):
                         self.add(owner=oid, suffix=f"aviation{k}", kind="aviation",
                                  cls="aviation", did=did, pos=(x, y, sh.base + zl),
                                  aim=(0.0, -90.0), color=red,
@@ -1228,7 +1286,7 @@ class Plan:
         lo_t, hi_t = P.SEARCHLIGHT_PERIOD
         for b, sh, n in jobs:
             did = b.get("district_id")
-            cs = corners(sh.crown[0], 2.0)
+            cs = corners_on(sh.crown[0], 2.0)
             if not cs:
                 continue
             g = sh.crown[0].centroid
@@ -1303,10 +1361,11 @@ class Plan:
             def mast(x, y, k, owner, cls="high_mast", aim=(0.0, -90.0), mount="mast",
                      kind_="high_mast"):
                 z = self.c.ground(x, y) + P.HIGH_MAST_Z_M
-                self.add(owner=owner, suffix=f"mast{k:03d}", kind=kind_, cls=cls, did=did,
-                         pos=(x, y, z - P.PHOTOMETRY[cls]["drop_m"]), aim=aim, color=col,
-                         temp_k=temp, cd=P.PHOTOMETRY[cls]["cd"], schedule="dusk_dawn",
-                         mount=mount)
+                rec = self.add(owner=owner, suffix=f"mast{k:03d}", kind=kind_, cls=cls,
+                               did=did, pos=(x, y, z - P.PHOTOMETRY[cls]["drop_m"]), aim=aim,
+                               color=col, temp_k=temp, cd=P.PHOTOMETRY[cls]["cd"],
+                               schedule="dusk_dawn", mount=mount)
+                rec["_fx"] = {"foot": [x, y, self.c.ground(x, y)], "mast": True}
                 count(kind_)
 
             if kind == "freight_terminal":
@@ -1529,7 +1588,7 @@ class Plan:
                                     y=y + dy / d * arm,
                                     z=self.c.ground(x, y) + nz + P.CORNER_POLE_Z_M,
                                     yaw=math.degrees(math.atan2(dy, dx)), mount="pole",
-                                    commit=False)
+                                    commit=False, foot=(x, y, self.c.ground(x, y) + nz))
                     e = LX.light_at(rec, xyz, occ, self.schedules)
                     left = int((cur + e < lim).sum())
                     if best is None or left < best[0]:
@@ -1632,18 +1691,23 @@ class Plan:
             o = max(0.0, width / 2.0 - 0.4)
             return self.spot("post_top", owner=owner, suffix="light", kind="road", did=did,
                              x=x + tx * o, y=y + ty * o, z=z + P.PED_POST_Z_M, yaw=yaw,
-                             mount="pole")
+                             mount="pole", foot=(x + tx * o, y + ty * o, z))
         # a carriageway: a pole at the road's edge on the point's side, its arm over the road
+        foot = (x - tx * P.ROAD_LIGHTS["service"][3], y - ty * P.ROAD_LIGHTS["service"][3], z)
         if seg is not None:
             sw = max((seg.get("cross_section") or {}).get("sidewalk_m") or [0.0])
             half = float(seg.get("width_m", 8.0)) / 2.0
             from shapely.geometry import LineString, Point
             ln = LineString([q[:2] for q in seg["centerline"]])
             q = ln.interpolate(ln.project(Point(x, y)))
-            o = half - sw + (0.6 if sw > 0 else 0.0) - P.ROAD_LIGHTS["service"][3]
+            arm = P.ROAD_LIGHTS["service"][3]
+            o = half - sw + (0.6 if sw > 0 else 0.0) - arm
             x, y = q.x - tx * max(0.0, o), q.y - ty * max(0.0, o)
+            fo = max(0.0, o) + arm + (0.0 if sw > 0 else P.POLE_OUT_M)
+            foot = (q.x - tx * fo, q.y - ty * fo, z)
         return self.spot("cobra_head", owner=owner, suffix="light", kind="road", did=did,
-                         x=x, y=y, z=z + P.ROAD_LIGHTS["service"][2], yaw=yaw, mount="pole")
+                         x=x, y=y, z=z + P.ROAD_LIGHTS["service"][2], yaw=yaw, mount="pole",
+                         foot=foot)
 
 
 # --- the plan's files -------------------------------------------------------------------------
@@ -1696,7 +1760,17 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     E = timed("lux", LX.illuminance_points, pl.lights, smp.points, occ, pl.schedules)
     E = timed("corners", pl.corners, smp, E, levels)
     E = timed("fill", pl.fill, smp, E, levels)
+    # dlss_lamps_flicker: a fixture under every light on a mount stage 2 does not draw (AG8's
+    # own variants), each light moved onto its fixture's lens; the check on the moved lights
+    from . import fixtures as FX
+    fxs = FX.Fixtures(pl)
+    fx_rep = timed("fixtures", fxs.place)
+    if fxs.moved or fxs.dropped:
+        E = timed("lux.fixtures", LX.illuminance_points, pl.lights, smp.points, occ,
+                  pl.schedules)
     lux = timed("check", LX.check, smp, E, levels)
+    fx_check = timed("fixtures.check", fxs.check)
+    FX.finish(pl.lights)
     lux["corners"] = pl.corner_report
     lux["fill"] = pl.fill_report
     # AT2: the lit faces against their own walls, and what they throw across the street
@@ -1819,7 +1893,7 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
         masks=[PM.Mask(**mk) for mk in we.masks],
         weather_plan=PM.Weather(**we_set),
         checks={"lux": lux, "faces": faces, "air": air_check, "weather": we_check,
-                "far": far_check})
+                "far": far_check, "fixtures": fx_check})
     ptext = json.dumps(json.loads(plan.model_dump_json(by_alias=True, exclude={"schema_ref"})),
                        indent=1, sort_keys=True) + "\n"
     if _write(od / "atmos_plan.json", ptext):
@@ -1839,6 +1913,14 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     ctext = json.dumps(json.loads(contrib.model_dump_json()), indent=1, sort_keys=True) + "\n"
     if _write(od / "unreal_contribution.atmos.json", ctext):
         wrote.append(str(od / "unreal_contribution.atmos.json"))
+    # dlss_lamps_flicker: the fixtures, and their contribution in stage 2's form (AG8's meshes)
+    ftext = dumps({"version": 1, "city": city.name, "fixtures": fxs.out}) + "\n"
+    if _write(od / "fixtures.json", ftext):
+        wrote.append(str(od / "fixtures.json"))
+    fctext = json.dumps(fxs.contribution(city.name, build / "assets"), indent=1,
+                        sort_keys=True) + "\n"
+    if _write(od / "unreal_contribution.fixtures.json", fctext):
+        wrote.append(str(od / "unreal_contribution.fixtures.json"))
     per_tile = sorted((i.count for i in index), reverse=True)
     rep = {"city": city.name, "code": code_hash(), "preset": filled["preset"],
            "counts": plan.counts, "sources": plan.sources, "tiles": len(index),
@@ -1854,7 +1936,8 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
            "air_sources": {k: v for k, v in air.report.items() if k != "skipped"},
            "air_skipped": dict(sorted(air.report["skipped"].items())),
            "ok": lux["ok"] and faces["ok"] and air_check["ok"] and we_check["ok"] and
-           far_check["ok"],
+           far_check["ok"] and fx_check["ok"],
+           "fixtures": {**fx_rep, "check": fx_check},
            "far": far_check,
            "weather": we_check, "weather_counts": we_set["counts"],
            "weather_stats": we_set["stats"],
@@ -1929,6 +2012,20 @@ def report_text(rep: dict) -> str:
     if rep.get("mounts"):
         lines.append("mounted on: " + ", ".join(f"{k} {v}" for k, v in rep["mounts"].items())
                      + f" ({rep.get('asked', 0)} on fixtures asked of stage 2: scope 4.1)")
+    if rep.get("fixtures"):
+        f = rep["fixtures"]
+        ck = f.get("check") or {}
+        mv = f.get("moved_m") or {}
+        lines.append(
+            f"fixtures (AG8's variants under the asked lights): {f.get('fixtures', 0)} "
+            f"({', '.join(f'{k} {v}' for k, v in (f.get('by_kind') or {}).items())}); "
+            f"lights moved onto their lens median {mv.get('median')} m, p95 {mv.get('p95')} "
+            f"m; dropped {sum((f.get('dropped') or {}).values())}; check "
+            f"{'PASS' if ck.get('ok') else 'FAIL'}: {ck.get('unsupported', 0)} lights on "
+            f"nothing, {ck.get('blocked', 0)} fixtures on a carriageway; held by "
+            + ", ".join(f"{k} {v}" for k, v in (ck.get("held_by") or {}).items()))
+        for why, w in (ck.get("why") or {}).items():
+            lines.append(f"  {why}: {w['count']} (first {', '.join(w['first'])})")
     if rep.get("lux"):
         from .lux import check_text
         c = rep["lux"].get("corners") or {}

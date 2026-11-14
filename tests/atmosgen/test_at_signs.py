@@ -313,8 +313,13 @@ def test_flicker_and_dying_signs_by_danger(build):
     core = [L for L in lights if L["id"].startswith("city.prop.sign.d01")]
     assert all(L["on"] for L in strand + core)          # (a sign's light never dark)
     fs = np.mean([L["flicker"] > 0 for L in strand])
-    assert fs > 0.2 and not any(L["flicker"] for L in core)
+    # (dlss_lamps_flicker: ten times fewer than AT2's 0.2 and more: `presets.FLICKER_SCALE`)
+    assert 0.01 < fs < 0.12 and not any(L["flicker"] for L in core)
     assert any(L["flicker"] >= P.DYING_DEPTH[0] for L in strand)
+    # the mood's share is the archetype's times the scale, pulled up by danger
+    hi, lo = S.mood("entertainment_market", 0.3, 0.9), S.mood("entertainment_market", 0.3, 0.1)
+    assert math.isclose(hi["flicker"], round(0.25 * P.FLICKER_SCALE * 1.4, 4))
+    assert hi["flicker"] > lo["flicker"] > 0.0
 
 
 def test_assetgen_face_and_emit_are_used(build):
@@ -343,4 +348,4 @@ def test_high_tier_in_the_plan(plan):
     rep, L = plan
     assert rep["tiers"]["high"] == sum(1 for v in L.values() if v["tier"] == "high")
     assert all(v["kind"] in P.HIGH_KINDS for v in L.values() if v["tier"] == "high")
-    assert rep["code"].startswith("at4.")
+    assert rep["code"] == PL.code_hash() and rep["code"].startswith("at7.")

@@ -71,7 +71,7 @@ def _atmos(lights: bool = True, fog: bool = False, rain: bool = False, wet: bool
            shadowed: int = 16, hour: str = "23", sky: bool = True, air: bool = False,
            tuned: bool = True, cvars: tuple | None = None,
            weather: str | None = None, post: bool = True,
-           far: bool = True) -> tuple[str, ...]:
+           far: bool = True, dlss: bool = False, fg: bool = False) -> tuple[str, ...]:
     """AT3: `hour` a number or the plan's named hour (day, dusk, night); `sky` the sky and
     time (a game with an earlier plugin warns of the unknown command and runs the same).
     AT4: `air` the fog volumes and plumes; `tuned` the plan's engine settings (the
@@ -81,7 +81,10 @@ def _atmos(lights: bool = True, fog: bool = False, rain: bool = False, wet: bool
     state into the next; a game with an earlier plugin warns of the unknown command and runs
     the same). AT6: `post` the look's post (bloom, flares, grain, fringes, the grade, local
     exposure; every pass sets it, so none leaks it into the next). AT7: `far` the far city's
-    cards past the live set (off: the play features' light pools; every pass sets it)."""
+    cards past the live set (off: the play features' light pools; every pass sets it).
+    dlss_lamps_flicker: `dlss` NVIDIA's DLSS Super Resolution (its mode from the pass's
+    screen percentage, `DLSS_PERCENT`), `fg` DLSS Frame Generation (every pass sets both; a
+    game without the plugin warns of the unknown variables and runs the same)."""
     weather = weather or "rain"
     out = (f"CityGenAtmos.Tiers {live} {range_m:g} {shadowed}",
            f"CityGenAtmos.Lights {int(lights)}", f"CityGenAtmos.Fog {int(fog)}",
@@ -93,6 +96,7 @@ def _atmos(lights: bool = True, fog: bool = False, rain: bool = False, wet: bool
            f"CityGenAtmos.Far {int(far)}")
     if cvars is not None:
         out += tuple(f"{k} {v}" for k, v in zip(TUNABLE, cvars))
+    out += (f"r.NGX.DLSS.Enable {int(dlss)}", f"r.Streamline.DLSSG.Enable {int(fg)}")
     return out + (f"CityGenAtmos.Hour {hour}",)
 
 
@@ -103,6 +107,11 @@ def _x(grid: int = 8, z: int = 128, refl: int = 1, lod: float = 1.0, **kw) -> tu
     a.update(kw)
     return _atmos(cvars=(str(grid), str(z), str(refl), f"{lod:g}"), **a)
 
+
+# dlss_lamps_flicker: DLSS Super Resolution's modes by their screen percentage (the plugin picks
+# the mode from it: NVIDIA's ratios, as `GetDLSSModeInformation` gives them at 1440p)
+DLSS_PERCENT = {"q": 66.667, "b": 58.0, "p": 50.0}
+_ALL = dict(fog=True, air=True, rain=True, wet=True)
 
 ATMOS_PASSES = (
     ("night_plan", True, 100.0, _atmos()),
@@ -165,7 +174,12 @@ ATMOS_PASSES = (
     ("x_refl2", True, 100.0, _x(refl=2)),
     ("x_lod2", True, 100.0, _x(lod=2.0)),
     ("x_all", True, 100.0, _x(grid=12, z=96, refl=2)),
-)
+    # dlss_lamps_flicker: the night as delivered with NVIDIA's DLSS (`citygen unreal --dlss`):
+    # Super Resolution at its quality, balanced and performance modes, and Frame Generation
+    # over each (and over native); the output at the benchmark's resolution
+) + tuple((f"night_plan_all_dlss_{m}", True, pct, _atmos(dlss=True, **_ALL))
+          for m, pct in DLSS_PERCENT.items()) +     tuple((f"night_plan_all_dlss_{m}_fg", True, pct, _atmos(dlss=True, fg=True, **_ALL))
+          for m, pct in DLSS_PERCENT.items()) +     (("night_plan_all_fg", True, 100.0, _atmos(fg=True, **_ALL)),)
 
 
 def _life(on: bool = True, shadows: bool = True, rebuild: bool = False,
@@ -487,7 +501,34 @@ def busy() -> list[str]:
             continue
         pid, ppid, name, cmd = parts
         procs[int(pid)] = (int(ppid) if ppid.strip().isdigit() else 0, name, cmd)
-    return _busy(procs, os.getpid())
+    hits = _busy(procs, os.getpid())
+    # (dlss_lamps_flicker: the Epic Games Launcher downloading or installing, an engine or
+    # MetaHuman content, takes the disk and the CPU: busy while it works, idle it is not)
+    if any(n.lower().startswith(DOWNLOADERS) for _, n, _ in procs.values()):
+        hits += downloading()
+    return hits
+
+
+# the Epic Games Launcher (and its helper) count as busy while they take more than
+# DOWNLOAD_CORES of the CPU over DOWNLOAD_S seconds: downloading, verifying or installing
+DOWNLOADERS = ("epicgameslauncher", "epicwebhelper")
+DOWNLOAD_CORES = 0.15
+DOWNLOAD_S = 4.0
+
+
+def downloading() -> list[str]:
+    """The Epic Games Launcher's processes busy downloading or installing (`name pid`): their
+    CPU between two samples `DOWNLOAD_S` apart over `DOWNLOAD_CORES`."""
+    a = cpu_times()
+    time.sleep(DOWNLOAD_S)
+    b = cpu_times()
+    tot, who = 0.0, []
+    for pid, (name, sec) in sorted(b.items()):
+        if name.lower().startswith(DOWNLOADERS) and pid in a and a[pid][0] == name:
+            tot += max(0.0, sec - a[pid][1])
+            who.append(f"{name}.exe {pid}")
+    return [who[0] + f" (downloading: {tot / DOWNLOAD_S:.2f} cores)"] if \
+        who and tot / DOWNLOAD_S > DOWNLOAD_CORES else []
 
 
 def _busy(procs: dict[int, tuple[int, str, str]], me: int) -> list[str]:
@@ -953,6 +994,8 @@ def summarize(rd: Path, rt: dict) -> dict:
         fp = [f for f in frames if int(f["pass"]) == pi]
         entry = {"name": p["name"], "night": p["night"],
                  "screen_percentage": p["screen_percentage"]}
+        if p.get("upscaler"):
+            entry["upscaler"] = p["upscaler"]          # (dlss_lamps_flicker: its state)
         for g in GROUPS:
             ids = {i for i, s in enumerate(segs) if s["group"] == g}
             phase = 3 if g == "teleport" else 2
@@ -992,6 +1035,16 @@ def _group(fs: list[dict], prof: dict | None, pi: int, ids: set) -> dict:
     rm = [f["ram_mb"] for f in fs if f["ram_mb"] >= 0]
     out["vram_mb_max"] = round(max(vr)) if vr else None
     out["ram_mb_max"] = round(max(rm)) if rm else None
+    # (dlss_lamps_flicker: with DLSS Frame Generation the frames shown per second and
+    # presented per rendered frame, Reflex's game to render latency; a run before has none)
+    hz = [f["fg_hz"] for f in fs if f.get("fg_hz", -1.0) > 0.0]
+    if hz:
+        out["fg_hz"] = _stats(hz)
+        out["fg_presented"] = round(sum(f["fg_presented"] for f in fs
+                                        if f.get("fg_hz", -1.0) > 0.0) / len(hz), 2)
+    lat = [f["latency_ms"] for f in fs if f.get("latency_ms", -1.0) > 0.0]
+    if lat:
+        out["latency_ms"] = _stats(lat)
     # the thread that sets the frame at its 95th percentile
     lim = {"game": out["game_ms"]["p95"], "render": out["render_ms"]["p95"],
            "rhi": out["rhi_ms"]["p95"], "gpu": out["gpu_ms"]["p95"]}
@@ -1030,6 +1083,8 @@ def combine(results: list[dict], rt: dict, label: str, resolution) -> dict:
     for i, p in enumerate(first["passes"]):
         ent = {"name": p["name"], "night": p["night"],
                "screen_percentage": p["screen_percentage"]}
+        if p.get("upscaler"):
+            ent["upscaler"] = p["upscaler"]
         for g in GROUPS + ("all",):
             runs = [r["passes"][i][g] for r in results if r["passes"][i][g].get("frames")]
             if not runs:
@@ -1092,6 +1147,15 @@ def _median_of(runs: list[dict]) -> dict:
         v = [r[k] for r in runs if r.get(k) is not None]
         out[k] = round(statistics.median(v), 4) if v else None
     out["bound_by"] = statistics.mode(r["bound_by"] for r in runs)
+    # (dlss_lamps_flicker: Frame Generation's shown frame rate and Reflex's latency)
+    for k in ("fg_hz", "latency_ms"):
+        v = [r[k] for r in runs if r.get(k)]
+        if v:
+            out[k] = {q: round(statistics.median(x[q] for x in v), 2)
+                      for q in ("p50", "p95", "p99", "max", "mean")}
+    fp = [r["fg_presented"] for r in runs if r.get("fg_presented")]
+    if fp:
+        out["fg_presented"] = round(statistics.median(fp), 2)
     gp = [r["gpu_passes_ms"] for r in runs if r.get("gpu_passes_ms")]
     if gp:
         keys = sorted({k for g in gp for k in g})

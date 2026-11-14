@@ -235,3 +235,54 @@ def test_plan_records_its_check(build):
     lux = plan["checks"]["lux"]
     assert lux["ok"] == rep["ok"] and set(lux["classes"]) <= set(LX.CLASSES)
     assert "lux check" in (build / "atmos" / "atmos_report.txt").read_text()
+
+
+def test_fixtures_under_the_asked_lights(build):
+    """dlss_lamps_flicker: every light on a mount stage 2 does not draw (a pole, a mast arm,
+    a wall pack) gets one of AG8's variants under it, the light on its lens; the check fails a
+    light standing on nothing."""
+    from atmosgen import fixtures as FX
+    rep = PL.build_plan(build)
+    od = build / "atmos"
+    L = _lights(build)
+    fx = json.loads((od / "fixtures.json").read_text())["fixtures"]
+    main = {f["light_id"]: f for f in fx if f["role"] == "main"}
+    asked = [v for v in L.values() if v["mount"] in ("pole", "mast_arm", "wall")]
+    assert asked and all(v["id"] in main for v in asked)
+    kit = FX.Kit()
+    for v in asked:
+        f = main[v["id"]]
+        _, kind, st, k = f["node"].split(".")
+        cl = kit.lens(kind, st, int(k[1:]))
+        lx, ly, lz = (sum(c[i] for c in cl) / len(cl) for i in range(3))
+        a = math.radians(f["yaw"])
+        sx, sy, sz = f["scale"]
+        lens = (f["pos"][0] + math.cos(a) * lx * sx - math.sin(a) * ly * sy,
+                f["pos"][1] + math.sin(a) * lx * sx + math.cos(a) * ly * sy,
+                f["pos"][2] + lz * sz)
+        drop = P.PHOTOMETRY[v["cls"]].get("drop_m", 0.0)
+        assert math.dist(lens, (v["pos"][0], v["pos"][1], v["pos"][2] + drop)) < 0.02
+    # the mast arm stands on its signal's foot; the alley's wall packs (its buildings 1.2 m
+    # behind them, at `WALL_REACH_M`) on poles just off it, their arms over to the lights
+    sig = main["d01.prop.traffic_signal.e93s7.light"]
+    assert sig["kind"] == "street_light" and math.dist(sig["pos"][:2], (93.0, -7.0)) < 0.01
+    walls = [main[v["id"]] for v in asked if v["mount"] == "wall"]
+    assert walls and all(f["kind"] in ("wall_light", "street_light") for f in walls)
+    ck = rep["fixtures"]["check"]
+    assert ck["ok"] and ck["unsupported"] == 0 and ck["blocked"] == 0
+    assert json.loads((od / "atmos_plan.json").read_text())["checks"]["fixtures"]["ok"]
+    # the contribution: an entry per 128 m cell, AG8's props part, parts by variant node
+    c = json.loads((od / "unreal_contribution.fixtures.json").read_text())
+    assert c["layer"] == 3 and c["part"] == "props"
+    assert sum(p["count"] for e in c["entries"] for p in e["parts"]) == len(fx)
+    assert all(e["key"].startswith("atmos.fixtures.t") for e in c["entries"])
+    # a light moved off its fixture stands on nothing: the check fails it
+    pl = type("Pl", (), {})()
+    pl.c = PL.City(build)
+    pl.lights = [dict(v) for v in L.values()]
+    f2 = FX.Fixtures(pl)
+    f2.out = fx
+    bad = next(v for v in pl.lights if v["mount"] == "pole")
+    bad["pos"] = [bad["pos"][0] + 3.0, bad["pos"][1], bad["pos"][2]]
+    ck2 = f2.check()
+    assert not ck2["ok"] and ck2["unsupported"] == 1
