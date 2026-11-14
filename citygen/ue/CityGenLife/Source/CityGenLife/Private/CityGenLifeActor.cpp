@@ -392,7 +392,18 @@ void ACityGenLife::SpawnAll()
 	FMassEntityManager& EM = Sub->GetMutableEntityManager();
 	FRandomStream Rng((int32)Hash(City + DistrictId + PlanHash));
 
-	// (people on the region's walkway lanes, each lane's share by its length)
+	// (people on the region's walkway lanes, each lane's share by its length, densest round
+	// the region's middle and thinning out, 1 / (1 + (d / CrowdFalloffM)^2): the budget's
+	// people within 300 m of a view where the benchmark walks)
+	const FZoneGraphStorage& St = *Frame.Storage;
+	const FVector Middle = Ue(Center.X, Center.Y, 0.f);
+	auto Near = [&](const int32 I)
+	{
+		const FZoneLaneData& L = St.Lanes[I];
+		const FVector P = 0.5 * (St.LanePoints[L.PointsBegin] + St.LanePoints[L.PointsEnd - 1]);
+		const double D = FVector::Dist2D(P, Middle) / (100.0 * FMath::Max(1.f, CrowdFalloffM));
+		return float(1.0 / (1.0 + D * D));
+	};
 	TArray<int32> WalkIn;
 	TArray<float> Cum;
 	float Tot = 0.f;
@@ -400,11 +411,29 @@ void ACityGenLife::SpawnAll()
 	{
 		if (InRegion[I])
 		{
-			Tot += Lengths[I];
+			Tot += Lengths[I] * Near(I);
 			WalkIn.Add(I);
 			Cum.Add(Tot);
 		}
 	}
+	TArray<float> CarCum;
+	float CarTot = 0.f;
+	for (const int32 I : CarStarts)
+	{
+		CarTot += Lengths[I] * Near(I);
+		CarCum.Add(CarTot);
+	}
+	auto PickCar = [&]()
+	{
+		const float Pick = Rng.FRand() * CarTot;
+		int32 Lo = 0, Hi = CarCum.Num() - 1;
+		while (Lo < Hi)
+		{
+			const int32 M = (Lo + Hi) / 2;
+			if (CarCum[M] < Pick) { Lo = M + 1; } else { Hi = M; }
+		}
+		return CarStarts[Lo];
+	};
 	const int32 NP = WalkIn.Num() ? FMath::Max(0, People) : 0;
 	WalkPos.SetNumZeroed(NP);
 	WalkYaw.SetNumZeroed(NP);
@@ -459,7 +488,7 @@ void ACityGenLife::SpawnAll()
 			Car.Seed = (uint32)Rng.GetUnsignedInt() | 1u;
 			for (int32 Try = 0; Try < 12; ++Try)
 			{
-				Car.Lane = CarStarts[Rng.RandHelper(CarStarts.Num())];
+				Car.Lane = PickCar();
 				Car.Dist = Rng.FRand() * Lengths[Car.Lane];
 				bool bClear = true;
 				for (const float D : Taken.FindOrAdd(Car.Lane))
@@ -687,11 +716,27 @@ void ACityGenLife::Tick(float DeltaSeconds)
 	TickMs = Ticks ? 0.98 * TickMs + 0.02 * Ms : Ms;
 	TickMsMax = FMath::Max(TickMsMax * 0.999, Ms);
 	++Ticks;
+	// (the state in the log now and then: a session's record of what lifegen did)
+	if (Ticks == 300 || Ticks % 6000 == 0)
+	{
+		UE_LOG(LogTemp, Display, TEXT("CITYGEN_LIFE_STATUS %s"), *GetStatus());
+	}
 }
 
 FString ACityGenLife::GetStatus() const
 {
-	return FString::Printf(TEXT("{\"enabled\":%s,\"built\":%s,\"district\":\"%s\",\"walk_lanes\":%d,\"drive_lanes\":%d,\"car_starts\":%d,\"people\":%d,\"cars\":%d,\"entities\":%d,\"tick_ms\":%.3f,\"tick_ms_max\":%.3f,\"ticks\":%lld}"),
+	// (where the first person and car are, citygen m, how many people are placed, and how
+	// many instances are drawn)
+	const FVector P0 = WalkPos.Num() ? WalkPos[0] / 100.0 : FVector::ZeroVector;
+	const FVector C0 = CarPos.Num() ? CarPos[0] / 100.0 : FVector::ZeroVector;
+	int32 Placed = 0;
+	for (const FVector& P : WalkPos)
+	{
+		Placed += P.IsZero() ? 0 : 1;
+	}
+	return FString::Printf(TEXT("{\"enabled\":%s,\"built\":%s,\"district\":\"%s\",\"walk_lanes\":%d,\"drive_lanes\":%d,\"car_starts\":%d,\"people\":%d,\"cars\":%d,\"entities\":%d,\"placed\":%d,\"bodies\":%d,\"car_parts\":%d,\"person0\":[%.1f,%.1f,%.1f],\"car0\":[%.1f,%.1f,%.1f],\"tick_ms\":%.3f,\"tick_ms_max\":%.3f,\"ticks\":%lld}"),
 		bEnabled ? TEXT("true") : TEXT("false"), bBuilt ? TEXT("true") : TEXT("false"), *DistrictId,
-		WalkLaneCount, DriveLaneCount, CarStarts.Num(), WalkPos.Num(), CarPos.Num(), Entities.Num(), TickMs, TickMsMax, (long long)Ticks);
+		WalkLaneCount, DriveLaneCount, CarStarts.Num(), WalkPos.Num(), CarPos.Num(), Entities.Num(), Placed,
+		Bodies ? Bodies->GetInstanceCount() : -1, CarParts.Num(), P0.X, -P0.Y, P0.Z, C0.X, -C0.Y, C0.Z,
+		TickMs, TickMsMax, (long long)Ticks);
 }

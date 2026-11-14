@@ -310,6 +310,14 @@
      "default": null,
      "title": "Name"
     },
+    "palette": {
+     "description": "The stand-ins' clothes: sRGB colors drawn by the district's style.",
+     "items": {
+      "type": "string"
+     },
+     "title": "Palette",
+     "type": "array"
+    },
     "people": {
      "title": "People",
      "type": "integer"
@@ -352,6 +360,7 @@
     "hour",
     "center",
     "radius_m",
+    "palette",
     "people",
     "cars",
     "models",

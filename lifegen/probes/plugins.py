@@ -8,6 +8,7 @@ experimental, beta or released in an engine, read from their plugin descriptors
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -31,7 +32,7 @@ PIECES = {
     "Chaos Cloth": "ChaosCloth",
     "Chaos Cloth Asset (panel cloth)": "ChaosClothAsset",
     "Chaos Outfit Asset": "ChaosOutfitAsset",
-    "ML Deformer": "MLDeformer",
+    "ML Deformer": "MLDeformerFramework",
     "Chaos Vehicles": "ChaosVehiclesPlugin",
     "MetaHuman Creator (MetaHumanCharacter)": "MetaHumanCharacter",
     "MetaHuman Crowd": "MetaHumanCrowd",
@@ -53,7 +54,8 @@ def status(root: Path) -> list[dict]:
         if p is None:
             out.append({"piece": name, "plugin": stem, "state": "missing", "path": None})
             continue
-        d = json.loads(p.read_text(encoding="utf-8-sig"))
+        # (Unreal's descriptors allow trailing commas)
+        d = json.loads(re.sub(r",(\s*[\]}])", r"\1", p.read_text(encoding="utf-8-sig")))
         state = "experimental" if d.get("IsExperimentalVersion") else \
             "beta" if d.get("IsBetaVersion") else "released"
         out.append({"piece": name, "plugin": stem, "state": state,

@@ -650,19 +650,39 @@ hour, its places and its districts' wealth and danger, it works out who is where
 and doing what, and hands that to Unreal's crowd and traffic simulation through the same
 exporter.
 
-Plan (draft): [`docs/lifegen_scope.md`](docs/lifegen_scope.md). It starts after AG16
-(performance).
+The vehicles are stage 2's hand-designed cars (AG18), driven and parked; the kinds the
+roster lacks (buses, trucks, bikes, flying cars, drones, boats) are designed the same way.
+The people are planned as MetaHumans made by script into your own project, in garments
+generated from sewing patterns.
+
+LG0 (the groundwork) is in: `lifegen plan` works out how many people and vehicles each
+district has at each hour, where people come out and go back in (doors, station stairs,
+garages, taxi stands) and the places they use (benches, bus stops, stalls, kiosks), and
+`citygen unreal` takes it into the level, where lifegen's runtime plugin (`CityGenLife`)
+turns the city's walkways and lanes into Unreal's ZoneGraph lanes and walks plain stand-ins
+and drives a few cars on one district.
+
+<!-- LG0_IMAGES -->
+
+```bash
+.venv/bin/python -m lifegen plan out/vesper_bay                   # BUILD/life: the plan and its checks
+.venv/bin/python -m lifegen plan out/vesper_bay --spec life_spec.json
+.venv/bin/python -m citygen unreal out/vesper_bay MyProject.uproject   # the plan comes along from BUILD/life
+```
+
+Plan: [`docs/lifegen_scope.md`](docs/lifegen_scope.md); what each milestone did:
+[`docs/lifegen_milestones.md`](docs/lifegen_milestones.md).
 
 ### Milestones
 
 | | Milestone | What it adds | Status |
 |---|---|---|---|
-| LG0 | Groundwork | A spec of who lives in each district (wealth, danger, archetype, time of day), the plan's format, the walkway and lane graphs as Unreal crowd and traffic lanes, people walking one district in Unreal as a test | Planned |
+| LG0 | Groundwork | A spec of who lives in each district (wealth, danger, archetype, time of day), the plan's format, the walkway and lane graphs as Unreal crowd and traffic lanes, people walking one district in Unreal as a test | Done |
 | LG1 | People | A generated population: realistic bodies, faces, skin and hair, every person different, walking, waiting, talking and sitting, with cheaper stand-ins for crowds far away | Planned |
 | LG2 | Clothing | Garments generated from sewing patterns and draped on each body, generated fabrics, prints and wear, accessories and cyberware; outfits by district, gang, job, wealth and weather; long coats that move near the view | Planned |
 | LG3 | Crowds on the streets | People walking every sidewalk, crossing at crosswalks with the signals, taking stairs and elevators between levels, in groups and at their own pace, as many as each street has at each hour | Planned |
 | LG4 | Life at places | People at benches, stalls, vending machines and bus stops, queueing at shop doors, going in and out of buildings, bars and clinics by their opening hours; gangs on their turf and police patrols | Planned |
-| LG5 | Traffic | Cars, trucks, buses, taxis and bikes on the lanes, stopping at signals and turning by the rules, parking and leaving, rush hour and night traffic; their lights by night | Planned |
+| LG5 | Traffic | The hand-designed cars, and trucks, buses, taxis and bikes, on the lanes, stopping at signals and turning by the rules, parking and leaving, rush hour and night traffic; their lights by night | Planned |
 | LG6 | Transit | Trains, metro, monorail, maglev and sky tube pods running their lines to timetables, stopping at stations, people boarding and leaving | Planned |
 | LG7 | Air and water | Flying cars on air lanes between towers and landing pads, drones, aircraft and shuttles over the spaceport, helicopters at helipads, boats and ferries on the water | Planned |
 | LG8 | Weather, reactions and release | People and traffic that follow the hour and the weather (umbrellas and shelter in rain, nightlife), step aside for the player and react to what happens near them; a performance pass for crowds and traffic; every sample city alive, checked in Unreal | Planned |

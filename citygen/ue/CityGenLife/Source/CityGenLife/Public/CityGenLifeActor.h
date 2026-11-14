@@ -50,6 +50,9 @@ public:
 	/** The live region: the spike's middle (citygen m) and radius (m). */
 	UPROPERTY(EditAnywhere, Category = "CityGen") FVector2D Center = FVector2D::ZeroVector;
 	UPROPERTY(EditAnywhere, Category = "CityGen") float RadiusM = 450.f;
+	/** People and cars are densest round the middle: a lane's share falls as
+	 *  1 / (1 + (d / CrowdFalloffM)^2) with its distance d (m). */
+	UPROPERTY(EditAnywhere, Category = "CityGen") float CrowdFalloffM = 150.f;
 	UPROPERTY(EditAnywhere, Category = "CityGen") FVector2D WalkSpeed = FVector2D(1.15, 1.55);
 	UPROPERTY(EditAnywhere, Category = "CityGen") FVector2D DriveSpeed = FVector2D(7.0, 11.0);
 	UPROPERTY(EditAnywhere, Category = "CityGen") float CarGapM = 9.f;
