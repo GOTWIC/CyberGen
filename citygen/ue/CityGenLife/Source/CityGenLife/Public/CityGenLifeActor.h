@@ -137,7 +137,7 @@ private:
 	TArray<int32> CarStarts;
 	TArray<FVector> WalkPos, CarPos;
 	TArray<float> WalkYaw, CarYaw, WalkZ, CarZ;
-	TArray<int32> CarModelCount, CarInstance;
+	TArray<int32> CarModelCount, CarInstance, CarOf;
 	TArray<FMassEntityHandle> Entities;
 	TArray<FTransform> Scratch;
 	int32 TraceCursor = 0;

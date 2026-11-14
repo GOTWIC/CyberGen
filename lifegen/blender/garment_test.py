@@ -30,9 +30,11 @@ import bpy
 from mathutils import Vector, geometry
 
 # the outline (x across, y up, meters over the floor); the body is 1.78 m
-OUTLINE = [(-0.27, 0.92), (0.27, 0.92), (0.27, 1.27), (0.46, 1.19), (0.50, 1.35),
-           (0.22, 1.48), (0.085, 1.51), (-0.085, 1.51), (-0.22, 1.48), (-0.50, 1.35),
-           (-0.46, 1.19), (-0.27, 1.27)]
+# (the shoulder seam over the shoulder's top, 1.50 m; the sleeves along the arms, which fall
+# 30 degrees from the shoulder)
+OUTLINE = [(-0.28, 0.92), (0.28, 0.92), (0.28, 1.26), (0.48, 1.16), (0.54, 1.33),
+           (0.23, 1.53), (0.085, 1.56), (-0.085, 1.56), (-0.23, 1.53), (-0.54, 1.33),
+           (-0.48, 1.16), (-0.28, 1.26)]
 # outline edges (by their first point) sewn front to back: sides, underarms, sleeve tops and
 # shoulders; open: the hem (0), the cuffs (3, 9) and the neck (6)
 SEAMS = (1, 2, 4, 5, 7, 8, 10, 11)
@@ -184,7 +186,7 @@ def drape(ob, frames):
     s.bending_stiffness = 0.15
     s.air_damping = 1.0
     s.use_sewing_springs = True
-    s.sewing_force_max = 12.0
+    s.sewing_force_max = 30.0
     s.shrink_min = 0.0
     cs = m.collision_settings
     cs.distance_min = 0.006

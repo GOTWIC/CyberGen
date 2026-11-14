@@ -470,7 +470,13 @@ void ACityGenLife::SpawnAll()
 	}
 
 	// (the cars on the region's lanes, apart by their gap)
-	const int32 NC = CarStarts.Num() ? FMath::Min(FMath::Max(0, Cars), CarModels.Num()) : 0;
+	// (more cars than the plan drew: its models and paints again in turn)
+	const int32 NC = CarStarts.Num() && CarModels.Num() ? FMath::Max(0, Cars) : 0;
+	CarOf.SetNumZeroed(NC);
+	for (int32 K = 0; K < NC; ++K)
+	{
+		CarOf[K] = K % CarModels.Num();
+	}
 	CarPos.SetNumZeroed(NC);
 	CarYaw.SetNumZeroed(NC);
 	CarModelCount.Reset();
@@ -508,7 +514,7 @@ void ACityGenLife::SpawnAll()
 			Taken.FindOrAdd(Car.Lane).Add(Car.Dist);
 			Car.Cruise = 100.f * FMath::Lerp((float)DriveSpeed.X, (float)DriveSpeed.Y, Rng.FRand());
 			Car.Speed = Car.Cruise * 0.5f;
-			Car.Model = FMath::Clamp(CarModels[K], 0, FMath::Max(0, Models - 1));
+			Car.Model = FMath::Clamp(CarModels[CarOf[K]], 0, FMath::Max(0, Models - 1));
 			Car.Index = K;
 			Car.Instance = CarModelCount.IsValidIndex(Car.Model) ? CarModelCount[Car.Model]++ : 0;
 			CarInstance[K] = Car.Instance;
@@ -570,9 +576,9 @@ void ACityGenLife::SpawnAll()
 		Comp->AddInstances(Scratch, false, true, false);
 		for (int32 K = 0; K < NC; ++K)
 		{
-			if (CarModels[K] == M && CarPaints.Num() >= (K + 1) * PaintFloats)
+			if (CarModels[CarOf[K]] == M && CarPaints.Num() >= (CarOf[K] + 1) * PaintFloats)
 			{
-				Comp->SetCustomData(CarInstance[K], MakeArrayView(&CarPaints[K * PaintFloats], PaintFloats), false);
+				Comp->SetCustomData(CarInstance[K], MakeArrayView(&CarPaints[CarOf[K] * PaintFloats], PaintFloats), false);
 			}
 		}
 		Comp->MarkRenderStateDirty();
@@ -717,7 +723,7 @@ void ACityGenLife::UpdateInstances()
 		Scratch.SetNum(CarModelCount.IsValidIndex(M) ? CarModelCount[M] : 0);
 		for (int32 K = 0; K < NC; ++K)
 		{
-			if (CarModels[K] != M || !Scratch.IsValidIndex(CarInstance[K]))
+			if (CarModels[CarOf[K]] != M || !Scratch.IsValidIndex(CarInstance[K]))
 			{
 				continue;
 			}

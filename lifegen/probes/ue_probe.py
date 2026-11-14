@@ -33,6 +33,13 @@ ROOT = "/Game/LG0Probe"
 EAL = unreal.EditorAssetLibrary
 AT = unreal.AssetToolsHelpers.get_asset_tools()
 R = {"steps": [], "api": {}}
+# the CMU skeleton's retarget chains, by the mannequin's chain names
+CMU_CHAINS = (("Spine", "lowerback", "thorax"), ("Neck", "lowerneck", "upperneck"),
+              ("Head", "head", "head"),
+              ("LeftLeg", "lfemur", "lfoot"), ("LeftFoot", "ltoes", "ltoes"),
+              ("RightLeg", "rfemur", "rfoot"), ("RightFoot", "rtoes", "rtoes"),
+              ("LeftClavicle", "lclavicle", "lclavicle"), ("LeftArm", "lhumerus", "lhand"),
+              ("RightClavicle", "rclavicle", "rclavicle"), ("RightArm", "rhumerus", "rhand"))
 
 
 def step(name):
@@ -223,16 +230,45 @@ def _ik_rig(name, mesh):
             done.append(fn)
     chains = [str(c.get_editor_property("chain_name")) for c in ctl.get_retarget_chains()] \
         if hasattr(ctl, "get_retarget_chains") else []
+    if not chains and name == "IK_CMU":
+        # (the auto characterization knows Epic's and common skeletons, not the CMU
+        # database's: its chains set by script, named as the mannequin's so the fuzzy map
+        # pairs them)
+        ctl.set_retarget_root("hip")
+        for ch, a, b in CMU_CHAINS:
+            ctl.add_retarget_chain(ch, a, b, "")
+            done.append(f"chain {ch}")
+        chains = [str(c.get_editor_property("chain_name")) for c in ctl.get_retarget_chains()]
     return rig, {"rig": path, "auto": done, "chains": chains,
                  "root": str(ctl.get_retarget_root()) if hasattr(ctl, "get_retarget_root")
                  else None}
+
+
+def _moves(seq):
+    """How far the retargeted clip's legs and arms turn over its first 15 frames (degrees):
+    a clip retargeted without its chains stands still."""
+    out = {}
+    AL = unreal.AnimationLibrary
+    for bone in ("thigh_l", "thigh_r", "upperarm_l", "calf_l"):
+        try:
+            a = AL.get_bone_pose_for_frame(seq, bone, 0, False).rotation
+            b = AL.get_bone_pose_for_frame(seq, bone, 15, False).rotation
+            out[bone] = round(abs(a.angular_distance(b)) * 57.29578, 2) \
+                if hasattr(a, "angular_distance") else str(b)
+        except Exception as e:                                      # noqa: BLE001
+            out[bone] = f"{type(e).__name__}: {e}"
+    return out
 
 
 @step("retarget.cmu_style")
 def retarget():
     if not FBX or not os.path.isfile(FBX):
         raise RuntimeError("no CMU-style clip (LG0_PROBE_FBX)")
-    got = _import_fbx(FBX, f"{ROOT}/CMU")
+    for d in (f"{ROOT}/CMU", f"{ROOT}/Retarget"):
+        if EAL.does_directory_exist(d):
+            EAL.delete_directory(d)
+    _import_fbx(FBX, f"{ROOT}/CMU")
+    got = [str(p).split(".")[0] for p in EAL.list_assets(f"{ROOT}/CMU", recursive=True)]
     src_mesh = next((unreal.load_asset(p) for p in got
                      if isinstance(unreal.load_asset(p), unreal.SkeletalMesh)), None)
     anims = [p for p in got if isinstance(unreal.load_asset(p), unreal.AnimSequence)]
@@ -275,7 +311,8 @@ def retarget():
     EAL.save_loaded_asset(rtg)
     pairs = [EAL.find_asset_data(a) for a in anims]
     out = unreal.IKRetargetBatchOperation.duplicate_and_retarget(
-        pairs, src_mesh, tgt_mesh, rtg, "", "", "_Manny", "", False, True)
+        pairs, src_mesh, tgt_mesh, rtg, search="", replace="", prefix="", suffix="_Manny",
+        target_path=f"{ROOT}/Retarget/Out")
     made = [str(x.get_editor_property("package_name")) for x in out]
     frames = []
     for p in made:
@@ -284,7 +321,8 @@ def retarget():
             frames.append({"asset": p, "length_s": seq.get_editor_property("sequence_length")
                            if hasattr(seq, "sequence_length") else
                            unreal.AnimationLibrary.get_sequence_length(seq),
-                           "skeleton": seq.get_editor_property("skeleton").get_path_name()})
+                           "skeleton": seq.get_editor_property("skeleton").get_path_name(),
+                           "moves": _moves(seq)})
     EAL.save_directory(ROOT, only_if_is_dirty=True, recursive=True)
     return {"imported": got, "source_rig": src_info, "target_rig": tgt_info,
             "retargeter_steps": steps, "retargeted": frames}

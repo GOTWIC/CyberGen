@@ -99,7 +99,48 @@ no signals yet (LG5) and no avoidance between people (LG3).
 (`unreal/`: the check's free camera views, `--view pday_* / night_*`; the stand-ins are a
 cylinder and a sphere in their district's clothing colors, the cars AG18's packs.)
 
-<!-- SPIKE_BENCH -->
+### What it costs
+
+AG16's benchmark, the lean route (Old Town's walk, the drive, the flight at 150 m), one run,
+`--bench-atmos` with `night_plan_all` (the night as delivered: the plan's lights, fog, air,
+rain, wet streets, post, far city), standalone game at 2560 x 1440 native, on the PC with
+nothing else heavy running (others under 1 core). ms; p95 of the moving frames.
+
+**Before and after** (`bench/before`: the project before the import with the life plan;
+`bench/final`: after it, as delivered):
+
+| `night_plan_all` | p95 all | walk | drive | fly | game p95 (walk) | GPU p95 (walk) | draws p50 (walk) |
+|---|---|---|---|---|---|---|---|
+| before (no life) | 15.1 | 14.9 | 14.9 | 15.5 | 13.8 | 13.5 | 492 |
+| after (2,000 stand-ins, 40 cars) | **16.6** | **16.6** | 15.4 | 17.3 | 16.5 | 14.2 | 1,519 |
+
+Under the 20 ms budget (decision 12.7) everywhere: **+1.5 ms all, +1.7 ms walking among the
+crowd**. Within one game process, the `night_life*` passes (`bench/final`, the same route
+each) part it:
+
+| Pass | p95 all | walk | fly | game p95 (walk) | GPU p95 (walk) | Lumen scene update (walk) |
+|---|---|---|---|---|---|---|
+| `night_life_off` (the spike hidden, not moving) | 15.2 | 15.6 | 15.2 | 15.2 | 13.6 | 0 |
+| `night_life` (as delivered) | 16.8 | 18.1 | 17.0 | 17.7 | 14.3 | 0 |
+| `night_life_noshadow` (no shadows from people and cars) | 16.7 | 18.0 | 17.0 | 17.8 | 13.8 | 0 |
+| `night_life_lumen` (in Lumen's scene, render state rebuilt each frame: the first build) | 23.6 | 25.2 | 18.1 | 21.3 | 23.9 | 8.2 |
+
+(The first import's build, `bench/after` and `bench/tuning`: walk 26.3 ms with every move
+recreating the components' render state, which put the moving instances through Lumen's
+scene update; 19.1 ms without the rebuild but still in Lumen's scene, 1.4 ms of it.)
+
+- **The game thread pays most of it:** about 2.5 ms at the walk's p95 (the controller's own
+  tick, the two Mass processors and the instance updates, is 1.0 to 1.8 ms a frame by its
+  status line; the rest is the engine's instance data and GPU scene upload for 2,000 bodies,
+  2,000 heads and 40 cars' 6 parts each, moved every frame). The walk becomes game-bound.
+- **The GPU pays 0.6 ms** (shadow depths 1.5 to 1.7 ms: the stand-ins' shadows cost
+  0.5 ms), once the people are out of Lumen's scene and their render state is not rebuilt.
+- **What it means for LG3:** 2,000 plain instanced stand-ins within 300 m fit the budget
+  with 3.4 ms to spare walking; real characters cost far more per person (skinning, more
+  draws), so LG1 and LG3 need the LODs of scope 6.1 (full characters only near, cheap
+  instanced or baked ones beyond), and moving far instances less often.
+
+<!-- SPIKE_CARS -->
 
 ## Probes
 

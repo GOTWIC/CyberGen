@@ -1,0 +1,19 @@
+{
+ "panel_vertices": 1141,
+ "vertices": 2282,
+ "triangles": 4266,
+ "seam_pairs": 102,
+ "frames": 150,
+ "res_m": 0.022,
+ "simulate_s": 13.5,
+ "seam_gap_start_m": 0.4,
+ "seam_gap_end_m": {
+  "max": 0.0572,
+  "mean": 0.0092
+ },
+ "lowest_z_m": 0.99,
+ "renders": [
+  "C:\\Users\\swagn\\CityGen\\builds\\lg0\\garment\\garment_front.jpg",
+  "C:\\Users\\swagn\\CityGen\\builds\\lg0\\garment\\garment_34.jpg"
+ ]
+}
