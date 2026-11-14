@@ -1,0 +1,255 @@
+{
+ "$defs": {
+  "Slot": {
+   "additionalProperties": false,
+   "description": "A place slot (scope 6.4): a Smart Object to be (LG4) at a bench, a stop, a stall.",
+   "properties": {
+    "behavior": {
+     "enum": [
+      "sit",
+      "wait",
+      "buy",
+      "queue"
+     ],
+     "title": "Behavior",
+     "type": "string"
+    },
+    "capacity": {
+     "title": "Capacity",
+     "type": "integer"
+    },
+    "district_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "District Id"
+    },
+    "hash": {
+     "title": "Hash",
+     "type": "string"
+    },
+    "id": {
+     "description": "`slot.<owner id>`.",
+     "title": "Id",
+     "type": "string"
+    },
+    "kind": {
+     "enum": [
+      "bench",
+      "bus_stop",
+      "kiosk",
+      "vending",
+      "stall",
+      "taxi_stand"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "owner_id": {
+     "title": "Owner Id",
+     "type": "string"
+    },
+    "pos": {
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 3,
+     "minItems": 3,
+     "title": "Pos",
+     "type": "array"
+    },
+    "tile": {
+     "title": "Tile",
+     "type": "string"
+    },
+    "yaw_deg": {
+     "description": "The way its user faces, degrees counterclockwise from east.",
+     "title": "Yaw Deg",
+     "type": "number"
+    }
+   },
+   "required": [
+    "id",
+    "owner_id",
+    "kind",
+    "behavior",
+    "capacity",
+    "tile",
+    "pos",
+    "yaw_deg",
+    "hash"
+   ],
+   "title": "Slot",
+   "type": "object"
+  },
+  "Spawn": {
+   "additionalProperties": false,
+   "description": "A spawn and sink point (scope 6.3): where people come out and go back in, so a crowd\nis never conjured out of nowhere in view.",
+   "properties": {
+    "district_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "District Id"
+    },
+    "hash": {
+     "title": "Hash",
+     "type": "string"
+    },
+    "id": {
+     "description": "`spawn.<owner id>.<k>` (the owner's k-th entrance).",
+     "title": "Id",
+     "type": "string"
+    },
+    "kind": {
+     "enum": [
+      "door",
+      "station",
+      "garage",
+      "taxi_stand"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "lane_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A garage's or taxi stand's drive lane.",
+     "title": "Lane Id"
+    },
+    "level": {
+     "default": 0,
+     "title": "Level",
+     "type": "integer"
+    },
+    "owner_id": {
+     "description": "A building, station, parking or taxi stand.",
+     "title": "Owner Id",
+     "type": "string"
+    },
+    "pos": {
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 3,
+     "minItems": 3,
+     "title": "Pos",
+     "type": "array"
+    },
+    "rates": {
+     "description": "People a hour coming out (and as many going in).",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 24,
+     "minItems": 24,
+     "title": "Rates",
+     "type": "array"
+    },
+    "sub": {
+     "description": "What the entrance is: main, service, unit, garage, ...",
+     "title": "Sub",
+     "type": "string"
+    },
+    "tile": {
+     "title": "Tile",
+     "type": "string"
+    },
+    "walkway_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The walkway it opens to.",
+     "title": "Walkway Id"
+    }
+   },
+   "required": [
+    "id",
+    "owner_id",
+    "kind",
+    "sub",
+    "tile",
+    "pos",
+    "rates",
+    "hash"
+   ],
+   "title": "Spawn",
+   "type": "object"
+  }
+ },
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": false,
+ "properties": {
+  "bounds": {
+   "items": {
+    "type": "number"
+   },
+   "maxItems": 4,
+   "minItems": 4,
+   "title": "Bounds",
+   "type": "array"
+  },
+  "city": {
+   "title": "City",
+   "type": "string"
+  },
+  "slots": {
+   "items": {
+    "$ref": "#/$defs/Slot"
+   },
+   "title": "Slots",
+   "type": "array"
+  },
+  "spawns": {
+   "items": {
+    "$ref": "#/$defs/Spawn"
+   },
+   "title": "Spawns",
+   "type": "array"
+  },
+  "tile": {
+   "title": "Tile",
+   "type": "string"
+  },
+  "version": {
+   "const": 1,
+   "default": 1,
+   "title": "Version",
+   "type": "integer"
+  }
+ },
+ "required": [
+  "city",
+  "tile",
+  "bounds",
+  "spawns",
+  "slots"
+ ],
+ "title": "lifegen tile spawns",
+ "type": "object"
+}

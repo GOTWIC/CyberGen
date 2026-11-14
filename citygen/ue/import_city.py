@@ -75,6 +75,7 @@ HASH_TAG = "cg.hash"
 # unchanged build applies the change (stored hashes are "<version>.<content hash>")
 MESH_VERSION = "3"
 ACTOR_VERSION = "1"
+LIFE_VERSION = "life1"   # LG0: lifegen's controller (CityGenLife) and its stand-in material
 ATMOS_VERSION = "atmos7"  # the atmos controller's and cells' actors (2, AT2: the high tier,
                           # blinks and sweeps in the packed lights; 3, AT3: the sky and time;
                           # 4, AT4: the air, a cell's fog volumes and emitters; 5, the visible
@@ -1114,6 +1115,32 @@ def light_pool_material():
     MEL.connect_material_property(op, "", MP.MP_OPACITY)
     MEL.recompile_material(m)
     EAL.set_metadata_tag(m, "cg.pool", LIGHT_POOL_VERSION)
+    EAL.save_loaded_asset(m, only_if_is_dirty=False)
+    return m
+
+
+def stand_in_material():
+    """LG0: /Game/CityGen/Core/Life/M_CgLifeStandIn, lifegen's plain stand-ins: the base
+    color from each instance's custom data (0 to 2, its style's color), a cloth's roughness;
+    for instanced static meshes only (no Nanite: the stand-ins move every frame)."""
+    folder = f"{CORE}/Life"
+    path = f"{folder}/M_CgLifeStandIn"
+    m = unreal.load_asset(path) if EAL.does_asset_exist(path) else None
+    if m is not None and meta(m, "cg.life") == LIFE_VERSION:
+        return m
+    if m is None:
+        m = AT.create_asset("M_CgLifeStandIn", folder, unreal.Material,
+                            unreal.MaterialFactoryNew())
+    else:
+        clear_material(m)
+    MP = unreal.MaterialProperty
+    col = expr(m, unreal.MaterialExpressionPerInstanceCustomData3Vector, -500, 0, data_index=0)
+    rough = expr(m, unreal.MaterialExpressionConstant, -500, 200, r=0.72)
+    MEL.connect_material_property(col, "", MP.MP_BASE_COLOR)
+    MEL.connect_material_property(rough, "", MP.MP_ROUGHNESS)
+    m.set_editor_property("used_with_instanced_static_meshes", True)
+    MEL.recompile_material(m)
+    EAL.set_metadata_tag(m, "cg.life", LIFE_VERSION)
     EAL.save_loaded_asset(m, only_if_is_dirty=False)
     return m
 
@@ -3294,6 +3321,7 @@ class Importer:
         n += int(self.plays())           # (the play features' actor)
         if self.atmos_ok():
             n += 1 + len(self.man["atmos"]["cells"])     # (AT1: the controller, its cells)
+        n += int(self.life_ok())                         # (LG0: lifegen's controller)
         n += len((self.man.get("vehicles") or {}).get("placements", []))     # (AG18)
         return n + 1 + 3                 # (the sun, the sky light, the atmosphere)
 
@@ -3309,6 +3337,12 @@ class Importer:
         return bool((self.man.get("atmos") or {}).get("cells")) and \
             JOB.get("atmos", True) and getattr(unreal, "CityGenAtmos", None) is not None and \
             getattr(unreal, "CityGenAtmosCell", None) is not None
+
+    def life_ok(self):
+        """Whether the import makes lifegen's controller (LG0): the manifest has a delivered
+        plan, the job wants it and the CityGenLife plugin's class is there."""
+        return bool((self.man.get("life") or {}).get("key")) and JOB.get("life", True) and \
+            getattr(unreal, "CityGenLife", None) is not None
 
     def place(self, have, key, h, cls, make, update, folder, version=ACTOR_VERSION):
         """The actor of `key`: unchanged when its hash matches, else updated in place, else
@@ -3409,6 +3443,8 @@ class Importer:
             out[self.man["atmos"]["key"]] = "CityGenAtmos"
             for c in self.man["atmos"]["cells"]:
                 out[c["key"]] = "CityGenAtmosCell"
+        if self.life_ok():
+            out[self.man["life"]["key"]] = "CityGenLife"
         if self.s2:
             for u in self.s2.get("underwater", []):
                 out[u["key"]] = "PostProcessVolume"
@@ -3489,6 +3525,7 @@ class Importer:
         self.lighting(have)
         self.play_features(have)
         self.atmos_controller(have)
+        self.life_controller(have)
         REPORT.update(self.placed, self.to_place, force=True)
         self.live = []
         self.reload()
@@ -4258,6 +4295,77 @@ class Importer:
         self.place(have, info["key"], info["hash"], cls.static_class(), make, update,
                    "CityGen/Atmos", version=ATMOS_VERSION)
         self.stats.setdefault("atmos", {})["controller"] = True
+
+    # -- lifegen (LG0: the CityGenLife plugin's controller with the plan's spike) --
+
+    def life_controller(self, have):
+        """lifegen's controller (CityGenLife), always loaded, with the plan's spike
+        (`citygen/unreal_life.py`): one district's walkway and drive lanes (the runtime makes
+        them ZoneGraph lanes), how many people and cars, the stand-ins' meshes, material and
+        palette, AG18's car part meshes (imported with the city's parked cars), their pivots,
+        each car's model and paint."""
+        if not self.life_ok():
+            info = self.man.get("life") or {}
+            self.stats["life"] = {
+                "made": False, "reason": info.get("skipped") or (
+                    "no CityGenLife class (the plugin is not built)" if info.get("key")
+                    else "the manifest has no life plan")}
+            return
+        cls = unreal.CityGenLife
+        info = self.man["life"]
+        d = json.load(open(os.path.join(self.build, info["file"]), encoding="utf-8"))["controller"]
+        mat = stand_in_material()
+        body = unreal.load_asset("/Engine/BasicShapes/Cylinder")
+        head = unreal.load_asset("/Engine/BasicShapes/Sphere")
+        meshes, missing = [], []
+        for prt in d["parts"]:
+            sm = unreal.load_asset(prt["mesh"]) if EAL.does_asset_exist(prt["mesh"]) else None
+            if sm is None:
+                missing.append(prt["mesh"])
+            meshes.append(sm)
+
+        def make():
+            return self.eas.spawn_actor_from_class(cls, unreal.Vector(0.0, 0.0, 0.0))
+
+        def update(a, hv):
+            a.set_editor_property("is_spatially_loaded", False)
+            fl = lambda k: [float(v) for v in d[k]]      # noqa: E731
+            it = lambda k: [int(v) for v in d[k]]        # noqa: E731
+            for k, v in (("city", d["city"]), ("plan_hash", d["plan_hash"]),
+                         ("district_id", d["district"]), ("people", int(d["people"])),
+                         ("cars", int(d["cars"])),
+                         ("center", unreal.Vector2D(*[float(x) for x in d["center"]])),
+                         ("radius_m", float(d["radius_m"])),
+                         ("walk_speed", unreal.Vector2D(*[float(x) for x in d["walk_speed"]])),
+                         ("drive_speed", unreal.Vector2D(*[float(x) for x in d["drive_speed"]])),
+                         ("car_gap_m", float(d["car_gap_m"])),
+                         ("walk_points", fl("walk_points")), ("walk_starts", it("walk_starts")),
+                         ("walk_widths", fl("walk_widths")), ("walk_links", it("walk_links")),
+                         ("walk_link_starts", it("walk_link_starts")),
+                         ("drive_points", fl("drive_points")),
+                         ("drive_starts", it("drive_starts")),
+                         ("drive_widths", fl("drive_widths")),
+                         ("drive_links", it("drive_links")),
+                         ("drive_link_starts", it("drive_link_starts")),
+                         ("drive_startable", it("drive_startable")),
+                         ("body_mesh", body), ("head_mesh", head), ("stand_in_material", mat),
+                         ("palette", fl("palette")),
+                         ("car_part_meshes", meshes),
+                         ("car_part_models", [int(x["model"]) for x in d["parts"]]),
+                         ("car_part_pivots", [float(v) for x in d["parts"] for v in x["pivot"]]),
+                         ("car_part_shadows", [1 if x.get("shadow", True) else 0
+                                               for x in d["parts"]]),
+                         ("car_models", it("car_models")), ("car_paints", fl("car_paints")),
+                         ("paint_floats", int(d["paint_floats"]))):
+                a.set_editor_property(k, v)
+            a.tags = self.tags(info["key"], hv, [], "life", "life", "", d["district"])
+
+        self.place(have, info["key"], info["hash"], cls.static_class(), make, update,
+                   "CityGen/Life", version=LIFE_VERSION)
+        self.stats["life"] = {"made": True, "district": d["district"], "people": d["people"],
+                              "cars": d["cars"], "walk_lanes": len(d["walk_starts"]) - 1,
+                              "drive_lanes": len(d["drive_starts"]) - 1,
+                              "models": d["models"], "missing_meshes": missing}
 
     # -- what Play puts you in, and how far the level streams around you --
 

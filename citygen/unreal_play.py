@@ -40,7 +40,7 @@ PLUGIN = "CityGenPlay"
 PLUGIN_DIR = Path(__file__).parent / "ue" / PLUGIN
 # AT0: atmosgen's runtime (citygen/ue/CityGenAtmos) is built into the project beside the play
 # features, in the same UnrealBuildTool run (one stamp for both)
-PLUGINS = (PLUGIN, "CityGenAtmos")
+PLUGINS = (PLUGIN, "CityGenAtmos", "CityGenLife")
 BUILT_STAMP = ".citygen_built"                     # the source hash the binaries were built from
 
 # the map's palette (sRGB): a night map, so the player arrow and labels stand out

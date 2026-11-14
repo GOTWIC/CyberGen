@@ -1,0 +1,24 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1",
+	"FriendlyName": "CityGen Life",
+	"Description": "lifegen's runtime (CyberGen stage 4): people and traffic on a city's own walkway and lane graphs, as ZoneGraph lanes, moved by Mass processors. LG0: plain stand-ins and a few of AG18's cars on one district.",
+	"Category": "CityGen",
+	"CreatedBy": "CyberGen",
+	"CanContainContent": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "CityGenLife",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "ZoneGraph",
+			"Enabled": true
+		}
+	]
+}

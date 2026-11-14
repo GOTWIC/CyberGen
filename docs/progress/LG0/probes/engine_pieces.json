@@ -1,0 +1,176 @@
+[
+ {
+  "piece": "Mass Entity",
+  "plugin": null,
+  "state": "engine module",
+  "path": "C:\\Games\\UE_5.8\\Engine\\Source\\Runtime\\MassEntity"
+ },
+ {
+  "piece": "Mass Gameplay (MassSimulation, MassSpawner, MassRepresentation, MassLOD)",
+  "plugin": "MassGameplay",
+  "state": "experimental",
+  "path": "Engine\\Plugins\\Runtime\\MassGameplay\\MassGameplay.uplugin",
+  "version": "0.4"
+ },
+ {
+  "piece": "Mass AI",
+  "plugin": "MassAI",
+  "state": "experimental",
+  "path": "Engine\\Plugins\\AI\\MassAI\\MassAI.uplugin",
+  "version": "0.4"
+ },
+ {
+  "piece": "Mass Crowd",
+  "plugin": "MassCrowd",
+  "state": "experimental",
+  "path": "Engine\\Plugins\\AI\\MassCrowd\\MassCrowd.uplugin",
+  "version": "0.4"
+ },
+ {
+  "piece": "ZoneGraph",
+  "plugin": "ZoneGraph",
+  "state": "experimental",
+  "path": "Engine\\Plugins\\Runtime\\ZoneGraph\\ZoneGraph.uplugin",
+  "version": "0.5"
+ },
+ {
+  "piece": "ZoneGraph Annotations",
+  "plugin": "ZoneGraphAnnotations",
+  "state": "experimental",
+  "path": "Engine\\Plugins\\Runtime\\ZoneGraphAnnotations\\ZoneGraphAnnotations.uplugin",
+  "version": "0.5"
+ },
+ {
+  "piece": "Smart Objects",
+  "plugin": "SmartObjects",
+  "state": "released",
+  "path": "Engine\\Plugins\\Runtime\\SmartObjects\\SmartObjects.uplugin",
+  "version": "0.1"
+ },
+ {
+  "piece": "Gameplay Behaviors (Smart Objects)",
+  "plugin": "GameplayBehaviorSmartObjects",
+  "state": "experimental",
+  "path": "Engine\\Plugins\\Runtime\\GameplayBehaviorSmartObjects\\GameplayBehaviorSmartObjects.uplugin",
+  "version": "1.0"
+ },
+ {
+  "piece": "StateTree",
+  "plugin": "StateTree",
+  "state": "released",
+  "path": "Engine\\Plugins\\Runtime\\StateTree\\StateTree.uplugin",
+  "version": "0.1"
+ },
+ {
+  "piece": "Gameplay StateTree",
+  "plugin": "GameplayStateTree",
+  "state": "released",
+  "path": "Engine\\Plugins\\Runtime\\GameplayStateTree\\GameplayStateTree.uplugin",
+  "version": "1.0"
+ },
+ {
+  "piece": "Motion Matching (Pose Search)",
+  "plugin": "PoseSearch",
+  "state": "released",
+  "path": "Engine\\Plugins\\Animation\\PoseSearch\\PoseSearch.uplugin",
+  "version": "1.0"
+ },
+ {
+  "piece": "Chooser",
+  "plugin": "Chooser",
+  "state": "released",
+  "path": "Engine\\Plugins\\Chooser\\Chooser.uplugin",
+  "version": "1.0"
+ },
+ {
+  "piece": "Motion Warping",
+  "plugin": "MotionWarping",
+  "state": "beta",
+  "path": "Engine\\Plugins\\Animation\\MotionWarping\\MotionWarping.uplugin",
+  "version": "0.1"
+ },
+ {
+  "piece": "IK Rig and retargeting",
+  "plugin": "IKRig",
+  "state": "released",
+  "path": "Engine\\Plugins\\Animation\\IKRig\\IKRig.uplugin",
+  "version": "1.0"
+ },
+ {
+  "piece": "AnimToTexture",
+  "plugin": "AnimToTexture",
+  "state": "experimental",
+  "path": "Engine\\Plugins\\Experimental\\AnimToTexture\\AnimToTexture.uplugin",
+  "version": "2.1"
+ },
+ {
+  "piece": "Mutable",
+  "plugin": "Mutable",
+  "state": "beta",
+  "path": "Engine\\Plugins\\Mutable\\Mutable.uplugin",
+  "version": "1.8.0"
+ },
+ {
+  "piece": "Chaos Cloth",
+  "plugin": "ChaosCloth",
+  "state": "released",
+  "path": "Engine\\Plugins\\ChaosCloth\\ChaosCloth.uplugin",
+  "version": "1.0"
+ },
+ {
+  "piece": "Chaos Cloth Asset (panel cloth)",
+  "plugin": "ChaosClothAsset",
+  "state": "released",
+  "path": "Engine\\Plugins\\ChaosClothAsset\\ChaosClothAsset.uplugin",
+  "version": "0.1"
+ },
+ {
+  "piece": "Chaos Outfit Asset",
+  "plugin": "ChaosOutfitAsset",
+  "state": "beta",
+  "path": "Engine\\Plugins\\ChaosOutfitAsset\\ChaosOutfitAsset.uplugin",
+  "version": "0.1"
+ },
+ {
+  "piece": "ML Deformer",
+  "plugin": "MLDeformerFramework",
+  "state": "released",
+  "path": "Engine\\Plugins\\Animation\\MLDeformer\\MLDeformerFramework\\MLDeformerFramework.uplugin",
+  "version": "1.0"
+ },
+ {
+  "piece": "Chaos Vehicles",
+  "plugin": "ChaosVehiclesPlugin",
+  "state": "experimental",
+  "path": "Engine\\Plugins\\Experimental\\ChaosVehiclesPlugin\\ChaosVehiclesPlugin.uplugin",
+  "version": "1.0"
+ },
+ {
+  "piece": "MetaHuman Creator (MetaHumanCharacter)",
+  "plugin": "MetaHumanCharacter",
+  "state": "beta",
+  "path": "Engine\\Plugins\\MetaHuman\\MetaHumanCharacter\\MetaHumanCharacter.uplugin",
+  "version": "1.0.0"
+ },
+ {
+  "piece": "MetaHuman Crowd",
+  "plugin": "MetaHumanCrowd",
+  "state": "experimental",
+  "path": "Engine\\Plugins\\MetaHuman\\MetaHumanCrowd\\MetaHumanCrowd.uplugin",
+  "version": "1.0.0"
+ },
+ {
+  "piece": "MetaHuman SDK",
+  "plugin": "MetaHumanSDK",
+  "state": "released",
+  "path": "Engine\\Plugins\\MetaHuman\\MetaHumanSDK\\MetaHumanSDK.uplugin",
+  "version": "1.0"
+ },
+ {
+  "piece": "MetaHuman Generator (toolset)",
+  "plugin": "MetaHumanGenerator",
+  "state": "experimental",
+  "path": "Engine\\Plugins\\Experimental\\Toolsets\\MetaHumanGenerator\\MetaHumanGenerator.uplugin",
+  "version": "1.0"
+ }
+]

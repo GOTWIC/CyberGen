@@ -166,6 +166,30 @@ ATMOS_PASSES = (
     ("x_lod2", True, 100.0, _x(lod=2.0)),
     ("x_all", True, 100.0, _x(grid=12, z=96, refl=2)),
 )
+
+
+def _life(on: bool = True, shadows: bool = True, rebuild: bool = False,
+          lumen: bool = False) -> tuple[str, ...]:
+    """LG0: lifegen's spike (the level's CityGenLife controller) over the night as delivered:
+    on or off, the stand-ins' and cars' shadows, each frame's move recreating the instanced
+    components' render state, the people and cars in Lumen's scene (every pass sets all
+    four, so none leaks into the next; a game without the plugin warns of the unknown
+    commands and runs the same)."""
+    # (before the atmos commands, whose hour is the pass's last)
+    return (f"CityGenLife.Enable {int(on)}", f"CityGenLife.Shadows {int(shadows)}",
+            f"CityGenLife.Rebuild {int(rebuild)}", f"CityGenLife.Lumen {int(lumen)}") + \
+        _atmos(fog=True, air=True, rain=True, wet=True)
+
+
+# LG0: the spike's passes (with --bench-atmos): what the people and cars cost, by part
+LIFE_PASSES = (
+    ("night_life_off", True, 100.0, _life(on=False)),
+    ("night_life_lumen", True, 100.0, _life(rebuild=True, lumen=True)),
+    ("night_life_rebuild", True, 100.0, _life(rebuild=True)),
+    ("night_life", True, 100.0, _life()),
+    ("night_life_noshadow", True, 100.0, _life(shadows=False)),
+)
+ATMOS_PASSES = ATMOS_PASSES + LIFE_PASSES
 # what a game with hardware ray tracing needs at startup (MegaLights traces its shadows; UE
 # 5.8 marks MegaLights experimental), in the game's -ini override of the project's settings
 RT_INI = ("[/Script/Engine.RendererSettings]:r.RayTracing=True,"

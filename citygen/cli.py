@@ -286,7 +286,8 @@ def cmd_unreal(args: argparse.Namespace) -> int:
     if args.manifest_only:
         path = U.write_manifest(build, args.name, not args.blockout_only, not args.no_play,
                                 atmos=False if args.no_atmos else args.atmos,
-                                vehicles=args.vehicles, all_vehicles=args.all_vehicles)
+                                vehicles=args.vehicles, all_vehicles=args.all_vehicles,
+                                life=False if args.no_life else args.life)
         print(f"wrote {path}")
         return EXIT_OK
     if args.uproject and args.new_project and not Path(args.uproject).is_file():
@@ -309,7 +310,8 @@ def cmd_unreal(args: argparse.Namespace) -> int:
                             startup=not args.no_startup, view_m=args.view_range,
                             play_features=not args.no_play,
                             atmos=False if args.no_atmos else args.atmos,
-                            vehicles=args.vehicles, all_vehicles=args.all_vehicles) \
+                            vehicles=args.vehicles, all_vehicles=args.all_vehicles,
+                            life=False if args.no_life else args.life) \
             if not (args.check_only or args.bench_only) else None
         if res is not None:
             print(U.import_summary(res))
@@ -319,6 +321,7 @@ def cmd_unreal(args: argparse.Namespace) -> int:
             print(U.play_summary(res))
             print(U.play_features_summary(res))
             print(U.atmos_summary(res))
+            print(U.life_summary(res))
         if not args.no_hlod and res is not None:
             hl = U.build_hlods(build, args.uproject, engine=args.engine, timeout=args.timeout)
             print(U.hlod_summary(hl))
@@ -692,6 +695,14 @@ def build_parser() -> argparse.ArgumentParser:
                          "left out)")
     ue.add_argument("--no-atmos", action="store_true",
                     help="leave out the atmos plan (its actors from an earlier import go)")
+    ue.add_argument("--life", metavar="PLAN_DIR",
+                    help="LG0: the city's life plan (lifegen plan's output; default BUILD/life "
+                         "when it has one): lifegen's controller with the plan's spike (plain "
+                         "stand-ins on one district's walkways, a few of AG18's cars on its "
+                         "lanes, as ZoneGraph lanes moved by Mass); a plan whose checks failed "
+                         "is left out")
+    ue.add_argument("--no-life", action="store_true",
+                    help="leave out the life plan (its controller from an earlier import goes)")
     ue.add_argument("--vehicles", metavar="LIBRARY_DIR",
                     help="AG18: the vehicle library (game packs, vehicles/GAME.md) that the "
                          "contributions' vehicle placements draw on (default "

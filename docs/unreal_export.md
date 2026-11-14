@@ -368,7 +368,7 @@ high resolution shot), and showing the lane and walkway graphs over the city for
 | 1 citygen | the blockout, props and plants, graphs, player start, a default sun and sky (M15); terrain: the ground per tile, walls, bores, terrain viaducts and columns by id (M13); decks: the slab, deck streets and the buildings on them tagged with their level, the manifest's decks, levels in the graphs (M14); water and ground: swim volumes per water body and tile, water at its surface, beds, banks by kind and the ground cover by kind with a material each (M16) |
 | 2 assetgen | buildings replacing their blockout boxes by id (own pivots, parts as instances, simple collision), textured master materials with per-actor parameters, street meshes replacing the joined pieces, prop and plant variants, signs, LODs for the pieces Nanite does not take, HLOD and Lumen settings (per milestone: `docs/assetgen_scope.md` section 14) |
 | 3 atmosgen | lights (street and wall lights, shopfronts, signs as lit faces, floods), sky, time, weather, fog and post volumes, replacing M15's default sun and sky; rendered by its runtime plugin `CityGenAtmos` (AT0: the plugin's skeleton, its assets, the plan's contribution format; "atmosgen's runtime (AT0)" below) |
-| 4 lifegen | traffic, crowd and transit systems on the graphs, spawners |
+| 4 lifegen | people, traffic, transit, air and water on the graphs, spawners, place slots; moved by its runtime plugin `CityGenLife` (LG0: the plugin's skeleton, ZoneGraph lanes from the graphs, the spike's stand-ins and cars; "lifegen's runtime (LG0)" below) |
 | 5 storygen | story actors, triggers, sequences |
 
 ## assetgen's contribution (AG0)
@@ -2226,6 +2226,71 @@ script about its pivot; with `--shots`, by day and by night, each car from its p
 camera (the proof's), one car at each LOD forced, the wheel turned, the hulls in place of a
 body, and the line-up of the AG18 check where the build has one. Results and shots:
 `docs/progress/AG18/unreal/`.
+
+## lifegen's runtime (LG0)
+
+Stage 4's plan (`lifegen plan BUILD`, `BUILD/life/`, or `citygen unreal --life DIR`) is layer 4
+of the manifest, its `life`: one actor, the `CityGenLife` controller (key `life`, class
+`CityGenLife`, always loaded, folder `CityGen/Life`), placed by the import with the plan's
+spike packed in `BUILD/unreal/life.json` (`citygen/unreal_life.py`). A plan whose checks
+failed is named (`life.skipped`) and left out; `--no-life` leaves it out (its actor from an
+earlier import goes); a build without a plan gets no section and exports as before.
+
+**The plugin** (`citygen/ue/CityGenLife`, C++, built by UnrealBuildTool in the same run as
+`CityGenPlay` and `CityGenAtmos`: `unreal_play.PLUGINS`, one stamp for the three; it enables
+the engine's ZoneGraph plugin and uses the engine's Mass modules, so the project needs no
+MassGameplay plugin). At BeginPlay the controller:
+
+- builds **ZoneGraph lanes from the city's graphs**: an `AZoneGraphData` of its own
+  (transient, registered with the world's ZoneGraph subsystem) whose storage it fills from
+  the packed lanes, one zone and one lane per walkway (tag bit 1, walked both ways: a link is
+  Outgoing where the other walkway meets this one's end, Incoming at its start) and per lane
+  or junction connector of the lane graph (tag bit 2, directed: successors Outgoing,
+  predecessors Incoming), points, tangents, up vectors, progressions and the zones' BV-tree
+  (built in the plugin: `FZoneGraphBVTree::Build` is not exported from the module in 5.8). No
+  hand-drawn shapes;
+- makes the spike's **people and cars Mass entities** of the world's entity manager (one
+  fragment each, `FCgLifeWalker`, `FCgLifeCar`) and runs two dynamic Mass processors every
+  tick (`UCityGenLifeWalkProcessor`: along a walkway lane at the person's pace and side,
+  onto a linked walkway at its end, back at a dead end or the live region's edge;
+  `UCityGenLifeDriveProcessor`: along the lane graph at a cruise speed, slowing behind the car
+  ahead on its lane and its next one, a car meeting the region's edge or a dead end started
+  again on a lane of the region);
+- draws them as **instanced static meshes** updated every frame: the stand-ins a body and a
+  head (`/Engine/BasicShapes` cylinder and sphere) in `/Game/CityGen/Core/Life/M_CgLifeStandIn`
+  (base color from per-instance custom data: the person's style's color, a skin tone), the
+  cars every part of AG18's packs already in the project (`/Game/CityGen/Vehicles/<car>/
+  SM_<car>_<part>`, the parked cars' meshes and materials, paint in nine floats of
+  per-instance custom data as the parked cars', glass and wheels casting no shadow);
+- finds the ground under 96 entities a frame (a line trace each, round robin: curbs, decks
+  and terrain);
+- keeps its instanced people and cars **out of Lumen's scene and the distance fields**
+  (`bInLumen` false: they take Lumen's light but give none back, as characters in games) and
+  moves them through the components' instance data without recreating their render state
+  each frame (`bRebuildRenderState` false). The spike measured both: recreating the render
+  state every frame put the moving instances through Lumen's scene update, 9 ms of GPU a
+  frame walking among them (`docs/progress/LG0/README.md`).
+
+Every reference (meshes, material) is a property of the actor, so a cook takes them.
+
+| Property (set by the import) | What |
+|---|---|
+| `City`, `PlanHash`, `DistrictId` | the plan |
+| `People`, `Cars`, `Center`, `RadiusM` | the spike's counts, its middle (citygen m) and live radius |
+| `WalkSpeed`, `DriveSpeed`, `CarGapM` | m/s ranges, the gap kept behind a car |
+| `WalkPoints`, `WalkStarts`, `WalkWidths`, `WalkLinks`, `WalkLinkStarts` | the walkway lanes (flat, citygen m; a link `2 * lane + 1` at this lane's end) |
+| `DrivePoints`, `DriveStarts`, `DriveWidths`, `DriveLinks`, `DriveLinkStarts`, `DriveStartable` | the drive lanes, successors, which a car may start on |
+| `BodyMesh`, `HeadMesh`, `StandInMaterial`, `Palette` | the stand-ins |
+| `CarPartMeshes`, `CarPartModels`, `CarPartPivots`, `CarPartShadows`, `CarModels`, `CarPaints`, `PaintFloats` | the cars |
+
+Console commands: `CityGenLife.Enable [0|1]`, `CityGenLife.Shadows [0|1]`,
+`CityGenLife.Lumen [0|1]`, `CityGenLife.Rebuild [0|1]`, `CityGenLife.Respawn PEOPLE CARS`,
+`CityGenLife.Status` (one JSON line, `CITYGEN_LIFE_STATUS`, also logged at the 300th tick and
+every 6,000th: lanes, entities, people placed, instances drawn, the first person's and car's
+places, the actor's game thread time per frame, mean and most). The benchmark's `night_life*`
+passes (`bench.LIFE_PASSES`, with `--bench-atmos`) switch them over the night as delivered. The import's summary line says what it placed
+(`Life (stage 4): ...`) and `import_result.json`'s `life` the lanes, models and any car mesh
+missing from the project. LG0's spike and its cost: `docs/progress/LG0/README.md`.
 
 ## Milestones and checks
 

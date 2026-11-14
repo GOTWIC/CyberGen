@@ -1,0 +1,515 @@
+{
+ "$defs": {
+  "Ask": {
+   "additionalProperties": false,
+   "description": "An ask of another stage (scope 4.1): what lifegen needs that the model does not record\nyet, and what the plan derives meanwhile.",
+   "properties": {
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "meanwhile": {
+     "title": "Meanwhile",
+     "type": "string"
+    },
+    "needed_by": {
+     "description": "The milestone that first needs it.",
+     "title": "Needed By",
+     "type": "string"
+    },
+    "of": {
+     "enum": [
+      "citygen",
+      "assetgen"
+     ],
+     "title": "Of",
+     "type": "string"
+    },
+    "record": {
+     "additionalProperties": true,
+     "description": "The record asked for: field -> meaning.",
+     "title": "Record",
+     "type": "object"
+    },
+    "status": {
+     "enum": [
+      "missing",
+      "derived",
+      "met"
+     ],
+     "title": "Status",
+     "type": "string"
+    },
+    "what": {
+     "title": "What",
+     "type": "string"
+    }
+   },
+   "required": [
+    "id",
+    "of",
+    "what",
+    "record",
+    "status",
+    "meanwhile",
+    "needed_by"
+   ],
+   "title": "Ask",
+   "type": "object"
+  },
+  "Check": {
+   "additionalProperties": false,
+   "properties": {
+    "detail": {
+     "title": "Detail",
+     "type": "string"
+    },
+    "ok": {
+     "title": "Ok",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "ok",
+    "detail"
+   ],
+   "title": "Check",
+   "type": "object"
+  },
+  "DistrictLife": {
+   "additionalProperties": false,
+   "description": "A district's people and vehicles by hour, from M11's densities and its filled spec.",
+   "properties": {
+    "archetype": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Archetype"
+    },
+    "busy": {
+     "title": "Busy",
+     "type": "number"
+    },
+    "danger": {
+     "title": "Danger",
+     "type": "number"
+    },
+    "fleet": {
+     "additionalProperties": {
+      "type": "number"
+     },
+     "description": "AG18's models by weight (decision 6).",
+     "title": "Fleet",
+     "type": "object"
+    },
+    "gangs": {
+     "description": "A value per hour, 0 to 23.",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 24,
+     "minItems": 24,
+     "title": "Gangs",
+     "type": "array"
+    },
+    "hash": {
+     "title": "Hash",
+     "type": "string"
+    },
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "mix": {
+     "additionalProperties": {
+      "type": "number"
+     },
+     "title": "Mix",
+     "type": "object"
+    },
+    "name": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Name"
+    },
+    "people": {
+     "description": "People on its streets at each hour.",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 24,
+     "minItems": 24,
+     "title": "People",
+     "type": "array"
+    },
+    "police": {
+     "description": "A value per hour, 0 to 23.",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 24,
+     "minItems": 24,
+     "title": "Police",
+     "type": "array"
+    },
+    "shape": {
+     "description": "A value per hour, 0 to 23.",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 24,
+     "minItems": 24,
+     "title": "Shape",
+     "type": "array"
+    },
+    "slots": {
+     "title": "Slots",
+     "type": "integer"
+    },
+    "spawns": {
+     "title": "Spawns",
+     "type": "integer"
+    },
+    "street_m": {
+     "description": "Length of its road segments with a density row.",
+     "title": "Street M",
+     "type": "number"
+    },
+    "style": {
+     "additionalProperties": true,
+     "title": "Style",
+     "type": "object"
+    },
+    "vehicles": {
+     "description": "Vehicles on its roads at each hour.",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 24,
+     "minItems": 24,
+     "title": "Vehicles",
+     "type": "array"
+    },
+    "wealth": {
+     "title": "Wealth",
+     "type": "number"
+    }
+   },
+   "required": [
+    "id",
+    "wealth",
+    "danger",
+    "busy",
+    "mix",
+    "shape",
+    "style",
+    "fleet",
+    "street_m",
+    "people",
+    "vehicles",
+    "gangs",
+    "police",
+    "spawns",
+    "slots",
+    "hash"
+   ],
+   "title": "DistrictLife",
+   "type": "object"
+  },
+  "SpikeCar": {
+   "additionalProperties": false,
+   "properties": {
+    "model": {
+     "title": "Model",
+     "type": "string"
+    },
+    "weight": {
+     "title": "Weight",
+     "type": "number"
+    }
+   },
+   "required": [
+    "model",
+    "weight"
+   ],
+   "title": "SpikeCar",
+   "type": "object"
+  },
+  "SpikePlan": {
+   "additionalProperties": false,
+   "description": "LG0's spike: plain stand-ins on one district's walkways, a few cars on its lanes.",
+   "properties": {
+    "car_gap_m": {
+     "title": "Car Gap M",
+     "type": "number"
+    },
+    "cars": {
+     "title": "Cars",
+     "type": "integer"
+    },
+    "center": {
+     "description": "The district's middle (x, y).",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 2,
+     "minItems": 2,
+     "title": "Center",
+     "type": "array"
+    },
+    "district_id": {
+     "title": "District Id",
+     "type": "string"
+    },
+    "drive_speed": {
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 2,
+     "minItems": 2,
+     "title": "Drive Speed",
+     "type": "array"
+    },
+    "hash": {
+     "title": "Hash",
+     "type": "string"
+    },
+    "hour": {
+     "title": "Hour",
+     "type": "integer"
+    },
+    "models": {
+     "items": {
+      "$ref": "#/$defs/SpikeCar"
+     },
+     "title": "Models",
+     "type": "array"
+    },
+    "name": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Name"
+    },
+    "palette": {
+     "description": "The stand-ins' clothes: sRGB colors drawn by the district's style.",
+     "items": {
+      "type": "string"
+     },
+     "title": "Palette",
+     "type": "array"
+    },
+    "people": {
+     "title": "People",
+     "type": "integer"
+    },
+    "polygon": {
+     "description": "The district's outline (exterior).",
+     "items": {
+      "items": {
+       "type": "number"
+      },
+      "type": "array"
+     },
+     "title": "Polygon",
+     "type": "array"
+    },
+    "radius_m": {
+     "description": "The stand-ins live within this of its middle.",
+     "title": "Radius M",
+     "type": "number"
+    },
+    "walk_kinds": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Walk Kinds",
+     "type": "array"
+    },
+    "walk_speed": {
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 2,
+     "minItems": 2,
+     "title": "Walk Speed",
+     "type": "array"
+    }
+   },
+   "required": [
+    "district_id",
+    "hour",
+    "center",
+    "radius_m",
+    "palette",
+    "people",
+    "cars",
+    "models",
+    "walk_kinds",
+    "walk_speed",
+    "drive_speed",
+    "car_gap_m",
+    "polygon",
+    "hash"
+   ],
+   "title": "SpikePlan",
+   "type": "object"
+  },
+  "TileIndex": {
+   "additionalProperties": false,
+   "properties": {
+    "file": {
+     "description": "`spawns/<tile>.json`, relative to the plan.",
+     "title": "File",
+     "type": "string"
+    },
+    "sha256": {
+     "description": "sha256 of the tile file's bytes.",
+     "title": "Sha256",
+     "type": "string"
+    },
+    "slots": {
+     "title": "Slots",
+     "type": "integer"
+    },
+    "spawns": {
+     "title": "Spawns",
+     "type": "integer"
+    },
+    "tile": {
+     "title": "Tile",
+     "type": "string"
+    }
+   },
+   "required": [
+    "tile",
+    "file",
+    "spawns",
+    "slots",
+    "sha256"
+   ],
+   "title": "TileIndex",
+   "type": "object"
+  }
+ },
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": false,
+ "properties": {
+  "asks": {
+   "items": {
+    "$ref": "#/$defs/Ask"
+   },
+   "title": "Asks",
+   "type": "array"
+  },
+  "bands": {
+   "items": {
+    "type": "string"
+   },
+   "title": "Bands",
+   "type": "array"
+  },
+  "checks": {
+   "additionalProperties": {
+    "$ref": "#/$defs/Check"
+   },
+   "title": "Checks",
+   "type": "object"
+  },
+  "city": {
+   "title": "City",
+   "type": "string"
+  },
+  "districts": {
+   "items": {
+    "$ref": "#/$defs/DistrictLife"
+   },
+   "title": "Districts",
+   "type": "array"
+  },
+  "model_sha256": {
+   "anyOf": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "title": "Model Sha256"
+  },
+  "plan_hash": {
+   "description": "Hash of the plan's content (every tile's and district's hash, the spike, the spec).",
+   "title": "Plan Hash",
+   "type": "string"
+  },
+  "spec": {
+   "additionalProperties": true,
+   "description": "The filled spec (budgets, reactions, ...).",
+   "title": "Spec",
+   "type": "object"
+  },
+  "spike": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/SpikePlan"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null
+  },
+  "tiles": {
+   "items": {
+    "$ref": "#/$defs/TileIndex"
+   },
+   "title": "Tiles",
+   "type": "array"
+  },
+  "totals": {
+   "additionalProperties": true,
+   "title": "Totals",
+   "type": "object"
+  },
+  "version": {
+   "const": 1,
+   "default": 1,
+   "title": "Version",
+   "type": "integer"
+  }
+ },
+ "required": [
+  "city",
+  "plan_hash",
+  "spec",
+  "bands",
+  "districts",
+  "tiles",
+  "asks",
+  "checks",
+  "totals"
+ ],
+ "title": "lifegen life plan",
+ "type": "object"
+}

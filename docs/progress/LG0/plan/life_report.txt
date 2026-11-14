@@ -1,0 +1,22 @@
+lifegen plan: Delta Megacity (ok), plan 92c7578e3c58064c
+
+spawn points 6789, slots 688, tiles 131; people on the streets at the peak hour 58189, vehicles 3394
+
+district  people@23  people peak  vehicles peak  spawns  slots  name
+d01            2060         6042            461     163     58  Transit Nexus
+d02            5421        10685            771     899     86  Midtown
+d03            1664         8785            971     291    191  Corporate Core
+d04           23373        33786            931    5130    191  Old Town
+d05             480         2692            698     249    120  Industrial Port
+d06             147         1672            118      54     41  Research Campus
+
+spike: Old Town (d04) at 23:00, 2000 people, 40 cars
+
+checks:
+  ok   spawns_on_graph: 6789 spawn points, each on a walkway (and a drive lane where it has one)
+  ok   spawns_reach: every spawn point's walkway reaches another spawn point (1 walkway components with spawns; the largest holds 6789 of 6789)
+  ok   densities: every district's people per hour band keep M11's densities (times its busy) within 1%
+  ok   slots: 688 slots, each facing its object's way
+  ok   spike_budget: the spike's 2000 people and 40 cars within the budget's 2000 and 500
+
+asks: signal_phases derived, bus_routes missing, turn_restrictions derived, lobby_points derived, piers missing, air_corridors derived, doors met, fleet_kinds derived
