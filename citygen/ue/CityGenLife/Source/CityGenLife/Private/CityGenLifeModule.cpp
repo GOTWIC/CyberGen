@@ -72,6 +72,17 @@ namespace
 			}
 		}));
 
+	FAutoConsoleCommandWithWorldAndArgs TiersCmd(TEXT("CityGenLife.Tiers"),
+		TEXT("CityGenLife.Tiers NEAR_M NEAR_MAX MID_M FAR_M: LG1's people tiers (m from the view; how many near at once)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenLife* A = LifeIn(World);
+			if (A && Args.Num() >= 4)
+			{
+				A->SetTiers(FCString::Atof(*Args[0]), FCString::Atoi(*Args[1]), FCString::Atof(*Args[2]), FCString::Atof(*Args[3]));
+			}
+		}));
+
 	FAutoConsoleCommandWithWorldAndArgs StatusCmd(TEXT("CityGenLife.Status"),
 		TEXT("CityGenLife.Status: log the state as one JSON line"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)

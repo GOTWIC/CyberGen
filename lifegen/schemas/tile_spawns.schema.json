@@ -165,6 +165,19 @@
      "title": "Rates",
      "type": "array"
     },
+    "seed": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "LG1: the seed the people it sends out are drawn from (its k-th person: `library.person((seed, k), ...)`).",
+     "title": "Seed"
+    },
     "sub": {
      "description": "What the entrance is: main, service, unit, garage, ...",
      "title": "Sub",

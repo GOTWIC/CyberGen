@@ -320,6 +320,12 @@
      "title": "Hour",
      "type": "integer"
     },
+    "library": {
+     "additionalProperties": true,
+     "description": "LG1: the people library the persons are drawn from (version, characters, walks, tiers).",
+     "title": "Library",
+     "type": "object"
+    },
     "models": {
      "items": {
       "$ref": "#/$defs/SpikeCar"
@@ -350,6 +356,17 @@
     "people": {
      "title": "People",
      "type": "integer"
+    },
+    "persons": {
+     "additionalProperties": {
+      "items": {
+       "type": "number"
+      },
+      "type": "array"
+     },
+     "description": "LG1: each person's draws by their seed, as columns (seed, character, scale, gait, pace, tint: an index into the palette).",
+     "title": "Persons",
+     "type": "object"
     },
     "polygon": {
      "description": "The district's outline (exterior).",

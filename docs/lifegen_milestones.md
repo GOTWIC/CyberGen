@@ -12,7 +12,7 @@ grows here as it lands, as in [`citygen_milestones.md`](citygen_milestones.md),
 | Milestone | What it adds | Status | Outputs |
 |---|---|---|---|
 | LG0 | Groundwork and spike: the life spec and styles, the plan format and schemas, `lifegen plan` (people and vehicles by district and hour, spawn and sink points, place slots, the fleet from AG18's roster, the asks of citygen), the `CityGenLife` plugin's skeleton (ZoneGraph lanes built from the graphs, Mass processors) built by the exporter; plain stand-ins and a few of AG18's cars on one district of Delta, against the benchmark; probes of MetaHuman, Mutable, retargeting and the engine pieces' maturity in 5.8; a tee draped in Blender's cloth solver | Done | [`docs/progress/LG0`](progress/LG0) |
-| LG1 | People | Planned | |
+| LG1 | People: the population library (24 MetaHumans made, rigged and assembled by script into the user's project, faces blended, bodies and skin by seed), Epic's walks retargeted in place, baked walks and impostor cards for the far crowd, the plan's person draws, the exporter's `--people` and the runtime's near, mid and far tiers; Delta's Old Town walked by them | Done | [`docs/progress/LG1`](progress/LG1) |
 | LG2 | Clothing | Planned | |
 | LG3 | Crowds on the streets | Planned | |
 | LG4 | Life at places | Planned | |
@@ -84,3 +84,56 @@ Built on the Windows PC (2026-11-13), on main after AT7, the play fixes and the 
   and rendered.
 - **Tests** (`tests/lifegen/test_lg_plan.py`; `test_no_network.py` reads lifegen;
   `test_unreal_play.py` the third plugin).
+
+## LG1: people
+
+Built on the Windows PC (2026-11-14), on main after LG0 (#222), DLSS and fixtures (#224) and
+cars and steam (#225). Report, shots, benchmark and open items:
+[`docs/progress/LG1/README.md`](progress/LG1/README.md).
+
+- **Frame** (Swagnik, 2026-11-14): MetaHumans made by script on his sign-in, for rigging and
+  assembly only (Epic's cloud service, as the EULA he accepted allows); Unreal's own
+  animations only (his Game Animation Sample), no other mocap; MetaHuman's plain wardrobe
+  (LG2 brings the garments); nothing of Epic's in the repo (decision 5).
+- **The library's spec** (`lifegen/library.py`, `LIB_VERSION` lg1.1): 24 characters by seed,
+  each a MetaHuman preset of the engine's optional content (its hair, eyebrows and wardrobe)
+  with its face's 1,397 coefficients blended 0.15 to 0.45 toward another preset of the same
+  body, its height and build (the creator's body constraints) and skin tone drawn; the clips
+  (two walks, two idles); the far stand-ins (LOD 3, 15 fps, 8 views by 8 frames, 128 x 256 a
+  cell); the tiers (near 30 m, at most 160; mid 90 m; far 300 m); `library_hash` (the spec,
+  the build's code, the engine's version) names the cache.
+- **The plan's draws** (`lifegen/plan.py`, `planmodel.py`): the spike's `library` and
+  `persons` (per person its character, height scale 0.96 to 1.04, gait, pace 1.15 to
+  1.55 m/s, outfit tint from its district's palette, seed), every spawn point's `seed`; check
+  `people_draws` (every character drawn, none over 12% of the people).
+- **The library's build** (`citygen/unreal_people.py`, `citygen/ue/people_library.py`): in
+  the project's full editor off screen (`-RenderOffscreen`, the script on the editor's tick,
+  `-NoMetaHumanAccountPortalLoginFallback`): characters made
+  (`MetaHumanCharacterEditorSubsystem`), rigged (`request_auto_rigging`, joints only) and
+  given their texture sources (`request_texture_sources`, 2k) by Epic's service on the
+  editor's saved sign-in, assembled (Optimized, Medium; 60 to 125 s each; the editor
+  restarted every 6 characters, whose memory otherwise grew the page file by 28 GB); the
+  clips retargeted by IK Rig's batch retarget and made in place (`in_place`); the mid mesh
+  (GeometryScript, the face's shells out) baked by AnimToTexture; the impostor sheets by
+  scene captures; `Saved/CityGenPeople/library.json`; the cache
+  `~/.cache/cybergen/people/<hash>` (3.2 GB; the MetaHuman Character sources left out), a
+  project's stamp `Saved/CityGenPeople.stamp`. A commandlet cannot assemble (the texture
+  graphs that bake the skin do not run in one).
+- **Epic's animations** (`citygen/ue/people_gas.py`, `unreal_people.migrate`): the clips'
+  14-package closure in the user's Game Animation Sample copied into the project at its own
+  paths, the sample's editor run read only.
+- **Exporter** (`citygen unreal ... --people [--gas UPROJECT]`; `unreal_life.persons`,
+  `people_library`; `import_city.people_assets`, `LIFE_VERSION` life2): the life
+  controller's people properties; `docs/unreal_export.md`, "From LG1: people".
+- **Runtime** (`CityGenLifePeople.cpp`): near people as pooled skeletal slots (body leading
+  face and outfit, the groom's cards on the head, the gait's clip at pace, the outfit's
+  garments tinted), mid people as instances of the baked walk (no shadow), far people as
+  cards; the walk's phase kept across tiers; `CityGenLife.Tiers`, the status's `library`.
+- **Delta** (Old Town's spike, 2,000 people, 40 cars): imported over its earlier import (one
+  actor updated); every check passes; 24 near, 229 mid and 1,050 far at once on the main
+  street. Lean benchmark at 2560 x 1440: `night_plan_all` **19.6 ms p95** native (walk 22.8,
+  the game thread), DLSS Quality 17.9 (walk 22.3); people off 18.1. The mid tier's shadows
+  doubled the draws (3,044 to 1,907 on the walk without them).
+- **Tests** (`tests/lifegen/test_lg_people.py`: characters and draws by seed, the hash, the
+  exporter's packing, the cache and stamp, no Unreal or MetaHuman file in the repo;
+  `test_bench.py` the tier passes).

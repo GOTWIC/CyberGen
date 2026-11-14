@@ -659,12 +659,21 @@ LG0 (the groundwork) is in: `lifegen plan` works out how many people and vehicle
 district has at each hour, where people come out and go back in (doors, station stairs,
 garages, taxi stands) and the places they use (benches, bus stops, stalls, kiosks), and
 `citygen unreal` takes it into the level, where lifegen's runtime plugin (`CityGenLife`)
-turns the city's walkways and lanes into Unreal's ZoneGraph lanes and walks plain stand-ins
-and drives a few cars on one district.
+turns the city's walkways and lanes into Unreal's ZoneGraph lanes and walks people and
+drives a few cars on one district.
 
-| Plain stand-ins walking an Old Town street (the first test) | People on the streets by hour, as planned |
+LG1 (people) is in: `citygen unreal ... --people` makes a library of 24 MetaHumans in your
+own project (their faces, bodies, heights and skin drawn by seed, rigged and assembled by
+Epic's MetaHuman service on your own sign-in), walking with the Game Animation Sample's
+walks; each person in the plan gets a character, height, pace and outfit color. Near the
+view they are full MetaHumans; farther off, baked walks and, past 90 m, cards that still
+walk.
+
+| People on an Old Town street | The walk by night |
 |---|---|
-| <img src="docs/progress/LG0/unreal/pday_street_eye.jpg" width="420"> | <img src="docs/progress/LG0/plan/preview_crowds.png" width="420"> |
+| <img src="docs/progress/LG1/unreal/pday_people_close_0.jpg" width="420"> | <img src="docs/progress/LG1/unreal/night_people_close_0.jpg" width="420"> |
+| A crowd from street level | People on the streets by hour, as planned |
+| <img src="docs/progress/LG1/unreal/pday_people_street_0.jpg" width="420"> | <img src="docs/progress/LG0/plan/preview_crowds.png" width="420"> |
 | A tee sewn from flat panels and draped in Blender (the clothing test) | |
 | <img src="docs/progress/LG0/garment/garment_34.jpg" width="200"> | |
 
@@ -672,6 +681,8 @@ and drives a few cars on one district.
 .venv/bin/python -m lifegen plan out/vesper_bay                   # BUILD/life: the plan and its checks
 .venv/bin/python -m lifegen plan out/vesper_bay --spec life_spec.json
 .venv/bin/python -m citygen unreal out/vesper_bay MyProject.uproject   # the plan comes along from BUILD/life
+.venv/bin/python -m citygen unreal out/vesper_bay MyProject.uproject --people --gas GameAnimationSample.uproject
+                                                                   # once: the people library (MetaHumans, Epic's walks)
 ```
 
 Plan: [`docs/lifegen_scope.md`](docs/lifegen_scope.md); what each milestone did:
@@ -682,7 +693,7 @@ Plan: [`docs/lifegen_scope.md`](docs/lifegen_scope.md); what each milestone did:
 | | Milestone | What it adds | Status |
 |---|---|---|---|
 | LG0 | Groundwork | A spec of who lives in each district (wealth, danger, archetype, time of day), the plan's format, the walkway and lane graphs as Unreal crowd and traffic lanes, people walking one district in Unreal as a test | Done |
-| LG1 | People | A generated population: realistic bodies, faces, skin and hair, every person different, walking, waiting, talking and sitting, with cheaper stand-ins for crowds far away | Planned |
+| LG1 | People | A population of MetaHumans made by script into your project (bodies, faces, skin and hair by seed), walking with Unreal's own animations, with baked walks and impostor cards for the crowd far away | Done |
 | LG2 | Clothing | Garments generated from sewing patterns and draped on each body, generated fabrics, prints and wear, accessories and cyberware; outfits by district, gang, job, wealth and weather; long coats that move near the view | Planned |
 | LG3 | Crowds on the streets | People walking every sidewalk, crossing at crosswalks with the signals, taking stairs and elevators between levels, in groups and at their own pace, as many as each street has at each hour | Planned |
 | LG4 | Life at places | People at benches, stalls, vending machines and bus stops, queueing at shop doors, going in and out of buildings, bars and clinics by their opening hours; gangs on their turf and police patrols | Planned |
