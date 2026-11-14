@@ -1,7 +1,8 @@
 // The module and its console commands (the benchmark's passes and the checks drive them):
 // CityGenLife.Enable [0|1] (toggling without an argument): the people and cars moving and drawn;
-// CityGenLife.Respawn PEOPLE CARS: as many again on the spike's lanes; CityGenLife.Status: the
-// state as one JSON line (CITYGEN_LIFE_STATUS).
+// CityGenLife.Respawn PEOPLE CARS: as many again on the spike's lanes; CityGenLife.Clothing
+// [0|1]: the people's clothes drawn or not (a debug switch); CityGenLife.Status: the state as
+// one JSON line (CITYGEN_LIFE_STATUS).
 
 #include "CityGenLifeActor.h"
 #include "HAL/IConsoleManager.h"
@@ -80,6 +81,16 @@ namespace
 			if (A && Args.Num() >= 4)
 			{
 				A->SetTiers(FCString::Atof(*Args[0]), FCString::Atoi(*Args[1]), FCString::Atof(*Args[2]), FCString::Atof(*Args[3]));
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs ClothingCmd(TEXT("CityGenLife.Clothing"),
+		TEXT("CityGenLife.Clothing [0|1]: the people's clothes drawn (1, the default) or not (a debug switch until LG2: off, near people out to the mid tier as MetaHuman's whole template body, mid garment slots hidden, far cards as they were)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (ACityGenLife* A = LifeIn(World))
+			{
+				A->SetClothing(Args.Num() ? FCString::Atoi(*Args[0]) != 0 : !A->bClothing);
 			}
 		}));
 

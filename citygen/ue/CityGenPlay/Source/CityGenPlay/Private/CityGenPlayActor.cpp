@@ -40,6 +40,7 @@ namespace
 	const FName UnderwaterTag(TEXT("cg.type=underwater"));
 	const FName SkyKey(TEXT("cg.key=lighting.sky"));
 	const FName AtmosClass(TEXT("CityGenAtmos"));  // atmosgen's controller, ACityGenAtmos
+	const FName LifeClass(TEXT("CityGenLife"));    // lifegen's controller, ACityGenLife
 
 	// AT1: the lamps' lights are atmosgen's (decision 12.2); its runtime (CityGenAtmos) sets
 	// this to 2 while its plan's lights show, so the pools stand only past its live range
@@ -630,6 +631,12 @@ void ACityGenPlay::Tick(float DeltaSeconds)
 		UnderwaterAt = Now;
 		UpdateUnderwater();
 	}
+	// (the life controller found in the level's first minute, as the atmos one, so the menu's
+	// clothing row is there whenever the menu first opens)
+	if (!Life.IsValid())
+	{
+		GetLife();
+	}
 }
 
 void ACityGenPlay::UpdateUnderwater()
@@ -721,6 +728,15 @@ bool ACityGenPlay::ClickMenuRow(const FString& Row)
 	{
 		const bool bOn = R == TEXT("framegen") ? !CityGenUpscaler::FrameGenOn() : R.EndsWith(TEXT("1"));
 		return CityGenUpscaler::SetFrameGen(bOn);
+	}
+	else if (R == TEXT("clothing") || R.StartsWith(TEXT("clothing=")))
+	{
+		// lifegen_clothing_toggle: the people's clothes drawn or not (a debug switch until LG2)
+		if (!HasLifeClothing())
+		{
+			return false;
+		}
+		SetLifeClothing(R == TEXT("clothing") ? !GetLifeClothing() : R.EndsWith(TEXT("1")));
 	}
 	else if (!GetAtmos())
 	{
@@ -873,6 +889,52 @@ namespace
 void ACityGenPlay::SetAtmosFlag(FName Function, bool bOn)
 {
 	CallOne(GetAtmos(), Function, bOn, 0.f);
+}
+
+// -- lifegen's controller (the developer menu's clothing row, lifegen_clothing_toggle) --
+
+AActor* ACityGenPlay::GetLife() const
+{
+	if (Life.IsValid())
+	{
+		return Life.Get();
+	}
+	// (always loaded and placed with the level, as the atmos controller: looked for at most
+	// once a second, in a level's first minute)
+	const UWorld* World = GetWorld();
+	const double Now = World ? World->GetTimeSeconds() : 0.0;
+	if (!World || Now > 60.0 || (LifeLookAt >= 0.0 && Now - LifeLookAt < 1.0))
+	{
+		return nullptr;
+	}
+	LifeLookAt = Now;
+	for (TActorIterator<AActor> It(const_cast<UWorld*>(World)); It; ++It)
+	{
+		if (It->GetClass()->GetFName() == LifeClass)
+		{
+			Life = *It;
+			return *It;
+		}
+	}
+	return nullptr;
+}
+
+bool ACityGenPlay::HasLifeClothing() const
+{
+	const AActor* A = GetLife();
+	return A && FindFProperty<FBoolProperty>(A->GetClass(), TEXT("bClothing")) != nullptr;
+}
+
+bool ACityGenPlay::GetLifeClothing() const
+{
+	const AActor* A = GetLife();
+	const FBoolProperty* P = A ? FindFProperty<FBoolProperty>(A->GetClass(), TEXT("bClothing")) : nullptr;
+	return P && P->GetPropertyValue_InContainer(A);
+}
+
+void ACityGenPlay::SetLifeClothing(bool bOn)
+{
+	CallOne(GetLife(), TEXT("SetClothing"), bOn, 0.f);
 }
 
 void ACityGenPlay::SetAtmosHour(float InHour)

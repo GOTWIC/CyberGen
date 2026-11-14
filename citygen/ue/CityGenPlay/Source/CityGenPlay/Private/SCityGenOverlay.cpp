@@ -32,7 +32,9 @@ namespace
 		// DLSS Frame Generation where the plugin offers it
 		RowUpscaler = 15, RowUpscalerDown = 16, RowUpscalerUp = 17, RowFrameGen = 18,
 		// cars_steam: AT4's steam and smoke plumes (off by default, issue #223)
-		RowSteam = 19 };
+		RowSteam = 19,
+		// lifegen_clothing_toggle: the people's clothes (a debug switch until LG2's garments)
+		RowClothing = 20 };
 
 	/** A row's name for ACityGenPlay::ClickMenuRow (the console's CityGen.MenuRow). */
 	const TCHAR* RowName(int32 Row)
@@ -56,6 +58,7 @@ namespace
 		case RowUpscalerDown: return TEXT("upscaler-");
 		case RowFrameGen: return TEXT("framegen");
 		case RowSteam: return TEXT("steam");
+		case RowClothing: return TEXT("clothing");
 		default: return TEXT("hour+");    // the hour row and its > arrow
 		}
 	}
@@ -346,6 +349,11 @@ int32 SCityGenOverlay::PaintMenu(FSlateWindowElementList& Out, int32 Layer, cons
 		{
 			Rows.Add({RowSteam, TEXT("Steam and smoke"), P->GetAtmosFlag(TEXT("bSteam")) ? TEXT("On") : TEXT("Off")});
 		}
+	}
+	if (P->HasLifeClothing())
+	{
+		// lifegen_clothing_toggle: with lifegen's controller, its people's clothes on or off
+		Rows.Add({RowClothing, TEXT("Clothing"), P->GetLifeClothing() ? TEXT("On") : TEXT("Off")});
 	}
 	constexpr double BarH = 30.0;
 	const double Extra = bAtmos ? BarH : 0.0;

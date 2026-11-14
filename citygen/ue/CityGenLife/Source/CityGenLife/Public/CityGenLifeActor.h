@@ -158,6 +158,26 @@ public:
 	/** The tiers at run time (CityGenLife.Tiers NEAR_M NEAR_MAX MID_M FAR_M). */
 	UFUNCTION(BlueprintCallable, Category = "CityGen") void SetTiers(float InNearM, int32 InNearMax, float InMidM, float InFarM);
 
+	/** A debug switch until LG2's garments (lifegen_clothing_toggle): off, the people's clothes
+	 *  are not drawn. The creator's assembled bodies have no triangles under their garments, so
+	 *  near, each person's body and outfit are hidden and WholeBody (MetaHuman's whole template
+	 *  body, in the character's own skin material) follows its pose, its face and hair kept,
+	 *  and the near tier reaches out to MidM (at most NearMax people); mid, past that cap, the
+	 *  baked mesh's garment slots are drawn with HiddenMaterial (the body under them is
+	 *  missing there too); the far cards keep their clothes (their sheets were captured clothed).
+	 *  On by default. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") bool bClothing = true;
+	/** A material that draws nothing (masked, its mask 0): the importer's
+	 *  Core/Life/M_CgLifeHidden, for the mid mesh's garment slots while bClothing is off. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") TObjectPtr<UMaterialInterface> HiddenMaterial;
+	/** MetaHuman's whole template body (the importer's /MetaHumanCharacter/Body/IdentityTemplate/
+	 *  SKM_Body), drawn near in place of a person's body while bClothing is off. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") TObjectPtr<USkeletalMesh> WholeBody;
+	/** The clothing switch at run time (CityGenLife.Clothing [0|1], the play menu's row). */
+	UFUNCTION(BlueprintCallable, Category = "CityGen") void SetClothing(bool bOn);
+	/** Whether the people are drawn unclothed now (the switch off, with a HiddenMaterial). */
+	bool Unclothed() const { return !bClothing && HiddenMaterial != nullptr; }
+
 	// --- the session --------------------------------------------------------------------------
 
 	UPROPERTY(EditAnywhere, Category = "CityGen") bool bEnabled = true;
@@ -289,21 +309,30 @@ private:
 	void Assign(int32 Slot, int32 Person);
 	float WalkRate(int32 Person) const;
 	float PhaseOffset(int32 Person) const;
+	// (lifegen_clothing_toggle)
+	void ApplyClothing();
 
 	/** A near person's components: the leader (the body) and its followers. */
 	struct FNearSlot
 	{
 		TArray<USkeletalMeshComponent*> Comps;
 		UStaticMeshComponent* Hair = nullptr;
+		USkeletalMeshComponent* Whole = nullptr;   // (lifegen_clothing_toggle: the whole body)
 		int32 Person = INDEX_NONE;
 		int32 Char = INDEX_NONE;
 		int32 Gait = INDEX_NONE;
 		bool bIdle = false;        // (LG3: playing an idle, standing)
 	};
+	/** A near slot's components by the clothing switch (lifegen_clothing_toggle). */
+	void SlotClothing(FNearSlot& Slot);
+	/** Per character the mid mesh's garment slots (lifegen_clothing_toggle). */
+	TArray<TArray<int32>> MidGarment;
+	bool bHiddenWarned = false;
 	TArray<uint8> MidSeen, FarSeen;
 	TArray<FNearSlot> NearSlots;
 	UPROPERTY(Transient) TArray<TObjectPtr<USkeletalMeshComponent>> NearComps;
 	UPROPERTY(Transient) TArray<TObjectPtr<UStaticMeshComponent>> HairComps;
+	UPROPERTY(Transient) TArray<TObjectPtr<USkeletalMeshComponent>> WholeComps;
 	UPROPERTY(Transient) TArray<TObjectPtr<UInstancedStaticMeshComponent>> MidComps;
 	UPROPERTY(Transient) TArray<TObjectPtr<UInstancedStaticMeshComponent>> FarComps;
 	TArray<int32> PersonInst, PersonSlot, CharCount;

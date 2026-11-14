@@ -1134,6 +1134,11 @@ def play_views(world, a, slug, prefix):
             st0w = (atmos_status(world) or {}).get("weather_target") or "rain"
             unreal.SystemLibrary.execute_console_command(
                 world, f"CityGenAtmos.Weather {wm.group(1)} now")
+        # (lifegen_clothing_toggle: a view named `*_noclothes` is shot twice, first with the
+        # people's clothes (`<name>` with `_noclothes` made `_clothes`), then with them off
+        # through the play menu's clothing row, the world's time held between, so both show the
+        # same people at the same step; the clothes on and the time running again after it)
+        noclothes = "_noclothes" in v["name"]
         eye, tg = ue(*v["eye"]), ue(*v["target"])
         cam.set_actor_location(eye, False, True)
         pc.set_control_rotation(unreal.MathLibrary.find_look_at_rotation(eye, tg))
@@ -1154,11 +1159,23 @@ def play_views(world, a, slug, prefix):
             yield from wait(float(wm.group(3)))
         # (AT7: CITYGEN_UE_VIEW_RES sets the views' size, 7680x4320 for an 8K shot)
         res = os.environ.get("CITYGEN_UE_VIEW_RES") or "1920x1080"
+        if noclothes:
+            unreal.GameplayStatics.set_global_time_dilation(world, 0.0001)
+            yield from wait(1.0)
+            yield from ui_shot(world, v["name"].replace("_noclothes", "_clothes"),
+                               f"HighResShot {res}", 600)
+            row = bool(a.click_menu_row("clothing=0"))
+            yield from wait(1.5)
+            RES.setdefault("clothing_views", {})[v["name"]] = {"menu_row": row}
+            log(f"clothing off at view {v['name']}: menu row {row}")
         yield from ui_shot(world, v["name"], f"HighResShot {res}", 600)
         # (LG3: lifegen's crowd at each view, in the log: CITYGEN_LIFE_STATUS after the view's
         # name; a level without the CityGenLife plugin only warns)
         log(f"life at view {v['name']}")
         unreal.SystemLibrary.execute_console_command(world, "CityGenLife.Status")
+        if noclothes:
+            a.click_menu_row("clothing=1")
+            unreal.GameplayStatics.set_global_time_dilation(world, 1.0)
         at = atmos_status(world)
         # (AT6: what the look showed at each view: the district, the exposure, the post)
         if at and "post" in at:
