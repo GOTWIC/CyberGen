@@ -227,10 +227,53 @@ def _cr_point(p0, p1, p2, p3, t):
     return lerp(b1, b2, t1, t2)
 
 
+FILLET_DEG = 12.0           # an inner point turning more than this is rounded off by an arc
+FILLET_CUT_M = 2.0          # ... cutting its corner by at most this much
+FILLET_LEG = 0.45           # ... its tangents at most this share of each leg
+
+
+def fillet(pts, step=SMOOTH_STEP_M):
+    """A lane's sharp inner corners (the lane graph's polylines turn at single points) rounded
+    off by circular arcs tangent to both legs: the tangent length the smallest of `FILLET_LEG`
+    of each leg and what cuts the corner by `FILLET_CUT_M`; arc points about `step` apart. The
+    ends stay where they are (the neighbor lanes meet them there)."""
+    if len(pts) < 3:
+        return [list(p) for p in pts]
+    out = [list(pts[0])]
+    for i in range(1, len(pts) - 1):
+        a, b, c = pts[i - 1], pts[i], pts[i + 1]
+        th = math.radians(_turn(a, b, c))
+        la, lc = math.dist(a[:2], b[:2]), math.dist(b[:2], c[:2])
+        if th < math.radians(FILLET_DEG) or th > math.radians(150.0) or la < 1e-3 or lc < 1e-3:
+            out.append(list(b))
+            continue
+        tn = math.tan(th / 2.0)
+        # (the corner cut by an arc of radius R is R (1 / cos(th / 2) - 1); its tangent R tn)
+        cut = 1.0 / math.cos(th / 2.0) - 1.0
+        d = min(FILLET_LEG * la, FILLET_LEG * lc, FILLET_CUT_M / cut * tn)
+        r = d / tn
+        ua = [(b[k] - a[k]) / la for k in range(2)]
+        uc = [(c[k] - b[k]) / lc for k in range(2)]
+        p0 = [b[0] - ua[0] * d, b[1] - ua[1] * d, b[2] - (b[2] - a[2]) * d / la]
+        p1 = [b[0] + uc[0] * d, b[1] + uc[1] * d, b[2] + (c[2] - b[2]) * d / lc]
+        side = 1.0 if ua[0] * uc[1] - ua[1] * uc[0] > 0.0 else -1.0
+        o = [p0[0] - side * ua[1] * r, p0[1] + side * ua[0] * r]
+        a0 = math.atan2(p0[1] - o[1], p0[0] - o[0])
+        m = max(2, int(math.ceil(r * th / step)))
+        for j in range(m + 1):
+            ang = a0 + side * th * j / m
+            out.append([o[0] + r * math.cos(ang), o[1] + r * math.sin(ang),
+                        p0[2] + (p1[2] - p0[2]) * j / m])
+    out.append(list(pts[-1]))
+    return out
+
+
 def smooth(pts, before=None, after=None, step=SMOOTH_STEP_M):
-    """A lane's points as a centripetal Catmull-Rom spline through them (the neighbor lanes'
-    points beyond its ends as the spline's end controls, so it leaves and joins them on their
-    tangents), sampled at most `step` apart; every original point kept."""
+    """A lane's points with its sharp corners rounded off (`fillet`), then as a centripetal
+    Catmull-Rom spline through them (the neighbor lanes' points beyond its ends as the
+    spline's end controls, so it leaves and joins them on their tangents), sampled at most
+    `step` apart; its ends kept, and every point that turns less than `FILLET_DEG`."""
+    pts = fillet(pts, step)
     n = len(pts)
     if n < 2:
         return [list(p) for p in pts]

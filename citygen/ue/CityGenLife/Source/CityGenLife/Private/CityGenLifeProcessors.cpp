@@ -235,7 +235,7 @@ void UCityGenLifeDriveProcessor::Execute(FMassEntityManager& EntityManager, FMas
 			float Cruise = C.Cruise;
 			if (Frame->PointVmax)
 			{
-				Cruise = C.Share * SpeedAhead(S, *Frame->PointVmax, C.Lane, C.Dist, FMath::Max(400.f, C.Speed * 0.6f));
+				Cruise = C.Share * CgLife::SpeedAhead(S, *Frame->PointVmax, C.Lane, C.Dist, FMath::Max(400.f, C.Speed * 0.6f));
 			}
 			// (full speed with two gaps clear, stopped at one)
 			const float Want = Cruise * FMath::Clamp((Ahead - Gap) / Gap, 0.f, 1.f);

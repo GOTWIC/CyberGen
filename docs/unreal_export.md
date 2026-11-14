@@ -308,7 +308,7 @@ developer menu with the time of day, unless `--no-play`:
 | (always) | the minimap, top left: the city around you, north up, your heading as an arrow, the city's name, the time of day (day or night without an atmos plan), the keys |
 | M | the map, full screen: the whole city with district names; the wheel zooms about the cursor, the right button drags it, the left button teleports you there (a walking player onto the nearest walkway, held until the city has streamed in around it; a flying one at its height, at least 30 m over the walkway there); M or Esc closes it |
 | . | the free camera: in the game (not the editor's eject), a spectator pawn with no collision, flown with W A S D, E or Space up, Q or C down, the mouse; the wheel sets its speed (2 to 500 m/s); `.` again goes back to the player, who waited where they were |
-| Tab | the developer menu: the time of day (AT3, with an atmos plan: the hour, `<` and `>` step it an hour, a click on the row swaps day and night, and a slider under it, dragged, sets any hour to the quarter; without one a day or night switch), the free camera, the minimap, the engine's on-screen messages, the upscaler (Native, TSR 67%, and with NVIDIA's plugin DLSS Quality, Balanced and Performance; "DLSS" above) and Frame Generation where the plugin offers it, and with an atmos plan atmosgen's weather prototypes (fog, rain, wet streets); click a row to change it; Tab or Esc closes it |
+| Tab | the developer menu: the time of day (AT3, with an atmos plan: the hour, `<` and `>` step it an hour, a click on the row swaps day and night, and a slider under it, dragged, sets any hour to the quarter; without one a day or night switch), the free camera, the minimap, the engine's on-screen messages, the upscaler (Native, TSR 67%, and with NVIDIA's plugin DLSS Quality, Balanced and Performance; "DLSS" above) and Frame Generation where the plugin offers it, and with an atmos plan atmosgen's weather prototypes (fog, rain, wet streets) and its steam and smoke (cars_steam, off by default); click a row to change it; Tab or Esc closes it |
 
 By night (`MPC_CityGen`'s `Night` 1) the windows' rooms light up (AG6's night interiors,
 lit by each building's own night since AG15: its schedule at `MPC_CityGen`'s `Hour`, its
@@ -2104,6 +2104,15 @@ needs stage 2's props (AG8) in the build; a blockout import has no fixtures. The
 `checks.fixtures` holds every light to something at its height: stage 2's own fixture, its
 fixture's lens, a structure (roof, facade, crane, station roof or deck slab) or the ground.
 
+### Steam and smoke off by default (cars_steam, issue #223)
+
+AT4's steam and smoke plumes (manholes, drains, vents, food stalls, chimneys) are off until
+they look real: the atmos spec's `steam` (default false, `presets.STEAM_ON`) is the plan's
+`air.steam` and the controller's `bSteam` (set by the import); the plan places the emitters
+either way. In the game the Tab menu's **Steam and smoke** row (shown when the controller has
+`bSteam`) and `CityGenAtmos.Steam [0|1]` switch them (`ACityGenAtmos::SetSteam`); the fog
+volumes stay with `CityGenAtmos.Air`.
+
 ### A packaged game
 
 A project a city was imported into packages as any Unreal project (UAT's `BuildCookRun`,
@@ -2357,6 +2366,7 @@ Every reference (meshes, material) is a property of the actor, so a cook takes t
 | `WalkSpeed`, `DriveSpeed`, `CarGapM` | m/s ranges, the gap kept behind a car |
 | `WalkPoints`, `WalkStarts`, `WalkWidths`, `WalkLinks`, `WalkLinkStarts` | the walkway lanes (flat, citygen m; a link `2 * lane + 1` at this lane's end) |
 | `DrivePoints`, `DriveStarts`, `DriveWidths`, `DriveLinks`, `DriveLinkStarts`, `DriveStartable` | the drive lanes, successors, which a car may start on |
+| `DriveVmax`, `DriveCruise`, `DriveVary` | (cars_steam) each drive lane point's speed (m/s), each lane's cruise speed, a car's share of it |
 | `BodyMesh`, `HeadMesh`, `StandInMaterial`, `Palette` | the stand-ins |
 | `CarPartMeshes`, `CarPartModels`, `CarPartPivots`, `CarPartShadows`, `CarModels`, `CarPaints`, `PaintFloats` | the cars |
 
@@ -2368,6 +2378,33 @@ places, the actor's game thread time per frame, mean and most). The benchmark's 
 passes (`bench.LIFE_PASSES`, with `--bench-atmos`) switch them over the night as delivered. The import's summary line says what it placed
 (`Life (stage 4): ...`) and `import_result.json`'s `life` the lanes, models and any car mesh
 missing from the project. LG0's spike and its cost: `docs/progress/LG0/README.md`.
+
+### Cars by road class, on smooth lanes (cars_steam)
+
+`citygen/unreal_life.py` (`PACK_VERSION` 2) packs every drive lane as a smooth curve and its
+speeds:
+
+- **Smooth lanes** (`smooth`): a centripetal Catmull-Rom spline through the lane's points,
+  sampled at most `SMOOTH_STEP_M` 1.5 m apart, every original point kept, the neighbor lanes'
+  points past its ends as the spline's end controls (so a connector leaves and joins its roads
+  on their tangents); a run turning under `SMOOTH_TURN_DEG` at both ends stays a chord, and z
+  follows the chord (the spline is for the plan's turns, not the grade). The runtime's ZoneGraph
+  lanes take these points; a car's heading is the lane's tangent interpolated between points
+  (`FZoneGraphLaneLocation::Tangent`), not its segment's, so it turns as it moves.
+- **Speeds** (the life plan's `spike.drive_speeds`, `drive`, `road_classes`, from
+  `lifegen/presets.py` `DRIVE_SPEEDS` and `DRIVE`): a lane's cruise speed by its road's class
+  (highway 22, avenue 14, street 9.5, service 7, alley 4.5 m/s: 80, 50, 35, 25 and 15 km/h);
+  a junction connector `junction` (0.7) of its slower road's; at each point at most
+  $\sqrt{a_{lat} R}$ ($a_{lat}$ = `lateral`, 2 m/s$^2$; $R$ from the turn at the point), never
+  under `crawl` (2 m/s, a turning bulb's hairpin); a lane's end at most its successors'
+  starts, braking back from every slow point at `brake` (2.5 m/s$^2$). Each car drives at its
+  own share of that (`vary`, 0.9 to 1.08), the lowest speed from where it is to a few meters
+  on (`CgLife::SpeedAhead`), still slowing behind the car ahead as in LG0. A plan before
+  cars_steam (no speeds) drives at LG0's `DriveSpeed`.
+- **The roads' own curves** are as coarse as M22's pavement map and AG17 draw them (a bend's
+  few stations): the smoothing rounds the lanes, not the roads under them, so on a tight bend
+  a car's line and the asphalt's polygon can part by a few centimeters (`docs/progress/
+  cars_steam/README.md`; a later issue).
 
 ## Milestones and checks
 

@@ -262,18 +262,24 @@ def test_exporter_packs_the_spike(build: Path):
 
 
 def test_drive_lanes_smooth_and_slow_by_class():
-    """cars_steam: a drive lane is a centripetal Catmull-Rom curve through its points (every
-    point kept, straight runs as chords), its cruise speed by its road's class, a connector the
-    junction's share of its slower road, a bend at most sqrt(lateral R), braking before it."""
+    """cars_steam: a drive lane's sharp corners rounded off by arcs, then a centripetal
+    Catmull-Rom curve through its points (ends kept, straight runs as chords), its cruise speed
+    by its road's class, a connector the junction's share of its slower road, a bend at most
+    sqrt(lateral R), braking before it."""
     import math
     from citygen import unreal_life as UL
-    # a right angle: smoothed, every point kept, steps near SMOOTH_STEP_M (it divides the
-    # chords; the curve bulges past them), no kink left
+    # a right angle: its ends kept, its corner cut by FILLET_CUT_M at most (an arc of radius
+    # FILLET_CUT_M / (sqrt 2 - 1) there), steps near SMOOTH_STEP_M, no kink left
     corner = [[0.0, 0.0, 0.0], [20.0, 0.0, 0.0], [20.0, 20.0, 0.0]]
     s = UL.smooth(corner)
-    assert all(p in s for p in corner)
+    assert s[0] == corner[0] and s[-1] == corner[-1]
+    cut = min(math.dist(p[:2], (20.0, 0.0)) for p in s)
+    assert UL.FILLET_CUT_M - 0.05 < cut < UL.FILLET_CUT_M + 0.05
     assert max(math.dist(a[:2], b[:2]) for a, b in zip(s, s[1:])) <= 1.25 * UL.SMOOTH_STEP_M
-    assert max(UL._turn(a, b, c) for a, b, c in zip(s, s[1:], s[2:])) < 30.0
+    assert max(UL._turn(a, b, c) for a, b, c in zip(s, s[1:], s[2:])) < 20.0
+    # a gentle bend keeps its point
+    gentle = [[0.0, 0.0, 0.0], [20.0, 0.0, 0.0], [40.0, 2.0, 0.0]]
+    assert gentle[1] in UL.smooth(gentle)
     # a straight lane stays its two points
     assert UL.smooth([[0.0, 0.0, 0.0], [50.0, 0.0, 1.0]]) == [[0.0, 0.0, 0.0], [50.0, 0.0, 1.0]]
     # a bend of radius 10 m: about sqrt(2 * 10) m/s at the bend, the cruise speed at its ends

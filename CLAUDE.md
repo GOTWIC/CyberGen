@@ -2754,6 +2754,24 @@ LG0 (groundwork and spike) is in place:
 - Results, the benchmark, the probes' findings and the recommendations for LG1 to LG8:
   `docs/progress/LG0/README.md`.
 
+The cars and steam fixes (after LG0, an exporter and runtime update) are in place:
+- **Cars by road class** (`lifegen/presets.py` `DRIVE_SPEEDS`, `DRIVE`; the plan's
+  `spike.drive_speeds`, `drive`, `road_classes`): a lane's cruise speed by its road's class
+  (highway 22, avenue 14, street 9.5, service 7, alley 4.5 m/s), a junction connector 0.7 of
+  its slower road's, at each point at most $\sqrt{a_{lat} R}$ (2 m/s$^2$), never under 2 m/s,
+  braking (2.5 m/s$^2$) before every slow point; each car its own share (0.9 to 1.08).
+- **Smooth turns** (`citygen/unreal_life.py`, `PACK_VERSION` 2): a lane's sharp corners
+  rounded off by arcs (`fillet`: at most 2 m inside the corner, 0.45 of each leg), then a
+  centripetal Catmull-Rom spline (`smooth`, points 1.5 m apart, neighbor lanes as end
+  controls); the runtime's lanes take them, a car's heading the lane's interpolated tangent,
+  its speed the lowest point speed a few meters on (`CgLife::SpeedAhead`; `DriveVmax`,
+  `DriveCruise`, `DriveVary`). The roads under them keep M22's and AG17's coarse curves (a
+  later issue).
+- **Steam and smoke off by default** (issue #223): the atmos spec's `steam`
+  (`presets.STEAM_ON` False), the plan's `air.steam`, the controller's `bSteam`; the Tab
+  menu's Steam and smoke row and `CityGenAtmos.Steam [0|1]`. Results:
+  `docs/progress/cars_steam/`.
+
 ## Gallery site (GitHub Pages)
 
 `site/` is the public gallery at https://gotwic.github.io/CyberGen/ (served at
