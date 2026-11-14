@@ -199,6 +199,19 @@
      "default": null,
      "description": "The walkway it opens to.",
      "title": "Walkway Id"
+    },
+    "yaw_deg": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "LG3: an AG3 door's outward facing (degrees counterclockwise from east).",
+     "title": "Yaw Deg"
     }
    },
    "required": [
@@ -212,6 +225,97 @@
     "hash"
    ],
    "title": "Spawn",
+   "type": "object"
+  },
+  "Walk": {
+   "additionalProperties": false,
+   "description": "LG3: a walkway's crowd (scope 6.3): how many people are on it in each of M11's hour\nbands (the district's day shapes the hours within a band), and the signal it waits for.",
+   "properties": {
+    "district_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "District Id"
+    },
+    "hash": {
+     "title": "Hash",
+     "type": "string"
+    },
+    "id": {
+     "description": "The walkway's id (M2's walkway graph).",
+     "title": "Id",
+     "type": "string"
+    },
+    "kind": {
+     "title": "Kind",
+     "type": "string"
+    },
+    "length_m": {
+     "title": "Length M",
+     "type": "number"
+    },
+    "level": {
+     "default": 0,
+     "title": "Level",
+     "type": "integer"
+    },
+    "people": {
+     "description": "People on it per hour band (M11's bands, the district's busy and the crowd's scale in).",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 5,
+     "minItems": 5,
+     "title": "People",
+     "type": "array"
+    },
+    "phase": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The phase it walks in.",
+     "title": "Phase"
+    },
+    "signal": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A signalized crosswalk's signal (`sig.<junction id>`).",
+     "title": "Signal"
+    },
+    "street": {
+     "description": "On a road segment with M11's density (its sidewalks, alleys, promenades, pedestrian streets), else off-street (`presets.OFFSTREET`).",
+     "title": "Street",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "id",
+    "kind",
+    "length_m",
+    "street",
+    "people",
+    "hash"
+   ],
+   "title": "Walk",
    "type": "object"
   }
  },
@@ -254,6 +358,14 @@
    "default": 1,
    "title": "Version",
    "type": "integer"
+  },
+  "walks": {
+   "description": "LG3: the walkways whose middle is in the tile.",
+   "items": {
+    "$ref": "#/$defs/Walk"
+   },
+   "title": "Walks",
+   "type": "array"
   }
  },
  "required": [

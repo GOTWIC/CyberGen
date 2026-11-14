@@ -1,0 +1,149 @@
+{
+ "$defs": {
+  "Phase": {
+   "additionalProperties": false,
+   "properties": {
+    "all_red_s": {
+     "title": "All Red S",
+     "type": "number"
+    },
+    "amber_s": {
+     "title": "Amber S",
+     "type": "number"
+    },
+    "crosswalks": {
+     "description": "Crosswalks walking (M18's ids).",
+     "items": {
+      "type": "string"
+     },
+     "title": "Crosswalks",
+     "type": "array"
+    },
+    "green_s": {
+     "title": "Green S",
+     "type": "number"
+    },
+    "index": {
+     "title": "Index",
+     "type": "integer"
+    },
+    "legs": {
+     "description": "Road segments moving (the junction's legs).",
+     "items": {
+      "type": "string"
+     },
+     "title": "Legs",
+     "type": "array"
+    },
+    "start_s": {
+     "description": "Its start in the cycle (s).",
+     "title": "Start S",
+     "type": "number"
+    },
+    "walk_s": {
+     "description": "People start crossing in its first walk_s.",
+     "title": "Walk S",
+     "type": "number"
+    },
+    "walkways": {
+     "description": "Their walkways (the walkway graph's).",
+     "items": {
+      "type": "string"
+     },
+     "title": "Walkways",
+     "type": "array"
+    }
+   },
+   "required": [
+    "index",
+    "legs",
+    "crosswalks",
+    "walkways",
+    "start_s",
+    "green_s",
+    "amber_s",
+    "all_red_s",
+    "walk_s"
+   ],
+   "title": "Phase",
+   "type": "object"
+  },
+  "Signal": {
+   "additionalProperties": false,
+   "description": "LG3: a signalized junction's phases (the ask `signal_phases`, derived).",
+   "properties": {
+    "cycle_s": {
+     "title": "Cycle S",
+     "type": "number"
+    },
+    "hash": {
+     "title": "Hash",
+     "type": "string"
+    },
+    "id": {
+     "description": "`sig.<junction id>`.",
+     "title": "Id",
+     "type": "string"
+    },
+    "junction_id": {
+     "title": "Junction Id",
+     "type": "string"
+    },
+    "offset_s": {
+     "title": "Offset S",
+     "type": "number"
+    },
+    "phases": {
+     "items": {
+      "$ref": "#/$defs/Phase"
+     },
+     "title": "Phases",
+     "type": "array"
+    }
+   },
+   "required": [
+    "id",
+    "junction_id",
+    "cycle_s",
+    "offset_s",
+    "phases",
+    "hash"
+   ],
+   "title": "Signal",
+   "type": "object"
+  }
+ },
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": false,
+ "properties": {
+  "city": {
+   "title": "City",
+   "type": "string"
+  },
+  "derived": {
+   "description": "True while citygen records no phases (the ask).",
+   "title": "Derived",
+   "type": "boolean"
+  },
+  "signals": {
+   "items": {
+    "$ref": "#/$defs/Signal"
+   },
+   "title": "Signals",
+   "type": "array"
+  },
+  "version": {
+   "const": 1,
+   "default": 1,
+   "title": "Version",
+   "type": "integer"
+  }
+ },
+ "required": [
+  "city",
+  "derived",
+  "signals"
+ ],
+ "title": "lifegen signal phases",
+ "type": "object"
+}

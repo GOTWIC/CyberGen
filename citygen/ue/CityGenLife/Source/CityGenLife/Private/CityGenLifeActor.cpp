@@ -9,6 +9,8 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 #include "Algo/Sort.h"
 #include "HAL/PlatformTime.h"
 #include "MassEntityManager.h"
@@ -351,6 +353,12 @@ void ACityGenLife::BuildLanes()
 	Frame.WalkYaw = &WalkYaw;
 	Frame.CarPos = &CarPos;
 	Frame.CarYaw = &CarYaw;
+	Frame.bCity = false;
+	if (IsCity())
+	{
+		// (LG3: the whole walkway graph, live round the view)
+		BuildCrowd();
+	}
 	bBuilt = true;
 }
 
@@ -437,7 +445,8 @@ void ACityGenLife::SpawnAll()
 	TArray<int32> WalkIn;
 	TArray<float> Cum;
 	float Tot = 0.f;
-	for (int32 I = 0; I < WalkLaneCount; ++I)
+	const bool bCity = IsCity();
+	for (int32 I = 0; I < WalkLaneCount && !bCity; ++I)
 	{
 		if (InRegion[I])
 		{
@@ -464,10 +473,18 @@ void ACityGenLife::SpawnAll()
 		}
 		return CarStarts[Lo];
 	};
-	const int32 NP = WalkIn.Num() ? FMath::Max(0, People) : 0;
-	WalkPos.SetNumZeroed(NP);
-	WalkYaw.SetNumZeroed(NP);
-	if (NP)
+	const int32 NP = (WalkIn.Num() || bCity) ? FMath::Max(0, People) : 0;
+	if (bCity)
+	{
+		// (LG3: the pool, every slot free until the first tick fills the live walkways)
+		SpawnPool();
+	}
+	else
+	{
+		WalkPos.SetNumZeroed(NP);
+		WalkYaw.SetNumZeroed(NP);
+	}
+	if (NP && !bCity)
 	{
 		const FMassArchetypeHandle Arch = EM.CreateArchetype({FCgLifeWalker::StaticStruct()});
 		TArray<FMassEntityHandle> Hs;
@@ -624,6 +641,11 @@ void ACityGenLife::SpawnAll()
 void ACityGenLife::Respawn(int32 InPeople, int32 InCars)
 {
 	People = FMath::Max(0, InPeople);
+	if (IsCity() && PersonChar.Num())
+	{
+		// (LG3: the pool is the plan's people; fewer is a smaller pool)
+		People = FMath::Min(People, PersonChar.Num());
+	}
 	Cars = FMath::Max(0, InCars);
 	if (bBuilt)
 	{
@@ -710,8 +732,11 @@ void ACityGenLife::FindGround()
 	}
 	FMassEntityManager& EM = Sub->GetMutableEntityManager();
 	FCollisionQueryParams Q(SCENE_QUERY_STAT(CityGenLifeGround), false, this);
+	// (TracesPerFrame traces, round the entities; LG3's skipped ones not counted, so the
+	// people near the view get their ground about as often as LG1's)
 	const int32 N = FMath::Min(TracesPerFrame, Entities.Num());
-	for (int32 K = 0; K < N; ++K)
+	int32 Done = 0;
+	for (int32 K = 0; K < Entities.Num() && Done < N; ++K)
 	{
 		TraceCursor = (TraceCursor + 1) % Entities.Num();
 		const FMassEntityHandle H = Entities[TraceCursor];
@@ -723,6 +748,11 @@ void ACityGenLife::FindGround()
 		FVector At;
 		if (FCgLifeWalker* W = EM.GetFragmentDataPtr<FCgLifeWalker>(H))
 		{
+			// (LG3: only people drawn near or mid need their ground; a free slot none)
+			if (!W->Active || (PersonTier.IsValidIndex(W->Instance) && PersonTier[W->Instance] >= 2))
+			{
+				continue;
+			}
 			ZOff = &W->ZOff;
 			At = W->Pos;
 		}
@@ -737,6 +767,7 @@ void ACityGenLife::FindGround()
 		}
 		const float LaneZ = At.Z - *ZOff;
 		FHitResult Hit;
+		++Done;
 		if (World->LineTraceSingleByChannel(Hit, FVector(At.X, At.Y, LaneZ + 250.f), FVector(At.X, At.Y, LaneZ - 300.f), ECC_Visibility, Q))
 		{
 			*ZOff = FMath::Clamp((float)(Hit.ImpactPoint.Z - LaneZ), -150.f, 250.f);
@@ -751,12 +782,17 @@ void ACityGenLife::UpdateInstances()
 	{
 		UpdatePeople();
 	}
+	// (LG3: a free slot of the pool, or a person in an elevator, is not drawn)
+	auto Shown = [this](const int32 K)
+	{
+		return !IsCity() || (WalkState.IsValidIndex(K) && (WalkState[K] == CgShow::Moving || WalkState[K] == CgShow::Still));
+	};
 	if (Bodies && NP)
 	{
 		Scratch.SetNum(NP);
 		for (int32 K = 0; K < NP; ++K)
 		{
-			Scratch[K] = FTransform(FRotator(0.f, WalkYaw[K], 0.f), WalkPos[K] + FVector(0.f, 0.f, 78.f), FVector(0.30f, 0.44f, 1.5f));
+			Scratch[K] = FTransform(FRotator(0.f, WalkYaw[K], 0.f), WalkPos[K] + FVector(0.f, 0.f, 78.f), Shown(K) ? FVector(0.30f, 0.44f, 1.5f) : FVector::ZeroVector);
 		}
 		Bodies->BatchUpdateInstancesTransforms(0, Scratch, false, bRebuildRenderState, false);
 	}
@@ -765,7 +801,7 @@ void ACityGenLife::UpdateInstances()
 		Scratch.SetNum(NP);
 		for (int32 K = 0; K < NP; ++K)
 		{
-			Scratch[K] = FTransform(FRotator(0.f, WalkYaw[K], 0.f), WalkPos[K] + FVector(0.f, 0.f, 166.f), FVector(0.22f, 0.20f, 0.25f));
+			Scratch[K] = FTransform(FRotator(0.f, WalkYaw[K], 0.f), WalkPos[K] + FVector(0.f, 0.f, 166.f), Shown(K) ? FVector(0.22f, 0.20f, 0.25f) : FVector::ZeroVector);
 		}
 		Heads->BatchUpdateInstancesTransforms(0, Scratch, false, bRebuildRenderState, false);
 	}
@@ -807,10 +843,40 @@ void ACityGenLife::Tick(float DeltaSeconds)
 		return;
 	}
 	FMassEntityManager& EM = Sub->GetMutableEntityManager();
+	const bool bCity = IsCity();
+	if (bCity)
+	{
+		// (LG3: the live walkways round the view, the doors' people, every LiveStep s; the
+		// view, the player and the time for the walk processor)
+		LiveClock += DeltaSeconds;
+		if (LiveClock >= 0.25f)
+		{
+			UpdateLive(LiveClock, Ticks == 0 || LastLiveView.X > 1.0e11);
+			DoorSpawns(LiveClock);
+			LiveClock = 0.f;
+		}
+		FVector View;
+		Frame.View = ViewPoint(View) ? View : FVector(Center.X * 100.0, -Center.Y * 100.0, 0.0);
+		Frame.bPlayer = false;
+		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+		{
+			if (const APawn* Pawn = PC->GetPawn())
+			{
+				Frame.Player = Pawn->GetActorLocation();
+				Frame.bPlayer = true;
+			}
+		}
+		Frame.Time = GetWorld()->GetTimeSeconds();
+		Frame.FrameNo = Frames++;
+	}
 	FindGround();
 	{
 		UE::Mass::FProcessingContext Ctx(EM, DeltaSeconds);
 		UE::Mass::Executor::Run(*WalkProc, Ctx);
+	}
+	if (bCity)
+	{
+		TakeFreed();
 	}
 	{
 		UE::Mass::FProcessingContext Ctx(EM, DeltaSeconds);
@@ -854,5 +920,5 @@ FString ACityGenLife::GetStatus() const
 		bEnabled ? TEXT("true") : TEXT("false"), bBuilt ? TEXT("true") : TEXT("false"), *DistrictId,
 		WalkLaneCount, DriveLaneCount, CarStarts.Num(), WalkPos.Num(), CarPos.Num(), Entities.Num(), Placed,
 		Bodies ? Bodies->GetInstanceCount() : -1, CarParts.Num(), P0.X, -P0.Y, P0.Z, C0.X, -C0.Y, C0.Z,
-		TickMs, TickMsMax, (long long)Ticks, *Lib);
+		TickMs, TickMsMax, (long long)Ticks, *(Lib + CrowdStatus()));
 }

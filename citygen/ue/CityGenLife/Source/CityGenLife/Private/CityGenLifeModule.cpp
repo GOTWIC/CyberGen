@@ -83,6 +83,32 @@ namespace
 			}
 		}));
 
+	FAutoConsoleCommandWithWorldAndArgs HourCmd(TEXT("CityGenLife.Hour"),
+		TEXT("CityGenLife.Hour H: LG3's crowd at hour H (0 to 23), the live walkways filled again"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenLife* A = LifeIn(World);
+			if (A && Args.Num())
+			{
+				A->SetHour(FCString::Atoi(*Args[0]));
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs CrowdCmd(TEXT("CityGenLife.Crowd"),
+		TEXT("CityGenLife.Crowd SCALE [TRIP_S]: LG3's crowd at SCALE times the plan's density (within the pool), its trips TRIP_S s long on average, filled again"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenLife* A = LifeIn(World);
+			if (A && Args.Num())
+			{
+				if (Args.Num() > 1)
+				{
+					A->TripS = FMath::Max(1.f, FCString::Atof(*Args[1]));
+				}
+				A->SetCrowdScale(FCString::Atof(*Args[0]));
+			}
+		}));
+
 	FAutoConsoleCommandWithWorldAndArgs StatusCmd(TEXT("CityGenLife.Status"),
 		TEXT("CityGenLife.Status: log the state as one JSON line"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)

@@ -14,6 +14,7 @@
 // A person's walk keeps its phase from tier to tier (one time offset, one rate).
 
 #include "CityGenLifeActor.h"
+#include "CityGenLifeTypes.h"
 #include "Algo/Sort.h"
 #include "AnimationRuntime.h"
 #include "Animation/AnimSequence.h"
@@ -304,6 +305,7 @@ void ACityGenLife::Assign(const int32 S, const int32 P)
 		Lead->PlayAnimation(Clip, true);
 		Slot.Gait = G;
 	}
+	Slot.bIdle = false;
 	// (the person's outfit color: the plan's tint, on the garments' dye)
 	const FLinearColor Tint(PersonTint.IsValidIndex(3 * P) ? PersonTint[3 * P] : 0.5f,
 		PersonTint.IsValidIndex(3 * P + 1) ? PersonTint[3 * P + 1] : 0.5f,
@@ -377,8 +379,18 @@ void ACityGenLife::UpdatePeople()
 	// (who is near: the NearMax nearest within NearM; a person already near keeps its slot
 	// out to 1.15 NearM, so the edge does not flicker)
 	NearCand.Reset();
+	// (LG3: a free slot of the pool, or someone in an elevator, is drawn by no tier)
+	const bool bCity = IsCity() && WalkState.Num() == NP;
+	auto Shown = [&](const int32 P)
+	{
+		return !bCity || WalkState[P] == CgShow::Moving || WalkState[P] == CgShow::Still;
+	};
 	for (int32 P = 0; P < NP; ++P)
 	{
+		if (!Shown(P))
+		{
+			continue;
+		}
 		const float D2 = FVector::DistSquared(WalkPos[P], View);
 		const float Lim = PersonSlot[P] != INDEX_NONE ? Near2 * 1.32f : Near2;
 		if (D2 <= Lim && !WalkPos[P].IsZero())
@@ -444,13 +456,46 @@ void ACityGenLife::UpdatePeople()
 		const float D2 = FVector::DistSquared(At, View);
 		const int32 S = PersonSlot[P];
 		uint8 Tier = 3;
-		if (S != INDEX_NONE)
+		const bool bStill = bCity && WalkState[P] == CgShow::Still;
+		if (!Shown(P))
+		{
+			// (out of the city, or in an elevator: no tier; its slot let go above)
+		}
+		else if (S != INDEX_NONE)
 		{
 			Tier = 0;
 			if (USkeletalMeshComponent* Lead = NearSlots[S].Comps.Num() ? NearSlots[S].Comps[0] : nullptr)
 			{
 				Lead->SetWorldLocationAndRotation(At, FRotator(0.f, WalkYaw[P] + MeshYaw, 0.f), false, nullptr, ETeleportType::TeleportPhysics);
 				Lead->SetWorldScale3D(FVector(Scale));
+				// (LG3: standing, at a signal or behind someone: the idle; walking, the walk)
+				if (bCity && NearSlots[S].bIdle != bStill)
+				{
+					UAnimSequence* Clip = nullptr;
+					if (bStill && IdleClips.Num())
+					{
+						Clip = IdleClips[(PersonGait.IsValidIndex(P) ? PersonGait[P] : 0) % IdleClips.Num()].Get();
+					}
+					if (bStill && Clip)
+					{
+						Lead->PlayAnimation(Clip, true);
+						Lead->SetPlayRate(1.f);
+						NearSlots[S].Gait = INDEX_NONE;
+					}
+					else if (!bStill)
+					{
+						const int32 Group = CharClipGroup.IsValidIndex(C) ? CharClipGroup[C] : 0;
+						const int32 Gait = PersonGait.IsValidIndex(P) ? FMath::Clamp(PersonGait[P], 0, FMath::Max(0, Gaits - 1)) : 0;
+						const int32 G = FMath::Clamp(Group * FMath::Max(1, Gaits) + Gait, 0, FMath::Max(0, WalkClips.Num() - 1));
+						if (UAnimSequence* Walk = WalkClips.IsValidIndex(G) ? WalkClips[G].Get() : nullptr)
+						{
+							Lead->PlayAnimation(Walk, true);
+							Lead->SetPlayRate(WalkRate(P));
+							NearSlots[S].Gait = G;
+						}
+					}
+					NearSlots[S].bIdle = bStill;
+				}
 			}
 			++NearNow;
 		}
@@ -469,16 +514,50 @@ void ACityGenLife::UpdatePeople()
 		MidXf[C][I] = Tier == 1 ? FTransform(FRotator(0.f, WalkYaw[P] + MeshYaw, 0.f), At, FVector(Scale)) : Hidden;
 		FarXf[C][I] = Tier == 2 ? FTransform(FRotator(0.f, WalkYaw[P], 0.f), At, FVector(Scale)) : Hidden;
 		PersonTier[P] = Tier;
+		// (LG3: a mid or far person standing still holds its walk's frame)
+		if (bCity && (Tier == 1 || Tier == 2) && PersonStill.IsValidIndex(P) && PersonStill[P] != (uint8)bStill)
+		{
+			PersonStill[P] = (uint8)bStill;
+			ApplyLook(P, bStill);
+		}
+	}
+	// (LG3: the far cards move half as often, each character's every second frame; a
+	// character with nobody drawn in a tier, now or the frame before, is not sent again)
+	if (FarSeen.Num() != NC)
+	{
+		FarSeen.Init(1, NC);
+		MidSeen.Init(1, NC);
 	}
 	for (int32 K = 0; K < NC; ++K)
 	{
+		auto Any = [](const TArray<FTransform>& Xs)
+		{
+			for (const FTransform& X : Xs)
+			{
+				if (X.GetScale3D().X > 0.0)
+				{
+					return true;
+				}
+			}
+			return false;
+		};
 		if (MidComps.IsValidIndex(K) && MidComps[K] && MidXf[K].Num())
 		{
-			MidComps[K]->BatchUpdateInstancesTransforms(0, MidXf[K], false, bRebuildRenderState, false);
+			const uint8 Now = Any(MidXf[K]) ? 1 : 0;
+			if (Now || MidSeen[K])
+			{
+				MidComps[K]->BatchUpdateInstancesTransforms(0, MidXf[K], false, bRebuildRenderState, false);
+			}
+			MidSeen[K] = Now;
 		}
-		if (FarComps.IsValidIndex(K) && FarComps[K] && FarXf[K].Num())
+		if (FarComps.IsValidIndex(K) && FarComps[K] && FarXf[K].Num() && (!bCity || ((Ticks + K) & 1) == 0 || !FarSeen[K]))
 		{
-			FarComps[K]->BatchUpdateInstancesTransforms(0, FarXf[K], false, bRebuildRenderState, false);
+			const uint8 Now = Any(FarXf[K]) ? 1 : 0;
+			if (Now || FarSeen[K])
+			{
+				FarComps[K]->BatchUpdateInstancesTransforms(0, FarXf[K], false, bRebuildRenderState, false);
+			}
+			FarSeen[K] = Now;
 		}
 	}
 	const double Ms = (FPlatformTime::Seconds() - T0) * 1000.0;

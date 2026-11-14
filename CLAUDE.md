@@ -2803,6 +2803,31 @@ LG1 (people) is in place:
   skin through the low LOD garments, barefoot until LG2, the idles not yet played):
   `docs/progress/LG1/README.md`.
 
+LG3 (crowds on the streets, built before LG2 at Swagnik's ask) is in place:
+- **The plan** (`lifegen/plan.py`): every walkway's people per hour band (`crowd_walks`: a
+  segment's M11 people on its own walkways by length, the rest at the district's mean
+  sidewalk density times `presets.OFFSTREET`, none where no spawn reaches; each tile file's
+  `walks`), derived signal phases (`signals`, `signals.json`, `presets.SIGNAL`: two phases
+  from the legs' lines, crosswalks walking while their leg is stopped, 60 s cycles), AG3's
+  doors as the spawn points where the build has them (`door_points`), the crowd's pool and
+  settings (`crowd_plan`, the spec's `crowd`, `presets.CROWD`: 2,400 people, live within
+  340 m, 600 s trips, groups of 1 to 5, jaywalking by danger, avoidance, speeds); checks
+  `crowd_densities`, `crowd_levels`, `signals`, `crowd_budget`, `crowd_spawns`, `people_draws`
+  on the pool. The spike keeps only its cars.
+- **Exporter and runtime** (`unreal_life.pack_crowd`, `PACK_VERSION` 3;
+  `import_city.crowd_props`, `LIFE_VERSION` life3; `CityGenLifeCrowd.cpp`, the walk
+  processor's `ExecuteCity`): the whole walkway graph as lanes; walkways live round the view,
+  filled and emptied past the far tier; a fixed pool of Mass entities, the density scaled
+  down evenly past 92% of it; trips out of and into doors; groups; signals and jaywalking;
+  avoidance and stepping aside from the player; stairs, escalators, elevators; idles while
+  standing; far people stepped less often; `CityGenLife.Hour`, `CityGenLife.Crowd`, the
+  status's `crowd`; the check logs it per view (`*_wait*` views wait 30 s).
+  `docs/unreal_export.md`, "From LG3: crowds on the streets".
+- Delta: `night_plan_all` 19.3 ms p95 native on the lean route (walk 21.4), people off 18.1;
+  Old Town walks at about a third of its density (the pool), the rest at full. Open items
+  (crosswalk and crossing walkways along the carriageway, Old Town's density, the hour until
+  LG8): `docs/progress/LG3/README.md`.
+
 ## Gallery site (GitHub Pages)
 
 `site/` is the public gallery at https://gotwic.github.io/CyberGen/ (served at

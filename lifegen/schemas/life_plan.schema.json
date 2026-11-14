@@ -76,6 +76,136 @@
    "title": "Check",
    "type": "object"
   },
+  "CrowdPlan": {
+   "additionalProperties": false,
+   "description": "LG3: the city's crowd (scope 6.3): who walks (a pool of people the runtime simulates\nround the view, each drawn from the library by their seed), how it lives (the hour, the\nlive radius, trips, groups, jaywalking, avoidance, speeds), the districts' palettes.",
+   "properties": {
+    "avoid": {
+     "additionalProperties": {
+      "type": "number"
+     },
+     "title": "Avoid",
+     "type": "object"
+    },
+    "group_gap_m": {
+     "title": "Group Gap M",
+     "type": "number"
+    },
+    "groups": {
+     "items": {
+      "type": "number"
+     },
+     "title": "Groups",
+     "type": "array"
+    },
+    "hash": {
+     "title": "Hash",
+     "type": "string"
+    },
+    "hour": {
+     "title": "Hour",
+     "type": "integer"
+    },
+    "jaywalk": {
+     "items": {
+      "type": "number"
+     },
+     "title": "Jaywalk",
+     "type": "array"
+    },
+    "kinds": {
+     "description": "Walkway kinds by the runtime's code.",
+     "items": {
+      "type": "string"
+     },
+     "title": "Kinds",
+     "type": "array"
+    },
+    "library": {
+     "additionalProperties": true,
+     "title": "Library",
+     "type": "object"
+    },
+    "live_m": {
+     "title": "Live M",
+     "type": "number"
+    },
+    "palettes": {
+     "additionalProperties": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "description": "Per district its clothes' colors (sRGB, by its style).",
+     "title": "Palettes",
+     "type": "object"
+    },
+    "persons": {
+     "additionalProperties": {
+      "items": {
+       "type": "number"
+      },
+      "type": "array"
+     },
+     "description": "Per pool slot its draws (seed, character, scale, gait, pace, tint: an index into the district's palette where it comes out).",
+     "title": "Persons",
+     "type": "object"
+    },
+    "pool": {
+     "title": "Pool",
+     "type": "integer"
+    },
+    "scale": {
+     "title": "Scale",
+     "type": "number"
+    },
+    "speeds": {
+     "additionalProperties": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "items": {
+         "type": "number"
+        },
+        "type": "array"
+       }
+      ]
+     },
+     "title": "Speeds",
+     "type": "object"
+    },
+    "totals": {
+     "additionalProperties": true,
+     "title": "Totals",
+     "type": "object"
+    },
+    "trip_s": {
+     "title": "Trip S",
+     "type": "number"
+    }
+   },
+   "required": [
+    "hour",
+    "pool",
+    "live_m",
+    "trip_s",
+    "scale",
+    "groups",
+    "group_gap_m",
+    "jaywalk",
+    "avoid",
+    "speeds",
+    "kinds",
+    "palettes",
+    "totals",
+    "hash"
+   ],
+   "title": "CrowdPlan",
+   "type": "object"
+  },
   "DistrictLife": {
    "additionalProperties": false,
    "description": "A district's people and vehicles by hour, from M11's densities and its filled spec.",
@@ -452,6 +582,11 @@
     "tile": {
      "title": "Tile",
      "type": "string"
+    },
+    "walks": {
+     "default": 0,
+     "title": "Walks",
+     "type": "integer"
     }
    },
    "required": [
@@ -492,6 +627,18 @@
   "city": {
    "title": "City",
    "type": "string"
+  },
+  "crowd": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/CrowdPlan"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "description": "LG3: the city's crowd."
   },
   "districts": {
    "items": {

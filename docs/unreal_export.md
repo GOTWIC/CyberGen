@@ -423,7 +423,7 @@ high resolution shot), and showing the lane and walkway graphs over the city for
 | 1 citygen | the blockout, props and plants, graphs, player start, a default sun and sky (M15); terrain: the ground per tile, walls, bores, terrain viaducts and columns by id (M13); decks: the slab, deck streets and the buildings on them tagged with their level, the manifest's decks, levels in the graphs (M14); water and ground: swim volumes per water body and tile, water at its surface, beds, banks by kind and the ground cover by kind with a material each (M16) |
 | 2 assetgen | buildings replacing their blockout boxes by id (own pivots, parts as instances, simple collision), textured master materials with per-actor parameters, street meshes replacing the joined pieces, prop and plant variants, signs, LODs for the pieces Nanite does not take, HLOD and Lumen settings (per milestone: `docs/assetgen_scope.md` section 14) |
 | 3 atmosgen | lights (street and wall lights, shopfronts, signs as lit faces, floods), sky, time, weather, fog and post volumes, replacing M15's default sun and sky; rendered by its runtime plugin `CityGenAtmos` (AT0: the plugin's skeleton, its assets, the plan's contribution format; "atmosgen's runtime (AT0)" below) |
-| 4 lifegen | people, traffic, transit, air and water on the graphs, spawners, place slots; moved by its runtime plugin `CityGenLife` (LG0: the plugin's skeleton, ZoneGraph lanes from the graphs, the spike's stand-ins and cars; "lifegen's runtime (LG0)" below; LG1: the people library, MetaHumans made by script into the project, near, mid and far tiers; "From LG1: people") |
+| 4 lifegen | people, traffic, transit, air and water on the graphs, spawners, place slots; moved by its runtime plugin `CityGenLife` (LG0: the plugin's skeleton, ZoneGraph lanes from the graphs, the spike's stand-ins and cars; "lifegen's runtime (LG0)" below; LG1: the people library, MetaHumans made by script into the project, near, mid and far tiers; "From LG1: people"; LG3: the city's crowd on every walkway round the view, doors, signals, groups, avoidance; "From LG3: crowds on the streets") |
 | 5 storygen | story actors, triggers, sequences |
 
 ## assetgen's contribution (AG0)
@@ -2489,6 +2489,77 @@ assets and Epic's animations are made or copied into the project only, never the
   FAR_M`; `CityGenLife.Status` adds `library` (characters, how many near, mid and far now,
   slots, the game thread's time drawing them). The benchmark's `night_life_near0` and
   `night_life_near80` passes; every life pass sets the tiers.
+
+### From LG3: crowds on the streets
+
+A life plan with a `crowd` (`lifegen plan` since LG3) replaces the spike's people with the
+city's crowd: every walkway of the city, every kind and level, at its street's density by hour,
+simulated only round the view (`citygen/unreal_life.py` `pack_crowd`, `PACK_VERSION` 3;
+`import_city.crowd_props`, `LIFE_VERSION` life3; `CityGenLifeCrowd.cpp`). The spike keeps its
+drive lanes and cars until LG5. A plan before LG3 packs and walks LG1's spike as before.
+
+- **The pack** (`BUILD/unreal/life.json`, the controller's properties): the whole walkway graph
+  as lanes (`pack_walks`, LG0's links); per walkway its kind (`WalkKinds`, lifegen's
+  `WALK_KIND_CODES`), district (`WalkDistrict`), people per hour band (`WalkPeople`, 5 a
+  walkway: M11's band densities, the district's busy and the crowd's scale in) and signal
+  window (`WalkSignal`, an index into `SignalWindows`: cycle, offset, walk from, walk to, s);
+  per district its day (`DistrictShape`, 24 floats), danger (`DistrictDanger`) and clothes'
+  colors (`DistrictPalettes`, `PaletteSize` linear RGB colors); the doors (`DoorLanes`,
+  `DoorDistsM`, `DoorPoints`, `DoorRates`: every spawn point of the plan, AG3's doors, station
+  stairs, garages and taxi stands, on its walkway at its distance along it, its people a hour
+  out at the crowd's hour); the pool (`People` its size, `PersonChar` ... as LG1's, its tint
+  an index into its district's palette, `PersonTintIndex`); the settings (`Hour`, `LiveM`,
+  `TripS`, `GroupShares`, `GroupGapM`, `Jaywalk`, `ReachM`, `PersonalM`, `PlayerM`, `AvoidM`,
+  `StairsShare`, `Escalator`, `ElevatorMS`). The import's `life.crowd` says the doors,
+  signals, hour and pool.
+- **Live round the view** (`UpdateLive`, every 0.25 s): a walkway within `LiveM` (340 m, 3D,
+  from its bounding box) of the view is live; one coming alive gets its people at the hour
+  (`WalkPeople` of the hour's band times its district's `DistrictShape` at the hour) times the
+  scale that keeps the live people at most 92% of the pool (`LiveScale`, in the status), in
+  groups at random places along it; one going past `LiveM` and 40 m loses its people; a person
+  walking toward a walkway that is not live turns back there. All of it past the far tier's
+  300 m, so out of sight; a jump of the view (a teleport, the benchmark's segments) fills the
+  walkways round the new view at once. The rest of the city is a number per walkway: no
+  entity, no cost.
+- **A fixed pool** (`SpawnPool`): `People` Mass entities made at BeginPlay (one fragment,
+  `FCgLifeWalker`, with LG3's state), free until used; no entity is made or destroyed while
+  the game runs. The mid and far tiers' instances stay one per pool slot (LG1's), a free slot
+  hidden.
+- **Trips** (`DoorSpawns`, `CgLife::StepCity`): the live doors send people out at their rates
+  (as many as go in over a trip, `TripS` 600 s on average, more while the live people are
+  under their number), one after another out of the door onto its walkway; a person whose trip
+  is over goes in at the next door ahead of it on its walkway (`Enter`: from where it walks to
+  0.6 m inside the door), or, long over and drawn by no tier, leaves where nobody sees.
+- **Groups and pace:** people come out and come alive in groups of 1 to 5 (`GroupShares`),
+  in pairs side by side `GroupGapM` apart, at the group's slowest pace; a group shares its
+  seed, so its members choose the same ways and doors; a follower may still start crossing up
+  to 4 s after the walk signal ends, so the hand does not cut a group in two.
+- **Signals:** a signalized crosswalk's people wait at its curb (its second point walked
+  forward, its last but one back, 0.3 to 1.5 m short of it, `HoldA`, `HoldB`) until its
+  phase's walk window (the cycle's time from the game's clock and the junction's offset); a
+  share crosses against it (`Jaywalk`, 1% at danger 0 to 30% at danger 1, by its district).
+- **Avoidance** (the walk processor's first pass, only for people within `AvoidM` 90 m of the
+  view): sorted by walkway and distance along it, each reacts to those ahead of it within
+  `ReachM`: a slower or waiting one in its way is passed on the left or followed at its pace;
+  one coming the other way makes both step to their own right; a group's members leave each
+  other be. Each person keeps to its side (75% right) plus that push, moving across at most
+  0.7 m/s; within `PlayerM` of the player's pawn (3D) people step aside and slow.
+- **Stairs, escalators, elevators:** every kind of walkway is walked, stairs at 0.6 of the
+  pace, escalators at 0.3 of it plus 0.5 m/s, elevators at 0.6 m/s along their shaft with
+  nobody drawn inside; people take elevators, skybridges and paths less often than streets.
+- **Cheaper far away:** the far people step every second frame, the people drawn by no tier
+  every fourth (with the time they missed); the far cards' instances are sent every second
+  frame per character, and a character with nobody drawn in a tier is not sent at all; the
+  ground is traced only under people drawn near or mid.
+- **The tiers:** LG1's, with a person standing (waiting, or held behind someone) on its idle
+  clip near, its baked walk and card frozen mid and far; a person in an elevator is drawn by
+  none.
+- **Console:** `CityGenLife.Hour H` (the crowd at another hour, every live walkway filled
+  again; until LG8 reads atmosgen's), `CityGenLife.Crowd SCALE [TRIP_S]` (the density times SCALE,
+  within the pool, trips TRIP_S long); `CityGenLife.Respawn PEOPLE CARS` takes a smaller pool; `CityGenLife.Status`
+  adds `crowd` (hour, pool, live walkways, the live people wanted and the scale, active, free,
+  waiting, standing, in elevators, spawned, out of doors, in at doors, gone with their
+  walkway, jaywalked, groups, doors live, signals). The check logs it at each play view.
 
 ## Milestones and checks
 

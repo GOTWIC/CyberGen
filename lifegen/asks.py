@@ -19,9 +19,11 @@ ASKS = (
                                       "ids walking, green_s, amber_s, all_red_s}",
                 "junctions[].cycle_s": "the cycle's length",
                 "junctions[].offset_s": "its offset in a corridor's green wave"},
-     "derived": "two phases from the legs' angles (opposite legs together, every crosswalk "
-                "across the legs that stop), a 60 s cycle; M18's `signalized` and crosswalk "
-                "ids say which junctions",
+     "derived": "LG3's `signals.json`: two phases from the legs' lines (legs within 45 "
+                "degrees of the first leg's line together), each crosswalk walking while the "
+                "leg it crosses is stopped, a 60 s cycle with 3 s amber and 2 s all-red, people "
+                "starting across in the first 12 s of their phase, an offset per junction by "
+                "its id; M18's `signalized` and crosswalk ids say which junctions",
      "missing": ""},
     {"id": "bus_routes", "of": "citygen", "needed_by": "LG5",
      "what": "bus routes and their stops",
@@ -45,8 +47,7 @@ ASKS = (
      "field": ("buildings", "lobbies"),
      "record": {"buildings[].lobbies": "[{entrance index, position 2 to 4 m inside, "
                                        "level}]"},
-     "derived": "a person goes in at the door's threshold (AG3's door record), 1.5 m inside "
-                "along its normal",
+     "derived": "a person goes in at AG3's door, 0.6 m past its threshold, and is gone (LG3)",
      "missing": ""},
     {"id": "piers", "of": "citygen", "needed_by": "LG7",
      "what": "piers for ferries and water taxis",
@@ -68,7 +69,8 @@ ASKS = (
      "what": "every door with its walkway (AG3's door records, the exporter's doors graph)",
      "field": ("@assetgen", "doors"),
      "record": {"doors": "AG3: id, kind, walkway id, position, normal, size"},
-     "derived": "M3's entrances (position, walkway id) until the build's assets are read",
+     "derived": "M3's entrances (position, walkway id) where the build has no stage 2 "
+                "buildings (LG3 reads AG3's doors where it has)",
      "missing": ""},
     {"id": "fleet_kinds", "of": "assetgen", "needed_by": "LG5, LG7",
      "what": "AG18's missing kinds: buses, trucks, motorbikes, bikes, flying cars, drones, "

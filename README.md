@@ -669,11 +669,18 @@ walks; each person in the plan gets a character, height, pace and outfit color. 
 view they are full MetaHumans; farther off, baked walks and, past 90 m, cards that still
 walk.
 
+LG3 (crowds) is in: the people now walk every street of the city, as many as each street
+has at the hour, in groups, at their own pace, waiting at crosswalks for the signals, coming
+out of shop and building doors and going back in; they come and go round you past where you
+can see them, so the whole city is lived in at the cost of one district.
+
 | People on an Old Town street | The walk by night |
 |---|---|
 | <img src="docs/progress/LG1/unreal/pday_people_close_0.jpg" width="420"> | <img src="docs/progress/LG1/unreal/night_people_close_0.jpg" width="420"> |
 | A crowd from street level | People on the streets by hour, as planned |
 | <img src="docs/progress/LG1/unreal/pday_people_street_0.jpg" width="420"> | <img src="docs/progress/LG0/plan/preview_crowds.png" width="420"> |
+| An Old Town street from above (LG3) | A group crossing in the Corporate Core (LG3) |
+| <img src="docs/progress/LG3/unreal/pday_crowd_d04_up.jpg" width="420"> | <img src="docs/progress/LG3/unreal/night_crowd_d03_up.jpg" width="420"> |
 | A tee sewn from flat panels and draped in Blender (the clothing test) | |
 | <img src="docs/progress/LG0/garment/garment_34.jpg" width="200"> | |
 
@@ -695,7 +702,7 @@ Plan: [`docs/lifegen_scope.md`](docs/lifegen_scope.md); what each milestone did:
 | LG0 | Groundwork | A spec of who lives in each district (wealth, danger, archetype, time of day), the plan's format, the walkway and lane graphs as Unreal crowd and traffic lanes, people walking one district in Unreal as a test | Done |
 | LG1 | People | A population of MetaHumans made by script into your project (bodies, faces, skin and hair by seed), walking with Unreal's own animations, with baked walks and impostor cards for the crowd far away | Done |
 | LG2 | Clothing | Garments generated from sewing patterns and draped on each body, generated fabrics, prints and wear, accessories and cyberware; outfits by district, gang, job, wealth and weather; long coats that move near the view | Planned |
-| LG3 | Crowds on the streets | People walking every sidewalk, crossing at crosswalks with the signals, taking stairs and elevators between levels, in groups and at their own pace, as many as each street has at each hour | Planned |
+| LG3 | Crowds on the streets | People walking every sidewalk of the city, crossing at crosswalks with the signals, taking stairs and elevators between levels, in groups and at their own pace, as many as each street has at each hour, coming out of doors and going back in | Done |
 | LG4 | Life at places | People at benches, stalls, vending machines and bus stops, queueing at shop doors, going in and out of buildings, bars and clinics by their opening hours; gangs on their turf and police patrols | Planned |
 | LG5 | Traffic | The hand-designed cars, and trucks, buses, taxis and bikes, on the lanes, stopping at signals and turning by the rules, parking and leaving, rush hour and night traffic; their lights by night | Planned |
 | LG6 | Transit | Trains, metro, monorail, maglev and sky tube pods running their lines to timetables, stopping at stations, people boarding and leaving | Planned |

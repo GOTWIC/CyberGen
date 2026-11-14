@@ -1,5 +1,5 @@
-// lifegen's Mass fragments (LG0): a stand-in walking a walkway lane and a car driving a lane,
-// each an entity of the world's Mass entity manager, moved by CityGenLife's processors.
+// lifegen's Mass fragments (LG0, LG3): a person walking a walkway lane and a car driving a
+// lane, each an entity of the world's Mass entity manager, moved by CityGenLife's processors.
 
 #pragma once
 
@@ -7,9 +7,34 @@
 #include "MassEntityTypes.h"
 #include "CityGenLifeTypes.generated.h"
 
+/** LG3: what a person is doing (FCgLifeWalker::State). */
+namespace CgWalk
+{
+	enum : uint8
+	{
+		Walk = 0,      // along its walkway lane
+		Wait = 1,      // at a crosswalk's curb for the signal
+		Enter = 2,     // from its walkway through a door, then gone (a trip's end)
+		Exit = 3,      // out of a door onto its walkway (a trip's start)
+	};
+}
+
+/** LG3: per person what the drawing reads (ACityGenLife's WalkState, per instance). */
+namespace CgShow
+{
+	enum : uint8
+	{
+		Off = 0,       // not in the city now (a free slot of the pool)
+		Moving = 1,
+		Still = 2,     // waiting at a signal, or held behind someone
+		Hidden = 3,    // in an elevator
+	};
+}
+
 /** A person walking: on a walkway lane (an index into the life actor's ZoneGraph storage), a
  *  distance along it and a direction (walkways are walked both ways), a pace, a side of the
- *  lane (the share of its half width, signed: + on the walker's right). */
+ *  lane (the share of its half width, signed: + on the walker's right). LG3: a slot of the
+ *  city's pool, live or free (`Active`), with its state, group, trip and avoidance. */
 USTRUCT()
 struct FCgLifeWalker : public FMassFragment
 {
@@ -19,13 +44,29 @@ struct FCgLifeWalker : public FMassFragment
 	int32 PrevLane = INDEX_NONE;
 	float Dist = 0.f;
 	float Dir = 1.f;
-	float Speed = 130.f;           // cm/s
+	float Speed = 130.f;           // cm/s: the pace (a group walks at its slowest member's)
 	float Side = 0.f;
 	float ZOff = 0.f;              // cm over the lane: the surface found under it
 	int32 Instance = 0;
 	uint32 Seed = 0;
 	FVector Pos = FVector::ZeroVector;
 	float Yaw = 0.f;
+
+	// --- LG3 ---------------------------------------------------------------------------------
+	uint8 Active = 1;              // (LG0's and LG1's people are always on)
+	uint8 State = CgWalk::Walk;
+	uint8 Crossed = 0;             // past this lane's signal (or none)
+	uint8 Member = 0;              // its place in its group (0 leads)
+	int32 Group = INDEX_NONE;
+	float Lat = 0.f;               // cm right of the lane's own direction, now
+	float Push = 0.f;              // cm the avoidance adds to where it keeps (this frame)
+	float SpeedMul = 1.f;          // the avoidance's share of its pace (this frame)
+	float TripLeft = 1.0e9f;       // s until it looks for a door to go in at
+	int32 Door = INDEX_NONE;       // the door it comes out of or goes in at
+	float T = 0.f;                 // s through the door
+	FVector From = FVector::ZeroVector;   // where it left its walkway for the door
+	float HoldBack = 0.f;          // cm short of a crosswalk's curb it waits
+	float Pending = 0.f;           // s held back by a far person's skipped frames
 };
 
 /** A car driving: on a lane of the lane graph (directed), its next lane chosen ahead, its
