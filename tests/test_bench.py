@@ -379,7 +379,14 @@ def test_life_passes():
         cmds = by[name][3]
         life = [c for c in cmds if c.startswith("CityGenLife.")]
         assert [c.split()[0] for c in life] == ["CityGenLife.Enable", "CityGenLife.Shadows",
-                                                "CityGenLife.Rebuild", "CityGenLife.Lumen"]
+                                                "CityGenLife.Rebuild", "CityGenLife.Lumen",
+                                                "CityGenLife.Tiers"]
         assert set(cmds) - set(life) == base and cmds[-1].startswith("CityGenAtmos.Hour")
     assert "CityGenLife.Enable 0" in by["night_life_off"][3]
     assert "CityGenLife.Lumen 1" in by["night_life_lumen"][3]
+    # (LG1: the people library's tiers, every pass setting them, the near pass none near)
+    from lifegen.library import TIERS
+    assert f"CityGenLife.Tiers {TIERS['near_m']:g} 0 {TIERS['mid_m']:g} {TIERS['far_m']:g}" \
+        in by["night_life_near0"][3]
+    assert f"CityGenLife.Tiers {TIERS['near_m']:g} {TIERS['near_max']} " \
+           f"{TIERS['mid_m']:g} {TIERS['far_m']:g}" in by["night_life"][3]

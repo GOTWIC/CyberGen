@@ -362,13 +362,20 @@ def people_library(lib: dict | None, spike: dict) -> dict:
         mid_frames += [float(c["mid"]["start"]), float(c["mid"]["end"]),
                        float(c["mid"]["fps"]), float(c["mid"].get("cycle_s", 1.0))]
         cards.append(c["far"]["material"])
-    walks = [lib["clips"][w] for w in spike.get("library", {}).get("walks", lib["walks"])]
+    names = (spike.get("library") or {}).get("walks") or lib["walks"]
+    # (characters on one body skeleton share their clips: a group's walks in gait order)
+    groups = lib.get("clip_groups") or {"s0": {"clips": lib["clips"]}}
+    keys = sorted(groups)
+    walks = [groups[k]["clips"][w] for k in keys for w in names]
     tiers = {**(lib.get("tiers") or {}), **((spike.get("library") or {}).get("tiers") or {})}
     return {"near_meshes": near, "near_mesh_starts": starts,
-            "near_follow": [c["near"].get("follow", []) for c in chars],
+            "near_hair": [c["near"].get("hair") or "" for c in chars],
+            "char_clip_group": [keys.index(c["skeleton"]) if c.get("skeleton") in keys else 0
+                                for c in chars],
+            "gaits": len(names),
             "walk_clips": [w["anim"] for w in walks],
             "walk_clip_speeds": [float(w["speed"]) for w in walks],
-            "idle_clips": [lib["clips"][k]["anim"] for k in lib.get("idles", [])],
+            "idle_clips": [groups[keys[0]]["clips"][k]["anim"] for k in lib.get("idles", [])],
             "mid_meshes": mid, "mid_frames": mid_frames,
             "card_mesh": lib["far"]["card"], "card_materials": cards,
             "card_size": [float(v) for v in lib["far"].get("size", [1.0, 2.0])],

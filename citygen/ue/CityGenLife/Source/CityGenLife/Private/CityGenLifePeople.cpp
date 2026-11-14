@@ -15,7 +15,9 @@
 
 #include "CityGenLifeActor.h"
 #include "Algo/Sort.h"
+#include "AnimationRuntime.h"
 #include "Animation/AnimSequence.h"
+#include "Components/StaticMeshComponent.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -187,6 +189,10 @@ void ACityGenLife::Release(const int32 S)
 			C->SetComponentTickEnabled(false);
 		}
 	}
+	if (Slot.Hair)
+	{
+		Slot.Hair->SetVisibility(false);
+	}
 }
 
 void ACityGenLife::Assign(const int32 S, const int32 P)
@@ -241,10 +247,42 @@ void ACityGenLife::Assign(const int32 S, const int32 P)
 				Comp->SetLeaderPoseComponent(Mesh ? Lead : nullptr);
 			}
 		}
+		// (its hair: the groom's cards on the face's head bone, placed by the bone's reference
+		// pose, since the cards are in the face's frame at that pose)
+		UStaticMesh* HairMesh = NearHair.IsValidIndex(C) ? NearHair[C].Get() : nullptr;
+		USkeletalMeshComponent* On = Slot.Comps.IsValidIndex(HairOn) ? Slot.Comps[HairOn] : Lead;
+		if (HairMesh && !Slot.Hair)
+		{
+			Slot.Hair = NewObject<UStaticMeshComponent>(this, *FString::Printf(TEXT("PeopleHair%d"), S));
+			Slot.Hair->SetMobility(EComponentMobility::Movable);
+			Slot.Hair->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Slot.Hair->SetCanEverAffectNavigation(false);
+			Slot.Hair->bAffectDistanceFieldLighting = false;
+			Slot.Hair->SetAffectDynamicIndirectLighting(false);
+			Slot.Hair->SetCastShadow(bShadows);
+			Slot.Hair->SetupAttachment(On);
+			Slot.Hair->RegisterComponent();
+			HairComps.Add(Slot.Hair);
+		}
+		if (Slot.Hair)
+		{
+			Slot.Hair->SetStaticMesh(HairMesh);
+			FTransform Rel = FTransform::Identity;
+			const USkeletalMesh* Face = On ? On->GetSkeletalMeshAsset() : nullptr;
+			const int32 Bone = Face ? Face->GetRefSkeleton().FindBoneIndex(TEXT("head")) : INDEX_NONE;
+			if (Bone != INDEX_NONE)
+			{
+				Rel = FAnimationRuntime::GetComponentSpaceTransformRefPose(Face->GetRefSkeleton(), Bone).Inverse();
+				Slot.Hair->AttachToComponent(On, FAttachmentTransformRules::KeepRelativeTransform, TEXT("head"));
+			}
+			Slot.Hair->SetRelativeTransform(Rel);
+		}
 		Slot.Char = C;
 		Slot.Gait = INDEX_NONE;
 	}
-	const int32 G = PersonGait.IsValidIndex(P) ? FMath::Clamp(PersonGait[P], 0, FMath::Max(0, WalkClips.Num() - 1)) : 0;
+	const int32 Group = CharClipGroup.IsValidIndex(C) ? CharClipGroup[C] : 0;
+	const int32 Gait = PersonGait.IsValidIndex(P) ? FMath::Clamp(PersonGait[P], 0, FMath::Max(0, Gaits - 1)) : 0;
+	const int32 G = FMath::Clamp(Group * FMath::Max(1, Gaits) + Gait, 0, FMath::Max(0, WalkClips.Num() - 1));
 	UAnimSequence* Clip = WalkClips.IsValidIndex(G) ? WalkClips[G].Get() : nullptr;
 	if (Clip && Slot.Gait != G)
 	{
@@ -266,6 +304,10 @@ void ACityGenLife::Assign(const int32 S, const int32 P)
 		const bool bOn = Comp->GetSkeletalMeshAsset() != nullptr;
 		Comp->SetVisibility(bOn);
 		Comp->SetComponentTickEnabled(bOn);
+	}
+	if (Slot.Hair)
+	{
+		Slot.Hair->SetVisibility(Slot.Hair->GetStaticMesh() != nullptr);
 	}
 	Slot.Person = P;
 	PersonSlot[P] = S;
@@ -394,9 +436,10 @@ void ACityGenLife::UpdatePeople()
 			Tier = 2;
 			++FarNow;
 		}
-		const FTransform Xf(FRotator(0.f, WalkYaw[P], 0.f), At, FVector(Scale));
-		MidXf[C][I] = Tier == 1 ? Xf : Hidden;
-		FarXf[C][I] = Tier == 2 ? Xf : Hidden;
+		// (the mid mesh is the skeletal meshes' frame, MeshYaw off the walk; the card's frame
+		// has the person facing +X, as its sheet was drawn)
+		MidXf[C][I] = Tier == 1 ? FTransform(FRotator(0.f, WalkYaw[P] + MeshYaw, 0.f), At, FVector(Scale)) : Hidden;
+		FarXf[C][I] = Tier == 2 ? FTransform(FRotator(0.f, WalkYaw[P], 0.f), At, FVector(Scale)) : Hidden;
 		PersonTier[P] = Tier;
 	}
 	for (int32 K = 0; K < NC; ++K)

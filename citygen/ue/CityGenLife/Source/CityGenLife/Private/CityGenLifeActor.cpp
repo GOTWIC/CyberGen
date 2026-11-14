@@ -850,7 +850,7 @@ FString ACityGenLife::GetStatus() const
 	{
 		Slots += S.Person != INDEX_NONE ? 1 : 0;
 	}
-	const FString People = HasPeople()
+	const FString Lib = HasPeople()
 		? FString::Printf(TEXT(",\"library\":{\"characters\":%d,\"near\":%d,\"mid\":%d,\"far\":%d,\"slots\":%d,\"slots_made\":%d,\"near_m\":%.0f,\"near_max\":%d,\"mid_m\":%.0f,\"far_m\":%.0f,\"people_ms\":%.3f}"),
 			MidMeshes.Num(), NearNow, MidNow, FarNow, Slots, NearSlots.Num(), NearM, NearMax, MidM, FarM, PeopleMs)
 		: FString(TEXT(",\"library\":null"));
@@ -858,5 +858,5 @@ FString ACityGenLife::GetStatus() const
 		bEnabled ? TEXT("true") : TEXT("false"), bBuilt ? TEXT("true") : TEXT("false"), *DistrictId,
 		WalkLaneCount, DriveLaneCount, CarStarts.Num(), WalkPos.Num(), CarPos.Num(), Entities.Num(), Placed,
 		Bodies ? Bodies->GetInstanceCount() : -1, CarParts.Num(), P0.X, -P0.Y, P0.Z, C0.X, -C0.Y, C0.Z,
-		TickMs, TickMsMax, (long long)Ticks, *People);
+		TickMs, TickMsMax, (long long)Ticks, *Lib);
 }

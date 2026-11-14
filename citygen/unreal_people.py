@@ -38,8 +38,11 @@ LIB_SCRIPT = UE_DIR / "people_library.py"
 STAMP = "CityGenPeople.stamp"
 MANIFEST = "library.json"
 # the engine plugins the library's build and its assets need in the project
-PLUGINS = ("MetaHumanCharacter", "AnimToTexture", "IKRig", "HairStrands", "RigLogic")
-DEFAULT_GAS = Path.home() / "CityGen" / "UnrealProjects" / "GameAnimationSample" / \
+PLUGINS = ("MetaHumanCharacter", "AnimToTexture", "IKRig", "HairStrands", "RigLogic",
+           "GeometryScripting")
+CACHE_SKIP = ("Characters",)
+RUNS_MAX = 12
+DEFAULT_GAS =Path.home() / "CityGen" / "UnrealProjects" / "GameAnimationSample" / \
     "GameAnimationSample.uproject"
 
 
@@ -129,21 +132,27 @@ def migrate(closure: dict, uproject: Path) -> dict:
 
 def run_library(root: Path, uproject: Path, job: dict, log: Path,
                 timeout: float = 4 * 3600.0) -> dict:
-    """people_library.py in the project's editor (a commandlet that renders: the creator's
-    build bakes textures, the impostor sheets are rendered)."""
+    """people_library.py in the project's full editor, off screen (the creator's build bakes
+    its textures through texture graphs, which a commandlet does not run; the impostor sheets
+    are scene captures). It never opens a sign-in (`-NoMetaHumanAccountPortalLoginFallback`):
+    the cloud requests use the sign-in the editor keeps."""
     from .unreal import run_editor
     return run_editor(Path(root), Path(uproject), LIB_SCRIPT, job, log, timeout=timeout,
-                      extra=["-AllowCommandletRendering", "-NoMetaHumanAccountPortalLoginFallback",
-                             "-nop4"])
+                      gui=True, extra=["-RenderOffscreen", "-NoMetaHumanAccountPortalLoginFallback",
+                                       "-nop4"])
 
 
 # --- 3. the cache ---------------------------------------------------------------------------
 
-def _copy_tree(src: Path, dest: Path) -> tuple[int, int]:
-    """Every file of `src` into `dest` where it differs; (copied, same)."""
+def _copy_tree(src: Path, dest: Path, skip: tuple[str, ...] = ()) -> tuple[int, int]:
+    """Every file of `src` into `dest` where it differs, but those under a folder named in
+    `skip` (relative to `src`); (copied, same)."""
     copied = same = 0
     for f in sorted(src.rglob("*")):
         if not f.is_file():
+            continue
+        rel = f.relative_to(src).as_posix()
+        if any(rel == s or rel.startswith(s + "/") for s in skip):
             continue
         d = dest / f.relative_to(src)
         if d.is_file() and d.stat().st_size == f.stat().st_size and \
@@ -209,20 +218,39 @@ def ensure_library(root: Path, uproject: Path, gas: Path | None = None,
                              "people's clips come from it (Epic's, in your project only)"}
         pk = sorted(set(spec["clips"].values()) | {spec["gas"]["mesh"], spec["gas"]["skeleton"],
                                                    spec["gas"]["ik_rig"]})
-        clo = gas_closure(Path(root), gas, log_dir / "gas", pk)
+        # (a closure listed before from the same sample is used again: the sample's editor
+        # is opened only when needed)
+        prev = log_dir / "gas" / "gas_closure.json"
+        clo = json.loads(prev.read_text(encoding="utf-8")) if prev.is_file() else None
+        if clo is None or not set(pk) <= {r["package"] for r in clo["keep"]} or \
+                not all(Path(r["file"]).is_file() for r in clo["keep"] if r.get("file")):
+            clo = gas_closure(Path(root), gas, log_dir / "gas", pk)
         res["migrate"] = {**migrate(clo, up), "packages": len(clo["keep"]),
                           "skipped": len(clo["skipped"]), "gas": str(gas)}
     # (2) the build in the project's editor
     job = {"result": str(log_dir / "library_result.json"), "spec": spec, "hash": h,
-           "manifest": str(saved / MANIFEST)}
-    r = run_library(Path(root), up, job, log_dir / "library_log.txt")
+           "manifest": str(saved / MANIFEST), "sheets_dir": str(log_dir / "sheets"),
+           "tiers": dict(L.TIERS)}
+    # (an editor run makes a few characters and ends, `restart`: the assembly's memory grows
+    # with each one; the next run goes on where it ended, every step keeping what is made)
+    runs = []
+    for k in range(RUNS_MAX):
+        r = run_library(Path(root), up, job, log_dir / f"library_log_{k}.txt")
+        runs.append({"ok": r.get("ok"), "restart": r.get("restart"),
+                     "wall_s": r.get("wall_s")})
+        if not r.get("restart"):
+            break
     res["build"] = {k: r.get(k) for k in ("ok", "error", "steps", "wall_s", "log", "missing")
                     if k in r}
+    res["build"]["runs"] = runs
     if not r.get("ok") or not (saved / MANIFEST).is_file():
         return {**res, "ok": False, "how": "build",
                 "error": r.get("error") or "the library's build failed (see its log)"}
     # (3) the cache: the library's content and manifest
-    c, _ = _copy_tree(people, cache / "Content" / Path(L.CONTENT[len("/Game/"):]))
+    # (the runtime's assets: not the MetaHuman Character sources, which only a rebuild needs,
+    # nor the sheets' pose instances)
+    c, _ = _copy_tree(people, cache / "Content" / Path(L.CONTENT[len("/Game/"):]),
+                      skip=CACHE_SKIP)
     for extra in (json.loads((saved / MANIFEST).read_text(encoding="utf-8")).get("extra_folders")
                   or []):
         src = content_dir(up, extra)

@@ -191,6 +191,10 @@ def assemble(ch, c):
     return made
 
 
+BUILT = [0]
+PER_RUN = int(JOB.get("per_run", 6))
+
+
 def step_characters():
     out = {}
     for c in SPEC["characters"]:
@@ -213,12 +217,20 @@ def step_characters():
             tag(ch, f"{char_hash(c)} textured")
             st = meta(ch)
         if "built" not in st or not EAL.does_directory_exist(built_path(c)):
-            rec["assets"] = assemble(ch, c)
+            rec["assets"] = len(assemble(ch, c))
             tag(ch, f"{char_hash(c)} built")
+            BUILT[0] += 1
         rec["s"] = round(time.time() - t, 1)
         out[c["id"]] = rec
         log(f"character {c['id']} ({c['preset']}) {rec}")
         save_result()
+        yield
+        if BUILT[0] >= PER_RUN and c is not SPEC["characters"][-1]:
+            # (the editor keeps what each assembly loaded: past a few characters its memory
+            # outgrows the machine's, so the run ends here and the next goes on)
+            R["restart"] = True
+            log(f"restart after {BUILT[0]} characters")
+            return {"count": len(out), "restart": True}
     return {"count": len(out)}
 
 
@@ -244,16 +256,25 @@ def find_body(c):
     return built_meshes(c)["body"]
 
 
-# --- 5. the clips: the sample's walks and idles onto the MetaHuman body ----------------------
+# --- 5. the clips: the sample's walks and idles onto each body skeleton ----------------------
 
 def _ik_rig(name, mesh, folder):
     path = f"{folder}/{name}"
-    if EAL.does_asset_exist(path):
-        EAL.delete_asset(path)
-    rig_ = AT.create_asset(name, folder, unreal.IKRigDefinition, unreal.IKRigDefinitionFactory())
+    rig_ = unreal.load_asset(path) if EAL.does_asset_exist(path) else None
+    if rig_ is None:
+        rig_ = AT.create_asset(name, folder, unreal.IKRigDefinition,
+                               unreal.IKRigDefinitionFactory())
     ctl = unreal.IKRigController.get_controller(rig_)
     ctl.set_skeletal_mesh(mesh)
     ctl.apply_auto_generated_retarget_definition()
+    # (the pelvis carries the walk's height and sway; a root that took them, as the
+    # automatic definition can make it, would leave the body on the ground once the root is
+    # locked in place)
+    try:
+        ctl.set_retarget_root("pelvis")
+        log(f"{name}: retarget root {ctl.get_retarget_root()}")
+    except Exception as e:                                          # noqa: BLE001
+        log(f"{name}: retarget root: {e}")
     EAL.save_loaded_asset(rig_)
     return rig_
 
@@ -274,70 +295,126 @@ def clip_speed(seq):
             continue
         d = math.hypot(b.x - a.x, b.y - a.y) / 100.0
         if d > 0.2:
-            return round(d / length * n / (n - 1), 3) if bone == "root" else round(d / length, 3)
+            return round(d / (length * (n - 1) / n), 3)
     return 0.0
 
 
-def step_clips():
-    """The sample's clips retargeted onto the first character's body skeleton (every
-    character's body shares it); the source mesh and its IK rig come with the sample."""
-    folder = f"{ROOT}/Anim"
-    body = None
-    for c in SPEC["characters"]:
-        body = find_body(c)
-        if body is not None:
-            break
-    if body is None:
-        raise RuntimeError("no assembled body to retarget the clips onto")
-    src_mesh = unreal.load_asset(SPEC["gas"]["mesh"])
-    if src_mesh is None:
-        R["missing"].append(f"{SPEC['gas']['mesh']} (the Game Animation Sample's mannequin)")
-        raise RuntimeError("the sample's mannequin is not in the project (migrate first)")
-    want = HASH
-    out = {}
-    have = {k: unreal.load_asset(f"{folder}/A_{k}") for k in SPEC["clips"]
-            if EAL.does_asset_exist(f"{folder}/A_{k}")}
-    if len(have) == len(SPEC["clips"]) and all(meta(a) == want for a in have.values()):
-        return {k: {"anim": f"{folder}/A_{k}", "speed": float(meta(a, "cg.speed") or 0)}
-                for k, a in have.items()}
-    src_rig = _ik_rig("IK_GasSource", src_mesh, f"{folder}/Rigs")
-    dst_rig = _ik_rig("IK_PeopleBody", body, f"{folder}/Rigs")
-    rpath = f"{folder}/Rigs/RTG_GasToPeople"
-    if EAL.does_asset_exist(rpath):
-        EAL.delete_asset(rpath)
-    rtg = AT.create_asset("RTG_GasToPeople", f"{folder}/Rigs", unreal.IKRetargeter,
-                          unreal.IKRetargetFactory())
+def stride_period(seq):
+    """A walk clip's stride (s): the lag, past 0.6 s, at which its left foot's track (in the
+    clip's root frame) best matches itself; the clip's length when none does."""
+    AL = unreal.AnimationLibrary
+    length = AL.get_sequence_length(seq)
+    n = AL.get_num_frames(seq)
+    if n < 8:
+        return length
+    track = []
+    for k in range(n):
+        try:
+            q = AL.get_bone_pose_for_frame(seq, "thigh_l", k, False).rotation
+        except Exception:                                           # noqa: BLE001
+            return length
+        s = 1.0 if q.w >= 0 else -1.0
+        track.append((s * q.x, s * q.y, s * q.z))
+    dt = length / max(1, n - 1)
+    best, lag_best = None, None
+    for lag in range(max(1, int(0.6 / dt)), n // 2 + 1):
+        err = sum((track[i][0] - track[i + lag][0]) ** 2 + (track[i][1] - track[i + lag][1]) ** 2
+                  + (track[i][2] - track[i + lag][2]) ** 2 for i in range(n - lag)) / (n - lag)
+        if best is None or err < best:
+            best, lag_best = err, lag
+    return round(lag_best * dt, 4) if lag_best else length
+
+
+def in_place(seq):
+    """A clip made in place: its root still at every key (the retarget leaves the pelvis's
+    height and the walk's travel in the root), the pelvis taking the root's height and
+    turn, the travel dropped (the people are moved along their lanes)."""
+    AL = unreal.AnimationLibrary
+    n = AL.get_num_keys(seq) if hasattr(AL, "get_num_keys") else AL.get_num_frames(seq)
+    roots = [AL.get_bone_pose_for_frame(seq, "root", k, False) for k in range(n)]
+    pelvis = [AL.get_bone_pose_for_frame(seq, "pelvis", k, False) for k in range(n)]
+    x0, y0 = roots[0].translation.x, roots[0].translation.y
+    xn, yn = roots[-1].translation.x, roots[-1].translation.y
+    pos, rot = [], []
+    for k in range(n):
+        g = unreal.MathLibrary.compose_transforms(pelvis[k], roots[k])
+        # (the travel: the root's own line from its first key to its last)
+        f = k / max(1, n - 1)
+        t = g.translation
+        pos.append(unreal.Vector(t.x - (x0 + (xn - x0) * f), t.y - (y0 + (yn - y0) * f), t.z))
+        rot.append(g.rotation)
+    ctrl = seq.get_editor_property("controller")
+    ctrl.set_bone_track_keys("pelvis", pos, rot, [unreal.Vector(1, 1, 1)] * n, False)
+    ctrl.set_bone_track_keys("root", [unreal.Vector(0, 0, 0)] * n, [unreal.Quat()] * n,
+                             [unreal.Vector(1, 1, 1)] * n, False)
+    for prop, v in (("force_root_lock", False), ("enable_root_motion", False)):
+        try:
+            seq.set_editor_property(prop, v)
+        except Exception:                                           # noqa: BLE001
+            pass
+    log(f"in place {seq.get_name()}: {n} keys, travel {round(xn - x0, 1)}, {round(yn - y0, 1)} cm, "
+        f"pelvis z {round(pos[0].z, 1)}")
+
+
+def skeleton_key(mesh):
+    sk = mesh.get_editor_property("skeleton")
+    p = sk.get_path_name() if sk else "none"
+    import hashlib
+    return "s" + hashlib.sha256(p.encode("utf-8")).hexdigest()[:8], p
+
+
+def retarget_group(key, body, src_mesh, src_rig):
+    """The sample's clips on one body skeleton: an IK rig for the body (auto), a retargeter
+    from the sample's mannequin (chains mapped by name), the clips retargeted in a batch, their
+    notifies stripped, each walk's speed measured."""
+    folder = f"{ROOT}/Anim/{key}"
+    have = {k: f"{folder}/A_{k}" for k in SPEC["clips"]}
+    if all(EAL.does_asset_exist(p) and meta(unreal.load_asset(p)) == HASH for p in have.values()):
+        return {k: {"anim": p, "speed": float(meta(unreal.load_asset(p), "cg.speed") or 0)}
+                for k, p in have.items()}
+    # (fresh rigs and retargeter for each library: one an earlier run left keeps its ops)
+    dst_rig = _ik_rig(f"IK_Body_{HASH[:8]}", body, folder)
+    rpath = f"{folder}/RTG_GasToBody_{HASH[:8]}"
+    rtg = unreal.load_asset(rpath) if EAL.does_asset_exist(rpath) else None
+    if rtg is None:
+        rtg = AT.create_asset(rpath.rsplit("/", 1)[1], folder, unreal.IKRetargeter,
+                              unreal.IKRetargetFactory())
     rc = unreal.IKRetargeterController.get_controller(rtg)
     S, T = unreal.RetargetSourceOrTarget.SOURCE, unreal.RetargetSourceOrTarget.TARGET
     rc.set_ik_rig(S, src_rig)
     rc.set_ik_rig(T, dst_rig)
     rc.set_preview_mesh(S, src_mesh)
     rc.set_preview_mesh(T, body)
-    for fn, args in (("add_default_ops", ()), ("auto_map_chains", None),
-                     ("auto_align_all_bones", (T,))):
-        if hasattr(rc, fn):
-            try:
-                if fn == "auto_map_chains":
-                    rc.auto_map_chains(unreal.AutoMapChainType.FUZZY, True)
-                else:
-                    getattr(rc, fn)(*args)
-            except Exception as e:                                  # noqa: BLE001
-                log(f"retargeter {fn}: {e}")
+    for fn in ("add_default_ops", "auto_map_chains", "auto_align_all_bones"):
+        if not hasattr(rc, fn):
+            continue
+        try:
+            if fn == "auto_map_chains":
+                rc.auto_map_chains(unreal.AutoMapChainType.FUZZY, True)
+            elif fn == "auto_align_all_bones":
+                rc.auto_align_all_bones(T)
+            else:
+                rc.add_default_ops()
+        except Exception as e:                                      # noqa: BLE001
+            log(f"retargeter {fn}: {e}")
     EAL.save_loaded_asset(rtg)
+    out = {}
     for k, src in SPEC["clips"].items():
         seq = unreal.load_asset(src)
         if seq is None:
-            R["missing"].append(f"{src} (the Game Animation Sample's clip)")
+            R["missing"].append(f"{src} (the Game Animation Sample's clip, copied by the "
+                                "library's migrate step)")
             raise RuntimeError(f"no clip {src} in the project")
-        dst = f"{folder}/A_{k}"
+        dst = have[k]
         if EAL.does_asset_exist(dst):
             EAL.delete_asset(dst)
         made = unreal.IKRetargetBatchOperation.duplicate_and_retarget(
             [EAL.find_asset_data(src)], src_mesh, body, rtg, search="", replace="",
-            prefix="", suffix="_People", target_path=folder)
+            prefix="", suffix=f"_{key}", target_path=folder)
         got = [str(x.get_editor_property("package_name")) for x in made]
-        seq2 = unreal.load_asset(got[0]) if got else None
-        if seq2 is None:
+        got = [g for g in got if unreal.load_asset(g) and
+               isinstance(unreal.load_asset(g), unreal.AnimSequence)]
+        if not got:
             raise RuntimeError(f"the retarget of {src} made nothing")
         EAL.rename_asset(got[0], dst)
         seq2 = unreal.load_asset(dst)
@@ -346,23 +423,630 @@ def step_clips():
         except Exception as e:                                      # noqa: BLE001
             log(f"notifies of {k}: {e}")
         sp = clip_speed(seq) if k.startswith("walk") else 0.0
+        # (in place: the people are moved along their lanes, the baked walks must not drift)
+        in_place(seq2)
+        try:
+            AL = unreal.AnimationLibrary
+            q0 = AL.get_bone_pose_for_frame(seq2, "thigh_l", 0, False).rotation
+            q1 = AL.get_bone_pose_for_frame(seq2, "thigh_l", 15, False).rotation
+            log(f"clip {k}: {AL.get_num_frames(seq2)} frames, thigh_l {q0} -> {q1}")
+            for bone in ("root", "pelvis"):
+                log(f"clip {k} {bone}: source {AL.get_bone_pose_for_frame(seq, bone, 0, False).translation}"
+                    f" retargeted {AL.get_bone_pose_for_frame(seq2, bone, 0, False).translation}")
+        except Exception as e:                                      # noqa: BLE001
+            log(f"clip {k}: {e}")
         EAL.set_metadata_tag(seq2, "cg.speed", str(sp))
-        tag(seq2, want)
-        out[k] = {"anim": dst, "speed": sp,
-                  "length_s": round(unreal.AnimationLibrary.get_sequence_length(seq2), 3)}
+        tag(seq2, HASH)
+        out[k] = {"anim": dst, "speed": sp}
     return out
 
 
-STEPS = [("characters", step_characters), ("clips", step_clips)]
+def step_clips():
+    src_mesh = unreal.load_asset(SPEC["gas"]["mesh"])
+    if src_mesh is None:
+        R["missing"].append(f"{SPEC['gas']['mesh']} (the Game Animation Sample's mannequin)")
+        raise RuntimeError("the sample's mannequin is not in the project (migrate first)")
+    src_rig = unreal.load_asset(SPEC["gas"]["ik_rig"]) or \
+        _ik_rig("IK_GasSource", src_mesh, f"{ROOT}/Anim")
+    groups = {}
+    for c in SPEC["characters"]:
+        body = built_meshes(c)["body"]
+        if body is None:
+            raise RuntimeError(f"{c['id']}: no assembled body")
+        key, path = skeleton_key(body)
+        R["characters"].setdefault(c["id"], {})["skeleton"] = key
+        if key not in groups:
+            groups[key] = {"skeleton": path, "clips": retarget_group(key, body, src_mesh, src_rig)}
+            log(f"clips on {path}: {groups[key]['clips']}")
+            yield
+    R["clip_groups"] = groups
+    return {k: v["skeleton"] for k, v in groups.items()}
 
 
-def main():
+# --- 6. mid: each character's walk baked into textures (AnimToTexture) ---------------------
+
+MF_BONE = "/AnimToTexture/Materials/MaterialFunctions/MF_BoneAnimation.MF_BoneAnimation"
+MEL = unreal.MaterialEditingLibrary
+
+
+def _new_material(path):
+    """A material at `path` with no expressions (an earlier run's emptied in place)."""
+    m = _asset(path, unreal.Material, unreal.MaterialFactoryNew())
+    MEL.delete_all_material_expressions(m)
+    return m
+
+
+def mid_material():
+    """M_CgPersonMid: a slot's base color (its texture times its tint), a cloth's roughness,
+    through AnimToTexture's MF_BoneAnimation (bone mode, auto play from per-instance custom
+    data 0 to 3: time offset, play rate, first and last frame)."""
+    path = f"{ROOT}/Materials/M_CgPersonMid"
+    if EAL.does_asset_exist(path) and meta(unreal.load_asset(path)) == HASH:
+        return unreal.load_asset(path)
+    m = _new_material(path)
+    m.set_editor_property("use_material_attributes", True)
+    m.set_editor_property("used_with_instanced_static_meshes", True)
+    m.set_editor_property("used_with_static_lighting", False)
+    tex = MEL.create_material_expression(m, unreal.MaterialExpressionTextureSampleParameter2D, -900, 0)
+    tex.set_editor_property("parameter_name", "BaseColor")
+    tex.set_editor_property("texture", unreal.load_asset("/Engine/EngineResources/WhiteSquareTexture"))
+    tint = MEL.create_material_expression(m, unreal.MaterialExpressionVectorParameter, -900, 250)
+    tint.set_editor_property("parameter_name", "Tint")
+    tint.set_editor_property("default_value", unreal.LinearColor(1, 1, 1, 1))
+    mul = MEL.create_material_expression(m, unreal.MaterialExpressionMultiply, -600, 100)
+    MEL.connect_material_expressions(tex, "RGB", mul, "A")
+    MEL.connect_material_expressions(tint, "", mul, "B")
+    rough = MEL.create_material_expression(m, unreal.MaterialExpressionScalarParameter, -600, 300)
+    rough.set_editor_property("parameter_name", "Roughness")
+    rough.set_editor_property("default_value", 0.7)
+    make = MEL.create_material_expression(m, unreal.MaterialExpressionMakeMaterialAttributes, -350, 100)
+    MEL.connect_material_expressions(mul, "", make, "BaseColor")
+    MEL.connect_material_expressions(rough, "", make, "Roughness")
+    call = MEL.create_material_expression(m, unreal.MaterialExpressionMaterialFunctionCall, -100, 100)
+    call.set_editor_property("material_function", unreal.load_asset(MF_BONE))
+    ins = MEL.get_material_expression_input_names(call) if hasattr(
+        MEL, "get_material_expression_input_names") else []
+    MEL.connect_material_expressions(make, "", call, ins[0] if ins else "")
+    MEL.connect_material_property(call, "", unreal.MaterialProperty.MP_MATERIAL_ATTRIBUTES)
+    MEL.recompile_material(m)
+    tag(m, HASH)
+    return m
+
+
+# a slot's base color as the mid material takes it: texture parameters by preference (the
+# creator's baked skin first), else a color parameter (the plain wardrobe's dye)
+HAIR_COLORS = ((0.012, 0.009, 0.007), (0.03, 0.018, 0.010), (0.006, 0.005, 0.005),
+               (0.07, 0.042, 0.022), (0.02, 0.013, 0.009), (0.16, 0.11, 0.06),
+               (0.012, 0.009, 0.007), (0.09, 0.035, 0.015), (0.25, 0.24, 0.23))
+TEX_PREFER = ("basecolor baked", "basecolor", "base color", "albedo", "diffuse", "texture")
+TEX_SKIP = ("normal", "mask", "cavity", "srmf", "scatter", "animated", "detail", "macro",
+            "micro", "n3c", "flow", "ao", "print", "pill", "stitch", "distort", "wrinkle")
+TINT_PREFER = ("diffuse_color_1", "basecolor global multiply post-bake", "dyecolor",
+               "hair color", "color")
+
+
+def _texture_of(mat):
+    """A material instance's base color texture (or None) and tint, as the mid slot takes
+    them."""
+    tex, tint = None, unreal.LinearColor(0.6, 0.6, 0.6, 1.0)
+    if mat is None:
+        return tex, tint
+    try:
+        names = [str(n) for n in MEL.get_texture_parameter_names(mat)]
+    except Exception:                                               # noqa: BLE001
+        names = []
+    for want in TEX_PREFER:
+        for n in names:
+            low = n.lower()
+            if want in low and not any(w in low for w in TEX_SKIP if w not in want):
+                t = MEL.get_material_instance_texture_parameter_value(mat, n)
+                if t is not None and "placeholder" not in t.get_path_name().lower():
+                    tex = t
+                    break
+        if tex is not None:
+            break
+    try:
+        vnames = [str(n) for n in MEL.get_vector_parameter_names(mat)]
+    except Exception:                                               # noqa: BLE001
+        vnames = []
+    for want in TINT_PREFER:
+        hit = next((n for n in vnames if n.lower() == want or
+                    (want == "color" and n.lower().endswith("color"))), None)
+        if hit:
+            tint = MEL.get_material_instance_vector_parameter_value(mat, hit)
+            break
+    if tex is not None:
+        # (the baked skin's multiplier, white, keeps the texture's own color)
+        tint = unreal.LinearColor(1.0, 1.0, 1.0, 1.0) if tint is None else tint
+    elif "eye" in mat.get_name().lower() or "lacrimal" in mat.get_name().lower():
+        tint = unreal.LinearColor(0.8, 0.8, 0.8, 1.0)
+    return tex, tint
+
+
+def _lod(mesh, want):
+    sms = unreal.get_editor_subsystem(unreal.SkeletalMeshEditorSubsystem)
+    return max(0, min(want, sms.get_lod_count(mesh) - 1))
+
+
+def hair_meshes(c):
+    """The character's hair cards (near) and helmet (mid), static meshes of its groom."""
+    near = mid = None
+    for p in sorted(EAL.list_assets(built_path(c), recursive=True)):
+        n = p.rsplit("/", 1)[-1]
+        if not n.startswith("Hair_"):
+            continue
+        if "_CardsMesh_" in n and n.split(".")[0].endswith("_LOD1"):
+            near = p.split(".")[0]
+        if "_Helmet_" in n and mid is None:
+            mid = p.split(".")[0]
+    return near, mid
+
+
+def _gs(name):
+    """A GeometryScript library function by its Python name (the libraries' script names
+    change between versions: the first class that has it)."""
+    for cls in ("GeometryScript_AssetUtils", "GeometryScript_MeshEdits",
+                "GeometryScript_NewAssetUtils"):
+        k = getattr(unreal, cls, None)
+        if k is not None and hasattr(k, name):
+            return getattr(k, name)
+    raise RuntimeError(f"no GeometryScript function {name} (the GeometryScripting plugin)")
+
+
+def _first(r):
+    return r[0] if isinstance(r, tuple) else r
+
+
+def assemble_static(path, skeletal, statics):
+    """One static mesh from skeletal meshes at given LODs and static meshes, all in the
+    character's frame (the groom's helmet is in the face's), their materials kept by slot."""
+    target = unreal.DynamicMesh()
+    mats = []
+    copy_sk, copy_sm = _gs("copy_mesh_from_skeletal_mesh"), _gs("copy_mesh_from_static_mesh")
+    append = _gs("append_mesh_with_materials")
+    for mesh, want in skeletal:
+        if mesh is None:
+            continue
+        dm = unreal.DynamicMesh()
+        rl = unreal.GeometryScriptMeshReadLOD()
+        rl.set_editor_property("lod_index", _lod(mesh, max(0, want)))
+        copy_sk(mesh, dm, unreal.GeometryScriptCopyMeshFromAssetOptions(), rl)
+        pm = [m.get_editor_property("material_interface") for m in mesh.get_editor_property("materials")]
+        r = append(target, mats, dm, pm, unreal.Transform())
+        mats = list(r[1]) if isinstance(r, tuple) else mats + pm
+    for sm in statics:
+        if sm is None:
+            continue
+        dm = unreal.DynamicMesh()
+        copy_sm(sm, dm, unreal.GeometryScriptCopyMeshFromAssetOptions(),
+                unreal.GeometryScriptMeshReadLOD())
+        pm = [m.get_editor_property("material_interface") for m in sm.get_editor_property("static_materials")]
+        r = append(target, mats, dm, pm, unreal.Transform())
+        mats = list(r[1]) if isinstance(r, tuple) else mats + pm
+    if EAL.does_asset_exist(path):
+        EAL.delete_asset(path)
+    opts = unreal.GeometryScriptCreateNewStaticMeshAssetOptions()
+    for k, v in (("enable_nanite", False), ("enable_collision", False),
+                 ("enable_recompute_normals", False), ("enable_recompute_tangents", False)):
+        try:
+            opts.set_editor_property(k, v)
+        except Exception:                                           # noqa: BLE001
+            pass
+    mesh = _first(_gs("create_new_static_mesh_asset_from_mesh")(target, path, opts))
+    if mesh is None:
+        mesh = unreal.load_asset(path)
+    if mesh is None:
+        raise RuntimeError(f"no static mesh made at {path}")
+    for i, m in enumerate(mats):
+        if i < len(mesh.get_editor_property("static_materials")):
+            mesh.set_material(i, m)
+    EAL.save_loaded_asset(mesh)
+    return mesh
+
+
+
+def _asset(path, cls, factory):
+    """The asset at `path`, made by `factory` when there is none (an asset an earlier run
+    made is updated in place: deleting one that loaded meshes or materials still name fails)."""
+    a = unreal.load_asset(path) if EAL.does_asset_exist(path) else None
+    if a is None:
+        folder, name = path.rsplit("/", 1)
+        a = AT.create_asset(name, folder, cls, factory)
+    if a is None:
+        a = unreal.load_asset(path)
+    if a is None:
+        raise RuntimeError(f"could not make {path}")
+    return a
+
+
+def mid_mesh(c, clips):
+    """The character as one static mesh (body, face, outfit at low LODs, the hair's helmet),
+    its walk baked into bone textures against its body, its slots on M_CgPersonMid."""
+    folder = f"{ROOT}/Mid/{c['id']}"
+    sm_path = f"{folder}/SM_{c['id']}_Mid"
+    da_path = f"{folder}/DA_{c['id']}_Mid"
+    if EAL.does_asset_exist(sm_path) and EAL.does_asset_exist(da_path) and \
+            meta(unreal.load_asset(da_path)) == HASH:
+        da = unreal.load_asset(da_path)
+        return {"mesh": sm_path, "start": 0, "end": int(da.get_editor_property("num_frames")) - 1,
+                "fps": float(SPEC["far"]["fps"]), "data": da_path,
+                "cycle_s": float(meta(da, "cg.cycle") or 1.0)}
+    parts = built_meshes(c)
+    body = parts["body"]
+    lod = int(SPEC["far"]["lod"])
+    pieces = [(body, lod - 2), (parts["face"], lod - 2)] + [(m, lod - 1) for m in parts["other"]]
+    _, helmet = hair_meshes(c)
+    mesh = assemble_static(sm_path, pieces, [unreal.load_asset(helmet)] if helmet else [])
+    bb = mesh.get_bounding_box()
+    log(f"mid {c['id']} bounds {bb.min} {bb.max}, slots "
+        f"{len(mesh.get_editor_property('static_materials'))}")
+    mesh.set_editor_property("nanite_settings", unreal.MeshNaniteSettings(enabled=False)) \
+        if hasattr(unreal, "MeshNaniteSettings") else None
+    # the bake: the body's skin drives every vertex (its nearest triangles), the walk at fps
+    walk = unreal.load_asset(clips[SPEC["walks"][0]]["anim"])
+    fac = unreal.DataAssetFactory()
+    fac.set_editor_property("data_asset_class", unreal.AnimToTextureDataAsset)
+    da = _asset(da_path, unreal.AnimToTextureDataAsset, fac)
+    texs = {}
+    for k in ("bone_position_texture", "bone_rotation_texture", "bone_weight_texture"):
+        tp = f"{folder}/T_{c['id']}_{k.replace('_texture', '')}"
+        texs[k] = _asset(tp, unreal.Texture2D, unreal.Texture2DFactoryNew())
+    smes = unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem)
+    n_uv = smes.get_num_uv_channels(mesh, 0)
+    info = unreal.AnimToTextureAnimSequenceInfo()
+    info.set_editor_property("anim_sequence", walk)
+    for k, v in (("skeletal_mesh", body), ("skeletal_lod_index", _lod(body, lod - 2)),
+                 ("static_mesh", mesh), ("static_lod_index", 0), ("uv_channel", min(3, n_uv)),
+                 ("mode", unreal.AnimToTextureMode.BONE),
+                 ("precision", unreal.AnimToTexturePrecision.SIXTEEN_BITS),
+                 ("num_bone_influences", unreal.AnimToTextureNumBoneInfluences.FOUR),
+                 ("sample_rate", float(SPEC["far"]["fps"])), ("anim_sequences", [info]),
+                 ("auto_play", True), ("num_driver_triangles", 1), *texs.items()):
+        da.set_editor_property(k, v)
+    if not unreal.AnimToTextureBPLibrary.animation_to_texture(da):
+        raise RuntimeError(f"{c['id']}: AnimToTexture's bake failed")
+    base = mid_material()
+    mats = mesh.get_editor_property("static_materials")
+    for i, sm_mat in enumerate(mats):
+        src = sm_mat.get_editor_property("material_interface")
+        mip = f"{folder}/MI_{c['id']}_Mid_{i}"
+        mi = _asset(mip, unreal.MaterialInstanceConstant,
+                    unreal.MaterialInstanceConstantFactoryNew())
+        MEL.set_material_instance_parent(mi, base)
+        tex, tint = _texture_of(src)
+        if src is not None and "hair" in src.get_name().lower() and tex is None:
+            # (the groom's helmet carries no color of its own: a natural hair color by the
+            # character, darker ones more often)
+            h = HAIR_COLORS[int(c["index"] * 7 + 3) % len(HAIR_COLORS)]
+            tint = unreal.LinearColor(h[0], h[1], h[2], 1.0)
+        if tex is not None:
+            MEL.set_material_instance_texture_parameter_value(mi, "BaseColor", tex)
+        MEL.set_material_instance_vector_parameter_value(mi, "Tint", tint)
+        unreal.AnimToTextureBPLibrary.update_material_instance_from_data_asset(
+            da, mi, unreal.MaterialParameterAssociation.GLOBAL_PARAMETER)
+        EAL.save_loaded_asset(mi)
+        mesh.set_material(i, mi)
+    EAL.save_loaded_asset(mesh)
+    nf = int(da.get_editor_property("num_frames"))
+    # (the far card's walk is one stride of it: its sheet's frames span that)
+    cyc = stride_period(walk)
+    log(f"mid {c['id']}: {nf} frames, the walk {unreal.AnimationLibrary.get_sequence_length(walk)} s, "
+        f"a stride {cyc} s")
+    EAL.set_metadata_tag(da, "cg.cycle", str(cyc))
+    tag(da, HASH)
+    return {"mesh": sm_path, "start": 0, "end": nf - 1, "fps": float(SPEC["far"]["fps"]),
+            "data": da_path, "cycle_s": cyc}
+
+
+def step_mid():
+    out = {}
+    for c in SPEC["characters"]:
+        sk = R["characters"][c["id"]]["skeleton"]
+        out[c["id"]] = mid_mesh(c, R["clip_groups"][sk]["clips"])
+        R["characters"][c["id"]]["mid"] = out[c["id"]]
+        log(f"mid {c['id']}: {out[c['id']]}")
+        save_result()
+        yield
+    return {"count": len(out)}
+
+
+# --- 7. far: impostor sheets ---------------------------------------------------------------
+
+CARD_W_CM, CARD_H_CM = 110.0, 220.0
+
+
+def card_material():
+    """M_CgPersonCard: a card turned to the view about its up axis (world position offset on
+    /Engine/BasicShapes/Plane), showing the cell of its sheet for the view's side of the
+    person (views round them, view 0 their front) and the walk's frame (per-instance custom
+    data 0 and 1: time offset, cycles a second), masked by the sheet's coverage."""
+    path = f"{ROOT}/Materials/M_CgPersonCard"
+    if EAL.does_asset_exist(path) and meta(unreal.load_asset(path)) == HASH:
+        return unreal.load_asset(path)
+    m = _new_material(path)
+    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
+    m.set_editor_property("two_sided", True)
+    m.set_editor_property("tangent_space_normal", False)
+    m.set_editor_property("used_with_instanced_static_meshes", True)
+    V, F = int(SPEC["impostor"]["views"]), int(SPEC["impostor"]["frames"])
+
+    def e(cls, x, y, **kw):
+        n = MEL.create_material_expression(m, cls, x, y)
+        for k, v in kw.items():
+            n.set_editor_property(k, v)
+        return n
+
+    cam = e(unreal.MaterialExpressionCameraPositionWS, -1600, 0)
+    obj = e(unreal.MaterialExpressionObjectPositionWS, -1600, 150)
+    wpos = e(unreal.MaterialExpressionWorldPosition, -1600, 300)
+    to_cam = e(unreal.MaterialExpressionSubtract, -1350, 50)
+    MEL.connect_material_expressions(cam, "", to_cam, "A")
+    MEL.connect_material_expressions(obj, "", to_cam, "B")
+    rel = e(unreal.MaterialExpressionSubtract, -1350, 250)
+    MEL.connect_material_expressions(wpos, "", rel, "A")
+    MEL.connect_material_expressions(obj, "", rel, "B")
+    up = e(unreal.MaterialExpressionConstant3Vector, -1600, 450,
+           constant=unreal.LinearColor(0, 0, 1, 0))
+    up_w = e(unreal.MaterialExpressionTransform, -1350, 450)
+    up_w.set_editor_property("transform_source_type", unreal.MaterialVectorCoordTransformSource.TRANSFORMSOURCE_LOCAL)
+    up_w.set_editor_property("transform_type", unreal.MaterialVectorCoordTransform.TRANSFORM_WORLD)
+    MEL.connect_material_expressions(up, "", up_w, "")
+    cam_l = e(unreal.MaterialExpressionTransform, -1100, 50)
+    cam_l.set_editor_property("transform_source_type", unreal.MaterialVectorCoordTransformSource.TRANSFORMSOURCE_WORLD)
+    cam_l.set_editor_property("transform_type", unreal.MaterialVectorCoordTransform.TRANSFORM_LOCAL)
+    MEL.connect_material_expressions(to_cam, "", cam_l, "")
+    lp = e(unreal.MaterialExpressionPreSkinnedPosition, -1600, 600)
+    t0 = e(unreal.MaterialExpressionPerInstanceCustomData, -1600, 750, data_index=0)
+    cps = e(unreal.MaterialExpressionPerInstanceCustomData, -1600, 850, data_index=1)
+    tm = e(unreal.MaterialExpressionTime, -1600, 950)
+
+    def custom(code, ins, out_type, x, y):
+        n = e(unreal.MaterialExpressionCustom, x, y, code=code, output_type=out_type)
+        cis = []
+        for k, _ in ins:
+            ci = unreal.CustomInput()
+            ci.set_editor_property("input_name", k)
+            cis.append(ci)
+        n.set_editor_property("inputs", cis)
+        MEL.recompile_material(m) if False else None
+        for k, src in ins:
+            MEL.connect_material_expressions(src, "", n, k)
+        return n
+
+    wpo_code = (
+        "float2 d = ToCam.xy; float l = max(length(d), 1e-3); d /= l;\n"
+        "float3 right = float3(d.y, -d.x, 0.0);\n"
+        f"float s = length(UpW);\n"
+        f"float u = LP.x / 100.0; float v = LP.y / 100.0 + 0.5;\n"
+        f"float3 want = right * (u * {CARD_W_CM} * s) + float3(0,0,1) * (v * {CARD_H_CM} * s);\n"
+        "return want - Rel;")
+    wpo = custom(wpo_code, [("ToCam", to_cam), ("Rel", rel), ("UpW", up_w), ("LP", lp)],
+                 unreal.CustomMaterialOutputType.CMOT_FLOAT3, -800, 300)
+    MEL.connect_material_property(wpo, "", unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
+    uv_code = (
+        f"float V = {V}.0; float F = {F}.0;\n"
+        "float a = atan2(CamL.y, CamL.x); if (a < 0) a += 6.2831853;\n"
+        "float view = fmod(floor(a / (6.2831853 / V) + 0.5), V);\n"
+        "float fr = floor(frac((T + T0) * Cps) * F);\n"
+        "float x = LP.x / 100.0 + 0.5; float y = 1.0 - (LP.y / 100.0 + 0.5);\n"
+        "return float2((view + x) / V, (fr + saturate(y)) / F);")
+    uv = custom(uv_code, [("CamL", cam_l), ("T", tm), ("T0", t0), ("Cps", cps), ("LP", lp)],
+                unreal.CustomMaterialOutputType.CMOT_FLOAT2, -800, 700)
+    sheet = e(unreal.MaterialExpressionTextureSampleParameter2D, -500, 700,
+              parameter_name="Sheet",
+              texture=unreal.load_asset("/Engine/EngineResources/WhiteSquareTexture"))
+    MEL.connect_material_expressions(uv, "", sheet, "UVs")
+    MEL.connect_material_property(sheet, "RGB", unreal.MaterialProperty.MP_BASE_COLOR)
+    inv = e(unreal.MaterialExpressionOneMinus, -250, 850)
+    MEL.connect_material_expressions(sheet, "A", inv, "")
+    MEL.connect_material_property(inv, "", unreal.MaterialProperty.MP_OPACITY_MASK)
+    nrm = e(unreal.MaterialExpressionNormalize, -250, 1000)
+    MEL.connect_material_expressions(to_cam, "", nrm, "")
+    MEL.connect_material_property(nrm, "", unreal.MaterialProperty.MP_NORMAL)
+    rough = e(unreal.MaterialExpressionConstant, -250, 1150, r=0.8)
+    MEL.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    MEL.recompile_material(m)
+    tag(m, HASH)
+    return m
+
+
+def capture_sheet(c, mid):
+    """The character's walk from `views` sides at `frames` frames, each cell rendered by an
+    orthographic scene capture (lighting off: the albedo, and the coverage in alpha) of its
+    mid mesh pinned to that frame, drawn into one sheet saved as a texture."""
+    V, F = int(SPEC["impostor"]["views"]), int(SPEC["impostor"]["frames"])
+    cw, ch = [int(v) for v in SPEC["impostor"]["cell"]]
+    folder = f"{ROOT}/Far"
+    tex_path = f"{folder}/T_{c['id']}_Sheet"
+    world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
+    eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+    RL = unreal.RenderingLibrary
+    origin = unreal.Vector(0.0, 0.0, 200000.0)
+    # (the character's mid mesh, its walk baked: each slot through a capture instance of its
+    # mid material with auto play off, so a frame is set by hand; the editor does not tick a
+    # skeletal mesh's animation off screen)
+    mesh = unreal.load_asset(mid["mesh"])
+    holder = eas.spawn_actor_from_class(unreal.StaticMeshActor, origin,
+                                        unreal.Rotator(0.0, 0.0, -90.0), transient=True)
+    smc = holder.static_mesh_component
+    smc.set_mobility(unreal.ComponentMobility.MOVABLE)
+    smc.set_static_mesh(mesh)
+    caps = []
+    for i, sm_mat in enumerate(mesh.get_editor_property("static_materials")):
+        parent = sm_mat.get_editor_property("material_interface")
+        mip = f"{ROOT}/Far/{c['id']}/MI_{c['id']}_Pose_{i}"
+        if EAL.does_asset_exist(mip):
+            EAL.delete_asset(mip)
+        mi = AT.create_asset(mip.rsplit("/", 1)[1], mip.rsplit("/", 1)[0],
+                             unreal.MaterialInstanceConstant,
+                             unreal.MaterialInstanceConstantFactoryNew())
+        MEL.set_material_instance_parent(mi, parent)
+        MEL.set_material_instance_static_switch_parameter_value(mi, "AutoPlay", False)
+        MEL.set_material_instance_scalar_parameter_value(mi, "Frame", 0.0)
+        MEL.update_material_instance(mi)
+        smc.set_material(i, mi)
+        caps.append(mi)
+    actors = [holder]
+    cam = eas.spawn_actor_from_class(unreal.SceneCapture2D, origin, transient=True)
+    cap = cam.capture_component2d
+    cap.set_editor_property("projection_type", unreal.CameraProjectionMode.ORTHOGRAPHIC)
+    cap.set_editor_property("ortho_width", CARD_W_CM)
+    cap.set_editor_property("capture_source", unreal.SceneCaptureSource.SCS_SCENE_COLOR_HDR)
+    cap.set_editor_property("capture_every_frame", False)
+    cap.set_editor_property("capture_on_movement", False)
+    cap.set_editor_property("primitive_render_mode",
+                            unreal.SceneCapturePrimitiveRenderMode.PRM_USE_SHOW_ONLY_LIST)
+    for a in actors:
+        cap.show_only_actor_components(a, True)
+    flags = []
+    for name in ("Lighting", "PostProcessing", "Atmosphere", "Fog", "Bloom", "AmbientOcclusion",
+                 "ScreenSpaceReflections", "Lumen"):
+        f = unreal.EngineShowFlagsSetting()
+        f.set_editor_property("show_flag_name", name)
+        f.set_editor_property("enabled", False)
+        flags.append(f)
+    cap.set_editor_property("show_flag_settings", flags)
+    cell = RL.create_render_target2d(world, cw, ch, unreal.TextureRenderTargetFormat.RTF_RGBA16F,
+                                     unreal.LinearColor(0, 0, 0, 1), False)
+    cap.set_editor_property("texture_target", cell)
+    sheet = RL.create_render_target2d(world, cw * V, ch * F,
+                                      unreal.TextureRenderTargetFormat.RTF_RGBA8,
+                                      unreal.LinearColor(0, 0, 0, 1), False)
+    unreal.AutomationLibrary.finish_loading_before_screenshot()
+    first, last = int(mid["start"]), int(mid["end"])
+    cells = []
+    for f in range(F):
+        frame = float(first) + float(mid["cycle_s"]) * float(mid["fps"]) * f / F
+        for mi in caps:
+            MEL.set_material_instance_scalar_parameter_value(mi, "Frame", frame)
+            MEL.update_material_instance(mi)
+        unreal.AutomationLibrary.finish_loading_before_screenshot()
+        for _ in range(2):
+            yield
+        for v in range(V):
+            a = 2.0 * math.pi * v / V
+            # (the person faces +X in the card's frame: view 0 is seen from the front)
+            eye = unreal.Vector(origin.x + 600.0 * math.cos(a), origin.y + 600.0 * math.sin(a),
+                                origin.z + CARD_H_CM / 2.0)
+            cam.set_actor_location(eye, False, False)
+            cam.set_actor_rotation(unreal.Rotator(0.0, 0.0, math.degrees(a) + 180.0), False)
+            cap.capture_scene()
+            canvas, size, ctx = RL.begin_draw_canvas_to_render_target(world, sheet)
+            canvas.draw_texture(cell, unreal.Vector2D(v * cw, f * ch), unreal.Vector2D(cw, ch),
+                                unreal.Vector2D(0, 0), unreal.Vector2D(1, 1),
+                                unreal.LinearColor(1, 1, 1, 1), unreal.BlendMode.BLEND_OPAQUE)
+            RL.end_draw_canvas_to_render_target(world, ctx)
+            cells.append((f, v))
+        yield
+    if EAL.does_asset_exist(tex_path):
+        EAL.delete_asset(tex_path)
+    tex = RL.render_target_create_static_texture2d_editor_only(sheet, tex_path)
+    if tex is None:
+        raise RuntimeError(f"{c['id']}: the sheet's texture was not made")
+    tex.set_editor_property("srgb", True)
+    tex.set_editor_property("mip_gen_settings", unreal.TextureMipGenSettings.TMGS_FROM_TEXTURE_GROUP)
+    EAL.save_loaded_asset(tex)
+    try:
+        RL.export_render_target(world, sheet, JOB.get("sheets_dir") or os.path.dirname(JOB["result"]),
+                                f"sheet_{c['id']}.png")
+    except Exception as e:                                          # noqa: BLE001
+        log(f"sheet export: {e}")
+    eas.destroy_actor(cam)
+    for a in actors:
+        eas.destroy_actor(a)
+    # (the pose instances stay: an asset an actor of this session named cannot be deleted
+    # before the editor collects it; nothing cooked names them)
+    mip = f"{folder}/MI_{c['id']}_Card"
+    if EAL.does_asset_exist(mip):
+        EAL.delete_asset(mip)
+    mi = AT.create_asset(mip.rsplit("/", 1)[1], folder, unreal.MaterialInstanceConstant,
+                         unreal.MaterialInstanceConstantFactoryNew())
+    MEL.set_material_instance_parent(mi, card_material())
+    MEL.set_material_instance_texture_parameter_value(mi, "Sheet", unreal.load_asset(tex_path))
+    tag(mi, HASH)
+    R.setdefault("far_last", {})[c["id"]] = len(cells)
+    return {"material": mip, "sheet": tex_path}
+
+
+def step_far():
+    out = {}
+    for c in SPEC["characters"]:
+        mip = f"{ROOT}/Far/MI_{c['id']}_Card"
+        if EAL.does_asset_exist(mip) and meta(unreal.load_asset(mip)) == HASH:
+            out[c["id"]] = {"material": mip}
+        else:
+            gen = capture_sheet(c, R["characters"][c["id"]]["mid"])
+            while True:
+                try:
+                    next(gen)
+                    yield
+                except StopIteration as s:
+                    out[c["id"]] = s.value
+                    break
+        R["characters"][c["id"]]["far"] = out[c["id"]]
+        save_result()
+    return {"count": len(out)}
+
+
+# --- 8. the manifest ------------------------------------------------------------------------
+
+def step_manifest():
+    chars = []
+    for c in SPEC["characters"]:
+        parts = built_meshes(c)
+        rec = R["characters"][c["id"]]
+        meshes = [m.get_path_name().split(".")[0] for m in
+                  [parts["body"], parts["face"]] + parts["other"] if m is not None]
+        hair, _ = hair_meshes(c)
+        chars.append({"id": c["id"], "preset": c["preset"], "body": c["body"],
+                      "skeleton": rec["skeleton"],
+                      "near": {"meshes": meshes, "hair": hair},
+                      "mid": rec["mid"], "far": rec["far"]})
+    groups = R["clip_groups"]
+    first = next(iter(groups.values()))["clips"]
+    man = {"version": SPEC["version"], "hash": HASH, "content": ROOT,
+           "characters": chars, "walks": SPEC["walks"],
+           "idles": [k for k in SPEC["clips"] if k.startswith("idle")],
+           "clips": first, "clip_groups": groups,
+           "far": {"card": "/Engine/BasicShapes/Plane", "size": [CARD_W_CM / 100.0,
+                                                                CARD_H_CM / 100.0],
+                   "views": SPEC["impostor"]["views"], "frames": SPEC["impostor"]["frames"]},
+           "tiers": JOB.get("tiers") or {}, "extra_folders": []}
+    os.makedirs(os.path.dirname(JOB["manifest"]), exist_ok=True)
+    with open(JOB["manifest"], "w", encoding="utf-8") as f:
+        json.dump(man, f, indent=1)
+    yield
+    return {"characters": len(chars), "groups": len(groups)}
+
+
+def as_gen(fn):
+    """A step as a generator (a plain function's result once)."""
+    def run():
+        r = fn()
+        if hasattr(r, "__next__"):
+            return (yield from r)
+        yield
+        return r
+    return run
+
+
+STEPS = [("characters", step_characters), ("clips", step_clips), ("mid", step_mid),
+         ("far", step_far), ("manifest", step_manifest)]
+
+
+def run():
+    yield
+    # (the editor scans the asset registry in the background at start: what an earlier run
+    # made is found only once it is done)
+    unreal.AssetRegistryHelpers.get_asset_registry().wait_for_completion()
     for name, fn in STEPS:
         if name not in JOB.get("steps", [n for n, _ in STEPS]):
             continue
         t = time.time()
+        log(f"step {name} begins")
         try:
-            R["steps"][name] = {"ok": True, "result": fn()}
+            res = yield from fn()
+            R["steps"][name] = {"ok": True, "result": res}
         except Exception as e:                                      # noqa: BLE001
             R["steps"][name] = {"ok": False, "error": f"{type(e).__name__}: {e}",
                                 "trace": traceback.format_exc()[-3000:]}
@@ -373,9 +1057,40 @@ def main():
         R["steps"][name]["s"] = round(time.time() - t, 1)
         log(f"step {name} done in {R['steps'][name]['s']} s")
         save_result()
+        if R.get("restart"):
+            return
     R["ok"] = True
     save_result()
 
 
-main()
-unreal.log("CITYGEN_UE_DONE")
+# --- the tick loop (the full editor: texture graphs and captures need it) -------------------
+
+GEN = run()
+HANDLE = None
+BUSY = [False]
+
+
+def finish():
+    save_result()
+    print("CITYGEN_UE_DONE " + json.dumps({"ok": R["ok"]}))
+    unreal.unregister_slate_post_tick_callback(HANDLE)
+    unreal.SystemLibrary.quit_editor()
+
+
+def tick(dt):
+    if BUSY[0]:
+        return
+    BUSY[0] = True
+    try:
+        next(GEN)
+    except StopIteration:
+        finish()
+    except Exception:                                               # noqa: BLE001
+        R["error"] = traceback.format_exc()
+        unreal.log_error(R["error"])
+        finish()
+    finally:
+        BUSY[0] = False
+
+
+HANDLE = unreal.register_slate_post_tick_callback(tick)

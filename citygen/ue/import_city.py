@@ -1157,12 +1157,16 @@ def people_assets(d, missing):
         return a
 
     if not d.get("mid_meshes"):
-        return {"near_meshes": [], "near_mesh_starts": [], "walk_clips": [],
+        return {"near_meshes": [], "near_mesh_starts": [], "near_hair": [],
+                "char_clip_group": [], "walk_clips": [],
                 "walk_clip_speeds": [], "idle_clips": [], "mid_meshes": [], "mid_frames": [],
                 "card_mesh": None, "card_materials": []}
     t = d.get("tiers") or {}
     out = {"near_meshes": [load(p) for p in d["near_meshes"]],
            "near_mesh_starts": [int(v) for v in d["near_mesh_starts"]],
+           "near_hair": [load(p) if p else None for p in d.get("near_hair") or []],
+           "char_clip_group": [int(v) for v in d.get("char_clip_group") or []],
+           "gaits": int(d.get("gaits") or 2),
            "walk_clips": [load(p) for p in d["walk_clips"]],
            "walk_clip_speeds": [float(v) for v in d["walk_clip_speeds"]],
            "idle_clips": [load(p) for p in d.get("idle_clips") or []],

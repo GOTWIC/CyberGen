@@ -24,6 +24,7 @@ class UAnimSequence;
 class UInstancedStaticMeshComponent;
 class USkeletalMesh;
 class USkeletalMeshComponent;
+class UStaticMeshComponent;
 class UMaterialInterface;
 class UStaticMesh;
 class UCityGenLifeWalkProcessor;
@@ -114,6 +115,15 @@ public:
 	 *  of NearMeshes, the first the leader (the body), the rest following its pose. */
 	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<TObjectPtr<USkeletalMesh>> NearMeshes;
 	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<int32> NearMeshStarts;
+	/** Per character its hair as a static mesh of its groom's cards (in the face's frame at
+	 *  its reference pose), carried on the face's head bone; null for none. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<TObjectPtr<UStaticMesh>> NearHair;
+	/** Per character which of its near meshes carries the hair (the face: 1). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") int32 HairOn = 1;
+	/** Per character its clip group (characters on one body skeleton share their clips):
+	 *  its walks are WalkClips[group * Gaits + gait]. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<int32> CharClipGroup;
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") int32 Gaits = 2;
 	/** The walk clips (per gait) on the characters' body skeleton, and the speed (m/s) each
 	 *  walks at its own rate. */
 	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<TObjectPtr<UAnimSequence>> WalkClips;
@@ -192,12 +202,14 @@ private:
 	struct FNearSlot
 	{
 		TArray<USkeletalMeshComponent*> Comps;
+		UStaticMeshComponent* Hair = nullptr;
 		int32 Person = INDEX_NONE;
 		int32 Char = INDEX_NONE;
 		int32 Gait = INDEX_NONE;
 	};
 	TArray<FNearSlot> NearSlots;
 	UPROPERTY(Transient) TArray<TObjectPtr<USkeletalMeshComponent>> NearComps;
+	UPROPERTY(Transient) TArray<TObjectPtr<UStaticMeshComponent>> HairComps;
 	UPROPERTY(Transient) TArray<TObjectPtr<UInstancedStaticMeshComponent>> MidComps;
 	UPROPERTY(Transient) TArray<TObjectPtr<UInstancedStaticMeshComponent>> FarComps;
 	TArray<int32> PersonInst, PersonSlot, CharCount;
