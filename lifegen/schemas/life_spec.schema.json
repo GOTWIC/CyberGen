@@ -1,0 +1,423 @@
+{
+ "$defs": {
+  "Budgets": {
+   "additionalProperties": false,
+   "description": "Decision 12.7 (2026-11-13): 20 ms p95 at native 2560 x 1440 on the PC.",
+   "properties": {
+    "frame_p95_ms": {
+     "default": 20.0,
+     "title": "Frame P95 Ms",
+     "type": "number"
+    },
+    "full_detail": {
+     "items": {
+      "type": "integer"
+     },
+     "maxItems": 2,
+     "minItems": 2,
+     "title": "Full Detail",
+     "type": "array"
+    },
+    "people_view": {
+     "default": 2000,
+     "maximum": 20000,
+     "minimum": 0,
+     "title": "People View",
+     "type": "integer"
+    },
+    "vehicles_view": {
+     "default": 500,
+     "maximum": 5000,
+     "minimum": 0,
+     "title": "Vehicles View",
+     "type": "integer"
+    },
+    "view_m": {
+     "default": 300.0,
+     "exclusiveMinimum": 0.0,
+     "maximum": 2000.0,
+     "title": "View M",
+     "type": "number"
+    }
+   },
+   "title": "Budgets",
+   "type": "object"
+  },
+  "Busy": {
+   "additionalProperties": false,
+   "properties": {
+    "busy": {
+     "default": 1.0,
+     "description": "A multiplier of how busy (LG7).",
+     "maximum": 5.0,
+     "minimum": 0.0,
+     "title": "Busy",
+     "type": "number"
+    }
+   },
+   "title": "Busy",
+   "type": "object"
+  },
+  "DistrictPopulation": {
+   "additionalProperties": false,
+   "description": "A district's people, by its name in the city model. Every field left out is its\narchetype's (`presets.MIX`, `DAY_SHAPE`).",
+   "properties": {
+    "busy": {
+     "anyOf": [
+      {
+       "maximum": 5.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A multiplier of M11's crowd densities here.",
+     "title": "Busy"
+    },
+    "mix": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "number"
+       },
+       "maxItems": 3,
+       "minItems": 3,
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Residents, workers, visitors (shares, normalized).",
+     "title": "Mix"
+    },
+    "shape": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "number"
+       },
+       "maxItems": 24,
+       "minItems": 24,
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The day's shape, a weight per hour (normalized per hour band, so every band keeps M11's density).",
+     "title": "Shape"
+    }
+   },
+   "title": "DistrictPopulation",
+   "type": "object"
+  },
+  "DistrictStyle": {
+   "additionalProperties": false,
+   "description": "What people wear in a district (scope 6.2), by its name.",
+   "properties": {
+    "cyberware": {
+     "anyOf": [
+      {
+       "maximum": 1.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "0 none, 1 everyone heavily augmented.",
+     "title": "Cyberware"
+    },
+    "groups": {
+     "additionalProperties": {
+      "maximum": 100.0,
+      "minimum": 0.0,
+      "type": "number"
+     },
+     "description": "Fashion groups and their weights.",
+     "propertyNames": {
+      "enum": [
+       "corporate",
+       "street",
+       "market",
+       "industrial",
+       "nightlife",
+       "techwear",
+       "punk",
+       "gang",
+       "police"
+      ]
+     },
+     "title": "Groups",
+     "type": "object"
+    },
+    "wear": {
+     "anyOf": [
+      {
+       "maximum": 1.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "0 new, 1 worn out.",
+     "title": "Wear"
+    }
+   },
+   "title": "DistrictStyle",
+   "type": "object"
+  },
+  "Fleet": {
+   "additionalProperties": false,
+   "description": "AG18's vehicles (decision 6): a model's weight is its district's from the parked cars'\ntable (`assetgen/parked/table.py`) times the multipliers here.",
+   "properties": {
+    "busy": {
+     "default": 1.0,
+     "description": "A multiplier of M11's vehicle densities.",
+     "maximum": 5.0,
+     "minimum": 0.0,
+     "title": "Busy",
+     "type": "number"
+    },
+    "districts": {
+     "additionalProperties": {
+      "additionalProperties": {
+       "maximum": 10.0,
+       "minimum": 0.0,
+       "type": "number"
+      },
+      "type": "object"
+     },
+     "description": "Per district name, per model multipliers.",
+     "title": "Districts",
+     "type": "object"
+    },
+    "weights": {
+     "additionalProperties": {
+      "maximum": 10.0,
+      "minimum": 0.0,
+      "type": "number"
+     },
+     "description": "Per model, a multiplier everywhere (0 leaves it out of the city).",
+     "title": "Weights",
+     "type": "object"
+    }
+   },
+   "title": "Fleet",
+   "type": "object"
+  },
+  "Reactions": {
+   "additionalProperties": false,
+   "description": "Decision 12.8: stepping aside and looking; fleeing and gathering are a later hook.",
+   "properties": {
+    "flee": {
+     "default": false,
+     "title": "Flee",
+     "type": "boolean"
+    },
+    "gather": {
+     "default": false,
+     "title": "Gather",
+     "type": "boolean"
+    },
+    "look": {
+     "default": true,
+     "title": "Look",
+     "type": "boolean"
+    },
+    "step_aside": {
+     "default": true,
+     "title": "Step Aside",
+     "type": "boolean"
+    }
+   },
+   "title": "Reactions",
+   "type": "object"
+  },
+  "Spike": {
+   "additionalProperties": false,
+   "description": "LG0's spike: plain stand-ins on one district's walkways and a few cars on its lanes.",
+   "properties": {
+    "cars": {
+     "default": 40,
+     "maximum": 2000,
+     "minimum": 0,
+     "title": "Cars",
+     "type": "integer"
+    },
+    "district": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The district by name (default the one with the most buildings: the benchmark's walk).",
+     "title": "District"
+    },
+    "hour": {
+     "default": 23,
+     "exclusiveMaximum": 24,
+     "minimum": 0,
+     "title": "Hour",
+     "type": "integer"
+    },
+    "people": {
+     "anyOf": [
+      {
+       "maximum": 20000,
+       "minimum": 0,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Default the plan's people on its streets at the hour, at most the budget's.",
+     "title": "People"
+    }
+   },
+   "title": "Spike",
+   "type": "object"
+  },
+  "Styles": {
+   "additionalProperties": false,
+   "properties": {
+    "districts": {
+     "additionalProperties": {
+      "$ref": "#/$defs/DistrictStyle"
+     },
+     "title": "Districts",
+     "type": "object"
+    },
+    "palette": {
+     "description": "The city's clothing accents (default its neon).",
+     "items": {
+      "pattern": "^#[0-9a-f]{6}$",
+      "type": "string"
+     },
+     "title": "Palette",
+     "type": "array"
+    }
+   },
+   "title": "Styles",
+   "type": "object"
+  },
+  "Transit": {
+   "additionalProperties": false,
+   "description": "Service per line by its name: headways by hour band (minutes).",
+   "properties": {
+    "headway_min": {
+     "additionalProperties": {
+      "items": {
+       "type": "number"
+      },
+      "maxItems": 5,
+      "minItems": 5,
+      "type": "array"
+     },
+     "title": "Headway Min",
+     "type": "object"
+    }
+   },
+   "title": "Transit",
+   "type": "object"
+  }
+ },
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": false,
+ "properties": {
+  "$schema": {
+   "anyOf": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "title": "$Schema"
+  },
+  "air": {
+   "$ref": "#/$defs/Busy"
+  },
+  "budgets": {
+   "$ref": "#/$defs/Budgets"
+  },
+  "city": {
+   "anyOf": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "description": "City name (checked against the model).",
+   "title": "City"
+  },
+  "fleet": {
+   "$ref": "#/$defs/Fleet"
+  },
+  "notes": {
+   "anyOf": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "description": "What the session inferred from the prompt.",
+   "title": "Notes"
+  },
+  "population": {
+   "additionalProperties": {
+    "$ref": "#/$defs/DistrictPopulation"
+   },
+   "title": "Population",
+   "type": "object"
+  },
+  "reactions": {
+   "$ref": "#/$defs/Reactions"
+  },
+  "spike": {
+   "$ref": "#/$defs/Spike"
+  },
+  "styles": {
+   "$ref": "#/$defs/Styles"
+  },
+  "transit": {
+   "$ref": "#/$defs/Transit"
+  },
+  "version": {
+   "const": 1,
+   "default": 1,
+   "title": "Version",
+   "type": "integer"
+  },
+  "water": {
+   "$ref": "#/$defs/Busy"
+  }
+ },
+ "title": "lifegen life spec",
+ "type": "object"
+}

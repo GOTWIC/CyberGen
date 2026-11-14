@@ -1,0 +1,95 @@
+{
+ "$defs": {
+  "Entry": {
+   "additionalProperties": false,
+   "description": "A layer 4 entry, keyed by what it belongs to.",
+   "properties": {
+    "count": {
+     "default": 0,
+     "title": "Count",
+     "type": "integer"
+    },
+    "hash": {
+     "title": "Hash",
+     "type": "string"
+    },
+    "key": {
+     "title": "Key",
+     "type": "string"
+    },
+    "kind": {
+     "enum": [
+      "life_controller",
+      "spawner",
+      "slots"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "tile": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Tile"
+    }
+   },
+   "required": [
+    "key",
+    "kind",
+    "hash"
+   ],
+   "title": "Entry",
+   "type": "object"
+  }
+ },
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": false,
+ "properties": {
+  "city": {
+   "title": "City",
+   "type": "string"
+  },
+  "entries": {
+   "items": {
+    "$ref": "#/$defs/Entry"
+   },
+   "title": "Entries",
+   "type": "array"
+  },
+  "layer": {
+   "const": 4,
+   "default": 4,
+   "title": "Layer",
+   "type": "integer"
+  },
+  "plan_hash": {
+   "title": "Plan Hash",
+   "type": "string"
+  },
+  "stage": {
+   "const": "lifegen",
+   "default": "lifegen",
+   "title": "Stage",
+   "type": "string"
+  },
+  "version": {
+   "const": 1,
+   "default": 1,
+   "title": "Version",
+   "type": "integer"
+  }
+ },
+ "required": [
+  "city",
+  "plan_hash",
+  "entries"
+ ],
+ "title": "lifegen layer 4 contribution",
+ "type": "object"
+}

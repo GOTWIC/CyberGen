@@ -1,4 +1,4 @@
-# lifegen: people, traffic, transit and air (scope, draft v0)
+# lifegen: people, traffic, transit and air (scope, v1: decided 2026-11-13, LG0 done)
 
 Stage 4 (lifegen) of CyberGen's five stages. It takes a built city with its assets (and,
 once stage 3 is there, its hours and weather) and fills it with life: varied, realistic
@@ -8,8 +8,8 @@ aircraft and boats. All of it goes into Unreal through the shared exporter
 (`docs/unreal_export.md`). Like the other stages it is city-agnostic, offline and
 deterministic in what it generates; the simulation that moves it runs in Unreal. Its
 milestones carry the prefix LG (LG0 to LG8, section 13). It starts after AG16
-(performance), whose benchmark is its baseline. The decisions that need Swagnik before LG0
-starts are in section 12.
+(performance), whose benchmark is its baseline. Swagnik decided section 12 on 2026-11-13;
+LG0's findings and the recommendations for LG1 to LG8 are in `docs/progress/LG0/README.md`.
 
 ```
  citygen build  ──>  city_model.json          assetgen build  ──>  assets/ (doors,
@@ -148,7 +148,7 @@ leads inside), ferry piers.
 | Stage | Owns | lifegen owns |
 |---|---|---|
 | citygen | where things are: walkways, lanes, places, densities, factions | who uses them, when, how |
-| assetgen | the city's static models: buildings, street elements, props, parked cars today | everything that moves: people and vehicles (one fleet; AG8's parked cars become the fleet's models, decision 12.6) |
+| assetgen | the city's static models: buildings, street elements, props; AG18's hand-designed vehicles (one roster, parked by step H) | everything that moves: people, and AG18's vehicles driven (decision 12.6: one fleet, parked and moving) |
 | atmosgen | light, air, weather, hour | people and traffic reacting to them; the vehicles' and aircraft's own lights as light sources go through atmosgen's tiers |
 | storygen | story, characters, events | the background life a story plays over; storygen's characters are lifegen people with a story |
 
@@ -163,8 +163,8 @@ to edit. Fields, all with defaults:
 - `styles`: fashion per district and group (corporate, street, market, industrial,
   nightlife, gang colors from M11's factions, police uniforms), how much cyberware, how
   worn; a city palette.
-- `fleet`: vehicle mix per district (compacts, sedans, vans, trucks, buses, taxis,
-  motorbikes, bikes), how many fly, how old and worn.
+- `fleet`: vehicle mix per district as weights of AG18's models (default the parked cars'
+  table, `assetgen/parked/table.py`), how many fly, how old and worn.
 - `transit`: service frequency per line and hour.
 - `air` and `water`: how busy the sky and the canals are.
 
@@ -238,6 +238,13 @@ has. The plan, from most generated to least:
 
 ### 6.5 Traffic
 
+- **The fleet is AG18's hand-designed vehicles** (decision 6, changed from the draft):
+  `vehicles/`, their game packs fetched by `vehicles/packs.py`, the same models moving and
+  parked (AG18's step H parks them in place of AG8's variants; LG5 drives them). The kinds
+  the roster lacks (buses, trucks, motorbikes, bikes, flying cars, drones, boats) are
+  designed on the Mac the same way, one Blender script each, and join the roster as packs.
+  lifegen draws a model per vehicle from its district's weights (`assetgen/parked/table.py`,
+  the parked cars' table) and paints it per vehicle; it generates no vehicle geometry.
 - A fleet per district (section 5) on the lane graph: following, lane changes, turns by
   the connectors, stopping at signals by their phases, yielding at crossings, parking at
   the curb and in garages and leaving again; buses on their routes, stopping at shelters;
@@ -301,9 +308,9 @@ built again.
 - **Baseline:** AG16's benchmark (`--bench`), by day and by night, before LG0 and after every
   LG milestone. AG16's scope already gives lifegen's crowds and traffic (game thread, CPU)
   a pass of their own.
-- **Scale:** a proposed budget for the PC at 1440p: up to 2,000 simulated people and 500
-  vehicles within 300 m, 150 to 250 people at full detail, the game thread's share at most
-  4 ms (decision 12.7).
+- **Scale:** up to 2,000 simulated people and 500 vehicles within 300 m, 150 to 250 people
+  at full detail (the goal). The frame budget is 20 ms p95 at native 2560 x 1440 on the PC
+  (decision 12.7): no tuning rounds unless a milestone goes over it.
 - **Engine pieces:** Mass Entity, Mass Crowd, ZoneGraph, Smart Objects, StateTree,
   Motion Matching, AnimToTexture (baked animation for far crowds), Mutable, Chaos Cloth,
   Chaos Vehicles near the player. Which of them are experimental in 5.8 is LG0's to check.
@@ -321,39 +328,44 @@ The player's own character and controls; combat, dialogue, quests and story even
 (storygen); people inside buildings beyond their doors (AG11, interiors); sound; driving
 by the player (a later option); seasons.
 
-## 12. Decisions that need Swagnik
+## 12. Decisions (Swagnik, 2026-11-13)
 
-1. **The shape:** a generator of the plan and a library, with a runtime plugin on
-   Unreal's Mass, ZoneGraph, Smart Objects and StateTree. Recommended.
-2. **Bodies and faces:** MetaHuman (the most realistic; Epic's license; made once by
-   script into the project, not the repo) or fully generated bodies (CyberGen's own, less
-   realistic up close). Recommended: MetaHuman, if 5.8's tools can be driven from a script.
-3. **Clothing:** generated garments draped in Blender (6.2), tried in LG0, with an
-   authored or bought base kit kept out of the repo as the fallback. Recommended.
-4. **Animation:** Epic's free Game Animation Sample (usable in an Unreal project, not in
-   the repo), free motion capture libraries such as CMU's (which may ship with a city), or
-   both, retargeted to the bodies. Recommended: both, Epic's near, the libraries for the
-   rest.
-5. **Third-party content:** nothing goes in the repo unless its license lets anyone use
-   it; what a user adds to their own project (MetaHumans, Fab clothing, Epic's animation)
-   is imported there by a step they run once.
-6. **Vehicles:** lifegen generates one fleet of every vehicle, moving and parked, with
-   assetgen's kit and materials; AG8's parked cars become the fleet's models. Recommended.
-7. **Budget:** the crowd and traffic budget of 9 (2,000 people, 500 vehicles within 300 m,
-   at most 4 ms of the game thread).
-8. **Reactions:** stepping aside and looking only, or also fleeing and gathering (a hook
-   for storygen).
+1. **The shape:** a generator of the plan and a library, with the `CityGenLife` runtime
+   plugin on Unreal's Mass, ZoneGraph, Smart Objects and StateTree. Decided as recommended.
+2. **Bodies and faces:** MetaHuman, if 5.8's tools can be driven from a script (LG0 found
+   out: `docs/progress/LG0/README.md`), made by script into the user's project, never the
+   repo. Fully generated bodies (CyberGen's own) only if that fails.
+3. **Clothing:** generated garments from sewing patterns draped in Blender's cloth solver
+   (6.2; LG0 draped a test garment), with an authored or bought base kit kept out of the repo
+   as the fallback.
+4. **Animation:** both. Epic's Game Animation Sample near the view (in the user's project,
+   never the repo) and free motion capture libraries (CMU-style, licenses that let anyone
+   use them) for the rest, retargeted to the bodies.
+5. **Third-party content:** nothing goes in the repo unless its license lets anyone use it.
+   A user's own content (MetaHumans, Fab clothing, Epic's animation) is imported into their
+   project by a step they run once.
+6. **Vehicles (changed from the draft):** the fleet is AG18's hand-designed vehicles
+   (`vehicles/`, game packs fetched by `vehicles/packs.py`), moving and parked. The kinds the
+   roster lacks (buses, trucks, motorbikes, bikes, flying cars, drones, boats) are designed
+   on the Mac the same way. lifegen generates no vehicle geometry (6.5).
+7. **Budget (changed):** the frame budget for lifegen is **20 ms p95** at native 2560 x 1440
+   on the PC for now (atmosgen held 16.7 ms; Delta's night was 15.0 ms after AT7). "Instead
+   of wasting time optimizing at every step, we can allow a larger budget and then optimize
+   later as needed": no tuning rounds unless a milestone goes over 20 ms. The people and
+   vehicle counts of section 9 stay the goal.
+8. **Reactions:** stepping aside and looking first; fleeing and gathering later, as a hook
+   for storygen.
 
 ## 13. Milestones
 
 | | Milestone | Adds | Needs |
 |---|---|---|---|
-| LG0 | Groundwork and spike | life spec and styles, plan format, the asks of citygen; the `CityGenLife` plugin's skeleton with ZoneGraph lanes built from the graphs; plain stand-in people walking one district of Delta and a few cars on its lanes, measured with AG16's benchmark; what MetaHuman and Mutable can do from a script in 5.8; a garment draped in Blender's cloth solver as a test | AG16 |
+| LG0 | Groundwork and spike (done, 2026-11-13) | life spec and styles, plan format, the asks of citygen; the `CityGenLife` plugin's skeleton with ZoneGraph lanes built from the graphs; plain stand-in people walking one district of Delta and a few cars on its lanes, measured with AG16's benchmark; what MetaHuman and Mutable can do from a script in 5.8; a garment draped in Blender's cloth solver as a test | AG16 |
 | LG1 | People | the population library: bodies, faces, skin and hair by seed, the animation set retargeted, LODs and far stand-ins (baked animation, impostors), assembly (Mutable or lifegen's merge); people in a plain base outfit | LG0 |
 | LG2 | Clothing | garments from sewing patterns draped in Blender, generated textiles, accessories and cyberware, outfits by district, group, job, wealth and weather, the variety check, cloth simulation near the view | LG1 |
 | LG3 | Crowds on the streets | people on every walkway at each street's density by hour, every level, stairs, escalators and elevators, crosswalks with the signals, groups, pace, avoidance; trips spawned and ended at doors, stations and garages | LG1 |
 | LG4 | Life at places | Smart Object slots at benches, stops, stalls, kiosks, vending machines and doors; places by their hours; gangs on their turf, police patrols | LG3 |
-| LG5 | Traffic | the fleet (cars, vans, trucks, buses, taxis, motorbikes, bikes) on the lanes; signal phases; parking; bus routes; taxis; densities by hour; lights at night; AG8's parked cars from the fleet | LG0 |
+| LG5 | Traffic | AG18's fleet (cars and vans now; buses, trucks, motorbikes and bikes as the Mac designs them) on the lanes; signal phases; parking; bus routes; taxis; densities by hour; lights at night | LG0 |
 | LG6 | Transit | trains, metro, monorail, maglev and sky tube pods on their lines to timetables, stations, boarding | LG3, LG5 |
 | LG7 | Air and water | flying cars on air lanes and pads, drones, police fliers, aircraft over the spaceport, boats, water taxis, ships and ferries | LG5 |
 | LG8 | Weather, reactions and release | crowds and traffic by atmosgen's hour and weather (umbrellas, shelter, nightlife), reactions to the player, the crowd and traffic performance pass, every sample city alive, Unreal checks on the PC, README | LG2 to LG7, AT3, AT5 |
