@@ -15,14 +15,20 @@ From the city model (read only) and the life spec:
 - **The fleet** (decision 6): AG18's models by each district's weights (the parked cars'
   table).
 - **The spike** (LG0): one district (default the one with the most buildings, the
-  benchmark's walk), its people at the spike's hour (at most the budget's), a few cars.
+  benchmark's walk) and a few cars on its lanes (LG3: its people only where the spec asks).
+- **The crowd** (LG3, scope 6.3): every walkway's people per hour band (`crowd_walks`: a road
+  segment's M11 people on its own walkways by length, the rest at the district's mean
+  sidewalk density times `presets.OFFSTREET`), the signals' phases (`signals`, the ask
+  `signal_phases` derived: `signals.json`), AG3's doors as the spawn points where the build
+  has them (`door_points`), the pool of people the runtime simulates round the view
+  (`crowd_plan`), checks (`crowd_checks`).
 - **The asks of citygen** (`asks.py`) and their state.
 - **Checks** (scope 8, the ones LG0 can make): spawns on the graphs, spawns reaching each
   other, densities kept, slots placed, the spike within the budgets.
 
-Outputs (written only when their bytes change): `life_plan.json`, `spawns/<tile>.json`,
-`life_report.json`, `life_report.txt`, `unreal_contribution.life.json`,
-`preview_crowds.png`.
+Outputs (written only when their bytes change): `life_plan.json`, `spawns/<tile>.json` (LG3:
+with its walkways' people), `signals.json`, `life_report.json`, `life_report.txt`,
+`unreal_contribution.life.json`, `preview_crowds.png`.
 """
 
 from __future__ import annotations

@@ -14,7 +14,7 @@ grows here as it lands, as in [`citygen_milestones.md`](citygen_milestones.md),
 | LG0 | Groundwork and spike: the life spec and styles, the plan format and schemas, `lifegen plan` (people and vehicles by district and hour, spawn and sink points, place slots, the fleet from AG18's roster, the asks of citygen), the `CityGenLife` plugin's skeleton (ZoneGraph lanes built from the graphs, Mass processors) built by the exporter; plain stand-ins and a few of AG18's cars on one district of Delta, against the benchmark; probes of MetaHuman, Mutable, retargeting and the engine pieces' maturity in 5.8; a tee draped in Blender's cloth solver | Done | [`docs/progress/LG0`](progress/LG0) |
 | LG1 | People: the population library (24 MetaHumans made, rigged and assembled by script into the user's project, faces blended, bodies and skin by seed), Epic's walks retargeted in place, baked walks and impostor cards for the far crowd, the plan's person draws, the exporter's `--people` and the runtime's near, mid and far tiers; Delta's Old Town walked by them | Done | [`docs/progress/LG1`](progress/LG1) |
 | LG2 | Clothing | Planned | |
-| LG3 | Crowds on the streets | Planned | |
+| LG3 | Crowds on the streets: every walkway of the city at its street's density by hour, live round the view from a fixed pool (people come alive and go past the far tier, out of sight), trips out of and into AG3's doors, stations, garages and taxi stands, groups, pace, signals with derived phases at the crosswalks, jaywalking by danger, local avoidance and stepping aside from the player, stairs and elevators; Delta walked city-wide | Done | [`docs/progress/LG3`](progress/LG3) |
 | LG4 | Life at places | Planned | |
 | LG5 | Traffic | Planned | |
 | LG6 | Transit | Planned | |
@@ -137,3 +137,72 @@ cars and steam (#225). Report, shots, benchmark and open items:
 - **Tests** (`tests/lifegen/test_lg_people.py`: characters and draws by seed, the hash, the
   exporter's packing, the cache and stamp, no Unreal or MetaHuman file in the repo;
   `test_bench.py` the tier passes).
+
+## LG3: crowds on the streets
+
+Built on the Windows PC (2026-11-14), before LG2 at Swagnik's ask (the people keep LG1's plain
+outfit), on main after LG1 (#226). Report, shots, benchmark and open items:
+[`docs/progress/LG3/README.md`](progress/LG3/README.md).
+
+- **Every walkway's people** (`lifegen/plan.py` `crowd_walks`, `planmodel.Walk`, each tile
+  file's `walks`): a road segment's M11 people per hour band (crowd per 100 m over its length,
+  the district's busy, the spec's `crowd.scale`) on its own walkways by length; every other
+  walkway (crossings, crosswalks, paths, skybridges, platforms, stairs) at its district's mean
+  sidewalk density times `presets.OFFSTREET` (crossing 0.6, crosswalk 0.4, path 0.3, skybridge
+  0.25, platform 0.6, stairs 0.4, elevator 0), lengths along the slope; none on a walkway no
+  spawn point reaches (said in `totals.left_out`). The hours within a band follow the
+  district's day.
+- **Signals** (`plan.signals`, `signals.json`, `planmodel.Signals`; the ask `signal_phases`,
+  derived): two phases per signalized junction from its legs' lines (within 45 degrees of the
+  first leg's, `attrs.cuts`), each crosswalk walking while the leg it crosses is stopped (its
+  walkways matched by their middle stretch), `presets.SIGNAL` (60 s cycle, 3 s amber, 2 s
+  all-red, 12 s to start crossing), an offset per junction by its id's hash.
+- **AG3's doors** (`plan.door_points`): the spawn points where the build has stage 2's
+  buildings (`assets/unreal_contribution.buildings.json`), each door's position on the facade,
+  outward yaw (`Spawn.yaw_deg`), walkway and weight by kind (`presets.DOOR_WEIGHT`); M3's
+  entrances otherwise.
+- **The crowd** (`plan.crowd_plan`, `planmodel.CrowdPlan`, the spec's `crowd`: hour, pool,
+  scale, trip_s; `presets.CROWD`): a pool of 2,400 people drawn from LG1's library by their
+  seeds (`lg3.person`, the tint an index into the district's palette where each comes out),
+  each district's palette, the live radius (340 m), trips (600 s), groups (1 to 5: 56, 26, 11,
+  5, 2%), jaywalking (1% to 30% by danger), avoidance (reach 4 m, personal 0.75 m, player
+  2.5 m, within 90 m of the view), speeds (stairs 0.6 of the pace, escalators 0.3 plus
+  0.5 m/s, elevators 0.6 m/s). The spike keeps its 40 cars and no people.
+- **Checks** (`plan.crowd_checks`): `crowd_densities`, `crowd_levels`, `signals`,
+  `crowd_budget` (the pool times (300 / 340)^2 within the 2,000 people in 300 m),
+  `people_draws` on the pool, `crowd_spawns`.
+- **Exporter** (`citygen/unreal_life.py` `pack_crowd`, `pack_walks`, `pack_drive`,
+  `PACK_VERSION` 3; `import_city.crowd_props`, `LIFE_VERSION` life3; `unreal.life_summary`):
+  the whole walkway graph as lanes with each walkway's kind, district, people per band and
+  signal window; the districts' days, dangers and palettes; the doors on their walkways at
+  their distance along them; the pool; `docs/unreal_export.md`, "From LG3: crowds on the
+  streets". A plan before LG3 packs LG1's spike as before.
+- **Runtime** (`CityGenLifeCrowd.cpp`; the walk processor's `ExecuteCity` and
+  `CgLife::StepCity`; `CityGenLifePeople.cpp`): walkways live within `LiveM` of the view,
+  filled as they come alive and emptied as they go (both past the far tier), people turning
+  back at a walkway that is not live; a fixed pool of Mass entities (no entity made or
+  destroyed while playing), the density scaled down evenly past 92% of it (`LiveScale`); doors
+  sending people out at their rates and taking them in at a trip's end (0.6 m inside, then
+  gone); groups sharing a seed; people waiting at a signalized crosswalk's curb for its walk
+  window, a share crossing against it; avoidance (passing on the left, following a slower
+  person, stepping right face to face, stepping aside from the player); stairs, escalators and
+  hidden elevator rides; the idle clip near while standing, the baked walk and card frozen mid
+  and far; far people stepping every second frame, untiered ones every fourth, far cards sent
+  every second frame, the ground traced only near; `CityGenLife.Hour`, `CityGenLife.Crowd
+  SCALE [TRIP_S]`, the status's `crowd`.
+- **Check** (`citygen/ue/check_city.py`): the life status at every play view; `*_wait*` views
+  wait 30 s more.
+- **Delta** (imported over LG1's import, one actor updated): every check passes; 20,245
+  ZoneGraph lanes; Old Town at 0.28 to 0.41 of its plan's density (6,300 to 7,900 people
+  wanted round the view, 2,400 in the pool), every other district at its full density;
+  doors verified with 20 s trips (4,873 in, 3,134 out over three views, the live people held
+  at their number). Lean benchmark at native 2560 x 1440 (no DLSS pass: Swagnik,
+  2026-11-14): `night_plan_all` **19.3 ms p95** (walk 21.4, drive 19.3, fly 18.5; LG1's spike
+  19.6), people off 18.1; the drive and the flight see 500 to 1,750 people live round the view
+  outside Old Town.
+- **Found:** the walkway graph's crosswalk and crossing walkways run their corner tails up to
+  25 m along or across the carriageway where M17's and M22's cuts reach far (922 crossings
+  and 403 crosswalks over 30 m in Delta); people follow them (open item for citygen).
+- **Tests** (`tests/lifegen/test_lg_plan.py`: every walkway's people, the signals' phases, a
+  walkway nobody reaches, AG3's doors as spawn points, the exporter's crowd pack and summary;
+  the fixture gained a signalized junction with two crosswalks).

@@ -95,12 +95,16 @@ namespace
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs CrowdCmd(TEXT("CityGenLife.Crowd"),
-		TEXT("CityGenLife.Crowd SCALE: LG3's crowd at SCALE times the plan's density (within the pool), filled again"),
+		TEXT("CityGenLife.Crowd SCALE [TRIP_S]: LG3's crowd at SCALE times the plan's density (within the pool), its trips TRIP_S s long on average, filled again"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 		{
 			ACityGenLife* A = LifeIn(World);
 			if (A && Args.Num())
 			{
+				if (Args.Num() > 1)
+				{
+					A->TripS = FMath::Max(1.f, FCString::Atof(*Args[1]));
+				}
 				A->SetCrowdScale(FCString::Atof(*Args[0]));
 			}
 		}));

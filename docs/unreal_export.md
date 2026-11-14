@@ -423,7 +423,7 @@ high resolution shot), and showing the lane and walkway graphs over the city for
 | 1 citygen | the blockout, props and plants, graphs, player start, a default sun and sky (M15); terrain: the ground per tile, walls, bores, terrain viaducts and columns by id (M13); decks: the slab, deck streets and the buildings on them tagged with their level, the manifest's decks, levels in the graphs (M14); water and ground: swim volumes per water body and tile, water at its surface, beds, banks by kind and the ground cover by kind with a material each (M16) |
 | 2 assetgen | buildings replacing their blockout boxes by id (own pivots, parts as instances, simple collision), textured master materials with per-actor parameters, street meshes replacing the joined pieces, prop and plant variants, signs, LODs for the pieces Nanite does not take, HLOD and Lumen settings (per milestone: `docs/assetgen_scope.md` section 14) |
 | 3 atmosgen | lights (street and wall lights, shopfronts, signs as lit faces, floods), sky, time, weather, fog and post volumes, replacing M15's default sun and sky; rendered by its runtime plugin `CityGenAtmos` (AT0: the plugin's skeleton, its assets, the plan's contribution format; "atmosgen's runtime (AT0)" below) |
-| 4 lifegen | people, traffic, transit, air and water on the graphs, spawners, place slots; moved by its runtime plugin `CityGenLife` (LG0: the plugin's skeleton, ZoneGraph lanes from the graphs, the spike's stand-ins and cars; "lifegen's runtime (LG0)" below; LG1: the people library, MetaHumans made by script into the project, near, mid and far tiers; "From LG1: people") |
+| 4 lifegen | people, traffic, transit, air and water on the graphs, spawners, place slots; moved by its runtime plugin `CityGenLife` (LG0: the plugin's skeleton, ZoneGraph lanes from the graphs, the spike's stand-ins and cars; "lifegen's runtime (LG0)" below; LG1: the people library, MetaHumans made by script into the project, near, mid and far tiers; "From LG1: people"; LG3: the city's crowd on every walkway round the view, doors, signals, groups, avoidance; "From LG3: crowds on the streets") |
 | 5 storygen | story actors, triggers, sequences |
 
 ## assetgen's contribution (AG0)
@@ -2555,8 +2555,8 @@ drive lanes and cars until LG5. A plan before LG3 packs and walks LG1's spike as
   clip near, its baked walk and card frozen mid and far; a person in an elevator is drawn by
   none.
 - **Console:** `CityGenLife.Hour H` (the crowd at another hour, every live walkway filled
-  again; until LG8 reads atmosgen's), `CityGenLife.Crowd SCALE` (the density times SCALE,
-  within the pool); `CityGenLife.Respawn PEOPLE CARS` takes a smaller pool; `CityGenLife.Status`
+  again; until LG8 reads atmosgen's), `CityGenLife.Crowd SCALE [TRIP_S]` (the density times SCALE,
+  within the pool, trips TRIP_S long); `CityGenLife.Respawn PEOPLE CARS` takes a smaller pool; `CityGenLife.Status`
   adds `crowd` (hour, pool, live walkways, the live people wanted and the scale, active, free,
   waiting, standing, in elevators, spawned, out of doors, in at doors, gone with their
   walkway, jaywalked, groups, doors live, signals). The check logs it at each play view.

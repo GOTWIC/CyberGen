@@ -7,6 +7,9 @@
   entrances, garages, taxi stands) with their rates by hour, and its place slots (benches,
   bus stops, kiosks, vending machines, stalls, taxi stands).
 - `unreal_contribution.life.json` (`Contribution`): layer 4 of the exporter's manifest.
+- LG3: the plan's `crowd` (`CrowdPlan`), each tile's `walks` (`Walk`: a walkway's people per
+  hour band and its signal) and `signals.json` (`Signals`: every signalized junction's
+  phases).
 
 Frames: citygen's (x east, y north, z up, meters, z over the ground as the model has it).
 Every entry carries the hash of its own record (`hash`, the sha256 of its canonical JSON

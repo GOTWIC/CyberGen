@@ -16,6 +16,11 @@ spike packed into `BUILD/unreal/life.json` for the importer:
   its paint by AG18's step H's rule (`assetgen/parked/table.py`), every part of every model
   used (its mesh path, its pivot).
 
+LG3: a plan with a `crowd` packs the city's crowd instead of the spike's people
+(`pack_crowd`): every walkway of the city with its kind, district, people per hour band and
+signal window; the doors; the districts' days, dangers and palettes; the pool; the drive lanes
+and cars stay the spike's.
+
 The runtime builds ZoneGraph lanes from these at BeginPlay (no hand-drawn shapes). A plan
 whose checks failed is named and left out (`skipped`); a build without a plan gets no
 section, and its manifest is what it was.
