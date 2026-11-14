@@ -2263,7 +2263,13 @@ MassGameplay plugin). At BeginPlay the controller:
   SM_<car>_<part>`, the parked cars' meshes and materials, paint in nine floats of
   per-instance custom data as the parked cars', glass and wheels casting no shadow);
 - finds the ground under 96 entities a frame (a line trace each, round robin: curbs, decks
-  and terrain).
+  and terrain);
+- keeps its instanced people and cars **out of Lumen's scene and the distance fields**
+  (`bInLumen` false: they take Lumen's light but give none back, as characters in games) and
+  moves them through the components' instance data without recreating their render state
+  each frame (`bRebuildRenderState` false). The spike measured both: recreating the render
+  state every frame put the moving instances through Lumen's scene update, 9 ms of GPU a
+  frame walking among them (`docs/progress/LG0/README.md`).
 
 Every reference (meshes, material) is a property of the actor, so a cook takes them.
 
@@ -2277,9 +2283,12 @@ Every reference (meshes, material) is a property of the actor, so a cook takes t
 | `BodyMesh`, `HeadMesh`, `StandInMaterial`, `Palette` | the stand-ins |
 | `CarPartMeshes`, `CarPartModels`, `CarPartPivots`, `CarPartShadows`, `CarModels`, `CarPaints`, `PaintFloats` | the cars |
 
-Console commands: `CityGenLife.Enable [0|1]`, `CityGenLife.Respawn PEOPLE CARS`,
-`CityGenLife.Status` (one JSON line, `CITYGEN_LIFE_STATUS`: lanes, entities, the actor's
-game thread time per frame, mean and most). The import's summary line says what it placed
+Console commands: `CityGenLife.Enable [0|1]`, `CityGenLife.Shadows [0|1]`,
+`CityGenLife.Lumen [0|1]`, `CityGenLife.Rebuild [0|1]`, `CityGenLife.Respawn PEOPLE CARS`,
+`CityGenLife.Status` (one JSON line, `CITYGEN_LIFE_STATUS`, also logged at the 300th tick and
+every 6,000th: lanes, entities, people placed, instances drawn, the first person's and car's
+places, the actor's game thread time per frame, mean and most). The benchmark's `night_life*`
+passes (`bench.LIFE_PASSES`, with `--bench-atmos`) switch them over the night as delivered. The import's summary line says what it placed
 (`Life (stage 4): ...`) and `import_result.json`'s `life` the lanes, models and any car mesh
 missing from the project. LG0's spike and its cost: `docs/progress/LG0/README.md`.
 

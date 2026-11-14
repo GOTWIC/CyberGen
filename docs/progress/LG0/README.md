@@ -33,11 +33,73 @@ aside and looking first.
 
 `lifegen plan` on Delta (the play fixes' build), an empty spec: 2 to 3 s, 131 tiles.
 
-<!-- PLAN_TABLE -->
+6,789 spawn points (5,470 main and 1,081 service building entrances and the loading docks
+and garages, the station stairs, the garages' and lots' entrances, the taxi stands), 688
+place slots, all on the walkway graph and all in one walkway component; 58,189 people and
+3,394 vehicles on the streets at the peak hour. Every check passes
+([`plan/life_report.txt`](plan/life_report.txt)).
+
+| District | People at 23:00 | People at the peak | Vehicles at the peak | Spawns | Slots |
+|---|---|---|---|---|---|
+| Transit Nexus | 2,060 | 6,042 | 461 | 163 | 58 |
+| Midtown | 5,421 | 10,685 | 771 | 899 | 86 |
+| Corporate Core | 1,664 | 8,785 | 971 | 291 | 191 |
+| Old Town | 23,373 | 33,786 | 931 | 5,130 | 191 |
+| Industrial Port | 480 | 2,692 | 698 | 249 | 120 |
+| Research Campus | 147 | 1,672 | 118 | 54 | 41 |
+
+![people on the streets at 23:00 and each district's people by hour](plan/preview_crowds.png)
+
+The day's shape is held within M11's five hour bands (each band keeps M11's density), so the
+curves step where the bands meet (Old Town from 30,000 at 19:00 to 14,000 at 20:00): M11's
+densities are per band, and smoothing across bands is LG3's to decide (it would move the
+bands' means). Old Town has 23,373 people on its streets at 23:00, twelve times the budget's
+2,000 within 300 m: the plan's people are spread over the whole 2 km district, so LG3 spawns
+by tile and view (the budget is per view, not per district).
+
+**The asks of citygen** (`lifegen/asks.py`; status on Delta):
+
+| Ask | Needed by | On Delta | Meanwhile |
+|---|---|---|---|
+| Signal phases and timing per signalized junction | LG3, LG5 | derived | two phases from the legs' angles, every crosswalk across the stopped legs, a 60 s cycle |
+| Bus routes and their stops | LG5 | missing | M6's 86 bus stops are there, no route joins them |
+| Turn restrictions | LG5 | derived | every connector lane allowed |
+| Lobby points behind main doors | LG3 | derived | people go in 1.5 m behind AG3's door |
+| Piers for ferries and water taxis | LG7 | missing | M16's quays and AG7's quay stairs; no berth named |
+| Air corridors | LG7 | derived | layers over the avenues and highways |
+| Doors with their walkways (assetgen) | LG3 | met | AG3's doors |
+| AG18's missing kinds (assetgen) | LG5, LG7 | derived | cars, taxis, vans and pickups from the 15 packs |
 
 ## The spike: Delta's Old Town in Unreal
 
-<!-- SPIKE -->
+**Setup.** Delta as the play fixes left it in CityAG16 (`builds/fix_play_cars`, its atmos
+plan), imported again over that import with the life plan (`--life`): the import placed one
+actor (`life`) and updated nothing else of the city but AT7's atmos cells, whose hashes moved
+with main. The spike is Old Town (the benchmark's lean walk district, the one with the most
+buildings) at 23:00: **2,000 stand-ins** (the budget's people, of Old Town's 23,373 on its
+streets at that hour) on the walkway lanes within 450 m of its middle, densest round the
+middle (a lane's share falling as $1 / (1 + (d / 150\,\mathrm{m})^2)$), and **40 cars** of
+nine of AG18's models (the Tanager Mino, Cab and Porter, Brakk's three, the Halcyon Ridge,
+Orrin Lumen and Pebble, by Old Town's weights), painted by step H's rule. At BeginPlay the
+controller builds **11,340 ZoneGraph lanes** (5,831 walkway lanes, 5,509 drive lanes and
+connectors) from `graphs.json` in 14 to 30 ms, then makes 2,040 Mass entities.
+
+The stand-ins walk the walkways both ways at 1.15 to 1.55 m/s, keeping (mostly) right across
+each walkway's width, turning onto the walkways their end meets (not back the way they came
+unless it is a dead end), turning back at the live region's edge; the cars drive the lane
+graph at 25 to 40 km/h, slowing to keep 9 m behind the car ahead on their lane and the one
+they go to next, and start again on a lane of the region at a dead end or its edge. There are
+no signals yet (LG5) and no avoidance between people (LG3).
+
+| By day (a market street in Old Town) | By night |
+|---|---|
+| ![](unreal/pday_street_eye.jpg) | ![](unreal/night_street_eye.jpg) |
+| ![](unreal/pday_aerial.jpg) | ![](unreal/night_aerial.jpg) |
+
+(`unreal/`: the check's free camera views, `--view pday_* / night_*`; the stand-ins are a
+cylinder and a sphere in their district's clothing colors, the cars AG18's packs.)
+
+<!-- SPIKE_BENCH -->
 
 ## Probes
 
@@ -49,4 +111,35 @@ aside and looking first.
 
 ## Recommendations for LG1 to LG8
 
-<!-- RECS -->
+- **LG1 (people).**
+  - Bodies from MetaHuman Creator by script (see the probes): one character asset per
+    archetype of body, edited by the editor subsystem from a seed (body constraints, face
+    model coefficients, skin), assembled by `BuildMetaHuman` into the user's project, never
+    the repo. The cloud steps (auto-rigging, high-resolution textures) need the user's Epic
+    sign-in and EULA, so a library step the user runs once; the local parts first.
+  - Look at **MetaHuman Crowd** (`Engine/Plugins/MetaHuman/MetaHumanCrowd`, experimental in
+    5.8) before writing lifegen's own assembly: it is Epic's Mass crowd of MetaHumans (an
+    appearance provider, a Mass visualization trait, a representation subsystem swapping
+    actors and instanced stand-ins, crowd pipelines for heads, grooms, outfits and
+    skeletal clothing). It may be LG1's assembly and LG3's LODs; Mutable (beta) is the
+    other route.
+  - The animation: Epic's Game Animation Sample is on the UE5 Manny skeleton, which
+    MetaHuman bodies share, so near the view it needs no retarget; the free mocap for the
+    rest goes through IK Rig's batch retarget by script (the probe).
+  - Far stand-ins: AnimToTexture (experimental) bakes a walk to vertex animation for
+    instanced far crowds; keep the instanced path the spike measured.
+- **LG3 (crowds).** Spawn by tile and view from the plan's spawn points and rates (the
+  budget is 2,000 within 300 m of the view, not a district's 23,000); keep people out of
+  Lumen's scene and the distance fields; do not recreate render state per frame; update far
+  instances less often (the game thread paid most of the spike's cost); add avoidance and
+  the signals; smooth the hour bands' steps if the crowds visibly jump at 06, 10, 16 and 20.
+- **LG4 (places).** Smart Objects at the plan's 688 slots (`slot.<prop id>`), StateTree
+  behaviors; both released in 5.8.
+- **LG5 (traffic).** The asks first: signal phases and bus routes from citygen; the cars
+  already drive the lane graph as ZoneGraph lanes with a following rule; add lane changes,
+  the signals' stop lines, parking from M11's spaces, and the missing kinds as the Mac
+  designs them. Chaos Vehicles is experimental: kinematic movers on lanes, as now, with
+  physics only near the player.
+- **LG6 to LG8.** Transit on M5's lines as lanes of their own; air lanes and piers after their
+  asks; every milestone runs the lean benchmark before and after (night_plan_all and the
+  `night_life*` passes) against the 20 ms budget.
