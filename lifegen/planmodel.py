@@ -138,6 +138,17 @@ class SpikePlan(_Model):
     walk_speed: Annotated[list[float], Field(min_length=2, max_length=2)]
     drive_speed: Annotated[list[float], Field(min_length=2, max_length=2)]
     car_gap_m: float
+    drive_speeds: dict[str, float] = Field(
+        default_factory=dict, description="cars_steam: a lane's cruise speed (m/s) by its "
+                                          "road's class.")
+    drive: dict[str, float | str | list[float]] = Field(
+        default_factory=dict, description="cars_steam: `junction` (a connector's share of its "
+                                          "roads' slower speed), `lateral` and `brake` "
+                                          "(m/s2: a bend's speed sqrt(lateral R), braking "
+                                          "before it), `vary` (a car's share), `default`.")
+    road_classes: dict[str, str] = Field(
+        default_factory=dict, description="cars_steam: the road class of the segments near "
+                                          "the spike.")
     polygon: list[list[float]] = Field(description="The district's outline (exterior).")
     hash: str
 

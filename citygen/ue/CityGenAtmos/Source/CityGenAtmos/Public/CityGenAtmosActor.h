@@ -496,6 +496,11 @@ public:
 	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
 	bool bAir = false;
 
+	/** cars_steam: the steam and smoke plumes shown (with the air on); off by default until
+	 *  they look real (issue #223); the plan's `air.steam` sets it at import. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
+	bool bSteam = false;
+
 	/** The height fog's start (m from the eye), the volumetric fog's reach (m), its
 	 *  scattering's phase g. */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Air")
@@ -566,6 +571,11 @@ public:
 	/** AT4: the fog volumes and plumes on or off. */
 	UFUNCTION(BlueprintCallable, Category = "CityGen")
 	void SetAir(bool bOn);
+
+	/** cars_steam: the steam and smoke plumes on or off (the play menu's row, the console's
+	 *  CityGenAtmos.Steam). */
+	UFUNCTION(BlueprintCallable, Category = "CityGen")
+	void SetSteam(bool bOn);
 
 	/** AT4: the engine settings (TunedSettings) applied, or the project's own. */
 	UFUNCTION(BlueprintCallable, Category = "CityGen")

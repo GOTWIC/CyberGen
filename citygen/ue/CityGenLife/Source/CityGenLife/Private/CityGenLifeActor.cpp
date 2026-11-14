@@ -194,6 +194,7 @@ void ACityGenLife::BuildLanes()
 	}
 	Lengths.SetNumZeroed(N);
 	Widths.SetNumZeroed(N);
+	PointVmax.Reset();
 	InRegion.SetNumZeroed(N);
 	CarStarts.Reset();
 
@@ -242,6 +243,7 @@ void ACityGenLife::BuildLanes()
 	S.LaneLinks.Reset();
 	S.Bounds = FBox(ForceInit);
 	TArray<FVector> Pts;
+	TArray<float> PtV;
 	for (int32 I = 0; I < N; ++I)
 	{
 		const bool bWalk = I < WalkLaneCount;
@@ -250,15 +252,23 @@ void ACityGenLife::BuildLanes()
 		const TArray<int32>& St = bWalk ? WalkStarts : DriveStarts;
 		const float W = 100.f * ((bWalk ? WalkWidths : DriveWidths).IsValidIndex(J) ? (bWalk ? WalkWidths : DriveWidths)[J] : 2.f);
 		Pts.Reset();
+		PtV.Reset();
 		bool bIn = false;
+		const bool bSpeeds = !bWalk && DriveVmax.Num() * 3 == DrivePoints.Num();
 		for (int32 K = St[J]; K < St[J + 1]; ++K)
 		{
 			const float X = Flat[3 * K], Y = Flat[3 * K + 1], Z = Flat[3 * K + 2];
 			bIn |= FVector2D::DistSquared(FVector2D(X, Y), C) <= R2;
 			const FVector Q = Ue(X, Y, Z);
+			const float V = bSpeeds ? 100.f * DriveVmax[K] : 0.f;
 			if (Pts.Num() == 0 || FVector::DistSquared(Pts.Last(), Q) > 1.0)
 			{
 				Pts.Add(Q);
+				PtV.Add(V);
+			}
+			else
+			{
+				PtV.Last() = FMath::Min(PtV.Last(), V);
 			}
 		}
 		if (Pts.Num() == 0)
@@ -269,6 +279,11 @@ void ACityGenLife::BuildLanes()
 		{
 			Pts.Add(Pts[0] + FVector(1.0, 0.0, 0.0));
 		}
+		while (PtV.Num() < Pts.Num())
+		{
+			PtV.Add(PtV.Num() ? PtV.Last() : 0.f);
+		}
+		PointVmax.Append(PtV.GetData(), Pts.Num());
 		FZoneLaneData L;
 		L.Width = W;
 		L.Tags = FZoneGraphTagMask(bWalk ? WalkTag : DriveTag);
@@ -330,6 +345,7 @@ void ACityGenLife::BuildLanes()
 	Frame.InRegion = &InRegion;
 	Frame.CarStarts = &CarStarts;
 	Frame.CarGap = CarGapM * 100.f;
+	Frame.PointVmax = DriveVmax.Num() ? &PointVmax : nullptr;
 	Frame.WalkPos = &WalkPos;
 	Frame.WalkYaw = &WalkYaw;
 	Frame.CarPos = &CarPos;
@@ -513,6 +529,8 @@ void ACityGenLife::SpawnAll()
 			}
 			Taken.FindOrAdd(Car.Lane).Add(Car.Dist);
 			Car.Cruise = 100.f * FMath::Lerp((float)DriveSpeed.X, (float)DriveSpeed.Y, Rng.FRand());
+			// (cars_steam: its share of each lane's speed, by its draw)
+			Car.Share = FMath::Lerp((float)DriveVary.X, (float)DriveVary.Y, Rng.FRand());
 			Car.Speed = Car.Cruise * 0.5f;
 			Car.Model = FMath::Clamp(CarModels[CarOf[K]], 0, FMath::Max(0, Models - 1));
 			Car.Index = K;

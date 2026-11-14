@@ -183,6 +183,12 @@ class AtmosSpec(_Model):
                                                               "of day.")
     post: PostSpec = Field(default_factory=PostSpec, description="AT6: the look's post and "
                                                                  "grade.")
+    steam: bool = Field(P.STEAM_ON, description="cars_steam: AT4's steam and smoke plumes "
+                                                "(manholes, drains, vents, stalls, chimneys) "
+                                                "shown; off by default until they look real "
+                                                "(issue #223). The plan places them either "
+                                                "way; the runtime and its Tab menu switch "
+                                                "them.")
     notes: str | None = Field(None, description="What the session inferred from the prompt.")
 
 
@@ -269,7 +275,8 @@ def fill(spec: AtmosSpec, districts: list[dict]) -> dict:
             "landmarks": {k: v.model_dump() for k, v in sorted(spec.landmarks.items())},
             "sky": {k: getattr(spec.sky, k) for k in ("latitude_deg", "day_of_year",
                                                        "moon_phase", "day_hour")},
-            "wind_deg": spec.wind_deg, "post": spec.post.model_dump()}
+            "wind_deg": spec.wind_deg, "post": spec.post.model_dump(),
+            "steam": bool(spec.steam)}
 
 
 # ---------------------------------------------------------------------------

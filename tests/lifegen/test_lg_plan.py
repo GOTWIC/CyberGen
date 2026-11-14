@@ -259,3 +259,62 @@ def test_exporter_packs_the_spike(build: Path):
     plan["checks"]["densities"]["ok"] = False
     (build / "life" / "life_plan.json").write_text(json.dumps(plan), encoding="utf-8")
     assert "skipped" in UL.write_life(build, None, graphs, veh)
+
+
+def test_drive_lanes_smooth_and_slow_by_class():
+    """cars_steam: a drive lane is a centripetal Catmull-Rom curve through its points (every
+    point kept, straight runs as chords), its cruise speed by its road's class, a connector the
+    junction's share of its slower road, a bend at most sqrt(lateral R), braking before it."""
+    import math
+    from citygen import unreal_life as UL
+    # a right angle: smoothed, every point kept, steps near SMOOTH_STEP_M (it divides the
+    # chords; the curve bulges past them), no kink left
+    corner = [[0.0, 0.0, 0.0], [20.0, 0.0, 0.0], [20.0, 20.0, 0.0]]
+    s = UL.smooth(corner)
+    assert all(p in s for p in corner)
+    assert max(math.dist(a[:2], b[:2]) for a, b in zip(s, s[1:])) <= 1.25 * UL.SMOOTH_STEP_M
+    assert max(UL._turn(a, b, c) for a, b, c in zip(s, s[1:], s[2:])) < 30.0
+    # a straight lane stays its two points
+    assert UL.smooth([[0.0, 0.0, 0.0], [50.0, 0.0, 1.0]]) == [[0.0, 0.0, 0.0], [50.0, 0.0, 1.0]]
+    # a bend of radius 10 m: about sqrt(2 * 10) m/s at the bend, the cruise speed at its ends
+    arc = [[10.0 * math.sin(a / 10.0), 10.0 - 10.0 * math.cos(a / 10.0), 0.0]
+           for a in range(0, 16)]
+    v = UL.lane_vmax(arc, 9.5, 2.0)
+    assert v[0] == 9.5 and v[-1] == 9.5 and abs(v[8] - math.sqrt(20.0)) < 0.1
+    # a hairpin crawls at the floor, no slower
+    assert min(UL.lane_vmax([[0, 0, 0], [0.5, 0, 0], [0, 0.01, 0]], 9.5, 2.0, 2.0)) == 2.0
+
+    # an avenue lane, then a connector turning onto a street lane
+    def flat(elems):
+        out = {"count": len(elems), "kinds": [], "refs": [], "widths": [], "point_start": [0],
+               "points": [], "link_start": [0], "links": []}
+        for e in elems:
+            out["kinds"].append(e[1])
+            out["refs"].append(e[2])
+            out["widths"].append(3.5)
+            for p in e[3]:
+                out["points"] += p
+            out["point_start"].append(len(out["points"]) // 3)
+            out["links"] += e[4]
+            out["link_start"].append(len(out["links"]))
+        return out
+    lanes = flat([("l1", "lane", "rs.av", [[0, 0, 0], [100, 0, 0]], [1]),
+                  ("c1", "connector", "jn.a", [[100, 0, 0], [108, 2, 0], [110, 10, 0]], [2]),
+                  ("l2", "lane", "rs.st", [[110, 10, 0], [110, 80, 0]], [])])
+    spike = {"center": [50.0, 0.0], "radius_m": 200.0, "walk_kinds": [],
+             "drive_speeds": dict(P.DRIVE_SPEEDS), "drive": dict(P.DRIVE),
+             "road_classes": {"rs.av": "avenue", "rs.st": "street"}}
+    c = UL.pack_lanes({"walkways": flat([]), "lanes": lanes}, spike)
+    assert c["drive_cruise"] == [P.DRIVE_SPEEDS["avenue"],
+                                 round(P.DRIVE["junction"] * P.DRIVE_SPEEDS["street"], 3),
+                                 P.DRIVE_SPEEDS["street"]]
+    st = c["drive_starts"]
+    v1 = c["drive_vmax"][st[0]:st[1]]
+    vc = c["drive_vmax"][st[1]:st[2]]
+    # the avenue lane brakes to the connector's speed at its end, cruises at its start
+    assert v1[0] == P.DRIVE_SPEEDS["avenue"] and v1[-1] <= vc[0] + 1e-6
+    assert len(vc) > 3 and max(vc) <= P.DRIVE["junction"] * P.DRIVE_SPEEDS["street"] + 1e-6
+    # (a plan before cars_steam: no speeds, LG0's cruise in the runtime)
+    old = UL.pack_lanes({"walkways": flat([]), "lanes": lanes},
+                        {k: spike[k] for k in ("center", "radius_m", "walk_kinds")})
+    assert set(old["drive_vmax"]) == {0.0}

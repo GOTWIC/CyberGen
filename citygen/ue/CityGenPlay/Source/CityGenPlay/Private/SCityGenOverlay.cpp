@@ -30,7 +30,9 @@ namespace
 		RowWeather = 12, RowWeatherDown = 13, RowWeatherUp = 14,
 		// dlss_lamps_flicker: the upscaler (native, TSR, DLSS's modes) and its arrows, and
 		// DLSS Frame Generation where the plugin offers it
-		RowUpscaler = 15, RowUpscalerDown = 16, RowUpscalerUp = 17, RowFrameGen = 18 };
+		RowUpscaler = 15, RowUpscalerDown = 16, RowUpscalerUp = 17, RowFrameGen = 18,
+		// cars_steam: AT4's steam and smoke plumes (off by default, issue #223)
+		RowSteam = 19 };
 
 	/** A row's name for ACityGenPlay::ClickMenuRow (the console's CityGen.MenuRow). */
 	const TCHAR* RowName(int32 Row)
@@ -53,6 +55,7 @@ namespace
 		case RowUpscalerUp: return TEXT("upscaler+");
 		case RowUpscalerDown: return TEXT("upscaler-");
 		case RowFrameGen: return TEXT("framegen");
+		case RowSteam: return TEXT("steam");
 		default: return TEXT("hour+");    // the hour row and its > arrow
 		}
 	}
@@ -338,6 +341,10 @@ int32 SCityGenOverlay::PaintMenu(FSlateWindowElementList& Out, int32 Layer, cons
 			Rows.Add({RowFog, TEXT("Fog"), OnOff(TEXT("bFog"))});
 			Rows.Add({RowRain, TEXT("Rain"), OnOff(TEXT("bRain"))});
 			Rows.Add({RowWet, TEXT("Wet streets"), OnOff(TEXT("bWet"))});
+		}
+		if (P->HasAtmosFlag(TEXT("bSteam")))
+		{
+			Rows.Add({RowSteam, TEXT("Steam and smoke"), P->GetAtmosFlag(TEXT("bSteam")) ? TEXT("On") : TEXT("Off")});
 		}
 	}
 	constexpr double BarH = 30.0;

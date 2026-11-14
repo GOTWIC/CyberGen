@@ -216,6 +216,11 @@ def test_settings_shafts_and_fog_by_the_hour(city):
     # the fog thicker by night than by day
     assert s["fog_hours"][23] > s["fog_hours"][14]
     assert s["counts"]["volumes"] == len(a.volumes) and s["cvars"] == dict(sorted(P.AIR_CVARS.items()))
+    # (cars_steam: the plumes placed but off by default, issue #223; the spec's `steam` on)
+    assert s["steam"] is False and a.emitters
+    from citygen import unreal_atmos as UA
+    assert UA.air_settings({"air": s})["steam"] is False
+    assert a.settings({**f, "steam": True}, sky)["steam"] is True
 
 
 def test_plan_records_the_air(city):

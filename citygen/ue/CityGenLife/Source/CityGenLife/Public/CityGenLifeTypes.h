@@ -40,6 +40,7 @@ struct FCgLifeCar : public FMassFragment
 	float Dist = 0.f;
 	float Speed = 0.f;             // cm/s
 	float Cruise = 900.f;
+	float Share = 1.f;             // (cars_steam: its share of each lane's speed)
 	float ZOff = 0.f;
 	int32 Model = 0;
 	int32 Instance = 0;

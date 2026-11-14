@@ -202,6 +202,9 @@ class Air(_Model):
     emitter_range_m: float
     puffs: dict[str, int] = Field(description="Cards per plume by emitter kind.")
     steam_gain: float = Field(10.0, description="The plumes' opacity gain.")
+    steam: bool = Field(False, description="cars_steam: the steam and smoke plumes shown at "
+                                           "start (the spec's `steam`; off by default, issue "
+                                           "#223).")
     volume_glow: float = Field(0.15, description="The fog volumes' glow by night (their "
                                                  "emissive's scale).")
     steam_glow: float = Field(0.0, description="AT6: the plumes lit by the city by night "

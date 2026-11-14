@@ -16,6 +16,32 @@ namespace CgLife
 		return Seed >> 8;
 	}
 
+	/** cars_steam: the lowest point speed (cm/s) from `Dist` along a lane to `Look` cm on
+	 *  (the points' speeds already brake before a bend: this is where the car is now). */
+	float SpeedAhead(const FZoneGraphStorage& S, const TArray<float>& V, const int32 Lane,
+	                 const float Dist, const float Look)
+	{
+		const FZoneLaneData& L = S.Lanes[Lane];
+		float Out = 1e9f;
+		for (int32 P = L.PointsBegin; P < L.PointsEnd; ++P)
+		{
+			const float Prog = S.LanePointProgressions[P];
+			if (Prog + 1.f < Dist && P + 1 < L.PointsEnd && S.LanePointProgressions[P + 1] < Dist)
+			{
+				continue;
+			}
+			if (Prog > Dist + Look)
+			{
+				break;
+			}
+			if (V.IsValidIndex(P) && V[P] > 0.f)
+			{
+				Out = FMath::Min(Out, V[P]);
+			}
+		}
+		return Out < 1e8f ? Out : 900.f;
+	}
+
 	/** One of a lane's links of `Type`, at random, not `Avoid` unless it is the only one;
 	 *  INDEX_NONE without one. */
 	int32 PickLink(const FZoneGraphStorage& S, const int32 Lane, const EZoneLaneLinkType Type,
@@ -204,8 +230,15 @@ void UCityGenLifeDriveProcessor::Execute(FMassEntityManager& EntityManager, FMas
 					}
 				}
 			}
+			// (cars_steam: the lane's speed where the car is and a few meters on, its road's
+			// class, a junction's, a bend's, braking before it; LG0's cruise without them)
+			float Cruise = C.Cruise;
+			if (Frame->PointVmax)
+			{
+				Cruise = C.Share * SpeedAhead(S, *Frame->PointVmax, C.Lane, C.Dist, FMath::Max(400.f, C.Speed * 0.6f));
+			}
 			// (full speed with two gaps clear, stopped at one)
-			const float Want = C.Cruise * FMath::Clamp((Ahead - Gap) / Gap, 0.f, 1.f);
+			const float Want = Cruise * FMath::Clamp((Ahead - Gap) / Gap, 0.f, 1.f);
 			C.Speed = FMath::Max(0.f, C.Speed + FMath::Clamp(Want - C.Speed, -900.f * Dt, 300.f * Dt));
 			C.Dist += C.Speed * Dt;
 			for (int32 Guard = 0; Guard < 4 && C.Dist > Len[C.Lane]; ++Guard)
@@ -233,7 +266,10 @@ void UCityGenLifeDriveProcessor::Execute(FMassEntityManager& EntityManager, FMas
 				continue;
 			}
 			C.Pos = Loc.Position + FVector(0.f, 0.f, C.ZOff);
-			C.Yaw = FMath::RadiansToDegrees(FMath::Atan2(Loc.Direction.Y, Loc.Direction.X));
+			// (cars_steam: heading along the lane's tangent, interpolated between its points,
+			// not the segment's: the lanes are smoothed curves, so the car turns as it moves)
+			const FVector Hd = Loc.Tangent.IsNearlyZero() ? Loc.Direction : Loc.Tangent;
+			C.Yaw = FMath::RadiansToDegrees(FMath::Atan2(Hd.Y, Hd.X));
 			if (Frame->CarPos->IsValidIndex(C.Index))
 			{
 				(*Frame->CarPos)[C.Index] = C.Pos;

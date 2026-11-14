@@ -28,7 +28,7 @@ import json
 import math
 from pathlib import Path
 
-PACK_VERSION = 1
+PACK_VERSION = 2            # 2 (cars_steam): smoothed drive lanes, their speeds
 DATA = "life.json"
 CONTROLLER_KEY = "life"
 MARGIN_M = 60.0             # lanes this far past the live radius come along (links out of it)
@@ -101,15 +101,153 @@ def pack_lanes(graphs: dict, spike: dict) -> dict:
              if len(e[2]) >= 2 and _near(e[2], cx, cy, reach)]
     dmap = {e[0]: k for k, e in enumerate(drive)}
     out.update({"drive_points": [], "drive_starts": [0], "drive_widths": [],
-                "drive_links": [], "drive_link_starts": [0], "drive_startable": []})
-    for e in drive:
-        for p in e[2]:
-            out["drive_points"] += [round(float(v), 3) for v in p]
+                "drive_links": [], "drive_link_starts": [0], "drive_startable": [],
+                "drive_vmax": [], "drive_cruise": []})
+    refs = graphs["lanes"].get("refs") or [""] * graphs["lanes"]["count"]
+    succ = [[dmap[j] for j in e[4] if j in dmap] for e in drive]
+    pred: list[list[int]] = [[] for _ in drive]
+    for k, ss in enumerate(succ):
+        for j in ss:
+            pred[j].append(k)
+    # (cars_steam) every lane a smooth curve through its points, leaving and joining its
+    # neighbors on their tangents; its cruise speed by its road's class, a junction's
+    # connector slower; per point at most what its bend allows, braking before it
+    pts = []
+    for k, e in enumerate(drive):
+        p = [[float(v) for v in q] for q in e[2]]
+        before = next((drive[j][2][-2] for j in pred[k]
+                       if math.dist(drive[j][2][-1][:2], p[0][:2]) < 0.5), None)
+        after = next((drive[j][2][1] for j in succ[k]
+                      if math.dist(drive[j][2][0][:2], p[-1][:2]) < 0.5), None)
+        pts.append(smooth(p, before, after))
+    speeds = spike.get("drive_speeds") or {}
+    dv = spike.get("drive") or {}
+    default = speeds.get(dv.get("default", "street"), 9.5) if speeds else None
+    classes = spike.get("road_classes") or {}
+    base = []
+    for k, e in enumerate(drive):
+        if default is None:
+            base.append(0.0)                  # (a plan before cars_steam: no speeds)
+        elif e[1] == "lane":
+            base.append(float(speeds.get(classes.get(refs[e[0]], ""), default)))
+        else:
+            base.append(-1.0)                 # (a connector: from its roads, below)
+    for k, e in enumerate(drive):
+        if base[k] < 0.0:
+            nb = [base[j] for j in pred[k] + succ[k] if base[j] > 0.0]
+            base[k] = round(float(dv.get("junction", 0.6)) * (min(nb) if nb else default), 3)
+    vmax = [lane_vmax(pts[k], base[k], float(dv.get("lateral", 2.0)),
+                      float(dv.get("crawl", 2.0))) if base[k] > 0.0
+            else [0.0] * len(pts[k]) for k in range(len(drive))]
+    if default is not None:
+        brake = float(dv.get("brake", 2.5))
+        # (a lane's end at most its successors' starts, braking back from there; again while a
+        # start that was lowered lowers its predecessors, a few rounds)
+        todo = set(range(len(drive)))
+        for _ in range(8):
+            if not todo:
+                break
+            lowered = set()
+            for k in sorted(todo):
+                v = vmax[k]
+                first = v[0]
+                if succ[k]:
+                    v[-1] = min(v[-1], min(vmax[j][0] for j in succ[k]))
+                for i in range(len(v) - 2, -1, -1):
+                    ds = math.dist(pts[k][i][:2], pts[k][i + 1][:2])
+                    v[i] = min(v[i], round(math.sqrt(v[i + 1] ** 2 + 2.0 * brake * ds), 3))
+                if v[0] < first:
+                    lowered.update(pred[k])
+            todo = lowered
+    for k, e in enumerate(drive):
+        for q in pts[k]:
+            out["drive_points"] += [round(float(v), 3) for v in q]
+        out["drive_vmax"] += [round(v, 2) for v in vmax[k]]
         out["drive_starts"].append(len(out["drive_points"]) // 3)
         out["drive_widths"].append(round(float(e[3]), 3))
-        out["drive_links"] += [dmap[j] for j in e[4] if j in dmap]
+        out["drive_links"] += succ[k]
         out["drive_link_starts"].append(len(out["drive_links"]))
         out["drive_startable"].append(1 if e[1] == "lane" else 0)
+        out["drive_cruise"].append(round(base[k], 3))
+    return out
+
+
+def lane_vmax(pts, base: float, lateral: float, crawl: float = 0.0) -> list[float]:
+    """A lane's speed at each of its points (m/s): its cruise speed, at most sqrt(lateral R)
+    where it bends (R from the turn at the point over the mean of its two segments), never
+    under `crawl` (nor over the cruise speed)."""
+    out = []
+    for i, q in enumerate(pts):
+        v = base
+        if 0 < i < len(pts) - 1:
+            a, c = pts[i - 1], pts[i + 1]
+            h0 = math.atan2(q[1] - a[1], q[0] - a[0])
+            h1 = math.atan2(c[1] - q[1], c[0] - q[0])
+            turn = abs((h1 - h0 + math.pi) % (2.0 * math.pi) - math.pi)
+            ds = 0.5 * (math.dist(a[:2], q[:2]) + math.dist(q[:2], c[:2]))
+            if turn > 1e-4 and ds > 1e-3:
+                v = min(v, max(min(crawl, base), math.sqrt(lateral * ds / turn)))
+        out.append(round(v, 3))
+    return out
+
+
+
+SMOOTH_STEP_M = 1.5         # a smoothed lane's points this far apart at most
+SMOOTH_TURN_DEG = 1.0       # a lane is smoothed only where it turns more than this somewhere
+
+
+def _turn(a, b, c) -> float:
+    """The turn (degrees) at b from a to c in plan."""
+    if math.dist(a[:2], b[:2]) < 1e-6 or math.dist(b[:2], c[:2]) < 1e-6:
+        return 0.0
+    h0 = math.atan2(b[1] - a[1], b[0] - a[0])
+    h1 = math.atan2(c[1] - b[1], c[0] - b[0])
+    return abs(math.degrees((h1 - h0 + math.pi) % (2.0 * math.pi) - math.pi))
+
+
+def _cr_point(p0, p1, p2, p3, t):
+    """A centripetal Catmull-Rom point (alpha 0.5) between p1 and p2 at t in [0, 1]."""
+    def tj(ti, a, b):
+        d = math.dist(a[:2], b[:2])
+        return ti + max(d, 1e-6) ** 0.5
+    t0 = 0.0
+    t1 = tj(t0, p0, p1)
+    t2 = tj(t1, p1, p2)
+    t3 = tj(t2, p2, p3)
+    u = t1 + (t2 - t1) * t
+
+    def lerp(a, b, ta, tb):
+        w = (u - ta) / (tb - ta) if tb != ta else 0.0
+        return [a[k] + (b[k] - a[k]) * w for k in range(3)]
+    a1 = lerp(p0, p1, t0, t1)
+    a2 = lerp(p1, p2, t1, t2)
+    a3 = lerp(p2, p3, t2, t3)
+    b1 = lerp(a1, a2, t0, t2)
+    b2 = lerp(a2, a3, t1, t3)
+    return lerp(b1, b2, t1, t2)
+
+
+def smooth(pts, before=None, after=None, step=SMOOTH_STEP_M):
+    """A lane's points as a centripetal Catmull-Rom spline through them (the neighbor lanes'
+    points beyond its ends as the spline's end controls, so it leaves and joins them on their
+    tangents), sampled at most `step` apart; every original point kept."""
+    n = len(pts)
+    if n < 2:
+        return [list(p) for p in pts]
+    ext = [list(before) if before is not None else
+           [2 * pts[0][k] - pts[1][k] for k in range(3)]] + [list(p) for p in pts] + \
+        [list(after) if after is not None else [2 * pts[-1][k] - pts[-2][k] for k in range(3)]]
+    out = [list(pts[0])]
+    for i in range(1, n):
+        p0, p1, p2, p3 = ext[i - 1], ext[i], ext[i + 1], ext[i + 2]
+        # (a straight run, turning less than SMOOTH_TURN_DEG at both its ends, stays a chord)
+        straight = _turn(p0, p1, p2) < SMOOTH_TURN_DEG and _turn(p1, p2, p3) < SMOOTH_TURN_DEG
+        m = 1 if straight else max(1, int(math.ceil(math.dist(p1[:2], p2[:2]) / step)))
+        for j in range(1, m + 1):
+            q = list(p2) if j == m else _cr_point(p0, p1, p2, p3, j / m)
+            # (z along the chord: the spline is for the plan's turns, not the grade)
+            q[2] = p1[2] + (p2[2] - p1[2]) * j / m
+            out.append(q)
     return out
 
 
@@ -158,6 +296,7 @@ def life_data(pdir: Path, graphs: dict | None, veh: dict | None) -> tuple[dict |
            "center": spike["center"], "radius_m": spike["radius_m"],
            "walk_speed": spike["walk_speed"], "drive_speed": spike["drive_speed"],
            "car_gap_m": spike["car_gap_m"],
+           "drive_vary": (spike.get("drive") or {}).get("vary") or [0.9, 1.08],
            "palette": [v for c in spike["palette"] for v in _lin(c)],
            "paint_floats": PAINT_FLOATS, **lanes, **cs}
     return {"version": PACK_VERSION, "controller": ctl}, ""
