@@ -140,15 +140,116 @@ scene update; 19.1 ms without the rebuild but still in Lumen's scene, 1.4 ms of 
   draws), so LG1 and LG3 need the LODs of scope 6.1 (full characters only near, cheap
   instanced or baked ones beyond), and moving far instances less often.
 
-<!-- SPIKE_CARS -->
+**The cars.** 40 cars over Old Town's 1,404 lanes a car may start on are few to the eye in
+the shots, Old Town's narrow streets mostly hidden between its buildings from above. A check
+run with `CityGenLife.Respawn 2000 400` (`CITYGEN_UE_ATMOS_CMDS`; the status line logs 400
+cars and 2,400 entities) shows them on the streets round the middle
+([`unreal/pday_traffic_400cars.jpg`](unreal/pday_traffic_400cars.jpg), a car in the street
+in [`unreal/pday_traffic_400cars_detail.jpg`](unreal/pday_traffic_400cars_detail.jpg)); the
+benchmark ran with the plan's 40. With no signals or yielding yet, cars pass through each
+other at junctions (LG5).
 
 ## Probes
 
-<!-- PROBES -->
+### The engine pieces in 5.8 (`lifegen/probes/plugins.py`, [`probes/engine_pieces.json`](probes/engine_pieces.json))
+
+Read from the plugins' descriptors in `C:/Games/UE_5.8`:
+
+| Piece | State in 5.8 | lifegen's use |
+|---|---|---|
+| Mass Entity | engine module (MassCore, MassEntity; headers still moving: `MassEntityHandle.h` deprecated for `Mass/EntityHandle.h`) | the entities and processors (LG0 uses only these) |
+| Mass Gameplay (simulation phases, spawner, representation, LOD), Mass AI, Mass Crowd | **experimental** | LG3's spawning, LODs and crowd lanes (LG0 runs its processors itself, without them) |
+| ZoneGraph, ZoneGraph Annotations | **experimental** | the lanes (LG0 builds them; `FZoneGraphBVTree::Build` is not exported, so the plugin builds the tree itself) |
+| Smart Objects, StateTree, Gameplay StateTree | released | LG4's places and behaviors |
+| Gameplay Behaviors (Smart Objects) | **experimental** | optional for LG4 |
+| Motion Matching (Pose Search), Chooser, IK Rig and retargeting, ML Deformer | released | LG1's animation near the view, retargeting |
+| Motion Warping | beta | LG4 (sitting, doors) |
+| AnimToTexture | **experimental** | LG1's far crowds (baked vertex animation) |
+| Mutable | beta | LG1's assembly, if chosen |
+| Chaos Cloth, Chaos Cloth Asset (panel cloth) | released | LG2's cloth near the view |
+| Chaos Outfit Asset | beta | MetaHuman outfits |
+| Chaos Vehicles | **experimental** | LG5: kinematic movers on lanes, physics only near the player |
+| MetaHuman Creator (MetaHumanCharacter) | beta | LG1's bodies |
+| MetaHuman Crowd | **experimental** | Epic's Mass crowd of MetaHumans (appearance provider, Mass visualization trait, representation subsystem, crowd pipelines for heads, grooms, outfits, clothing): LG1 and LG3 should start from it |
+| MetaHuman SDK | released | |
+
+### MetaHuman from a script (`lifegen/probes/ue_probe.py`, [`probes/ue_probe_result.json`](probes/ue_probe_result.json))
+
+In a throwaway project (`UnrealProjects/LG0Probe`, the First Person template with the
+MetaHuman, Mutable, Mass, ZoneGraph, Smart Objects, StateTree, Pose Search, AnimToTexture and
+Chaos Cloth plugins on), headless (`UnrealEditor-Cmd -run=pythonscript`):
+
+- **Creating and editing: yes.** `AssetTools.create_asset` with
+  `MetaHumanCharacterFactoryNew` makes a MetaHuman Character asset;
+  `MetaHumanCharacterEditorSubsystem` (51 Python functions) opens it for editing, reads its
+  body's 32 constraints (height 135 to 220 cm, chest, waist, hips, inseam, ...), sets them
+  and commits the body (`set_body_constraints`, `commit_body_state`); the face by
+  `set_face_model_coefficients` and landmarks, conforming to a template mesh or a DNA file,
+  are there too. So a person's body can be drawn from a seed in Python.
+- **Skin: not without the optional content.** "MetaHuman Optional Content folder not
+  found": texture synthesis (the skin's textures from its tone) is disabled until the
+  engine's optional MetaHuman content is installed.
+- **Building: not without Epic's cloud.** `build_meta_human` refuses: "Character is not
+  rigged". Rigging is `request_auto_rigging`, a MetaHuman cloud service (its results
+  include `Unauthorized`, `EulaNotAccepted`, `LoginFailed`): it needs the user's Epic
+  account and the MetaHuman EULA. The probe stopped there (no sign-in, nothing downloaded).
+  High-resolution textures are a cloud request too.
+- **Mutable:** a Customizable Object is made by its factory and compiled by
+  `CustomizableObjectEditorFunctionLibrary` (`new_customizable_object`,
+  `compile_customizable_object_synchronously`), and its node classes are visible to
+  Python, but its graph has no Python editing API: an object's graph would be authored
+  by hand or in C++. MetaHuman Crowd's pipelines are the likelier route.
+
+### Retargeting by script (CMU-style)
+
+No download: `lifegen/probes/cmu_style.py` writes a BVH in the CMU database's skeleton (its
+27 joints and names) with a generated walk, skins a stick figure to it in Blender and writes
+an FBX. The probe imports it (a skeletal mesh, its skeleton and the clip), makes an IK Rig for
+it and for the template's mannequin (`IKRigController`: `apply_auto_generated_retarget_definition`,
+`apply_auto_fbik`), a retargeter between them (`IKRetargeterController`: the rigs, the default
+ops, `auto_map_chains`, `auto_align_all_bones`) and runs `IKRetargetBatchOperation.
+duplicate_and_retarget`: **the clip comes out on the mannequin's skeleton, moving**
+(`cmu_style_walk_Anim_Manny`, its thighs and arms turning over the frames). The automatic
+characterization knows Epic's skeletons and found no chains on the CMU one: the probe sets its
+11 chains by script (`add_retarget_chain`, named as the mannequin's so the fuzzy map pairs
+them). The pose's quality (the reference pose's alignment, the clip's length: Blender wrote
+10.4 s for a 2 s walk) was not judged: LG1's.
+
+**The Game Animation Sample** is on the UE5 mannequin's skeleton, which MetaHuman bodies
+share, so near the view it needs no retargeting at all.
+
+### What Swagnik would have to fetch (nothing was fetched)
+
+| For | What | Where |
+|---|---|---|
+| LG1: MetaHuman skin | the engine's MetaHuman optional content (texture synthesis models) | Epic Games Launcher, UE 5.8, Options |
+| LG1: MetaHuman rigging and high-resolution textures | an Epic account signed in to the editor and the MetaHuman EULA accepted, once | the editor's MetaHuman Creator |
+| LG1: the near view's animation | Epic's Game Animation Sample (Epic's license: in his project, never the repo) | Fab / the Launcher's samples |
+| LG1: the far crowds' animation | a free mocap library (CMU's database or its BVH conversions; licenses that let anyone use them) | a download he chooses |
+| LG2: fallback garments | a small authored or bought base kit (only if generated garments do not hold up) | Fab or his own |
 
 ## Garment test
 
-<!-- GARMENT -->
+`lifegen/blender/garment_test.py` (Blender 5.2, headless, stdlib and bpy only): a tee from two
+flat panels, one outline in code (body, sleeves along the arms, a neck opening), each
+triangulated by a constrained Delaunay fill at 2.2 cm (1,141 vertices a panel), hung 20 cm in
+front of and behind a plain body of primitives in an A pose; its sides, underarms, sleeve
+tops and shoulders joined by 102 sewing springs, the hem, cuffs and neck open. The cloth
+solver sews it shut round the body for 30 frames without gravity, then lets it hang
+(150 frames, 13.5 s); the last frame is kept as a mesh of its own (2,282 vertices, 4,266
+triangles, written as a GLB outside the repo) and rendered in Cycles.
+
+| Front | Three quarters |
+|---|---|
+| ![](garment/garment_front.jpg) | ![](garment/garment_34.jpg) |
+
+The seams close from 40 cm apart to 0.9 cm on average (5.7 cm at most, at a cuff), and the
+tee sits on the shoulders and hangs over the chest and the arms' tops
+([`garment/garment_report.json`](garment/garment_report.json)). A first try with the shoulder
+seam under the shoulders' tops left the sleeves crumpled in the armpits: a pattern must be
+cut for the body it dresses (LG2 cuts each per body type, from the body's own measurements).
+It reads as a garment, not yet as clothing: no thickness, hems or seam allowances, a
+mannequin of primitives, no textile. LG2's work.
 
 ## Recommendations for LG1 to LG8
 
