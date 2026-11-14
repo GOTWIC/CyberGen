@@ -1,4 +1,5 @@
 #include "CityGenBench.h"
+#include "CityGenUpscaler.h"
 
 #include "CityGenPlayActor.h"
 #include "Dom/JsonObject.h"
@@ -209,7 +210,7 @@ void UCityGenBench::Begin()
 #endif
 	T0 = FPlatformTime::Seconds();
 	Rows.Reset();
-	Rows.Add(TEXT("pass,seg,phase,t,frame_ms,game_ms,render_ms,rhi_ms,gpu_ms,draws,prims,streamed,perf,vram_mb,ram_mb,x,y,z"));
+	Rows.Add(TEXT("pass,seg,phase,t,frame_ms,game_ms,render_ms,rhi_ms,gpu_ms,draws,prims,streamed,perf,vram_mb,ram_mb,x,y,z,fg_hz,fg_presented,latency_ms"));
 	PassIndex = 0;
 	StartPass();
 }
@@ -232,9 +233,9 @@ void UCityGenBench::StartPass()
 		GEngine->Exec(GetWorld(), *C);
 	}
 	SegIndex = 0;
-	Event(FString::Printf(TEXT("\"op\": \"pass\", \"name\": \"%s\", \"night\": %s, \"screen_percentage\": %.1f, \"warm\": %s"),
+	Event(FString::Printf(TEXT("\"op\": \"pass\", \"name\": \"%s\", \"night\": %s, \"screen_percentage\": %.1f, \"warm\": %s, \"upscaler\": %s"),
 		*Esc(P.Name), P.bNight ? TEXT("true") : TEXT("false"), P.ScreenPercentage,
-		P.bWarm ? TEXT("true") : TEXT("false")));
+		P.bWarm ? TEXT("true") : TEXT("false"), *CityGenUpscaler::StatusJson(FIntPoint(0, 0))));
 	while (SegIndex < Segments.Num() && !P.Only.IsEmpty() && !P.Only.Contains(SegIndex))
 	{
 		++SegIndex;
@@ -363,12 +364,21 @@ void UCityGenBench::Record(double Dt, int32 Phase, bool bSampleStream)
 		RHIGetMemoryStats(Mem);
 		LastVramMB = Mem.IsValid() ? double(Mem.UsedLocal) / 1048576.0 : -1.0;
 		LastRamMB = double(FPlatformMemory::GetStats().UsedPhysical) / 1048576.0;
+		// (dlss_lamps_flicker: with DLSS Frame Generation the frames shown per second and
+		// presented per rendered frame, and Reflex's game to render latency; -1 without)
+		LastFgHz = -1.f;
+		LastFgPresented = 0;
+		if (CityGenUpscaler::FrameGenOn())
+		{
+			CityGenUpscaler::FrameGenTiming(LastFgHz, LastFgPresented);
+		}
+		LastLatencyMs = CityGenUpscaler::LatencyMs();
 	}
-	Rows.Add(FString::Printf(TEXT("%d,%d,%d,%.4f,%.3f,%.3f,%.3f,%.3f,%.3f,%d,%d,%d,%d,%.0f,%.0f,%.0f,%.0f,%.0f"),
+	Rows.Add(FString::Printf(TEXT("%d,%d,%d,%.4f,%.3f,%.3f,%.3f,%.3f,%.3f,%d,%d,%d,%d,%.0f,%.0f,%.0f,%.0f,%.0f,%.2f,%d,%.2f"),
 		PassIndex, SegIndex, Phase, FPlatformTime::Seconds() - T0, Dt * 1000.0,
 		Ms(GGameThreadTime), Ms(GRenderThreadTime), Ms(GRHIThreadTime), Ms(RHIGetGPUFrameCycles(0)),
 		GNumDrawCallsRHI[0], GNumPrimitivesDrawnRHI[0], bSampleStream ? LastStreamed : -1, LastPerf,
-		LastVramMB, LastRamMB, L.X, L.Y, L.Z));
+		LastVramMB, LastRamMB, L.X, L.Y, L.Z, LastFgHz, LastFgPresented, LastLatencyMs));
 	++FrameCount;
 }
 
@@ -480,6 +490,7 @@ void UCityGenBench::Tick(float DeltaTime)
 			}
 			Stage = EStage::Move;
 			StageStart = Now;
+			bMoveShot = false;
 		}
 		return;
 	}
@@ -495,6 +506,7 @@ void UCityGenBench::Tick(float DeltaTime)
 			}
 			Stage = EStage::Move;
 			StageStart = Now;
+			bMoveShot = false;
 		}
 		return;
 	}
@@ -514,6 +526,16 @@ void UCityGenBench::Tick(float DeltaTime)
 		}
 		Place(At, Yaw, S.Pitch);
 		Record(Dt, 2, true);
+		if (bShots && !bMoveShot && Now - StageStart >= MoveShotS)
+		{
+			// (dlss_lamps_flicker: the view in motion, where an upscaler's shimmer and ghosting
+			// show: the same moment of the route in every pass)
+			bMoveShot = true;
+			const FString Shot = FPaths::Combine(OutDir, TEXT("shots"), FString::Printf(TEXT("%s_%s_moving.png"),
+				*Passes[PassIndex].Name, *S.Name));
+			FScreenshotRequest::RequestScreenshot(Shot, false, false);
+			Event(FString::Printf(TEXT("\"op\": \"shot\", \"file\": \"%s\", \"moving\": true"), *Esc(Shot)));
+		}
 		if (Travelled >= Total)
 		{
 			NextSegment();

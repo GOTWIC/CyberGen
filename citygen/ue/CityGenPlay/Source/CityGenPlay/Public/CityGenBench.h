@@ -82,6 +82,8 @@ private:
 	int32 StreamEvery = 5;
 	int32 MemoryEvery = 15;
 	bool bShots = false;          // a screenshot at each segment's start, once loaded
+	bool bMoveShot = false;       // dlss_lamps_flicker: one more, MoveShotS into the segment's motion
+	double MoveShotS = 2.0;
 	int32 ShotFrames = 0;
 
 	EStage Stage = EStage::Start;
@@ -96,6 +98,9 @@ private:
 	int32 LastPerf = -1;
 	double LastVramMB = -1.0;
 	double LastRamMB = -1.0;
+	float LastFgHz = -1.f;          // (dlss_lamps_flicker: DLSS Frame Generation and Reflex)
+	int32 LastFgPresented = 0;
+	float LastLatencyMs = -1.f;
 	bool bFailed = false;
 	FString Error;
 

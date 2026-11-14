@@ -218,7 +218,8 @@ def mood(archetype: str | None, wealth: float | None, danger: float | None,
     d = 0.5 if danger is None else float(danger)
     pull = 0.5 * (d - 0.5) - 0.4 * (w - 0.5)          # +0.45 poor and dangerous, -0.45 rich
     base["grit"] = _r(_clamp(base["grit"] + pull))
-    base["flicker"] = _r(_clamp(base["flicker"] * (0.5 + d)))
+    # (dlss_lamps_flicker: ten times fewer flicker, `presets.FLICKER_SCALE`; to 0.0001)
+    base["flicker"] = round(_clamp(base["flicker"] * P.FLICKER_SCALE * (0.5 + d)), 4) + 0.0
     base["broken"] = _r(_clamp(base["broken"] * (0.5 + d)))
     base["alleys"] = _r(_clamp(base["alleys"] + 0.3 * pull))
     base["haze"] = _r(base["haze"] * (1.0 + 0.3 * pull))

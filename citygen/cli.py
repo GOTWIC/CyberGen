@@ -311,7 +311,8 @@ def cmd_unreal(args: argparse.Namespace) -> int:
                             play_features=not args.no_play,
                             atmos=False if args.no_atmos else args.atmos,
                             vehicles=args.vehicles, all_vehicles=args.all_vehicles,
-                            life=False if args.no_life else args.life) \
+                            life=False if args.no_life else args.life,
+                            dlss=args.dlss) \
             if not (args.check_only or args.bench_only) else None
         if res is not None:
             print(U.import_summary(res))
@@ -322,6 +323,7 @@ def cmd_unreal(args: argparse.Namespace) -> int:
             print(U.play_features_summary(res))
             print(U.atmos_summary(res))
             print(U.life_summary(res))
+            print(U.dlss_summary(res))
         if not args.no_hlod and res is not None:
             hl = U.build_hlods(build, args.uproject, engine=args.engine, timeout=args.timeout)
             print(U.hlod_summary(hl))
@@ -703,6 +705,12 @@ def build_parser() -> argparse.ArgumentParser:
                          "is left out")
     ue.add_argument("--no-life", action="store_true",
                     help="leave out the life plan (its controller from an earlier import goes)")
+    ue.add_argument("--dlss", metavar="DIR",
+                    help="NVIDIA's DLSS plugin for UE 5.8, extracted from its zip (its folder or "
+                         "its Plugins folder; default $CITYGEN_DLSS): its plugins copied into "
+                         "the project, enabled and set up, so the developer menu's upscaler row "
+                         "offers DLSS and Frame Generation and a packaged game takes them; "
+                         "without it nothing changes (docs/unreal_export.md, DLSS)")
     ue.add_argument("--vehicles", metavar="LIBRARY_DIR",
                     help="AG18: the vehicle library (game packs, vehicles/GAME.md) that the "
                          "contributions' vehicle placements draw on (default "

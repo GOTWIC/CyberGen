@@ -298,6 +298,12 @@ KEPT_KINDS = ("tunnel", "underpass", "station", "soffit", "aviation", "runway",
 # flickers deep instead, a dying tube
 DYING_KINDS = ("sign", "neon", "shop_sign")
 DYING_DEPTH = (0.8, 0.95)
+# Swagnik, 2026-11-14 (walking Delta): ten times fewer lights flicker. The moods' flicker
+# shares below (and their pull by danger, `spec.mood`) are scaled by this, and a broken sign
+# dies flickering at this share (the rest burn on steady, as their faces do); the runtime
+# also spaces a flickering light's bursts out (`ACityGenAtmos::InBurst`: a burst of a
+# fraction of a second every 9 to 26 s, a dying tube's every 4 to 10 s)
+FLICKER_SCALE = 0.1
 
 # --- district moods (scope 5: palette, haze, neon density, flicker, alleys, grit) -----------
 
@@ -432,6 +438,7 @@ ROAD_LIGHTS = {
     "highway": ("highway", 42.0, 12.0, 2.5),
     "service": ("cobra_head", 30.0, 8.0, 1.5),
 }
+POLE_OUT_M = 0.5                  # an edge pole's foot past its road's edge (dlss_lamps_flicker)
 ALLEY_STEP_M = (9.0, 10.0)        # wall packs every a + b * the mood's alley darkness (m)
 ALLEY_PACK_Z_M = 4.0
 CORNER_POLE_Z_M = 8.0             # a corner pole's head over the ground

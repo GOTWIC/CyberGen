@@ -166,6 +166,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "CityGen")
 	bool ClickMenuRow(const FString& Row);
 
+	/** The game viewport's size: the output the developer menu's upscaler renders to
+	 *  (dlss_lamps_flicker). */
+	FIntPoint OutputSize() const;
+
 	/** The level's atmos controller, else null (the menu then shows no weather rows). */
 	AActor* GetAtmos() const;
 

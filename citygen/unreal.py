@@ -1866,7 +1866,8 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
                 startup: bool = True, view_m: float = VIEW_M,
                 play_features: bool = True, atmos: str | Path | bool | None = None,
                 vehicles: str | Path | None = None, all_vehicles: bool = False,
-                life: str | Path | bool | None = None) -> dict:
+                life: str | Path | bool | None = None,
+                dlss: str | Path | None = None) -> dict:
     """`citygen unreal`: the manifest, then the headless import; the importer's result
     (created, updated, deleted and unchanged actors and assets, timings). `assets` False
     imports the blockout alone (stage 2's actors, if imported before, go; its meshes
@@ -1884,7 +1885,9 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
     (AG18): the vehicle library the contributions' placements draw on (`unreal_vehicles`;
     `all_vehicles` imports every car of it, placed or not). `life` (LG0): the life plan's
     folder (None: BUILD/life when there is one, False: none); its controller comes with the
-    plugin (CityGenLife, built with the play features)."""
+    plugin (CityGenLife, built with the play features). `dlss` (dlss_lamps_flicker): NVIDIA's
+    DLSS plugin folder (None: $CITYGEN_DLSS, else none), copied into the project, enabled and
+    set up before the plugins build (`unreal_dlss`); without it nothing of DLSS changes."""
     if play not in PLAY_MODES:
         raise ValueError(f"play: {play!r} is not one of {', '.join(PLAY_MODES)}")
     from . import unreal_play
@@ -1894,6 +1897,9 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
     if root is None:
         raise RuntimeError("no Unreal Engine found (pass --engine or set CITYGEN_UE_ROOT)")
     (build / OUT_DIR).mkdir(parents=True, exist_ok=True)
+    from . import unreal_dlss
+    dsrc = unreal_dlss.source(dlss)
+    dlss_res = unreal_dlss.install(dsrc, up) if dsrc is not None else None
     # (with --no-play a plugin built before stays, so the importer can delete its actor)
     plugin = (unreal_play.build_plugin(root, up, build / OUT_DIR / "plugin_build_log.txt")
               if play_features else {"ok": False, "built": False, "error": "--no-play"})
@@ -1933,6 +1939,8 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
     res["manifest_s"] = manifest_s
     res["plugins_enabled"] = added
     res["play_plugin"] = plugin
+    if dlss_res is not None:
+        res["dlss"] = dlss_res
     if man_at:
         res["atmos_plan"] = {k: man_at.get(k) for k in ("plan", "skipped", "lights")
                              if man_at.get(k) is not None}
@@ -2058,6 +2066,17 @@ def atmos_summary(res: dict) -> str:
                 f"cell actors and its controller, from {ap.get('plan')}")
     why = ap.get("skipped") or st.get("reason") or "no atmos plan (run atmosgen plan)"
     return f"Atmos (stage 3): left out ({why})"
+
+
+def dlss_summary(res: dict) -> str:
+    """What the import did with NVIDIA's DLSS plugin (dlss_lamps_flicker)."""
+    d = res.get("dlss")
+    if not d:
+        return "DLSS: not asked for (--dlss DIR or $CITYGEN_DLSS)"
+    return (f"DLSS: NVIDIA's plugin {d.get('version')} in the project "
+            f"({'copied' if d.get('copied') else 'as copied before'}"
+            + (f", enabled {', '.join(d['enabled'])}" if d.get("enabled") else "")
+            + ("; settings set" if d.get("settings_changed") else "") + ")")
 
 
 def life_summary(res: dict) -> str:
