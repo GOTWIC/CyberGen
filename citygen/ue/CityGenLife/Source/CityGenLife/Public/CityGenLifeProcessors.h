@@ -26,6 +26,8 @@ struct FCgLifeFrame
 	/** Drive lanes to start a car on when it leaves the region or meets a dead end. */
 	const TArray<int32>* CarStarts = nullptr;
 	float CarGap = 900.f;
+	/** cars_steam: per storage point the speed a car may drive at (cm/s; empty: none). */
+	const TArray<float>* PointVmax = nullptr;
 	/** Out: per walker instance, location and yaw (deg). */
 	TArray<FVector>* WalkPos = nullptr;
 	TArray<float>* WalkYaw = nullptr;

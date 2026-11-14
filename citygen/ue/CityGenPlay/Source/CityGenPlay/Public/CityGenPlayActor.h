@@ -175,8 +175,11 @@ public:
 	/** The level's atmos controller, else null (the menu then shows no weather rows). */
 	AActor* GetAtmos() const;
 
-	/** One of the controller's switches: bFog, bRain, bWet. */
+	/** One of the controller's switches: bFog, bRain, bWet, bSteam. */
 	bool GetAtmosFlag(FName Property) const;
+
+	/** Whether the controller has that switch (cars_steam: an older runtime has no bSteam). */
+	bool HasAtmosFlag(FName Property) const;
 
 	/** Calls SetFog, SetRain or SetWet on the controller. */
 	void SetAtmosFlag(FName Function, bool bOn);

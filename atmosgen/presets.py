@@ -304,6 +304,10 @@ DYING_DEPTH = (0.8, 0.95)
 # also spaces a flickering light's bursts out (`ACityGenAtmos::InBurst`: a burst of a
 # fraction of a second every 9 to 26 s, a dying tube's every 4 to 10 s)
 FLICKER_SCALE = 0.1
+# cars_steam (Swagnik): AT4's steam and smoke plumes off by default until they look real
+# (issue #223); the spec's `steam` turns them on, the runtime's CityGenAtmos.Steam and Tab
+# menu switch them
+STEAM_ON = False
 
 # --- district moods (scope 5: palette, haze, neon density, flicker, alleys, grit) -----------
 

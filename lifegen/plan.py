@@ -320,6 +320,20 @@ def _centroid(b: dict) -> tuple[float, float]:
     return (sum(p[0] for p in ring) / len(ring), sum(p[1] for p in ring) / len(ring))
 
 
+def road_classes(model: dict, mid, reach: float) -> dict[str, str]:
+    """cars_steam: the road class of every segment with a point within `reach` of the
+    spike's middle (its lanes' cruise speed, `presets.DRIVE_SPEEDS`; a class without a speed
+    of its own drives as `DRIVE["default"]`)."""
+    out = {}
+    r2 = reach * reach
+    for s in model.get("road_segments", []):
+        if any((p[0] - mid[0]) ** 2 + (p[1] - mid[1]) ** 2 <= r2
+               for p in s.get("centerline") or []):
+            rc = s.get("road_class") or P.DRIVE["default"]
+            out[s["id"]] = rc if rc in P.DRIVE_SPEEDS else P.DRIVE["default"]
+    return dict(sorted(out.items()))
+
+
 def spike_plan(model: dict, filled: dict, hours: dict) -> dict | None:
     sp = filled["spike"]
     ds = {d["id"]: d for d in model.get("districts", [])}
@@ -372,6 +386,12 @@ def spike_plan(model: dict, filled: dict, hours: dict) -> dict | None:
                    "walk_speed": list(P.SPIKE["walk_speed"]),
                    "drive_speed": list(P.SPIKE["drive_speed"]),
                    "car_gap_m": P.SPIKE["car_gap_m"],
+                   # (cars_steam: each lane's speed by its road's class, its curves, its
+                   # junctions)
+                   "drive_speeds": dict(sorted(P.DRIVE_SPEEDS.items())),
+                   "drive": {k: (list(v) if isinstance(v, list) else v)
+                             for k, v in sorted(P.DRIVE.items())},
+                   "road_classes": road_classes(model, mid, P.SPIKE["radius_m"] + 80.0),
                    "polygon": [[_r(x, 2), _r(y, 2)] for x, y in ring]})
 
 

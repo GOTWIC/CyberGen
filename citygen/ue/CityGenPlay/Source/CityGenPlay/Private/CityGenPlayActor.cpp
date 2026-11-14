@@ -726,6 +726,15 @@ bool ACityGenPlay::ClickMenuRow(const FString& Row)
 	{
 		return false;                           // (the weather rows are hidden)
 	}
+	else if (R == TEXT("steam"))
+	{
+		// cars_steam: AT4's steam and smoke plumes (off by default, issue #223)
+		if (!HasAtmosFlag(TEXT("bSteam")))
+		{
+			return false;
+		}
+		SetAtmosFlag(TEXT("SetSteam"), !GetAtmosFlag(TEXT("bSteam")));
+	}
 	else if (R == TEXT("fog") || R == TEXT("rain") || R == TEXT("wet"))
 	{
 		const FString Name = R.Left(1).ToUpper() + R.Mid(1);
@@ -804,6 +813,12 @@ bool ACityGenPlay::GetAtmosFlag(FName Property) const
 	const AActor* A = GetAtmos();
 	const FBoolProperty* P = A ? FindFProperty<FBoolProperty>(A->GetClass(), Property) : nullptr;
 	return P && P->GetPropertyValue_InContainer(A);
+}
+
+bool ACityGenPlay::HasAtmosFlag(FName Property) const
+{
+	const AActor* A = GetAtmos();
+	return A && FindFProperty<FBoolProperty>(A->GetClass(), Property) != nullptr;
 }
 
 FString ACityGenPlay::GetAtmosWeather() const

@@ -150,6 +150,15 @@ SPIKE = {
     "drive_speed": [7.0, 11.0],    # m/s (25 to 40 km/h)
     "car_gap_m": 9.0,              # a car keeps this far behind the one ahead on its lane
 }
+# cars_steam (Swagnik: slower on smaller roads): a lane's cruise speed by its road's class
+# (m/s: 80, 50, 35, 25 and 15 km/h, a city's), each car's own a share of it
+# (`DRIVE["vary"]`); through a junction its connector the slower of its roads' times
+# `junction`; on a bend at most sqrt(`lateral` R) (m/s2 of sideways pull, comfortable), never
+# under `crawl` (a dead end's turning bulb, whose hairpin connector is tighter than a car turns),
+# braking before it at `brake`
+DRIVE_SPEEDS = {"highway": 22.0, "avenue": 14.0, "street": 9.5, "service": 7.0, "alley": 4.5}
+DRIVE = {"junction": 0.7, "lateral": 2.0, "brake": 2.5, "crawl": 2.0, "vary": [0.9, 1.08],
+         "default": "street"}
 # walkway kinds the stand-ins walk (not elevators, skybridges or stairs in LG0)
 SPIKE_WALK_KINDS = ("sidewalk", "crossing", "crosswalk", "alley", "promenade",
                     "pedestrian_street", "path", "footbridge")

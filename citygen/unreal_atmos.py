@@ -386,6 +386,8 @@ def air_settings(plan: dict) -> dict:
             "emitter_kinds": list(EMITTER_KINDS),
             "puffs": [int(a["puffs"].get(k, 4)) for k in EMITTER_KINDS],
             "steam_gain": float(a.get("steam_gain", 10.0)),
+            # (cars_steam: the plumes shown at start; off by default, issue #223)
+            "steam": bool(a.get("steam", False)),
             "volume_glow": float(a.get("volume_glow", 0.15)),
             # (AT6: the plumes by night and far off)
             "steam_glow": float(a.get("steam_glow", 0.0)),

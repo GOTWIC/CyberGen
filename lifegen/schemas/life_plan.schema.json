@@ -274,6 +274,27 @@
      "title": "District Id",
      "type": "string"
     },
+    "drive": {
+     "additionalProperties": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "items": {
+         "type": "number"
+        },
+        "type": "array"
+       }
+      ]
+     },
+     "description": "cars_steam: `junction` (a connector's share of its roads' slower speed), `lateral` and `brake` (m/s2: a bend's speed sqrt(lateral R), braking before it), `vary` (a car's share), `default`.",
+     "title": "Drive",
+     "type": "object"
+    },
     "drive_speed": {
      "items": {
       "type": "number"
@@ -282,6 +303,14 @@
      "minItems": 2,
      "title": "Drive Speed",
      "type": "array"
+    },
+    "drive_speeds": {
+     "additionalProperties": {
+      "type": "number"
+     },
+     "description": "cars_steam: a lane's cruise speed (m/s) by its road's class.",
+     "title": "Drive Speeds",
+     "type": "object"
     },
     "hash": {
      "title": "Hash",
@@ -337,6 +366,14 @@
      "description": "The stand-ins live within this of its middle.",
      "title": "Radius M",
      "type": "number"
+    },
+    "road_classes": {
+     "additionalProperties": {
+      "type": "string"
+     },
+     "description": "cars_steam: the road class of the segments near the spike.",
+     "title": "Road Classes",
+     "type": "object"
     },
     "walk_kinds": {
      "items": {

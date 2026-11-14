@@ -957,6 +957,12 @@
    "$ref": "#/$defs/SkySpec",
    "description": "AT3: the sky and the time of day."
   },
+  "steam": {
+   "default": false,
+   "description": "cars_steam: AT4's steam and smoke plumes (manholes, drains, vents, stalls, chimneys) shown; off by default until they look real (issue #223). The plan places them either way; the runtime and its Tab menu switch them.",
+   "title": "Steam",
+   "type": "boolean"
+  },
   "version": {
    "const": 1,
    "default": 1,

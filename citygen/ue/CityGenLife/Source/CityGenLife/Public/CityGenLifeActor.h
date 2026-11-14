@@ -74,6 +74,12 @@ public:
 	UPROPERTY(EditAnywhere, Category = "CityGen") TArray<int32> DriveLinkStarts;
 	/** 1 where a drive lane is a lane a car may start on (not a junction connector). */
 	UPROPERTY(EditAnywhere, Category = "CityGen") TArray<uint8> DriveStartable;
+	/** cars_steam: per drive lane point the speed a car may drive at (m/s: its road's class,
+	 *  slower through a junction, at most what its bend allows, braking before it), per lane
+	 *  its cruise speed, and a car's share of it (by hash); empty: `DriveSpeed` as in LG0. */
+	UPROPERTY(EditAnywhere, Category = "CityGen") TArray<float> DriveVmax;
+	UPROPERTY(EditAnywhere, Category = "CityGen") TArray<float> DriveCruise;
+	UPROPERTY(EditAnywhere, Category = "CityGen") FVector2D DriveVary = FVector2D(0.9, 1.08);
 
 	/** The stand-ins: a body and a head, colors per person by their style's palette (linear
 	 *  RGB, 3 floats a color). */
@@ -133,6 +139,7 @@ private:
 
 	FCgLifeFrame Frame;
 	TArray<float> Lengths, Widths;
+	TArray<float> PointVmax;       // (cars_steam: per storage point, cm/s; walkways 0)
 	TArray<uint8> InRegion;
 	TArray<int32> CarStarts;
 	TArray<FVector> WalkPos, CarPos;

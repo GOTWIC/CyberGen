@@ -95,6 +95,12 @@
      "title": "Scatter",
      "type": "object"
     },
+    "steam": {
+     "default": false,
+     "description": "cars_steam: the steam and smoke plumes shown at start (the spec's `steam`; off by default, issue #223).",
+     "title": "Steam",
+     "type": "boolean"
+    },
     "steam_far": {
      "description": "AT6: the plumes' opacity times 1 + a from 30 m to b m off (they read far off).",
      "items": {

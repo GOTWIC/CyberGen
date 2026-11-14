@@ -4216,6 +4216,9 @@ class Importer:
                           "volume_range_m", "emitter_range_m", "steam_gain", "volume_glow"):
                     sky.append((k, float(ctl[k])))
                 sky.append(("max_volumes", int(ctl["max_volumes"])))
+                # (cars_steam: the steam and smoke plumes shown at start; off by default until
+                # they look real, issue #223)
+                sky.append(("steam", bool(ctl.get("steam", False))))
                 for k in ("fog_hours", "kind_scatter"):
                     sky.append((k, [float(x) for x in ctl[k]]))
                 sky.append(("puffs", [int(x) for x in ctl["puffs"]]))
@@ -4358,6 +4361,13 @@ class Importer:
                          ("car_models", it("car_models")), ("car_paints", fl("car_paints")),
                          ("paint_floats", int(d["paint_floats"]))):
                 a.set_editor_property(k, v)
+            if "drive_vmax" in d:
+                # (cars_steam: each drive lane point's speed, each lane's cruise speed, a
+                # car's share of it)
+                a.set_editor_property("drive_vmax", fl("drive_vmax"))
+                a.set_editor_property("drive_cruise", fl("drive_cruise"))
+                a.set_editor_property("drive_vary", unreal.Vector2D(
+                    *[float(x) for x in d.get("drive_vary", [0.9, 1.08])]))
             a.tags = self.tags(info["key"], hv, [], "life", "life", "", d["district"])
 
         self.place(have, info["key"], info["hash"], cls.static_class(), make, update,

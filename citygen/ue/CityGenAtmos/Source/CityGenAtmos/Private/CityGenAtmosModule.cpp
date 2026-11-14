@@ -54,6 +54,7 @@ namespace
 	CG_ATMOS_TOGGLE(ExposureCmd, "CityGenAtmos.Exposure", "CityGenAtmos.Exposure [0|1]: the exposure held at the hour's (0: the engine's eye adaptation)", bLockExposure, SetLockExposure)
 	CG_ATMOS_TOGGLE(FixturesCmd, "CityGenAtmos.Fixtures", "CityGenAtmos.Fixtures [0|1]: AT2's aviation beacons and searchlight beams", bFixtures, SetFixtures)
 	CG_ATMOS_TOGGLE(AirCmd, "CityGenAtmos.Air", "CityGenAtmos.Air [0|1]: AT4's fog volumes (mist, smog, haze) and steam and smoke plumes", bAir, SetAir)
+	CG_ATMOS_TOGGLE(SteamCmd, "CityGenAtmos.Steam", "CityGenAtmos.Steam [0|1]: cars_steam: AT4's steam and smoke plumes (manholes, drains, vents, stalls, chimneys; off by default, issue #223)", bSteam, SetSteam)
 	CG_ATMOS_TOGGLE(TunedCmd, "CityGenAtmos.Tuned", "CityGenAtmos.Tuned [0|1]: AT4's engine settings (the plan's cvars) applied, or the project's own", bTuned, SetTuned)
 	CG_ATMOS_TOGGLE(PostCmd, "CityGenAtmos.Post", "CityGenAtmos.Post [0|1]: AT6's look (bloom, flares, grain, fringes, vignette, the grade, local exposure; off: the engine's own, the exposure still held)", bPost, SetPost)
 	CG_ATMOS_TOGGLE(PostDistrictsCmd, "CityGenAtmos.PostDistricts", "CityGenAtmos.PostDistricts [0|1]: AT6's post per district (clean or gritty by place), blended by where the view stands", bDistrictPost, SetPostDistricts)

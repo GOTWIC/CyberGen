@@ -2192,8 +2192,16 @@ void ACityGenAtmos::DropPlumes(int32 Slot)
 	S.PlumeRate.Reset();
 }
 
+void ACityGenAtmos::SetSteam(bool bOn)
+{
+	bSteam = bOn;
+	ShowPlumes(bAir);
+}
+
 void ACityGenAtmos::ShowPlumes(bool bOn)
 {
+	// (cars_steam: only with the steam on, issue #223)
+	bOn = bOn && bSteam;
 	bPlumesShown = bOn;
 	for (UPrimitiveComponent* C : PlumeComps)
 	{
