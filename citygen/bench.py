@@ -1083,6 +1083,8 @@ def combine(results: list[dict], rt: dict, label: str, resolution) -> dict:
     for i, p in enumerate(first["passes"]):
         ent = {"name": p["name"], "night": p["night"],
                "screen_percentage": p["screen_percentage"]}
+        if p.get("upscaler"):
+            ent["upscaler"] = p["upscaler"]
         for g in GROUPS + ("all",):
             runs = [r["passes"][i][g] for r in results if r["passes"][i][g].get("frames")]
             if not runs:
@@ -1145,6 +1147,15 @@ def _median_of(runs: list[dict]) -> dict:
         v = [r[k] for r in runs if r.get(k) is not None]
         out[k] = round(statistics.median(v), 4) if v else None
     out["bound_by"] = statistics.mode(r["bound_by"] for r in runs)
+    # (dlss_lamps_flicker: Frame Generation's shown frame rate and Reflex's latency)
+    for k in ("fg_hz", "latency_ms"):
+        v = [r[k] for r in runs if r.get(k)]
+        if v:
+            out[k] = {q: round(statistics.median(x[q] for x in v), 2)
+                      for q in ("p50", "p95", "p99", "max", "mean")}
+    fp = [r["fg_presented"] for r in runs if r.get("fg_presented")]
+    if fp:
+        out["fg_presented"] = round(statistics.median(fp), 2)
     gp = [r["gpu_passes_ms"] for r in runs if r.get("gpu_passes_ms")]
     if gp:
         keys = sorted({k for g in gp for k in g})

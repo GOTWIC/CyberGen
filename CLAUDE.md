@@ -2684,8 +2684,9 @@ The DLSS, ghost lamps and flicker fixes (after LG0, Swagnik's walk of Delta) are
   plugins copied into the project (never into the repo), enabled, set up; the play menu's
   Upscaler and Frame generation rows (`CityGenUpscaler`, by reflection, no link); bench passes
   `night_plan_all_dlss_{q,b,p}` and `_fg`; `bench.busy` counts the Epic Games Launcher while it
-  downloads. Docs: `docs/unreal_export.md` ("DLSS", "The lights' fixtures"). Results:
-  `docs/progress/dlss_lamps_flicker/`.
+  downloads. Docs: `docs/unreal_export.md` ("DLSS", "The lights' fixtures"). Delta's night
+  (game-thread bound): native 18.8 to 20.0 ms p95, TSR 67% 16.2, DLSS Quality 16.1, Performance
+  15.8, Frame Generation 163 to 177 shown fps. Results: `docs/progress/dlss_lamps_flicker/`.
 
 ## Life generator (lifegen)
 

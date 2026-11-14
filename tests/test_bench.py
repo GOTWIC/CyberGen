@@ -274,7 +274,9 @@ def test_air_passes():
     for name, p in by.items():
         if name.startswith("x_"):
             assert "CityGenAtmos.Tuned 0" in p[3]
-            assert [c.split()[0] for c in p[3] if c.startswith(("r.",))] == list(B.TUNABLE)
+            # (dlss_lamps_flicker: every atmos pass also switches DLSS and Frame Generation)
+            assert [c.split()[0] for c in p[3] if c.startswith(("r.",)) and
+                    not c.startswith(("r.NGX.", "r.Streamline."))] == list(B.TUNABLE)
             assert p[3][-1] == "CityGenAtmos.Hour 23"
     assert "r.VolumetricFog.GridPixelSize 16" in by["x_grid16"][3]
 
