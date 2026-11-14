@@ -493,9 +493,26 @@ def mid_material():
     tint = MEL.create_material_expression(m, unreal.MaterialExpressionVectorParameter, -900, 250)
     tint.set_editor_property("parameter_name", "Tint")
     tint.set_editor_property("default_value", unreal.LinearColor(1, 1, 1, 1))
+    # (a garment slot takes the person's own tint from per-instance custom data 4 to 6, the
+    # plan's draw from its district's style)
+    inst = MEL.create_material_expression(m, unreal.MaterialExpressionPerInstanceCustomData3Vector, -1100, 450)
+    inst.set_editor_property("data_index", 4)
+    inst.set_editor_property("const_default_value", unreal.LinearColor(1, 1, 1, 1))
+    use = MEL.create_material_expression(m, unreal.MaterialExpressionScalarParameter, -1100, 600)
+    use.set_editor_property("parameter_name", "UseInstanceTint")
+    use.set_editor_property("default_value", 0.0)
+    one = MEL.create_material_expression(m, unreal.MaterialExpressionConstant3Vector, -1100, 350)
+    one.set_editor_property("constant", unreal.LinearColor(1, 1, 1, 1))
+    lp = MEL.create_material_expression(m, unreal.MaterialExpressionLinearInterpolate, -850, 450)
+    MEL.connect_material_expressions(one, "", lp, "A")
+    MEL.connect_material_expressions(inst, "", lp, "B")
+    MEL.connect_material_expressions(use, "", lp, "Alpha")
+    mul0 = MEL.create_material_expression(m, unreal.MaterialExpressionMultiply, -750, 100)
+    MEL.connect_material_expressions(tex, "RGB", mul0, "A")
+    MEL.connect_material_expressions(tint, "", mul0, "B")
     mul = MEL.create_material_expression(m, unreal.MaterialExpressionMultiply, -600, 100)
-    MEL.connect_material_expressions(tex, "RGB", mul, "A")
-    MEL.connect_material_expressions(tint, "", mul, "B")
+    MEL.connect_material_expressions(mul0, "", mul, "A")
+    MEL.connect_material_expressions(lp, "", mul, "B")
     rough = MEL.create_material_expression(m, unreal.MaterialExpressionScalarParameter, -600, 300)
     rough.set_editor_property("parameter_name", "Roughness")
     rough.set_editor_property("default_value", 0.7)
@@ -597,6 +614,22 @@ def _first(r):
     return r[0] if isinstance(r, tuple) else r
 
 
+# (the face's see-through shells over the eyes and its eyelash cards: the mid material is
+# opaque, so they would cover the face; a mid person needs neither)
+SHELLS = ("eyeshell", "lacrimal", "eyelash", "cartilage", "eyeedge")
+
+
+def _drop_shells(dm, pm):
+    """Takes the triangles of a piece's see-through shells out of its dynamic mesh."""
+    select = unreal.GeometryScript_MeshSelection.select_mesh_elements_by_material_id
+    for i, m in enumerate(pm):
+        if m is None or not any(k in m.get_name().lower() for k in SHELLS):
+            continue
+        r = select(dm, i)
+        sel = r[1] if isinstance(r, tuple) else r
+        _gs("delete_selected_triangles_from_mesh")(dm, sel)
+
+
 def assemble_static(path, skeletal, statics):
     """One static mesh from skeletal meshes at given LODs and static meshes, all in the
     character's frame (the groom's helmet is in the face's), their materials kept by slot."""
@@ -612,6 +645,7 @@ def assemble_static(path, skeletal, statics):
         rl.set_editor_property("lod_index", _lod(mesh, max(0, want)))
         copy_sk(mesh, dm, unreal.GeometryScriptCopyMeshFromAssetOptions(), rl)
         pm = [m.get_editor_property("material_interface") for m in mesh.get_editor_property("materials")]
+        _drop_shells(dm, pm)
         r = append(target, mats, dm, pm, unreal.Transform())
         mats = list(r[1]) if isinstance(r, tuple) else mats + pm
     for sm in statics:
@@ -659,6 +693,32 @@ def _asset(path, cls, factory):
     return a
 
 
+def mid_texture(tex, folder):
+    """A base color texture as the mid material samples it: a plain (not virtual) copy at
+    most MID_TEX px (the creator's baked textures are virtual in a project that streams
+    virtual textures, which the mid material's sampler does not take; and the mid tier needs
+    no 2k)."""
+    try:
+        vt = bool(tex.get_editor_property("virtual_texture_streaming"))
+    except Exception:                                               # noqa: BLE001
+        vt = False
+    if not vt and tex.get_path_name().startswith(f"{ROOT}/Mid"):
+        return tex
+    path = f"{folder}/T_{tex.get_name()}_Mid"
+    t = unreal.load_asset(path) if EAL.does_asset_exist(path) else None
+    if t is None:
+        t = EAL.duplicate_asset(tex.get_path_name().split(".")[0], path)
+    if t is None:
+        return tex
+    t.set_editor_property("virtual_texture_streaming", False)
+    t.set_editor_property("max_texture_size", MID_TEX)
+    EAL.save_loaded_asset(t)
+    return t
+
+
+MID_TEX = 512
+
+
 def mid_mesh(c, clips):
     """The character as one static mesh (body, face, outfit at low LODs, the hair's helmet),
     its walk baked into bone textures against its body, its slots on M_CgPersonMid."""
@@ -676,7 +736,12 @@ def mid_mesh(c, clips):
     lod = int(SPEC["far"]["lod"])
     pieces = [(body, lod - 2), (parts["face"], lod - 2)] + [(m, lod - 1) for m in parts["other"]]
     _, helmet = hair_meshes(c)
-    mesh = assemble_static(sm_path, pieces, [unreal.load_asset(helmet)] if helmet else [])
+    helm = unreal.load_asset(helmet) if helmet else None
+    # (the helmet's own slots take the hair's color: its material has none to read)
+    helm_mats = {m.get_editor_property("material_interface").get_path_name()
+                 for m in (helm.get_editor_property("static_materials") if helm else [])
+                 if m.get_editor_property("material_interface") is not None}
+    mesh = assemble_static(sm_path, pieces, [helm] if helm else [])
     bb = mesh.get_bounding_box()
     log(f"mid {c['id']} bounds {bb.min} {bb.max}, slots "
         f"{len(mesh.get_editor_property('static_materials'))}")
@@ -701,7 +766,7 @@ def mid_mesh(c, clips):
                  ("precision", unreal.AnimToTexturePrecision.SIXTEEN_BITS),
                  ("num_bone_influences", unreal.AnimToTextureNumBoneInfluences.FOUR),
                  ("sample_rate", float(SPEC["far"]["fps"])), ("anim_sequences", [info]),
-                 ("auto_play", True), ("num_driver_triangles", 1), *texs.items()):
+                 ("auto_play", True), ("num_driver_triangles", 4), *texs.items()):
         da.set_editor_property(k, v)
     if not unreal.AnimToTextureBPLibrary.animation_to_texture(da):
         raise RuntimeError(f"{c['id']}: AnimToTexture's bake failed")
@@ -714,12 +779,17 @@ def mid_mesh(c, clips):
                     unreal.MaterialInstanceConstantFactoryNew())
         MEL.set_material_instance_parent(mi, base)
         tex, tint = _texture_of(src)
-        if src is not None and "hair" in src.get_name().lower() and tex is None:
+        if src is not None and "garment" in src.get_name().lower():
+            MEL.set_material_instance_scalar_parameter_value(mi, "UseInstanceTint", 1.0)
+        if src is not None and ("hair" in src.get_name().lower()
+                                or src.get_path_name() in helm_mats):
+            tex = None
             # (the groom's helmet carries no color of its own: a natural hair color by the
             # character, darker ones more often)
             h = HAIR_COLORS[int(c["index"] * 7 + 3) % len(HAIR_COLORS)]
             tint = unreal.LinearColor(h[0], h[1], h[2], 1.0)
         if tex is not None:
+            tex = mid_texture(tex, folder)
             MEL.set_material_instance_texture_parameter_value(mi, "BaseColor", tex)
         MEL.set_material_instance_vector_parameter_value(mi, "Tint", tint)
         unreal.AnimToTextureBPLibrary.update_material_instance_from_data_asset(
@@ -828,17 +898,29 @@ def card_material():
         "float a = atan2(CamL.y, CamL.x); if (a < 0) a += 6.2831853;\n"
         "float view = fmod(floor(a / (6.2831853 / V) + 0.5), V);\n"
         "float fr = floor(frac((T + T0) * Cps) * F);\n"
-        "float x = LP.x / 100.0 + 0.5; float y = 1.0 - (LP.y / 100.0 + 0.5);\n"
+        "float x = UV.x; float y = UV.y;\n"
         "return float2((view + x) / V, (fr + saturate(y)) / F);")
-    uv = custom(uv_code, [("CamL", cam_l), ("T", tm), ("T0", t0), ("Cps", cps), ("LP", lp)],
+    tc = e(unreal.MaterialExpressionTextureCoordinate, -1600, 1050)
+    uv = custom(uv_code, [("CamL", cam_l), ("T", tm), ("T0", t0), ("Cps", cps), ("UV", tc)],
                 unreal.CustomMaterialOutputType.CMOT_FLOAT2, -800, 700)
     sheet = e(unreal.MaterialExpressionTextureSampleParameter2D, -500, 700,
               parameter_name="Sheet",
               texture=unreal.load_asset("/Engine/EngineResources/WhiteSquareTexture"))
     MEL.connect_material_expressions(uv, "", sheet, "UVs")
-    MEL.connect_material_property(sheet, "RGB", unreal.MaterialProperty.MP_BASE_COLOR)
+    ptint = e(unreal.MaterialExpressionPerInstanceCustomData3Vector, -800, 1250, data_index=2,
+              const_default_value=unreal.LinearColor(1, 1, 1, 1))
+    tinted = custom("float l = dot(C, float3(0.3, 0.59, 0.11));\n"
+                    "float w = saturate((l - 0.5) * 4.0);\n"
+                    "return lerp(C, C * Tint, w);",
+                    [("C", sheet), ("Tint", ptint)],
+                    unreal.CustomMaterialOutputType.CMOT_FLOAT3, -250, 650)
+    MEL.connect_material_property(tinted, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    cover = e(unreal.MaterialExpressionTextureSampleParameter2D, -500, 950,
+              parameter_name="Mask", sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR,
+              texture=unreal.load_asset("/Engine/EngineResources/Black"))
+    MEL.connect_material_expressions(uv, "", cover, "UVs")
     inv = e(unreal.MaterialExpressionOneMinus, -250, 850)
-    MEL.connect_material_expressions(sheet, "A", inv, "")
+    MEL.connect_material_expressions(cover, "A", inv, "")
     MEL.connect_material_property(inv, "", unreal.MaterialProperty.MP_OPACITY_MASK)
     nrm = e(unreal.MaterialExpressionNormalize, -250, 1000)
     MEL.connect_material_expressions(to_cam, "", nrm, "")
@@ -887,33 +969,46 @@ def capture_sheet(c, mid):
         smc.set_material(i, mi)
         caps.append(mi)
     actors = [holder]
-    cam = eas.spawn_actor_from_class(unreal.SceneCapture2D, origin, transient=True)
-    cap = cam.capture_component2d
-    cap.set_editor_property("projection_type", unreal.CameraProjectionMode.ORTHOGRAPHIC)
-    cap.set_editor_property("ortho_width", CARD_W_CM)
-    cap.set_editor_property("capture_source", unreal.SceneCaptureSource.SCS_SCENE_COLOR_HDR)
-    cap.set_editor_property("capture_every_frame", False)
-    cap.set_editor_property("capture_on_movement", False)
-    cap.set_editor_property("primitive_render_mode",
-                            unreal.SceneCapturePrimitiveRenderMode.PRM_USE_SHOW_ONLY_LIST)
-    for a in actors:
-        cap.show_only_actor_components(a, True)
-    flags = []
-    for name in ("Lighting", "PostProcessing", "Atmosphere", "Fog", "Bloom", "AmbientOcclusion",
-                 "ScreenSpaceReflections", "Lumen"):
-        f = unreal.EngineShowFlagsSetting()
-        f.set_editor_property("show_flag_name", name)
-        f.set_editor_property("enabled", False)
-        flags.append(f)
-    cap.set_editor_property("show_flag_settings", flags)
-    cell = RL.create_render_target2d(world, cw, ch, unreal.TextureRenderTargetFormat.RTF_RGBA16F,
-                                     unreal.LinearColor(0, 0, 0, 1), False)
-    cap.set_editor_property("texture_target", cell)
+    # (two captures a cell: the lit color, front-lit by a light that turns with the camera,
+    # as the project draws it; and the coverage, the scene color's alpha with the lighting
+    # off, which the card's mask takes)
+    def capturer(source, flags_off):
+        cam = eas.spawn_actor_from_class(unreal.SceneCapture2D, origin, transient=True)
+        cap = cam.capture_component2d
+        cap.set_editor_property("projection_type", unreal.CameraProjectionMode.ORTHOGRAPHIC)
+        cap.set_editor_property("ortho_width", CARD_W_CM)
+        cap.set_editor_property("capture_source", source)
+        cap.set_editor_property("capture_every_frame", False)
+        cap.set_editor_property("capture_on_movement", False)
+        cap.set_editor_property("primitive_render_mode",
+                                unreal.SceneCapturePrimitiveRenderMode.PRM_USE_SHOW_ONLY_LIST)
+        for act in actors:
+            cap.show_only_actor_components(act, True)
+        flags = []
+        for name in flags_off:
+            fl = unreal.EngineShowFlagsSetting()
+            fl.set_editor_property("show_flag_name", name)
+            fl.set_editor_property("enabled", False)
+            flags.append(fl)
+        cap.set_editor_property("show_flag_settings", flags)
+        cell = RL.create_render_target2d(world, cw, ch, unreal.TextureRenderTargetFormat.RTF_RGBA16F,
+                                         unreal.LinearColor(0, 0, 0, 1), False)
+        cap.set_editor_property("texture_target", cell)
+        return cam, cap, cell
+
+    cam_c, cap_c, cell_c = capturer(unreal.SceneCaptureSource.SCS_FINAL_COLOR_LDR,
+                                    ("Atmosphere", "Fog", "Bloom", "LensFlares"))
+    cam_m, cap_m, cell_m = capturer(unreal.SceneCaptureSource.SCS_SCENE_COLOR_HDR,
+                                    ("Lighting", "PostProcessing", "Atmosphere", "Fog"))
+    light = eas.spawn_actor_from_class(unreal.DirectionalLight, origin, transient=True)
     sheet = RL.create_render_target2d(world, cw * V, ch * F,
                                       unreal.TextureRenderTargetFormat.RTF_RGBA8,
                                       unreal.LinearColor(0, 0, 0, 1), False)
+    mask = RL.create_render_target2d(world, cw * V, ch * F,
+                                     unreal.TextureRenderTargetFormat.RTF_RGBA8,
+                                     unreal.LinearColor(0, 0, 0, 1), False)
     unreal.AutomationLibrary.finish_loading_before_screenshot()
-    first, last = int(mid["start"]), int(mid["end"])
+    first = int(mid["start"])
     cells = []
     for f in range(F):
         frame = float(first) + float(mid["cycle_s"]) * float(mid["fps"]) * f / F
@@ -928,32 +1023,38 @@ def capture_sheet(c, mid):
             # (the person faces +X in the card's frame: view 0 is seen from the front)
             eye = unreal.Vector(origin.x + 600.0 * math.cos(a), origin.y + 600.0 * math.sin(a),
                                 origin.z + CARD_H_CM / 2.0)
-            cam.set_actor_location(eye, False, False)
-            cam.set_actor_rotation(unreal.Rotator(0.0, 0.0, math.degrees(a) + 180.0), False)
-            cap.capture_scene()
-            canvas, size, ctx = RL.begin_draw_canvas_to_render_target(world, sheet)
-            canvas.draw_texture(cell, unreal.Vector2D(v * cw, f * ch), unreal.Vector2D(cw, ch),
-                                unreal.Vector2D(0, 0), unreal.Vector2D(1, 1),
-                                unreal.LinearColor(1, 1, 1, 1), unreal.BlendMode.BLEND_OPAQUE)
-            RL.end_draw_canvas_to_render_target(world, ctx)
+            look = unreal.Rotator(0.0, 0.0, math.degrees(a) + 180.0)
+            light.set_actor_rotation(unreal.Rotator(0.0, -35.0, math.degrees(a) + 200.0), False)
+            for cam, cap, cell, target in ((cam_c, cap_c, cell_c, sheet),
+                                           (cam_m, cap_m, cell_m, mask)):
+                cam.set_actor_location(eye, False, False)
+                cam.set_actor_rotation(look, False)
+                cap.capture_scene()
+                canvas, size, ctx = RL.begin_draw_canvas_to_render_target(world, target)
+                canvas.draw_texture(cell, unreal.Vector2D(v * cw, f * ch), unreal.Vector2D(cw, ch),
+                                    unreal.Vector2D(0, 0), unreal.Vector2D(1, 1),
+                                    unreal.LinearColor(1, 1, 1, 1), unreal.BlendMode.BLEND_OPAQUE)
+                RL.end_draw_canvas_to_render_target(world, ctx)
             cells.append((f, v))
         yield
-    if EAL.does_asset_exist(tex_path):
-        EAL.delete_asset(tex_path)
-    tex = RL.render_target_create_static_texture2d_editor_only(sheet, tex_path)
-    if tex is None:
-        raise RuntimeError(f"{c['id']}: the sheet's texture was not made")
-    tex.set_editor_property("srgb", True)
-    tex.set_editor_property("mip_gen_settings", unreal.TextureMipGenSettings.TMGS_FROM_TEXTURE_GROUP)
-    EAL.save_loaded_asset(tex)
-    try:
-        RL.export_render_target(world, sheet, JOB.get("sheets_dir") or os.path.dirname(JOB["result"]),
-                                f"sheet_{c['id']}.png")
-    except Exception as e:                                          # noqa: BLE001
-        log(f"sheet export: {e}")
-    eas.destroy_actor(cam)
-    for a in actors:
-        eas.destroy_actor(a)
+    made = {}
+    for rt, path, srgb in ((sheet, tex_path, True), (mask, f"{folder}/T_{c['id']}_Mask", False)):
+        if EAL.does_asset_exist(path):
+            EAL.delete_asset(path)
+        tex = RL.render_target_create_static_texture2d_editor_only(rt, path)
+        if tex is None:
+            raise RuntimeError(f"{c['id']}: the sheet's texture {path} was not made")
+        # (as made: the render target's own gamma; changing it trips the texture build)
+        EAL.save_loaded_asset(tex)
+        made[path] = tex
+        try:
+            RL.export_render_target(world, rt, JOB.get("sheets_dir") or
+                                    os.path.dirname(JOB["result"]),
+                                    f"{'sheet' if srgb else 'mask'}_{c['id']}.png")
+        except Exception as e:                                      # noqa: BLE001
+            log(f"sheet export: {e}")
+    for act in [cam_c, cam_m, light] + actors:
+        eas.destroy_actor(act)
     # (the pose instances stay: an asset an actor of this session named cannot be deleted
     # before the editor collects it; nothing cooked names them)
     mip = f"{folder}/MI_{c['id']}_Card"
@@ -963,6 +1064,8 @@ def capture_sheet(c, mid):
                          unreal.MaterialInstanceConstantFactoryNew())
     MEL.set_material_instance_parent(mi, card_material())
     MEL.set_material_instance_texture_parameter_value(mi, "Sheet", unreal.load_asset(tex_path))
+    MEL.set_material_instance_texture_parameter_value(
+        mi, "Mask", unreal.load_asset(f"{folder}/T_{c['id']}_Mask"))
     tag(mi, HASH)
     R.setdefault("far_last", {})[c["id"]] = len(cells)
     return {"material": mip, "sheet": tex_path}

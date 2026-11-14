@@ -26,6 +26,7 @@
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "HAL/PlatformTime.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 
 namespace
@@ -241,10 +242,21 @@ void ACityGenLife::Assign(const int32 S, const int32 P)
 		{
 			USkeletalMeshComponent* Comp = Slot.Comps[K];
 			USkeletalMesh* Mesh = (A + K < B && NearMeshes.IsValidIndex(A + K)) ? NearMeshes[A + K].Get() : nullptr;
+			Comp->EmptyOverrideMaterials();
 			Comp->SetSkeletalMesh(Mesh, false);
 			if (K > 0)
 			{
 				Comp->SetLeaderPoseComponent(Mesh ? Lead : nullptr);
+			}
+			// (the wardrobe's garments: a dynamic instance a slot, which takes each person's
+			// own color)
+			for (int32 M = 0; Mesh && M < Comp->GetNumMaterials(); ++M)
+			{
+				const UMaterialInterface* Mat = Comp->GetMaterial(M);
+				if (Mat && Mat->GetName().Contains(TEXT("Garment")))
+				{
+					Comp->CreateDynamicMaterialInstance(M);
+				}
 			}
 		}
 		// (its hair: the groom's cards on the face's head bone, placed by the bone's reference
@@ -289,6 +301,20 @@ void ACityGenLife::Assign(const int32 S, const int32 P)
 		Lead->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 		Lead->PlayAnimation(Clip, true);
 		Slot.Gait = G;
+	}
+	// (the person's outfit color: the plan's tint, on the garments' dye)
+	const FLinearColor Tint(PersonTint.IsValidIndex(3 * P) ? PersonTint[3 * P] : 0.5f,
+		PersonTint.IsValidIndex(3 * P + 1) ? PersonTint[3 * P + 1] : 0.5f,
+		PersonTint.IsValidIndex(3 * P + 2) ? PersonTint[3 * P + 2] : 0.5f);
+	for (USkeletalMeshComponent* Comp : Slot.Comps)
+	{
+		for (int32 M = 0; Comp && M < Comp->GetNumMaterials(); ++M)
+		{
+			if (UMaterialInstanceDynamic* D = Cast<UMaterialInstanceDynamic>(Comp->GetMaterial(M)))
+			{
+				D->SetVectorParameterValue(TEXT("diffuse_color_1"), Tint);
+			}
+		}
 	}
 	const float Rate = WalkRate(P);
 	Lead->SetPlayRate(Rate);
