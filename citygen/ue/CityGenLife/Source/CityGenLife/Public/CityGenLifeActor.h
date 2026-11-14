@@ -99,7 +99,19 @@ public:
 	/** How many entities have their ground found each frame (a line trace each). */
 	UPROPERTY(EditAnywhere, Category = "CityGen") int32 TracesPerFrame = 96;
 
+	/** Whether the stand-ins and the cars' bodies cast shadows. */
+	UPROPERTY(EditAnywhere, Category = "CityGen") bool bShadows = true;
+	/** Whether each frame's move also recreates the instanced components' render state (the
+	 *  engine's MarkRenderStateDirty); off, the moves reach the GPU scene through the
+	 *  components' instance data alone. */
+	UPROPERTY(EditAnywhere, Category = "CityGen") bool bRebuildRenderState = false;
+	/** Whether the instanced people and cars are in Lumen's scene and the distance fields
+	 *  (off: they take Lumen's light but give none back, as characters in games). */
+	UPROPERTY(EditAnywhere, Category = "CityGen") bool bInLumen = false;
+
 	UFUNCTION(BlueprintCallable, Category = "CityGen") void SetEnabled(bool bOn);
+	UFUNCTION(BlueprintCallable, Category = "CityGen") void SetShadows(bool bOn);
+	UFUNCTION(BlueprintCallable, Category = "CityGen") void SetLumen(bool bOn);
 	UFUNCTION(BlueprintCallable, Category = "CityGen") void Respawn(int32 InPeople, int32 InCars);
 	/** The state as one JSON line (lanes, entities, the game thread's time in the actor). */
 	UFUNCTION(BlueprintCallable, Category = "CityGen") FString GetStatus() const;

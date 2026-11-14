@@ -354,22 +354,27 @@ void ACityGenLife::MakeComponents()
 		C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		C->SetCanEverAffectNavigation(false);
 		C->SetCastShadow(bShadow);
+		// (out of Lumen's scene and the distance fields: moving every frame, the stand-ins'
+		// basic shapes cost Lumen's scene update 9 ms a frame on the spike's first run, as
+		// characters stay out of it in games)
+		C->bAffectDistanceFieldLighting = bInLumen;
+		C->SetAffectDynamicIndirectLighting(bInLumen);
 		C->NumCustomDataFloats = Floats;
 		C->RegisterComponent();
 		return C;
 	};
 	if (BodyMesh)
 	{
-		Bodies = Make(TEXT("StandInBodies"), BodyMesh, StandInMaterial, 3, true);
+		Bodies = Make(TEXT("StandInBodies"), BodyMesh, StandInMaterial, 3, bShadows);
 	}
 	if (HeadMesh)
 	{
-		Heads = Make(TEXT("StandInHeads"), HeadMesh, StandInMaterial, 3, true);
+		Heads = Make(TEXT("StandInHeads"), HeadMesh, StandInMaterial, 3, bShadows);
 	}
 	CarParts.Reset();
 	for (int32 P = 0; P < CarPartMeshes.Num(); ++P)
 	{
-		CarParts.Add(CarPartMeshes[P] ? Make(*FString::Printf(TEXT("CarPart%d"), P), CarPartMeshes[P], nullptr, PaintFloats, !CarPartShadows.IsValidIndex(P) || CarPartShadows[P] != 0) : nullptr);
+		CarParts.Add(CarPartMeshes[P] ? Make(*FString::Printf(TEXT("CarPart%d"), P), CarPartMeshes[P], nullptr, PaintFloats, bShadows && (!CarPartShadows.IsValidIndex(P) || CarPartShadows[P] != 0)) : nullptr);
 	}
 }
 
@@ -597,6 +602,41 @@ void ACityGenLife::SetEnabled(bool bOn)
 	}
 }
 
+void ACityGenLife::SetShadows(bool bOn)
+{
+	bShadows = bOn;
+	for (UInstancedStaticMeshComponent* C : {Bodies.Get(), Heads.Get()})
+	{
+		if (C) { C->SetCastShadow(bOn); }
+	}
+	for (int32 P = 0; P < CarParts.Num(); ++P)
+	{
+		if (CarParts[P])
+		{
+			CarParts[P]->SetCastShadow(bOn && (!CarPartShadows.IsValidIndex(P) || CarPartShadows[P] != 0));
+		}
+	}
+}
+
+void ACityGenLife::SetLumen(bool bOn)
+{
+	bInLumen = bOn;
+	TArray<UInstancedStaticMeshComponent*> All = {Bodies.Get(), Heads.Get()};
+	for (UInstancedStaticMeshComponent* C : CarParts)
+	{
+		All.Add(C);
+	}
+	for (UInstancedStaticMeshComponent* C : All)
+	{
+		if (C)
+		{
+			C->bAffectDistanceFieldLighting = bOn;
+			C->SetAffectDynamicIndirectLighting(bOn);
+			C->MarkRenderStateDirty();
+		}
+	}
+}
+
 // --- each frame -----------------------------------------------------------------------------
 
 void ACityGenLife::FindGround()
@@ -653,7 +693,7 @@ void ACityGenLife::UpdateInstances()
 		{
 			Scratch[K] = FTransform(FRotator(0.f, WalkYaw[K], 0.f), WalkPos[K] + FVector(0.f, 0.f, 78.f), FVector(0.30f, 0.44f, 1.5f));
 		}
-		Bodies->BatchUpdateInstancesTransforms(0, Scratch, true, true, false);
+		Bodies->BatchUpdateInstancesTransforms(0, Scratch, false, bRebuildRenderState, false);
 	}
 	if (Heads && NP)
 	{
@@ -662,7 +702,7 @@ void ACityGenLife::UpdateInstances()
 		{
 			Scratch[K] = FTransform(FRotator(0.f, WalkYaw[K], 0.f), WalkPos[K] + FVector(0.f, 0.f, 166.f), FVector(0.22f, 0.20f, 0.25f));
 		}
-		Heads->BatchUpdateInstancesTransforms(0, Scratch, true, true, false);
+		Heads->BatchUpdateInstancesTransforms(0, Scratch, false, bRebuildRenderState, false);
 	}
 	const int32 NC = CarPos.Num();
 	for (int32 P = 0; P < CarParts.Num(); ++P)
@@ -684,7 +724,7 @@ void ACityGenLife::UpdateInstances()
 			const FTransform Car(FRotator(0.f, CarYaw[K], 0.f), CarPos[K]);
 			Scratch[CarInstance[K]] = FTransform(Pivot) * Car;
 		}
-		Comp->BatchUpdateInstancesTransforms(0, Scratch, true, true, false);
+		Comp->BatchUpdateInstancesTransforms(0, Scratch, false, bRebuildRenderState, false);
 	}
 }
 

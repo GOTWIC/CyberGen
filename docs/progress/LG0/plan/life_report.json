@@ -1,0 +1,103 @@
+{
+ "asks": {
+  "air_corridors": "derived",
+  "bus_routes": "missing",
+  "doors": "met",
+  "fleet_kinds": "derived",
+  "lobby_points": "derived",
+  "piers": "missing",
+  "signal_phases": "derived",
+  "turn_restrictions": "derived"
+ },
+ "checks": {
+  "densities": {
+   "detail": "every district's people per hour band keep M11's densities (times its busy) within 1%",
+   "ok": true
+  },
+  "slots": {
+   "detail": "688 slots, each facing its object's way",
+   "ok": true
+  },
+  "spawns_on_graph": {
+   "detail": "6789 spawn points, each on a walkway (and a drive lane where it has one)",
+   "ok": true
+  },
+  "spawns_reach": {
+   "detail": "every spawn point's walkway reaches another spawn point (1 walkway components with spawns; the largest holds 6789 of 6789)",
+   "ok": true
+  },
+  "spike_budget": {
+   "detail": "the spike's 2000 people and 40 cars within the budget's 2000 and 500",
+   "ok": true
+  }
+ },
+ "city": "Delta Megacity",
+ "districts": {
+  "d01": {
+   "name": "Transit Nexus",
+   "people_23": 2060.0,
+   "people_peak": 6042.35,
+   "slots": 58,
+   "spawns": 163,
+   "vehicles_peak": 461.29
+  },
+  "d02": {
+   "name": "Midtown",
+   "people_23": 5420.59,
+   "people_peak": 10685.0,
+   "slots": 86,
+   "spawns": 899,
+   "vehicles_peak": 771.24
+  },
+  "d03": {
+   "name": "Corporate Core",
+   "people_23": 1663.98,
+   "people_peak": 8785.47,
+   "slots": 191,
+   "spawns": 291,
+   "vehicles_peak": 970.94
+  },
+  "d04": {
+   "name": "Old Town",
+   "people_23": 23373.26,
+   "people_peak": 33786.15,
+   "slots": 191,
+   "spawns": 5130,
+   "vehicles_peak": 931.48
+  },
+  "d05": {
+   "name": "Industrial Port",
+   "people_23": 479.96,
+   "people_peak": 2692.19,
+   "slots": 120,
+   "spawns": 249,
+   "vehicles_peak": 698.47
+  },
+  "d06": {
+   "name": "Research Campus",
+   "people_23": 147.04,
+   "people_peak": 1672.48,
+   "slots": 41,
+   "spawns": 54,
+   "vehicles_peak": 117.93
+  }
+ },
+ "ok": true,
+ "out": "C:\\Users\\swagn\\CityGen\\builds\\lg0\\delta_life",
+ "plan_hash": "92c7578e3c58064c",
+ "spike": {
+  "cars": 40,
+  "district_id": "d04",
+  "hour": 23,
+  "name": "Old Town",
+  "people": 2000
+ },
+ "totals": {
+  "people_peak": 58188.6,
+  "slots": 688,
+  "spawns": 6789,
+  "spawns_without_walkway": 0,
+  "tiles": 131,
+  "vehicles_peak": 3393.7
+ }
+}

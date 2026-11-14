@@ -2665,15 +2665,61 @@ Results: `docs/progress/AT6/`.
 
 ## Life generator (lifegen)
 
-`docs/lifegen_scope.md` (draft v0, its decisions in section 12 still open) is the plan for
-stage 4: a deterministic plan per city (population by district and hour, trips, fleet,
-signal phases, timetables, air and boat lanes, place slots) keyed by M10's ids and
-checked; a library of people (bodies, garments from sewing patterns draped in Blender,
-generated textiles, accessories and cyberware, animation, crowd stand-ins) and vehicles,
-built once per project; layer 4 of the manifest; a C++ runtime plugin, `CityGenLife`, that
-simulates it on Unreal's Mass, ZoneGraph, Smart Objects and StateTree. Nothing third-party
-goes in the repo unless its license lets anyone use it. Milestones LG0 to LG8, after AG16;
-only LG8 waits for atmosgen's hour and weather.
+`docs/lifegen_scope.md` (v1, Swagnik's decisions of 2026-11-13 in section 12) is the spec
+for stage 4 (milestones LG0 to LG8, section 13), its log `docs/lifegen_milestones.md`: a
+deterministic plan per city (population by district and hour, spawn and sink points, place
+slots, trips, the fleet, signal phases, timetables, air and boat lanes) keyed by M10's ids
+and checked; a library of people (MetaHuman bodies made by script into the user's project,
+garments from sewing patterns draped in Blender, generated textiles, accessories and
+cyberware, Epic's Game Animation Sample near the view and free mocap for the rest, crowd
+stand-ins), built once per project; layer 4 of the manifest; a C++ runtime plugin,
+`CityGenLife`, on Unreal's Mass, ZoneGraph, Smart Objects and StateTree. **The fleet is
+AG18's hand-designed vehicles**, moving and parked; the kinds the roster lacks (buses,
+trucks, bikes, flying cars, drones, boats) are designed on the Mac the same way (decision 6).
+**The frame budget is 20 ms p95** at native 2560 x 1440 on the PC: no tuning rounds unless a
+milestone goes over it (decision 7). Nothing third-party goes in the repo unless its license
+lets anyone use it; a user's own content (MetaHumans, Fab clothing, Epic's animation) is
+imported into their project by a step they run once. Package `lifegen/` beside the others,
+which it reads only (citygen's model JSON; `assetgen/parked/table.py` for the fleet's
+weights and paint); tests in `tests/lifegen/` (`test_lg_*.py`, no `conftest.py`). Only LG8
+waits for atmosgen's hour and weather.
+
+LG0 (groundwork and spike) is in place:
+- **Spec and presets** (`lifegen/spec.py`, `presets.py`; `python -m lifegen spec
+  validate|schema`): per district its people (busy, residents, workers, visitors, the day's
+  shape within M11's hour bands), style (fashion groups and their colors, cyberware, wear by
+  wealth and danger), fleet (AG18's models by the parked cars' table times the spec's
+  multipliers); transit headways, air, water, budgets, reactions (step aside and look;
+  flee and gather later), the spike.
+- **Plan** (`lifegen plan BUILD [--spec S] [--out DIR]`, `plan.py`, `planmodel.py`,
+  `lifegen/schemas/`): `BUILD/life/`: `life_plan.json` (people, vehicles, gang members and
+  police per district and hour from M11's densities, the asks, the spike, the checks),
+  `spawns/<tile>.json` (spawn points at building entrances, station stairs, garages and taxi
+  stands with rates by hour; place slots `slot.<prop id>` at benches, bus stops, kiosks,
+  vending machines, stalls, taxi stands), `unreal_contribution.life.json` (layer 4),
+  `life_report.*`, `preview_crowds.png`; only changed files written; exit 1 when a check
+  fails (spawns on the graphs, every spawn reaching another, densities within 1%, slots
+  facing, the spike within the budget).
+- **Asks of citygen** (`lifegen/asks.py`): signal phases and timing, bus routes, turn
+  restrictions, lobby points, piers, air corridors; of assetgen the doors (met) and AG18's
+  missing kinds; each with its record, its state on a model and what the plan does meanwhile.
+- **Runtime** (`citygen/ue/CityGenLife`, built with CityGenPlay and CityGenAtmos:
+  `unreal_play.PLUGINS`): the `CityGenLife` controller builds ZoneGraph lanes from the
+  spike's walkway and lane graphs at BeginPlay (an `AZoneGraphData` of its own; its BV-tree
+  built in the plugin, `FZoneGraphBVTree::Build` is not exported in 5.8), makes people and
+  cars entities of the world's Mass entity manager and moves them with two dynamic Mass
+  processors (no MassGameplay plugin needed), draws stand-ins (`/Engine/BasicShapes`, the
+  import's `Core/Life/M_CgLifeStandIn`) and AG18's car parts as instanced meshes, densest
+  round the spike's middle (`CrowdFalloffM`); `CityGenLife.Enable|Respawn|Status`.
+- **Exporter** (`citygen/unreal_life.py`, `Importer.life_controller`; `citygen unreal
+  --life DIR`, `--no-life`): the manifest's `life`, `BUILD/unreal/life.json`;
+  `docs/unreal_export.md`, "lifegen's runtime (LG0)".
+- **Probes** (`lifegen/probes/`: `plugins.py` the engine pieces' maturity, `ue_probe.py`
+  MetaHuman Creator, Mutable and retargeting from Python in a throwaway project,
+  `cmu_style.py` a CMU-skeleton walk made in Blender) and the **garment test**
+  (`lifegen/blender/garment_test.py`: a tee from two panels sewn and draped headless).
+- Results, the benchmark, the probes' findings and the recommendations for LG1 to LG8:
+  `docs/progress/LG0/README.md`.
 
 ## Gallery site (GitHub Pages)
 

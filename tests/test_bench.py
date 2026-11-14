@@ -366,3 +366,18 @@ def test_busy_sees_any_benchmark():
                   108: (1, "Overwolf.exe", "Overwolf.exe")})
     assert B._busy(procs, 12) == ["CityAG16.exe 101", "python.exe 102", "UnrealEditor.exe 105",
                                   "javaw.exe 106", "ow-obs.exe 107"]
+
+
+def test_life_passes():
+    """LG0: lifegen's passes set the spike on or off, its shadows, its render state rebuild
+    and its Lumen (every one all four, before the night as delivered, the hour last)."""
+    by = {p[0]: p for p in B.ATMOS_PASSES}
+    base = set(by["night_plan_all"][3])
+    for name, *_ in B.LIFE_PASSES:
+        cmds = by[name][3]
+        life = [c for c in cmds if c.startswith("CityGenLife.")]
+        assert [c.split()[0] for c in life] == ["CityGenLife.Enable", "CityGenLife.Shadows",
+                                                "CityGenLife.Rebuild", "CityGenLife.Lumen"]
+        assert set(cmds) - set(life) == base and cmds[-1].startswith("CityGenAtmos.Hour")
+    assert "CityGenLife.Enable 0" in by["night_life_off"][3]
+    assert "CityGenLife.Lumen 1" in by["night_life_lumen"][3]

@@ -31,6 +31,36 @@ namespace
 			}
 		}));
 
+	FAutoConsoleCommandWithWorldAndArgs ShadowsCmd(TEXT("CityGenLife.Shadows"),
+		TEXT("CityGenLife.Shadows [0|1]: the stand-ins and the cars' bodies casting shadows"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (ACityGenLife* A = LifeIn(World))
+			{
+				A->SetShadows(Args.Num() ? FCString::Atoi(*Args[0]) != 0 : !A->bShadows);
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs LumenCmd(TEXT("CityGenLife.Lumen"),
+		TEXT("CityGenLife.Lumen [0|1]: the people and cars in Lumen's scene and the distance fields"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (ACityGenLife* A = LifeIn(World))
+			{
+				A->SetLumen(Args.Num() ? FCString::Atoi(*Args[0]) != 0 : !A->bInLumen);
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs RebuildCmd(TEXT("CityGenLife.Rebuild"),
+		TEXT("CityGenLife.Rebuild [0|1]: each frame's move also recreating the instanced components' render state"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (ACityGenLife* A = LifeIn(World))
+			{
+				A->bRebuildRenderState = Args.Num() ? FCString::Atoi(*Args[0]) != 0 : !A->bRebuildRenderState;
+			}
+		}));
+
 	FAutoConsoleCommandWithWorldAndArgs RespawnCmd(TEXT("CityGenLife.Respawn"),
 		TEXT("CityGenLife.Respawn PEOPLE CARS: the stand-ins and cars again, as many as given, on the spike's lanes"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
