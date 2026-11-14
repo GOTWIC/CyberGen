@@ -338,6 +338,38 @@ def corners(g, inset: float) -> list[tuple[float, float]]:
     return out
 
 
+def corners_on(g, inset: float) -> list[tuple[float, float]]:
+    """`corners`, each on the footprint itself (dlss_lamps_flicker: the oriented box's corner
+    of a curved or odd footprint lies off it, and a beacon or a searchlight there stood on
+    nothing): `inset` > 0 the nearest point `inset` inside it where the box's is not; < 0
+    (out on a facade's corner) the nearest point of its outline, `-inset` out."""
+    from shapely.geometry import Point
+    from shapely.ops import nearest_points
+    out = []
+    core = g.buffer(-inset, join_style="mitre") if inset > 0 else None
+    for x, y in corners(g, inset):
+        p = Point(x, y)
+        if inset > 0:
+            if core is None or core.is_empty:
+                q = g.representative_point()
+            elif core.contains(p):
+                q = p
+            else:
+                q = nearest_points(core, p)[0]
+            out.append((round(q.x, 3), round(q.y, 3)))
+            continue
+        d = g.exterior.distance(p)
+        if not g.contains(p) and d <= -inset + 0.05:
+            out.append((x, y))
+            continue
+        q = nearest_points(g.exterior, p)[0]
+        c = g.centroid
+        vx, vy = q.x - c.x, q.y - c.y
+        n = math.hypot(vx, vy) or 1.0
+        out.append((round(q.x - inset * vx / n, 3), round(q.y - inset * vy / n, 3)))
+    return out
+
+
 class Shape:
     """A building's (or a megasite structure's) masses for its night lights (AT2): their
     footprints with their spans over its base, its body's top (M21's thin parts, masts,
@@ -636,8 +668,8 @@ class Plan:
                         self.spot(cls, owner=sid, suffix=f"light{k:03d}{sfx}", kind="road",
                                   did=did, x=x + nx * o, y=y + ny * o, z=z,
                                   yaw=math.degrees(math.atan2(ny * side, nx * side)),
-                                  mount="pole", foot=(x, y, z - h),
-                                  deck=seg_z(s, sv) > 1.0)
+                                  mount="pole", foot=(x, y, z - h), deck=True)
+                    # (deck: the twin column stands in the median, on its barrier)
                 else:
                     # one column at an edge, its arm over the road, from side to side (its
                     # foot `POLE_OUT_M` past the edge)
@@ -1192,7 +1224,7 @@ class Plan:
                 c = g.representative_point()
                 pts.append((c.x, c.y, sh.base + z1 + 0.3))
             else:
-                pts += [(x, y, sh.base + z1 + 0.4) for x, y in corners(g, 0.4)]
+                pts += [(x, y, sh.base + z1 + 0.4) for x, y in corners_on(g, 0.4)]
             for x, y, z in pts:
                 self.add(owner=oid, suffix=f"aviation{k}", kind="aviation", cls="aviation",
                          did=did, pos=(x, y, z), aim=(0.0, -90.0), color=red,
@@ -1205,7 +1237,7 @@ class Plan:
             while zl >= 45.0:
                 lv = sh.at(zl)
                 if lv is not None:
-                    for x, y in corners(lv[0], -0.4):
+                    for x, y in corners_on(lv[0], -0.4):
                         self.add(owner=oid, suffix=f"aviation{k}", kind="aviation",
                                  cls="aviation", did=did, pos=(x, y, sh.base + zl),
                                  aim=(0.0, -90.0), color=red,
@@ -1254,7 +1286,7 @@ class Plan:
         lo_t, hi_t = P.SEARCHLIGHT_PERIOD
         for b, sh, n in jobs:
             did = b.get("district_id")
-            cs = corners(sh.crown[0], 2.0)
+            cs = corners_on(sh.crown[0], 2.0)
             if not cs:
                 continue
             g = sh.crown[0].centroid

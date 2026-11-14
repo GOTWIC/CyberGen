@@ -100,8 +100,12 @@ def install(src: Path, uproject: str | Path, say=None) -> dict:
         for name in PLUGINS:
             if say:
                 say(f"dlss: copying {name}")
-            shutil.copytree(src / name, dest / name, dirs_exist_ok=True)
-            files += sum(1 for f in (src / name).rglob("*") if f.is_file())
+            # (not NVIDIA's own build intermediates: UnrealBuildTool builds the plugins'
+            # modules for this project, as a packaged game's build does)
+            shutil.copytree(src / name, dest / name, dirs_exist_ok=True,
+                            ignore=shutil.ignore_patterns("Intermediate"))
+            files += sum(1 for f in (src / name).rglob("*")
+                         if f.is_file() and "Intermediate" not in f.relative_to(src).parts)
         (dest / "DLSS" / STAMP).write_text(want + "\n", encoding="utf-8", newline="\n")
         copied = True
     enabled = enable(up)

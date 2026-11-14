@@ -59,13 +59,15 @@ FAMILY_GLB = {k: f"props/variants/{k}.glb" for k in (STREET, WALL, BRACKET)}
 STYLE_ORDER = ("civic", "heavy", "sleek", "old", "neon")
 POST_A_M = 0.45              # a head this near its foot is a post top's
 CLUSTER_MM = 600             # lens vertices this near one another are one head
-POLE_SCALE = (0.55, 1.9)     # a street light scaled at most this far to reach its head
+POLE_SCALE = (0.45, 1.9)     # a street light scaled at most this far to reach its head
+ARM_STRETCH = 1.6            # ... and its arm at most this much longer (a mast arm's reach)
 MAST_SCALE = (2.0, 5.5)      # ... a high mast
 NEAR_M = 0.5                 # variants whose arm misses the head by this more than the best
                              # are left out of the hashed pick
 PUSH_STEP_M = 0.25           # a fixture on a carriageway moves back this much at a time
-PUSH_MAX_M = 3.0
-WALL_REACH_M = 3.0           # a wall pack's facade at most this far behind it
+PUSH_MAX_M = 4.0
+WALL_REACH_M = 1.2           # a wall pack's facade at most this far behind it
+ALLEY_POLE_M = 0.9           # else a pole this far back from it, off the alley
 WALL_REACH = 0.2             # AG8's wall light frame: the wall at x = -0.2
 FLOOD_HEAD_S = 2.0           # a flood's head: AG8's heavy wall light's flood form, scaled
 FLOOD_FORMS = (2, 4)         # ... its flood form's variants (`variants.WALL_FORMS["heavy"]`)
@@ -227,6 +229,7 @@ class Fixtures:
         self.out: list[dict] = []
         self.dropped: dict[str, int] = {}
         self.moved: list[float] = []
+        self.moves: dict[str, list[float]] = {}
         self.report: dict = {}
 
     # -- helpers -------------------------------------------------------------------------
@@ -236,10 +239,11 @@ class Fixtures:
         return self.ST.style_of(arch) if arch else "civic"
 
     def clear(self, kind: str, style: str, k: int, x: float, y: float, z: float, yaw: float,
-              s: float, xwalk: bool = True) -> bool:
+              s: float, xwalk: bool = True, sx: float | None = None) -> bool:
         """AG8's rule (`gather._Fit.clear`): the variant's footprint 2 m up, turned and
-        scaled as placed, reaches at most 5 cm onto a vehicle carriageway, junction or (unless
-        `xwalk` is False: a mast arm at its signal's crosswalk) a crosswalk at its height."""
+        scaled as placed (`sx` along its arm where stretched), reaches at most 5 cm onto a
+        vehicle carriageway, junction or (unless `xwalk` is False) a crosswalk at its
+        height."""
         import shapely
         from assetgen.props.gather import FIT_Z_M, _z_along
         f = self.fit
@@ -248,9 +252,10 @@ class Fixtures:
         ring = f.hull(kind, style, k)
         if ring is None:
             return True
+        sx = s if sx is None else sx
         a = math.radians(yaw)
         c, sn = math.cos(a), math.sin(a)
-        poly = shapely.Polygon([(x + c * u * s - sn * v * s, y + sn * u * s + c * v * s)
+        poly = shapely.Polygon([(x + c * u * sx - sn * v * s, y + sn * u * sx + c * v * s)
                                 for u, v in ring])
         for gi in sorted(f.tree.query(poly, predicate="intersects").tolist()):
             kind_, ln, zp = f.rows[gi]
@@ -264,14 +269,18 @@ class Fixtures:
                 return False
         return True
 
-    def pick_pole(self, style: str, A: float, H: float, key: str, mast: bool = False):
-        """The street light variant whose arm reaches nearest `A` from its foot with its lens
-        `H` over it: (style, k, scale, (lx, ly, lz)) or None. Its own style first, the others
-        only where it has none that fits."""
+    def poles(self, style: str, A: float, H: float, key: str, mast: bool = False) -> list:
+        """The street light variants that fit a head `A` from its foot with its lens `H` over
+        it, best first: [(style, k, scale, stretch, (lx, ly, lz))]; an arm variant scaled to
+        the height and stretched along its arm by at most `ARM_STRETCH` to reach the head (a
+        post's or a mast's heads over its foot). Its own style first (the hashed pick among
+        those within `NEAR_M` of the best leading), the others after it."""
         from .plan import u
         order = ([style] + [s for s in STYLE_ORDER if s != style]) if not mast else \
             ["heavy"] + [s for s in STYLE_ORDER if s != "heavy"]
         lo, hi = MAST_SCALE if mast else POLE_SCALE
+        post = mast or A < POST_A_M
+        out = []
         for st in order:
             cands = []
             for k in range(self.ST.PROP_VARIANTS[STREET]):
@@ -281,9 +290,8 @@ class Fixtures:
                 cx = sum(c[0] for c in cl) / len(cl)
                 cy = sum(c[1] for c in cl) / len(cl)
                 cz = sum(c[2] for c in cl) / len(cl)
-                post = all(math.hypot(c[0], c[1]) < 0.65 for c in cl)
-                if mast or A < POST_A_M:
-                    if not post:
+                if post:
+                    if not all(math.hypot(c[0], c[1]) < 0.65 for c in cl):
                         continue
                 elif len(cl) != 1 or cx < 0.5 or abs(cy) > 0.25:
                     continue
@@ -292,14 +300,24 @@ class Fixtures:
                 s = H / cz
                 if not lo <= s <= hi:
                     continue
-                miss = abs(s * math.hypot(cx, cy) - (0.0 if (mast or A < POST_A_M) else A))
-                cands.append((round(miss, 3), k, s, (cx, cy, cz)))
-            if cands:
-                cands.sort()
-                near = [c for c in cands if c[0] <= cands[0][0] + NEAR_M]
-                miss, k, s, lens = near[min(int(u(key, "fixture") * len(near)), len(near) - 1)]
-                return st, k, s, lens
-        return None
+                if post:
+                    stretch, miss = 1.0, s * math.hypot(cx, cy)
+                else:
+                    stretch = min(ARM_STRETCH, max(1.0, A / (s * cx)))
+                    miss = abs(s * stretch * cx - A)
+                cands.append((round(miss, 3), k, s, stretch, (cx, cy, cz)))
+            if not cands:
+                continue
+            cands.sort()
+            near = [c for c in cands if c[0] <= cands[0][0] + NEAR_M]
+            first = near[min(int(u(key, "fixture") * len(near)), len(near) - 1)]
+            for c in [first] + [c for c in cands if c is not first]:
+                out.append((st, c[1], c[2], c[3], c[4]))
+        return out
+
+    def pick_pole(self, style: str, A: float, H: float, key: str, mast: bool = False):
+        ps = self.poles(style, A, H, key, mast)
+        return ps[0] if ps else None
 
     def add(self, L: dict, kind: str, style: str, k: int, pos, yaw: float, scale,
             role: str) -> dict:
@@ -318,6 +336,7 @@ class Fixtures:
         drop = float(P.PHOTOMETRY[L["cls"]].get("drop_m", 0.0))
         nx, ny, nz = lens[0], lens[1], lens[2] - drop
         self.moved.append(math.dist((nx, ny, nz), L["pos"]))
+        self.moves.setdefault(L["mount"], []).append(math.dist((nx, ny, nz), L["pos"]))
         L["pos"] = [_r(nx), _r(ny), _r(nz)]
         L["_lens"] = [nx, ny, lens[2]]
 
@@ -342,56 +361,56 @@ class Fixtures:
     # -- by mount --------------------------------------------------------------------------
 
     def pole(self, L: dict, foot, mast: bool = False, arm: bool = False,
-             deck: bool = False) -> None:
-        """A street light standing at `foot` under the light (`deck`: on a raised road's
-        parapet line, where it stands on the deck's edge: no carriageway test)."""
+             free: bool = False) -> bool:
+        """A street light standing at `foot` under the light, else the nearest spot clear of
+        the carriageways (back from the road along its arm, then turned up to 90 degrees
+        either way, out to `PUSH_MAX_M`); `free`: where it stands needs no test (a raised
+        road's parapet line, a median, a mast arm on its own signal's pole). False (the light
+        dropped) where none fits."""
         drop = float(P.PHOTOMETRY[L["cls"]].get("drop_m", 0.0))
         hx, hy, hz = L["pos"][0], L["pos"][1], L["pos"][2] + drop
         fx, fy, fz = foot
         A = math.hypot(hx - fx, hy - fy)
         H = hz - fz
         st0 = "heavy" if mast else self.style(L.get("district_id"))
-        if A >= POST_A_M and not mast:
-            yaw = math.degrees(math.atan2(hy - fy, hx - fx))
-            tries = [(-PUSH_STEP_M * i, 0.0) for i in range(int(PUSH_MAX_M / PUSH_STEP_M) + 1)]
-        else:
-            yaw = float(L["aim"][0])
-            tries = [(0.0, 0.0)] + [(d * math.cos(math.radians(a)), d * math.sin(math.radians(a)))
-                                    for d in (0.3, 0.6, 1.0, 1.5, 2.0)
-                                    for a in range(0, 360, 45)]
-        ux, uy = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
+        armed = A >= POST_A_M and not mast
+        back = math.degrees(math.atan2(fy - hy, fx - hx)) if armed else float(L["aim"][0])
+        tries = [(0.0, 0.0)]
+        steps = [PUSH_STEP_M * i for i in range(1, int(PUSH_MAX_M / PUSH_STEP_M) + 1)]
+        for d in steps:
+            for turn in ((0.0, 30.0, -30.0, 60.0, -60.0, 90.0, -90.0) if armed
+                         else tuple(range(0, 360, 45))):
+                a = math.radians(back + turn)
+                tries.append((d * math.cos(a), d * math.sin(a)))
         for dx, dy in tries:
-            if A >= POST_A_M and not mast:
-                px, py = fx + ux * dx, fy + uy * dx         # (back from the road, along the arm)
-                reach = A - dx
-            else:
-                px, py = fx + dx, fy + dy
-                reach = 0.0
-            ch = self.pick_pole(st0, reach, H, L["id"], mast)
-            if ch is None:
-                break
-            st, k, s, (lx, ly, lz) = ch
-            if deck or (arm and dx == 0.0):
-                # (on a deck's parapet line; a mast arm's pole on its signal's own, which AG8
-                # stands where its signal stands)
-                ok = True
-            else:
-                ok = self.clear(STREET, st, k, px, py, fz, yaw, s)
-            if ok:
-                f = self.add(L, STREET, st, k, (px, py, fz), yaw, (s, s, s), "main")
-                if deck:
-                    f["deck"] = True
-                if arm and dx == 0.0:
+            px, py = fx + dx, fy + dy
+            reach = math.hypot(hx - px, hy - py) if armed else 0.0
+            yaw = math.degrees(math.atan2(hy - py, hx - px)) if armed else back
+            for st, k, s, stretch, (lx, ly, lz) in self.poles(st0, reach, H, L["id"], mast):
+                at_signal = arm and dx == 0.0 and dy == 0.0
+                if not (free or at_signal or
+                        self.clear(STREET, st, k, px, py, fz, yaw, s, sx=s * stretch)):
+                    continue
+                f = self.add(L, STREET, st, k, (px, py, fz), yaw, (s * stretch, s, s), "main")
+                if free:
+                    f["free"] = True
+                if at_signal:
                     f["at_signal"] = True
                 c, sn = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
-                self.move(L, (px + c * lx * s - sn * ly * s, py + sn * lx * s + c * ly * s,
-                              fz + lz * s))
-                return
+                self.move(L, (px + c * lx * s * stretch - sn * ly * s,
+                              py + sn * lx * s * stretch + c * ly * s, fz + lz * s))
+                return True
+            if free:
+                break
         self.drop(L, "mast: no fitting variant" if mast else
-                  ("pole: no clear spot" if self.pick_pole(st0, A, H, L["id"], mast)
+                  ("pole: no clear spot" if self.poles(st0, A, H, L["id"], mast)
                    else "pole: no fitting variant"))
+        return False
 
     def wall(self, L: dict) -> None:
+        """A wall light on the facade right behind an alley's wall pack (within
+        `WALL_REACH_M`, at its height), else a pole just off the alley, its arm reaching
+        over to the light."""
         from shapely.geometry import Point
         from .plan import u
         drop = float(P.PHOTOMETRY[L["cls"]].get("drop_m", 0.0))
@@ -414,7 +433,7 @@ class Fixtures:
             q = nearest_points(best[2].exterior, Point(hx, hy))[0]
             nx, ny = hx - q.x, hy - q.y
             d = math.hypot(nx, ny)
-            if d > 0.05 and (nx * ax + ny * ay) / d > -0.2:
+            if d > 0.05 and (nx * ax + ny * ay) / d > 0.3:
                 nx, ny = nx / d, ny / d
                 st = self.style(L.get("district_id"))
                 k = min(int(u(L["id"], "fixture") * self.ST.PROP_VARIANTS[WALL]),
@@ -430,22 +449,10 @@ class Fixtures:
                     self.add(L, WALL, st, k, (ox, oy, oz), wy, (1.0, 1.0, 1.0), "main")
                     self.move(L, (ox + nx * lx - ny * ly, oy + ny * lx + nx * ly, hz))
                     return
-        # no facade behind it: a post just off the alley, behind the light
+        # no facade right behind it: a pole just off the alley, its arm over to the light
         g = self.c.ground(hx, hy)
-        for d in (0.6, 1.0, 1.5, 2.0, 2.5, 3.0):
-            fx, fy = hx - ax * d, hy - ay * d
-            ch = self.pick_pole(self.style(L.get("district_id")), 0.0, hz - g, L["id"])
-            if ch is None:
-                break
-            st, k, s, (lx, ly, lz) = ch
-            if self.clear(STREET, st, k, fx, fy, g, yaw, s):
-                self.add(L, STREET, st, k, (fx, fy, g), yaw, (s, s, s), "main")
-                c, sn = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
-                self.move(L, (fx + c * lx * s - sn * ly * s, fy + sn * lx * s + c * ly * s,
-                              g + lz * s))
-                self.report["wall_posts"] = self.report.get("wall_posts", 0) + 1
-                return
-        self.drop(L, "wall: no facade and no clear spot")
+        if self.pole(L, (hx - ax * ALLEY_POLE_M, hy - ay * ALLEY_POLE_M, g)):
+            self.report["wall_poles"] = self.report.get("wall_poles", 0) + 1
 
     def flood(self, L: dict, hint: dict) -> None:
         """A flood's head (AG8's heavy wall light, flood form, tilted up toward its facade),
@@ -487,7 +494,7 @@ class Fixtures:
             fx = L.get("_fx")
             mount = L["mount"]
             if mount in ("pole", "mast_arm") and fx and fx.get("foot"):
-                self.pole(L, fx["foot"], arm=mount == "mast_arm", deck=bool(fx.get("deck")))
+                self.pole(L, fx["foot"], arm=mount == "mast_arm", free=bool(fx.get("deck")))
             elif mount == "mast" and fx and fx.get("mast"):
                 self.pole(L, fx["foot"], mast=True)
             elif mount == "wall":
@@ -511,7 +518,10 @@ class Fixtures:
             "dropped": dict(sorted(self.dropped.items())),
             "moved_m": ({"median": _r(mv[len(mv) // 2], 2),
                          "p95": _r(mv[int(0.95 * (len(mv) - 1))], 2), "max": _r(mv[-1], 2)}
-                        if mv else None)})
+                        if mv else None),
+            "moved_by_mount": {m: {"n": len(v), "median": _r(sorted(v)[len(v) // 2], 2),
+                                   "max": _r(max(v), 2)}
+                               for m, v in sorted(self.moves.items())}})
         return self.report
 
     # -- the check -------------------------------------------------------------------------
@@ -593,11 +603,11 @@ class Fixtures:
         for f in self.out:
             if f["kind"] != STREET:
                 continue
-            if f.get("deck") or f.get("at_signal"):
+            if f.get("free") or f.get("at_signal"):
                 continue
             _, _, st, v = f["node"].split(".")
             if not self.clear(STREET, st, int(v[1:]), f["pos"][0], f["pos"][1], f["pos"][2],
-                              f["yaw"], f["scale"][0], xwalk=not f.get("at_signal")):
+                              f["yaw"], f["scale"][1], sx=f["scale"][0]):
                 blocked.append(f["id"])
         n_bad = sum(len(v) for v in bad.values())
         return {"ok": n_bad == 0 and not blocked, "lights": len(self.pl.lights),

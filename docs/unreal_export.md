@@ -191,6 +191,7 @@ Then open the project: the editor opens on the city, and Play (Alt+P) puts you i
 | `--blockout-only` | off | leave out stage 2's buildings and streets |
 | `--check`, `--check-only`, `--shots DIR`, `--view ...` | | play and check the level, render views |
 | `--no-play` | off | leave out the play features (below) |
+| `--dlss DIR` | `$CITYGEN_DLSS` | NVIDIA's DLSS plugin, extracted from its zip: copied into the project and set up ("DLSS" below) |
 | `--quiet` | off | no progress on stderr |
 
 ### The fast import
@@ -243,6 +244,60 @@ version's Interchange misbehaves with concurrent imports; it needs a little less
   `LauncherInstalled.dat`), the usual `C:\Program Files\Epic Games\UE_5.*` or
   `/Users/Shared/Epic Games/UE_5.*` too; `--engine` or `CITYGEN_UE_ROOT` names another.
 
+### DLSS
+
+NVIDIA's DLSS renders the city at a lower resolution and upscales it to the window with a
+neural network (Super Resolution), and can add a generated frame between every two it renders
+(Frame Generation, RTX 40 series and newer). It is NVIDIA's plugin under NVIDIA's license, so
+it is not part of CyberGen: you download it yourself and the exporter puts it in your
+project.
+
+1. **Get the plugin:** NVIDIA's DLSS page for Unreal Engine (developer.nvidia.com/rtx/dlss,
+   "Unreal Engine Plugin"), the build for UE 5.8 (tested: `DLSS4.5Plugin_v8.9.0`, 2026-10-16).
+   Accept NVIDIA's license there.
+2. **Put it anywhere outside the repository and the engine** and extract it, for example
+   `C:\Users\you\CityGen\downloads\dlss\` (the zip's root holds `Plugins/`, `Documentation/`
+   and NVIDIA's guides; the folder is about 4 GB).
+3. **Import with it:**
+
+   ```powershell
+   .venv\Scripts\python -m citygen unreal out\delta_megacity "...\CityTest.uproject" --dlss C:\Users\you\CityGen\downloads\dlss
+   ```
+
+   or set `CITYGEN_DLSS` to that folder once. The importer copies the five plugins DLSS needs
+   into the project's `Plugins/` (`DLSS`, `StreamlineCore`, `StreamlineDLSSG`,
+   `StreamlineReflex`, `StreamlineNGXCommon`; not NIS, RTX Dynamic Vibrance, the Movie Render
+   Queue support or the deprecated `Streamline`), again only when the download changes,
+   enables them in the .uproject, sets their project settings (DLSS's on-screen debug messages
+   and Frame Generation's debug overlay off; the engine's anti-aliasing TSR, which DLSS takes
+   the place of when it is on) and builds them with the play features. Without `--dlss`
+   nothing of this happens: a project keeps whatever plugins it has.
+4. **In the game:** Tab, the developer menu's **Upscaler** row: `<` and `>` (or a click) step
+   through Native (100%), TSR 67%, DLSS Quality (67%), DLSS Balanced (58%) and DLSS
+   Performance (50%); the output stays at the window's size (the monitor's native resolution
+   in a packaged game). Until you pick one the row says Default: the engine's own automatic
+   screen percentage, as every import before. The DLSS modes appear only where the plugin is
+   in the game and runs on the machine (an NVIDIA RTX GPU, a recent driver). The **Frame
+   generation** row (On or Off) appears where the plugin is in the game; it says n/a where
+   Frame Generation does not run (it needs an RTX 40 series or newer, DirectX 12 and Windows'
+   hardware-accelerated GPU scheduling). The console's `CityGen.MenuRow upscaler=dlss_quality`
+   (`native`, `tsr`, `dlss_balanced`, `dlss_performance`, `default`) and `CityGen.MenuRow
+   framegen=1` do the same; `CityGen.Status` gives the `upscaler` (mode, screen percentage,
+   whether DLSS and Frame Generation are there and supported, Frame Generation's shown frame
+   rate and Reflex's latency).
+5. **Packaging:** the plugins are the project's own, so a packaged game builds, cooks and
+   stages them with it (their DLLs, `nvngx_dlss.dll` and Streamline's, under the package's
+   `CityAG16/Plugins/`), and the game logs `NVIDIA NGX DLSS supported 1`.
+
+The menu reaches DLSS without linking it: CityGenPlay sets the plugin's console variables
+(`r.NGX.DLSS.Enable`, `r.ScreenPercentage`, `r.Streamline.DLSSG.Enable`) and calls its
+Blueprint libraries (`UDLSSLibrary`, `UStreamlineLibraryDLSSG`, `UStreamlineLibraryReflex`) by
+name, so the play features build and run the same in a project without it. The benchmark's
+`night_plan_all_dlss_q`, `_dlss_b`, `_dlss_p` and their `_fg` passes (with `--bench-atmos`)
+run the night as delivered with each (its frames also record Frame Generation's shown frame
+rate and Reflex's latency where it is on); the numbers on Delta Megacity are in
+`docs/progress/dlss_lamps_flicker/README.md`.
+
 ## Play features
 
 Every import gives the level a minimap, a map you can teleport with, a free camera and a
@@ -253,7 +308,7 @@ developer menu with the time of day, unless `--no-play`:
 | (always) | the minimap, top left: the city around you, north up, your heading as an arrow, the city's name, the time of day (day or night without an atmos plan), the keys |
 | M | the map, full screen: the whole city with district names; the wheel zooms about the cursor, the right button drags it, the left button teleports you there (a walking player onto the nearest walkway, held until the city has streamed in around it; a flying one at its height, at least 30 m over the walkway there); M or Esc closes it |
 | . | the free camera: in the game (not the editor's eject), a spectator pawn with no collision, flown with W A S D, E or Space up, Q or C down, the mouse; the wheel sets its speed (2 to 500 m/s); `.` again goes back to the player, who waited where they were |
-| Tab | the developer menu: the time of day (AT3, with an atmos plan: the hour, `<` and `>` step it an hour, a click on the row swaps day and night, and a slider under it, dragged, sets any hour to the quarter; without one a day or night switch), the free camera, the minimap, the engine's on-screen messages, and with an atmos plan atmosgen's weather prototypes (fog, rain, wet streets); click a row to change it; Tab or Esc closes it |
+| Tab | the developer menu: the time of day (AT3, with an atmos plan: the hour, `<` and `>` step it an hour, a click on the row swaps day and night, and a slider under it, dragged, sets any hour to the quarter; without one a day or night switch), the free camera, the minimap, the engine's on-screen messages, the upscaler (Native, TSR 67%, and with NVIDIA's plugin DLSS Quality, Balanced and Performance; "DLSS" above) and Frame Generation where the plugin offers it, and with an atmos plan atmosgen's weather prototypes (fog, rain, wet streets); click a row to change it; Tab or Esc closes it |
 
 By night (`MPC_CityGen`'s `Night` 1) the windows' rooms light up (AG6's night interiors,
 lit by each building's own night since AG15: its schedule at `MPC_CityGen`'s `Hour`, its
@@ -2026,6 +2081,28 @@ far skyline keeps its emissive; and the cloud deck glows from the plan's upward 
 - **The benchmark** (`bench.ATMOS_PASSES`): every atmos pass sets `CityGenAtmos.Far 1` (so
   none leaks), `ATMOS_OFF` `Far 0`; `night_plan_nofar` without them (the play features' pools
   instead: what the cards cost).
+
+### The lights' fixtures (dlss_lamps_flicker)
+
+Swagnik, walking Delta: "quite a few ghost lamps, ie the light is there but theres no
+lamppost there". AT1's and AT2's lights on fixtures they asked of stage 2 (a junction's corner
+poles, the signals' mast arms, highway and ramp columns, service road, pedestrian street and
+footbridge posts, alley wall packs, high masts, crown floods out from their facades) had none
+drawn. The atmos plan now draws one under each from AG8's own prop variants, in the
+district's style (`atmosgen/fixtures.py`): a street light at the pole's foot, its arm toward
+the head (a mast arm: at its signal's foot, reaching over the junction), a wall light on the
+facade behind an alley's wall pack (else a post just off the alley), AG8's heavy mast form
+for a high mast, a flood head (tilted up) on its setback or on an outrigger (AG8's bracket)
+from its facade. Each light moves onto its fixture's lens; a fixture keeps off carriageways,
+junctions and crosswalks as AG8's props do. The plan's `fixtures.json` lists them and its
+`unreal_contribution.fixtures.json` places them: an entry per 128 m cell
+(`atmos.fixtures.<tile>.<quarter>`, kind `prop.fixture`) whose instanced parts are AG8's
+variant nodes in AG8's `props` part, so the exporter imports AG8's meshes and materials once
+for both. `citygen unreal` layers it with stage 2's contributions where the plan is delivered
+(`unreal_atmos.fixtures_contribution`; a plan whose new fixtures check fails is not), so it
+needs stage 2's props (AG8) in the build; a blockout import has no fixtures. The plan's
+`checks.fixtures` holds every light to something at its height: stage 2's own fixture, its
+fixture's lens, a structure (roof, facade, crane, station roof or deck slab) or the ground.
 
 ### A packaged game
 

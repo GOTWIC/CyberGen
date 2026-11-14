@@ -1173,6 +1173,13 @@ def build_manifest(build_dir: str | Path, name: str | None = None,
     from . import unreal_vehicles as UV
     build = Path(build_dir)
     contribs = contributions(build) if assets else []
+    if contribs and atmos is not False:
+        # dlss_lamps_flicker: the fixtures atmosgen's plan draws under its lights (AG8's own
+        # variants placed again), layered with stage 2's where the plan is delivered
+        from . import unreal_atmos
+        fx = unreal_atmos.fixtures_contribution(build, atmos or None)
+        if fx is not None:
+            contribs.append(fx)
     if vehicles is None:
         vehicles = UV.named_library(contribs)
     # (AG18: the vehicle placements apart; without them the contributions are as they were)

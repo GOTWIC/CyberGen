@@ -501,7 +501,34 @@ def busy() -> list[str]:
             continue
         pid, ppid, name, cmd = parts
         procs[int(pid)] = (int(ppid) if ppid.strip().isdigit() else 0, name, cmd)
-    return _busy(procs, os.getpid())
+    hits = _busy(procs, os.getpid())
+    # (dlss_lamps_flicker: the Epic Games Launcher downloading or installing, an engine or
+    # MetaHuman content, takes the disk and the CPU: busy while it works, idle it is not)
+    if any(n.lower().startswith(DOWNLOADERS) for _, n, _ in procs.values()):
+        hits += downloading()
+    return hits
+
+
+# the Epic Games Launcher (and its helper) count as busy while they take more than
+# DOWNLOAD_CORES of the CPU over DOWNLOAD_S seconds: downloading, verifying or installing
+DOWNLOADERS = ("epicgameslauncher", "epicwebhelper")
+DOWNLOAD_CORES = 0.15
+DOWNLOAD_S = 4.0
+
+
+def downloading() -> list[str]:
+    """The Epic Games Launcher's processes busy downloading or installing (`name pid`): their
+    CPU between two samples `DOWNLOAD_S` apart over `DOWNLOAD_CORES`."""
+    a = cpu_times()
+    time.sleep(DOWNLOAD_S)
+    b = cpu_times()
+    tot, who = 0.0, []
+    for pid, (name, sec) in sorted(b.items()):
+        if name.lower().startswith(DOWNLOADERS) and pid in a and a[pid][0] == name:
+            tot += max(0.0, sec - a[pid][1])
+            who.append(f"{name}.exe {pid}")
+    return [who[0] + f" (downloading: {tot / DOWNLOAD_S:.2f} cores)"] if \
+        who and tot / DOWNLOAD_S > DOWNLOAD_CORES else []
 
 
 def _busy(procs: dict[int, tuple[int, str, str]], me: int) -> list[str]:
