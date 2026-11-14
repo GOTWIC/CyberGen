@@ -825,12 +825,40 @@ def step_mid():
 CARD_W_CM, CARD_H_CM = 110.0, 220.0
 
 
-def card_material():
+def _sampled(tex):
+    """A texture sample parameter's sampler type for `tex` (its own gamma): a sampler of the
+    other type does not compile, and the material falls back to the default one."""
+    srgb = True
+    try:
+        srgb = bool(tex.get_editor_property("srgb"))
+    except Exception:                                               # noqa: BLE001
+        pass
+    return (unreal.MaterialSamplerType.SAMPLERTYPE_COLOR if srgb
+            else unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR)
+
+
+def _link(a, out, b, inp):
+    """Links an output of `a` to an input of `b`, the input by its name, else by the names
+    single-input nodes give theirs ("" connects nothing on some, as Normalize's and
+    OneMinus's); a link that cannot be made stops the build (the material would compile to
+    the default one)."""
+    for name in dict.fromkeys((inp, "", "Input", "VectorInput", "A")):
+        if MEL.connect_material_expressions(a, out, b, name):
+            return
+    raise RuntimeError(f"could not link {a.get_name()}.{out} to {b.get_name()}.{inp}")
+
+
+def card_material(sheet_tex=None, mask_tex=None):
     """M_CgPersonCard: a card turned to the view about its up axis (world position offset on
     /Engine/BasicShapes/Plane), showing the cell of its sheet for the view's side of the
     person (views round them, view 0 their front) and the walk's frame (per-instance custom
-    data 0 and 1: time offset, cycles a second), masked by the sheet's coverage."""
-    path = f"{ROOT}/Materials/M_CgPersonCard"
+    data 0 and 1: time offset, cycles a second), masked by the sheet's coverage. Its default
+    textures are the first character's sheet and mask, so its samplers match their gamma
+    (an engine texture of the other gamma kept the material from compiling)."""
+    # (a new asset per library: emptied in place, an earlier build's graph left expressions
+    # behind that the compile still read, "Missing 1-x input", and the cards drew the
+    # default material)
+    path = f"{ROOT}/Materials/M_CgPersonCard_{HASH[:8]}"
     if EAL.does_asset_exist(path) and meta(unreal.load_asset(path)) == HASH:
         return unreal.load_asset(path)
     m = _new_material(path)
@@ -850,21 +878,21 @@ def card_material():
     obj = e(unreal.MaterialExpressionObjectPositionWS, -1600, 150)
     wpos = e(unreal.MaterialExpressionWorldPosition, -1600, 300)
     to_cam = e(unreal.MaterialExpressionSubtract, -1350, 50)
-    MEL.connect_material_expressions(cam, "", to_cam, "A")
-    MEL.connect_material_expressions(obj, "", to_cam, "B")
+    _link(cam, "", to_cam, "A")
+    _link(obj, "", to_cam, "B")
     rel = e(unreal.MaterialExpressionSubtract, -1350, 250)
-    MEL.connect_material_expressions(wpos, "", rel, "A")
-    MEL.connect_material_expressions(obj, "", rel, "B")
+    _link(wpos, "", rel, "A")
+    _link(obj, "", rel, "B")
     up = e(unreal.MaterialExpressionConstant3Vector, -1600, 450,
            constant=unreal.LinearColor(0, 0, 1, 0))
     up_w = e(unreal.MaterialExpressionTransform, -1350, 450)
     up_w.set_editor_property("transform_source_type", unreal.MaterialVectorCoordTransformSource.TRANSFORMSOURCE_LOCAL)
     up_w.set_editor_property("transform_type", unreal.MaterialVectorCoordTransform.TRANSFORM_WORLD)
-    MEL.connect_material_expressions(up, "", up_w, "")
+    _link(up, "", up_w, "")
     cam_l = e(unreal.MaterialExpressionTransform, -1100, 50)
     cam_l.set_editor_property("transform_source_type", unreal.MaterialVectorCoordTransformSource.TRANSFORMSOURCE_WORLD)
     cam_l.set_editor_property("transform_type", unreal.MaterialVectorCoordTransform.TRANSFORM_LOCAL)
-    MEL.connect_material_expressions(to_cam, "", cam_l, "")
+    _link(to_cam, "", cam_l, "")
     lp = e(unreal.MaterialExpressionPreSkinnedPosition, -1600, 600)
     t0 = e(unreal.MaterialExpressionPerInstanceCustomData, -1600, 750, data_index=0)
     cps = e(unreal.MaterialExpressionPerInstanceCustomData, -1600, 850, data_index=1)
@@ -880,7 +908,7 @@ def card_material():
         n.set_editor_property("inputs", cis)
         MEL.recompile_material(m) if False else None
         for k, src in ins:
-            MEL.connect_material_expressions(src, "", n, k)
+            _link(src, "", n, k)
         return n
 
     wpo_code = (
@@ -903,10 +931,11 @@ def card_material():
     tc = e(unreal.MaterialExpressionTextureCoordinate, -1600, 1050)
     uv = custom(uv_code, [("CamL", cam_l), ("T", tm), ("T0", t0), ("Cps", cps), ("UV", tc)],
                 unreal.CustomMaterialOutputType.CMOT_FLOAT2, -800, 700)
+    sheet_tex = sheet_tex or unreal.load_asset("/Engine/EngineResources/WhiteSquareTexture")
+    mask_tex = mask_tex or unreal.load_asset("/Engine/EngineResources/Black")
     sheet = e(unreal.MaterialExpressionTextureSampleParameter2D, -500, 700,
-              parameter_name="Sheet",
-              texture=unreal.load_asset("/Engine/EngineResources/WhiteSquareTexture"))
-    MEL.connect_material_expressions(uv, "", sheet, "UVs")
+              parameter_name="Sheet", sampler_type=_sampled(sheet_tex), texture=sheet_tex)
+    _link(uv, "", sheet, "UVs")
     ptint = e(unreal.MaterialExpressionPerInstanceCustomData3Vector, -800, 1250, data_index=2,
               const_default_value=unreal.LinearColor(1, 1, 1, 1))
     tinted = custom("float l = dot(C, float3(0.3, 0.59, 0.11));\n"
@@ -916,14 +945,13 @@ def card_material():
                     unreal.CustomMaterialOutputType.CMOT_FLOAT3, -250, 650)
     MEL.connect_material_property(tinted, "", unreal.MaterialProperty.MP_BASE_COLOR)
     cover = e(unreal.MaterialExpressionTextureSampleParameter2D, -500, 950,
-              parameter_name="Mask", sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR,
-              texture=unreal.load_asset("/Engine/EngineResources/Black"))
-    MEL.connect_material_expressions(uv, "", cover, "UVs")
+              parameter_name="Mask", sampler_type=_sampled(mask_tex), texture=mask_tex)
+    _link(uv, "", cover, "UVs")
     inv = e(unreal.MaterialExpressionOneMinus, -250, 850)
-    MEL.connect_material_expressions(cover, "A", inv, "")
+    _link(cover, "A", inv, "")
     MEL.connect_material_property(inv, "", unreal.MaterialProperty.MP_OPACITY_MASK)
     nrm = e(unreal.MaterialExpressionNormalize, -250, 1000)
-    MEL.connect_material_expressions(to_cam, "", nrm, "")
+    _link(to_cam, "", nrm, "VectorInput")
     MEL.connect_material_property(nrm, "", unreal.MaterialProperty.MP_NORMAL)
     rough = e(unreal.MaterialExpressionConstant, -250, 1150, r=0.8)
     MEL.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
@@ -1062,10 +1090,11 @@ def capture_sheet(c, mid):
         EAL.delete_asset(mip)
     mi = AT.create_asset(mip.rsplit("/", 1)[1], folder, unreal.MaterialInstanceConstant,
                          unreal.MaterialInstanceConstantFactoryNew())
-    MEL.set_material_instance_parent(mi, card_material())
-    MEL.set_material_instance_texture_parameter_value(mi, "Sheet", unreal.load_asset(tex_path))
-    MEL.set_material_instance_texture_parameter_value(
-        mi, "Mask", unreal.load_asset(f"{folder}/T_{c['id']}_Mask"))
+    sheet_tex = unreal.load_asset(tex_path)
+    mask_tex = unreal.load_asset(f"{folder}/T_{c['id']}_Mask")
+    MEL.set_material_instance_parent(mi, card_material(sheet_tex, mask_tex))
+    MEL.set_material_instance_texture_parameter_value(mi, "Sheet", sheet_tex)
+    MEL.set_material_instance_texture_parameter_value(mi, "Mask", mask_tex)
     tag(mi, HASH)
     R.setdefault("far_last", {})[c["id"]] = len(cells)
     return {"material": mip, "sheet": tex_path}

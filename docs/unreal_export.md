@@ -2449,7 +2449,8 @@ assets and Epic's animations are made or copied into the project only, never the
      of one stride, 128 x 256 a cell) and its coverage (`T_<id>_Mask`), drawn by orthographic
      scene captures of the mid mesh pinned to each frame (`MI_<id>_Pose_<i>`: auto play off,
      the frame a parameter): the color lit by a light turned with the camera, the coverage
-     with lighting off; on `People/Materials/M_CgPersonCard` (world position offset turning
+     with lighting off; on `People/Materials/M_CgPersonCard_<hash>` (a new material per
+     library; its samplers' gamma that of the sheets; world position offset turning
      `/Engine/BasicShapes/Plane` to the view about its up axis, the cell by the view's side of
      the person and the walk's frame, masked by the coverage, the garments' white tinted by
      the person's tint from per-instance custom data 2 to 4);
