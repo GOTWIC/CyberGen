@@ -25,8 +25,9 @@ PACKAGE_NAMES = {m.split(".")[0].replace("_", "-") for m in FORBIDDEN if "." not
     "google-generativeai", "google-genai", "langchain-openai", "langchain-anthropic",
     "llama-index", "huggingface-hub"}
 
-# (AT0: atmosgen too, which makes no call either)
-SOURCES = sorted((ROOT / "citygen").rglob("*.py")) + sorted((ROOT / "atmosgen").rglob("*.py"))
+# (AT0: atmosgen too, which makes no call either; LG0: lifegen)
+SOURCES = sorted((ROOT / "citygen").rglob("*.py")) + sorted((ROOT / "atmosgen").rglob("*.py")) \
+    + sorted((ROOT / "lifegen").rglob("*.py"))
 
 
 def _imports(path):

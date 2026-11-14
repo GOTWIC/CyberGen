@@ -97,6 +97,21 @@ STYLE = {
     "spaceport":             ({"industrial": 3, "techwear": 3, "corporate": 2, "street": 2}, 0.45, 0.40),
 }
 
+# a group's colors (sRGB): the stand-ins' clothing until LG2's garments; a gang's are its
+# faction's color (M11), the police's its uniform blue
+GROUP_COLORS = {
+    "corporate": ("#22252b", "#2b3242", "#5a5f69", "#1b2433", "#8a8d93"),
+    "street": ("#3f4a2f", "#2f4a6b", "#141414", "#8c2a25", "#6d6a60"),
+    "market": ("#9a6a2a", "#5b3b25", "#8a3f1f", "#c2a46a", "#40382c"),
+    "industrial": ("#e0681c", "#d9b21a", "#2a4a78", "#4c4c46", "#7a5a32"),
+    "nightlife": ("#c21d8c", "#17b2c9", "#5e2a9e", "#0f0f12", "#e6e1ea"),
+    "techwear": ("#101113", "#2a2c30", "#1d6f6b", "#4b5057", "#b8bcc2"),
+    "punk": ("#b31d1d", "#0d0d0d", "#9bd11a", "#5d1a7a", "#d9d2c5"),
+    "gang": ("#7a1414", "#141414", "#3a3a3a"),
+    "police": ("#1d2f5c", "#24375f", "#0f1a33"),
+}
+SPIKE_PALETTE = 24             # colors in the spike's palette, drawn by the style's weights
+
 # --- the fleet (scope 6.5, decision 6) -------------------------------------------------------
 
 # AG18's roster by what a vehicle is (the kinds lifegen drives); the kinds it lacks are

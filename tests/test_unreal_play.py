@@ -192,6 +192,9 @@ def test_plugin_install(tmp_path):
     # (AT0: atmosgen's runtime beside it, enabled too)
     assert (dest.parent / "CityGenAtmos" / "Source" / "CityGenAtmos" / "CityGenAtmos.Build.cs").is_file()
     assert {"Name": "CityGenAtmos", "Enabled": True} in json.loads(up.read_text())["Plugins"]
+    # (LG0: lifegen's runtime too)
+    assert (dest.parent / "CityGenLife" / "Source" / "CityGenLife" / "CityGenLife.Build.cs").is_file()
+    assert {"Name": "CityGenLife", "Enabled": True} in json.loads(up.read_text())["Plugins"]
     assert (dest / "Source" / "CityGenPlay" / "CityGenPlay.Build.cs").is_file()
     plugins = json.loads(up.read_text())["Plugins"]
     assert {"Name": P.PLUGIN, "Enabled": True} in plugins and {"Name": "X", "Enabled": True} in plugins
@@ -202,6 +205,7 @@ def test_plugin_install(tmp_path):
     assert len(P.plugin_hash()) == 16
     P.remove_plugin(up)
     assert not dest.exists() and not (dest.parent / "CityGenAtmos").exists()
+    assert not (dest.parent / "CityGenLife").exists()
     assert json.loads(up.read_text())["Plugins"] == [{"Name": "X", "Enabled": True}]
 
 

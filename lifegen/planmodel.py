@@ -129,6 +129,8 @@ class SpikePlan(_Model):
     center: Annotated[list[float], Field(min_length=2, max_length=2,
                                          description="The district's middle (x, y).")]
     radius_m: float = Field(description="The stand-ins live within this of its middle.")
+    palette: list[str] = Field(description="The stand-ins' clothes: sRGB colors drawn by "
+                                           "the district's style.")
     people: int
     cars: int
     models: list[SpikeCar]

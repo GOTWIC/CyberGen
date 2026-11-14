@@ -305,6 +305,16 @@ def library_cars() -> list[str]:
     return sorted(c for c in CLASS if c not in EXCLUDED)
 
 
+def _pick(items: dict, *salt) -> str:
+    keys = sorted(items)
+    x = _u(*salt) * sum(items[k] for k in keys)
+    for k in keys:
+        x -= items[k]
+        if x < 0.0:
+            return k
+    return keys[-1]
+
+
 def _centroid(b: dict) -> tuple[float, float]:
     ring = (b.get("footprint") or {}).get("exterior") or [[0.0, 0.0]]
     return (sum(p[0] for p in ring) / len(ring), sum(p[1] for p in ring) / len(ring))
@@ -343,7 +353,18 @@ def spike_plan(model: dict, filled: dict, hours: dict) -> dict | None:
     else:
         mid = (sum(p[0] for p in ring) / max(1, len(ring)), sum(p[1] for p in ring) /
                max(1, len(ring)))
+    # (the stand-ins' clothes: the district's style's groups by weight, each a color of its
+    # group's, a gang's its faction's color)
+    style = filled["districts"][did]["style"]["groups"]
+    gang = next((f.get("color") for f in model.get("factions", [])
+                 if f.get("kind") == "gang" and f.get("home_district_id") == did), None)
+    palette = []
+    for k in range(P.SPIKE_PALETTE):
+        g = _pick(style, "lg0.palette.group", did, k)
+        cols = (gang,) if g == "gang" and gang else P.GROUP_COLORS[g]
+        palette.append(cols[int(_u("lg0.palette.color", did, k) * len(cols))])
     return hashed({"district_id": did, "name": ds[did].get("name"), "hour": sp["hour"],
+                   "palette": palette,
                    "center": [_r(mid[0], 2), _r(mid[1], 2)], "radius_m": P.SPIKE["radius_m"],
                    "people": int(people), "cars": int(sp["cars"]),
                    "models": [{"model": m, "weight": w} for m, w in models],
