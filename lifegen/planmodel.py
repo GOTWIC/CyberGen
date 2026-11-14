@@ -47,6 +47,9 @@ class Spawn(_Model):
     walkway_id: str | None = Field(None, description="The walkway it opens to.")
     lane_id: str | None = Field(None, description="A garage's or taxi stand's drive lane.")
     rates: Hours = Field(description="People a hour coming out (and as many going in).")
+    seed: int | None = Field(None, description="LG1: the seed the people it sends out are "
+                                               "drawn from (its k-th person: "
+                                               "`library.person((seed, k), ...)`).")
     hash: str
 
 
@@ -150,6 +153,13 @@ class SpikePlan(_Model):
         default_factory=dict, description="cars_steam: the road class of the segments near "
                                           "the spike.")
     polygon: list[list[float]] = Field(description="The district's outline (exterior).")
+    library: dict = Field(default_factory=dict, description="LG1: the people library the "
+                                                            "persons are drawn from (version, "
+                                                            "characters, walks, tiers).")
+    persons: dict[str, list[float]] = Field(
+        default_factory=dict, description="LG1: each person's draws by their seed, as columns "
+                                          "(seed, character, scale, gait, pace, tint: an index "
+                                          "into the palette).")
     hash: str
 
 

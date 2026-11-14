@@ -5,6 +5,7 @@
 #include "CityGenLifeTypes.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -379,13 +380,21 @@ void ACityGenLife::MakeComponents()
 		C->RegisterComponent();
 		return C;
 	};
-	if (BodyMesh)
+	if (HasPeople())
 	{
-		Bodies = Make(TEXT("StandInBodies"), BodyMesh, StandInMaterial, 3, bShadows);
+		// (LG1: the library's people in place of the stand-ins)
+		MakePeople();
 	}
-	if (HeadMesh)
+	else
 	{
-		Heads = Make(TEXT("StandInHeads"), HeadMesh, StandInMaterial, 3, bShadows);
+		if (BodyMesh)
+		{
+			Bodies = Make(TEXT("StandInBodies"), BodyMesh, StandInMaterial, 3, bShadows);
+		}
+		if (HeadMesh)
+		{
+			Heads = Make(TEXT("StandInHeads"), HeadMesh, StandInMaterial, 3, bShadows);
+		}
 	}
 	CarParts.Reset();
 	for (int32 P = 0; P < CarPartMeshes.Num(); ++P)
@@ -477,6 +486,11 @@ void ACityGenLife::SpawnAll()
 			W.Dist = Rng.FRand() * Lengths[W.Lane];
 			W.Dir = Rng.FRand() < 0.5f ? 1.f : -1.f;
 			W.Speed = 100.f * FMath::Lerp((float)WalkSpeed.X, (float)WalkSpeed.Y, Rng.FRand());
+			if (PersonPace.IsValidIndex(K))
+			{
+				// (LG1: the person's own pace, as the plan drew it)
+				W.Speed = 100.f * PersonPace[K];
+			}
 			// (most keep right, some left, across the walkway's width)
 			W.Side = (Rng.FRand() < 0.75f ? 1.f : -1.f) * FMath::Lerp(0.15f, 0.8f, Rng.FRand());
 			W.Instance = K;
@@ -554,6 +568,10 @@ void ACityGenLife::SpawnAll()
 
 	// (the instances: one a person in each stand-in component, one a car of its model in each
 	// of the model's parts; colors and paint once)
+	if (HasPeople())
+	{
+		SpawnPeople(NP);
+	}
 	Scratch.Init(FTransform::Identity, NP);
 	for (UInstancedStaticMeshComponent* Comp : {Bodies.Get(), Heads.Get()})
 	{
@@ -624,6 +642,21 @@ void ACityGenLife::SetEnabled(bool bOn)
 	{
 		if (C) { C->SetVisibility(bOn); }
 	}
+	for (UInstancedStaticMeshComponent* C : MidComps)
+	{
+		if (C) { C->SetVisibility(bOn); }
+	}
+	for (UInstancedStaticMeshComponent* C : FarComps)
+	{
+		if (C) { C->SetVisibility(bOn); }
+	}
+	for (int32 S = 0; S < NearSlots.Num(); ++S)
+	{
+		if (!bOn)
+		{
+			Release(S);
+		}
+	}
 }
 
 void ACityGenLife::SetShadows(bool bOn)
@@ -639,6 +672,14 @@ void ACityGenLife::SetShadows(bool bOn)
 		{
 			CarParts[P]->SetCastShadow(bOn && (!CarPartShadows.IsValidIndex(P) || CarPartShadows[P] != 0));
 		}
+	}
+	for (UInstancedStaticMeshComponent* C : MidComps)
+	{
+		if (C) { C->SetCastShadow(bOn); }
+	}
+	for (USkeletalMeshComponent* C : NearComps)
+	{
+		if (C) { C->SetCastShadow(bOn); }
 	}
 }
 
@@ -710,6 +751,10 @@ void ACityGenLife::FindGround()
 void ACityGenLife::UpdateInstances()
 {
 	const int32 NP = WalkPos.Num();
+	if (HasPeople())
+	{
+		UpdatePeople();
+	}
 	if (Bodies && NP)
 	{
 		Scratch.SetNum(NP);
@@ -798,9 +843,20 @@ FString ACityGenLife::GetStatus() const
 	{
 		Placed += P.IsZero() ? 0 : 1;
 	}
-	return FString::Printf(TEXT("{\"enabled\":%s,\"built\":%s,\"district\":\"%s\",\"walk_lanes\":%d,\"drive_lanes\":%d,\"car_starts\":%d,\"people\":%d,\"cars\":%d,\"entities\":%d,\"placed\":%d,\"bodies\":%d,\"car_parts\":%d,\"person0\":[%.1f,%.1f,%.1f],\"car0\":[%.1f,%.1f,%.1f],\"tick_ms\":%.3f,\"tick_ms_max\":%.3f,\"ticks\":%lld}"),
+	// (LG1: the people library's tiers: how many people are near, mid and far now, the slots,
+	// the game thread's time drawing them)
+	int32 Slots = 0;
+	for (const FNearSlot& S : NearSlots)
+	{
+		Slots += S.Person != INDEX_NONE ? 1 : 0;
+	}
+	const FString People = HasPeople()
+		? FString::Printf(TEXT(",\"library\":{\"characters\":%d,\"near\":%d,\"mid\":%d,\"far\":%d,\"slots\":%d,\"slots_made\":%d,\"near_m\":%.0f,\"near_max\":%d,\"mid_m\":%.0f,\"far_m\":%.0f,\"people_ms\":%.3f}"),
+			MidMeshes.Num(), NearNow, MidNow, FarNow, Slots, NearSlots.Num(), NearM, NearMax, MidM, FarM, PeopleMs)
+		: FString(TEXT(",\"library\":null"));
+	return FString::Printf(TEXT("{\"enabled\":%s,\"built\":%s,\"district\":\"%s\",\"walk_lanes\":%d,\"drive_lanes\":%d,\"car_starts\":%d,\"people\":%d,\"cars\":%d,\"entities\":%d,\"placed\":%d,\"bodies\":%d,\"car_parts\":%d,\"person0\":[%.1f,%.1f,%.1f],\"car0\":[%.1f,%.1f,%.1f],\"tick_ms\":%.3f,\"tick_ms_max\":%.3f,\"ticks\":%lld%s}"),
 		bEnabled ? TEXT("true") : TEXT("false"), bBuilt ? TEXT("true") : TEXT("false"), *DistrictId,
 		WalkLaneCount, DriveLaneCount, CarStarts.Num(), WalkPos.Num(), CarPos.Num(), Entities.Num(), Placed,
 		Bodies ? Bodies->GetInstanceCount() : -1, CarParts.Num(), P0.X, -P0.Y, P0.Z, C0.X, -C0.Y, C0.Z,
-		TickMs, TickMsMax, (long long)Ticks);
+		TickMs, TickMsMax, (long long)Ticks, *People);
 }

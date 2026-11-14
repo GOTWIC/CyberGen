@@ -35,11 +35,14 @@ from collections import defaultdict
 from pathlib import Path
 
 from . import asks as A
+from . import library as L
 from . import planmodel as PM
 from . import presets as P
 from . import spec as S
 
 TILE_M = 256.0
+# (LG1) a person's draws, kept per person as columns in the spike (`library.person`)
+PERSON_COLUMNS = ("seed", "character", "scale", "gait", "pace", "tint")
 
 
 def _sha(data) -> str:
@@ -289,7 +292,25 @@ def run_checks(model, spawns, slot_rows, hours, filled, spike) -> dict:
         out["spike_budget"] = {"ok": ok, "detail": (
             f"the spike's {spike['people']} people and {spike['cars']} cars within the "
             f"budget's {bud['people_view']} and {bud['vehicles_view']}")}
+        # (LG1) every character of the library among the spike's people, none of them more
+        # than PEOPLE_SHARE_MAX of the crowd
+        ps = spike.get("persons") or {}
+        chars = ps.get("character") or []
+        n = (spike.get("library") or {}).get("characters") or 0
+        if chars and n:
+            cnt = [chars.count(k) for k in range(n)]
+            most = max(cnt) / len(chars)
+            # (a crowd of a few people cannot spread over the library: only past 10 a character)
+            ok = len(chars) < 10 * n or (min(cnt) > 0 and most <= PEOPLE_SHARE_MAX)
+            out["people_draws"] = {"ok": ok, "detail": (
+                f"the spike's {len(chars)} people drawn from {n} characters, each "
+                f"{min(cnt)} to {max(cnt)} of them (at most {PEOPLE_SHARE_MAX:.0%}), "
+                f"{len(set(ps.get('seed') or []))} distinct seeds")}
     return out
+
+
+# (LG1) no character of the library more than this share of a crowd
+PEOPLE_SHARE_MAX = 0.12
 
 
 # ---------------------------------------------------------------------------
@@ -377,8 +398,19 @@ def spike_plan(model: dict, filled: dict, hours: dict) -> dict | None:
         g = _pick(style, "lg0.palette.group", did, k)
         cols = (gang,) if g == "gang" and gang else P.GROUP_COLORS[g]
         palette.append(cols[int(_u("lg0.palette.color", did, k) * len(cols))])
+    # (LG1: who each of them is, by their seed: a character of the people library, a height
+    # scale, a gait, a pace, the outfit's tint from the palette)
+    n = L.CHARACTERS
+    cols = {k: [] for k in PERSON_COLUMNS}
+    for k in range(int(people)):
+        p = L.person(("lg1.person", did, k), n, palette=palette)
+        for c in PERSON_COLUMNS:
+            cols[c].append(p[c])
     return hashed({"district_id": did, "name": ds[did].get("name"), "hour": sp["hour"],
                    "palette": palette,
+                   "library": {"version": L.LIB_VERSION, "characters": n,
+                               "walks": list(L.WALKS), "tiers": dict(sorted(L.TIERS.items()))},
+                   "persons": cols,
                    "center": [_r(mid[0], 2), _r(mid[1], 2)], "radius_m": P.SPIKE["radius_m"],
                    "people": int(people), "cars": int(sp["cars"]),
                    "models": [{"model": m, "weight": w} for m, w in models],
@@ -433,6 +465,9 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
         ppl = hours[d]["people"] if d in hours else [0.0] * P.HOURS
         share = w / wsum[d] if wsum[d] > 0 else 0.0
         rec["rates"] = [_r(ppl[h] * turn * share, 3) for h in range(P.HOURS)]
+        # (LG1: the people a spawn point sends out are drawn from its seed and their count,
+        # `library.person((seed, n), ...)`)
+        rec["seed"] = L.person((rec["id"],), 1)["seed"]
         spawns.append(hashed(rec))
     slot_rows = []
     for s in sorted(slots(model), key=lambda s: s["id"]):

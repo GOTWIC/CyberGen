@@ -319,7 +319,64 @@ def cars(spike: dict, archetype: str | None, veh: dict | None) -> dict:
     return out
 
 
-def life_data(pdir: Path, graphs: dict | None, veh: dict | None) -> tuple[dict | None, str]:
+def persons(spike: dict) -> dict:
+    """LG1: each of the spike's people as the plan drew them (`lifegen.library.person`):
+    their character of the library, height scale, gait, pace (m/s), the outfit's tint (linear
+    RGB, 3 floats a person, from the spike's palette) and seed (signed 32 bits for Unreal's
+    int32). Empty for a plan before LG1."""
+    ps = spike.get("persons") or {}
+    if not ps.get("character"):
+        return {}
+    pal = spike.get("palette") or []
+    lin = [_lin(c) for c in pal]
+    tint = []
+    for t in ps.get("tint") or [0] * len(ps["character"]):
+        tint += lin[int(t)] if lin else [0.5, 0.5, 0.5]
+    return {"person_char": [int(v) for v in ps["character"]],
+            "person_scale": [float(v) for v in ps["scale"]],
+            "person_gait": [int(v) for v in ps["gait"]],
+            "person_pace": [float(v) for v in ps["pace"]],
+            "person_tint": [round(v, 4) for v in tint],
+            "person_seed": [int(v) - (1 << 32) if int(v) >= (1 << 31) else int(v)
+                            for v in ps["seed"]]}
+
+
+def people_library(lib: dict | None, spike: dict) -> dict:
+    """LG1: what the runtime draws people with, from the project's people library
+    (`citygen/unreal_people.py`, its manifest): per character its near meshes (the assembled
+    MetaHuman's skeletal meshes, the leader first), its mid mesh (its walk baked into
+    textures), its impostor card's material; the walk clips and their speeds; the tiers. None
+    without a library or when its characters are not the plan's."""
+    if not lib or not lib.get("characters"):
+        return {}
+    chars = lib["characters"]
+    want = (spike.get("library") or {}).get("characters")
+    if want and want != len(chars):
+        return {"people_skipped": f"the plan draws from {want} characters, the project's "
+                                  f"library has {len(chars)}"}
+    near, starts, mid, mid_frames, cards = [], [0], [], [], []
+    for c in chars:
+        near += c["near"]["meshes"]
+        starts.append(len(near))
+        mid.append(c["mid"]["mesh"])
+        mid_frames += [float(c["mid"]["start"]), float(c["mid"]["end"]),
+                       float(c["mid"]["fps"]), float(c["mid"].get("cycle_s", 1.0))]
+        cards.append(c["far"]["material"])
+    walks = [lib["clips"][w] for w in spike.get("library", {}).get("walks", lib["walks"])]
+    tiers = {**(lib.get("tiers") or {}), **((spike.get("library") or {}).get("tiers") or {})}
+    return {"near_meshes": near, "near_mesh_starts": starts,
+            "near_follow": [c["near"].get("follow", []) for c in chars],
+            "walk_clips": [w["anim"] for w in walks],
+            "walk_clip_speeds": [float(w["speed"]) for w in walks],
+            "idle_clips": [lib["clips"][k]["anim"] for k in lib.get("idles", [])],
+            "mid_meshes": mid, "mid_frames": mid_frames,
+            "card_mesh": lib["far"]["card"], "card_materials": cards,
+            "card_size": [float(v) for v in lib["far"].get("size", [1.0, 2.0])],
+            "tiers": tiers, "library_hash": lib.get("hash")}
+
+
+def life_data(pdir: Path, graphs: dict | None, veh: dict | None,
+              lib: dict | None = None) -> tuple[dict | None, str]:
     plan = json.loads((pdir / "life_plan.json").read_text(encoding="utf-8"))
     bad = [k for k, c in (plan.get("checks") or {}).items() if not c.get("ok")]
     if bad:
@@ -341,20 +398,23 @@ def life_data(pdir: Path, graphs: dict | None, veh: dict | None) -> tuple[dict |
            "car_gap_m": spike["car_gap_m"],
            "drive_vary": (spike.get("drive") or {}).get("vary") or [0.9, 1.08],
            "palette": [v for c in spike["palette"] for v in _lin(c)],
-           "paint_floats": PAINT_FLOATS, **lanes, **cs}
+           "paint_floats": PAINT_FLOATS, **lanes, **cs, **persons(spike),
+           **people_library(lib, spike)}
     return {"version": PACK_VERSION, "controller": ctl}, ""
 
 
 def write_life(build: str | Path, given: str | Path | None = None,
-               graphs: dict | None = None, veh: dict | None = None) -> dict | None:
+               graphs: dict | None = None, veh: dict | None = None,
+               lib: dict | None = None) -> dict | None:
     """The manifest's `life` (and BUILD/unreal/life.json, written only when its bytes
-    change); None without a plan, {"skipped": why} for a plan not delivered."""
+    change); None without a plan, {"skipped": why} for a plan not delivered. `lib` (LG1): the
+    project's people library manifest (`unreal_people`), whose people replace the stand-ins."""
     pdir = plan_dir(build, given)
     if pdir is None:
         if given:
             raise FileNotFoundError(f"{given}: no life_plan.json (run lifegen plan)")
         return None
-    data, why = life_data(pdir, graphs, veh)
+    data, why = life_data(pdir, graphs, veh, lib)
     if data is None:
         return {"skipped": why, "plan": str(pdir)}
     text = json.dumps(data, separators=(",", ":"), ensure_ascii=False) + "\n"
@@ -367,7 +427,11 @@ def write_life(build: str | Path, given: str | Path | None = None,
             "key": CONTROLLER_KEY, "hash": _sha16([PACK_VERSION, c]),
             "district": c["district"], "people": c["people"], "cars": c["cars"],
             "walk_lanes": len(c["walk_starts"]) - 1, "drive_lanes": len(c["drive_starts"]) - 1,
-            "models": c["models"]}
+            "models": c["models"],
+            "library": ({"characters": len(c["mid_meshes"]), "hash": c.get("library_hash"),
+                        "tiers": c.get("tiers")} if c.get("mid_meshes") else
+                       {"stand_ins": True, "why": c.get("people_skipped") or
+                        "no people library in the project (--people)"})}
 
 
 def actor_hashes(life: dict | None) -> dict[str, str]:

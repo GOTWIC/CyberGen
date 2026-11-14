@@ -75,7 +75,8 @@ HASH_TAG = "cg.hash"
 # unchanged build applies the change (stored hashes are "<version>.<content hash>")
 MESH_VERSION = "3"
 ACTOR_VERSION = "1"
-LIFE_VERSION = "life1"   # LG0: lifegen's controller (CityGenLife) and its stand-in material
+LIFE_VERSION = "life2"   # LG0: lifegen's controller (CityGenLife) and its stand-in material;
+                         # LG1: the people library's properties
 ATMOS_VERSION = "atmos7"  # the atmos controller's and cells' actors (2, AT2: the high tier,
                           # blinks and sweeps in the packed lights; 3, AT3: the sky and time;
                           # 4, AT4: the air, a cell's fog volumes and emitters; 5, the visible
@@ -1143,6 +1144,37 @@ def stand_in_material():
     EAL.set_metadata_tag(m, "cg.life", LIFE_VERSION)
     EAL.save_loaded_asset(m, only_if_is_dirty=False)
     return m
+
+
+def people_assets(d, missing):
+    """LG1: the life controller's people library properties from its packed data (the
+    project's library, `citygen/unreal_people.py`): loaded assets by path, the missing ones
+    named in `missing`; all empty (the stand-ins) without a library."""
+    def load(path, cls=None):
+        a = unreal.load_asset(path) if path and EAL.does_asset_exist(path) else None
+        if a is None and path:
+            missing.append(path)
+        return a
+
+    if not d.get("mid_meshes"):
+        return {"near_meshes": [], "near_mesh_starts": [], "walk_clips": [],
+                "walk_clip_speeds": [], "idle_clips": [], "mid_meshes": [], "mid_frames": [],
+                "card_mesh": None, "card_materials": []}
+    t = d.get("tiers") or {}
+    out = {"near_meshes": [load(p) for p in d["near_meshes"]],
+           "near_mesh_starts": [int(v) for v in d["near_mesh_starts"]],
+           "walk_clips": [load(p) for p in d["walk_clips"]],
+           "walk_clip_speeds": [float(v) for v in d["walk_clip_speeds"]],
+           "idle_clips": [load(p) for p in d.get("idle_clips") or []],
+           "mid_meshes": [load(p) for p in d["mid_meshes"]],
+           "mid_frames": [float(v) for v in d["mid_frames"]],
+           "card_mesh": load(d["card_mesh"]),
+           "card_materials": [load(p) for p in d["card_materials"]]}
+    for k, prop in (("near_m", "near_m"), ("near_max", "near_max"), ("mid_m", "mid_m"),
+                    ("far_m", "far_m")):
+        if k in t:
+            out[prop] = int(t[k]) if k == "near_max" else float(t[k])
+    return out
 
 
 def sparam(m, name, x, y, default=0.0, cpd=None):
@@ -4368,6 +4400,14 @@ class Importer:
                 a.set_editor_property("drive_cruise", fl("drive_cruise"))
                 a.set_editor_property("drive_vary", unreal.Vector2D(
                     *[float(x) for x in d.get("drive_vary", [0.9, 1.08])]))
+            # (LG1: each person's draws, and the people library's meshes, clips and cards;
+            # without a library the people stay LG0's stand-ins)
+            for k, conv in (("person_char", it), ("person_scale", fl), ("person_gait", it),
+                            ("person_pace", fl), ("person_tint", fl), ("person_seed", it)):
+                a.set_editor_property(k, conv(k) if k in d else [])
+            people = people_assets(d, missing)
+            for k, v in people.items():
+                a.set_editor_property(k, v)
             a.tags = self.tags(info["key"], hv, [], "life", "life", "", d["district"])
 
         self.place(have, info["key"], info["hash"], cls.static_class(), make, update,
@@ -4375,7 +4415,9 @@ class Importer:
         self.stats["life"] = {"made": True, "district": d["district"], "people": d["people"],
                               "cars": d["cars"], "walk_lanes": len(d["walk_starts"]) - 1,
                               "drive_lanes": len(d["drive_starts"]) - 1,
-                              "models": d["models"], "missing_meshes": missing}
+                              "models": d["models"], "missing_meshes": missing,
+                              "library": len(d.get("mid_meshes") or []),
+                              "tiers": d.get("tiers")}
 
     # -- what Play puts you in, and how far the level streams around you --
 

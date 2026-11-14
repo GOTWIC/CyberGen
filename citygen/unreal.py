@@ -1155,7 +1155,8 @@ def build_manifest(build_dir: str | Path, name: str | None = None,
                    assets: bool = True, play: bool = False,
                    atmos: str | Path | bool | None = None,
                    vehicles: str | Path | None = None, all_vehicles: bool = False,
-                   life: str | Path | bool | None = None) -> dict:
+                   life: str | Path | bool | None = None,
+                   people: dict | None = None) -> dict:
     """The manifest of a blockout output (see the module docstring), with the prototypes'
     meshes and the flat graphs beside it: (manifest, prototype meshes, flat graphs). With
     `assets` (the default), stage 2's contributions in BUILD_DIR/assets are layered over the
@@ -1169,7 +1170,8 @@ def build_manifest(build_dir: str | Path, name: str | None = None,
     every car of the library, placed or not. Stage 2's entries a placement replaces (AG8's
     parked car variants of its tile) are left out of stage 2. `life` (LG0): the life plan's
     folder (None: BUILD/life when it has one, False: none), the manifest's `life`
-    (`unreal_life`)."""
+    (`unreal_life`); `people` (LG1) the project's people library manifest
+    (`unreal_people`), whose people replace the spike's stand-ins."""
     from . import unreal_vehicles as UV
     build = Path(build_dir)
     contribs = contributions(build) if assets else []
@@ -1297,7 +1299,7 @@ def build_manifest(build_dir: str | Path, name: str | None = None,
                 man["counts"]["actors"] = len(actor_hashes(man))
     if life is not False:
         from . import unreal_life
-        lf = unreal_life.write_life(build, life or None, graphs, man.get("vehicles"))
+        lf = unreal_life.write_life(build, life or None, graphs, man.get("vehicles"), people)
         if lf is not None:
             # layer 4 (LG0): the CityGenLife controller with the plan's spike
             man["life"] = lf
@@ -1396,7 +1398,8 @@ def write_manifest(build_dir: str | Path, name: str | None = None,
                    assets: bool = True, play: bool = True,
                    atmos: str | Path | bool | None = None,
                    vehicles: str | Path | None = None, all_vehicles: bool = False,
-                   life: str | Path | bool | None = None) -> Path:
+                   life: str | Path | bool | None = None,
+                   people: dict | None = None) -> Path:
     """BUILD_DIR/unreal/manifest.json, prototypes.glb and graphs.json (and with `play` the
     play features' map.png and play.json); the manifest's path. `assets` False: the blockout
     alone, stage 2's contributions left out (their vehicle placements too)."""
@@ -1406,7 +1409,7 @@ def write_manifest(build_dir: str | Path, name: str | None = None,
             raise FileNotFoundError(f"{build / f}: not a blockout output (run citygen build "
                                     f"--blockout or citygen blockout)")
     man, meshes, graphs = build_manifest(build, name, assets, play, atmos, vehicles,
-                                         all_vehicles, life)
+                                         all_vehicles, life, people)
     out = build / OUT_DIR
     out.mkdir(parents=True, exist_ok=True)
     write_glb(meshes, man["materials"], out / "prototypes.glb")
@@ -1874,7 +1877,8 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
                 play_features: bool = True, atmos: str | Path | bool | None = None,
                 vehicles: str | Path | None = None, all_vehicles: bool = False,
                 life: str | Path | bool | None = None,
-                dlss: str | Path | None = None) -> dict:
+                dlss: str | Path | None = None, people: bool = False,
+                gas: str | Path | None = None) -> dict:
     """`citygen unreal`: the manifest, then the headless import; the importer's result
     (created, updated, deleted and unchanged actors and assets, timings). `assets` False
     imports the blockout alone (stage 2's actors, if imported before, go; its meshes
@@ -1894,7 +1898,11 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
     folder (None: BUILD/life when there is one, False: none); its controller comes with the
     plugin (CityGenLife, built with the play features). `dlss` (dlss_lamps_flicker): NVIDIA's
     DLSS plugin folder (None: $CITYGEN_DLSS, else none), copied into the project, enabled and
-    set up before the plugins build (`unreal_dlss`); without it nothing of DLSS changes."""
+    set up before the plugins build (`unreal_dlss`); without it nothing of DLSS changes.
+    `people` (LG1): the people library made in the project first (`unreal_people.
+    ensure_library`: from the cache, else built, which needs `gas`, the user's Game Animation
+    Sample, and the editor's MetaHuman sign-in); without it a library the project has (its
+    stamp) is used, else the spike keeps LG0's stand-ins."""
     if play not in PLAY_MODES:
         raise ValueError(f"play: {play!r} is not one of {', '.join(PLAY_MODES)}")
     from . import unreal_play
@@ -1910,11 +1918,19 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
     # (with --no-play a plugin built before stays, so the importer can delete its actor)
     plugin = (unreal_play.build_plugin(root, up, build / OUT_DIR / "plugin_build_log.txt")
               if play_features else {"ok": False, "built": False, "error": "--no-play"})
+    from . import unreal_people
+    people_res = None
+    if people and life is not False:
+        people_res = unreal_people.ensure_library(root, up, gas=gas,
+                                                  log_dir=build / OUT_DIR / "people")
+        if not people_res.get("ok"):
+            raise RuntimeError(f"the people library: {people_res.get('error')}")
+    lib = (people_res or {}).get("manifest") or unreal_people.read_manifest(up)
     t = time.time()
     man_path = write_manifest(build, name, assets, play=plugin["ok"],
                               atmos=atmos if plugin["ok"] else False, vehicles=vehicles,
                               all_vehicles=all_vehicles,
-                              life=life if plugin["ok"] else False)
+                              life=life if plugin["ok"] else False, people=lib)
     manifest_s = round(time.time() - t, 1)
     atmos_res = None
     man_at = json.loads(man_path.read_text(encoding="utf-8")).get("atmos") or {}
@@ -1948,6 +1964,8 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
     res["play_plugin"] = plugin
     if dlss_res is not None:
         res["dlss"] = dlss_res
+    if people_res is not None:
+        res["people_library"] = {k: v for k, v in people_res.items() if k != "manifest"}
     if man_at:
         res["atmos_plan"] = {k: man_at.get(k) for k in ("plan", "skipped", "lights")
                              if man_at.get(k) is not None}
@@ -1957,7 +1975,8 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
     man_lf = json.loads(man_path.read_text(encoding="utf-8")).get("life") or {}
     if man_lf:
         res["life_plan"] = {k: man_lf.get(k) for k in ("plan", "skipped", "district", "people",
-                                                       "cars", "walk_lanes", "drive_lanes")
+                                                       "cars", "walk_lanes", "drive_lanes",
+                                                       "library")
                             if man_lf.get(k) is not None}
     if res.get("ok") and startup:
         res["startup_map_changed"] = set_startup_map(up, res["level"])
@@ -2089,6 +2108,14 @@ def dlss_summary(res: dict) -> str:
 def life_summary(res: dict) -> str:
     """What the import did with the city's life plan (LG0)."""
     lp, st = res.get("life_plan") or {}, res.get("life") or {}
+    if st.get("made") and st.get("library"):
+        miss = st.get("missing_meshes") or []
+        t = st.get("tiers") or {}
+        return (f"Life (stage 4): the spike's {st.get('people', 0)} people (the library's "
+                f"{st['library']} characters: near within {t.get('near_m')} m, at most "
+                f"{t.get('near_max')}, baked walks to {t.get('mid_m')} m, impostors to "
+                f"{t.get('far_m')} m) and {st.get('cars', 0)} cars on {st.get('district')}, "
+                f"from {lp.get('plan')}" + (f"; {len(miss)} assets missing" if miss else ""))
     if st.get("made"):
         miss = st.get("missing_meshes") or []
         return (f"Life (stage 4): the spike's {st.get('people', 0)} stand-ins and "

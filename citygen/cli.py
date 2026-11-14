@@ -312,7 +312,7 @@ def cmd_unreal(args: argparse.Namespace) -> int:
                             atmos=False if args.no_atmos else args.atmos,
                             vehicles=args.vehicles, all_vehicles=args.all_vehicles,
                             life=False if args.no_life else args.life,
-                            dlss=args.dlss) \
+                            dlss=args.dlss, people=args.people, gas=args.gas) \
             if not (args.check_only or args.bench_only) else None
         if res is not None:
             print(U.import_summary(res))
@@ -705,6 +705,17 @@ def build_parser() -> argparse.ArgumentParser:
                          "is left out")
     ue.add_argument("--no-life", action="store_true",
                     help="leave out the life plan (its controller from an earlier import goes)")
+    ue.add_argument("--people", action="store_true",
+                    help="LG1: lifegen's people library in the project first (MetaHumans made "
+                         "by script from the engine's presets, rigged and textured by Epic's "
+                         "MetaHuman service on the editor's sign-in, Epic's animations from "
+                         "your Game Animation Sample; from the cache in ~/.cache/cybergen/"
+                         "people when built before); its people replace the spike's stand-ins. "
+                         "Without it a library the project has is used")
+    ue.add_argument("--gas", metavar="UPROJECT",
+                    help="LG1: your Game Animation Sample project (default $CITYGEN_GAS, else "
+                         "~/CityGen/UnrealProjects/GameAnimationSample): the people's walks "
+                         "and idles are copied from it into the project, never changed")
     ue.add_argument("--dlss", metavar="DIR",
                     help="NVIDIA's DLSS plugin for UE 5.8, extracted from its zip (its folder or "
                          "its Plugins folder; default $CITYGEN_DLSS): its plugins copied into "

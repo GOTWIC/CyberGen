@@ -20,7 +20,10 @@
 #include "CityGenLifeActor.generated.h"
 
 class AZoneGraphData;
+class UAnimSequence;
 class UInstancedStaticMeshComponent;
+class USkeletalMesh;
+class USkeletalMeshComponent;
 class UMaterialInterface;
 class UStaticMesh;
 class UCityGenLifeWalkProcessor;
@@ -99,6 +102,52 @@ public:
 	UPROPERTY(EditAnywhere, Category = "CityGen") TArray<float> CarPaints;
 	UPROPERTY(EditAnywhere, Category = "CityGen") int32 PaintFloats = 9;
 
+	// --- LG1: the people library (set by the importer from the project's library) -------------
+	// Each person is a character of the library (PersonChar, drawn by the plan from its seed)
+	// drawn by the view's distance: near (NearM, at most NearMax of them) as the assembled
+	// MetaHuman's skeletal meshes playing its gait's clip at its pace; mid (MidM) as the
+	// character's walk baked into textures (AnimToTexture: one instanced static mesh per
+	// character, its frame from per-instance custom data); far (FarM) as an impostor card
+	// showing the walk from its side. Without a library (no MidMeshes) LG0's stand-ins.
+
+	/** Per character its near skeletal meshes, flat: [NearMeshStarts[c], NearMeshStarts[c + 1])
+	 *  of NearMeshes, the first the leader (the body), the rest following its pose. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<TObjectPtr<USkeletalMesh>> NearMeshes;
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<int32> NearMeshStarts;
+	/** The walk clips (per gait) on the characters' body skeleton, and the speed (m/s) each
+	 *  walks at its own rate. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<TObjectPtr<UAnimSequence>> WalkClips;
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<float> WalkClipSpeeds;
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<TObjectPtr<UAnimSequence>> IdleClips;
+	/** Per character its mid mesh (the baked walk) and 4 floats: the walk's first and last
+	 *  baked frame, the bake's frames a second, the walk cycle's length (s). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<TObjectPtr<UStaticMesh>> MidMeshes;
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<float> MidFrames;
+	/** The far cards: one quad (a person's height, standing on its origin), per character its
+	 *  impostor sheet's material. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") TObjectPtr<UStaticMesh> CardMesh;
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<TObjectPtr<UMaterialInterface>> CardMaterials;
+	/** The tiers (m from the view) and how many people may be near at once. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") float NearM = 30.f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") int32 NearMax = 160;
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") float MidM = 90.f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") float FarM = 300.f;
+	/** The skeletal meshes' yaw in their own frame (MetaHumans face +Y: -90). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") float MeshYaw = -90.f;
+	/** Per person (the plan's draws): character, height scale, gait (into WalkClips), pace
+	 *  (m/s), the outfit's tint (3 floats, linear RGB) and seed. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<int32> PersonChar;
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<float> PersonScale;
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<int32> PersonGait;
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<float> PersonPace;
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<float> PersonTint;
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<int32> PersonSeed;
+
+	/** Whether the people library is in use (else LG0's stand-ins). */
+	bool HasPeople() const { return MidMeshes.Num() > 0 && NearMeshStarts.Num() == MidMeshes.Num() + 1; }
+	/** The tiers at run time (CityGenLife.Tiers NEAR_M NEAR_MAX MID_M FAR_M). */
+	UFUNCTION(BlueprintCallable, Category = "CityGen") void SetTiers(float InNearM, int32 InNearMax, float InMidM, float InFarM);
+
 	// --- the session --------------------------------------------------------------------------
 
 	UPROPERTY(EditAnywhere, Category = "CityGen") bool bEnabled = true;
@@ -129,6 +178,34 @@ private:
 	void MakeComponents();
 	void UpdateInstances();
 	void FindGround();
+	// (LG1, CityGenLifePeople.cpp)
+	void MakePeople();
+	void SpawnPeople(int32 NP);
+	void UpdatePeople();
+	bool ViewPoint(FVector& Out) const;
+	void Release(int32 Slot);
+	void Assign(int32 Slot, int32 Person);
+	float WalkRate(int32 Person) const;
+	float PhaseOffset(int32 Person) const;
+
+	/** A near person's components: the leader (the body) and its followers. */
+	struct FNearSlot
+	{
+		TArray<USkeletalMeshComponent*> Comps;
+		int32 Person = INDEX_NONE;
+		int32 Char = INDEX_NONE;
+		int32 Gait = INDEX_NONE;
+	};
+	TArray<FNearSlot> NearSlots;
+	UPROPERTY(Transient) TArray<TObjectPtr<USkeletalMeshComponent>> NearComps;
+	UPROPERTY(Transient) TArray<TObjectPtr<UInstancedStaticMeshComponent>> MidComps;
+	UPROPERTY(Transient) TArray<TObjectPtr<UInstancedStaticMeshComponent>> FarComps;
+	TArray<int32> PersonInst, PersonSlot, CharCount;
+	TArray<uint8> PersonTier;
+	TArray<TArray<FTransform>> MidXf, FarXf;
+	TArray<TPair<float, int32>> NearCand;
+	int32 NearNow = 0, MidNow = 0, FarNow = 0;
+	double PeopleMs = 0.0;
 
 	UPROPERTY(Transient) TObjectPtr<AZoneGraphData> Lanes;
 	UPROPERTY(Transient) TObjectPtr<UInstancedStaticMeshComponent> Bodies;
