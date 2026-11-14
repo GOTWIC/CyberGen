@@ -49,7 +49,7 @@ from . import sky as SK
 from . import spec as S
 
 CODE_FILES = ("presets.py", "spec.py", "planmodel.py", "emitters.py", "plan.py", "lux.py",
-              "sky.py", "air.py", "sight.py", "weather.py", "look.py", "far.py")
+              "sky.py", "air.py", "sight.py", "weather.py", "look.py", "far.py", "fixtures.py")
 OUT = "atmos"
 TILE_M = 256.0
 
