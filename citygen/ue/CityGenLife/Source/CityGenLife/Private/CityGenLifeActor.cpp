@@ -673,10 +673,6 @@ void ACityGenLife::SetShadows(bool bOn)
 			CarParts[P]->SetCastShadow(bOn && (!CarPartShadows.IsValidIndex(P) || CarPartShadows[P] != 0));
 		}
 	}
-	for (UInstancedStaticMeshComponent* C : MidComps)
-	{
-		if (C) { C->SetCastShadow(bOn); }
-	}
 	for (USkeletalMeshComponent* C : NearComps)
 	{
 		if (C) { C->SetCastShadow(bOn); }

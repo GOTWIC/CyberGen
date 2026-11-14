@@ -183,17 +183,21 @@ ATMOS_PASSES = (
 
 
 def _life(on: bool = True, shadows: bool = True, rebuild: bool = False,
-          lumen: bool = False, near: int | None = None) -> tuple[str, ...]:
+          lumen: bool = False, near: int | None = None,
+          near_m: float | None = None) -> tuple[str, ...]:
     """LG0: lifegen's spike (the level's CityGenLife controller) over the night as delivered:
     on or off, the stand-ins' and cars' shadows, each frame's move recreating the instanced
     components' render state, the people and cars in Lumen's scene (every pass sets all
     four, so none leaks into the next; a game without the plugin warns of the unknown
     commands and runs the same). LG1: `near`, how many of the library's people may be near
-    (skeletal) at once; every life pass sets the tiers (the library's own by default)."""
+    (skeletal) at once, and `near_m` how far; every life pass sets the tiers (the library's
+    own by default)."""
     from lifegen.library import TIERS
     t = dict(TIERS)
     if near is not None:
         t["near_max"] = near
+    if near_m is not None:
+        t["near_m"] = near_m
     # (before the atmos commands, whose hour is the pass's last)
     return (f"CityGenLife.Enable {int(on)}", f"CityGenLife.Shadows {int(shadows)}",
             f"CityGenLife.Rebuild {int(rebuild)}", f"CityGenLife.Lumen {int(lumen)}",
@@ -211,6 +215,7 @@ LIFE_PASSES = (
     # LG1: the people library's near tier: none near (every person baked or a card), half
     ("night_life_near0", True, 100.0, _life(near=0)),
     ("night_life_near80", True, 100.0, _life(near=80)),
+    ("night_life_near20m", True, 100.0, _life(near_m=20)),
 )
 ATMOS_PASSES = ATMOS_PASSES + LIFE_PASSES
 # what a game with hardware ray tracing needs at startup (MegaLights traces its shadows; UE

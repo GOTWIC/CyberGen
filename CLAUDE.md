@@ -2772,6 +2772,37 @@ The cars and steam fixes (after LG0, an exporter and runtime update) are in plac
   menu's Steam and smoke row and `CityGenAtmos.Steam [0|1]`. Results:
   `docs/progress/cars_steam/`.
 
+LG1 (people) is in place:
+- **The library's spec** (`lifegen/library.py`, `LIB_VERSION`): `CHARACTERS` 24 MetaHumans
+  by seed (a preset of the engine's optional MetaHuman content each, its face's coefficients
+  blended toward another preset of the same body, height, build and skin tone), `CLIPS` (the
+  Game Animation Sample's two walks and two idles), the far stand-ins, `TIERS` (near 30 m and
+  at most 160, mid 90 m, far 300 m), `library_hash` (spec, `CODE_FILES`, engine version);
+  `person(...)` a person's draws. The plan's spike carries `library` and `persons`, every
+  spawn a `seed`; check `people_draws`.
+- **The build** (`citygen unreal ... --people [--gas UPROJECT]`; `citygen/unreal_people.py`
+  `ensure_library`, `citygen/ue/people_library.py` in the project's full editor off screen,
+  on its tick): characters made, rigged and textured by Epic's MetaHuman service on the
+  user's saved sign-in (never a sign-in window: `-NoMetaHumanAccountPortalLoginFallback`),
+  assembled (Optimized, Medium; a commandlet cannot: the skin's texture graphs need the
+  editor; restart every `PER_RUN` 6), clips retargeted and made in place, the mid mesh baked
+  by AnimToTexture (the face's shells out), impostor sheets by scene captures, the manifest
+  `Saved/CityGenPeople/library.json`. The clips' closure is copied from the user's Game
+  Animation Sample (`citygen/ue/people_gas.py`, read only). Cache
+  `~/.cache/cybergen/people/<hash>` (or `$CITYGEN_PEOPLE_CACHE`), stamp
+  `Saved/CityGenPeople.stamp`: another project gets the library by copy, with no cloud or
+  sample. Nothing of Epic's or MetaHuman's ever in the repo (a test checks).
+- **Exporter and runtime** (`unreal_life.persons`, `people_library`, `import_city.
+  people_assets`, `LIFE_VERSION` life2; `CityGenLifePeople.cpp`): near people pooled
+  skeletal MetaHumans playing the gait's clip at pace, the garments tinted per person; mid
+  instances of the baked walk (no shadow: its sections doubled the draws); far cards; the
+  walk's phase kept across tiers; `CityGenLife.Tiers`; bench passes `night_life_near0`,
+  `_near80`, `_near20m`. `docs/unreal_export.md`, "From LG1: people".
+- Delta's Old Town (2,000 people): `night_plan_all` 19.6 ms p95 native on the lean route
+  (walk 22.8, game thread), people off 18.1. Results and open items (the mid tier's faces,
+  skin through the low LOD garments, barefoot until LG2, the idles not yet played):
+  `docs/progress/LG1/README.md`.
+
 ## Gallery site (GitHub Pages)
 
 `site/` is the public gallery at https://gotwic.github.io/CyberGen/ (served at

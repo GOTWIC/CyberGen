@@ -423,7 +423,7 @@ high resolution shot), and showing the lane and walkway graphs over the city for
 | 1 citygen | the blockout, props and plants, graphs, player start, a default sun and sky (M15); terrain: the ground per tile, walls, bores, terrain viaducts and columns by id (M13); decks: the slab, deck streets and the buildings on them tagged with their level, the manifest's decks, levels in the graphs (M14); water and ground: swim volumes per water body and tile, water at its surface, beds, banks by kind and the ground cover by kind with a material each (M16) |
 | 2 assetgen | buildings replacing their blockout boxes by id (own pivots, parts as instances, simple collision), textured master materials with per-actor parameters, street meshes replacing the joined pieces, prop and plant variants, signs, LODs for the pieces Nanite does not take, HLOD and Lumen settings (per milestone: `docs/assetgen_scope.md` section 14) |
 | 3 atmosgen | lights (street and wall lights, shopfronts, signs as lit faces, floods), sky, time, weather, fog and post volumes, replacing M15's default sun and sky; rendered by its runtime plugin `CityGenAtmos` (AT0: the plugin's skeleton, its assets, the plan's contribution format; "atmosgen's runtime (AT0)" below) |
-| 4 lifegen | people, traffic, transit, air and water on the graphs, spawners, place slots; moved by its runtime plugin `CityGenLife` (LG0: the plugin's skeleton, ZoneGraph lanes from the graphs, the spike's stand-ins and cars; "lifegen's runtime (LG0)" below) |
+| 4 lifegen | people, traffic, transit, air and water on the graphs, spawners, place slots; moved by its runtime plugin `CityGenLife` (LG0: the plugin's skeleton, ZoneGraph lanes from the graphs, the spike's stand-ins and cars; "lifegen's runtime (LG0)" below; LG1: the people library, MetaHumans made by script into the project, near, mid and far tiers; "From LG1: people") |
 | 5 storygen | story actors, triggers, sequences |
 
 ## assetgen's contribution (AG0)
@@ -2435,19 +2435,24 @@ assets and Epic's animations are made or copied into the project only, never the
      the retarget root), notifies stripped, made in place (`in_place`: the root still, the
      pelvis taking the root's height, the travel dropped), each walk's speed measured from the
      sample's root motion;
-  3. *mid*: the character as one static mesh (body and face at LOD 1, outfit LOD 2, the hair's
-     helmet; GeometryScript, `assemble_static`), its first walk baked into bone textures by
-     AnimToTexture (bone mode, 16 bits, four influences, the body as the driver, one triangle
-     a vertex), each slot on `People/Materials/M_CgPersonMid` (the slot's base color texture
-     and tint read from the creator's materials: the baked skin's `Basecolor Baked`, the
-     wardrobe's `diffuse_color_1`, a hair color by the character; AnimToTexture's
-     `MF_BoneAnimation`, auto play from per-instance custom data);
+  3. *mid*: the character as one static mesh (body and face at LOD 1 less the face's
+     see-through shells and eyelashes, `SHELLS`; outfit LOD 2; the hair's helmet;
+     GeometryScript, `assemble_static`), its first walk baked into bone textures by
+     AnimToTexture (bone mode, 16 bits, four influences, the body as the driver, four triangles
+     a vertex, 15 fps), each slot on `People/Materials/M_CgPersonMid` (the slot's base color
+     as a plain 512 px copy of the creator's virtual texture, `mid_texture`, and its tint: the
+     baked skin's `Basecolor Baked`, a hair color by the character on the helmet's slots, the
+     garments white with `UseInstanceTint` 1, so each person's outfit tint from per-instance
+     custom data 4 to 6 colors them; AnimToTexture's `MF_BoneAnimation`, auto play from
+     per-instance custom data 0 to 3);
   4. *far*: an impostor sheet (`People/Far/T_<id>_Sheet`, 8 views round the person by 8 frames
-     of one stride, 128 x 256 a cell) drawn by orthographic scene captures of the mid mesh
-     pinned to each frame (lighting off: the albedo, the coverage in alpha), on
-     `People/Materials/M_CgPersonCard` (world position offset turning `/Engine/BasicShapes/
-     Plane` to the view about its up axis, the cell by the view's side of the person and the
-     walk's frame, masked);
+     of one stride, 128 x 256 a cell) and its coverage (`T_<id>_Mask`), drawn by orthographic
+     scene captures of the mid mesh pinned to each frame (`MI_<id>_Pose_<i>`: auto play off,
+     the frame a parameter): the color lit by a light turned with the camera, the coverage
+     with lighting off; on `People/Materials/M_CgPersonCard` (world position offset turning
+     `/Engine/BasicShapes/Plane` to the view about its up axis, the cell by the view's side of
+     the person and the walk's frame, masked by the coverage, the garments' white tinted by
+     the person's tint from per-instance custom data 2 to 4);
   5. *manifest*: `Saved/CityGenPeople/library.json` (per character its near meshes and hair,
      mid mesh and frames, card material; the clips per body skeleton).
 - **Epic's animations** (`migrate`): the clips' hard references in the user's Game Animation
@@ -2473,10 +2478,12 @@ assets and Epic's animations are made or copied into the project only, never the
   components (the body leading the face and outfit, the groom's cards on the face's head bone
   at the bone's reference pose; the gait's clip in single node mode at pace over the clip's
   speed; the pose ticked only when rendered, update rate optimizations, no post-process
-  Blueprints), a slot keeping its person out to 1.15 `NearM`; within `MidM` an instance of the
-  character's mid mesh (one instanced component per character; custom data: time offset, play
-  rate, first and last frame, tint), within `FarM` an instance of its card (custom data: time
-  offset, strides a second); the walk keeps its phase from tier to tier. None of them in
+  Blueprints; the outfit's garment materials as dynamic instances with the person's tint in
+  `diffuse_color_1`), a slot keeping its person out to 1.15 `NearM`; within `MidM` an
+  instance of the character's mid mesh (one instanced component per character; custom data:
+  time offset, play rate, first and last frame, tint), within `FarM` an instance of its card
+  (custom data: time offset, strides a second, tint); the walk keeps its phase from tier to
+  tier. None of them in
   Lumen's scene or the distance fields. Console `CityGenLife.Tiers NEAR_M NEAR_MAX MID_M
   FAR_M`; `CityGenLife.Status` adds `library` (characters, how many near, mid and far now,
   slots, the game thread's time drawing them). The benchmark's `night_life_near0` and

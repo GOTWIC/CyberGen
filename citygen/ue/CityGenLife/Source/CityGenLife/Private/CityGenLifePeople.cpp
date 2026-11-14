@@ -97,7 +97,9 @@ void ACityGenLife::MakePeople()
 	};
 	for (int32 K = 0; K < NC; ++K)
 	{
-		MidComps.Add(MidMeshes[K] ? Make(FString::Printf(TEXT("PeopleMid%d"), K), MidMeshes[K], nullptr, MidFloats, bShadows, MidM + 20.f) : nullptr);
+		// (the mid tier casts no shadow: a mid mesh has a section per creator slot, and its
+		// shadow depths doubled the people's draws for a shadow too small to see past NearM)
+		MidComps.Add(MidMeshes[K] ? Make(FString::Printf(TEXT("PeopleMid%d"), K), MidMeshes[K], nullptr, MidFloats, false, MidM + 20.f) : nullptr);
 		UMaterialInterface* Card = CardMaterials.IsValidIndex(K) ? CardMaterials[K].Get() : nullptr;
 		FarComps.Add(CardMesh ? Make(FString::Printf(TEXT("PeopleFar%d"), K), CardMesh, Card, FarFloats, false, FarM + 20.f) : nullptr);
 	}
