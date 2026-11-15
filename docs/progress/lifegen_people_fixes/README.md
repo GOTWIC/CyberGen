@@ -57,7 +57,18 @@ The lean route at native 2560 x 1440, one run, no DLSS pass (`bench/final/`):
 
 ## Package
 
-PACKAGE
+`C:/Users/swagn/CityGen/builds/packaged/Delta_lg3_fix2/Windows/CityAG16.exe` (Development,
+Win64, 5.0 GB; `builds/packaged/package_lg3_fix2.cmd` from a mirror of `CityAG16` without the
+MetaHuman Character sources, cooked in 14 minutes; the mid bone textures among its files).
+Its smoke launch (`-userdir=` outside the package, no `Saved/` left in it) loads the level in
+14 s, logs the walk's loop (60 frames, passing pose at frame 33) and the crowd: 603 people
+live round the player start, 630 a minute and a half later, the controller's tick 0.5 to
+0.6 ms. The mirror and the superseded `Delta_lg3` package were deleted (`Delta_lg3_fix1`
+kept).
+
+The people library's old cache (`~/.cache/cybergen/people/e3de959bdf362d86`, 3.2 GB, the
+broken mid meshes) is superseded by `1de3e256eff2a119`; the session left it for Swagnik to
+delete.
 
 ## Tests
 
