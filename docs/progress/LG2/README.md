@@ -62,3 +62,156 @@ bag), held rigidly to their bone (head, spine_04, spine_02); arm plates (cyberwa
 glowing seam) follow the forearm's skin and only on bare forearms. A hood up is held to the
 head more the higher it goes. Looks with a hood up, a cap, a beanie or a hard hat leave the
 hair out.
+
+## The garments on every body
+
+Every character's six looks, drawn on its own body in Blender (the renders' colors are three
+of the look's group's, as a person of that group might wear; in the city each person draws
+their own):
+
+| Front, characters 0 to 11 | Three quarters, characters 0 to 11 |
+|---|---|
+| [![](garments/bodies_front_1.jpg)](garments/bodies_front_1.jpg) | [![](garments/bodies_34_1.jpg)](garments/bodies_34_1.jpg) |
+| **Front, characters 12 to 23** | **Three quarters, characters 12 to 23** |
+| [![](garments/bodies_front_2.jpg)](garments/bodies_front_2.jpg) | [![](garments/bodies_34_2.jpg)](garments/bodies_34_2.jpg) |
+
+Outfits by style group (a row a group, eight of its looks: street, corporate, techwear,
+nightlife, market, industrial, punk, gang, police, rain):
+
+[![](garments/styles.jpg)](garments/styles.jpg)
+
+The textiles (base color and normal; a dyed textile's base is a light weave the person's
+color multiplies, the wear mask in the ORM image's alpha):
+
+![](garments/textiles.jpg)
+
+## Outfits in the plan, and the variety check
+
+- **Looks by group** (`garments.GROUP_LOOKS`): street 24, corporate 22, techwear 20,
+  nightlife 16, market 14, industrial 14, punk 10, gang 10, rain 8, police 6; a character
+  has one look of a group at most, so a group's looks are worn by that many faces.
+- **The pool** (2,400 people, LG3's): each person is a character (LG1's draw) in one of its
+  looks; the looks' groups are drawn half by the city's people per group at the crowd's hour
+  and half by each group's largest share of any district (`plan.assign_looks`), so a quiet
+  district's own group (Delta's port: 70% industrial, 0.5% of the city's people at night)
+  has people enough when the view is there.
+- **Spawning** (`CityGenLife` `TakeSlot`, `DressSlot`): a person coming out of a door in a
+  district takes a free slot of a group drawn by that district's people by group (the
+  district's style groups; in rain, drizzle a share in raincoats: `presets.WEATHER_OUTFITS`,
+  the spec's `crowd.weather`, fixed to clear until LG8 drives it), then three colors from that
+  group's 12 in that district (a gang's own faction color first) and a wear about the
+  district's (worn and grimed by its danger and poverty, `style.wear`).
+- **Variety** (the check `variety`, scope 8): at each district's busiest hour, the people
+  within 50 m of one another (its busiest tile's density, at most the pool's), the expected
+  number of pairs alike in character, look and the two colors every look carries must be at
+  most 1, and no look over 12% of a district's people.
+
+On Delta (`lifegen plan`, every check passing): 125 of the 144 looks in the pool (no police
+look: no district's style has police, which LG4's patrols bring; no raincoat: the weather is
+clear), at most 0.44 expected alike pairs within 50 m (the port, where 70% wear one group's
+14 looks), the commonest look 3.2 to 10.3% of a district.
+
+## In Unreal: Delta
+
+The library was built once with the final code (hash `dd24b28ed929920b`, 24 characters, 144
+looks, 2,082 s for the looks, mid meshes and cards after Blender's dressing; every look's
+garments appended with no dropped triangle) and Delta imported into the test project
+(`CityAG16`) with LG2's plan (`lifegen plan`, every check passing). `--check` passes
+(spawn, streaming, collision, the walk and the curb, sky, air, weather, look, far city, play
+features, fly). The library is in the people cache, so another project gets it by copy.
+
+| A near person (within 30 m), day | The clothing switch off (LG3's debug view: the template body) |
+|---|---|
+| [![](unreal/pday_near_clothes.jpg)](unreal/pday_near_clothes.jpg) | [![](unreal/pday_near_noclothes.jpg)](unreal/pday_near_noclothes.jpg) |
+| **A downtown sidewalk by night (near people)** | **Old Town by night** |
+| [![](unreal/night_crowd_d02.jpg)](unreal/night_crowd_d02.jpg) | [![](unreal/night_crowd_d04.jpg)](unreal/night_crowd_d04.jpg) |
+| **The corporate core by night** | **Old Town from above, day** |
+| [![](unreal/night_crowd_d03.jpg)](unreal/night_crowd_d03.jpg) | [![](unreal/pday_crowd_d04_up.jpg)](unreal/pday_crowd_d04_up.jpg) |
+| **Every person at the mid tier (baked walks), close** | **Every person at the far tier (cards), close** |
+| [![](unreal/pday_allmid_close.jpg)](unreal/pday_allmid_close.jpg) | [![](unreal/pday_allfar_close.jpg)](unreal/pday_allfar_close.jpg) |
+| **Down a street, day (mid and far people)** | **The port, day** |
+| [![](unreal/pday_far_street.jpg)](unreal/pday_far_street.jpg) | [![](unreal/pday_crowd_d05_up.jpg)](unreal/pday_crowd_d05_up.jpg) |
+
+Up close (crops):
+
+| | |
+|---|---|
+| [![](unreal/night_crowd_d02_crop.jpg)](unreal/night_crowd_d02_crop.jpg) | [![](unreal/pday_near_clothes_crop.jpg)](unreal/pday_near_clothes_crop.jpg) |
+
+- **Near:** people read as dressed: shirts, long tees and jackets over trousers, cargo pants
+  and skirts, sneakers with their white soles, boots, hard hats, visors, headsets and
+  backpacks, each in their own colors. The garments are smooth shells with the textile's
+  grain, not tailored cloth: no folds but the drape's, seams only where the trims are.
+- **Mid and far:** the baked walks wear their look's colors per person; the cards show the
+  outfit's silhouette and colors, which is what they are for at 90 to 300 m (seen close, as in
+  the debug view above, they are smeared ghosts).
+- **Faults seen** (open items below): a heavy-bodied character's long coat shows a row of
+  holes across its back at the waist while walking (the layer under it, likely the trousers'
+  waistband, passes through the coat as the two are skinned differently); collars and coat
+  edges are jagged at the rims; the dyed garments are glossy in the rain.
+
+## Benchmark
+
+The lean route at native 2560 x 1440, one run a pass, no DLSS pass (`bench/final/`), against
+LG5's `night_plan_all`:
+
+| pass | p95 all | walk | drive | fly | game p95 (all) | draws p50 (walk) |
+|---|---|---|---|---|---|---|
+| **`night_plan_all`** (LG2, clothing on) | **20.8** | 23.8 | 20.9 | 19.7 | 18.1 | 2,415 |
+| `night_life_noclothes` (the clothing switch off) | 22.0 | 29.2 | 20.9 | 19.6 | 20.3 | 2,071 |
+| LG5's `night_plan_all` | 21.2 | 25.5 | 20.7 | 19.7 | 19.1 | 2,060 |
+
+- **Clothing costs nothing measurable:** 20.8 ms p95 against LG5's 21.2 (the walk varies by
+  2 ms from run to run with the same scene, as LG5 found), still over the 20 ms budget by the
+  traffic's 1 ms (LG5's open item for the performance pass). The looks add draws on the walk
+  (2,415 to 2,060: a look's garments are more sections than LG1's character), not frame time.
+  No tuning round.
+- **The switch off is slower** (22.0, walk 29.2): its near people are MetaHuman's whole
+  template body, heavier than a look's garments, and its mid people draw holes over their
+  garment slots. It is a debug view.
+
+## The package
+
+`builds/packaged/Delta_lg2` (Development, Win64, 5.1 GB; `package_lg2.cmd`, 15.5 minutes from
+a mirror of `CityAG16` without its Saved, Intermediate, DerivedDataCache and plugin builds).
+Its smoke launch (`-userdir=` outside the package, no `Saved/` left in it) loads the level in
+14.1 s with the library's 144 looks and the clothing on: 610 people live round the player
+start (2 near, 5 mid, 120 far in view), 599 cars, lifegen's tick 1.7 ms. The mirror was
+deleted after it, as were the superseded `Delta_lg3_fix2` package and the people caches of the
+development libraries (`Delta_lg5` kept).
+
+## Cloth simulation
+
+Not set up. Chaos Cloth's clothing data is made only by `UClothingAssetFactoryBase::
+CreateFromSkeletalMesh`, a C++ virtual with no Python or Blueprint route, and the editor's
+cloth painting is a manual tool; a plugin of its own for it was out of LG2's reach. The long
+coats and skirts move with the legs' skinning (weights from the plain outfit and the body),
+not by simulation.
+
+## Tests
+
+`tests/lifegen` (the new `test_lg_clothing.py`: looks, drafts, textiles, the variety check,
+the exporter's outfits; `test_lg_plan.py`, `test_lg_people.py` updated) and
+`tests/test_bench.py`; see the summary below.
+
+## Open items
+
+- **A long coat over trousers shows the layer under it** at the waist while walking (a row of
+  holes across a heavy-bodied character's back): the two layers are skinned apart. Taking the
+  inner layer's faces out wherever an outer layer runs within a few centimeters (not only
+  where a ray from them meets it) would cure it; it needs a library rebuild.
+- **Rims and fronts:** the rims of collars, coat edges and zipped fronts are jagged (the
+  voxel mannequin's 9 mm grid shows through the cuts); the front trims read as ragged white
+  lines on the contact sheets.
+- **No prints or logos** on the garments yet (AG6's brand logos were in the scope): the
+  textiles are plain weaves, dyed.
+- **Raincoats** (drawn only in rain, from LG8) have a weak front skirt panel.
+- **Glossy in the rain:** the dyed garments take AT5's wetness as the streets do.
+- **No police looks in Delta's pool:** no district's style has police; LG4's patrols bring
+  them.
+- **Hair:** a look with a cap, beanie, hard hat or hood up leaves the character's hair out,
+  so the hat's shell alone covers the head; the contact sheets draw every head bald (the
+  mannequin has no hair).
+- **The far cards** seen close are smeared (as they are meant for 90 to 300 m).
+- **Cloth simulation** (above).
+- **The budget:** still LG5's 1 ms over 20 ms (the traffic), for the performance pass.

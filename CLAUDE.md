@@ -2930,6 +2930,10 @@ LG2 (clothing) is in place:
   mask). Cloth simulation near the view is not set up (Chaos Cloth's clothing data is made
   only by a C++ factory, no script route). Bench pass `night_life_noclothes`.
   `docs/unreal_export.md`, "From LG2: clothing".
+- Delta: every check passes, 125 of the 144 looks in the pool; `night_plan_all` 20.8 ms p95
+  native (walk 23.8) against LG5's 21.2, clothing off 22.0 (the template bodies): clothing
+  costs no frame time. Open items (a long coat's waist showing the layer under it while
+  walking, jagged rims, no prints or logos, no cloth simulation): `docs/progress/LG2/README.md`.
 
 ## Gallery site (GitHub Pages)
 

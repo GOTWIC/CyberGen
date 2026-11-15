@@ -13,7 +13,7 @@ grows here as it lands, as in [`citygen_milestones.md`](citygen_milestones.md),
 |---|---|---|---|
 | LG0 | Groundwork and spike: the life spec and styles, the plan format and schemas, `lifegen plan` (people and vehicles by district and hour, spawn and sink points, place slots, the fleet from AG18's roster, the asks of citygen), the `CityGenLife` plugin's skeleton (ZoneGraph lanes built from the graphs, Mass processors) built by the exporter; plain stand-ins and a few of AG18's cars on one district of Delta, against the benchmark; probes of MetaHuman, Mutable, retargeting and the engine pieces' maturity in 5.8; a tee draped in Blender's cloth solver | Done | [`docs/progress/LG0`](progress/LG0) |
 | LG1 | People: the population library (24 MetaHumans made, rigged and assembled by script into the user's project, faces blended, bodies and skin by seed), Epic's walks retargeted in place, baked walks and impostor cards for the far crowd, the plan's person draws, the exporter's `--people` and the runtime's near, mid and far tiers; Delta's Old Town walked by them | Done | [`docs/progress/LG1`](progress/LG1) |
-| LG2 | Clothing | Planned | |
+| LG2 | Clothing: 144 looks (6 a character, by fashion group) of garments cut from pattern parameters on each character's own body and draped in Blender's cloth solver (tees, shirts, hoodies, coveralls, bombers, jackets, trench coats, raincoats, cargo pants, trousers, skirts, sneakers, boots, dress shoes), 15 generated textiles, accessories and cyberware; looks' skeletal meshes, mid meshes and cards in the people library; people spawned by their district's groups in its colors and wear; the variety check | Done | [`docs/progress/LG2`](progress/LG2) |
 | LG3 | Crowds on the streets: every walkway of the city at its street's density by hour, live round the view from a fixed pool (people come alive and go past the far tier, out of sight), trips out of and into AG3's doors, stations, garages and taxi stands, groups, pace, signals with derived phases at the crosswalks, jaywalking by danger, local avoidance and stepping aside from the player, stairs and elevators; Delta walked city-wide | Done | [`docs/progress/LG3`](progress/LG3) |
 | LG4 | Life at places | Planned | |
 | LG5 | Traffic: every lane of the city at its street's density by hour (twice M11's by default), live round the view from a fixed pool of AG18's cars by the districts' fleets and paints; following the car in front, red lights, junctions taken in turn with room past them, stopping for people and the player; Delta driven city-wide | Done | [`docs/progress/LG5`](progress/LG5) |
@@ -137,6 +137,51 @@ cars and steam (#225). Report, shots, benchmark and open items:
 - **Tests** (`tests/lifegen/test_lg_people.py`: characters and draws by seed, the hash, the
   exporter's packing, the cache and stamp, no Unreal or MetaHuman file in the repo;
   `test_bench.py` the tier passes).
+
+## LG2: clothing
+
+Built on the Windows PC (2026-11-14 and 15), on main after LG5 (#230). Report, contact sheets,
+shots, benchmark and open items: [`docs/progress/LG2/README.md`](progress/LG2/README.md).
+
+- **Looks** (`lifegen/garments.py`): 6 a character, 144 in all, each a whole outfit of a
+  group (`GROUPS`: the styles' nine and `rain`; `GROUP_LOOKS` shares them out, a character one
+  look a group): a base layer, an outer layer or none, a bottom, shoes and accessories, each
+  garment in a textile of its group with its trims (`RECIPES`); in the library's spec and hash.
+- **Garments** (`KINDS`, `draft`; `lifegen/blender/garments.py`): 15 kinds (tee, long tee,
+  shirt, hoodie, coveralls, bomber, jacket, trench, raincoat, cargo, trousers, skirt, sneakers,
+  boots, dress shoes) as pattern parameters cut for each body's landmarks, built on the
+  mannequin (the body, its plain outfit and face as one voxel surface, labelled by part),
+  offset by their ease, cut at hem, sleeve, ankle and the plain outfit's neckline, flared,
+  hooded, collared, draped by Blender's cloth solver, rimmed at every open edge, UV'd as their
+  pattern pieces; a look layered (each 4 mm outside those under it) with its covered faces out.
+  The flat-panel sewing of the scope (LG0's test) was dropped: a panel cut for one body and
+  sewn by springs crumples where it does not fit.
+- **Textiles** (`lifegen/textiles.py`): 15 tileable PBR sets in AG6's style.
+- **Accessories and cyberware**: visor, respirator, mask, headset, cap, beanie, hard hat,
+  implant plates, arm plates, backpack, bag; rigid on their bone, arm plates on the skin.
+- **The library's build** (`citygen/unreal_people.py` `dress`, `citygen/ue/people_library.py`
+  steps `bodies`, `looks`; `LIB_VERSION` lg2.1): the bodies exported, every character dressed
+  in Blender (4 at once), each look's garments a skeletal mesh on the body's skeleton (weights
+  from the plain outfit where nearer than the body), a mid mesh and a card with a dye mask per
+  look; the manifest's entries are the looks.
+- **The plan** (`lifegen/plan.py`): each pool person's look and group, the districts' people by
+  group (raincoats by the weather's share, clear until LG8), colors per group, wear; the check
+  `variety`.
+- **Exporter and runtime** (`PACK_VERSION` 5, `LIFE_VERSION` life6): a person spawned in a
+  district takes a slot of the district's groups and three of its colors and a wear; garments
+  tinted per person near (dynamic instances), mid (14 custom floats) and far (the cards' dye
+  mask); bench pass `night_life_noclothes`. Cloth simulation near the view not set up (no
+  script route to Chaos Cloth's clothing data).
+- **Delta:** the library built once with the final code (`dd24b28ed929920b`, the looks, mid
+  meshes and cards in 2,082 s after the dressing); every check passes; 125 of the 144 looks in
+  the pool, at most 0.44 expected alike pairs within 50 m. `night_plan_all` 20.8 ms p95 native
+  on the lean route (walk 23.8, drive 20.9, fly 19.7) against LG5's 21.2: clothing costs no
+  frame time (more draws on the walk, 2,415 to 2,060); the clothing switch off 22.0 (MetaHuman's
+  template bodies). Still over the 20 ms budget by LG5's traffic.
+- **Open items:** a heavy-bodied character's long coat shows the layer under it at the waist
+  while walking; jagged rims at collars and coat edges; no prints or logos on the garments
+  (AG6's brand logos not used yet); raincoats (drawn only in rain, LG8) with a weak front
+  skirt panel; the dyed garments glossy in the rain; cloth simulation.
 
 ## LG3: crowds on the streets
 
