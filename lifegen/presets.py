@@ -145,7 +145,7 @@ SPIKE = {
     "hour": 23,                    # the benchmark's night
     "people_max": 2000,            # at most the budget's people
     "radius_m": 450.0,             # round the district's middle (the benchmark's walk)
-    "cars": 40,                    # "a few cars" on its lanes
+    "cars": 0,                     # (LG0's 40 cars on its lanes; LG5's traffic drives the city)
     "walk_speed": [1.15, 1.55],    # m/s, per person by hash
     "drive_speed": [7.0, 11.0],    # m/s (25 to 40 km/h)
     "car_gap_m": 9.0,              # a car keeps this far behind the one ahead on its lane
@@ -215,6 +215,48 @@ DOOR_WEIGHT = {"shop.lobby": 3.0, "shop.bar": 2.0, "shop.club": 2.5, "shop.food"
 # 5% of a crowd; the library itself is unchanged (its hash is the built assets').
 BODY_WEIGHT = {"Bo": 0.15, "Bruce": 0.15, "Dominic": 0.15, "Jorge": 0.05, "Orlando": 0.2,
                "Lani": 0.3}
+
+# --- LG5: traffic (scope 6.5) -----------------------------------------------------------------
+
+# the city's traffic: cars on every lane of the lane graph at its road's density by hour (M11's
+# vehicles per 100 m and band per segment, over its lanes by length; the district's day shapes
+# the hours within a band), simulated round the view only: every lane within `live_m` of the
+# view is live (cars come alive and go past it, a car driving onto a lane that is not live
+# leaves there), the rest a number per lane and hour; at most `pool` cars at once (the
+# budget's 500 vehicles within 300 m: pool (300 / live_m)^2 of them), each a pool slot of a
+# fixed model (the slots shared out by the districts' fleets), painted by the district it comes
+# out in. Lanes coming alive and the lanes far from the view (past `refill_m` of it) keep the
+# live cars at their number as cars drive out of the live region.
+TRAFFIC = {
+    # (Delta at 23:00: at most 771 cars wanted within 800 m of any point, 1,156 at 18:00, the
+    # busiest hour; the pool holds the busiest hour's within its 92%, and from a flight at
+    # 150 m the roads stay full to 800 m)
+    "pool": 1400,                  # cars simulated at once
+    "live_m": 800.0,               # lanes within this of the view (3D) are live
+    "margin_m": 60.0,              # a live lane goes this far past live_m
+    "refill_m": 450.0,             # cars making up the number come in this far off the view
+    # the car following model (the intelligent driver model): its acceleration and comfortable
+    # braking (m/s2), the hardest it brakes, the gap it keeps standing (m) and its time
+    # headway (s), the exponent of its free road term
+    "accel": 1.8, "brake": 2.6, "brake_max": 8.0, "gap_m": 2.2, "headway_s": 1.2,
+    "delta": 4.0,
+    # signals: a car stops this far short of a crosswalk it would cross (m), and at amber only
+    # where it can stop braking at most `amber_brake` (m/s2); it does not enter a signalized
+    # junction without room past it for its length and gap
+    "stop_margin_m": 1.2, "amber_brake": 3.5,
+    # junctions: connectors whose lines come within `conflict_m` (and 3 m in height) of each
+    # other are never driven at once; a car waiting `starve_s` claims its connector, so the
+    # conflicting ones wait for it; past `force_s` it goes (a guard against a jam)
+    "conflict_m": 2.2, "starve_s": 6.0, "force_s": 25.0,
+    # people and the player in the way: cars within `yield_m` of the view look ahead along
+    # their lanes (their stopping distance and `look_s` of their speed, at least `look_min_m`,
+    # at most `look_max_m`) for anyone within `lateral_m` of their line, where they are and
+    # `predict_s` on at their pace, and stop `margin_m` short of them
+    "yield_m": 180.0, "look_s": 1.6, "look_min_m": 8.0, "look_max_m": 45.0,
+    "lateral_m": 1.45, "predict_s": 1.0, "margin_m": 2.0,
+    # paints per district and model (drawn as AG18's step H draws a parked car's)
+    "paints": 6,
+}
 
 # signal phases (the ask `signal_phases`, derived until citygen records them): two phases per
 # signalized junction from its legs' angles (legs within 45 degrees of the first leg's line

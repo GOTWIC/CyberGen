@@ -75,10 +75,10 @@ HASH_TAG = "cg.hash"
 # unchanged build applies the change (stored hashes are "<version>.<content hash>")
 MESH_VERSION = "3"
 ACTOR_VERSION = "1"
-LIFE_VERSION = "life4"   # LG0: lifegen's controller (CityGenLife) and its stand-in material;
+LIFE_VERSION = "life5"   # LG0: lifegen's controller (CityGenLife) and its stand-in material;
                          # LG1: the people library's properties; LG3: the city's crowd;
                          # 4, lifegen_clothing_toggle: the clothing switch's hidden material
-                         # and whole body
+                         # and whole body; 5, LG5: the city's traffic
 ATMOS_VERSION = "atmos7"  # the atmos controller's and cells' actors (2, AT2: the high tier,
                           # blinks and sweeps in the packed lights; 3, AT3: the sky and time;
                           # 4, AT4: the air, a cell's fog volumes and emitters; 5, the visible
@@ -1241,6 +1241,47 @@ def crowd_props(d):
                     "stairs_share": float(c["stairs"]),
                     "escalator": unreal.Vector2D(*[float(v) for v in c["escalator"]]),
                     "elevator_ms": float(c["elevator"]), "crowd_scale": 1.0})
+    return out
+
+
+def traffic_props(d):
+    """LG5: the life controller's traffic properties from its packed data (`unreal_life.
+    pack_traffic`): every drive lane's cars per hour band, district, main part, signal window
+    and stop, the connectors' conflicts; the signals' windows for cars; the pool's slots by
+    model, the districts' fleets and paints, the models' lengths, the parts' wheel radii and
+    draw distances; the settings. All empty (no traffic: the spike's cars, if any) for a plan
+    before LG5."""
+    fl = lambda k: [float(v) for v in d.get(k) or []]     # noqa: E731
+    it = lambda k: [int(v) for v in d.get(k) or []]       # noqa: E731
+    out = {"drive_cars": fl("drive_cars"), "drive_district": it("drive_district"),
+           "drive_main": it("drive_main"), "drive_signal": it("drive_signal"),
+           "drive_stop_back": fl("drive_stop_back"), "drive_windows": fl("drive_windows"),
+           "drive_conflicts": it("drive_conflicts"),
+           "drive_conflict_starts": it("drive_conflict_starts"),
+           "traffic_slots": it("traffic_slots"),
+           "traffic_weights": [float(v) for w in d.get("traffic_weights") or [] for v in w],
+           "traffic_paints": [float(v) for p in d.get("traffic_paints") or [] for v in p],
+           "car_lengths": fl("car_lengths"),
+           "car_part_spin": [float(p.get("spin_radius") or 0.0) for p in d.get("parts") or []],
+           "car_part_cull": [float(p.get("cull_m") or 0.0) for p in d.get("parts") or []],
+           "traffic_pool": 0}
+    t = d.get("traffic")
+    if t:
+        out.update({"paints_per": int(d.get("paints_per") or 6),
+                    "traffic_pool": int(t["pool"]), "traffic_live_m": float(t["live_m"]),
+                    "traffic_margin_m": float(t["margin_m"]),
+                    "traffic_refill_m": float(t["refill_m"]), "traffic_scale": 1.0,
+                    "traffic_accel": float(t["accel"]), "traffic_brake": float(t["brake"]),
+                    "traffic_brake_max": float(t["brake_max"]),
+                    "traffic_gap_m": float(t["gap_m"]),
+                    "traffic_headway_s": float(t["headway_s"]),
+                    "traffic_delta": float(t["delta"]),
+                    "amber_brake": float(t["amber_brake"]), "starve_s": float(t["starve_s"]),
+                    "force_s": float(t["force_s"]), "yield_m": float(t["yield_m"]),
+                    "look_s": float(t["look_s"]), "look_min_m": float(t["look_min_m"]),
+                    "look_max_m": float(t["look_max_m"]), "lateral_m": float(t["lateral_m"]),
+                    "predict_s": float(t["predict_s"]),
+                    "yield_margin_m": float(t["margin_m"]), "traffic": True})
     return out
 
 
@@ -4492,6 +4533,9 @@ class Importer:
             # (LG3: the city's crowd; empty for a plan before it, which walks LG1's spike)
             for k, v in crowd_props(d).items():
                 a.set_editor_property(k, v)
+            # (LG5: the city's traffic; empty for a plan before it, whose spike drives its cars)
+            for k, v in traffic_props(d).items():
+                a.set_editor_property(k, v)
             a.tags = self.tags(info["key"], hv, [], "life", "life", "", d["district"])
 
         self.place(have, info["key"], info["hash"], cls.static_class(), make, update,
@@ -4506,7 +4550,14 @@ class Importer:
                                          "signals": len(d.get("signal_windows") or []) // 8,
                                          "hour": d["crowd"]["hour"],
                                          "pool": d["crowd"]["pool"]}
-                                        if d.get("crowd") else None)}
+                                        if d.get("crowd") else None),
+                              "traffic": ({"lanes": len(d["drive_starts"]) - 1,
+                                           "pool": d["traffic"]["pool"],
+                                           "live_m": d["traffic"]["live_m"],
+                                           "signal_lanes": sum(1 for v in d["drive_signal"]
+                                                               if v >= 0),
+                                           "models": len(d["models"])}
+                                          if d.get("traffic") else None)}
 
     # -- what Play puts you in, and how far the level streams around you --
 

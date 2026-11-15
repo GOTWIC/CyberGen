@@ -78,8 +78,25 @@ struct FCgLifeWalker : public FMassFragment
 	float PrevHW = 0.f;            // cm: that lane's half width
 };
 
+/** LG5: why a car drives slower than its lane allows now (FCgLifeCar::Why). */
+namespace CgWhy
+{
+	enum : uint8
+	{
+		Free = 0,      // nothing in its way
+		Leader = 1,    // the car in front
+		Red = 2,       // a red (or amber) light at its stop line
+		Person = 3,    // someone of the crowd on or entering its lane ahead
+		Player = 4,    // the player
+		Junction = 5,  // a junction's connector it would cross is being driven
+		Box = 6,       // no room past the junction for it
+	};
+}
+
 /** A car driving: on a lane of the lane graph (directed), its next lane chosen ahead, its
- *  speed and cruise speed, its model and its instance among that model's cars. */
+ *  speed and cruise speed, its model and its instance among that model's cars. LG5: a slot of
+ *  the city's traffic pool, live or free (`Active`), its lane after next, its length, the
+ *  junction connector it holds, why it is slowing, its wheels' turn. */
 USTRUCT()
 struct FCgLifeCar : public FMassFragment
 {
@@ -87,7 +104,7 @@ struct FCgLifeCar : public FMassFragment
 
 	int32 Lane = INDEX_NONE;
 	int32 Next = INDEX_NONE;
-	float Dist = 0.f;
+	float Dist = 0.f;              // cm along its lane (its middle)
 	float Speed = 0.f;             // cm/s
 	float Cruise = 900.f;
 	float Share = 1.f;             // (cars_steam: its share of each lane's speed)
@@ -98,4 +115,15 @@ struct FCgLifeCar : public FMassFragment
 	uint32 Seed = 0;
 	FVector Pos = FVector::ZeroVector;
 	float Yaw = 0.f;
+
+	// --- LG5 -----------------------------------------------------------------------------------
+	uint8 Active = 1;              // (LG0's spike cars are always on)
+	uint8 Why = CgWhy::Free;
+	int32 Next2 = INDEX_NONE;      // the lane after Next
+	int32 Reserved = INDEX_NONE;   // the junction connector it holds (ahead of it)
+	int32 Rank = INDEX_NONE;       // its place in the frame's cars sorted by lane and distance
+	float Len = 480.f;             // cm, its model's length
+	float Wait = 0.f;              // s waiting to enter a junction
+	float Spin = 0.f;              // degrees its wheels have turned
+	float Pending = 0.f;           // s held back by a far car's skipped frames
 };

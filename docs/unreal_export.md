@@ -2616,6 +2616,93 @@ A runtime update and a people library rebuild (no exporter or pack change;
   `MidStand`) at its walking rate, and its card the sheet's cell nearest that pose (a stride
   rate of 1e-5, its offset putting the cell's middle at now; `CardFrames` 8, the library's).
 
+### From LG5: traffic
+
+A life plan with `traffic` (`lifegen plan` since LG5) replaces the spike's cars with the city's
+traffic: every lane and junction connector of the lane graph, at its road's density by hour,
+simulated only round the view (`citygen/unreal_life.py` `pack_traffic`, `PACK_VERSION` 4;
+`import_city.traffic_props`, `LIFE_VERSION` life5; `CityGenLifeTraffic.cpp`). A plan before
+LG5 drives the spike's cars as before.
+
+- **The pack** (`BUILD/unreal/life.json`, the controller's properties): the whole lane graph
+  as drive lanes (`pack_drive_lanes`: cars_steam's smoothed curves and point speeds); per
+  drive lane its cars per hour band (`DriveCars`, 5 a lane: M11's vehicles per 100 m over its
+  segment's lanes by length, the fleet's busy and the traffic's scale in; none on a
+  connector), district (`DriveDistrict`, the crowd's order, so `DistrictShape` gives its
+  day), whether it is on the lane graph's largest strongly connected part (`DriveMain`: cars
+  drive only there and never reach a dead end), the signal window it stops at (`DriveSignal`,
+  an index into `DriveWindows`: cycle, offset, green from, green to, amber to, s; LG3's
+  derived phases) and where (`DriveStopBack`, m back from its end, the plan's: 1.2 m short of
+  the crosswalk across it), the connectors it may not be driven at once with
+  (`DriveConflicts`, `DriveConflictStarts`: `conflicts`, connectors whose lines come within
+  2.2 m in plan and 3 m in height, by GEOS's tree: crossing, merging or leaving one lane);
+  the pool's slots by model (`TrafficSlots`), each district's fleet (`TrafficWeights`, a weight
+  per model) and paints (`TrafficPaints`, `PaintsPer` paints of 9 floats per model: AG18's
+  step H draw by the district's archetype), each model's length (`CarLengths`), each part's
+  wheel radius (`CarPartSpin`) and draw distance (`CarPartCull`, `unreal_life.TRAFFIC_CULL_M`:
+  body 900 m, glass 300, wheels 150); the settings (`TrafficPool`, `TrafficLiveM`, ...). The
+  models are the plan's the project has (AG18's packs imported with the parked cars; never a
+  Vex or an Aurel). The import's `life.traffic` says the lanes, pool, radius, signal lanes and
+  models; its summary line names them.
+- **Live round the view** (`UpdateTraffic`, every 0.25 s): a drive lane within `TrafficLiveM`
+  (800 m, 3D, from its bounding box) of the view is live; one coming alive gets its cars at the
+  hour (`DriveCars` of the hour's band times its district's day, the scale keeping the live
+  cars within 92% of the pool) at random places clear of the cars there; one going past
+  `TrafficLiveM` and 60 m loses its cars; a car driving onto a lane that is not live leaves
+  there. While the live cars are under their number, new ones come in on live lanes past
+  `TrafficRefillM` (450 m) of the view, by their want, over about 4 s. A jump of the view
+  fills the lanes round the new view at once. The rest of the city is a number per lane.
+- **A fixed pool** (`SpawnCarPool`): `TrafficPool` Mass entities (`FCgLifeCar` with LG5's
+  state) made at BeginPlay, each slot a model of the fleet (an instance of each of its parts,
+  drawn at no size while free); a car coming out takes a free slot of a model drawn by its
+  district's fleet among the models with one free, and one of its district's paints for that
+  model (per-instance custom data, as the parked cars').
+- **Driving** (the drive processor's `ExecuteTraffic`, every frame; cars past 450 m every
+  second): the live cars sorted by lane and distance; each accelerates by the intelligent
+  driver model (`TrafficAccel` 1.8 m/s2, `TrafficBrake` 2.6, at most `TrafficBrakeMax` 8,
+  `TrafficGapM` 2.2 m standing, `TrafficHeadwayS` 1.2 s, `TrafficDelta` 4) toward its lane's
+  speed (cars_steam's: its road's class, bends, junctions, its own share) against the nearest
+  of:
+  - the car in front, on its lane, its next lane or the one after (no car drives through
+    another);
+  - its signal's stop line on red, and on amber where it can stop braking at most
+    `AmberBrake` (3.5 m/s2); past the line it goes on;
+  - the end of its lane while the junction ahead is not its own: a car within its braking
+    distance and 6 m of a connector holds it (`FCgLifeCar::Reserved`) only while no
+    connector crossing it is driven or held, nor claimed by a car that has waited longer (a
+    car waiting `StarveS`, 6 s, claims its connector, so the crossing ones wait for it), and
+    only with room past the junction for its length and gap (no car blocks a box); a car
+    queued behind a stopped one waits at the edge without holding; past `ForceS` (25 s) of
+    waiting it goes (a guard against a jam);
+  - anyone in its way: within `YieldM` (180 m) of the view, a car looks ahead along its lanes
+    (its stopping distance and `LookS` of its speed, 8 to 45 m) for the crowd's people
+    (`WalkPos`, where they are and `PredictS` 1 s on at their pace) and the pawns (every pawn
+    but the free camera: the walker, the fly pawn at the road's height) within `LateralM`
+    (1.45 m) of its line and 2.5 m in height, and stops `YieldMarginM` (2 m) short of them;
+    a car stopped `ForceS` for a person standing still in its way goes on, never for the
+    player.
+  Each car's wheels roll by its travel over their radius (`CarPartSpin`).
+- **Night:** the packs' head, tail and marker lamps are emissive (`M_CgVehicle`'s emission by
+  `MPC_CityGen`'s Night, as the parked cars'); no light of their own.
+- **Console:** `CityGenLife.Traffic [0|1] [SCALE]` (the traffic on or off, at SCALE times the
+  plan's density, filled again), the play menu's **Traffic** row (`traffic`, `traffic=0|1`;
+  `ACityGenPlay::HasLifeTraffic`); `CityGenLife.Hour H` fills the lanes again too;
+  `CityGenLife.Status` adds `traffic` (hour, pool, live lanes, the cars wanted and the scale,
+  active, moving, how many slow for the car in front, a red light, a person, the player, a
+  junction, no room past it, spawned, refilled, left at the edge, lost with their lane,
+  forced, conflicts, signal lanes, the cars' step and draw ms). For the check's shots,
+  `CityGenLife.TrafficShow red|person|player|moving` moves the camera to the nearest car
+  stopped at a red light with a queue behind it (most queued first), stopped for a person, for
+  the player, or moving (`CITYGEN_LIFE_SHOW`), `CityGenLife.BlockPlayer` stands the walker in
+  the lane of the nearest moving car 45 m ahead of it, and `CityGenLife.Jaywalk A B` sets
+  LG3's share crossing against the signal.
+- **Check** (`citygen/ue/check_city.py`): a view's commands (`$CITYGEN_UE_VIEW_CMDS`) take
+  `wait S`, `dilate X` and `until S COMMAND` (again every half second until the traffic shows
+  what it was asked, the status's `traffic.show`), and `<name>@late` runs right before the
+  view's shot; the result's `traffic_views`.
+- **Benchmark:** every life pass sets `CityGenLife.Traffic 1`, the pass `night_traffic_off`
+  the night with the people and no traffic (`bench.LIFE_PASSES`).
+
 ## Milestones and checks
 
 - **Every milestone** updates the exporter in its own PR for what it adds or changes (a new

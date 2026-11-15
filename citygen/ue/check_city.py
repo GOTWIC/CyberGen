@@ -1081,6 +1081,46 @@ def atmos_status(world):
     return json.loads(found[0].get_status()) if found else None
 
 
+def life_status(world):
+    """lifegen's controller's state (LG0), or None when the level has none."""
+    cls = getattr(unreal, "CityGenLife", None)
+    found = unreal.GameplayStatics.get_all_actors_of_class(world, cls) if cls else []
+    return json.loads(found[0].get_status()) if found else None
+
+
+def view_cmds(world, text, name):
+    """A view's commands ($CITYGEN_UE_VIEW_CMDS), `;` between them: console commands, and
+    (LG5) `wait S` (seconds), `dilate X` (the world's time dilation) and `until S COMMAND`
+    (the command again every half second, at most S seconds, until lifegen's traffic shows
+    what it was asked for: its status's `traffic.show` not ending in `:none`)."""
+    for c in (text or "").split(";"):
+        c = c.strip()
+        if not c:
+            continue
+        if c.startswith("wait "):
+            yield from wait(float(c[5:]))
+            continue
+        if c.startswith("dilate "):
+            unreal.GameplayStatics.set_global_time_dilation(world, float(c[7:]))
+            continue
+        m = re.match(r"until (\d+(?:\.\d+)?) (.+)$", c)
+        if m:
+            t, cmd, got = 0.0, m.group(2), None
+            while t <= float(m.group(1)):
+                unreal.SystemLibrary.execute_console_command(world, cmd)
+                got = ((life_status(world) or {}).get("traffic") or {}).get("show", "")
+                if got and not got.endswith(":none"):
+                    break
+                yield from wait(0.5)
+                t += 0.5
+            log(f"view {name} until {cmd}: {got} after {t:.1f} s")
+            RES.setdefault("traffic_views", {})[name] = {"command": cmd, "show": got,
+                                                         "after_s": t}
+            continue
+        unreal.SystemLibrary.execute_console_command(world, c)
+        log(f"view {name} command: {c}")
+
+
 def play_views(world, a, slug, prefix):
     """The `--view`s named `<prefix>*` from the free camera in the play world (by night
     atmosgen's lights and the light pools live only there; streaming loads the
@@ -1143,10 +1183,7 @@ def play_views(world, a, slug, prefix):
         # console commands, `;` between them, run as the camera reaches that view, e.g. the
         # people's tiers set for one view; `<name>@after` runs after its shot)
         vcmds = json.loads(os.environ.get("CITYGEN_UE_VIEW_CMDS") or "{}")
-        for c in (vcmds.get(v["name"]) or "").split(";"):
-            if c.strip():
-                unreal.SystemLibrary.execute_console_command(world, c.strip())
-                log(f"view {v['name']} command: {c.strip()}")
+        yield from view_cmds(world, vcmds.get(v["name"]), v["name"])
         # (a view named `*_seq<N>` is shot N times with the world slowed to
         # $CITYGEN_UE_SEQ_DILATION (0.05) between them: `<name>_<k>`, a short sequence)
         seq = re.search(r"_seq(\d+)$", v["name"])
@@ -1168,6 +1205,9 @@ def play_views(world, a, slug, prefix):
             unreal.SystemLibrary.execute_console_command(
                 world, f"CityGenAtmos.Weather {wm.group(2)}")
             yield from wait(float(wm.group(3)))
+        # (LG5: `<name>@late`, commands run when the view has streamed in and waited, right
+        # before its shot: the traffic's shots frame a car there, `CityGenLife.TrafficShow`)
+        yield from view_cmds(world, vcmds.get(v["name"] + "@late"), v["name"])
         # (AT7: CITYGEN_UE_VIEW_RES sets the views' size, 7680x4320 for an 8K shot)
         res = os.environ.get("CITYGEN_UE_VIEW_RES") or "1920x1080"
         if noclothes:
@@ -1189,9 +1229,7 @@ def play_views(world, a, slug, prefix):
             unreal.GameplayStatics.set_global_time_dilation(world, 1.0)
         else:
             yield from ui_shot(world, v["name"], f"HighResShot {res}", 600)
-        for c in (vcmds.get(v["name"] + "@after") or "").split(";"):
-            if c.strip():
-                unreal.SystemLibrary.execute_console_command(world, c.strip())
+        yield from view_cmds(world, vcmds.get(v["name"] + "@after"), v["name"])
         # (LG3: lifegen's crowd at each view, in the log: CITYGEN_LIFE_STATUS after the view's
         # name; a level without the CityGenLife plugin only warns)
         log(f"life at view {v['name']}")

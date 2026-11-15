@@ -561,6 +561,11 @@
   "TileIndex": {
    "additionalProperties": false,
    "properties": {
+    "drives": {
+     "default": 0,
+     "title": "Drives",
+     "type": "integer"
+    },
     "file": {
      "description": "`spawns/<tile>.json`, relative to the plan.",
      "title": "File",
@@ -597,6 +602,131 @@
     "sha256"
    ],
    "title": "TileIndex",
+   "type": "object"
+  },
+  "TrafficPlan": {
+   "additionalProperties": false,
+   "description": "LG5: the city's traffic (scope 6.5): the pool of cars the runtime simulates round the\nview (each slot a model of AG18's fleet, shared out by the districts' fleets), how they\ndrive (the car following model, signals, junctions, yielding), the districts' fleets and\npaints, its totals by hour.",
+   "properties": {
+    "drive": {
+     "additionalProperties": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "items": {
+         "type": "number"
+        },
+        "type": "array"
+       }
+      ]
+     },
+     "description": "cars_steam's speeds: `junction`, `lateral`, `brake`, `crawl`, `vary`, `default`.",
+     "title": "Drive",
+     "type": "object"
+    },
+    "drive_speeds": {
+     "additionalProperties": {
+      "type": "number"
+     },
+     "title": "Drive Speeds",
+     "type": "object"
+    },
+    "follow": {
+     "additionalProperties": {
+      "type": "number"
+     },
+     "description": "The car following model and the signals, junctions and yielding (`presets.TRAFFIC`).",
+     "title": "Follow",
+     "type": "object"
+    },
+    "hash": {
+     "title": "Hash",
+     "type": "string"
+    },
+    "hour": {
+     "title": "Hour",
+     "type": "integer"
+    },
+    "live_m": {
+     "title": "Live M",
+     "type": "number"
+    },
+    "models": {
+     "description": "AG18's models the traffic draws from (no Vex or Aurel: `assetgen.parked.table.EXCLUDED`).",
+     "items": {
+      "type": "string"
+     },
+     "title": "Models",
+     "type": "array"
+    },
+    "paints": {
+     "additionalProperties": {
+      "items": {
+       "items": {
+        "type": "number"
+       },
+       "type": "array"
+      },
+      "type": "array"
+     },
+     "description": "Per district, per model, `paints` paints of 9 floats (three linear colors, AG18's step H's draw by the district's archetype).",
+     "title": "Paints",
+     "type": "object"
+    },
+    "pool": {
+     "title": "Pool",
+     "type": "integer"
+    },
+    "scale": {
+     "title": "Scale",
+     "type": "number"
+    },
+    "slots": {
+     "description": "Per pool slot its model (an index into `models`).",
+     "items": {
+      "type": "integer"
+     },
+     "title": "Slots",
+     "type": "array"
+    },
+    "totals": {
+     "additionalProperties": true,
+     "title": "Totals",
+     "type": "object"
+    },
+    "weights": {
+     "additionalProperties": {
+      "items": {
+       "type": "number"
+      },
+      "type": "array"
+     },
+     "description": "Per district its fleet: a weight per model (in `models`' order).",
+     "title": "Weights",
+     "type": "object"
+    }
+   },
+   "required": [
+    "hour",
+    "pool",
+    "live_m",
+    "scale",
+    "models",
+    "slots",
+    "weights",
+    "paints",
+    "drive",
+    "drive_speeds",
+    "follow",
+    "totals",
+    "hash"
+   ],
+   "title": "TrafficPlan",
    "type": "object"
   }
  },
@@ -692,6 +822,18 @@
    "additionalProperties": true,
    "title": "Totals",
    "type": "object"
+  },
+  "traffic": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/TrafficPlan"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "description": "LG5: the city's traffic."
   },
   "version": {
    "const": 1,

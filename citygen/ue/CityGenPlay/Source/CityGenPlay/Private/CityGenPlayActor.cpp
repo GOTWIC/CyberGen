@@ -738,6 +738,15 @@ bool ACityGenPlay::ClickMenuRow(const FString& Row)
 		}
 		SetLifeClothing(R == TEXT("clothing") ? !GetLifeClothing() : R.EndsWith(TEXT("1")));
 	}
+	else if (R == TEXT("traffic") || R.StartsWith(TEXT("traffic=")))
+	{
+		// LG5: lifegen's traffic on or off
+		if (!HasLifeTraffic())
+		{
+			return false;
+		}
+		SetLifeTraffic(R == TEXT("traffic") ? !GetLifeTraffic() : R.EndsWith(TEXT("1")));
+	}
 	else if (!GetAtmos())
 	{
 		return false;                           // (the weather rows are hidden)
@@ -935,6 +944,26 @@ bool ACityGenPlay::GetLifeClothing() const
 void ACityGenPlay::SetLifeClothing(bool bOn)
 {
 	CallOne(GetLife(), TEXT("SetClothing"), bOn, 0.f);
+}
+
+bool ACityGenPlay::HasLifeTraffic() const
+{
+	const AActor* A = GetLife();
+	const FIntProperty* Pool = A ? FindFProperty<FIntProperty>(A->GetClass(), TEXT("TrafficPool")) : nullptr;
+	return A && FindFProperty<FBoolProperty>(A->GetClass(), TEXT("bTraffic")) != nullptr && Pool &&
+		Pool->GetPropertyValue_InContainer(A) > 0;
+}
+
+bool ACityGenPlay::GetLifeTraffic() const
+{
+	const AActor* A = GetLife();
+	const FBoolProperty* P = A ? FindFProperty<FBoolProperty>(A->GetClass(), TEXT("bTraffic")) : nullptr;
+	return P && P->GetPropertyValue_InContainer(A);
+}
+
+void ACityGenPlay::SetLifeTraffic(bool bOn)
+{
+	CallOne(GetLife(), TEXT("SetTraffic"), bOn, 0.f);
 }
 
 void ACityGenPlay::SetAtmosHour(float InHour)

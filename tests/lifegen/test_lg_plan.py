@@ -51,13 +51,14 @@ def _model() -> dict:
              "params": {"wealth": 0.3, "danger": 0.65}, "polygon": _sq(250, -100, 500, 100)}],
         "road_segments": [
             {"id": "rs.a", "road_class": "street", "centerline": [[0.0, 0.0], [200.0, 0.0]],
-             "attrs": {"length_m": 200.0}},
+             "attrs": {"length_m": 200.0}, "start": "rn.w", "end": "rn.x"},
             {"id": "rs.c", "road_class": "street", "centerline": [[300.0, 0.0], [400.0, 0.0]],
              "attrs": {}},
             {"id": "rs.n", "road_class": "street", "centerline": [[200.0, 0.0], [200.0, 90.0]],
              "attrs": {}}],
         "junctions": [
-            {"id": "jn.x", "signalized": True, "crosswalk_ids": ["cw.a", "cw.n"],
+            {"id": "jn.x", "node_id": "rn.x", "signalized": True,
+             "crosswalk_ids": ["cw.a", "cw.n"],
              "attrs": {"cuts": [["rs.a", "b", 5.0], ["rs.n", "a", 5.0]]}},
             {"id": "jn.y", "signalized": False, "crosswalk_ids": [], "attrs": {"cuts": []}}],
         "crosswalks": [
@@ -75,9 +76,23 @@ def _model() -> dict:
              "vehicles_per_100m": [0.5, 2.0, 2.0, 3.0, 2.0],
              "gang_per_100m": [0.5] * 5, "police_per_100m": [0.05] * 5}],
         "walkways": walks,
+        # (LG5: rs.a both ways, a turning connector at each end: the lane graph's main part)
         "lanes": [
-            {"id": "rs.a.f0", "kind": "lane", "centerline": [[0.0, -1.8, 0.0], [200.0, -1.8, 0.0]],
-             "width_m": 3.6, "successors": [], "forward": True, "index": 0,
+            {"id": "rs.a.f0", "kind": "lane", "segment_id": "rs.a",
+             "centerline": [[0.0, -1.8, 0.0], [200.0, -1.8, 0.0]],
+             "width_m": 3.6, "successors": ["rs.a.f0.c1"], "forward": True, "index": 0,
+             "adjacent_ids": []},
+            {"id": "rs.a.f0.c1", "kind": "connector", "node_id": "rn.x",
+             "centerline": [[200.0, -1.8, 0.0], [202.0, 0.0, 0.0], [200.0, 1.8, 0.0]],
+             "width_m": 3.6, "successors": ["rs.a.b0"], "forward": True, "index": 0,
+             "adjacent_ids": []},
+            {"id": "rs.a.b0", "kind": "lane", "segment_id": "rs.a",
+             "centerline": [[200.0, 1.8, 0.0], [0.0, 1.8, 0.0]],
+             "width_m": 3.6, "successors": ["rs.a.b0.c1"], "forward": False, "index": 0,
+             "adjacent_ids": []},
+            {"id": "rs.a.b0.c1", "kind": "connector", "node_id": "rn.w",
+             "centerline": [[0.0, 1.8, 0.0], [-2.0, 0.0, 0.0], [0.0, -1.8, 0.0]],
+             "width_m": 3.6, "successors": ["rs.a.f0"], "forward": True, "index": 0,
              "adjacent_ids": []}],
         "buildings": [
             {"id": "d01.lot.e50n20.bld", "district_id": "d01", "floors": 20,
@@ -271,8 +286,11 @@ def test_exporter_packs_the_spike(build: Path):
     lb = c["walk_links"][c["walk_link_starts"][1]:c["walk_link_starts"][2]]
     assert la == [2 * 1 + 1] and 2 * 0 in lb
     assert c["drive_startable"] == [1, 0] and c["drive_links"] == [1]
-    assert len(c["car_models"]) == P.SPIKE["cars"] and set(c["car_models"]) == {0}
-    assert len(c["car_paints"]) == 9 * P.SPIKE["cars"]
+    # (LG5: no spike cars; the traffic's pool drives the city's lanes, its models the plan's
+    # the project has)
+    assert c["car_models"] == [] and c["car_paints"] == []
+    assert c["cars"] == P.TRAFFIC["pool"] == len(c["traffic_slots"])
+    assert set(c["traffic_slots"]) == {0}
     assert [p["shadow"] for p in c["parts"]] == [True, False]
     assert len(c["palette"]) == 3 * P.SPIKE_PALETTE
     assert UL.actor_hashes(lf) == {"life": lf["hash"]}
@@ -502,3 +520,178 @@ def test_exporter_packs_the_crowd(build: Path):
                                   "crowd": {"pool": c["people"], "hour": 23, "doors": 8,
                                             "signals": 1}}})
     assert "the city's crowd, a pool of 2400" in line and "stand-ins" in line
+
+
+# --- LG5: traffic -----------------------------------------------------------------------------
+
+def _drives(out: Path) -> dict:
+    plan = json.loads((out / "life_plan.json").read_text(encoding="utf-8"))
+    rows = {}
+    for t in plan["tiles"]:
+        tile = PM.TileSpawns.model_validate_json((out / t["file"]).read_text(encoding="utf-8"))
+        rows.update({d.id: d for d in tile.drives})
+    return rows
+
+
+def test_traffic_on_every_lane(build: Path):
+    """Every lane's cars per hour band from M11's vehicles per 100 m over its segment's lanes
+    by length, its district and road class, the signal its end stops at and where (short of
+    the crosswalk across it); the pool's slots by the districts' fleets (no Vex or Aurel), the
+    districts' paints; the checks."""
+    from assetgen.parked.table import EXCLUDED
+    rep = PL.build_plan(build, preview=False)
+    assert rep["ok"], rep["checks"]
+    for k in ("traffic_densities", "traffic_lanes", "traffic_signals", "traffic_budget",
+              "traffic_fleet"):
+        assert rep["checks"][k]["ok"], (k, rep["checks"][k])
+    rows = _drives(build / "life")
+    # (connectors carry no cars of their own: only the lanes are rows)
+    assert set(rows) == {"rs.a.f0", "rs.a.b0"}
+    f0, b0 = rows["rs.a.f0"], rows["rs.a.b0"]
+    # rs.a: 200 m, 5 vehicles per 100 m by morning, over its two 200 m lanes
+    assert f0.vehicles[1] == pytest.approx(5.0, abs=1e-3) and b0.vehicles[1] == f0.vehicles[1]
+    assert f0.district_id == "d01" and f0.road_class == "street" and f0.main and b0.main
+    # rs.a.f0 ends at jn.x, rs.a its phase 0 leg; its cars stop short of cw.a (x 195, 3 m wide)
+    assert f0.signal == "sig.jn.x" and f0.phase == 0
+    assert f0.stop_back_m == pytest.approx(200.0 - (195.0 - 1.5 - P.TRAFFIC["stop_margin_m"]),
+                                           abs=0.01)
+    assert b0.signal is None and b0.stop_back_m is None
+    plan = PM.LifePlan.model_validate_json(
+        (build / "life" / "life_plan.json").read_text(encoding="utf-8"))
+    tr = plan.traffic
+    assert tr.pool == P.TRAFFIC["pool"] == len(tr.slots) and tr.live_m == P.TRAFFIC["live_m"]
+    assert tr.models and not set(tr.models) & set(EXCLUDED)
+    assert set(tr.slots) <= set(range(len(tr.models)))
+    assert all(c > 0 for c in tr.totals["slots"].values())
+    assert set(tr.weights) == {"d01", "d02"} and len(tr.weights["d01"]) == len(tr.models)
+    assert len(tr.paints["d02"]) == len(tr.models)
+    assert len(tr.paints["d02"][0]) == 9 * P.TRAFFIC["paints"]
+    # (rs.c has vehicles and no lane: left out, said so)
+    assert tr.totals["left_out"]["segments"] == 1
+    # (the hour's cars: the bands by the districts' days)
+    band = P.band_of(tr.hour)
+    shape = {d.id: d.shape for d in plan.districts}
+    assert tr.totals["cars_by_hour"][tr.hour] == pytest.approx(
+        2 * f0.vehicles[band] * shape["d01"][tr.hour], abs=0.1)
+
+
+def test_traffic_off_the_main_part_is_left_out(build: Path):
+    """A lane off the lane graph's largest strongly connected part (cars there could never
+    leave) gets no cars; what it would have had is said, and the densities still hold."""
+    m = _model()
+    m["lanes"].append({"id": "rs.c.f0", "kind": "lane", "segment_id": "rs.c",
+                       "centerline": [[300.0, -1.8, 0.0], [400.0, -1.8, 0.0]],
+                       "width_m": 3.6, "successors": [], "forward": True, "index": 0,
+                       "adjacent_ids": []})
+    (build / "city_model.json").write_text(json.dumps(m), encoding="utf-8")
+    rep = PL.build_plan(build, preview=False)
+    assert rep["ok"], rep["checks"]
+    c = _drives(build / "life")["rs.c.f0"]
+    assert not c.main and c.vehicles == [0.0] * 5 and c.district_id == "d02"
+    assert rep["traffic"]["left_out"]["lanes"] == 1
+    assert rep["traffic"]["left_out"]["segments"] == 0
+    # rs.c's 100 m at 3 vehicles per 100 m in the evening band, left out
+    assert rep["traffic"]["left_out"]["vehicles"][3] == pytest.approx(3.0, abs=1e-3)
+
+
+def test_traffic_budget_check_fails_past_the_budget(build: Path):
+    (build / "life_spec.json").write_text(json.dumps({"traffic": {"pool": 5000,
+                                                                   "live_m": 300.0}}),
+                                          encoding="utf-8")
+    rep = PL.build_plan(build, build / "life_spec.json", preview=False)
+    assert not rep["ok"] and not rep["checks"]["traffic_budget"]["ok"]
+
+
+def test_strong_components():
+    from citygen import unreal_life as UL
+    # 0 -> 1 -> 2 -> 0 a ring, 3 -> 0 a way in, 4 <-> 5 a pair
+    succ = [[1], [2], [0], [0], [5], [4]]
+    comp = UL.strong_components(succ)
+    assert comp[0] == comp[1] == comp[2] and len({comp[3], comp[0], comp[4]}) == 3
+    assert comp[4] == comp[5]
+    assert UL.main_component(succ) == {0, 1, 2}
+    # (a long chain: no recursion limit)
+    n = 20000
+    chain = [[k + 1] for k in range(n - 1)] + [[0]]
+    assert len(UL.main_component(chain)) == n
+
+
+def test_exporter_packs_the_traffic(build: Path):
+    """The exporter packs every lane and connector of the lane graph with its cars per band,
+    district, main part, signal window and stop, the connectors it may not share (crossing in
+    plan at one height, not one over another), the signals' windows for cars, the pool's slots,
+    the fleets and paints, the models' lengths, the wheels' radii and draw distances."""
+    from citygen import unreal_life as UL
+    from citygen.unreal import life_summary
+    PL.build_plan(build, preview=False)
+    m = _model()
+    walks = [{"id": w["id"], "kind": w["kind"], "width": w["width_m"], "points": w["line"],
+              "links": w["neighbors"]} for w in m["walkways"]]
+    lanes = [{"id": ln["id"], "kind": ln["kind"], "width": ln["width_m"],
+              "points": ln["centerline"], "links": ln["successors"]} for ln in m["lanes"]]
+    # (two connectors crossing at grade, a third over them on a deck, a fourth far off)
+    lanes += [{"id": "x1", "kind": "connector", "width": 3.0,
+               "points": [[100, -10, 0], [110, 10, 0]], "links": []},
+              {"id": "x2", "kind": "connector", "width": 3.0,
+               "points": [[100, 10, 0], [110, -10, 0]], "links": []},
+              {"id": "x3", "kind": "connector", "width": 3.0,
+               "points": [[95, 0, 9], [115, 0, 9]], "links": []},
+              {"id": "x4", "kind": "connector", "width": 3.0,
+               "points": [[300, 50, 0], [310, 50, 0]], "links": []}]
+    graphs = {"walkways": _flat(walks), "lanes": _flat(lanes)}
+    veh = {"cars": {"tanager_mino": {"folder": "/Game/CityGen/Vehicles/tanager_mino",
+                                     "dimensions": {"length": 3.43},
+                                     "parts": [{"name": "body", "kind": "body",
+                                                "pivot": [0, 0, 0]},
+                                               {"name": "wheel_fl", "kind": "wheel",
+                                                "pivot": [1.2, 0.7, 0.3], "radius": 0.31,
+                                                "spins": True}]}}}
+    lf = UL.write_life(build, None, graphs, veh)
+    c = json.loads((build / "unreal" / "life.json").read_text(encoding="utf-8"))["controller"]
+    ids = [ln["id"] for ln in lanes]
+    k = {i: n for n, i in enumerate(ids)}
+    rows = _drives(build / "life")
+    assert c["drive_cars"][5 * k["rs.a.f0"]:5 * k["rs.a.f0"] + 5] == \
+        pytest.approx(rows["rs.a.f0"].vehicles)
+    assert c["drive_cars"][5 * k["rs.a.f0.c1"]:5 * k["rs.a.f0.c1"] + 5] == [0.0] * 5
+    assert c["drive_district"][k["rs.a.f0"]] == 0
+    # (the ring of rs.a's lanes and connectors is the main part; the loose connectors are not)
+    assert [c["drive_main"][k[i]] for i in ids[:4]] == [1, 1, 1, 1]
+    assert c["drive_main"][k["x1"]] == 0
+    # (the signal's windows for cars: cycle, offset, green from, green to, amber to; rs.a.f0
+    # moves in phase 0 and stops short of its crosswalk)
+    win = c["drive_windows"]
+    assert len(win) == 10
+    s = c["drive_signal"][k["rs.a.f0"]]
+    sg = P.SIGNAL
+    green = sg["cycle_s"] / 2 - sg["amber_s"] - sg["all_red_s"]
+    assert win[5 * s + 2:5 * s + 5] == pytest.approx([0.0, green, green + sg["amber_s"]])
+    assert c["drive_stop_back"][k["rs.a.f0"]] == pytest.approx(rows["rs.a.f0"].stop_back_m)
+    assert c["drive_signal"][k["rs.a.b0"]] == -1
+    # (conflicts: x1 and x2 cross at grade; x3 passes 9 m over them; x4 is far off)
+    cs, cl = c["drive_conflict_starts"], c["drive_conflicts"]
+    con = {i: sorted(ids[j] for j in cl[cs[k[i]]:cs[k[i] + 1]]) for i in ids}
+    assert con["x1"] == ["x2"] and con["x2"] == ["x1"]
+    assert con["x3"] == [] and con["x4"] == [] and con["rs.a.f0"] == []
+    # (the pool, the fleet, paints, lengths, wheels, draw distances, settings)
+    assert len(c["traffic_slots"]) == P.TRAFFIC["pool"] and set(c["traffic_slots"]) == {0}
+    assert len(c["traffic_weights"]) == 2 and len(c["traffic_weights"][0]) == 1
+    assert len(c["traffic_paints"][0]) == 9 * c["paints_per"] == 9 * P.TRAFFIC["paints"]
+    assert c["car_lengths"] == [3.43]
+    assert [p["spin_radius"] for p in c["parts"]] == [0.0, 0.31]
+    assert [p["cull_m"] for p in c["parts"]] == [UL.TRAFFIC_CULL_M["body"],
+                                                 UL.TRAFFIC_CULL_M["wheel"]]
+    t = c["traffic"]
+    assert t["pool"] == P.TRAFFIC["pool"] and t["live_m"] == P.TRAFFIC["live_m"]
+    assert t["accel"] == P.TRAFFIC["accel"] and t["districts"] == ["d01", "d02"]
+    assert lf["traffic"]["conflicts"] == 1 and lf["traffic"]["signal_lanes"] == 1
+    # (the import's summary line names the traffic)
+    line = life_summary({"life_plan": {"plan": "x"},
+                         "life": {"made": True, "people": c["people"], "cars": c["cars"],
+                                  "district": "d02", "walk_lanes": 6, "library": 0,
+                                  "crowd": {"pool": c["people"], "hour": 23, "doors": 8,
+                                            "signals": 1},
+                                  "traffic": {"pool": t["pool"], "models": 1,
+                                              "live_m": t["live_m"], "lanes": len(ids),
+                                              "signal_lanes": 1}}})
+    assert f"the city's traffic, a pool of {P.TRAFFIC['pool']} cars" in line

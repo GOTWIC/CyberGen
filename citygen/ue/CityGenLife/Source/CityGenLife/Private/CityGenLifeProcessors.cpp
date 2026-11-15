@@ -820,6 +820,12 @@ void UCityGenLifeDriveProcessor::ConfigureQueries(const TSharedRef<FMassEntityMa
 
 void UCityGenLifeDriveProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context)
 {
+	if (Frame && Frame->Storage && Frame->bTraffic)
+	{
+		// (LG5: the city's traffic)
+		ExecuteTraffic(Context);
+		return;
+	}
 	if (!Frame || !Frame->Storage || !Frame->CarStarts || Frame->CarStarts->Num() == 0)
 	{
 		return;

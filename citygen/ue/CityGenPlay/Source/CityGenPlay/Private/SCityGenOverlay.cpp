@@ -34,7 +34,9 @@ namespace
 		// cars_steam: AT4's steam and smoke plumes (off by default, issue #223)
 		RowSteam = 19,
 		// lifegen_clothing_toggle: the people's clothes (a debug switch until LG2's garments)
-		RowClothing = 20 };
+		RowClothing = 20,
+		// LG5: lifegen's traffic on or off
+		RowTraffic = 21 };
 
 	/** A row's name for ACityGenPlay::ClickMenuRow (the console's CityGen.MenuRow). */
 	const TCHAR* RowName(int32 Row)
@@ -59,6 +61,7 @@ namespace
 		case RowFrameGen: return TEXT("framegen");
 		case RowSteam: return TEXT("steam");
 		case RowClothing: return TEXT("clothing");
+		case RowTraffic: return TEXT("traffic");
 		default: return TEXT("hour+");    // the hour row and its > arrow
 		}
 	}
@@ -354,6 +357,11 @@ int32 SCityGenOverlay::PaintMenu(FSlateWindowElementList& Out, int32 Layer, cons
 	{
 		// lifegen_clothing_toggle: with lifegen's controller, its people's clothes on or off
 		Rows.Add({RowClothing, TEXT("Clothing"), P->GetLifeClothing() ? TEXT("On") : TEXT("Off")});
+	}
+	if (P->HasLifeTraffic())
+	{
+		// LG5: with lifegen's traffic, the cars on or off
+		Rows.Add({RowTraffic, TEXT("Traffic"), P->GetLifeTraffic() ? TEXT("On") : TEXT("Off")});
 	}
 	constexpr double BarH = 30.0;
 	const double Extra = bAtmos ? BarH : 0.0;

@@ -21,6 +21,12 @@ LG3: a plan with a `crowd` packs the city's crowd instead of the spike's people
 signal window; the doors; the districts' days, dangers and palettes; the pool; the drive lanes
 and cars stay the spike's.
 
+LG5: a plan with `traffic` packs the city's traffic instead of the spike's cars
+(`pack_traffic`): every lane and junction connector of the lane graph with its cars per hour
+band, district, whether it is on the graph's largest strongly connected part, the signal it
+stops at and where, the connectors it may not share (`conflicts`); the signals' windows for
+cars; the pool's slots by model, the districts' fleets and paints (`traffic_cars`).
+
 The runtime builds ZoneGraph lanes from these at BeginPlay (no hand-drawn shapes). A plan
 whose checks failed is named and left out (`skipped`); a build without a plan gets no
 section, and its manifest is what it was.
@@ -33,12 +39,17 @@ import json
 import math
 from pathlib import Path
 
-PACK_VERSION = 3            # 2 (cars_steam): smoothed drive lanes, their speeds; 3 (LG3): the
-                            # city's crowd (every walkway, doors, signals, the pool)
+PACK_VERSION = 4            # 2 (cars_steam): smoothed drive lanes, their speeds; 3 (LG3): the
+                            # city's crowd (every walkway, doors, signals, the pool); 4 (LG5):
+                            # the city's traffic (every lane, signals, conflicts, the pool)
 DATA = "life.json"
 CONTROLLER_KEY = "life"
 MARGIN_M = 60.0             # lanes this far past the live radius come along (links out of it)
 PAINT_FLOATS = 9
+# LG5: how far each part of a moving car is drawn (m): the body out past the traffic's live
+# radius (a flight sees the roads full), its glass, wheels and small parts nearer (the parked
+# cars' import.VEHICLE_CULL_M is shorter: they are many more)
+TRAFFIC_CULL_M = {"body": 900.0, "glass": 300.0, "wheel": 150.0, "brake": 80.0, "other": 200.0}
 
 
 def _sha16(data) -> str:
@@ -121,12 +132,23 @@ def pack_drive(graphs: dict, spike: dict) -> dict:
     reach = float(spike["radius_m"]) + MARGIN_M
     drive = [e for e in _elements(graphs["lanes"])
              if len(e[2]) >= 2 and _near(e[2], cx, cy, reach)]
+    refs = graphs["lanes"].get("refs") or [""] * graphs["lanes"]["count"]
+    classes = spike.get("road_classes") or {}
+    return pack_drive_lanes(graphs, drive, spike.get("drive_speeds") or {},
+                            spike.get("drive") or {},
+                            {e[0]: classes.get(refs[e[0]], "") for e in drive})
+
+
+def pack_drive_lanes(graphs: dict, drive: list, speeds: dict, dv: dict,
+                     lane_class: dict) -> dict:
+    """Drive lanes (`_elements` of the lane graph), flat, with their speeds (cars_steam):
+    `lane_class` the road class of each element (by its index in the graph; a connector's
+    unused)."""
     dmap = {e[0]: k for k, e in enumerate(drive)}
     out = {"drive_points": [], "drive_starts": [0], "drive_widths": [],
            "drive_links": [], "drive_link_starts": [0], "drive_startable": [],
            "drive_vmax": [], "drive_cruise": []}
-    refs = graphs["lanes"].get("refs") or [""] * graphs["lanes"]["count"]
-    succ = [[dmap[j] for j in e[4] if j in dmap] for e in drive]
+    succ =[[dmap[j] for j in e[4] if j in dmap] for e in drive]
     pred: list[list[int]] = [[] for _ in drive]
     for k, ss in enumerate(succ):
         for j in ss:
@@ -142,16 +164,13 @@ def pack_drive(graphs: dict, spike: dict) -> dict:
         after = next((drive[j][2][1] for j in succ[k]
                       if math.dist(drive[j][2][0][:2], p[-1][:2]) < 0.5), None)
         pts.append(smooth(p, before, after))
-    speeds = spike.get("drive_speeds") or {}
-    dv = spike.get("drive") or {}
     default = speeds.get(dv.get("default", "street"), 9.5) if speeds else None
-    classes = spike.get("road_classes") or {}
     base = []
     for k, e in enumerate(drive):
         if default is None:
             base.append(0.0)                  # (a plan before cars_steam: no speeds)
         elif e[1] == "lane":
-            base.append(float(speeds.get(classes.get(refs[e[0]], ""), default)))
+            base.append(float(speeds.get(lane_class.get(e[0], ""), default)))
         else:
             base.append(-1.0)                 # (a connector: from its roads, below)
     for k, e in enumerate(drive):
@@ -192,6 +211,66 @@ def pack_drive(graphs: dict, spike: dict) -> dict:
         out["drive_startable"].append(1 if e[1] == "lane" else 0)
         out["drive_cruise"].append(round(base[k], 3))
     return out
+
+
+def strong_components(succ: list[list[int]]) -> list[int]:
+    """LG5: each node's strongly connected component (Tarjan's, iterative) of a directed graph
+    given by its successors; components numbered in the order they close."""
+    n = len(succ)
+    index = [-1] * n
+    low = [0] * n
+    on = [False] * n
+    comp = [-1] * n
+    stack: list[int] = []
+    count = 0
+    nc = 0
+    for root in range(n):
+        if index[root] >= 0:
+            continue
+        work = [(root, 0)]
+        while work:
+            v, i = work[-1]
+            if i == 0:
+                index[v] = low[v] = count
+                count += 1
+                stack.append(v)
+                on[v] = True
+            if i < len(succ[v]):
+                work[-1] = (v, i + 1)
+                w = succ[v][i]
+                if index[w] < 0:
+                    work.append((w, 0))
+                elif on[w]:
+                    low[v] = min(low[v], index[w])
+                continue
+            work.pop()
+            if work:
+                u = work[-1][0]
+                low[u] = min(low[u], low[v])
+            if low[v] == index[v]:
+                while True:
+                    w = stack.pop()
+                    on[w] = False
+                    comp[w] = nc
+                    if w == v:
+                        break
+                nc += 1
+    return comp
+
+
+def main_component(succ: list[list[int]]) -> set[int]:
+    """LG5: the nodes of a directed graph's largest strongly connected component (by nodes;
+    of two as large, the one holding the lowest node)."""
+    comp = strong_components(succ)
+    size: dict[int, int] = {}
+    first: dict[int, int] = {}
+    for k, c in enumerate(comp):
+        size[c] = size.get(c, 0) + 1
+        first.setdefault(c, k)
+    if not size:
+        return set()
+    best = min(size, key=lambda c: (-size[c], first[c]))
+    return {k for k, c in enumerate(comp) if c == best}
 
 
 def lane_vmax(pts, base: float, lateral: float, crawl: float = 0.0) -> list[float]:
@@ -499,6 +578,142 @@ def pack_crowd(plan: dict, pdir: Path, graphs: dict) -> dict:
     return out
 
 
+def conflicts(pts: list[list[list[float]]], connector: list[bool], reach: float,
+              dz: float = 3.0) -> list[list[int]]:
+    """LG5: per drive lane the junction connectors it may not be driven at once with: for a
+    connector, every other connector whose line comes within `reach` (m, in plan) of its own
+    where the two are within `dz` in height (crossing, merging or leaving one lane); none for
+    a lane. GEOS's tree and distances (a pair is symmetric)."""
+    import shapely
+    ids = [k for k, c in enumerate(connector) if c and len(pts[k]) >= 2]
+    out: list[list[int]] = [[] for _ in pts]
+    if not ids:
+        return out
+    geoms = [shapely.LineString([(p[0], p[1], p[2]) for p in pts[k]]) for k in ids]
+    tree = shapely.STRtree(geoms)
+    a, b = tree.query(geoms, predicate="dwithin", distance=reach)
+    for i, j in zip(a.tolist(), b.tolist()):
+        if i >= j:
+            continue
+        gi, gj = geoms[i], geoms[j]
+        pa, pb = shapely.shortest_line(gi, gj).coords
+        za = shapely.line_interpolate_point(gi, shapely.line_locate_point(gi, shapely.Point(pa)))
+        zb = shapely.line_interpolate_point(gj, shapely.line_locate_point(gj, shapely.Point(pb)))
+        if abs(shapely.get_coordinates(za, include_z=True)[0][2] -
+               shapely.get_coordinates(zb, include_z=True)[0][2]) > dz:
+            continue
+        out[ids[i]].append(ids[j])
+        out[ids[j]].append(ids[i])
+    return [sorted(c) for c in out]
+
+
+def traffic_cars(traffic: dict, veh: dict | None, dids: list[str]) -> dict:
+    """LG5: the traffic's models (the plan's that the project has: AG18's packs imported with
+    the city's parked cars), every part of them (mesh, pivot, shadow, a wheel's radius to spin
+    by), each model's length, the pool's slots by model, the districts' fleets and paints in
+    those models' order."""
+    have = (veh or {}).get("cars") or {}
+    models = [m for m in traffic["models"] if m in have]
+    out = {"models": models, "parts": [], "car_lengths": [], "traffic_slots": [],
+           "traffic_weights": [], "traffic_paints": []}
+    if not models:
+        return out
+    at = {m: k for k, m in enumerate(traffic["models"])}
+    for mi, car in enumerate(models):
+        rec = have[car]
+        dim = rec.get("dimensions") or {}
+        out["car_lengths"].append(round(float(dim.get("length") or 4.8), 3))
+        for p in rec["parts"]:
+            spin = p.get("kind") == "wheel" and p.get("spins", True) is not False
+            out["parts"].append({"model": mi, "mesh": f"{rec['folder']}/SM_{car}_{p['name']}",
+                                 "shadow": p.get("kind") not in ("glass", "wheel", "brake"),
+                                 "pivot": [float(v) for v in p.get("pivot", [0.0, 0.0, 0.0])],
+                                 "spin_radius": round(float(p.get("radius") or 0.0), 4)
+                                 if spin else 0.0,
+                                 "cull_m": TRAFFIC_CULL_M.get(p.get("kind"),
+                                                             TRAFFIC_CULL_M["other"])})
+    # (a slot of a model the project lacks: the models it has, in turn)
+    for k, s in enumerate(traffic["slots"]):
+        m = traffic["models"][s]
+        out["traffic_slots"].append(models.index(m) if m in have else k % len(models))
+    kp = None
+    for d in dids:
+        w = traffic["weights"].get(d) or [0.0] * len(traffic["models"])
+        out["traffic_weights"].append([round(float(w[at[m]]), 5) for m in models])
+        pd = traffic["paints"].get(d) or []
+        rows = [pd[at[m]] for m in models]
+        kp = len(rows[0]) // 9 if rows and rows[0] else 0
+        out["traffic_paints"].append([v for r in rows for v in r])
+    out["paints_per"] = kp or 0
+    return out
+
+
+def pack_traffic(plan: dict, pdir: Path, graphs: dict, veh: dict | None) -> dict:
+    """LG5: the city's traffic, flat: every lane and junction connector of the lane graph a
+    drive lane (`pack_drive_lanes`, cars_steam's speeds) with its cars per hour band, district,
+    whether it is on the lane graph's largest strongly connected part (cars drive only there),
+    the signal window it stops at and where (m back from its end), the connectors it may not
+    be driven at once with; the signals' windows for cars (cycle, offset, green from, green
+    to, amber to: s); the models, pool slots, fleets and paints; the settings."""
+    tr = plan["traffic"]
+    g = graphs["lanes"]
+    drive = [e for e in _elements(g) if len(e[2]) >= 2]
+    gids = g.get("ids") or [str(e[0]) for e in drive]
+    rows = {}
+    for t in plan["tiles"]:
+        tile = json.loads((pdir / t["file"]).read_text(encoding="utf-8"))
+        for r in tile.get("drives") or []:
+            rows[r["id"]] = r
+    out = pack_drive_lanes(graphs, drive, tr["drive_speeds"], tr["drive"],
+                           {e[0]: (rows.get(gids[e[0]]) or {}).get("road_class", "")
+                            for e in drive})
+    st = out["drive_starts"]
+    fp = out["drive_points"]
+    pts = [[fp[3 * i:3 * i + 3] for i in range(st[k], st[k + 1])] for k in range(len(drive))]
+    succ = [out["drive_links"][out["drive_link_starts"][k]:out["drive_link_starts"][k + 1]]
+            for k in range(len(drive))]
+    main = main_component(succ)
+    # (the districts in the plan's order: the crowd's, whose days DistrictShape holds)
+    dids = [d["id"] for d in plan["districts"]]
+    didx = {d: k for k, d in enumerate(dids)}
+    sigs = []
+    sfile = pdir / "signals.json"
+    if sfile.is_file():
+        sigs = json.loads(sfile.read_text(encoding="utf-8")).get("signals") or []
+    win, windows = {}, []
+    for s in sigs:
+        for p in s["phases"]:
+            win[(s["id"], p["index"])] = len(windows) // 5
+            g0 = float(p["start_s"])
+            g1 = g0 + float(p["green_s"])
+            windows += [float(s["cycle_s"]), float(s["offset_s"]), g0, round(g1, 3),
+                        round(g1 + float(p["amber_s"]), 3)]
+    cars, dist, msk, sig, back = [], [], [], [], []
+    for k, e in enumerate(drive):
+        r = rows.get(gids[e[0]]) or {}
+        cars += [round(float(v), 4) for v in (r.get("vehicles") or [0.0] * 5)]
+        dist.append(didx.get(r.get("district_id"), -1))
+        msk.append(1 if k in main else 0)
+        w = win.get((r.get("signal"), r.get("phase")), -1)
+        sig.append(w)
+        back.append(round(float(r.get("stop_back_m") or 0.0), 3) if w >= 0 else 0.0)
+    fl = tr["follow"]
+    con = conflicts(pts, [e[1] != "lane" for e in drive], float(fl["conflict_m"]))
+    cflat, cstart = [], [0]
+    for c in con:
+        cflat += c
+        cstart.append(len(cflat))
+    out.update({"drive_cars": cars, "drive_district": dist, "drive_main": msk,
+                "drive_signal": sig, "drive_stop_back": back, "drive_windows": windows,
+                "drive_conflicts": cflat, "drive_conflict_starts": cstart,
+                "traffic": {"hour": int(tr["hour"]), "pool": int(tr["pool"]),
+                            "live_m": float(tr["live_m"]), "scale": 1.0,
+                            "districts": dids,
+                            **{k: float(v) for k, v in fl.items()}},
+                **traffic_cars(tr, veh, dids)})
+    return out
+
+
 def life_data(pdir: Path, graphs: dict | None, veh: dict | None,
               lib: dict | None = None) -> tuple[dict | None, str]:
     plan = json.loads((pdir / "life_plan.json").read_text(encoding="utf-8"))
@@ -512,10 +727,17 @@ def life_data(pdir: Path, graphs: dict | None, veh: dict | None,
         return None, "no graphs (graphs.json) to build lanes from"
     arch = next((d["archetype"] for d in plan["districts"] if d["id"] == spike["district_id"]),
                 None)
+    traffic = None
     if plan.get("crowd"):
-        # (LG3: every walkway of the city, the crowd's pool; the spike's drive lanes and cars)
+        # (LG3: every walkway of the city, the crowd's pool; LG5: every lane of the city, the
+        # traffic's pool, else the spike's drive lanes and cars)
         lanes = pack_crowd(plan, pdir, graphs)
-        lanes.update(pack_drive(graphs, spike))
+        if plan.get("traffic"):
+            traffic = pack_traffic(plan, pdir, graphs, veh)
+            tcars = {"parts": traffic.pop("parts"), "models": traffic.pop("models")}
+            lanes.update(traffic)
+        else:
+            lanes.update(pack_drive(graphs, spike))
         crowd = plan["crowd"]
         spike = {**spike, "people": int(crowd["pool"]), "library": crowd.get("library") or {},
                  "persons": {}}
@@ -523,10 +745,16 @@ def life_data(pdir: Path, graphs: dict | None, veh: dict | None,
     else:
         lanes = pack_lanes(graphs, spike)
         lib_spike = spike
-    cs = cars(spike, arch, veh)
+    if traffic is not None:
+        # (LG5: no spike cars; the pool's slots carry the traffic's models)
+        cs = {"car_models": [], "car_paints": [], **tcars}
+        ncars = int(traffic["traffic"]["pool"]) if cs["models"] else 0
+    else:
+        cs = cars(spike, arch, veh)
+        ncars = len(cs["car_models"])
     ctl = {"city": plan["city"], "plan_hash": plan["plan_hash"],
            "district": spike["district_id"], "hour": spike["hour"],
-           "people": int(spike["people"]), "cars": len(cs["car_models"]),
+           "people": int(spike["people"]), "cars": ncars,
            "center": spike["center"], "radius_m": spike["radius_m"],
            "walk_speed": spike["walk_speed"], "drive_speed": spike["drive_speed"],
            "car_gap_m": spike["car_gap_m"],
@@ -566,6 +794,13 @@ def write_life(build: str | Path, given: str | Path | None = None,
                           "signals": len(c["signal_windows"]) // 8,
                           "hour": c["crowd"]["hour"], "pool": c["crowd"]["pool"]}}
                if c.get("crowd") else {}),
+            **({"traffic": {"lanes": len(c["drive_starts"]) - 1,
+                            "main": sum(c["drive_main"]),
+                            "signal_lanes": sum(1 for v in c["drive_signal"] if v >= 0),
+                            "conflicts": len(c["drive_conflicts"]) // 2,
+                            "hour": c["traffic"]["hour"], "pool": c["traffic"]["pool"],
+                            "live_m": c["traffic"]["live_m"], "models": len(c["models"])}}
+               if c.get("traffic") else {}),
             "library": ({"characters": len(c["mid_meshes"]), "hash": c.get("library_hash"),
                         "tiers": c.get("tiers")} if c.get("mid_meshes") else
                        {"stand_ins": True, "why": c.get("people_skipped") or
