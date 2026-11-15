@@ -1242,8 +1242,8 @@ def places_checks(model, filled, slots, place_rows, rows, drows, turfs, gm, pol,
     out["slots_placed"] = {"ok": not bad, "detail": (
         f"{len(slots)} slots ({', '.join(f'{k} {v}' for k, v in sorted(kinds.items()))}), "
         f"each on its walkway (its first point within {P.SLOT_REACH_M:.0f} m), its points out "
-        f"of every building, each user facing its object (a bench's away from its back, a "
-        f"ring's to its middle)" if not bad else "; ".join(bad[:5]))}
+        f"of every building and carriageway, each user facing its object (a bench's away "
+        f"from its back, a ring's to its middle)" if not bad else "; ".join(bad[:5]))}
     ubad = [s["id"] for s in slots if any(u < 0.0 or u > s["capacity"] + 1e-6
                                           for u in s.get("use") or [])]
     use = [sum((s.get("use") or [0.0] * 5)[b] for s in slots) for b in range(5)]

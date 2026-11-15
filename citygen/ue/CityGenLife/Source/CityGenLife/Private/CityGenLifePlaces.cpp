@@ -434,16 +434,16 @@ void ACityGenLife::FillLaneRoles(const int32 Lane)
 	}
 	if (bPolice && WalkPatrol.IsValidIndex(Lane) && WalkPatrol[Lane])
 	{
-		int32 Count = Draw(RoleWant(Lane, CgRole::Police) * PoliceScaleNow, CrowdRng);
-		while (Count > 0 && FreePolice.Num())
+		// (in pairs: the walkway's police drawn as pairs, so a quiet walkway's fraction of an
+		// officer does not make a whole pair each time)
+		int32 Pairs = Draw(0.5f * RoleWant(Lane, CgRole::Police) * PoliceScaleNow, CrowdRng);
+		for (; Pairs > 0 && FreePolice.Num() >= 2; --Pairs)
 		{
-			const int32 Made = SpawnGroup(Lane, CrowdRng.FRand() * Lengths[Lane], CrowdRng.FRand() < 0.5f ? 1.f : -1.f,
-				2, INDEX_NONE, CrowdRng, CgRole::Police, INDEX_NONE);
-			if (Made == 0)
+			if (SpawnGroup(Lane, CrowdRng.FRand() * Lengths[Lane], CrowdRng.FRand() < 0.5f ? 1.f : -1.f,
+				2, INDEX_NONE, CrowdRng, CgRole::Police, INDEX_NONE) == 0)
 			{
 				break;
 			}
-			Count -= Made;
 		}
 	}
 	if (LaneSlotStarts.IsValidIndex(Lane + 1))
