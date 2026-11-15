@@ -658,7 +658,8 @@ bool ACityGenLife::ShowPlace(const FString& What)
 		LastShow = FString::Printf(TEXT("%s:%d"), *What, Best);
 		UE_LOG(LogTemp, Display, TEXT("CITYGEN_LIFE_SHOW {\"what\":\"%s\",\"found\":true,\"car\":%d,\"at\":[%.1f,%.1f,%.1f],\"speed\":%.2f}"),
 			*What, Best, P.X, -P.Y, P.Z, C.Speed / 100.0);
-		return FrameCar(C.Pos + Fwd * 1200.0, -Fwd, 1100.0, 350.0, 500.0);
+		// (from ahead of it and to the side, looking back at it)
+		return FrameCar(C.Pos, -Fwd, 900.0, 260.0, 380.0);
 	}
 	int32 Best = INDEX_NONE;
 	double Score = 1.0e18;
@@ -728,8 +729,14 @@ bool ACityGenLife::ShowPlace(const FString& What)
 	LastShow = FString::Printf(TEXT("%s:%d"), *What, Best);
 	UE_LOG(LogTemp, Display, TEXT("CITYGEN_LIFE_SHOW {\"what\":\"%s\",\"found\":true,\"person\":%d,\"at\":[%.1f,%.1f,%.1f],\"slot\":%d,\"users\":%d,\"role\":%d}"),
 		*What, Best, P.X, -P.Y, P.Z, W.Slot, W.Slot != INDEX_NONE ? SlotUsersNow[W.Slot] : 0, (int32)W.Role);
-	// (from in front of them, a little to the side and above)
-	return FrameCar(W.Pos, -Face, 520.0, 150.0, 160.0);
+	// (someone sitting, talking in a ring or walking: from in front of them, a little to the
+	// side and above; someone facing a door, a counter or a road, at a queue, a stall or a
+	// stop: from behind them, on the walkway's side, where the camera is not in a building)
+	const FString Kind = (W.Slot != INDEX_NONE && SlotKinds.IsValidIndex(W.Slot) && SlotKindNames.IsValidIndex(SlotKinds[W.Slot]))
+		? SlotKindNames[SlotKinds[W.Slot]] : FString();
+	const bool bBehind = Kind == TEXT("bar_queue") || Kind == TEXT("smoke") || Kind == TEXT("kiosk") ||
+		Kind == TEXT("vending") || Kind == TEXT("stall") || Kind == TEXT("taxi_stand") || Kind == TEXT("bus_stop");
+	return bBehind ? FrameCar(W.Pos, Face, 600.0, 190.0, 220.0) : FrameCar(W.Pos, -Face, 520.0, 150.0, 160.0);
 }
 
 // --- the status ----------------------------------------------------------------------------------

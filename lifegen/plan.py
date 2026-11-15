@@ -1228,8 +1228,8 @@ def places_checks(model, filled, slots, place_rows, rows, drows, turfs, gm, pol,
             bad.append(f"{s['id']}: {len(pts)} points for capacity {s['capacity']}")
         elif w is None:
             bad.append(f"{s['id']}: no walkway")
-        elif any(fp.inside(p[0], p[1]) for p in pts):
-            bad.append(f"{s['id']}: a point in a building")
+        elif any(fp.blocked(p[0], p[1]) for p in pts):
+            bad.append(f"{s['id']}: a point in a building or on a carriageway")
         elif PL4._nearest_on(w["line"], pts[0][0], pts[0][1])[2] > P.SLOT_REACH_M + 1.0 and \
                 s["kind"] not in ("gang_spot",):
             bad.append(f"{s['id']}: {PL4._nearest_on(w['line'], pts[0][0], pts[0][1])[2]:.1f} m "

@@ -390,7 +390,7 @@ GANG_NEUTRALS = ("#141414", "#2a2a2a", "#3d3a36", "#1c1f26")
 # three sRGB colors, AG18's paint channels: no model of their own), the first of `car_models`
 # the traffic has
 POLICE = {"patrol_min": 0.25, "car_share": 0.35, "per_car": 2.0,
-          "livery": ["#0d1220", "#e8ecf2", "#1f4fff"],
+          "livery": ["#e8ecf2", "#0d1220", "#1f4fff"],
           "car_models": ["halcyon_sable", "orrin_lumen", "vanta_r", "halcyon_ridge"]}
 # the pool's people kept for gangs and police (their looks): enough for the most wanted within
 # the crowd's live radius of any tile at the crowd's hour, times `margin`, at most the share of

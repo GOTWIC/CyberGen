@@ -1,0 +1,1 @@
+First Unreal check of LG4 on Delta (import over LG2's in CityAG16): every check passed. Seen: people sitting on benches (the sample's bench loop), a gang ring in its faction's red, police pairs. Found and fixed after it: gang corner spots on the carriageway (now kept off lanes and junctions), the queue shot's camera inside the building, the patrol livery's dark body (now white).

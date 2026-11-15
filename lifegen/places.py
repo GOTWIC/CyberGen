@@ -189,6 +189,11 @@ class Footprints:
                     continue
         self.polys = polys
         self.tree = shapely.STRtree(polys) if polys else None
+        self.cw = Carriageway(model)
+
+    def blocked(self, x: float, y: float) -> bool:
+        """In a building or on a carriageway (a lane or a junction): no slot's point there."""
+        return self.inside(x, y) or self.cw.on(x, y)
 
     def inside(self, x: float, y: float) -> bool:
         import shapely
@@ -196,6 +201,41 @@ class Footprints:
             return False
         pt = shapely.Point(x, y)
         return any(self.polys[int(k)].contains(pt) for k in self.tree.query(pt))
+
+
+class Carriageway:
+    """Where cars drive (the lane graph's lanes and connectors, half a lane's width either side
+    of each) and the junctions' polygons: no one stands there to use a slot."""
+
+    def __init__(self, model: dict):
+        import shapely
+        self.lines, self.hw = [], []
+        for ln in model.get("lanes", []):
+            cl = ln.get("centerline") or []
+            if len(cl) >= 2 and _length(cl) > 0.1:
+                self.lines.append(shapely.LineString([(p[0], p[1]) for p in cl]))
+                self.hw.append(0.5 * float(ln.get("width_m") or 3.2))
+        self.tree = shapely.STRtree(self.lines) if self.lines else None
+        self.junc = []
+        for j in model.get("junctions", []):
+            ext = (j.get("polygon") or {}).get("exterior") or []
+            if len(ext) >= 3 and int(j.get("level") or 0) == 0:
+                p = shapely.Polygon(ext)
+                if p.is_valid:
+                    self.junc.append(p)
+        self.jtree = shapely.STRtree(self.junc) if self.junc else None
+
+    def on(self, x: float, y: float) -> bool:
+        import shapely
+        pt = shapely.Point(x, y)
+        if self.tree is not None:
+            for k in self.tree.query(pt.buffer(3.0)):
+                if self.lines[int(k)].distance(pt) < self.hw[int(k)]:
+                    return True
+        if self.jtree is not None:
+            if any(self.junc[int(k)].contains(pt) for k in self.jtree.query(pt)):
+                return True
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -272,7 +312,7 @@ def make_slots(model: dict, wi: WalkIndex, fp: Footprints, walk_rows: dict,
     Returns the slots (unhashed, without their tile) and what was left out."""
     segs = {s["id"]: s for s in model.get("road_segments", [])}
     walks = {w["id"]: w for w in model.get("walkways", [])}
-    left = {"no_walkway": 0, "in_building": 0, "points_dropped": 0}
+    left = {"no_walkway": 0, "blocked": 0, "points_dropped": 0}
     out = []
 
     def per_m(wid: str) -> list[float]:
@@ -283,10 +323,10 @@ def make_slots(model: dict, wi: WalkIndex, fp: Footprints, walk_rows: dict,
 
     def finish(rec: dict, kind: str, obj, center=None):
         pts = rec["points"]
-        keep = [p for p in pts if not fp.inside(p[0], p[1])]
+        keep = [p for p in pts if not fp.blocked(p[0], p[1])]
         left["points_dropped"] += len(pts) - len(keep)
         if not keep:
-            left["in_building"] += 1
+            left["blocked"] += 1
             return
         # (its users per band at most its points kept)
         k = len(keep) / len(pts)
@@ -622,12 +662,26 @@ def gang_spots(model: dict, turfs: list[dict], members: dict, rows: dict, wi: Wa
             _, w, end, nxt = hit
             L = math.dist(end[:2], nxt[:2]) or 1.0
             ux, uy = (nxt[0] - end[0]) / L, (nxt[1] - end[1]) / L
-            run = min(2.5, 0.5 * L)
-            cx, cy = end[0] + ux * run, end[1] + uy * run
-            to = _side_from(segs.get((w.get("attrs") or {}).get("segment")), cx, cy)
-            off = 0.3 * float(w.get("width_m") or 2.0)
-            if to is not None:
-                cx, cy = cx - to[0] * off, cy - to[1] * off
+            # (on the sidewalk's line, in from its end past the junction's corner, the first
+            # place a ring of the gang's clears every lane, junction and building; a little to
+            # the building's side where the sidewalk has room)
+            spot = None
+            to0 = _side_from(segs.get((w.get("attrs") or {}).get("segment")), end[0], end[1])
+            for run in (4.0, 6.0, 8.0, 11.0, 15.0):
+                if run > 0.8 * L:
+                    break
+                cx, cy = end[0] + ux * run, end[1] + uy * run
+                for off in (0.25 * float(w.get("width_m") or 2.0), 0.0):
+                    px, py = (cx - to0[0] * off, cy - to0[1] * off) if to0 else (cx, cy)
+                    ring = frame_points("gang_spot", px, py, 0.0, 0.0)
+                    if not any(fp.blocked(p[0], p[1]) for p in ring) and not fp.blocked(px, py):
+                        spot = (px, py)
+                        break
+                if spot:
+                    break
+            if spot is None:
+                continue
+            cx, cy = spot
             r = rows.get(w["id"]) or {}
             g = (r.get("gang") or [0.0] * 5)[late]
             if r.get("turf") != t["id"]:
@@ -643,7 +697,7 @@ def gang_spots(model: dict, turfs: list[dict], members: dict, rows: dict, wi: Wa
             pts = frame_points("gang_spot", c[2], c[3], 0.0, 0.0)
             pts = [[p[0], p[1], p[2], _r(math.degrees(math.atan2(c[3] - p[1], c[2] - p[0])), 2)]
                    for p in pts]
-            if any(fp.inside(p[0], p[1]) for p in pts):
+            if any(fp.blocked(p[0], p[1]) for p in pts):
                 continue
             chosen.append((*c, pts))
         n = max(1, len(chosen))
