@@ -376,6 +376,8 @@ private:
 	TArray<float> DriveStopBackG, CarSpin, DriveHalf;
 	TArray<FVector> DriveMid;
 	TArray<TArray<int32>> ModelSlots, FreeByModel, PartsOfModel;
+	TArray<TArray<uint8>> PartShown;          // (per part, per instance: drawn now)
+	int32 InstancesSent = 0;
 	TArray<int32> TrafficLaneHave;
 	TArray<FMassEntityHandle> CarEnts;
 	FRandomStream TrafficRng;

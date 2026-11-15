@@ -228,10 +228,14 @@ BODY_WEIGHT = {"Bo": 0.15, "Bruce": 0.15, "Dominic": 0.15, "Jorge": 0.05, "Orlan
 # out in. Lanes coming alive and the lanes far from the view (past `refill_m` of it) keep the
 # live cars at their number as cars drive out of the live region.
 TRAFFIC = {
-    # (Delta at 23:00: at most 771 cars wanted within 800 m of any point, 1,156 at 18:00, the
-    # busiest hour; the pool holds the busiest hour's within its 92%, and from a flight at
-    # 150 m the roads stay full to 800 m)
-    "pool": 1400,                  # cars simulated at once
+    # (Delta at 23:00 at M11's densities: 0.7 cars per 100 m of lane, one car a block, and at
+    # most 771 cars wanted within 800 m of any point, 1,156 at 18:00, the busiest hour. Read
+    # from the street and from a flight that is empty roads (LG5's first shots), so the
+    # traffic's `scale` is 2 by default: at most 1,542 within 800 m by night, within the pool's
+    # 92%; the busiest hour's is scaled down evenly to it. From a flight at 150 m the roads
+    # stay full to 800 m)
+    "scale": 2.0,                  # times M11's vehicles per 100 m (the fleet's busy too)
+    "pool": 1800,                  # cars simulated at once
     "live_m": 800.0,               # lanes within this of the view (3D) are live
     "margin_m": 60.0,              # a live lane goes this far past live_m
     "refill_m": 450.0,             # cars making up the number come in this far off the view

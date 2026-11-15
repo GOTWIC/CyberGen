@@ -130,7 +130,7 @@ class Traffic(_Model):
     fleet's `busy`)."""
     pool: Annotated[int, Field(ge=0, le=10000)] = P.TRAFFIC["pool"]
     live_m: Annotated[float, Field(gt=50.0, le=3000.0)] = P.TRAFFIC["live_m"]
-    scale: Annotated[float, Field(ge=0.0, le=10.0)] = 1.0
+    scale: Annotated[float, Field(ge=0.0, le=10.0)] = P.TRAFFIC["scale"]
 
 
 class LifeSpec(_Model):

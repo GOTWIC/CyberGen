@@ -834,7 +834,7 @@ def traffic_plan(model: dict, filled: dict, rows: list[dict], left: dict) -> dic
         for h in range(P.HOURS):
             at_hour[h] += r["vehicles"][P.band_of(h)] * shp[h]
     follow = {k: float(v) for k, v in P.TRAFFIC.items()
-              if k not in ("pool", "live_m", "paints")}
+              if k not in ("pool", "live_m", "paints", "scale")}
     return hashed({
         "hour": hour, "pool": pool, "live_m": float(tr["live_m"]), "scale": float(tr["scale"]),
         "models": models, "slots": slots, "weights": weights, "paints": paints,

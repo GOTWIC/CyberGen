@@ -16,7 +16,7 @@ grows here as it lands, as in [`citygen_milestones.md`](citygen_milestones.md),
 | LG2 | Clothing | Planned | |
 | LG3 | Crowds on the streets: every walkway of the city at its street's density by hour, live round the view from a fixed pool (people come alive and go past the far tier, out of sight), trips out of and into AG3's doors, stations, garages and taxi stands, groups, pace, signals with derived phases at the crosswalks, jaywalking by danger, local avoidance and stepping aside from the player, stairs and elevators; Delta walked city-wide | Done | [`docs/progress/LG3`](progress/LG3) |
 | LG4 | Life at places | Planned | |
-| LG5 | Traffic | Planned | |
+| LG5 | Traffic: every lane of the city at its street's density by hour (twice M11's by default), live round the view from a fixed pool of AG18's cars by the districts' fleets and paints; following the car in front, red lights, junctions taken in turn with room past them, stopping for people and the player; Delta driven city-wide | Done | [`docs/progress/LG5`](progress/LG5) |
 | LG6 | Transit | Planned | |
 | LG7 | Air and water | Planned | |
 | LG8 | Weather, reactions and release | Planned | |

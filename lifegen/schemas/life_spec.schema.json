@@ -366,14 +366,14 @@
      "type": "number"
     },
     "pool": {
-     "default": 1400,
+     "default": 1800,
      "maximum": 10000,
      "minimum": 0,
      "title": "Pool",
      "type": "integer"
     },
     "scale": {
-     "default": 1.0,
+     "default": 2.0,
      "maximum": 10.0,
      "minimum": 0.0,
      "title": "Scale",

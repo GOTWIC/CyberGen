@@ -280,6 +280,7 @@ void ACityGenLife::SpawnCarPool()
 	CarFreed.Reset();
 	CarOf.Reset();
 	CarEnts.Reset();
+	PartShown.Reset();
 	if (NC)
 	{
 		const FMassArchetypeHandle Arch = EM.CreateArchetype({FCgLifeCar::StaticStruct()});
@@ -658,7 +659,23 @@ void ACityGenLife::GatherPlayers()
 
 void ACityGenLife::UpdateCarInstances()
 {
+	// (the engine's cost is in the instances sent each frame: a part drawn as far as the cars
+	// live (a body) is sent over its model's instances in use, the lowest first (a free slot is
+	// taken lowest first); a part drawn nearer (glass, wheels, trims) only for the cars within
+	// its draw distance, each one by itself, and hidden once as its car leaves that distance)
 	const double T0 = FPlatformTime::Seconds();
+	const FTransform Hidden(FQuat::Identity, FVector::ZeroVector, FVector::ZeroVector);
+	const FVector View = Frame.View;
+	if (PartShown.Num() != CarParts.Num())
+	{
+		PartShown.SetNum(CarParts.Num());
+		for (int32 P = 0; P < CarParts.Num(); ++P)
+		{
+			const int32 M = CarPartModels.IsValidIndex(P) ? CarPartModels[P] : 0;
+			PartShown[P].Init(0, ModelSlots.IsValidIndex(M) ? ModelSlots[M].Num() : 0);
+		}
+	}
+	int32 Sent = 0;
 	for (int32 P = 0; P < CarParts.Num(); ++P)
 	{
 		UInstancedStaticMeshComponent* Comp = CarParts[P];
@@ -669,23 +686,68 @@ void ACityGenLife::UpdateCarInstances()
 		}
 		const FVector Pivot = CarPartPivots.Num() >= 3 * (P + 1) ? Ue(CarPartPivots[3 * P], CarPartPivots[3 * P + 1], CarPartPivots[3 * P + 2]) : FVector::ZeroVector;
 		const float R = CarPartSpin.IsValidIndex(P) ? 100.f * CarPartSpin[P] : 0.f;
+		const float Cull = CarPartCull.IsValidIndex(P) ? 100.f * CarPartCull[P] : 0.f;
+		const bool bNear = Cull > 0.f && Cull < 100.f * TrafficLiveM;
+		const double Reach2 = FMath::Square((double)Cull + 3000.0);
 		const TArray<int32>& Slots = ModelSlots[M];
-		Scratch.SetNum(Slots.Num());
-		for (const int32 Slot : Slots)
+		TArray<uint8>& Shown = PartShown[P];
+		auto Of = [&](const int32 Slot)
 		{
-			const int32 I = CarInstance[Slot];
-			if (!CarShow[Slot] || !bTraffic)
-			{
-				Scratch[I] = FTransform(FQuat::Identity, FVector::ZeroVector, FVector::ZeroVector);
-				continue;
-			}
 			const FTransform Car(FRotator(0.f, CarYaw[Slot], 0.f), CarPos[Slot]);
 			// (a wheel rolls: its turn the car's travel over its radius)
 			const FTransform Local = R > 1.f ? FTransform(FRotator(-FMath::RadiansToDegrees(FMath::Fmod(CarSpin[Slot] / R, 2.0 * UE_PI)), 0.f, 0.f), Pivot) : FTransform(Pivot);
-			Scratch[I] = Local * Car;
+			return Local * Car;
+		};
+		if (bNear)
+		{
+			for (const int32 Slot : Slots)
+			{
+				const int32 I = CarInstance[Slot];
+				const bool bOn = bTraffic && CarShow[Slot] && FVector::DistSquared(CarPos[Slot], View) < Reach2;
+				if (bOn)
+				{
+					Comp->UpdateInstanceTransform(I, Of(Slot), false, bRebuildRenderState, false);
+					Shown[I] = 1;
+					++Sent;
+				}
+				else if (Shown[I])
+				{
+					Comp->UpdateInstanceTransform(I, Hidden, false, bRebuildRenderState, false);
+					Shown[I] = 0;
+					++Sent;
+				}
+			}
+			continue;
+		}
+		int32 Hi = 0;
+		for (const int32 Slot : Slots)
+		{
+			const int32 I = CarInstance[Slot];
+			if ((bTraffic && CarShow[Slot]) || Shown[I])
+			{
+				Hi = FMath::Max(Hi, I + 1);
+			}
+		}
+		if (Hi == 0)
+		{
+			continue;
+		}
+		Scratch.SetNum(Hi);
+		for (const int32 Slot : Slots)
+		{
+			const int32 I = CarInstance[Slot];
+			if (I >= Hi)
+			{
+				continue;
+			}
+			const bool bOn = bTraffic && CarShow[Slot];
+			Scratch[I] = bOn ? Of(Slot) : Hidden;
+			Shown[I] = bOn ? 1 : 0;
 		}
 		Comp->BatchUpdateInstancesTransforms(0, Scratch, false, bRebuildRenderState, false);
+		Sent += Hi;
 	}
+	InstancesSent = Sent;
 	CarDrawMs = 0.95 * CarDrawMs + 0.05 * (FPlatformTime::Seconds() - T0) * 1000.0;
 }
 
@@ -740,12 +802,12 @@ FString ACityGenLife::TrafficStatus() const
 	{
 		return TEXT(",\"traffic\":null");
 	}
-	return FString::Printf(TEXT(",\"traffic\":{\"on\":%s,\"hour\":%d,\"pool\":%d,\"live_m\":%.0f,\"live_lanes\":%d,\"want\":%.1f,\"scale\":%.3f,\"traffic_scale\":%.2f,\"active\":%d,\"moving\":%d,\"leader\":%d,\"red\":%d,\"person\":%d,\"player\":%d,\"junction\":%d,\"box\":%d,\"spawned\":%d,\"refilled\":%d,\"left_edge\":%d,\"lost\":%d,\"forced\":%d,\"conflicts\":%d,\"signal_lanes\":%d,\"traffic_ms\":%.3f,\"draw_ms\":%.3f,\"show\":\"%s\"}"),
+	return FString::Printf(TEXT(",\"traffic\":{\"on\":%s,\"hour\":%d,\"pool\":%d,\"live_m\":%.0f,\"live_lanes\":%d,\"want\":%.1f,\"scale\":%.3f,\"traffic_scale\":%.2f,\"active\":%d,\"moving\":%d,\"leader\":%d,\"red\":%d,\"person\":%d,\"player\":%d,\"junction\":%d,\"box\":%d,\"spawned\":%d,\"refilled\":%d,\"left_edge\":%d,\"lost\":%d,\"forced\":%d,\"conflicts\":%d,\"signal_lanes\":%d,\"traffic_ms\":%.3f,\"draw_ms\":%.3f,\"instances_sent\":%d,\"show\":\"%s\"}"),
 		bTraffic ? TEXT("true") : TEXT("false"), Hour, CarEnts.Num(), TrafficLiveM, TrafficLiveLanes, TrafficWantLive, TrafficLiveScale, TrafficScale,
 		CarsActive, CarsMovingNow, CarsWhyNow[CgWhy::Leader], CarsWhyNow[CgWhy::Red], CarsWhyNow[CgWhy::Person], CarsWhyNow[CgWhy::Player],
 		CarsWhyNow[CgWhy::Junction], CarsWhyNow[CgWhy::Box], CarsSpawned, CarsRefilled, CarsLeftTotal, CarsLost, CarsForcedTotal,
 		ConflictsG.Num() / 2, DriveSignal.Num() ? DriveSignal.FilterByPredicate([](int32 V) { return V >= 0; }).Num() : 0,
-		TrafficMs, CarDrawMs, *LastShow);
+		TrafficMs, CarDrawMs, InstancesSent, *LastShow);
 }
 
 void ACityGenLife::SetJaywalk(const float AtSafe, const float AtDanger)
@@ -851,7 +913,7 @@ bool ACityGenLife::ShowTraffic(const FString& What)
 	else if (What == TEXT("person") || What == TEXT("player"))
 	{
 		// (from ahead and to the side, looking back at the car and who it stops for)
-		bOk = FrameCar(C.Pos + Fwd * 350.0, -Fwd, 1300.0, 320.0, 550.0);
+		bOk = FrameCar(C.Pos + Fwd * 350.0, -Fwd, 1100.0, 550.0, 450.0);
 	}
 	else
 	{
@@ -902,7 +964,7 @@ bool ACityGenLife::BlockPlayer()
 			continue;
 		}
 		const double D = FVector::Dist(C.Pos, View);
-		if (D < BestD && D < 25000.0)
+		if (D < BestD && D < 15000.0)
 		{
 			BestD = D;
 			Best = Slot;
@@ -1214,7 +1276,13 @@ void UCityGenLifeDriveProcessor::ExecuteTraffic(FMassExecutionContext& Context)
 		}
 		// anyone in its way: the crowd's people and the player on its line ahead, where they
 		// are and where they will be in PredictS (cars near the view only)
-		if (DView2 < Yield2 && PedPos.Num())
+		// (near the view, or near a pawn: the player in the road is seen however far the camera)
+		bool bNearPawn = false;
+		for (const FVector& P : F.Players)
+		{
+			bNearPawn |= FVector::DistSquared(C.Pos, P) < FMath::Square((double)F.LookMaxCm + 2000.0);
+		}
+		if ((DView2 < Yield2 || bNearPawn) && PedPos.Num())
 		{
 			const float Look = FMath::Clamp(V * F.LookS + V * V / (2.f * F.Brake), F.LookMinCm, F.LookMaxCm);
 			FVector Pts[48];

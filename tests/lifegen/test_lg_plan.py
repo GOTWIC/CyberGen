@@ -548,8 +548,10 @@ def test_traffic_on_every_lane(build: Path):
     # (connectors carry no cars of their own: only the lanes are rows)
     assert set(rows) == {"rs.a.f0", "rs.a.b0"}
     f0, b0 = rows["rs.a.f0"], rows["rs.a.b0"]
-    # rs.a: 200 m, 5 vehicles per 100 m by morning, over its two 200 m lanes
-    assert f0.vehicles[1] == pytest.approx(5.0, abs=1e-3) and b0.vehicles[1] == f0.vehicles[1]
+    # rs.a: 200 m, 5 vehicles per 100 m by morning, over its two 200 m lanes (times the
+    # traffic's scale)
+    assert f0.vehicles[1] == pytest.approx(5.0 * P.TRAFFIC["scale"], abs=1e-3)
+    assert b0.vehicles[1] == f0.vehicles[1]
     assert f0.district_id == "d01" and f0.road_class == "street" and f0.main and b0.main
     # rs.a.f0 ends at jn.x, rs.a its phase 0 leg; its cars stop short of cw.a (x 195, 3 m wide)
     assert f0.signal == "sig.jn.x" and f0.phase == 0
@@ -590,8 +592,9 @@ def test_traffic_off_the_main_part_is_left_out(build: Path):
     assert not c.main and c.vehicles == [0.0] * 5 and c.district_id == "d02"
     assert rep["traffic"]["left_out"]["lanes"] == 1
     assert rep["traffic"]["left_out"]["segments"] == 0
-    # rs.c's 100 m at 3 vehicles per 100 m in the evening band, left out
-    assert rep["traffic"]["left_out"]["vehicles"][3] == pytest.approx(3.0, abs=1e-3)
+    # rs.c's 100 m at 3 vehicles per 100 m in the evening band (times the scale), left out
+    assert rep["traffic"]["left_out"]["vehicles"][3] == \
+        pytest.approx(3.0 * P.TRAFFIC["scale"], abs=1e-3)
 
 
 def test_traffic_budget_check_fails_past_the_budget(build: Path):

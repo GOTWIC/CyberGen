@@ -1,0 +1,37 @@
+lifegen plan: Delta Megacity (ok), plan fa9e987bb20f9cb8
+
+spawn points 21192, slots 688, tiles 132; people on the streets at the peak hour 58189, vehicles 3394
+
+district  people@23  people peak  vehicles peak  spawns  slots  name
+d01            2060         6042            461     738     58  Transit Nexus
+d02            5421        10685            771    3295     86  Midtown
+d03            1664         8785            971    2027    191  Corporate Core
+d04           23373        33786            931   14860    191  Old Town
+d05             480         2692            698     215    120  Industrial Port
+d06             147         1672            118      54     41  Research Campus
+
+crowd: 43493 people on 14075 of 14736 walkways at 23:00 (levels [0]), a pool of 2400 live within 340 m of the view; 150 signals; left out: 0 walkways no spawn reaches, 0 segments without a walkway
+
+traffic: 3331 cars on 4849 of 4875 lanes at 23:00 (6712 at the busiest hour), 15 models; a pool of 1800 live within 800 m of the view; 907 lanes stop at signals; left out: 26 lanes off the lane graph's main part, 0 segments without a lane
+
+spike: Old Town (d04) at 23:00, 0 people, 0 cars
+
+checks:
+  ok   spawns_on_graph: 21192 spawn points, each on a walkway (and a drive lane where it has one)
+  ok   spawns_reach: every spawn point's walkway reaches another spawn point (1 walkway components with spawns; the largest holds 21192 of 21192)
+  ok   densities: every district's people per hour band keep M11's densities (times its busy) within 1%
+  ok   slots: 688 slots, each facing its object's way
+  ok   spike_budget: the spike's 0 people and 0 cars within the budget's 2000 and 500
+  ok   crowd_densities: every district's sidewalks carry M11's people per hour band (times its busy and the crowd's scale) within 1%; off-street walkways 17027 more at the most; 0 walkways no spawn reaches left empty (0.0 people)
+  ok   crowd_levels: levels 0: 14075 of 14075 walkways with people on the main walkway graph
+  ok   signals: 150 signalized junctions, two phases each (derived: the ask), no crosswalk walking across a moving leg, the phases filling each cycle; 544 crosswalk walkways served
+  ok   crowd_budget: a pool of 2400 people live within 340 m of the view, about 1869 within 300 m (the budget's 2000)
+  ok   people_draws: the crowd's pool of 2400 people drawn from 24 characters, each 4 to 154 of them (at most 12%), 2400 distinct seeds
+  ok   crowd_spawns: 21192 spawn points open to the crowd's walkways
+  ok   traffic_densities: every district's lanes carry M11's vehicles per hour band (times the fleet's busy and the traffic's scale) within 1%; left out: 26 lanes off the lane graph's main part and 0 segments without a lane (70.3 cars at the most)
+  ok   traffic_lanes: every car on the lane graph's largest strongly connected part (14727 of 14779 lanes and connectors, 99.2% of the lanes' length)
+  ok   traffic_signals: 150 of 150 signals with lanes stopping at them (907 lanes, each stopping within its lane, short of its crosswalk)
+  ok   traffic_budget: a pool of 1800 cars live within 800 m of the view, about 253 within 300 m (the budget's 500)
+  ok   traffic_fleet: 15 of AG18's models (brakk_bastion, brakk_hauler, brakk_mule, halcyon_ridge, halcyon_sable, kestrel_atlas, kestrel_dart, kestrel_meridian, orrin_aria, orrin_lumen, orrin_pebble, tanager_cab, tanager_mino, tanager_porter, vanta_r), each in 8 to 364 pool slots; every district with cars has a fleet; no Vex or Aurel
+
+asks: signal_phases derived, bus_routes missing, turn_restrictions derived, lobby_points derived, piers missing, air_corridors derived, doors met, fleet_kinds derived
