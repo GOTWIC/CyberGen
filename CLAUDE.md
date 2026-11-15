@@ -2867,8 +2867,12 @@ LG5 (traffic, built before LG2 at Swagnik's ask: "I want cars everywhere") is in
   people and every pawn but the free camera on their line; cars_steam's speeds; wheels roll;
   the packs' lamps emissive by Night. `CityGenLife.Traffic [0|1] [SCALE]`, the Tab menu's
   Traffic row, the status's `traffic`; `CityGenLife.TrafficShow`, `BlockPlayer`, `Jaywalk`
-  and the check's `@late`, `wait`, `dilate`, `until` view commands for the shots; bench pass
-  `night_traffic_off`. `docs/unreal_export.md`, "From LG5: traffic";
+  and the check's `@late`, `wait`, `dilate`, `until` view commands for the shots; bench passes
+  `night_traffic_off`, `night_traffic_half`. `docs/unreal_export.md`, "From LG5: traffic".
+- Delta: every check passes, 550 to 860 cars live round the view in every district;
+  `night_plan_all` 21.2 ms p95 native (walk 25.5), traffic off 18.9, half the cars 20.1: over
+  the 20 ms budget by about 1 ms after a tuning round, the engine's cost of 92 moving instanced
+  components (lifegen's tick 1.3 to 2 ms), left for the performance pass.
   `docs/progress/LG5/README.md`.
 
 ## Gallery site (GitHub Pages)

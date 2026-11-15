@@ -386,7 +386,7 @@ private:
 	int32 TrafficLiveLanes = 0, CarsActive = 0, CarsSpawned = 0, CarsRefilled = 0, CarsLost = 0, CarsLeftTotal = 0;
 	int32 CarsWhyNow[7] = {0, 0, 0, 0, 0, 0, 0};
 	int32 CarsMovingNow = 0, CarsForcedTotal = 0;
-	double TrafficMs = 0.0, CarDrawMs = 0.0;
+	double TrafficMs = 0.0, TrafficMsMax = 0.0, CarDrawMs = 0.0, LiveMs = 0.0, LiveMsMax = 0.0;
 	FString LastShow;
 
 	// (LG3, CityGenLifeCrowd.cpp)

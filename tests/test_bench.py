@@ -385,9 +385,10 @@ def test_life_passes():
     assert "CityGenLife.Enable 0" in by["night_life_off"][3]
     assert "CityGenLife.Lumen 1" in by["night_life_lumen"][3]
     # (LG5: the traffic on in every life pass but the one that measures it off)
-    assert "CityGenLife.Traffic 0" in by["night_traffic_off"][3]
-    assert all("CityGenLife.Traffic 1" in by[n][3] for n, *_ in B.LIFE_PASSES
-               if n != "night_traffic_off")
+    assert "CityGenLife.Traffic 0 1" in by["night_traffic_off"][3]
+    assert "CityGenLife.Traffic 1 0.5" in by["night_traffic_half"][3]
+    assert all("CityGenLife.Traffic 1 1" in by[n][3] for n, *_ in B.LIFE_PASSES
+               if n not in ("night_traffic_off", "night_traffic_half"))
     # (LG1: the people library's tiers, every pass setting them, the near pass none near)
     from lifegen.library import TIERS
     assert f"CityGenLife.Tiers {TIERS['near_m']:g} 0 {TIERS['mid_m']:g} {TIERS['far_m']:g}" \

@@ -2682,6 +2682,13 @@ LG5 drives the spike's cars as before.
     a car stopped `ForceS` for a person standing still in its way goes on, never for the
     player.
   Each car's wheels roll by its travel over their radius (`CarPartSpin`).
+- **Drawn** (`UpdateCarInstances`): an instanced component per model and part, an instance per
+  slot of that model; a part drawn as far as the cars live (a body) is sent over its model's
+  instances in use (a free slot is taken lowest first), a nearer part (glass, wheels, trims:
+  `CarPartCull`) only for the cars within its draw distance and 30 m, each by itself, hidden
+  once as its car leaves, and its component not drawn while no car is near (no draw calls).
+  The status's `instances_sent`, `draw_ms`, `live_ms` (the live update, half a step off the
+  crowd's so the two never land on one frame).
 - **Night:** the packs' head, tail and marker lamps are emissive (`M_CgVehicle`'s emission by
   `MPC_CityGen`'s Night, as the parked cars'); no light of their own.
 - **Console:** `CityGenLife.Traffic [0|1] [SCALE]` (the traffic on or off, at SCALE times the
@@ -2700,8 +2707,10 @@ LG5 drives the spike's cars as before.
   `wait S`, `dilate X` and `until S COMMAND` (again every half second until the traffic shows
   what it was asked, the status's `traffic.show`), and `<name>@late` runs right before the
   view's shot; the result's `traffic_views`.
-- **Benchmark:** every life pass sets `CityGenLife.Traffic 1`, the pass `night_traffic_off`
-  the night with the people and no traffic (`bench.LIFE_PASSES`).
+- **Benchmark:** every life pass sets `CityGenLife.Traffic 1 1`, the pass `night_traffic_off`
+  the night with the people and no traffic, `night_traffic_half` half the cars
+  (`bench.LIFE_PASSES`). Delta: `night_plan_all` 21.2 ms p95 native, traffic off 18.9
+  (`docs/progress/LG5/README.md`).
 
 ## Milestones and checks
 

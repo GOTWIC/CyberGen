@@ -126,4 +126,6 @@ struct FCgLifeCar : public FMassFragment
 	float Wait = 0.f;              // s waiting to enter a junction
 	float Spin = 0.f;              // degrees its wheels have turned
 	float Pending = 0.f;           // s held back by a far car's skipped frames
+	float PedHit = 1.0e9f;         // cm ahead of its front to someone in its way (last look)
+	uint8 PedPlayer = 0;           // that someone the player
 };

@@ -206,3 +206,58 @@ outfit), on main after LG1 (#226). Report, shots, benchmark and open items:
 - **Tests** (`tests/lifegen/test_lg_plan.py`: every walkway's people, the signals' phases, a
   walkway nobody reaches, AG3's doors as spawn points, the exporter's crowd pack and summary;
   the fixture gained a signalized junction with two crosswalks).
+
+## LG5: traffic
+
+Built on the Windows PC (2026-11-14), before LG2 at Swagnik's ask after his walk of the
+packaged Delta ("I want cars everywhere"; a car drove through him), on main after the people
+fixes (#229). Report, shots, benchmark and open items:
+[`docs/progress/LG5/README.md`](progress/LG5/README.md).
+
+- **Every lane's cars** (`lifegen/plan.py` `traffic_lanes`, `planmodel.Drive`, each tile file's
+  `drives`): a road segment's M11 vehicles per 100 m and hour band over its lanes by length,
+  times the fleet's `busy` and the spec's `traffic.scale` (2 by default: M11's late band, 0.7
+  cars per 100 m of lane, read as empty roads); none on a lane off the lane graph's largest
+  strongly connected part (`citygen.unreal_life.strong_components`, `main_component`), said in
+  `totals.left_out`.
+- **Signals for cars** (`plan.lane_signals`): each lane ending at a signalized junction on one
+  of its legs gets LG3's derived signal, its leg's phase and a stop point 1.2 m short of the
+  crosswalk across it (`presets.TRAFFIC["stop_margin_m"]`).
+- **The traffic** (`plan.traffic_plan`, `planmodel.TrafficPlan`, the spec's `traffic`: pool,
+  live_m, scale; `presets.TRAFFIC`): a pool of 1,800 slots of AG18's models (no Vex or Aurel),
+  shared out half by the city's mix at the hour and half by each model's most in any
+  district; the districts' fleets and 6 paints per model; the live radius (800 m); the car
+  following (the intelligent driver model), signal, junction and yielding settings. LG0's
+  spike cars go (`SPIKE["cars"]` 0).
+- **Checks** (`plan.traffic_checks`): `traffic_densities`, `traffic_lanes`, `traffic_signals`,
+  `traffic_budget` (the pool within the 500 vehicles in 300 m: 253), `traffic_fleet`.
+- **Exporter** (`citygen/unreal_life.py` `pack_traffic`, `pack_drive_lanes`, `conflicts`,
+  `traffic_cars`, `PACK_VERSION` 4; `import_city.traffic_props`, `LIFE_VERSION` life5;
+  `unreal.life_summary`): the whole lane graph as drive lanes with their cars per band,
+  district, main part, signal window and stop; the junction connectors that may not be driven
+  at once (GEOS's tree: lines within 2.2 m in plan and 3 m in height); the signals' windows for
+  cars; the pool's models, fleets, paints, lengths, wheel radii and draw distances
+  (`TRAFFIC_CULL_M`); `docs/unreal_export.md`, "From LG5: traffic".
+- **Runtime** (`CityGenLifeTraffic.cpp`; the drive processor's `ExecuteTraffic`): the whole lane
+  graph live within 800 m of the view from a fixed pool (lanes filled and emptied past where
+  cars are seen, refilled past 450 m, the density scaled evenly past 92% of the pool); cars
+  following the car in front by the intelligent driver model at cars_steam's speeds, stopping
+  at red and amber, holding a junction connector only while no conflicting one is driven, held
+  or claimed by a longer waiter and with room past the junction (forced after 25 s), stopping
+  for the crowd's people and every pawn but the free camera on their line ahead; wheels
+  rolling; instances sent only for slots in use and near parts only for near cars.
+  `CityGenLife.Traffic [0|1] [SCALE]`, the Tab menu's Traffic row (`CityGenPlay`), the
+  status's `traffic`; `CityGenLife.TrafficShow`, `BlockPlayer`, `Jaywalk` for the check's
+  shots, whose view commands gained `wait`, `dilate`, `until` and `<name>@late`.
+- **Delta**: 3,331 cars on 4,849 lanes at 23:00 (twice M11's), 25,548 conflicting connector
+  pairs, 907 lanes stopping at 150 signals; imported over the people fixes' import (one actor
+  updated); every check passes; 550 to 860 cars live round the views, every district driven;
+  shots of a red light's queue, a car stopped for the walker in its lane and for people
+  crossing. Lean benchmark at native 2560 x 1440: `night_plan_all` **21.2 ms p95** (walk 25.5,
+  drive 20.7, fly 19.7), traffic off 18.9: over the 20 ms budget by about 1 ms after one tuning
+  round (21.6 before it); the rest is the engine's cost of 92 moving instanced components
+  (lifegen's tick 1.3 to 2 ms), half the cars 20.1 (an open item for the performance pass).
+- **Tests** (`tests/lifegen/test_lg_plan.py`: every lane's cars, signals and stops, the pool and
+  fleets, a lane off the main part, the budget check, strong components, the exporter's
+  traffic pack and summary; the fixture's lanes became a ring with a signalized end;
+  `tests/test_bench.py` the traffic passes).

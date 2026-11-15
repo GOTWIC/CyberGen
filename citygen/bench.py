@@ -184,14 +184,16 @@ ATMOS_PASSES = (
 
 def _life(on: bool = True, shadows: bool = True, rebuild: bool = False,
           lumen: bool = False, near: int | None = None,
-          near_m: float | None = None, traffic: bool = True) -> tuple[str, ...]:
+          near_m: float | None = None, traffic: bool = True,
+          traffic_scale: float = 1.0) -> tuple[str, ...]:
     """LG0: lifegen's spike (the level's CityGenLife controller) over the night as delivered:
     on or off, the stand-ins' and cars' shadows, each frame's move recreating the instanced
     components' render state, the people and cars in Lumen's scene (every pass sets all
     four, so none leaks into the next; a game without the plugin warns of the unknown
     commands and runs the same). LG1: `near`, how many of the library's people may be near
     (skeletal) at once, and `near_m` how far; every life pass sets the tiers (the library's
-    own by default). LG5: `traffic`, the city's traffic on or off (every life pass sets it)."""
+    own by default). LG5: `traffic`, the city's traffic on or off, at `traffic_scale` times the
+    plan's density (every life pass sets both)."""
     from lifegen.library import TIERS
     t = dict(TIERS)
     if near is not None:
@@ -202,7 +204,7 @@ def _life(on: bool = True, shadows: bool = True, rebuild: bool = False,
     return (f"CityGenLife.Enable {int(on)}", f"CityGenLife.Shadows {int(shadows)}",
             f"CityGenLife.Rebuild {int(rebuild)}", f"CityGenLife.Lumen {int(lumen)}",
             f"CityGenLife.Tiers {t['near_m']:g} {t['near_max']} {t['mid_m']:g} {t['far_m']:g}",
-            f"CityGenLife.Traffic {int(traffic)}") + \
+            f"CityGenLife.Traffic {int(traffic)} {traffic_scale:g}") + \
         _atmos(fog=True, air=True, rain=True, wet=True)
 
 
@@ -219,6 +221,7 @@ LIFE_PASSES = (
     ("night_life_near20m", True, 100.0, _life(near_m=20)),
     # LG5: the night with lifegen's people and no traffic (`night_life` has the traffic on)
     ("night_traffic_off", True, 100.0, _life(traffic=False)),
+    ("night_traffic_half", True, 100.0, _life(traffic_scale=0.5)),
 )
 ATMOS_PASSES = ATMOS_PASSES + LIFE_PASSES
 # what a game with hardware ray tracing needs at startup (MegaLights traces its shadows; UE

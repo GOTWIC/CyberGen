@@ -27,6 +27,7 @@
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 #include "HAL/PlatformTime.h"
+#include "Misc/ScopeExit.h"
 #include "MassEntityManager.h"
 #include "MassEntitySubsystem.h"
 #include "MassExecutionContext.h"
@@ -314,7 +315,9 @@ void ACityGenLife::SpawnCarPool()
 	}
 	CarsActive = 0;
 	TrafficRng.Initialize((int32)(MixU(GetTypeHash(City) ^ GetTypeHash(PlanHash) ^ 0x5eedu) & 0x7fffffff));
-	TrafficClock = LiveStep;
+	// (half a step after the crowd's live update, never on the same frame: each is a frame
+	// longer than the rest, every 15th or so, which a 95th percentile sees)
+	TrafficClock = 0.5f * LiveStep;
 	LastTrafficView = FVector(1.0e12);
 	RefillAcc = 0.f;
 	for (int32 J = 0; J < DriveLaneCount; ++J)
@@ -470,10 +473,18 @@ void ACityGenLife::TakeFreedCars()
 	CarsMovingNow = Frame.CarsMoving;
 	CarsForcedTotal += Frame.CarsForced;
 	TrafficMs = TrafficMs > 0.0 ? 0.95 * TrafficMs + 0.05 * Frame.TrafficMs : Frame.TrafficMs;
+	TrafficMsMax = FMath::Max(TrafficMsMax * 0.999, Frame.TrafficMs);
 }
 
 void ACityGenLife::UpdateTraffic(const float Dt, const bool bRefill)
 {
+	const double T0 = FPlatformTime::Seconds();
+	ON_SCOPE_EXIT
+	{
+		const double Ms = (FPlatformTime::Seconds() - T0) * 1000.0;
+		LiveMsMax = FMath::Max(LiveMsMax * 0.99, Ms);
+		LiveMs = LiveMs > 0.0 ? 0.9 * LiveMs + 0.1 * Ms : Ms;
+	};
 	FVector View;
 	if (!ViewPoint(View))
 	{
@@ -532,12 +543,20 @@ void ACityGenLife::UpdateTraffic(const float Dt, const bool bRefill)
 			}
 		}
 	}
-	// (where the live cars are, by lane, so a new car keeps clear of them)
+	// (where the live cars are on the lanes cars may come out on now, so a new car keeps clear
+	// of them: only those lanes, gathered once)
+	const float Target = FMath::Min(TrafficWantLive, PoolFill * (float)CarEnts.Num());
+	const bool bRefillNow = (float)CarsActive < 0.97f * Target && Dt > 0.f;
 	TMultiMap<int32, float> Taken;
+	if (Born.Num() || bRefillNow)
 	{
 		FMassEntityManager& EM = GetWorld()->GetSubsystem<UMassEntitySubsystem>()->GetMutableEntityManager();
 		for (int32 Slot = 0; Slot < CarEnts.Num(); ++Slot)
 		{
+			if (!CarShow.IsValidIndex(Slot) || !CarShow[Slot])
+			{
+				continue;
+			}
 			const FCgLifeCar& C = EM.GetFragmentDataChecked<FCgLifeCar>(CarEnts[Slot]);
 			if (C.Active)
 			{
@@ -591,8 +610,7 @@ void ACityGenLife::UpdateTraffic(const float Dt, const bool bRefill)
 	}
 	// (the cars that drove out of the live region made up for on the lanes far from the view,
 	// by their want)
-	const float Target = FMath::Min(TrafficWantLive, PoolFill * (float)CarEnts.Num());
-	if ((float)CarsActive < 0.97f * Target && Dt > 0.f)
+	if (bRefillNow)
 	{
 		RefillAcc += (Target - (float)CarsActive) * Dt / 4.f;
 		if (RefillAcc >= 1.f)
@@ -700,6 +718,7 @@ void ACityGenLife::UpdateCarInstances()
 		};
 		if (bNear)
 		{
+			int32 On = 0;
 			for (const int32 Slot : Slots)
 			{
 				const int32 I = CarInstance[Slot];
@@ -709,6 +728,7 @@ void ACityGenLife::UpdateCarInstances()
 					Comp->UpdateInstanceTransform(I, Of(Slot), false, bRebuildRenderState, false);
 					Shown[I] = 1;
 					++Sent;
+					++On;
 				}
 				else if (Shown[I])
 				{
@@ -716,6 +736,12 @@ void ACityGenLife::UpdateCarInstances()
 					Shown[I] = 0;
 					++Sent;
 				}
+			}
+			// (a part with no car near enough to draw it is not drawn at all: no draw calls)
+			const bool bVis = On > 0 && bEnabled;
+			if (Comp->IsVisible() != bVis)
+			{
+				Comp->SetVisibility(bVis);
 			}
 			continue;
 		}
@@ -802,12 +828,12 @@ FString ACityGenLife::TrafficStatus() const
 	{
 		return TEXT(",\"traffic\":null");
 	}
-	return FString::Printf(TEXT(",\"traffic\":{\"on\":%s,\"hour\":%d,\"pool\":%d,\"live_m\":%.0f,\"live_lanes\":%d,\"want\":%.1f,\"scale\":%.3f,\"traffic_scale\":%.2f,\"active\":%d,\"moving\":%d,\"leader\":%d,\"red\":%d,\"person\":%d,\"player\":%d,\"junction\":%d,\"box\":%d,\"spawned\":%d,\"refilled\":%d,\"left_edge\":%d,\"lost\":%d,\"forced\":%d,\"conflicts\":%d,\"signal_lanes\":%d,\"traffic_ms\":%.3f,\"draw_ms\":%.3f,\"instances_sent\":%d,\"show\":\"%s\"}"),
+	return FString::Printf(TEXT(",\"traffic\":{\"on\":%s,\"hour\":%d,\"pool\":%d,\"live_m\":%.0f,\"live_lanes\":%d,\"want\":%.1f,\"scale\":%.3f,\"traffic_scale\":%.2f,\"active\":%d,\"moving\":%d,\"leader\":%d,\"red\":%d,\"person\":%d,\"player\":%d,\"junction\":%d,\"box\":%d,\"spawned\":%d,\"refilled\":%d,\"left_edge\":%d,\"lost\":%d,\"forced\":%d,\"conflicts\":%d,\"signal_lanes\":%d,\"traffic_ms\":%.3f,\"traffic_ms_max\":%.3f,\"draw_ms\":%.3f,\"live_ms\":%.3f,\"live_ms_max\":%.3f,\"instances_sent\":%d,\"show\":\"%s\"}"),
 		bTraffic ? TEXT("true") : TEXT("false"), Hour, CarEnts.Num(), TrafficLiveM, TrafficLiveLanes, TrafficWantLive, TrafficLiveScale, TrafficScale,
 		CarsActive, CarsMovingNow, CarsWhyNow[CgWhy::Leader], CarsWhyNow[CgWhy::Red], CarsWhyNow[CgWhy::Person], CarsWhyNow[CgWhy::Player],
 		CarsWhyNow[CgWhy::Junction], CarsWhyNow[CgWhy::Box], CarsSpawned, CarsRefilled, CarsLeftTotal, CarsLost, CarsForcedTotal,
 		ConflictsG.Num() / 2, DriveSignal.Num() ? DriveSignal.FilterByPredicate([](int32 V) { return V >= 0; }).Num() : 0,
-		TrafficMs, CarDrawMs, InstancesSent, *LastShow);
+		TrafficMs, TrafficMsMax, CarDrawMs, LiveMs, LiveMsMax, InstancesSent, *LastShow);
 }
 
 void ACityGenLife::SetJaywalk(const float AtSafe, const float AtDanger)
@@ -1282,9 +1308,31 @@ void UCityGenLifeDriveProcessor::ExecuteTraffic(FMassExecutionContext& Context)
 		{
 			bNearPawn |= FVector::DistSquared(C.Pos, P) < FMath::Square((double)F.LookMaxCm + 2000.0);
 		}
-		if ((DView2 < Yield2 || bNearPawn) && PedPos.Num())
+		// (looked for every second frame, and only up to the car in front or a red light's stop
+		// line: nobody past them is in its way; between looks, the last one carried on)
+		float Look = FMath::Clamp(V * F.LookS + V * V / (2.f * F.Brake), F.LookMinCm, F.LookMaxCm);
+		if (LeadGap < 1.0e8f)
 		{
-			const float Look = FMath::Clamp(V * F.LookS + V * V / (2.f * F.Brake), F.LookMinCm, F.LookMaxCm);
+			Look = FMath::Min(Look, LeadGap + 100.f);
+		}
+		if (bAtLight)
+		{
+			Look = FMath::Min(Look, FMath::Max(DStop, 0.f) + 100.f);
+		}
+		const bool bLookNow = bNearPawn || ((F.FrameNo + C.Index) & 1) == 0;
+		if ((DView2 < Yield2 || bNearPawn) && PedPos.Num() && !bLookNow)
+		{
+			if (C.PedHit < 1.0e8f)
+			{
+				C.PedHit -= V * Dt;
+				if (C.PedPlayer || C.Wait < F.ForceS)
+				{
+					Consider(C.PedHit + F.GapCm - F.MarginCm, 0.f, C.PedPlayer ? CgWhy::Player : CgWhy::Person);
+				}
+			}
+		}
+		else if ((DView2 < Yield2 || bNearPawn) && PedPos.Num() && Look > 150.f)
+		{
 			FVector Pts[48];
 			float Along[48];
 			int32 Np = 0;
@@ -1343,6 +1391,10 @@ void UCityGenLifeDriveProcessor::ExecuteTraffic(FMassExecutionContext& Context)
 						const int32 Pd = Items[K].Ped;
 						for (const FVector& Q : {PedPos[Pd], PedAhead[Pd]})
 						{
+							if (!Box.IsInside(FVector2D(Q.X, Q.Y)))
+							{
+								continue;
+							}
 							for (int32 Sgi = 0; Sgi + 1 < Np; ++Sgi)
 							{
 								const FVector2D A2(Pts[Sgi].X, Pts[Sgi].Y), B2(Pts[Sgi + 1].X, Pts[Sgi + 1].Y);
@@ -1371,6 +1423,8 @@ void UCityGenLifeDriveProcessor::ExecuteTraffic(FMassExecutionContext& Context)
 					}
 				}
 			}
+			C.PedHit = Hit;
+			C.PedPlayer = bPlayerHit ? 1 : 0;
 			if (Hit < 1.0e8f)
 			{
 				// (a car stopped long for someone standing still in its way, past ForceS, goes on
@@ -1380,6 +1434,10 @@ void UCityGenLifeDriveProcessor::ExecuteTraffic(FMassExecutionContext& Context)
 					Consider(Hit + F.GapCm - F.MarginCm, 0.f, bPlayerHit ? CgWhy::Player : CgWhy::Person);
 				}
 			}
+		}
+		else
+		{
+			C.PedHit = 1.0e9f;
 		}
 		// the step (the intelligent driver model)
 		float Acc = F.Accel * (1.f - FMath::Pow(FMath::Min(V / V0, 3.f), F.Delta)) - F.Accel * FMath::Min(Term, 1.0e4f);
