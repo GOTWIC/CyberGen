@@ -124,7 +124,11 @@ The lean route at native 2560 x 1440, one run a pass, no DLSS pass (`bench/`):
 ## Package
 
 `C:/Users/swagn/CityGen/builds/packaged/Delta_lg5/Windows/CityAG16.exe` (Development, Win64;
-`builds/packaged/package_lg5.cmd` from a mirror of `CityAG16`): SMOKE.
+`builds/packaged/package_lg5.cmd` from a mirror of `CityAG16`, cooked in 15 minutes, 5.0 GB).
+Its smoke launch (`-userdir=` outside the package, no `Saved/` left in it) loads the level in
+15 s and drives the city round the player start: 615 cars live, 599 of them moving, 60 at red
+lights, the traffic's step 0.4 ms. The mirror and the superseded `Delta_lg3_fix1` package were
+deleted (`Delta_lg3_fix2` kept).
 
 ## Tests
 
