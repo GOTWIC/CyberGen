@@ -192,7 +192,8 @@ not by simulation.
 
 `tests/lifegen` (the new `test_lg_clothing.py`: looks, drafts, textiles, the variety check,
 the exporter's outfits; `test_lg_plan.py`, `test_lg_people.py` updated) and
-`tests/test_bench.py`; see the summary below.
+`tests/test_bench.py`: 52 passed (29 s). `tests/test_unreal.py` (the exporter's import script):
+45 passed (the small city's Unreal imports included).
 
 ## Open items
 
