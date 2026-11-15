@@ -105,7 +105,22 @@ namespace CgLife
 	 *  weighted by its kind (elevators and skybridges seldom, paths less: most people keep to
 	 *  the streets), not `Avoid` (back the way it came) unless that is the only one;
 	 *  INDEX_NONE without one (it turns back). */
-	int32 PickWalk(const FCgLifeFrame& F, const int32 Lane, const EZoneLaneLinkType Type,
+	/** LG4: whether a person of its role may walk a walkway: a gang member only its turf's, a
+	 *  patrol only the patrol walkways, everyone else any. */
+	bool RoleMay(const FCgLifeFrame& F, const FCgLifeWalker& W, const int32 To)
+	{
+		if (W.Role == CgRole::Gang)
+		{
+			return F.LaneTurf && F.LaneTurf->IsValidIndex(To) && (*F.LaneTurf)[To] == W.Turf;
+		}
+		if (W.Role == CgRole::Police)
+		{
+			return F.LanePatrol && F.LanePatrol->IsValidIndex(To) && (*F.LanePatrol)[To];
+		}
+		return true;
+	}
+
+	int32 PickWalk(const FCgLifeFrame& F, const FCgLifeWalker& W, const int32 Lane, const EZoneLaneLinkType Type,
 	               const int32 Avoid, uint32& Seed)
 	{
 		const FZoneGraphStorage& S = *F.Storage;
@@ -119,7 +134,7 @@ namespace CgLife
 		{
 			const FZoneLaneLinkData& Link = S.LaneLinks[K];
 			const int32 To = Link.DestLaneIndex;
-			if (Link.Type != Type || To < 0 || To >= F.WalkLanes || !(*F.InRegion)[To])
+			if (Link.Type != Type || To < 0 || To >= F.WalkLanes || !(*F.InRegion)[To] || !RoleMay(F, W, To))
 			{
 				continue;
 			}
@@ -329,12 +344,29 @@ namespace CgLife
 			(*F.WalkPos)[W.Instance] = W.Pos;
 			(*F.WalkYaw)[W.Instance] = W.Yaw;
 			(*F.WalkState)[W.Instance] = Show;
+			if (F.WalkAnim && F.WalkAnim->IsValidIndex(W.Instance))
+			{
+				(*F.WalkAnim)[W.Instance] = W.State == CgWalk::AtSlot ? W.Anim : (uint8)CgAnim::Walk;
+			}
 		}
+	}
+
+	/** LG4: a person's place slot let go (its claim freed). */
+	void LetGo(FCgLifeFrame& F, FCgLifeWalker& W)
+	{
+		if (W.Slot != INDEX_NONE && F.Release)
+		{
+			F.Release(W.Slot, W.Point);
+			++F.SlotsLeft;
+		}
+		W.Slot = INDEX_NONE;
+		W.Point = INDEX_NONE;
 	}
 
 	/** A person out of the city: its slot back in the pool. */
 	void Free(FCgLifeFrame& F, FCgLifeWalker& W)
 	{
+		LetGo(F, W);
 		if (F.LaneHave->IsValidIndex(W.Lane))
 		{
 			--(*F.LaneHave)[W.Lane];
@@ -342,9 +374,142 @@ namespace CgLife
 		W.Active = 0;
 		W.State = CgWalk::Walk;
 		W.Door = INDEX_NONE;
+		W.Visit = 0;
 		W.Pos = FVector::ZeroVector;
 		Place(F, W, CgShow::Off);
 		F.Freed->Add(W.Instance);
+	}
+
+	/** LG4: a uniform draw in [0, 1) from a person's own stream. */
+	float Unit(FCgLifeWalker& W)
+	{
+		return (float)(Next(W.Seed) % 10000u) / 10000.f;
+	}
+
+	/** LG4: whether a slot wants another user now: under its wanted users (the fraction by
+	 *  chance), of the person's role (a gang spot its own turf's). */
+	bool SlotWants(const FCgLifeFrame& F, FCgLifeWalker& W, const int32 S)
+	{
+		if (!(*F.SlotLive)[S] || (*F.SlotRole)[S] != W.Role)
+		{
+			return false;
+		}
+		if (W.Role == CgRole::Gang && (*F.SlotTurf)[S] != W.Turf)
+		{
+			return false;
+		}
+		const float Want = (*F.SlotWant)[S];
+		const int32 Have = (*F.SlotUsers)[S];
+		if ((float)Have >= FMath::CeilToFloat(Want))
+		{
+			return false;
+		}
+		return (float)Have + Unit(W) < Want;
+	}
+
+	/** LG4: a person goes to a slot's point it has claimed, from where it is. */
+	void GoToSlot(FCgLifeWalker& W, const int32 S, const int32 Pt)
+	{
+		W.Slot = S;
+		W.Point = Pt;
+		W.State = CgWalk::ToSlot;
+		W.From = W.Pos;
+		W.T = 0.f;
+	}
+
+	/** LG4: a person to, at and back from a place slot; true while that is what it does this
+	 *  step, false once it is back on its walkway's line (it walks on). */
+	bool StepSlot(FCgLifeFrame& F, FCgLifeWalker& W, const float Dt)
+	{
+		const int32 S = W.Slot;
+		const bool bValid = S != INDEX_NONE && F.SlotLive && F.SlotLive->IsValidIndex(S) &&
+			F.PointPos->IsValidIndex(W.Point);
+		if (W.State != CgWalk::FromSlot && (!bValid || !(*F.SlotLive)[S]))
+		{
+			// (its slot gone: back to its walkway)
+			LetGo(F, W);
+			W.State = CgWalk::FromSlot;
+			W.From = W.Pos;
+			W.T = 0.f;
+		}
+		if (W.State == CgWalk::ToSlot)
+		{
+			const FVector To = (*F.PointPos)[W.Point] + FVector(0.f, 0.f, W.ZOff);
+			const float Dur = FMath::Max(0.3f, (float)FVector::Dist(W.From, To) / FMath::Max(50.f, W.Speed));
+			W.T += Dt;
+			const float U = FMath::Clamp(W.T / Dur, 0.f, 1.f);
+			W.Pos = FMath::Lerp(W.From, To, U);
+			const FVector D = To - W.From;
+			if (D.SizeSquared2D() > 1.0)
+			{
+				TurnTo(F, W, FMath::RadiansToDegrees(FMath::Atan2(D.Y, D.X)), Dt);
+			}
+			if (U < 1.f)
+			{
+				Place(F, W, CgShow::Moving);
+				return true;
+			}
+			W.State = CgWalk::AtSlot;
+			W.Anim = (*F.SlotAnim)[S];
+			const float A = (*F.SlotDwell)[2 * S];
+			const float B = (*F.SlotDwell)[2 * S + 1];
+			W.Dwell = FMath::Lerp(A, FMath::Max(A, B), Unit(W));
+			if (F.Occupy)
+			{
+				F.Occupy(S, W.Point);
+			}
+			++F.SlotsTaken;
+		}
+		if (W.State == CgWalk::AtSlot)
+		{
+			W.Pos = (*F.PointPos)[W.Point] + FVector(0.f, 0.f, W.ZOff);
+			TurnTo(F, W, (*F.PointYaw)[W.Point], Dt);
+			W.Dwell -= Dt;
+			if (W.Dwell > 0.f)
+			{
+				Place(F, W, CgShow::Still);
+				return true;
+			}
+			// (done: a club's queue goes in at its door, everyone else back to its walkway)
+			const int32 Door = (*F.SlotDoor)[S];
+			LetGo(F, W);
+			if (Door >= 0 && F.DoorInside->IsValidIndex(Door) &&
+				(!F.DoorOpenNow || (*F.DoorOpenNow)[Door]))
+			{
+				W.State = CgWalk::Enter;
+				W.Door = Door;
+				W.Visit = 0;
+				W.From = W.Pos;
+				W.T = 0.f;
+				Place(F, W, CgShow::Moving);
+				return true;
+			}
+			W.State = CgWalk::FromSlot;
+			W.From = W.Pos;
+			W.T = 0.f;
+		}
+		// (back to where it left its walkway's line, on its own side)
+		FVector At, Head;
+		PathAt(F, W, At, Head);
+		const FVector Right = FVector::CrossProduct(FVector::UpVector, Head * W.Dir).GetSafeNormal();
+		const FVector To = At + Right * W.Lat + FVector(0.f, 0.f, W.ZOff);
+		const float Dur = FMath::Max(0.3f, (float)FVector::Dist(W.From, To) / FMath::Max(50.f, W.Speed));
+		W.T += Dt;
+		const float U = FMath::Clamp(W.T / Dur, 0.f, 1.f);
+		W.Pos = FMath::Lerp(W.From, To, U);
+		const FVector D = To - W.From;
+		if (D.SizeSquared2D() > 1.0)
+		{
+			TurnTo(F, W, FMath::RadiansToDegrees(FMath::Atan2(D.Y, D.X)), Dt);
+		}
+		if (U < 1.f)
+		{
+			Place(F, W, CgShow::Moving);
+			return true;
+		}
+		W.State = CgWalk::Walk;
+		W.T = 0.f;
+		return false;
 	}
 
 	/** One person's step of `Dt` s (LG3). */
@@ -352,6 +517,32 @@ namespace CgLife
 	{
 		const FZoneGraphStorage& S = *F.Storage;
 		const TArray<float>& Len = *F.Lengths;
+		// (LG4: in a shop on a visit, not drawn; then out of its door again)
+		if (W.State == CgWalk::Inside)
+		{
+			W.Dwell -= Dt;
+			if (W.Dwell > 0.f && F.DoorInside->IsValidIndex(W.Door))
+			{
+				Place(F, W, CgShow::Hidden);
+				return;
+			}
+			W.State = CgWalk::Exit;
+			W.T = 0.f;
+			W.Visit = 0;
+		}
+		// (LG4: to, at and back from a place slot)
+		if (W.State == CgWalk::ToSlot || W.State == CgWalk::AtSlot || W.State == CgWalk::FromSlot)
+		{
+			if (!S.Lanes.IsValidIndex(W.Lane) || W.Lane >= F.WalkLanes)
+			{
+				Free(F, W);
+				return;
+			}
+			if (StepSlot(F, W, Dt))
+			{
+				return;
+			}
+		}
 		// (through a door: out of it onto the walkway, or in at it and gone)
 		if (W.State == CgWalk::Exit || W.State == CgWalk::Enter)
 		{
@@ -379,6 +570,17 @@ namespace CgLife
 			}
 			if (!bOut)
 			{
+				if (W.Visit && F.DoorDwell && F.DoorDwell->IsValidIndex(2 * W.Door + 1))
+				{
+					// (LG4: in on a visit: out again after it)
+					const float A = (*F.DoorDwell)[2 * W.Door];
+					const float B = (*F.DoorDwell)[2 * W.Door + 1];
+					W.State = CgWalk::Inside;
+					W.Dwell = FMath::Lerp(A, FMath::Max(A, B), Unit(W));
+					++F.Visits;
+					Place(F, W, CgShow::Hidden);
+					return;
+				}
 				++F.Entered;
 				Free(F, W);
 				return;
@@ -415,7 +617,62 @@ namespace CgLife
 			W.TripLeft -= Dt;
 			const float V = KindSpeed(F, Kind, W.Speed) * (Kind == CgKind::Elevator ? 1.f : W.SpeedMul);
 			bStill = V < 25.f;
+			const float DistBefore = W.Dist;
 			W.Dist += W.Dir * V * Dt;
+			// (LG4: a place slot passed on its walkway that wants a user: claimed and gone to;
+			// an open shop's door passed: in for a visit, by its chance; crowd groups keep
+			// together, a gang's members break off)
+			if (F.bPlaces && W.Door == INDEX_NONE && W.Lane < F.WalkLanes &&
+				(W.Group == INDEX_NONE || W.Role == CgRole::Gang))
+			{
+				const float Lo = FMath::Min(DistBefore, W.Dist);
+				const float Hi = FMath::Max(DistBefore, W.Dist);
+				if (F.LaneSlotStarts && F.LaneSlotStarts->IsValidIndex(W.Lane + 1))
+				{
+					for (int32 K = (*F.LaneSlotStarts)[W.Lane]; K < (*F.LaneSlotStarts)[W.Lane + 1]; ++K)
+					{
+						const int32 Sl = (*F.LaneSlots)[K];
+						const float D = (*F.SlotDist)[Sl];
+						if (D < Lo || D > Hi || Sl == W.PassedSlot)
+						{
+							continue;
+						}
+						W.PassedSlot = Sl;
+						if (!SlotWants(F, W, Sl))
+						{
+							continue;
+						}
+						const int32 Pt = F.Claim ? F.Claim(Sl, W.Instance) : INDEX_NONE;
+						if (Pt != INDEX_NONE)
+						{
+							GoToSlot(W, Sl, Pt);
+							Place(F, W, CgShow::Moving);
+							return;
+						}
+					}
+				}
+				if (F.DoorVisitNow && W.Role == CgRole::Crowd && W.Group == INDEX_NONE && W.TripLeft > 0.f)
+				{
+					for (int32 K = (*F.LaneDoorStarts)[W.Lane]; K < (*F.LaneDoorStarts)[W.Lane + 1]; ++K)
+					{
+						const float D = (*F.DoorDists)[K];
+						if (D <= Lo || D > Hi || !(*F.DoorOpenNow)[K] || (*F.DoorDwell)[2 * K + 1] <= 0.f)
+						{
+							continue;
+						}
+						if (Unit(W) < (*F.DoorVisitNow)[K])
+						{
+							W.State = CgWalk::Enter;
+							W.Door = K;
+							W.Visit = 1;
+							W.From = W.Pos;
+							W.T = 0.f;
+							Place(F, W, CgShow::Moving);
+							return;
+						}
+					}
+				}
+			}
 			// (a signalized crosswalk: wait at its curb until people may start crossing, or
 			// cross against it, more often where the district is dangerous)
 			const int32 Sig = (*F.LaneSignal)[W.Lane];
@@ -451,8 +708,14 @@ namespace CgLife
 				const int32 A = (*F.LaneDoorStarts)[W.Lane];
 				const int32 B = (*F.LaneDoorStarts)[W.Lane + 1];
 				float Best = 1.0e9f;
-				for (int32 K = A; K < B; ++K)
+				for (int32 K = A; K < B && W.Role != CgRole::Gang; ++K)
 				{
+					// (LG4: an open door only; a patrol back in at its station's)
+					if ((F.DoorOpenNow && !(*F.DoorOpenNow)[K]) ||
+						(W.Role == CgRole::Police && (!F.DoorPolice || !(*F.DoorPolice)[K])))
+					{
+						continue;
+					}
 					const float Ahead = ((*F.DoorDists)[K] - W.Dist) * W.Dir;
 					if (Ahead >= 0.f && Ahead < Best)
 					{
@@ -486,7 +749,7 @@ namespace CgLife
 				const float Over = FMath::Min(bEnd ? W.Dist - L : -W.Dist, 200.f);
 				// (the walkway chosen as it neared the end, if it is still live; else one now)
 				const bool bChosen = W.Next != INDEX_NONE && W.Next < F.WalkLanes && (*F.InRegion)[W.Next];
-				const int32 To = bChosen ? W.Next : PickWalk(F, W.Lane, bEnd ? EZoneLaneLinkType::Outgoing : EZoneLaneLinkType::Incoming, W.PrevLane, W.Seed);
+				const int32 To = bChosen ? W.Next : PickWalk(F, W, W.Lane, bEnd ? EZoneLaneLinkType::Outgoing : EZoneLaneLinkType::Incoming, W.PrevLane, W.Seed);
 				W.Next = INDEX_NONE;
 				if (To == INDEX_NONE)
 				{
@@ -530,7 +793,7 @@ namespace CgLife
 			if (W.Next == INDEX_NONE && (W.Dir > 0.f ? Len[W.Lane] - W.Dist : W.Dist) < F.CornerCm + 50.f)
 			{
 				const bool bEnd = W.Dir > 0.f;
-				W.Next = PickWalk(F, W.Lane, bEnd ? EZoneLaneLinkType::Outgoing : EZoneLaneLinkType::Incoming, W.PrevLane, W.Seed);
+				W.Next = PickWalk(F, W, W.Lane, bEnd ? EZoneLaneLinkType::Outgoing : EZoneLaneLinkType::Incoming, W.PrevLane, W.Seed);
 				if (W.Next != INDEX_NONE)
 				{
 					const FZoneLaneData& Cur = S.Lanes[W.Lane];
@@ -697,7 +960,11 @@ void UCityGenLifeWalkProcessor::ExecuteCity(FMassExecutionContext& Context)
 				continue;
 			}
 			const uint8 Tier = F.PersonTier && F.PersonTier->IsValidIndex(W.Instance) ? (*F.PersonTier)[W.Instance] : 0;
-			const int32 Every = (Tier <= 1 || W.State >= CgWalk::Enter) ? 1 : (Tier == 2 ? 2 : 4);
+			// (LG4: someone sitting, standing at a slot or inside a shop far off as seldom as a
+			// far walker; going through a door or to and from a slot every frame)
+			const bool bMoving = W.State == CgWalk::Enter || W.State == CgWalk::Exit ||
+				W.State == CgWalk::ToSlot || W.State == CgWalk::FromSlot;
+			const int32 Every = (Tier <= 1 || bMoving) ? 1 : (Tier == 2 ? 2 : 4);
 			W.Pending += Dt0;
 			if (Every > 1 && ((F.FrameNo + W.Instance) % Every) != 0)
 			{

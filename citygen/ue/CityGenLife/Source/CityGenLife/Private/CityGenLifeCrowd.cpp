@@ -138,8 +138,29 @@ void ACityGenLife::BuildCrowd()
 	TArray<int32> DoorLaneS;
 	TArray<float> DoorRateS;
 	LaneDoorStarts.Init(0, N + 1);
+	// (LG4: the doors' hours, visits, stations and rates by the hour, in the same order)
+	DoorSortedOf.Init(INDEX_NONE, ND);
+	DoorRatesHSorted.Reset();
+	DoorOpenSorted.Reset();
+	DoorVisitSorted.Reset();
+	DoorDwellSorted.Reset();
+	DoorPoliceSorted.Reset();
+	const bool bH = DoorRatesH.Num() >= 24 * ND && ND > 0;
 	for (const int32 K : Order)
 	{
+		DoorSortedOf[K] = DoorDists.Num();
+		for (int32 H = 0; H < 24 && bH; ++H)
+		{
+			DoorRatesHSorted.Add(FMath::Max(0.f, DoorRatesH[24 * K + H]));
+		}
+		DoorOpenSorted.Add(DoorOpen.IsValidIndex(K) ? DoorOpen[K] : 0xFFFFFF);
+		for (int32 B = 0; B < 5; ++B)
+		{
+			DoorVisitSorted.Add(DoorVisit.IsValidIndex(5 * K + B) ? DoorVisit[5 * K + B] : 0.f);
+		}
+		DoorDwellSorted.Add(DoorDwell.IsValidIndex(2 * K) ? DoorDwell[2 * K] : 0.f);
+		DoorDwellSorted.Add(DoorDwell.IsValidIndex(2 * K + 1) ? DoorDwell[2 * K + 1] : 0.f);
+		DoorPoliceSorted.Add(DoorPolice.IsValidIndex(K) ? DoorPolice[K] : 0);
 		const int32 Ln = DoorLanes[K];
 		const float D = FMath::Clamp(100.f * DoorDistsM[K], 0.f, Lengths[Ln]);
 		FZoneGraphLaneLocation Loc;
@@ -189,6 +210,11 @@ void ACityGenLife::BuildCrowd()
 	Frame.Jaywalk = Jaywalk;
 	Frame.TurnDegS = TurnDegS;
 	Frame.CornerCm = 100.f * CornerM;
+	if (IsPlaces())
+	{
+		// (LG4: life at places)
+		BuildPlaces();
+	}
 }
 
 void ACityGenLife::SpawnPool()
@@ -218,10 +244,18 @@ void ACityGenLife::SpawnPool()
 			W.Instance = K;
 		}
 		Entities.Append(Hs);
+		// (LG4: the slots the plan keeps for gang members and police in lists of their own)
+		FreeGang.Reset();
+		FreePolice.Reset();
+		GangActive = PoliceActive = 0;
 		for (int32 K = NP - 1; K >= 0; --K)
 		{
-			FreeSlots.Add(K);
+			const uint8 PRole = PersonRole.IsValidIndex(K) && IsPlaces() ? PersonRole[K] : (uint8)CgRole::Crowd;
+			(PRole == CgRole::Gang ? FreeGang : (PRole == CgRole::Police ? FreePolice : FreeSlots)).Add(K);
 		}
+		CrowdPoolN = FreeSlots.Num();
+		GangPoolN = FreeGang.Num();
+		PolicePoolN = FreePolice.Num();
 	}
 	for (int32 I = 0; I < LaneHave.Num(); ++I)
 	{
@@ -237,9 +271,12 @@ void ACityGenLife::SpawnPool()
 	DoorAcc = 0.f;
 }
 
-int32 ACityGenLife::SpawnGroup(const int32 Lane, const float Dist, const float Dir, const int32 Size, const int32 Door, FRandomStream& Rng)
+int32 ACityGenLife::SpawnGroup(const int32 Lane, const float Dist, const float Dir, const int32 Size, const int32 Door, FRandomStream& Rng,
+	const uint8 PRole, const int32 Turf, TArray<int32>* OutSlots)
 {
-	if (!Entities.Num() || FreeSlots.Num() == 0 || !InRegion.IsValidIndex(Lane))
+	// (LG4: a gang's members and police from their own slots of the pool)
+	TArray<int32>& Free = PRole == CgRole::Gang ? FreeGang : (PRole == CgRole::Police ? FreePolice : FreeSlots);
+	if (!Entities.Num() || Free.Num() == 0 || !InRegion.IsValidIndex(Lane))
 	{
 		return 0;
 	}
@@ -247,16 +284,27 @@ int32 ACityGenLife::SpawnGroup(const int32 Lane, const float Dist, const float D
 	TArray<int32, TInlineAllocator<8>> Slots;
 	float Pace = 1.0e9f;
 	const int32 D0 = LaneDistrictArr.IsValidIndex(Lane) ? LaneDistrictArr[Lane] : INDEX_NONE;
-	for (int32 K = 0; K < Size && FreeSlots.Num(); ++K)
+	for (int32 K = 0; K < Size && Free.Num(); ++K)
 	{
 		// (LG2: a slot whose look is of a group the district wears, drawn by its people)
-		const int32 Slot = TakeSlot(D0, Rng);
+		const int32 Slot = PRole == CgRole::Crowd ? TakeSlot(D0, Rng) : Free.Pop(EAllowShrinking::No);
 		Slots.Add(Slot);
 		Pace = FMath::Min(Pace, 100.f * (PersonPace.IsValidIndex(Slot) ? PersonPace[Slot] : 1.35f));
 	}
+	if (OutSlots)
+	{
+		OutSlots->Append(Slots);
+	}
 	const int32 Group = Slots.Num() > 1 ? ++GroupCounter : INDEX_NONE;
 	const uint32 Seed = Rng.GetUnsignedInt() | 1u;
-	const float Trip = TripS * (0.25f + 1.5f * Rng.FRand());
+	// (a gang member is out on its turf for good; a patrol a while, then back in at its station)
+	const float Trip = PRole == CgRole::Gang ? 1.0e9f :
+		(PRole == CgRole::Police ? TripS * (1.f + 2.f * Rng.FRand()) : TripS * (0.25f + 1.5f * Rng.FRand()));
+	// (a patrol at a constable's pace)
+	if (PRole == CgRole::Police)
+	{
+		Pace = FMath::Min(Pace, 115.f);
+	}
 	const float HW = FMath::Max(50.f, 0.5f * Widths[Lane]);
 	// (most keep right, some left; a group walks in pairs, side by side, one pair behind
 	// another)
@@ -282,6 +330,10 @@ int32 ACityGenLife::SpawnGroup(const int32 Lane, const float Dist, const float D
 		W.Member = (uint8)M;
 		W.TripLeft = Trip;
 		W.HoldBack = 30.f + (float)(MixU((uint32)Slot + 7u) % 120u);
+		W.Role = PRole;
+		W.Turf = Turf;
+		GangActive += PRole == CgRole::Gang ? 1 : 0;
+		PoliceActive += PRole == CgRole::Police ? 1 : 0;
 		if (Door >= 0)
 		{
 			// (out of its door one after another)
@@ -297,7 +349,12 @@ int32 ACityGenLife::SpawnGroup(const int32 Lane, const float Dist, const float D
 		WalkPos[Slot] = FVector::ZeroVector;
 		// (the clothes' color: a color of the district it comes out in; LG2: three, one per
 		// dye channel, of its look's group in this district, and its wear)
-		if (D >= 0 && OutfitColors > 0 && PersonGroup.IsValidIndex(Slot))
+		if (PRole == CgRole::Gang && TurfFaction.IsValidIndex(Turf) && FactionColors > 0)
+		{
+			// (LG4: a gang member in its faction's colors)
+			DressFaction(Slot, TurfFaction[Turf], Rng);
+		}
+		else if (D >= 0 && OutfitColors > 0 && PersonGroup.IsValidIndex(Slot))
 		{
 			DressSlot(Slot, D, Rng);
 		}
@@ -313,11 +370,35 @@ int32 ACityGenLife::SpawnGroup(const int32 Lane, const float Dist, const float D
 			}
 		}
 		PersonStill[Slot] = 0;
+		if (WalkAnimG.IsValidIndex(Slot))
+		{
+			WalkAnimG[Slot] = CgAnim::Walk;
+		}
 		ApplyLook(Slot, false);
 		++ActiveNow;
 		++Spawned;
 	}
 	return Slots.Num();
+}
+
+void ACityGenLife::FreeRole(const int32 Slot)
+{
+	// (LG4: a slot back in its role's list)
+	const uint8 PRole = PersonRole.IsValidIndex(Slot) && IsPlaces() ? PersonRole[Slot] : (uint8)CgRole::Crowd;
+	if (PRole == CgRole::Gang)
+	{
+		FreeGang.Add(Slot);
+		--GangActive;
+	}
+	else if (PRole == CgRole::Police)
+	{
+		FreePolice.Add(Slot);
+		--PoliceActive;
+	}
+	else
+	{
+		FreeSlots.Add(Slot);
+	}
 }
 
 int32 ACityGenLife::TakeSlot(const int32 D, FRandomStream& Rng)
@@ -397,12 +478,20 @@ void ACityGenLife::FreeOnDeadLanes()
 		{
 			--LaneHave[W.Lane];
 		}
+		// (LG4: its place slot let go)
+		if (W.Slot != INDEX_NONE)
+		{
+			ReleasePoint(W.Slot, W.Point);
+		}
+		W.Slot = W.Point = INDEX_NONE;
 		W.Active = 0;
 		W.Door = INDEX_NONE;
+		W.Visit = 0;
+		W.State = CgWalk::Walk;
 		W.Pos = FVector::ZeroVector;
 		WalkState[Slot] = CgShow::Off;
 		WalkPos[Slot] = FVector::ZeroVector;
-		FreeSlots.Add(Slot);
+		FreeRole(Slot);
 		--ActiveNow;
 		++Lost;
 	}
@@ -412,14 +501,16 @@ void ACityGenLife::TakeFreed()
 {
 	for (const int32 Slot : Freed)
 	{
-		FreeSlots.Add(Slot);
+		FreeRole(Slot);
 		--ActiveNow;
 	}
 	Freed.Reset();
 	DoorIn += Frame.Entered;
 	JaywalkTotal += Frame.Jaywalked;
 	WaitingNow = Frame.Waiting;
+	VisitsTotal += Frame.Visits;
 	Frame.Entered = Frame.Exited = Frame.Jaywalked = 0;
+	Frame.SlotsTaken = Frame.SlotsLeft = Frame.Visits = 0;
 }
 
 void ACityGenLife::UpdateLive(const float Dt, const bool bRefill)
@@ -432,10 +523,13 @@ void ACityGenLife::UpdateLive(const float Dt, const bool bRefill)
 	LastLiveView = View;
 	const double In = 100.0 * LiveM;
 	const double Out = 100.0 * (LiveM + LiveMarginM);
-	TArray<int32> Born;
+	TArray<int32> Born, Died;
 	bool bDied = false;
 	WantLive = 0.f;
+	WantGang = WantPolice = 0.f;
 	LiveLanes = 0;
+	const bool bPl = IsPlaces();
+	const int32 Band = BandOf(Hour);
 	for (int32 I = 0; I < WalkLaneCount; ++I)
 	{
 		const double D = FMath::Max(0.0, FVector::Dist(LaneMid[I], View) - LaneHalf[I]);
@@ -451,16 +545,40 @@ void ACityGenLife::UpdateLive(const float Dt, const bool bRefill)
 			else
 			{
 				bDied = true;
+				Died.Add(I);
 			}
 		}
 		if (bLive)
 		{
 			WantLive += Want(I);
 			++LiveLanes;
+			if (bPl)
+			{
+				// (LG4: the gang members and police walking it, its slots' users by their role)
+				WantGang += RoleWant(I, CgRole::Gang);
+				WantPolice += RoleWant(I, CgRole::Police);
+				for (int32 K = LaneSlotStarts[I]; K < LaneSlotStarts[I + 1] && bPlaces; ++K)
+				{
+					const int32 Sl = LaneSlotList[K];
+					if (SlotRoles[Sl] == CgRole::Gang)
+					{
+						WantGang += bGangs ? SlotWantOf(Sl) : 0.f;
+					}
+					else
+					{
+						WantLive += SlotWantOf(Sl) * CrowdScale;
+					}
+				}
+			}
 		}
 	}
-	// (the live people at most PoolFill of the pool: the density scaled down evenly)
-	LiveScale = WantLive > 0.f ? FMath::Min(1.f, PoolFill * (float)People / WantLive) : 1.f;
+	(void)Band;
+	// (the live people at most PoolFill of the pool: the density scaled down evenly; LG4: each
+	// role within its own slots of the pool)
+	const int32 NCrowd = bPl ? CrowdPoolN : People;
+	LiveScale = WantLive > 0.f ? FMath::Min(1.f, PoolFill * (float)NCrowd / WantLive) : 1.f;
+	GangScaleNow = WantGang > 0.f ? FMath::Min(1.f, PoolFill * (float)GangPoolN / WantGang) : 1.f;
+	PoliceScaleNow = WantPolice > 0.f ? FMath::Min(1.f, PoolFill * (float)PolicePoolN / WantPolice) : 1.f;
 	if (bRefill)
 	{
 		// (the hour or the scale changed: everyone out, every live walkway filled again)
@@ -469,6 +587,10 @@ void ACityGenLife::UpdateLive(const float Dt, const bool bRefill)
 			InRegion[I] = 0;
 		}
 		FreeOnDeadLanes();
+		for (int32 I = 0; I < WalkLaneCount && bPl; ++I)
+		{
+			SlotsAlive(I, false);
+		}
 		Born.Reset();
 		for (int32 I = 0; I < WalkLaneCount; ++I)
 		{
@@ -483,6 +605,13 @@ void ACityGenLife::UpdateLive(const float Dt, const bool bRefill)
 	else if (bDied)
 	{
 		FreeOnDeadLanes();
+		for (const int32 Lane : Died)
+		{
+			if (bPl)
+			{
+				SlotsAlive(Lane, false);
+			}
+		}
 	}
 	for (const int32 Lane : Born)
 	{
@@ -498,6 +627,15 @@ void ACityGenLife::UpdateLive(const float Dt, const bool bRefill)
 			}
 			Count -= Made;
 		}
+		if (bPl)
+		{
+			// (LG4: its gang members, police and slots' users)
+			FillLaneRoles(Lane);
+		}
+	}
+	if (bPl)
+	{
+		UpdateSlotWants();
 	}
 	// (the doors on live walkways, by their rates)
 	if (Born.Num() || bDied || bRefill || DoorCum.Num() == 0)
@@ -520,9 +658,11 @@ void ACityGenLife::UpdateLive(const float Dt, const bool bRefill)
 
 void ACityGenLife::DoorSpawns(const float Dt)
 {
+	// (LG4: police pairs out of their stations' doors)
+	PoliceFromStations(Dt);
 	// (as many come out as go in over a trip, more while the live people are under their
 	// number: the doors keep the streets at their density)
-	const float Target = FMath::Min(WantLive, PoolFill * (float)People);
+	const float Target = FMath::Min(WantLive, PoolFill * (float)(IsPlaces() ? CrowdPoolN : People));
 	if (DoorCum.Num() == 0 || (float)ActiveNow >= 1.05f * Target)
 	{
 		DoorAcc = 0.f;
@@ -554,6 +694,11 @@ void ACityGenLife::DoorSpawns(const float Dt)
 void ACityGenLife::SetHour(const int32 InHour)
 {
 	Hour = ((InHour % 24) + 24) % 24;
+	if (bBuilt && IsPlaces())
+	{
+		// (LG4: the doors at the hour: open, their visits, their rates)
+		ApplyHour();
+	}
 	if (bBuilt && IsCity())
 	{
 		UpdateLive(0.f, true);
@@ -611,5 +756,6 @@ FString ACityGenLife::CrowdStatus() const
 	}
 	return FString::Printf(TEXT(",\"crowd\":{\"hour\":%d,\"pool\":%d,\"live_m\":%.0f,\"live_lanes\":%d,\"want\":%.1f,\"scale\":%.3f,\"crowd_scale\":%.2f,\"active\":%d,\"free\":%d,\"waiting\":%d,\"still\":%d,\"in_elevators\":%d,\"spawned\":%d,\"door_out\":%d,\"door_in\":%d,\"lost\":%d,\"jaywalked\":%d,\"groups\":%d,\"doors\":%d,\"doors_live\":%d,\"signals\":%d}"),
 		Hour, People, LiveM, LiveLanes, WantLive, LiveScale, CrowdScale, ActiveNow, FreeSlots.Num(), WaitingNow, Still, Hidden,
-		Spawned, DoorOut, DoorIn, Lost, JaywalkTotal, GroupCounter, DoorDists.Num(), DoorLive.Num(), SignalWindows.Num() / 4);
+		Spawned, DoorOut, DoorIn, Lost, JaywalkTotal, GroupCounter, DoorDists.Num(), DoorLive.Num(), SignalWindows.Num() / 4)
+		+ PlacesStatus();
 }

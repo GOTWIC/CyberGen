@@ -39,10 +39,12 @@ import json
 import math
 from pathlib import Path
 
-PACK_VERSION = 5            # 2 (cars_steam): smoothed drive lanes, their speeds; 3 (LG3): the
+PACK_VERSION = 6            # 2 (cars_steam): smoothed drive lanes, their speeds; 3 (LG3): the
                             # city's crowd (every walkway, doors, signals, the pool); 4 (LG5):
                             # the city's traffic (every lane, signals, conflicts, the pool); 5 (LG2):
-                            # looks for people, their groups, dye colors and wear
+                            # looks for people, their groups, dye colors and wear; 6 (LG4): slots,
+                            # places by their hours, gangs, police patrols and cars, the
+                            # places' clips
 DATA = "life.json"
 CONTROLLER_KEY = "life"
 MARGIN_M = 60.0             # lanes this far past the live radius come along (links out of it)
@@ -475,7 +477,17 @@ def people_library(lib: dict | None, spike: dict) -> dict:
     keys = sorted(groups)
     walks = [groups[k]["clips"][w] for k in keys for w in names]
     tiers = {**(lib.get("tiers") or {}), **((spike.get("library") or {}).get("tiers") or {})}
-    return {"near_meshes": near, "near_mesh_starts": starts,
+    # (LG4: the places' clips on each clip group's skeleton, `unreal_people.ensure_place_clips`:
+    # a bench's sitting loop, standing idle breaks for talking, smoking and eating)
+    pc = lib.get("place_clips") or {}
+    pg = pc.get("groups") or {}
+    talk = [c for c in pc.get("clips") or [] if c.startswith("talk")]
+    place = {}
+    if pg and all(k in pg for k in keys):
+        place = {"sit_clips": [(pg[k].get("sit") or {}).get("anim", "") for k in keys],
+                 "talk_clips": [(pg[k].get(c) or {}).get("anim", "") for k in keys for c in talk],
+                 "talk_count": len(talk), "places_hash": pc.get("hash")}
+    return {**place, "near_meshes": near, "near_mesh_starts": starts,
             "near_hair": [c["near"].get("hair") or "" for c in chars],
             "char_clip_group": [keys.index(c["skeleton"]) if c.get("skeleton") in keys else 0
                                 for c in chars],
@@ -515,12 +527,15 @@ def pack_crowd(plan: dict, pdir: Path, graphs: dict) -> dict:
     gids = graphs["walkways"].get("ids") or [str(e[0]) for e in walk]
     lane_of = {gids[e[0]]: k for k, e in enumerate(walk)}
     out = pack_walks(graphs, walk)
-    rows, doors = {}, []
+    rows, doors, slots, places = {}, [], [], {}
     for t in plan["tiles"]:
         tile = json.loads((pdir / t["file"]).read_text(encoding="utf-8"))
         for w in tile.get("walks") or []:
             rows[w["id"]] = w
         doors += tile.get("spawns") or []
+        slots += tile.get("slots") or []
+        for p in tile.get("places") or []:
+            places[p["spawn_id"]] = p
     dids = [d["id"] for d in plan["districts"]]
     didx = {d: k for k, d in enumerate(dids)}
     codes = {k: i for i, k in enumerate(crowd["kinds"])}
@@ -544,15 +559,28 @@ def pack_crowd(plan: dict, pdir: Path, graphs: dict) -> dict:
         sig.append(win.get((r.get("signal"), r.get("phase")), -1))
     hour = int(crowd["hour"])
     dl, dd, dp, dr = [], [], [], []
+    # (LG4: each door's rates every hour, its place's open hours as 24 bits, visit chance by
+    # band and visit length, a precinct station's door)
+    drh, dopen, dvisit, ddwell, dpolice = [], [], [], [], []
+    door_index = {}
+    stations = {d for p in ((plan.get("police") or {}).get("precincts") or [])
+                for d in p.get("station_doors") or []}
     for s in sorted(doors, key=lambda s: s["id"]):
         k = lane_of.get(s.get("walkway_id"))
         if k is None:
             continue
         e = walk[k]
+        door_index[s["id"]] = len(dl)
         dl.append(k)
         dd.append(round(_along(e[2], s["pos"][0], s["pos"][1]), 3))
         dp += [round(float(v), 3) for v in s["pos"]]
         dr.append(round(float(s["rates"][hour]), 4))
+        drh += [round(float(v), 4) for v in s["rates"]]
+        pl = places.get(s["id"])
+        dopen.append(sum(1 << h for h, o in enumerate(pl["open"]) if o) if pl else (1 << 24) - 1)
+        dvisit += [round(float(v), 4) for v in (pl["visit"] if pl else [0.0] * 5)]
+        ddwell += [float(v) for v in (pl["dwell_s"] if pl else [0.0, 0.0])]
+        dpolice.append(1 if s["id"] in stations else 0)
     shape, danger, pal = [], [], []
     size = max((len(v) for v in crowd["palettes"].values()), default=0)
     for d in plan["districts"]:
@@ -580,6 +608,11 @@ def pack_crowd(plan: dict, pdir: Path, graphs: dict) -> dict:
     ps = persons({"palette": [], "persons": crowd["persons"]})
     ps["person_tint"] = [0.5] * (3 * len(ps.get("person_char") or []))
     ps["person_tint_index"] = [int(v) for v in crowd["persons"].get("tint") or []]
+    if plan.get("places"):
+        # (LG4: life at places)
+        out.update(pack_places(plan, walk, gids, lane_of, rows, slots, door_index))
+        out.update({"door_rates_h": drh, "door_open": dopen, "door_visit": dvisit,
+                    "door_dwell": ddwell, "door_police": dpolice})
     out.update({"walk_kinds": kinds, "walk_district": dist, "walk_people": ppl,
                 "walk_signal": sig, "signal_windows": windows,
                 "district_ids": dids, "district_shape": shape, "district_danger": danger,
@@ -600,6 +633,74 @@ def pack_crowd(plan: dict, pdir: Path, graphs: dict) -> dict:
                           "elevator": float(sp["elevator"])},
                 **ps})
     return out
+
+
+def pack_places(plan: dict, walk: list, gids: list, lane_of: dict, rows: dict, slots: list,
+                door_index: dict) -> dict:
+    """LG4: life at places, flat: every slot (its kind's code, walkway lane, distance along it,
+    use points, users per band, dwell, role, turf, clip, the door a queue goes in at); per
+    walkway lane its gang turf, gang members and police walking per band, whether police patrol
+    it; the turfs' factions and their dye colors (linear); the pool's roles; the settings."""
+    pl = plan["places"]
+    kinds = pl["kinds"]
+    anims = pl["anims"]
+    turfs = (plan.get("gangs") or {}).get("turfs") or []
+    tidx = {t["id"]: k for k, t in enumerate(turfs)}
+    facs = sorted({t["faction_id"] for t in turfs})
+    fidx = {f: k for k, f in enumerate(facs)}
+    fcols = []
+    ncol = max((len(t["colors"]) for t in turfs), default=0)
+    for f in facs:
+        cols = next(t["colors"] for t in turfs if t["faction_id"] == f)
+        for k in range(ncol):
+            fcols += _lin(cols[k % len(cols)])
+    sk, sl, sd, sps, sp, su, sw, sr, st, sa, sdoor = ([] for _ in range(11))
+    roles = {"crowd": 0, "gang": 1, "police": 2}
+    for s in sorted(slots, key=lambda s: s["id"]):
+        k = lane_of.get(s.get("walkway_id"))
+        if k is None or not s.get("points"):
+            continue
+        p0 = s["points"][0]
+        sk.append(kinds.index(s["kind"]))
+        sl.append(k)
+        sd.append(round(_along(walk[k][2], p0[0], p0[1]), 3))
+        sps.append(len(sp) // 4)
+        for p in s["points"]:
+            sp += [round(float(v), 3) for v in p]
+        su += [round(float(v), 4) for v in (s.get("use") or [0.0] * 5)]
+        sw += [float(v) for v in (s.get("dwell_s") or [30.0, 120.0])]
+        sr.append(roles.get(s.get("role"), 0))
+        st.append(tidx.get(s.get("turf_id"), -1))
+        sa.append(anims.index(s.get("anim") or "idle") if (s.get("anim") or "idle") in anims
+                  else 0)
+        pid = s.get("place_id") or ""
+        sdoor.append(door_index.get("spawn." + pid[len("place."):], -1)
+                     if s["kind"] == "bar_queue" else -1)
+    sps.append(len(sp) // 4)
+    wturf, wgang, wpol, wpat = [], [], [], []
+    for e in walk:
+        r = rows.get(gids[e[0]]) or {}
+        wturf.append(tidx.get(r.get("turf"), -1))
+        wgang += [round(float(v), 4) for v in (r.get("gang") or [0.0] * 5)]
+        wpol += [round(float(v), 4) for v in (r.get("police") or [0.0] * 5)]
+        wpat.append(1 if r.get("patrol") else 0)
+    gp = plan.get("gangs") or {}
+    po = plan.get("police") or {}
+    return {"slot_kinds": sk, "slot_lanes": sl, "slot_dists": sd, "slot_point_starts": sps,
+            "slot_points": sp, "slot_use": su, "slot_dwell": sw, "slot_roles": sr,
+            "slot_turfs": st, "slot_anims": sa, "slot_doors": sdoor,
+            "slot_kind_names": list(kinds),
+            "slot_kind_behaviors": [pl["slot_kinds"][k]["behavior"] for k in kinds],
+            "walk_turf": wturf, "walk_gang": wgang, "walk_police": wpol, "walk_patrol": wpat,
+            "turf_faction": [fidx[t["faction_id"]] for t in turfs],
+            "turf_ids": [t["id"] for t in turfs],
+            "faction_palettes": [round(v, 4) for v in fcols], "faction_colors": ncol,
+            "person_role": [int(v) for v in (plan["crowd"]["persons"].get("role") or [])],
+            "places": {"visit_p": float(pl["visit_p"]),
+                       "gang_groups": [float(v) for v in gp.get("groups") or [1.0]],
+                       "slots": len(sk), "turfs": len(turfs),
+                       "gang_pool": int(gp.get("pool") or 0),
+                       "police_pool": int(po.get("pool") or 0)}}
 
 
 def conflicts(pts: list[list[list[float]]], connector: list[bool], reach: float,
@@ -669,6 +770,13 @@ def traffic_cars(traffic: dict, veh: dict | None, dids: list[str]) -> dict:
         kp = len(rows[0]) // 9 if rows and rows[0] else 0
         out["traffic_paints"].append([v for r in rows for v in r])
     out["paints_per"] = kp or 0
+    if traffic.get("police_slots") and traffic.get("police_model") in have:
+        # (LG4: the slots kept for patrol cars, a model the project has, in the livery)
+        flag = [0] * len(traffic["slots"])
+        for k in traffic["police_slots"]:
+            flag[k] = 1
+        out["traffic_police"] = flag
+        out["police_paint"] = [round(float(v), 4) for v in traffic["police_paint"]]
     return out
 
 
@@ -712,10 +820,11 @@ def pack_traffic(plan: dict, pdir: Path, graphs: dict, veh: dict | None) -> dict
             g1 = g0 + float(p["green_s"])
             windows += [float(s["cycle_s"]), float(s["offset_s"]), g0, round(g1, 3),
                         round(g1 + float(p["amber_s"]), 3)]
-    cars, dist, msk, sig, back = [], [], [], [], []
+    cars, dist, msk, sig, back, pol = [], [], [], [], [], []
     for k, e in enumerate(drive):
         r = rows.get(gids[e[0]]) or {}
         cars += [round(float(v), 4) for v in (r.get("vehicles") or [0.0] * 5)]
+        pol += [round(float(v), 4) for v in (r.get("police") or [0.0] * 5)]
         dist.append(didx.get(r.get("district_id"), -1))
         msk.append(1 if k in main else 0)
         w = win.get((r.get("signal"), r.get("phase")), -1)
@@ -730,6 +839,9 @@ def pack_traffic(plan: dict, pdir: Path, graphs: dict, veh: dict | None) -> dict
     out.update({"drive_cars": cars, "drive_district": dist, "drive_main": msk,
                 "drive_signal": sig, "drive_stop_back": back, "drive_windows": windows,
                 "drive_conflicts": cflat, "drive_conflict_starts": cstart,
+                # (LG4: patrol cars per lane and band; the pool's patrol car slots, their
+                # livery)
+                **({"drive_police": pol} if tr.get("police_slots") else {}),
                 "traffic": {"hour": int(tr["hour"]), "pool": int(tr["pool"]),
                             "live_m": float(tr["live_m"]), "scale": 1.0,
                             "districts": dids,
@@ -825,6 +937,11 @@ def write_life(build: str | Path, given: str | Path | None = None,
                             "hour": c["traffic"]["hour"], "pool": c["traffic"]["pool"],
                             "live_m": c["traffic"]["live_m"], "models": len(c["models"])}}
                if c.get("traffic") else {}),
+            **({"places": {"slots": len(c["slot_kinds"]), "turfs": len(c["turf_faction"]),
+                           "roles": [c["person_role"].count(k) for k in range(3)],
+                           "patrol_cars": sum(c.get("traffic_police") or []),
+                           "clips": bool(c.get("sit_clips"))}}
+               if c.get("slot_kinds") is not None else {}),
             "library": ({"characters": len(c["mid_meshes"]), "hash": c.get("library_hash"),
                         "tiers": c.get("tiers")} if c.get("mid_meshes") else
                        {"stand_ins": True, "why": c.get("people_skipped") or

@@ -165,6 +165,58 @@ namespace
 			}
 		}));
 
+	// --- LG4: life at places
+	FAutoConsoleCommandWithWorldAndArgs PlacesCmd(TEXT("CityGenLife.Places"),
+		TEXT("CityGenLife.Places [0|1]: LG4's place slots (benches, stops, stalls, queues) and shop visits on or off (toggling without an argument), the live walkways filled again"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (ACityGenLife* A = LifeIn(World))
+			{
+				A->SetPlaces(Args.Num() ? FCString::Atoi(*Args[0]) != 0 : !A->bPlaces);
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs GangsCmd(TEXT("CityGenLife.Gangs"),
+		TEXT("CityGenLife.Gangs [0|1]: LG4's gangs on their turf on or off (toggling without an argument)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (ACityGenLife* A = LifeIn(World))
+			{
+				A->SetGangs(Args.Num() ? FCString::Atoi(*Args[0]) != 0 : !A->bGangs);
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs PoliceCmd(TEXT("CityGenLife.Police"),
+		TEXT("CityGenLife.Police [0|1]: LG4's police patrols on foot and in cars on or off (toggling without an argument)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (ACityGenLife* A = LifeIn(World))
+			{
+				A->SetPolice(Args.Num() ? FCString::Atoi(*Args[0]) != 0 : !A->bPolice);
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs PlaceShowCmd(TEXT("CityGenLife.PlaceShow"),
+		TEXT("CityGenLife.PlaceShow sit|queue|stall|smoke|gang|gangwalk|police|patrol: the camera moved to the nearest person sitting, queueing or waiting, at a stall or kiosk, smoking at a bar, a gang at its spot or walking, a police pair, a patrol car (the check's shots)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (ACityGenLife* A = LifeIn(World))
+			{
+				A->ShowPlace(Args.Num() ? Args[0] : FString(TEXT("sit")));
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs SitCmd(TEXT("CityGenLife.SitOffset"),
+		TEXT("CityGenLife.SitOffset FORWARD_CM UP_CM: where a sitter's root goes from its bench point"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenLife* A = LifeIn(World);
+			if (A && Args.Num() >= 2)
+			{
+				A->SitOffset = FVector2D(FCString::Atof(*Args[0]), FCString::Atof(*Args[1]));
+			}
+		}));
+
 	FAutoConsoleCommandWithWorldAndArgs StatusCmd(TEXT("CityGenLife.Status"),
 		TEXT("CityGenLife.Status: log the state as one JSON line"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)

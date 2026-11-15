@@ -17,6 +17,7 @@
 #include "GameFramework/Actor.h"
 #include "Mass/EntityHandle.h"
 #include "CityGenLifeProcessors.h"
+#include "CityGenLifePlaces.h"
 #include "CityGenLifeActor.generated.h"
 
 class AZoneGraphData;
@@ -367,12 +368,130 @@ public:
 	/** LG3's share of people crossing against the signal at danger 0 and 1 (CityGenLife.Jaywalk). */
 	UFUNCTION(BlueprintCallable, Category = "CityGen") void SetJaywalk(float AtSafe, float AtDanger);
 
+	// --- LG4: life at places (set by the importer from the plan's places, gangs and police) ------
+	// Place slots (benches, bus stops, kiosks, vending machines, food stalls, taxi stands, a
+	// club's queue and a bar's smokers at their door, a gang's spots): each use point a Smart
+	// Object of the world's Smart Object subsystem while its walkway is live (one slot each, its
+	// definition by kind with a UCgPlaceBehaviorDefinition), claimed, occupied and freed through
+	// the subsystem as people use it. People walking by a slot that wants users go to a free
+	// point, sit, wait, queue, buy, eat, smoke or talk there for a while, and walk on (a club's
+	// queue goes in at its door); a walkway coming alive gets its slots' users at once. Shops
+	// by their hours: closed doors send no one out and take no one in, an open shop takes a
+	// passer-by in for a visit by its chance, who comes back out. Gangs: the pool's gang slots
+	// walk only their turf's walkways in groups in their faction's colors and stand at its
+	// spots. Police: the pool's police slots walk the patrol walkways in pairs, out of and back
+	// in at their station's doors; the traffic's police slots drive the lanes in the livery.
+
+	/** Per slot: its kind (an index into SlotKindNames), walkway lane, distance along it (m),
+	 *  use points [SlotPointStarts[s], SlotPointStarts[s + 1]) of SlotPoints (x, y, z, yaw:
+	 *  citygen m and degrees), users per hour band (5), stay (2: s), role (CgRole), turf (-1),
+	 *  clip (CgAnim - 1: 0 idle, 1 sit, 2 talk), the door a queue goes in at (an index of the
+	 *  doors, -1). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<uint8> SlotKinds;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<int32> SlotLanes;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<float> SlotDists;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<int32> SlotPointStarts;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<float> SlotPoints;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<float> SlotUse;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<float> SlotDwell;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<uint8> SlotRoles;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<int32> SlotTurfs;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<uint8> SlotAnims;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<int32> SlotDoors;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<FString> SlotKindNames;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<FString> SlotKindBehaviors;
+	/** Per walkway lane: its gang turf (-1), gang members and police walking per band (5 each),
+	 *  whether police patrol it. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<int32> WalkTurf;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<float> WalkGang;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<float> WalkPolice;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<uint8> WalkPatrol;
+	/** Per turf its faction; per faction its members' dye colors (FactionColors linear RGB). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<int32> TurfFaction;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<float> FactionPalettes;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") int32 FactionColors = 0;
+	/** Per pool slot its role (CgRole: the plan's slots kept for gangs and police). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<uint8> PersonRole;
+	/** Per door (as DoorLanes): its people out a hour every hour (24), its place's open hours (24
+	 *  bits), a passer-by's visit chance per band (5), a visit's stay (2: s; 0 none), a precinct
+	 *  station's door. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<float> DoorRatesH;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<int32> DoorOpen;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<float> DoorVisit;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<float> DoorDwell;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<uint8> DoorPolice;
+	/** The gangs' group sizes (shares of 1 to 4). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<float> GangGroups;
+	/** The places' clips per clip group (the library's bodies): a bench's sitting loop, the
+	 *  standing idle breaks people talk, smoke and eat by (TalkCount a group). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<TObjectPtr<UAnimSequence>> SitClips;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<TObjectPtr<UAnimSequence>> TalkClips;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") int32 TalkCount = 0;
+	/** Where a sitter's root goes from its point (cm: forward along its facing, up). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") FVector2D SitOffset = FVector2D(0.0, 0.0);
+	/** Patrol cars per drive lane and band (5); per traffic pool slot 1 where it is a patrol
+	 *  car's; the livery (PaintFloats). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<float> DrivePolice;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<uint8> TrafficPolice;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<float> PolicePaint;
+	/** The switches (CityGenLife.Places, .Gangs, .Police; the play menu's rows). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") bool bPlaces = true;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") bool bGangs = true;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") bool bPolice = true;
+
+	/** Whether this is LG4's life at places (else LG3's crowd only). */
+	bool IsPlaces() const { return IsCity() && SlotKinds.Num() > 0 && SlotPointStarts.Num() == SlotKinds.Num() + 1; }
+	UFUNCTION(BlueprintCallable, Category = "CityGen") void SetPlaces(bool bOn);
+	UFUNCTION(BlueprintCallable, Category = "CityGen") void SetGangs(bool bOn);
+	UFUNCTION(BlueprintCallable, Category = "CityGen") void SetPolice(bool bOn);
+	/** For the check's shots: the camera moved to the nearest person sitting (`sit`), queueing or
+	 *  waiting at a slot (`queue`), at a stall or kiosk (`stall`), a gang at its spot (`gang`), a
+	 *  police pair walking (`police`), a patrol car (`patrol`); false without one. */
+	UFUNCTION(BlueprintCallable, Category = "CityGen") bool ShowPlace(const FString& What);
+
+private:
+	// (LG4, CityGenLifePlaces.cpp)
+	void BuildPlaces();
+	void MakeDefinitions();
+	void SlotsAlive(int32 Lane, bool bAlive);
+	int32 ClaimPoint(int32 Slot, int32 Person);
+	void OccupyPoint(int32 Slot, int32 Point);
+	void ReleasePoint(int32 Slot, int32 Point);
+	void UpdateSlotWants();
+	void FillLaneRoles(int32 Lane);
+	void FillSlot(int32 Slot);
+	void PoliceFromStations(float Dt);
+	void DressFaction(int32 Slot, int32 Faction, FRandomStream& Rng);
+	void ApplyHour();
+	float RoleWant(int32 Lane, uint8 PRole) const;
+	FString PlacesStatus() const;
+	TArray<int32> LaneSlotStarts, LaneSlotList, SlotPointStartG;
+	TArray<float> SlotDistCm, SlotWantNow, PointYawG;
+	TArray<int32> SlotUsersNow, PointUser, SlotDoorSorted;
+	TArray<uint8> SlotLiveNow, SlotAnimG, WalkAnimG;
+	TArray<FVector> PointPosG;
+	TArray<int32> DoorSortedOf;              // (an exported door's sorted index)
+	TArray<uint8> DoorOpenNow, DoorPoliceSorted;
+	TArray<float> DoorVisitNow, DoorDwellSorted, DoorRatesHSorted, DoorVisitSorted;
+	TArray<int32> DoorOpenSorted;
+	TArray<int32> FreeGang, FreePolice;      // (the role slots of the pool, free)
+	TArray<int32> FreePoliceCars;
+	TArray<uint8> CarIsPolice;
+	TArray<FCgPointSO> PointSO;              // (each live point's Smart Object, its slot, claim)
+	UPROPERTY(Transient) TArray<TObjectPtr<UObject>> Definitions;
+	float GangScaleNow = 1.f, PoliceScaleNow = 1.f, WantGang = 0.f, WantPolice = 0.f, PoliceAcc = 0.f;
+	float PoliceCarScaleNow = 1.f, WantPoliceCars = 0.f, PoliceRefillAcc = 0.f;
+	int32 GangActive = 0, PoliceActive = 0, PoliceCarsActive = 0, SlotsLiveNow = 0, PointsSO = 0;
+	int32 CrowdPoolN = 0, GangPoolN = 0, PolicePoolN = 0, PoliceCarPoolN = 0;
+	float SlotWantOf(int32 Slot) const;
+	int32 SlotsTakenTotal = 0, SlotsLeftTotal = 0, VisitsTotal = 0, PoliceOut = 0, ClaimsRefused = 0;
+
 private:
 	// (LG5, CityGenLifeTraffic.cpp)
 	void BuildTraffic();
 	void SpawnCarPool();
 	void UpdateTraffic(float Dt, bool bRefill);
-	bool SpawnCar(int32 Lane, float Dist, FRandomStream& Rng);
+	bool SpawnCar(int32 Lane, float Dist, FRandomStream& Rng, bool bPoliceCar = false);
 	void FreeCarsOnDeadLanes();
 	void TakeFreedCars();
 	void FreeCar(int32 Slot, FCgLifeCar& C);
@@ -403,7 +522,9 @@ private:
 	void BuildCrowd();
 	void SpawnPool();
 	void UpdateLive(float Dt, bool bRefill);
-	int32 SpawnGroup(int32 Lane, float Dist, float Dir, int32 Size, int32 Door, FRandomStream& Rng);
+	int32 SpawnGroup(int32 Lane, float Dist, float Dir, int32 Size, int32 Door, FRandomStream& Rng,
+		uint8 PRole = 0, int32 Turf = INDEX_NONE, TArray<int32>* OutSlots = nullptr);
+	void FreeRole(int32 Slot);
 	void DoorSpawns(float Dt);
 	void TakeFreed();
 	void FreeOnDeadLanes();
@@ -468,7 +589,7 @@ private:
 		int32 Person = INDEX_NONE;
 		int32 Char = INDEX_NONE;
 		int32 Gait = INDEX_NONE;
-		bool bIdle = false;        // (LG3: playing an idle, standing)
+		uint8 Clip = 0;            // (LG3: 0 its walk, 1 an idle; LG4: 2 sitting, 3 + k a talk clip)
 	};
 	/** A near slot's components by the clothing switch (lifegen_clothing_toggle). */
 	void SlotClothing(FNearSlot& Slot);

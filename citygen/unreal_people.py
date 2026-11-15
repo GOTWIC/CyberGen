@@ -360,6 +360,94 @@ def ensure_library(root: Path, uproject: Path, gas: Path | None = None,
             "seconds": round(time.time() - t0, 1)}
 
 
+# --- LG4: the places' clips -----------------------------------------------------------------
+
+PLACES_SCRIPT = UE_DIR / "people_places.py"
+PLACES_MANIFEST = "places.json"
+
+
+def places_hash(lib_hash: str) -> str:
+    """The places' clips' hash: the library's, the clips (`lifegen.presets.PLACE_CLIPS`), the
+    script that makes them."""
+    import hashlib
+    from lifegen import presets as LP
+    h = hashlib.sha256()
+    h.update(lib_hash.encode("utf-8"))
+    h.update(json.dumps(LP.PLACE_CLIPS, sort_keys=True).encode("utf-8"))
+    h.update(PLACES_SCRIPT.read_bytes())
+    return h.hexdigest()[:16]
+
+
+def read_places(uproject: Path) -> dict | None:
+    """The places' clips' manifest in the project (Saved/CityGenPeople/places.json), if it
+    belongs to the project's library."""
+    p = Path(uproject).parent / "Saved" / "CityGenPeople" / PLACES_MANIFEST
+    lib = read_manifest(uproject)
+    if not p.is_file() or not lib:
+        return None
+    man = json.loads(p.read_text(encoding="utf-8"))
+    return man if man.get("lib_hash") == lib.get("hash") else None
+
+
+def ensure_place_clips(root: Path, uproject: Path, gas: Path | None = None,
+                       log_dir: Path | None = None) -> dict:
+    """LG4: the places' clips (a bench's sitting loop, standing idle breaks: `lifegen.presets.
+    PLACE_CLIPS`) in the project, retargeted with the library's own retargeter onto each of its
+    clip groups' body skeleton (`citygen/ue/people_places.py`). Their manifest kept when its hash
+    is the same; else the sample's clips copied in (its closure, `gas_closure`, `migrate`) and the
+    editor's run. The library's assets and hash are untouched. {ok, how, hash, manifest}."""
+    from lifegen import presets as LP
+    t0 = time.time()
+    up = Path(uproject).resolve()
+    lib = read_manifest(up)
+    if not lib or not lib.get("clip_groups"):
+        return {"ok": False, "how": "none", "error": "no people library in the project"}
+    h = places_hash(lib["hash"])
+    saved = up.parent / "Saved" / "CityGenPeople"
+    have = read_places(up)
+    if have and have.get("hash") == h:
+        return {"ok": True, "how": "kept", "hash": h, "manifest": have,
+                "seconds": round(time.time() - t0, 1)}
+    log_dir = Path(log_dir or saved)
+    log_dir.mkdir(parents=True, exist_ok=True)
+    res = {"hash": h}
+    clips = dict(LP.PLACE_CLIPS)
+    need = [p for p in clips.values()
+            if not (content_dir(up, p.rsplit("/", 1)[0]) / (p.rsplit("/", 1)[1] + ".uasset"))
+            .is_file()]
+    if need:
+        gas = Path(gas or os.environ.get("CITYGEN_GAS") or DEFAULT_GAS)
+        if not gas.is_file():
+            return {**res, "ok": False, "how": "build",
+                    "error": f"no Game Animation Sample at {gas} (--gas UPROJECT): the places' "
+                             "clips come from it (Epic's, in your project only)"}
+        clo = gas_closure(Path(root), gas, log_dir / "gas_places", sorted(clips.values()))
+        res["migrate"] = {**migrate(clo, up), "packages": len(clo["keep"]),
+                          "skipped": len(clo["skipped"]), "gas": str(gas)}
+    from lifegen import library as L
+    groups = {}
+    for key in sorted(lib["clip_groups"]):
+        body = next((c["near"]["meshes"][0] for c in lib["characters"]
+                     if c.get("skeleton") == key), None)
+        if body is None:
+            continue
+        groups[key] = {"body": body,
+                       "retargeter": f"{lib['content']}/Anim/{key}/RTG_GasToBody_{lib['hash'][:8]}"}
+    job = {"result": str(log_dir / "places_result.json"), "hash": h, "lib_hash": lib["hash"],
+           "content": lib["content"], "gas_mesh": L.GAS_MESH, "clips": clips, "groups": groups,
+           "manifest": str(saved / PLACES_MANIFEST)}
+    from .unreal import run_editor
+    r = run_editor(Path(root), up, PLACES_SCRIPT, job, log_dir / "places_log.txt",
+                   timeout=3600.0, gui=True, extra=["-RenderOffscreen", "-nop4"])
+    res["build"] = {k: r.get(k) for k in ("ok", "error", "missing", "wall_in_editor_s",
+                                          "groups") if k in r}
+    if not r.get("ok"):
+        return {**res, "ok": False, "how": "build",
+                "error": r.get("error") or "the places' clips failed (see its log)"}
+    return {**res, "ok": True, "how": "build", "manifest": read_places(up),
+            "seconds": round(time.time() - t0, 1)}
+
+
 def _engine_version(root: Path) -> str:
     """The engine's version (Engine/Build/Build.version), part of the library's hash."""
     p = Path(root) / "Engine" / "Build" / "Build.version"

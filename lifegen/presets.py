@@ -398,3 +398,16 @@ POLICE = {"patrol_min": 0.25, "car_share": 0.35, "per_car": 2.0,
 ROLES = {"margin": 1.25, "gang_max_share": 0.12, "police_max_share": 0.08,
          "car_max_share": 0.06, "min": 8}
 ROLE_CODES = ("crowd", "gang", "police")
+
+# the clips life at places plays (Epic's Game Animation Sample, the user's, copied into the
+# project and retargeted by `citygen/unreal_people.py`'s `ensure_place_clips`; kept apart from
+# the library's own spec, so its hash and cache stay as they are): a bench's sitting loop and
+# standing idle breaks (talking, smoking, eating at a stall: the sample has no clip of any of
+# these, its idle breaks stand in, an open item)
+GAS_ANIM = "/Game/Characters/UEFN_Mannequin/Animations"
+PLACE_CLIPS = {
+    "sit": f"{GAS_ANIM}/Interactions/Bench/M_interaction_bench_idle_loop",
+    "talk_a": f"{GAS_ANIM}/Idle/M_Relaxed_Stand_Idle_Break_v02",
+    "talk_b": f"{GAS_ANIM}/Idle/M_Relaxed_Stand_Idle_Break_v05",
+    "talk_c": f"{GAS_ANIM}/Idle/M_Neutral_Stand_Idle_Break_v03",
+}

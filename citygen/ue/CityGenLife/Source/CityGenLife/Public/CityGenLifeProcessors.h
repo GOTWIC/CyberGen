@@ -93,6 +93,48 @@ struct FCgLifeFrame
 	/** Out: counts this frame. */
 	int32 Waiting = 0, Entered = 0, Exited = 0, Jaywalked = 0;
 
+	// --- LG4: life at places --------------------------------------------------------------------
+	bool bPlaces = false;
+	/** Per walkway lane its place slots [LaneSlotStarts[l], LaneSlotStarts[l + 1]) of LaneSlots,
+	 *  sorted by their distance along it (SlotDist, cm). */
+	const TArray<int32>* LaneSlotStarts = nullptr;
+	const TArray<int32>* LaneSlots = nullptr;
+	const TArray<float>* SlotDist = nullptr;
+	/** Per slot: live now, its role (CgRole), turf (-1), clip (CgAnim), the users it wants now
+	 *  and has, the door its queue goes in at (a sorted door, -1), its stay (2 floats, s); its
+	 *  use points [SlotPointStart[s], SlotPointStart[s + 1]) of PointPos (UE cm, on its lane's
+	 *  surface) and PointYaw (deg, the way its user faces). */
+	const TArray<uint8>* SlotLive = nullptr;
+	const TArray<uint8>* SlotRole = nullptr;
+	const TArray<uint8>* SlotAnim = nullptr;
+	const TArray<int32>* SlotTurf = nullptr;
+	const TArray<int32>* SlotDoor = nullptr;
+	const TArray<float>* SlotWant = nullptr;
+	const TArray<int32>* SlotUsers = nullptr;
+	const TArray<float>* SlotDwell = nullptr;
+	const TArray<int32>* SlotPointStart = nullptr;
+	const TArray<FVector>* PointPos = nullptr;
+	const TArray<float>* PointYaw = nullptr;
+	/** A slot's point claimed for a person (the actor's: the Smart Objects' claims), INDEX_NONE
+	 *  when none is free; occupied on arrival; freed. */
+	TFunction<int32(int32 Slot, int32 Person)> Claim;
+	TFunction<void(int32 Slot, int32 Point)> Occupy;
+	TFunction<void(int32 Slot, int32 Point)> Release;
+	/** Per walkway lane its gang turf (-1 none: a gang member walks only its turf's) and
+	 *  whether police patrol it (a patrol walks only those). */
+	const TArray<int32>* LaneTurf = nullptr;
+	const TArray<uint8>* LanePatrol = nullptr;
+	/** The doors (sorted as DoorDists): open now (by the hour), a passer-by's visit chance now,
+	 *  a visit's length (2 floats, s), a precinct station's door. */
+	const TArray<uint8>* DoorOpenNow = nullptr;
+	const TArray<float>* DoorVisitNow = nullptr;
+	const TArray<float>* DoorDwell = nullptr;
+	const TArray<uint8>* DoorPolice = nullptr;
+	/** Out: per person what it plays (CgAnim). */
+	TArray<uint8>* WalkAnim = nullptr;
+	/** Out: counts this frame. */
+	int32 SlotsTaken = 0, SlotsLeft = 0, Visits = 0;
+
 	// --- LG5: the city's traffic ----------------------------------------------------------------
 	bool bTraffic = false;
 	/** Per lane (every lane of the storage; walkways 0): on the lane graph's largest strongly

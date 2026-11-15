@@ -595,7 +595,7 @@ void ACityGenLife::Assign(const int32 S, const int32 P)
 		Lead->PlayAnimation(Clip, true);
 		Slot.Gait = G;
 	}
-	Slot.bIdle = false;
+	Slot.Clip = 0;
 	// (the person's outfit color: the plan's tint, on the garments' dye)
 	const FLinearColor Tint(PersonTint.IsValidIndex(3 * P) ? PersonTint[3 * P] : 0.5f,
 		PersonTint.IsValidIndex(3 * P + 1) ? PersonTint[3 * P + 1] : 0.5f,
@@ -717,7 +717,10 @@ void ACityGenLife::UpdatePeople()
 			continue;
 		}
 		const float D2 = FVector::DistSquared(WalkPos[P], View);
-		const float Lim = PersonSlot[P] != INDEX_NONE ? Near2 * 1.32f : Near2;
+		// (LG4: someone sitting is near out to the mid tier: the baked walk has no sitting pose)
+		const bool bSit = WalkAnimG.IsValidIndex(P) && WalkAnimG[P] == CgAnim::Sit && SitClips.Num();
+		const float Base = bSit ? FMath::Max(Near2, Mid2) : Near2;
+		const float Lim = PersonSlot[P] != INDEX_NONE ? Base * 1.32f : Base;
 		if (D2 <= Lim && !WalkPos[P].IsZero())
 		{
 			NearCand.Emplace(PersonSlot[P] != INDEX_NONE ? D2 * 0.75f : D2, P);
@@ -791,25 +794,56 @@ void ACityGenLife::UpdatePeople()
 			Tier = 0;
 			if (USkeletalMeshComponent* Lead = NearSlots[S].Comps.Num() ? NearSlots[S].Comps[0] : nullptr)
 			{
-				Lead->SetWorldLocationAndRotation(At, FRotator(0.f, WalkYaw[P] + MeshYaw, 0.f), false, nullptr, ETeleportType::TeleportPhysics);
+				// (LG4: at a place slot, its clip: sitting on a bench, a talk clip (talking,
+				// smoking, eating), else standing idle; a sitter's root where the bench loop
+				// wants it, SitOffset off its point)
+				const uint8 Anim = WalkAnimG.IsValidIndex(P) ? WalkAnimG[P] : (uint8)CgAnim::Walk;
+				const int32 Group = CharClipGroup.IsValidIndex(C) ? CharClipGroup[C] : 0;
+				uint8 ClipWant = bStill ? 1 : 0;
+				UAnimSequence* PlaceClip = nullptr;
+				if (Anim == CgAnim::Sit && SitClips.IsValidIndex(Group) && SitClips[Group])
+				{
+					ClipWant = 2;
+					PlaceClip = SitClips[Group].Get();
+				}
+				else if (Anim == CgAnim::Talk && TalkCount > 0 && TalkClips.IsValidIndex(Group * TalkCount))
+				{
+					const int32 K = (int32)((uint32)(PersonSeed.IsValidIndex(P) ? PersonSeed[P] : P) % (uint32)TalkCount);
+					ClipWant = (uint8)(3 + K);
+					PlaceClip = TalkClips[Group * TalkCount + K].Get();
+				}
+				else if (Anim != CgAnim::Walk)
+				{
+					ClipWant = 1;
+				}
+				FVector Root = At;
+				if (ClipWant == 2)
+				{
+					const FVector Fwd(FMath::Cos(FMath::DegreesToRadians(WalkYaw[P])), FMath::Sin(FMath::DegreesToRadians(WalkYaw[P])), 0.0);
+					Root += Fwd * SitOffset.X + FVector(0.0, 0.0, SitOffset.Y);
+				}
+				Lead->SetWorldLocationAndRotation(Root, FRotator(0.f, WalkYaw[P] + MeshYaw, 0.f), false, nullptr, ETeleportType::TeleportPhysics);
 				Lead->SetWorldScale3D(FVector(Scale));
 				// (LG3: standing, at a signal or behind someone: the idle; walking, the walk)
-				if (bCity && NearSlots[S].bIdle != bStill)
+				if (bCity && NearSlots[S].Clip != ClipWant)
 				{
-					UAnimSequence* Clip = nullptr;
-					if (bStill && IdleClips.Num())
+					const bool bStand = ClipWant != 0;
+					UAnimSequence* Clip = PlaceClip;
+					if (!Clip && bStand && IdleClips.Num())
 					{
 						Clip = IdleClips[(PersonGait.IsValidIndex(P) ? PersonGait[P] : 0) % IdleClips.Num()].Get();
 					}
-					if (bStill && Clip)
+					if (bStand && Clip)
 					{
 						Lead->PlayAnimation(Clip, true);
 						Lead->SetPlayRate(1.f);
+						// (each its own place in the loop, so a bench's two sitters or a gang's
+						// ring do not move as one)
+						Lead->SetPosition(FMath::Fmod(PhaseOffset(P) * 1.7f, FMath::Max(0.1f, Clip->GetPlayLength())), false);
 						NearSlots[S].Gait = INDEX_NONE;
 					}
-					else if (!bStill)
+					else if (!bStand)
 					{
-						const int32 Group = CharClipGroup.IsValidIndex(C) ? CharClipGroup[C] : 0;
 						const int32 Gait = PersonGait.IsValidIndex(P) ? FMath::Clamp(PersonGait[P], 0, FMath::Max(0, Gaits - 1)) : 0;
 						const int32 G = FMath::Clamp(Group * FMath::Max(1, Gaits) + Gait, 0, FMath::Max(0, WalkClips.Num() - 1));
 						if (UAnimSequence* Walk = WalkClips.IsValidIndex(G) ? WalkClips[G].Get() : nullptr)
@@ -819,7 +853,7 @@ void ACityGenLife::UpdatePeople()
 							NearSlots[S].Gait = G;
 						}
 					}
-					NearSlots[S].bIdle = bStill;
+					NearSlots[S].Clip = ClipWant;
 				}
 			}
 			++NearNow;
