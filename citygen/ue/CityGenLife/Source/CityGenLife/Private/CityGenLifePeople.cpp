@@ -38,8 +38,9 @@
 
 namespace
 {
-	constexpr int32 MidFloats = 7;     // time offset, play rate, first frame, last frame, tint rgb
-	constexpr int32 FarFloats = 5;     // time offset, cycles a second, tint rgb
+	// LG2: the person's three dye colors (rgb each) and wear after the walk's floats
+	constexpr int32 MidFloats = 14;    // time offset, play rate, first frame, last frame, 3 x rgb, wear
+	constexpr int32 FarFloats = 12;    // time offset, cycles a second, 3 x rgb, wear
 	const FTransform Hidden(FQuat::Identity, FVector(0.0, 0.0, -1.0e6), FVector(0.0));
 
 	uint32 Mix(uint32 X)
@@ -269,7 +270,18 @@ void ACityGenLife::MakeMidLoops()
 	}
 }
 
-void ACityGenLife::LookData(const int32 P, const bool bStill, float Mid[7], float Far[5]) const
+void ACityGenLife::TintOf(const int32 P, const int32 Ch, float Out[3]) const
+{
+	// (LG2: 9 floats a person, its three dye channels; before LG2 one color for all)
+	const bool bNine = PersonTint.Num() >= 9 * FMath::Max(1, People) && PersonTint.IsValidIndex(9 * P + 8);
+	for (int32 Q = 0; Q < 3; ++Q)
+	{
+		const int32 I = bNine ? 9 * P + 3 * Ch + Q : 3 * P + Q;
+		Out[Q] = PersonTint.IsValidIndex(I) ? PersonTint[I] : 0.5f;
+	}
+}
+
+void ACityGenLife::LookData(const int32 P, const bool bStill, float Mid[14], float Far[12]) const
 {
 	// (the mid instance: time offset, rate, first and last frame of its loop, the tint; the far
 	// card: time offset, strides a second, the tint. Standing, the mid instance loops its one
@@ -303,11 +315,20 @@ void ACityGenLife::LookData(const int32 P, const bool bStill, float Mid[7], floa
 		Far[0] = T0;
 		Far[1] = Rate / Cycle;
 	}
-	for (int32 K = 0; K < 3; ++K)
+	for (int32 Ch = 0; Ch < 3; ++Ch)
 	{
-		Mid[4 + K] = Tint[K];
-		Far[2 + K] = Tint[K];
+		float T[3];
+		TintOf(P, Ch, T);
+		for (int32 K = 0; K < 3; ++K)
+		{
+			Mid[4 + 3 * Ch + K] = T[K];
+			Far[2 + 3 * Ch + K] = T[K];
+		}
 	}
+	const float Wear = PersonWear.IsValidIndex(P) ? PersonWear[P] : 0.f;
+	Mid[13] = Wear;
+	Far[11] = Wear;
+	(void)Tint;
 }
 
 void ACityGenLife::MakePeople()
@@ -416,15 +437,15 @@ void ACityGenLife::SpawnPeople(const int32 NP)
 	for (int32 P = 0; P < NP; ++P)
 	{
 		const int32 C = PersonChar.IsValidIndex(P) ? FMath::Clamp(PersonChar[P], 0, NC - 1) : P % NC;
-		float MidData[7], FarData[5];
+		float MidData[14], FarData[12];
 		LookData(P, false, MidData, FarData);
 		if (UInstancedStaticMeshComponent* Mid = MidComps.IsValidIndex(C) ? MidComps[C].Get() : nullptr)
 		{
-			Mid->SetCustomData(PersonInst[P], MakeArrayView(MidData, 7), false);
+			Mid->SetCustomData(PersonInst[P], MakeArrayView(MidData, MidFloats), false);
 		}
 		if (UInstancedStaticMeshComponent* Far = FarComps.IsValidIndex(C) ? FarComps[C].Get() : nullptr)
 		{
-			Far->SetCustomData(PersonInst[P], MakeArrayView(FarData, 5), false);
+			Far->SetCustomData(PersonInst[P], MakeArrayView(FarData, FarFloats), false);
 		}
 	}
 	for (UInstancedStaticMeshComponent* Comp : MidComps)
@@ -520,12 +541,12 @@ void ACityGenLife::Assign(const int32 S, const int32 P)
 			{
 				Comp->SetLeaderPoseComponent(Mesh ? Lead : nullptr);
 			}
-			// (the wardrobe's garments: a dynamic instance a slot, which takes each person's
-			// own color)
+			// (the garments: a dynamic instance a slot, which takes each person's own colors and
+			// wear; LG2's are instances of M_CgGarment under People/Materials/Garments)
 			for (int32 M = 0; Mesh && M < Comp->GetNumMaterials(); ++M)
 			{
 				const UMaterialInterface* Mat = Comp->GetMaterial(M);
-				if (Mat && Mat->GetName().Contains(TEXT("Garment")))
+				if (Mat && (Mat->GetName().Contains(TEXT("Garment")) || Mat->GetPathName().Contains(TEXT("/Garments/"))))
 				{
 					Comp->CreateDynamicMaterialInstance(M);
 				}
@@ -579,6 +600,12 @@ void ACityGenLife::Assign(const int32 S, const int32 P)
 	const FLinearColor Tint(PersonTint.IsValidIndex(3 * P) ? PersonTint[3 * P] : 0.5f,
 		PersonTint.IsValidIndex(3 * P + 1) ? PersonTint[3 * P + 1] : 0.5f,
 		PersonTint.IsValidIndex(3 * P + 2) ? PersonTint[3 * P + 2] : 0.5f);
+	float T3[3][3];
+	for (int32 Ch = 0; Ch < 3; ++Ch)
+	{
+		TintOf(P, Ch, T3[Ch]);
+	}
+	const float Wear = PersonWear.IsValidIndex(P) ? PersonWear[P] : 0.f;
 	for (USkeletalMeshComponent* Comp : Slot.Comps)
 	{
 		for (int32 M = 0; Comp && M < Comp->GetNumMaterials(); ++M)
@@ -586,6 +613,11 @@ void ACityGenLife::Assign(const int32 S, const int32 P)
 			if (UMaterialInstanceDynamic* D = Cast<UMaterialInstanceDynamic>(Comp->GetMaterial(M)))
 			{
 				D->SetVectorParameterValue(TEXT("diffuse_color_1"), Tint);
+				for (int32 Ch = 0; Ch < 3; ++Ch)
+				{
+					D->SetVectorParameterValue(*FString::Printf(TEXT("Tint%d"), Ch), FLinearColor(T3[Ch][0], T3[Ch][1], T3[Ch][2]));
+				}
+				D->SetScalarParameterValue(TEXT("Wear"), Wear);
 			}
 		}
 	}

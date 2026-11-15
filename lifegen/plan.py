@@ -47,6 +47,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from . import asks as A
+from . import garments as G
 from . import library as L
 from . import planmodel as PM
 from . import presets as P
@@ -478,6 +479,58 @@ def crowd_walks(model: dict, filled: dict, polys: list, sig_of: dict,
 CROWD_COLUMNS = PERSON_COLUMNS
 
 
+def variety_checks(rows: list[dict], crowd: dict) -> dict:
+    """LG2's variety check (scope 8): in every district at its busiest band, the people within
+    `presets.VARIETY_M` of one another (its busiest tile's people per square meter over that
+    circle, at most the pool's within it) alike in character, look and colors in fewer than
+    `VARIETY_PAIRS` expected pairs; no look more than `LOOK_SHARE_MAX` of its people."""
+    ps = crowd["persons"]
+    out_f = crowd.get("outfits") or {}
+    if not ps.get("look") or not out_f:
+        return {}
+    G_ = out_f["groups"]
+    by_group = defaultdict(lambda: defaultdict(int))
+    for lk, g in zip(ps["look"], ps["group"]):
+        by_group[g][lk] += 1
+    tile_ppl = defaultdict(lambda: [0.0] * 5)
+    for r in rows:
+        for i in range(5):
+            tile_ppl[(r["district_id"], r["tile"])][i] += r["people"][i]
+    pool_n = crowd["pool"] * (P.VARIETY_M / crowd["live_m"]) ** 2
+    bad, notes = [], []
+    worst = 0.0
+    for d, w in sorted(out_f["district_groups"].items()):
+        dens = max((max(v) for (dd, _), v in tile_ppl.items() if dd == d),
+                   default=0.0) / (TILE_M * TILE_M)
+        n50 = min(pool_n, dens * math.pi * P.VARIETY_M ** 2)
+        alike = 0.0
+        share = defaultdict(float)
+        for gi, wg in enumerate(w):
+            if wg <= 0.0 or gi not in by_group:
+                continue
+            tot = sum(by_group[gi].values())
+            pl = sum((c / tot) ** 2 for c in by_group[gi].values())
+            cols = out_f["palettes"][d][gi]
+            pc = sum((cols.count(c) / len(cols)) ** 2 for c in set(cols))
+            # (two people alike: the same group, the same look, the same colors on its two
+            # dyed channels a look always has)
+            alike += wg * wg * pl * pc * pc
+            for lk, c in by_group[gi].items():
+                share[lk] += wg * c / tot
+        pairs = n50 * (n50 - 1) / 2.0 * alike
+        worst = max(worst, pairs)
+        top = max(share.values()) if share else 0.0
+        notes.append(f"{d} {n50:.0f} within {P.VARIETY_M:.0f} m, {pairs:.2f} alike pairs, "
+                     f"its commonest look {top:.1%}")
+        if pairs > P.VARIETY_PAIRS:
+            bad.append(f"{d}: {pairs:.2f} expected alike pairs within {P.VARIETY_M:.0f} m")
+        if top > P.LOOK_SHARE_MAX:
+            bad.append(f"{d}: a look is {top:.1%} of its people")
+    return {"variety": {"ok": not bad, "detail": "; ".join(bad[:4]) if bad else
+                        f"{len(set(ps['look']))} looks among the pool's {len(ps['look'])} "
+                        f"people; " + "; ".join(notes)}}
+
+
 def character_weights(n: int) -> list[float]:
     """lifegen_people_fixes: each of the library's `n` characters' weight in a crowd, by the
     preset it is made from (`presets.BODY_WEIGHT`: heavy builds rare)."""
@@ -499,6 +552,82 @@ def draw_person(seed_parts: tuple, n: int, palette: list | None = None) -> dict:
     return p
 
 
+def _lin(h: str) -> list[float]:
+    def c(v):
+        v /= 255.0
+        return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+    return [c(int(h[1 + 2 * k:3 + 2 * k], 16)) for k in range(3)]
+
+
+def _hex(rgb) -> str:
+    return "#" + "".join(f"{max(0, min(255, int(round(v * 255)))):02x}" for v in rgb)
+
+
+def outfit_groups(filled: dict) -> dict[str, list[float]]:
+    """LG2: each district's people by look group (`garments.GROUPS`): its style's groups,
+    with the weather's share in the rain looks."""
+    rain = float(P.WEATHER_OUTFITS.get(filled["crowd"].get("weather", "clear"), 0.0))
+    out = {}
+    for d, fd in sorted(filled["districts"].items()):
+        w = [float(fd["style"]["groups"].get(g, 0.0)) for g in G.GROUPS]
+        t = sum(w) or 1.0
+        w = [v / t * (1.0 - rain) for v in w]
+        w[G.GROUPS.index("rain")] += rain
+        out[d] = [_r(v, 4) for v in w]
+    return out
+
+
+def outfit_palettes(model: dict, filled: dict) -> dict[str, list[list[str]]]:
+    """LG2: per district and look group the colors a person's dye channels draw from
+    (`presets.OUTFIT_COLORS`): the group's colors shaded, a gang's its faction's first."""
+    out = {}
+    for d in sorted(filled["districts"]):
+        gang = next((f.get("color") for f in model.get("factions", [])
+                     if f.get("kind") == "gang" and f.get("home_district_id") == d), None)
+        rows = []
+        for g in G.GROUPS:
+            base = list(P.GROUP_COLORS.get("street" if g == "rain" else g, ("#808080",)))
+            if g == "gang" and gang:
+                base = [gang, gang] + base
+            # (every color of the group in every shade, in an order drawn by hash, the first
+            # OUTFIT_COLORS distinct ones; a gang's own color first)
+            combos = sorted({(c, 1.0 if g == "police" else sh) for c in base
+                             for sh in P.OUTFIT_SHADES},
+                            key=lambda cs: (-(cs[0] == gang and g == "gang" and cs[1] == 1.0),
+                                            _u("lg2.palette", d, g, cs[0], cs[1])))
+            cols = []
+            for c, sh in combos:
+                rgb = [min(1.0, int(c[1 + 2 * j:3 + 2 * j], 16) / 255.0 * sh) for j in range(3)]
+                h = _hex(rgb)
+                if h not in cols:
+                    cols.append(h)
+                if len(cols) >= P.OUTFIT_COLORS:
+                    break
+            rows.append(cols)
+        out[d] = rows
+    return out
+
+
+def assign_looks(persons: dict, mix: list[float]) -> tuple[list[int], list[int]]:
+    """LG2: each pool person's look: a look of their character, its group drawn from the
+    city's mix of groups among the character's looks (the runtime spawns a person in a
+    district by its groups, so the pool holds every group by the city's people)."""
+    looks = G.spec(L.characters(L.CHARACTERS))["looks"]
+    out_look, out_group = [], []
+    for k, (c, seed) in enumerate(zip(persons["character"], persons["seed"])):
+        mine = looks[c]
+        w = [mix[G.GROUPS.index(lk["group"])] for lk in mine]
+        t = sum(w)
+        x = _u("lg2.look", seed, k) * (t if t > 0 else len(mine))
+        j = 0
+        while j < len(mine) - 1 and x >= (w[j] if t > 0 else 1.0):
+            x -= w[j] if t > 0 else 1.0
+            j += 1
+        out_look.append(c * G.LOOKS + j)
+        out_group.append(G.GROUPS.index(mine[j]["group"]))
+    return out_look, out_group
+
+
 def crowd_plan(model: dict, filled: dict, rows: list[dict], sigs: list[dict],
                left: dict) -> dict:
     """The crowd's record in the plan: its settings, the pool's people by their seeds, the
@@ -511,6 +640,23 @@ def crowd_plan(model: dict, filled: dict, rows: list[dict], sigs: list[dict],
         p = draw_person(("lg3.person", k), n, palette=[0] * P.SPIKE_PALETTE)
         for c in CROWD_COLUMNS:
             cols[c].append(p[c])
+    # (LG2: each person's look and its group, by the city's people per district and group)
+    groups = outfit_groups(filled)
+    band = P.band_of(int(cr["hour"]))
+    ppl = defaultdict(float)
+    for r in rows:
+        ppl[r["district_id"]] += r["people"][band]
+    # (the pool lives round the view, a district or two at a time: half its mix is the city's
+    # people by group, half each group's largest share of any district, so a quiet district's
+    # group has people enough when the view is there)
+    tot = sum(ppl.values()) or 1.0
+    mix = [0.5 * sum(ppl[d] * groups[d][i] for d in groups) / tot +
+           0.5 * max(groups[d][i] for d in groups) / max(1e-9, sum(
+               max(groups[d][j] for d in groups) for j in range(len(G.GROUPS))))
+           for i in range(len(G.GROUPS))]
+    if not sum(mix):
+        mix = [1.0] * len(G.GROUPS)
+    cols["look"], cols["group"] = assign_looks(cols, mix)
     shapes = {d: fd["shape"] for d, fd in filled["districts"].items()}
     street = [0.0] * P.HOURS
     off = [0.0] * P.HOURS
@@ -538,7 +684,14 @@ def crowd_plan(model: dict, filled: dict, rows: list[dict], sigs: list[dict],
                    "elevator": c["elevator"]},
         "kinds": list(P.WALK_KIND_CODES),
         "palettes": {d: district_palette(model, filled, d) for d in filled["districts"]},
-        "library": {"version": L.LIB_VERSION, "characters": n, "walks": list(L.WALKS),
+        "outfits": {"groups": list(G.GROUPS), "district_groups": groups,
+                    "palettes": outfit_palettes(model, filled),
+                    "wear": {d: fd["style"].get("wear", 0.3)
+                             for d, fd in sorted(filled["districts"].items())},
+                    "weather": filled["crowd"].get("weather", "clear"),
+                    "looks_per": G.LOOKS},
+        "library": {"version": L.LIB_VERSION, "characters": n,
+                    "looks": n * G.LOOKS, "walks": list(L.WALKS),
                     "tiers": dict(sorted(L.TIERS.items()))},
         "persons": cols,
         "totals": {"walkways": len(rows), "with_people": with_people,
@@ -633,6 +786,7 @@ def crowd_checks(model: dict, rows: list[dict], hours: dict, filled: dict, sigs:
             f"the crowd's pool of {len(chars)} people drawn from {n} characters, each "
             f"{min(cnt)} to {max(cnt)} of them (at most {PEOPLE_SHARE_MAX:.0%}), "
             f"{len(set(crowd['persons'].get('seed') or []))} distinct seeds")}
+    out.update(variety_checks(rows, crowd))
     # every spawn point's walkway a walkway of the crowd
     ids = {r["id"] for r in rows}
     off = [s["id"] for s in spawns if s["walkway_id"] not in ids]

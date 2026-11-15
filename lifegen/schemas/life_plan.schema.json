@@ -130,6 +130,12 @@
      "title": "Live M",
      "type": "number"
     },
+    "outfits": {
+     "additionalProperties": true,
+     "description": "LG2: the look groups, each district's people by group, per district and group the colors a person's three dye channels draw from (sRGB), each district's wear, the weather the outfits are drawn for, the looks per character.",
+     "title": "Outfits",
+     "type": "object"
+    },
     "palettes": {
      "additionalProperties": {
       "items": {
@@ -148,7 +154,7 @@
       },
       "type": "array"
      },
-     "description": "Per pool slot its draws (seed, character, scale, gait, pace, tint: an index into the district's palette where it comes out).",
+     "description": "Per pool slot its draws (seed, character, scale, gait, pace, tint: an index into the district's palette where it comes out; LG2: look, the library's look it wears, and group, its group).",
      "title": "Persons",
      "type": "object"
     },

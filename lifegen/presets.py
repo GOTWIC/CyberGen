@@ -112,6 +112,24 @@ GROUP_COLORS = {
 }
 SPIKE_PALETTE = 24             # colors in the spike's palette, drawn by the style's weights
 
+# --- LG2: outfits (scope 6.2) ------------------------------------------------------------------
+
+# a group's colors per district (the person's three dye channels drawn from them at spawn):
+# its `GROUP_COLORS` shaded light and dark (`OUTFIT_SHADES`), a gang's its faction's color
+# first; the rain looks wear the street's
+OUTFIT_COLORS = 12
+OUTFIT_SHADES = (1.0, 0.7, 1.25, 0.5)
+# the weather's outfits (the hook LG8 drives with atmosgen's state; the plan's state is the
+# crowd's `weather`, clear until then): the share of people in the rain looks (raincoats; an
+# umbrella is a library item no one carries yet)
+WEATHER_OUTFITS = {"clear": 0.0, "fog": 0.0, "smog": 0.0, "drizzle": 0.25, "rain": 0.5}
+# the variety check (scope 8): at a district's busiest hour, the expected number of pairs of
+# people within `VARIETY_M` of each other alike in body, face and outfit (character, look and
+# colors) at most `VARIETY_PAIRS`; no look more than `LOOK_SHARE_MAX` of a district's people
+VARIETY_M = 50.0
+VARIETY_PAIRS = 1.0
+LOOK_SHARE_MAX = 0.12
+
 # --- the fleet (scope 6.5, decision 6) -------------------------------------------------------
 
 # AG18's roster by what a vehicle is (the kinds lifegen drives); the kinds it lacks are

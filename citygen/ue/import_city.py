@@ -75,10 +75,11 @@ HASH_TAG = "cg.hash"
 # unchanged build applies the change (stored hashes are "<version>.<content hash>")
 MESH_VERSION = "3"
 ACTOR_VERSION = "1"
-LIFE_VERSION = "life5"   # LG0: lifegen's controller (CityGenLife) and its stand-in material;
+LIFE_VERSION = "life6"   # LG0: lifegen's controller (CityGenLife) and its stand-in material;
                          # LG1: the people library's properties; LG3: the city's crowd;
                          # 4, lifegen_clothing_toggle: the clothing switch's hidden material
-                         # and whole body; 5, LG5: the city's traffic
+                         # and whole body; 5, LG5: the city's traffic; 6, LG2: the looks,
+                         # their dye colors, groups and wear
 ATMOS_VERSION = "atmos7"  # the atmos controller's and cells' actors (2, AT2: the high tier,
                           # blinks and sweeps in the packed lights; 3, AT3: the sky and time;
                           # 4, AT4: the air, a cell's fog volumes and emitters; 5, the visible
@@ -1227,6 +1228,10 @@ def crowd_props(d):
            "district_danger": fl("district_danger"),
            "district_palettes": fl("district_palettes"),
            "person_tint_index": it("person_tint_index"), "door_lanes": it("door_lanes"),
+           "person_group": it("person_group"), "outfit_palettes": fl("outfit_palettes"),
+           "outfit_colors": int(d.get("outfit_colors") or 0),
+           "outfit_group_count": int(d.get("outfit_groups") or 0),
+           "district_groups": fl("district_groups"), "district_wear": fl("district_wear"),
            "door_dists_m": fl("door_dists"), "door_points": fl("door_points"),
            "door_rates": fl("door_rates")}
     c = d.get("crowd")

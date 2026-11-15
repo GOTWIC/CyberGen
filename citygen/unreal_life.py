@@ -39,9 +39,10 @@ import json
 import math
 from pathlib import Path
 
-PACK_VERSION = 4            # 2 (cars_steam): smoothed drive lanes, their speeds; 3 (LG3): the
+PACK_VERSION = 5            # 2 (cars_steam): smoothed drive lanes, their speeds; 3 (LG3): the
                             # city's crowd (every walkway, doors, signals, the pool); 4 (LG5):
-                            # the city's traffic (every lane, signals, conflicts, the pool)
+                            # the city's traffic (every lane, signals, conflicts, the pool); 5 (LG2):
+                            # looks for people, their groups, dye colors and wear
 DATA = "life.json"
 CONTROLLER_KEY = "life"
 MARGIN_M = 60.0             # lanes this far past the live radius come along (links out of it)
@@ -433,7 +434,10 @@ def persons(spike: dict) -> dict:
     tint = []
     for t in ps.get("tint") or [0] * len(ps["character"]):
         tint += lin[int(t)] if lin else [0.5, 0.5, 0.5]
-    return {"person_char": [int(v) for v in ps["character"]],
+    # (LG2: the runtime's unit is a look, its character's body and face in its garments)
+    unit = ps.get("look") or ps["character"]
+    return {"person_char": [int(v) for v in unit],
+            "person_group": [int(v) for v in ps.get("group") or []],
             "person_scale": [float(v) for v in ps["scale"]],
             "person_gait": [int(v) for v in ps["gait"]],
             "person_pace": [float(v) for v in ps["pace"]],
@@ -451,10 +455,12 @@ def people_library(lib: dict | None, spike: dict) -> dict:
     if not lib or not lib.get("characters"):
         return {}
     chars = lib["characters"]
-    want = (spike.get("library") or {}).get("characters")
+    # (LG2: the library's entries are looks; a plan before LG2 draws characters)
+    pl = spike.get("library") or {}
+    want = pl.get("looks") if lib.get("looks") else pl.get("characters")
     if want and want != len(chars):
-        return {"people_skipped": f"the plan draws from {want} characters, the project's "
-                                  f"library has {len(chars)}"}
+        return {"people_skipped": f"the plan draws from {want} looks or characters, the "
+                                  f"project's library has {len(chars)}"}
     near, starts, mid, mid_frames, cards = [], [0], [], [], []
     for c in chars:
         near += c["near"]["meshes"]
@@ -555,6 +561,21 @@ def pack_crowd(plan: dict, pdir: Path, graphs: dict) -> dict:
         cols = crowd["palettes"].get(d["id"]) or ["#808080"]
         for k in range(size):
             pal += _lin(cols[k % len(cols)])
+    # (LG2: per district and look group the dye colors, linear; the districts' people by
+    # group and wear)
+    of = crowd.get("outfits") or {}
+    opal, ogrp, owear = [], [], []
+    ncol = 0
+    if of:
+        ncol = max(len(c) for rows_ in of["palettes"].values() for c in rows_)
+        for d in plan["districts"]:
+            rows_ = of["palettes"].get(d["id"]) or [["#808080"]] * len(of["groups"])
+            for cols in rows_:
+                for k in range(ncol):
+                    opal += _lin(cols[k % len(cols)])
+            ogrp += [float(v) for v in of["district_groups"].get(d["id"]) or
+                     [1.0 / len(of["groups"])] * len(of["groups"])]
+            owear.append(float(of["wear"].get(d["id"], 0.3)))
     av, sp = crowd["avoid"], crowd["speeds"]
     ps = persons({"palette": [], "persons": crowd["persons"]})
     ps["person_tint"] = [0.5] * (3 * len(ps.get("person_char") or []))
@@ -563,6 +584,9 @@ def pack_crowd(plan: dict, pdir: Path, graphs: dict) -> dict:
                 "walk_signal": sig, "signal_windows": windows,
                 "district_ids": dids, "district_shape": shape, "district_danger": danger,
                 "district_palettes": pal, "palette_size": size,
+                "outfit_palettes": [round(v, 4) for v in opal], "outfit_colors": ncol,
+                "outfit_groups": len(of.get("groups") or []), "district_groups": ogrp,
+                "district_wear": owear,
                 "door_lanes": dl, "door_dists": dd, "door_points": dp, "door_rates": dr,
                 "crowd": {"hour": hour, "pool": int(crowd["pool"]),
                           "live_m": float(crowd["live_m"]), "trip_s": float(crowd["trip_s"]),

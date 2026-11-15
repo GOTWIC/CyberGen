@@ -2875,6 +2875,66 @@ LG5 (traffic, built before LG2 at Swagnik's ask: "I want cars everywhere") is in
   components (lifegen's tick 1.3 to 2 ms), left for the performance pass.
   `docs/progress/LG5/README.md`.
 
+LG2 (clothing) is in place:
+- **Looks** (`lifegen/garments.py`): each of the library's 24 characters has `LOOKS` (6)
+  whole outfits, each of a look group (`GROUPS`: `presets.GROUPS` and `rain`; `GROUP_LOOKS`
+  shares the 144 out, a character one look a group): a base layer (tee, long tee, shirt,
+  hoodie, coveralls), an outer layer or none (bomber, jacket, trench, raincoat), a bottom
+  (cargo, trousers, skirt), shoes (sneakers, boots, dress shoes), accessories (`ACCESSORIES`:
+  visor, respirator, mask, headset, cap, beanie, hard hat, implant, arm plates, backpack,
+  bag), each garment in a textile of its group (`RECIPES`) with its trims; `look`, `spec`
+  (in the library's spec and hash). `draft` cuts a garment's pattern (`KINDS`: parts, ease
+  by fit, an outer layer looser than any base layer) for one body's landmarks (`measure`);
+  `blender_job` is one character's job (each garment once).
+- **Textiles** (`lifegen/textiles.py`): 15 tileable PBR sets in AG6's style (`TEXTILES`:
+  denim, leather, vinyl, nylon, knit, rib, canvas, wool, mesh, reflective, LED trim, rubber,
+  metal, plastic, visor; `assetgen.materials.noise`, `pbr.pack`), dyed ones a light weave.
+- **The Blender stage** (`lifegen/blender/garments.py`, stdlib and bpy): the mannequin (the
+  assembled body, its plain outfit, which fills the body's holes under it, and the face's
+  skin, one voxel remesh, every vertex labelled with its part and place), the plain outfit's
+  openings measured (every look reaches past them: the body has no skin inside); a garment the
+  mannequin's faces of its parts offset by its ease (at most `ROOM` of the free space),
+  smoothed over the hollows and kept outside, cut by its pattern's planes (hem, sleeve,
+  ankle, the neckline at the outfit's, a front opening), flared skirts and coat tails, hoods
+  (an ellipsoid open at the face, or a roll), collars, then draped by Blender's cloth solver
+  (`FRAMES`, goal springs on fitted parts; a drape that throws vertices is dropped), a rim of
+  the textile's thickness at every open edge, UVs the pattern pieces' meters, vertex colors (a
+  multiplier, the dye channel in alpha: 0 none, 1/3 base, 2/3 outer, 1 bottom); accessories
+  rigid on their bone (`rb`, `rw`); a look its pieces layered (`layered`: each 4 mm outside
+  those under it, a tucked shirt under its trousers) and the covered faces out
+  (`hide_covered`), written as near (LOD 0, 1) and mid JSON in Unreal's frame (`export`; a
+  triangle keeps its corners' order).
+- **The library's build** (`citygen/unreal_people.py`, `citygen/ue/people_library.py`,
+  `LIB_VERSION` lg2.1): phase A in the editor (characters, clips, `bodies`: the assembled
+  body, plain outfit and face at LOD 0 with their bones as JSON), `dress` (Blender, 4 at
+  once, a character kept while its job and script are), phase B (`looks`: the textiles
+  imported, `M_CgGarment_<hash>` and an instance per textile, each look's garments one
+  skeletal mesh on the body's skeleton, LOD 0 and 1, GeometryScript, weights from the plain
+  outfit where nearer than the body, else the body, accessories held to their bone, the JSON
+  made manifold first, `manifold`; `mid` and `far` per look, the card's dye mask a second
+  capture in `DyeMode`); the manifest's `characters` are the 144 looks (`looks` true).
+  `$CITYGEN_PEOPLE_HASH` pins a library while its code changes, `$CITYGEN_PEOPLE_KEEP_DRESS`
+  keeps the dressed characters.
+- **The plan** (`lifegen/plan.py`): each pool person's look and group (`assign_looks`: the
+  pool's groups half the city's people, half each group's largest share of any district),
+  `crowd.outfits` (each district's people by group, `outfit_groups`, with the weather's share
+  in raincoats, `presets.WEATHER_OUTFITS`, the spec's `crowd.weather`, clear until LG8; its
+  colors per group, `outfit_palettes`, `OUTFIT_COLORS` distinct; its wear); the check
+  `variety` (expected alike pairs within `VARIETY_M` at most `VARIETY_PAIRS`, no look over
+  `LOOK_SHARE_MAX` of a district).
+- **Exporter and runtime** (`unreal_life` `PACK_VERSION` 5, `import_city` `LIFE_VERSION`
+  life6; `CityGenLifeCrowd.cpp` `TakeSlot`, `DressSlot`; `CityGenLifePeople.cpp` `TintOf`):
+  a person spawned in a district takes a free slot of a group drawn by the district's people,
+  three dye colors of that group there and a wear; near garments' dynamic instances `Tint0` to
+  `Tint2` and `Wear`, mid instances 14 custom floats, far cards 12 (tinted by the sheet's dye
+  mask). Cloth simulation near the view is not set up (Chaos Cloth's clothing data is made
+  only by a C++ factory, no script route). Bench pass `night_life_noclothes`.
+  `docs/unreal_export.md`, "From LG2: clothing".
+- Delta: every check passes, 125 of the 144 looks in the pool; `night_plan_all` 20.8 ms p95
+  native (walk 23.8) against LG5's 21.2, clothing off 22.0 (the template bodies): clothing
+  costs no frame time. Open items (a long coat's waist showing the layer under it while
+  walking, jagged rims, no prints or logos, no cloth simulation): `docs/progress/LG2/README.md`.
+
 ## Gallery site (GitHub Pages)
 
 `site/` is the public gallery at https://gotwic.github.io/CyberGen/ (served at

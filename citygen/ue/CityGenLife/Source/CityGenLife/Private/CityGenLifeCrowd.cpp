@@ -246,9 +246,11 @@ int32 ACityGenLife::SpawnGroup(const int32 Lane, const float Dist, const float D
 	FMassEntityManager& EM = GetWorld()->GetSubsystem<UMassEntitySubsystem>()->GetMutableEntityManager();
 	TArray<int32, TInlineAllocator<8>> Slots;
 	float Pace = 1.0e9f;
+	const int32 D0 = LaneDistrictArr.IsValidIndex(Lane) ? LaneDistrictArr[Lane] : INDEX_NONE;
 	for (int32 K = 0; K < Size && FreeSlots.Num(); ++K)
 	{
-		const int32 Slot = FreeSlots.Pop(EAllowShrinking::No);
+		// (LG2: a slot whose look is of a group the district wears, drawn by its people)
+		const int32 Slot = TakeSlot(D0, Rng);
 		Slots.Add(Slot);
 		Pace = FMath::Min(Pace, 100.f * (PersonPace.IsValidIndex(Slot) ? PersonPace[Slot] : 1.35f));
 	}
@@ -293,8 +295,13 @@ int32 ACityGenLife::SpawnGroup(const int32 Lane, const float Dist, const float D
 		}
 		WalkState[Slot] = CgShow::Off;
 		WalkPos[Slot] = FVector::ZeroVector;
-		// (the clothes' color: a color of the district it comes out in)
-		if (D >= 0 && PersonTintIndex.IsValidIndex(Slot) && PaletteSize > 0)
+		// (the clothes' color: a color of the district it comes out in; LG2: three, one per
+		// dye channel, of its look's group in this district, and its wear)
+		if (D >= 0 && OutfitColors > 0 && PersonGroup.IsValidIndex(Slot))
+		{
+			DressSlot(Slot, D, Rng);
+		}
+		else if (D >= 0 && PersonTintIndex.IsValidIndex(Slot) && PaletteSize > 0)
 		{
 			const int32 C = 3 * (D * PaletteSize + (PersonTintIndex[Slot] % PaletteSize));
 			if (DistrictPalettes.IsValidIndex(C + 2))
@@ -311,6 +318,69 @@ int32 ACityGenLife::SpawnGroup(const int32 Lane, const float Dist, const float D
 		++Spawned;
 	}
 	return Slots.Num();
+}
+
+int32 ACityGenLife::TakeSlot(const int32 D, FRandomStream& Rng)
+{
+	const int32 G = OutfitGroupCount;
+	if (D >= 0 && G > 0 && PersonGroup.Num() && DistrictGroups.IsValidIndex(D * G + G - 1))
+	{
+		float X = Rng.FRand(), Acc = 0.f;
+		int32 Want = G - 1;
+		for (int32 K = 0; K < G; ++K)
+		{
+			Acc += DistrictGroups[D * G + K];
+			if (X < Acc)
+			{
+				Want = K;
+				break;
+			}
+		}
+		// (the last freed first: a scan from the end, then any slot of a group the district
+		// has, then any)
+		int32 Other = INDEX_NONE;
+		for (int32 I = FreeSlots.Num() - 1, N = 0; I >= 0 && N < 800; --I, ++N)
+		{
+			const int32 S = FreeSlots[I];
+			const int32 Gs = PersonGroup.IsValidIndex(S) ? PersonGroup[S] : -1;
+			if (Gs == Want)
+			{
+				FreeSlots.RemoveAtSwap(I, EAllowShrinking::No);
+				return S;
+			}
+			if (Other == INDEX_NONE && Gs >= 0 && Gs < G && DistrictGroups[D * G + Gs] > 0.f)
+			{
+				Other = I;
+			}
+		}
+		if (Other != INDEX_NONE)
+		{
+			const int32 S = FreeSlots[Other];
+			FreeSlots.RemoveAtSwap(Other, EAllowShrinking::No);
+			return S;
+		}
+	}
+	return FreeSlots.Pop(EAllowShrinking::No);
+}
+
+void ACityGenLife::DressSlot(const int32 Slot, const int32 D, FRandomStream& Rng)
+{
+	const int32 G = FMath::Max(1, OutfitGroupCount);
+	const int32 K = FMath::Max(1, OutfitColors);
+	const int32 Gs = FMath::Clamp(PersonGroup[Slot], 0, G - 1);
+	PersonTint.SetNumZeroed(FMath::Max(PersonTint.Num(), 9 * People));
+	for (int32 C = 0; C < 3; ++C)
+	{
+		const int32 Idx = Rng.RandRange(0, K - 1);
+		const int32 B = 3 * ((D * G + Gs) * K + Idx);
+		for (int32 Q = 0; Q < 3; ++Q)
+		{
+			PersonTint[9 * Slot + 3 * C + Q] = OutfitPalettes.IsValidIndex(B + Q) ? OutfitPalettes[B + Q] : 0.5f;
+		}
+	}
+	PersonWear.SetNumZeroed(FMath::Max(PersonWear.Num(), People));
+	const float W = DistrictWear.IsValidIndex(D) ? DistrictWear[D] : 0.3f;
+	PersonWear[Slot] = FMath::Clamp(W + 0.3f * (Rng.FRand() - 0.5f), 0.f, 1.f);
 }
 
 void ACityGenLife::FreeOnDeadLanes()
@@ -514,16 +584,17 @@ void ACityGenLife::ApplyLook(const int32 P, const bool bStill)
 		return;
 	}
 	const int32 C = PersonChar.IsValidIndex(P) ? FMath::Clamp(PersonChar[P], 0, NC - 1) : P % NC;
-	float MidData[7], FarData[5];
+	float MidData[14], FarData[12];
 	LookData(P, bStill, MidData, FarData);
 	if (UInstancedStaticMeshComponent* Mid = MidComps.IsValidIndex(C) ? MidComps[C].Get() : nullptr)
 	{
-		Mid->SetCustomData(PersonInst[P], MakeArrayView(MidData, 7), false);
+		Mid->SetCustomData(PersonInst[P], MakeArrayView(MidData, 14), false);
 	}
 	if (UInstancedStaticMeshComponent* Far = FarComps.IsValidIndex(C) ? FarComps[C].Get() : nullptr)
 	{
-		Far->SetCustomData(PersonInst[P], MakeArrayView(FarData, 5), false);
+		Far->SetCustomData(PersonInst[P], MakeArrayView(FarData, 12), false);
 	}
+	// (a near person takes its colors and wear when its slot is assigned: Assign)
 }
 
 FString ACityGenLife::CrowdStatus() const

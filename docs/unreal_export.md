@@ -2616,6 +2616,58 @@ A runtime update and a people library rebuild (no exporter or pack change;
   `MidStand`) at its walking rate, and its card the sheet's cell nearest that pose (a stride
   rate of 1e-5, its offset putting the cell's middle at now; `CardFrames` 8, the library's).
 
+### From LG2: clothing
+
+The people library's unit becomes a **look**: one of a character's `garments.LOOKS` (6) whole
+outfits, each of a fashion group (`lifegen/garments.py`), so the library holds 144 looks of
+its 24 characters (`LIB_VERSION` lg2.1). The runtime draws a look where LG1 drew a character:
+its character's body and face (the assembled MetaHuman, the plain outfit no longer drawn), the
+look's garments, its hair unless the look covers it, its mid mesh and card.
+(`citygen/unreal_people.py`, `citygen/ue/people_library.py`; `unreal_life.PACK_VERSION` 5;
+`import_city.LIFE_VERSION` life6.)
+
+- **The library's build** runs the editor twice with Blender between (`ensure_library`):
+  - *bodies* (editor): each character's assembled body, plain outfit and face at LOD 0 in the
+    reference pose, with its bones, as JSON (`<log>/bodies/<id>.json`);
+  - *dress* (`dress`, Blender, `BLENDER_JOBS` 4 at once): the textiles drawn
+    (`lifegen/textiles.py`) and each character's garments cut, built and draped on its body
+    (`lifegen/blender/garments.py`), each look written as its near mesh (LOD 0 and 1) and mid
+    mesh (`<cache>/garments/<id>/<look>.{near,lod1,mid}.json`); a character whose job and
+    script are unchanged is kept (`done.json`);
+  - *looks* (editor): the textiles imported (`People/Textiles`, the normal map's green
+    flipped), `M_CgGarment_<hash>` and an instance per textile (`People/Materials/Garments/
+    MI_<textile>`), each look's garments one skeletal mesh on the body's skeleton
+    (`People/Looks/<id>/SKM_<look>`, LOD 0 and 1, `GeometryScript`'s
+    `create_new_skeletal_mesh_asset_from_mesh_lods`, the body's bone proportions): weights
+    transferred from the plain outfit where it is nearer than the body (the body has no skin
+    under it) and from the body elsewhere, accessories and a raised hood held to their bone;
+  - *mid* per look: the body and face at a low LOD, the look's mid mesh (one cloth and one
+    glow slot on `M_CgPersonMidCloth`, `_Glow`: vertex colors times the person's dye colors
+    from per-instance custom data 4 to 12), the hair's helmet unless the look covers the hair;
+    the walk baked as LG1's;
+  - *far* per look: the sheet (cells 64 x 128) and a dye mask (a capture with `DyeMode` 1: the
+    garments' dye channels red, green and blue, skin and hair black, its alpha the coverage);
+  - the manifest's `characters` are the looks (`looks` true, `people` 24, each with its
+    `character`, `group`, near meshes `[body, face, look]` and hair or none).
+  Editor runs end every 60 looks made (`looks_per_run`) or 72 mid or far (`mid_per_run`,
+  `far_per_run`) and the next goes on. `$CITYGEN_PEOPLE_HASH` pins a library while its code is
+  worked on, `$CITYGEN_PEOPLE_KEEP_DRESS` keeps the dressed characters.
+- **The pack**: `PersonChar` is the person's look (`persons.look`), `PersonGroup` its group;
+  `OutfitPalettes` (per district, group and `OutfitColors` colors, linear RGB),
+  `OutfitGroupCount`, `DistrictGroups` (per district its people by group) and `DistrictWear`.
+- **The runtime**: a person spawned in a district takes a free pool slot of a group drawn by
+  the district's people by group (`TakeSlot`: the slot freed last of that group, else any of a
+  group the district has, else any), its three dye colors from that group's colors in that
+  district and a wear about the district's (`DressSlot`); `PersonTint` holds 9 floats a person.
+  Mid instances carry 14 custom floats (the walk's 4, the three colors, wear), far cards 12
+  (the walk's 2, the three colors, wear); the card tints its sheet by its dye mask. Near, each
+  garment slot gets a dynamic instance with `Tint0` to `Tint2` and `Wear`. The clothing switch
+  (`CityGenLife.Clothing`, the Tab menu's row) is unchanged: off hides the look's garments and
+  draws MetaHuman's whole body.
+- **Cloth near the view:** not set up. Chaos Cloth's clothing data is made by
+  `UClothingAssetFactoryBase::CreateFromSkeletalMesh`, a C++ virtual with no Python or Blueprint
+  route; the garments move with the body's weights at every tier.
+
 ### From LG5: traffic
 
 A life plan with `traffic` (`lifegen plan` since LG5) replaces the spike's cars with the city's
