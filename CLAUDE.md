@@ -1491,6 +1491,41 @@ The water coverage fixes (issue #140 and #144's Nexus `water_gaps`) are in place
   narrow part could split into a wide one). No city's model moves.
 Outputs: `docs/progress/fix_nexus_water/`.
 
+The crossings fix (LG3's and the people fixes' open item: the crowd walked on the
+carriageway) is in place, in `citygen/junctions.py` (check in `network_checks.py`):
+- **Crossings straight across:** a crosswalk or crossing of a leg with sidewalks is
+  `[sidewalk, curb, curb, sidewalk]` square across the road at its station (M18's, M22's
+  stations unchanged), each end on its sidewalk's middle line, the sidewalk walkway split
+  there (`_split_at`); a crosswalk walkway's middle stretch is its record's line, as LG3's
+  `signals` reads it. Where the sidewalk does not reach the station (`ATTACH_MAX_M` 2 m), and
+  across a road with no sidewalk (a highway, an alley, a service road), the crossing runs
+  between the leg's two corners; a highway's crosswalk record stands there (wholly on one
+  face, M22's rule). Before, every crossing ran from the corner at the node out along the curb
+  or across the junction to its station past M17's and M22's long cuts.
+- **Corners off the carriageway** (`_corner_walk`, `_Carriage`, `_round`): the junction's
+  carriageway is its unit's region less its corner pads and its pedestrian legs' stubs, taken
+  out by `CURB_OFF_M` 0.3 m; a corner whose sidewalks' way to it runs onto it is led round its
+  edge on the corner pad (the shorter way round that crosses no leg's port and stays on the
+  right of way, at most `WAY_LONG` 4 times the way across and `WAY_LONG_M` 60 m more; a
+  bulb's way round its rim), the corner node the walk's middle; beside a road with no
+  sidewalk the corner is where the sidewalk reaches the curb; with no pad, each sidewalk ends
+  at its port and a crossing joins the two; where nothing stays on the right of way, M2's
+  corner as before (`parkpaths.keep_off` leads it round the lots). Every sidewalk walkway is
+  led round the carriageways of the junctions at its ends; a road going on as one of another
+  cross-section with no junction gets the same corner walk over both carriageways
+  (`OFFSET_STEP_M`); a dead end with no junction a crossing of its end; links from an alley's
+  or path's centerline go by M2's corner point (`corner_x`). `_walk_offset` puts a highway's,
+  alley's or service road's corners on its curb.
+- **Check** `walkway_carriageway` (with the street checks: 108 on a flat sample, 113 with
+  decks): `walk_on_roads` measures each walkway's length on the pavement map's carriageway
+  faces at its level and height (`ROAD_FACES`; not a pedestrian junction or its pedestrian
+  legs' stubs); a crosswalk or crossing more than `WALK_ROAD_TOL_M` 5 m past its one straight
+  span fails, and a city whose sidewalk walkways run over `SIDEWALK_ROAD_SHARE` 0.5% of their
+  length on a road's carriageway; sidewalks on a junction's face (roads inside a cluster, a
+  junction face over a road's sidewalk bands) and the alleys and their links, which share
+  their carriageway, are noted. `walk_road_stats` gives the measure per kind.
+Outputs: `docs/progress/fix_crossings/`.
+
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
 - **Validation:** as in "Validation" above; nothing beyond it.
