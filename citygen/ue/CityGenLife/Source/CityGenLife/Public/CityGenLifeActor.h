@@ -133,9 +133,15 @@ public:
 	 *  baked frame, the bake's frames a second, the walk cycle's length (s). */
 	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<TObjectPtr<UStaticMesh>> MidMeshes;
 	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<float> MidFrames;
+	/** lifegen_people_fixes: how fast a person turns (deg/s) and how far its walkway's
+	 *  corners are rounded (m along each leg at most). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") float TurnDegS = 270.f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") float CornerM = 1.5f;
 	/** The far cards: one quad (a person's height, standing on its origin), per character its
 	 *  impostor sheet's material. */
 	UPROPERTY(EditAnywhere, Category = "CityGen|People") TObjectPtr<UStaticMesh> CardMesh;
+	/** The cells of a sheet's stride (the library's impostor frames). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") int32 CardFrames = 8;
 	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<TObjectPtr<UMaterialInterface>> CardMaterials;
 	/** The tiers (m from the view) and how many people may be near at once. */
 	UPROPERTY(EditAnywhere, Category = "CityGen|People") float NearM = 30.f;
@@ -309,6 +315,14 @@ private:
 	void Assign(int32 Slot, int32 Person);
 	float WalkRate(int32 Person) const;
 	float PhaseOffset(int32 Person) const;
+	// (lifegen_people_fixes: per character the baked walk's own loop, [MidFirst, MidLast]: the
+	// bake samples AnimToTexture's frame count, the clip's 30 fps keys, at 15 fps, so it ran
+	// past the clip's end and its second half held the last pose; and the frame a standing
+	// person holds, the walk's passing pose, found from the clip's thighs. The instances'
+	// custom data for a person walking or standing, mid and far.)
+	void MakeMidLoops();
+	void LookData(int32 Person, bool bStill, float Mid[7], float Far[5]) const;
+	TArray<float> MidFirst, MidLast, MidStand, StandShare;
 	// (lifegen_clothing_toggle)
 	void ApplyClothing();
 

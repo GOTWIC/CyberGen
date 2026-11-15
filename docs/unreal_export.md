@@ -2553,8 +2553,8 @@ drive lanes and cars until LG5. A plan before LG3 packs and walks LG1's spike as
   frame per character, and a character with nobody drawn in a tier is not sent at all; the
   ground is traced only under people drawn near or mid.
 - **The tiers:** LG1's, with a person standing (waiting, or held behind someone) on its idle
-  clip near, its baked walk and card frozen mid and far; a person in an elevator is drawn by
-  none.
+  clip near, the walk's passing pose mid and far (lifegen_people_fixes, below); a person in an
+  elevator is drawn by none.
 - **Console:** `CityGenLife.Hour H` (the crowd at another hour, every live walkway filled
   again; until LG8 reads atmosgen's), `CityGenLife.Crowd SCALE [TRIP_S]` (the density times SCALE,
   within the pool, trips TRIP_S long); `CityGenLife.Respawn PEOPLE CARS` takes a smaller pool; `CityGenLife.Status`
@@ -2575,6 +2575,46 @@ drive lanes and cars until LG5. A plan before LG3 packs and walks LG1's spike as
   far, the cards keep the clothes their sheets were captured in. `LIFE_VERSION` life4; the
   status's `library` adds `clothing`, `hidden_material`, `whole_body`; the check shoots a view
   named `*_noclothes` twice, clothed (`*_clothes`) and not, the world's time held between.
+
+### People turning, standing and walking far off (lifegen_people_fixes)
+
+A runtime update and a people library rebuild (no exporter or pack change;
+`CityGenLifeProcessors.cpp` `CgLife::PathAt`, `TurnTo`; `CityGenLifePeople.cpp`
+`MakeMidLoops`, `LookData`; `citygen/ue/people_library.py` `mid_mesh`):
+
+- **The mid tier's bone textures:** LG1's build baked each character's walk into its three
+  bone textures (AnimToTexture) and saved the data asset and the mid material instances, but
+  never the textures, so once the editor that baked them closed, every mid material sampled
+  the engine's default texture: mid people (30 to 90 m) stood crouched, sunk to the knees,
+  arms out, in every project and package since LG1 (the impostor sheets, captured in the
+  baking session, were right). The build now saves the textures before the data asset and
+  the materials that name them, and bakes again a mid mesh whose data asset names none
+  (`library.json` is otherwise as before; the library's hash moves, so `--people` rebuilds the
+  clips, mid meshes and sheets in a project, the characters kept).
+
+- **Rounded corners:** a person walks its walkway's line with every corner rounded, inside a
+  walkway (between two of its stretches) and between walkways (the next one chosen
+  `CornerM` plus 0.5 m before its walkway ends, `FCgLifeWalker::Next`, and the heading it left
+  the last one on kept, `PrevHead`): a quadratic curve over at most `CornerM` (1.5 m) each
+  way, 0.45 of the shorter leg, and cutting the corner by at most half the narrower
+  walkway's half width, so a person on its side of a walkway stays on it; a turn back (over
+  about 150 degrees) is not rounded. Its side offset is on the curve's own right (and kept on
+  the walker's right across walkways that run the other way), so it no longer jumps across
+  the walkway at a corner.
+- **Turning:** every person's yaw turns toward where it goes (along the curve, and toward the
+  side it steps to) at most `TurnDegS` (270 degrees a second), at a door too; a new person
+  faces its way at once. The yaw is what all three tiers draw.
+- **The mid walk's loop:** AnimToTexture's bake samples the clip's own frame count (its 30 fps
+  keys) at the bake's 15 fps, so a library's mid walk ran twice the clip's length and its
+  second half held the clip's last pose: mid people walked half the time and slid, frozen,
+  the rest. The build bakes one loop of the clip (its custom range) and the runtime plays
+  each character's loop as the clip's length at the bake's rate from its first frame
+  (`MidFirst`, `MidLast`; logged once per clip), so a library baked before plays right too.
+- **Standing mid and far:** LG3 froze a standing person's walk (a rate of 0: the loop's first
+  frame, mid stride, and the card's first cell). A standing person now holds the walk's passing pose
+  (the frame where both thighs are nearest their mean, found from the clip at BeginPlay,
+  `MidStand`) at its walking rate, and its card the sheet's cell nearest that pose (a stride
+  rate of 1e-5, its offset putting the cell's middle at now; `CardFrames` 8, the library's).
 
 ## Milestones and checks
 

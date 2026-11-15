@@ -2833,6 +2833,16 @@ LG3 (crowds on the streets, built before LG2 at Swagnik's ask) is in place:
   creator's bodies have no triangles under the garments), mid past that cap their garment
   slots drawn with `M_CgLifeHidden` (holes), far cards unchanged (`LIFE_VERSION` life4):
   `docs/progress/lifegen_clothing_toggle/README.md`.
+- **People fixes** (lifegen_people_fixes, Swagnik's walk of the packaged Delta): people walk
+  their walkways with every corner rounded (within and between walkways, the next one chosen
+  ahead, `CgLife::PathAt`) and turn at most 270 degrees a second (`TurnTo`), all tiers; the
+  library's build saves the mid bake's bone textures (LG1's never did: every mid person was
+  drawn crouched, arms out, from the engine's default texture; `people_library.mid_mesh`,
+  a library rebuild) and bakes one loop of the walk, which the runtime plays
+  (`MakeMidLoops`; the bake had run twice the clip, its second half frozen); a standing mid or
+  far person holds the walk's passing pose (`LookData`); the crowd draws the six heavy-bodied presets'
+  characters rarely (`presets.BODY_WEIGHT`, `plan.draw_person`: 26% of people to 5%; the
+  library unchanged). `docs/progress/lifegen_people_fixes/README.md`.
 
 ## Gallery site (GitHub Pages)
 

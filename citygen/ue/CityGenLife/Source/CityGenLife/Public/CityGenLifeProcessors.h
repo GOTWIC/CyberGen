@@ -85,6 +85,10 @@ struct FCgLifeFrame
 	float ReachCm = 400.f, PersonalCm = 75.f, PlayerCm = 250.f, AvoidCm = 9000.f;
 	float StairsShare = 0.6f, EscShare = 0.3f, EscAddCm = 50.f, ElevatorCm = 60.f;
 	FVector2D Jaywalk = FVector2D(0.01, 0.30);
+	/** lifegen_people_fixes: how fast a person turns (deg/s), and the walkways' corners
+	 *  rounded for walking: at most CornerCm along each leg (and CornerLeg of it), cutting
+	 *  the corner by at most CornerCut of the narrower walkway's half width. */
+	float TurnDegS = 270.f, CornerCm = 150.f, CornerLeg = 0.45f, CornerCut = 0.5f;
 	/** Out: counts this frame. */
 	int32 Waiting = 0, Entered = 0, Exited = 0, Jaywalked = 0;
 };

@@ -206,6 +206,16 @@ WALK_KIND_CODES = ("sidewalk", "crossing", "crosswalk", "path", "alley", "promen
 # `shop.<use>`, as a unit); the rest as `SPAWN_WEIGHT`
 DOOR_WEIGHT = {"shop.lobby": 3.0, "shop.bar": 2.0, "shop.club": 2.5, "shop.food": 1.8}
 
+# lifegen_people_fixes: how often a character of the people library is drawn, by the
+# MetaHuman preset it is made from (1 for a preset not named). The presets' own bodies carry
+# their build: measured on the assembled characters (the creator's body constraints, waist
+# over height, 2026-11-14), Bo 0.70, Bruce 0.65, Dominic 0.69, Jorge 0.86, Orlando 0.60 and
+# Lani 0.57 against 0.37 to 0.53 for the other 18: a quarter of the library and five of its
+# twelve men heavy (Swagnik: "too many fat people"). Drawn this rarely, heavy builds are about
+# 5% of a crowd; the library itself is unchanged (its hash is the built assets').
+BODY_WEIGHT = {"Bo": 0.15, "Bruce": 0.15, "Dominic": 0.15, "Jorge": 0.05, "Orlando": 0.2,
+               "Lani": 0.3}
+
 # signal phases (the ask `signal_phases`, derived until citygen records them): two phases per
 # signalized junction from its legs' angles (legs within 45 degrees of the first leg's line
 # move in phase 0, the rest in phase 1), each crosswalk walking in the phase its crossed leg
