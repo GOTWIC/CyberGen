@@ -774,11 +774,224 @@ def check_park_access(spec: CitySpec, m: CityModel):
     return c
 
 
+ROAD_FACES = ("carriageway", "junction", "bulb")   # the pavement map's faces cars drive on
+WALK_ROAD_KINDS = ("sidewalk", "crosswalk", "crossing")   # walkways kept off them
+CROSS_KINDS = ("crosswalk", "crossing")
+WALK_ROAD_TOL_M = 5.0   # a crossing may run this far on a carriageway past its span
+SIDEWALK_ROAD_SHARE = 0.005   # the city's sidewalk walkways at most this share on a
+#                               road's carriageway
+WALK_GROUND_M = 2.0     # walkways this near the ground (not a skybridge, a station's
+#                         concourse, a raised road's) are measured
+SHARED_PEDS = ("pedestrian", "footbridge")
+WALK_LEVEL_M = 2.5      # a face this far under or over a walkway is another level
+
+
+def walk_on_roads(m: CityModel) -> dict:
+    """Crossings fix: each ground or deck walkway's length on the carriageway faces of M22's
+    pavement map at its level (a road's carriageway, a junction's, a bulb; not a junction
+    of pedestrian streets only) and, for a crossing or crosswalk, the most of it on one of
+    its stretches (its straight span across the road): {walkway id: (kind, length, on,
+    past its span, on a road's carriageway face)}. Walkways of a raised road (its
+    sidewalks, at the ground in the walk graph) are left out."""
+    if m.pavement_net is None or not m.walkways:
+        return {}
+    vert = {v.id: tuple(v.p) for v in m.pavement_net.vertices}
+    vz = {v.id: v.z for v in m.pavement_net.vertices}
+    edge = {e.id: e.v for e in m.pavement_net.edges}
+    peds = {j.id for j in m.junctions
+            if all(c in SHARED_PEDS for c in (j.attrs or {}).get("classes", []))}
+    from shapely.geometry import Polygon
+
+    def ring(refs):
+        out = []
+        for r in refs:
+            vs = list(edge[r.lstrip("-")])
+            out += (vs[::-1] if r.startswith("-") else vs)[0 if not out else 1:]
+        return [vert[v] for v in out[:-1]]
+
+    segs_by = {s.id: s for s in m.road_segments}
+
+    def stub(seg, end: str, cut: float, h: float):
+        pts = [tuple(p[:2]) for p in seg.centerline]
+        pts = pts if end == "a" else pts[::-1]
+        part = ST._substring(pts, 0.0, min(cut, ST._plen(pts)))
+        if len(part) < 2 or h <= 0.0:
+            return None
+        return LineString(part).buffer(h, cap_style="flat", join_style="mitre", mitre_limit=2.0)
+
+    def walked(j):
+        """A junction's pedestrian legs' stubs in it (walked on, as `junctions._Carriage`
+        takes them out of its carriageway), less its roads' carriageway stubs."""
+        cuts = (j.attrs or {}).get("cuts") or []
+        if not any(c[0] in segs_by and ST.street_class(segs_by[c[0]]) in SHARED_PEDS
+                   for c in cuts):
+            return None
+        ped, road = [], []
+        for sid, end, cut in cuts:
+            s = segs_by.get(sid)
+            if s is None:
+                continue
+            if ST.street_class(s) in SHARED_PEDS:
+                ped.append(stub(s, end, cut, s.width_m / 2))
+            else:
+                side = s.cross_section.sidewalk_m[0] if s.cross_section.sidewalk_m else 0.0
+                road.append(stub(s, end, cut, s.width_m / 2 - side))
+        ped = [g for g in ped if g is not None]
+        if not ped:
+            return None
+        g = shapely.union_all(ped)
+        road = [g for g in road if g is not None]
+        return shapely.difference(g, shapely.union_all(road)) if road else g
+
+    jn = {j.id: j for j in m.junctions}
+    polys, layers, zs, jface = [], [], [], []
+    for f in m.pavement:
+        if f.kind not in ROAD_FACES or (f.kind == "junction" and f.owner_id in peds):
+            continue
+        try:
+            rs = [ring(r) for r in f.rings]
+        except KeyError:
+            continue        # (`pavement_edges` fails such a face)
+        g = Polygon(rs[0], rs[1:])
+        if not g.is_valid:
+            g = g.buffer(0)
+        if f.kind == "junction" and f.owner_id in jn:
+            w = walked(jn[f.owner_id])
+            if w is not None and not w.is_empty:
+                g = shapely.difference(g, w)
+        polys.append(g)
+        layers.append(f.layer)
+        jface.append(f.kind != "carriageway")
+        vs = [v for r in f.rings for ref in r for v in edge[ref.lstrip("-")]]
+        hz = [vz[v] for v in vs]
+        zs.append((min(hz), max(hz), np.array([vert[v] for v in vs]), np.array(hz)))
+    if not polys:
+        return {}
+    raised = {s.id for s in m.road_segments if any(p.z > WALK_GROUND_M for p in s.z_profile)}
+    segs, wid, lay, wz = [], [], [], []
+    for k, w in enumerate(m.walkways):
+        if (w.attrs or {}).get("segment") in raised:
+            continue
+        for a, b in zip(w.line, w.line[1:]):
+            if (a[0], a[1]) == (b[0], b[1]):
+                continue
+            if not w.level and max(abs(a[2]), abs(b[2])) > WALK_GROUND_M:
+                continue
+            segs.append(LineString([a[:2], b[:2]]))
+            wid.append(k)
+            lay.append("d1" if w.level else "g0")
+            wz.append((a[2] + b[2]) / 2 if not w.level else None)
+    out = {}
+    nw = len(m.walkways)
+    won, wmax, wlen, wrd = np.zeros(nw), np.zeros(nw), np.zeros(nw), np.zeros(nw)
+    if segs:
+        sarr = np.array(segs, dtype=object)
+        parr = np.array(polys, dtype=object)
+        lay_s, lay_p = np.array(lay), np.array(layers)
+        i, j = shapely.STRtree(parr).query(sarr, predicate="intersects")
+        keep = lay_s[i] == lay_p[j]
+        # (at its height: a road passing under or over it is not walked on)
+        keep &= np.array([wz[a] is None or zs[b][0] - WALK_LEVEL_M <= wz[a] <=
+                          zs[b][1] + WALK_LEVEL_M for a, b in zip(i, j)], dtype=bool)
+        i, j = i[keep], j[keep]
+        on = np.zeros(len(segs))
+        rd = np.zeros(len(segs))
+        if len(i):
+            inter = shapely.intersection(sarr[i], parr[j])
+            lens = shapely.length(inter)
+            # (a face that climbs, a ramp's: its height where the walkway meets it, by its
+            # nearest vertex)
+            for n_, (a, b) in enumerate(zip(i, j)):
+                if wz[a] is None or zs[b][1] - zs[b][0] <= WALK_LEVEL_M or not lens[n_]:
+                    continue
+                c = shapely.centroid(inter[n_])
+                d = ((zs[b][2] - (c.x, c.y)) ** 2).sum(axis=1)
+                if abs(zs[b][3][int(np.argmin(d))] - wz[a]) > WALK_LEVEL_M:
+                    lens[n_] = 0.0
+            np.add.at(on, i, lens)
+            np.add.at(rd, i, np.where(np.array(jface)[j], 0.0, lens))
+        wid_a = np.array(wid)
+        np.add.at(won, wid_a, on)
+        np.add.at(wrd, wid_a, rd)
+        np.maximum.at(wmax, wid_a, on)
+        np.add.at(wlen, wid_a, shapely.length(sarr))
+    for k, w in enumerate(m.walkways):
+        if wlen[k] <= 0.0:
+            continue
+        past = won[k] - (wmax[k] if w.kind in CROSS_KINDS else 0.0)
+        out[w.id] = (w.kind, float(wlen[k]), float(won[k]), float(max(past, 0.0)),
+                     float(wrd[k]))
+    return out
+
+
+def walk_road_stats(m: CityModel, got: dict | None = None) -> dict:
+    """Per walkway kind: count, length, length on a carriageway, past the crossings' spans,
+    and walkways past `WALK_ROAD_TOL_M` (m, rounded)."""
+    got = walk_on_roads(m) if got is None else got
+    st: dict = {}
+    for kind, L, on, past, _ in got.values():
+        d = st.setdefault(kind, [0, 0.0, 0.0, 0.0, 0])
+        d[0] += 1
+        d[1] += L
+        d[2] += on
+        d[3] += past
+        d[4] += past > WALK_ROAD_TOL_M
+    return {k: {"walkways": n, "length_m": round(L, 1), "on_carriageway_m": round(o, 1),
+                "past_span_m": round(p, 1), "past_tol": t}
+            for k, (n, L, o, p, t) in sorted(st.items())}
+
+
+def check_walk_roads(spec: CitySpec, m: CityModel):
+    c = _check("walkway_carriageway",
+               "Crossings fix: no crosswalk or crossing walkway runs on a carriageway (a "
+               "road's, a junction's or a bulb's face of the pavement map at its level) for "
+               f"more than {WALK_ROAD_TOL_M:g} m past its one straight span across the road; "
+               f"the city's sidewalk walkways at most {100 * SIDEWALK_ROAD_SHARE:g}% of their "
+               "length on a road's carriageway (on a junction's face, and alleys, service "
+               "roads and the links to them, which share their carriageway: noted)")
+    got = walk_on_roads(m)
+    n_j, m_j, L_sw, m_rd = 0, 0.0, 0.0, 0.0
+    worst = []
+    for wid in sorted(got):
+        kind, L, on, past, road = got[wid]
+        if kind == "sidewalk":
+            L_sw += L
+            m_rd += road
+            if past - road > WALK_ROAD_TOL_M:
+                n_j += 1
+                m_j += past - road
+            if road > WALK_ROAD_TOL_M:
+                worst.append((-road, wid))
+        elif kind in CROSS_KINDS and past > WALK_ROAD_TOL_M:
+            _lim(c, f"walkway {wid} ({kind}, {L:.1f} m): {past:.1f} m on a carriageway past "
+                    "its crossing's span")
+    if L_sw and m_rd > SIDEWALK_ROAD_SHARE * L_sw:
+        c.failures.append(f"sidewalk walkways run {m_rd:.0f} m of {L_sw:.0f} m on a road's "
+                          f"carriageway ({100 * m_rd / L_sw:.2f}%)")
+    if worst:
+        worst.sort()
+        c.notes.append(f"{len(worst)} sidewalk walkways on a road's carriageway for more "
+                       f"than {WALK_ROAD_TOL_M:g} m ({m_rd:.0f} m in all; where two roads of "
+                       "different cross-sections meet with no junction, a sidewalk's line "
+                       "folding across a tight bend): " + ", ".join(
+                           f"{w} {-r:.1f} m" for r, w in worst[:6]))
+    if n_j:
+        c.notes.append(f"{n_j} sidewalk walkways run {m_j:.0f} m on a junction's face (the "
+                       "sidewalks of roads inside a cluster, M22, and junction faces that "
+                       "cover a road's sidewalk bands, with no corner pad to walk round on)")
+    st = walk_road_stats(m, got)
+    for k in ("alley", "path"):
+        if st.get(k, {}).get("on_carriageway_m"):
+            c.notes.append(f"{k} walkways: {st[k]['on_carriageway_m']:.0f} m of "
+                           f"{st[k]['length_m']:.0f} m on a carriageway")
+    return c
+
+
 def run_streets(spec: CitySpec, m: CityModel) -> list:
     """The checks a city with local streets has (M2 on)."""
     return [check_dead_ends(spec, m), check_overlaps(spec, m),
             check_junction_levels(spec, m), check_crossing_spacing(spec, m),
-            check_park_access(spec, m)]
+            check_park_access(spec, m), check_walk_roads(spec, m)]
 
 
 def run_finished(spec: CitySpec, m: CityModel) -> list:
