@@ -49,6 +49,7 @@ from pathlib import Path
 from . import asks as A
 from . import garments as G
 from . import library as L
+from . import places as PL4
 from . import planmodel as PM
 from . import presets as P
 from . import spec as S
@@ -261,28 +262,40 @@ def _district_at(polys: list, x: float, y: float) -> str | None:
     return None
 
 
-def slots(model: dict) -> list[dict]:
-    out = []
-    for p in model.get("props", []):
-        sk = P.SLOTS.get(p.get("type"))
-        if sk is None:
+def assign_roles(cols: dict, n_gang: int, n_police: int) -> None:
+    """LG4: the pool slots kept for gang members and police (`places.reserve`), drawn by hash
+    among the pool; each a character of the library with a look of its group (LG2's gang and
+    police looks), drawn by `character_weights`, wearing that look. `cols["role"]`: 0 the crowd,
+    1 a gang member, 2 police (`presets.ROLE_CODES`)."""
+    pool = len(cols["seed"])
+    looks = G.spec(L.characters(L.CHARACTERS))["looks"]
+    w = character_weights(L.CHARACTERS)
+    order = sorted(range(pool), key=lambda k: (_u("lg4.role", k), k))
+    role = [0] * pool
+    for k in order[:n_police]:
+        role[k] = 2
+    for k in order[n_police:n_police + n_gang]:
+        role[k] = 1
+    for k, r in enumerate(role):
+        if r == 0:
             continue
-        kind, beh, cap = sk
-        pos = p["position"]
-        did = p["id"].split(".")[0] if p["id"].startswith("d") else None
-        out.append({"id": f"slot.{p['id']}", "owner_id": p["id"], "kind": kind,
-                    "behavior": beh, "capacity": cap, "district_id": did,
-                    "pos": [_r(pos[0], 2), _r(pos[1], 2), _r(pos[2] if len(pos) > 2 else 0, 2)],
-                    "yaw_deg": _r(float(p.get("yaw_deg") or 0.0), 2)})
-    for t in model.get("travel_points", []):
-        if t.get("kind") != "taxi_stand":
+        g = P.ROLE_CODES[r]
+        cands = [(c, j) for c, lks in enumerate(looks) for j, lk in enumerate(lks)
+                 if lk["group"] == g]
+        if not cands:
+            role[k] = 0
             continue
-        kind, beh, cap = P.TAXI_SLOT
-        pos = (t.get("access") or {}).get("position") or t["position"]
-        out.append({"id": f"slot.{t['id']}", "owner_id": t["id"], "kind": kind,
-                    "behavior": beh, "capacity": cap, "district_id": t.get("district_id"),
-                    "pos": [_r(pos[0], 2), _r(pos[1], 2), 0.0], "yaw_deg": 0.0})
-    return out
+        ws = [w[c] for c, _ in cands]
+        x = _u("lg4.role.char", cols["seed"][k], k) * sum(ws)
+        i = 0
+        while i < len(cands) - 1 and x >= ws[i]:
+            x -= ws[i]
+            i += 1
+        c, j = cands[i]
+        cols["character"][k] = c
+        cols["look"][k] = c * G.LOOKS + j
+        cols["group"][k] = G.GROUPS.index(g)
+    cols["role"] = role
 
 
 # ---------------------------------------------------------------------------
@@ -629,9 +642,10 @@ def assign_looks(persons: dict, mix: list[float]) -> tuple[list[int], list[int]]
 
 
 def crowd_plan(model: dict, filled: dict, rows: list[dict], sigs: list[dict],
-               left: dict) -> dict:
+               left: dict, roles: tuple[int, int] | None = None) -> dict:
     """The crowd's record in the plan: its settings, the pool's people by their seeds, the
-    districts' palettes, its totals by hour."""
+    districts' palettes, its totals by hour; LG4: the slots kept for gang members and police
+    (`roles`: how many of each, `assign_roles`)."""
     cr = filled["crowd"]
     n = L.CHARACTERS
     pool = int(cr["pool"])
@@ -657,6 +671,8 @@ def crowd_plan(model: dict, filled: dict, rows: list[dict], sigs: list[dict],
     if not sum(mix):
         mix = [1.0] * len(G.GROUPS)
     cols["look"], cols["group"] = assign_looks(cols, mix)
+    if roles is not None:
+        assign_roles(cols, int(roles[0]), int(roles[1]))
     shapes = {d: fd["shape"] for d, fd in filled["districts"].items()}
     street = [0.0] * P.HOURS
     off = [0.0] * P.HOURS
@@ -694,6 +710,9 @@ def crowd_plan(model: dict, filled: dict, rows: list[dict], sigs: list[dict],
                     "looks": n * G.LOOKS, "walks": list(L.WALKS),
                     "tiers": dict(sorted(L.TIERS.items()))},
         "persons": cols,
+        **({"roles": {"names": list(P.ROLE_CODES),
+                      "slots": [cols["role"].count(k) for k in range(len(P.ROLE_CODES))]}}
+           if "role" in cols else {}),
         "totals": {"walkways": len(rows), "with_people": with_people,
                    "levels": sorted(levels), "signals": len(sigs),
                    "street_people": [_r(v, 1) for v in street],
@@ -928,18 +947,22 @@ def traffic_lanes(model: dict, filled: dict, sigs: list[dict]) -> tuple[list[dic
     return rows, left
 
 
-def traffic_plan(model: dict, filled: dict, rows: list[dict], left: dict) -> dict:
+def traffic_plan(model: dict, filled: dict, rows: list[dict], left: dict,
+                 police_cars: int = 0) -> dict:
     """The traffic's record in the plan: its settings, the pool's slots by model (shared out by
     the districts' fleets: half the city's mix at the hour, half each model's most in any
     district, so a district's own fleet finds its models free), the districts' fleets and
-    paints, its totals by hour."""
+    paints, its totals by hour; LG4: `police_cars` slots at the pool's end kept for patrol
+    cars (the first of `POLICE["car_models"]` the fleet has, in the police livery)."""
     from assetgen.parked.table import EXCLUDED, paint
     tr = filled["traffic"]
     hour = int(filled["crowd"]["hour"])
-    pool = int(tr["pool"])
     dists = filled["districts"]
     models = sorted({m for fd in dists.values() for m, w in fd["fleet"].items()
                      if w > 0 and m not in EXCLUDED})
+    police_cars = min(int(police_cars), int(tr["pool"]) - len(models)) if models else 0
+    police_cars = max(0, police_cars)
+    pool = int(tr["pool"]) - police_cars
     weights = {d: [float(fd["fleet"].get(m, 0.0)) for m in models] for d, fd in dists.items()}
     veh = defaultdict(float)
     for r in rows:
@@ -989,9 +1012,20 @@ def traffic_plan(model: dict, filled: dict, rows: list[dict], left: dict) -> dic
             at_hour[h] += r["vehicles"][P.band_of(h)] * shp[h]
     follow = {k: float(v) for k, v in P.TRAFFIC.items()
               if k not in ("pool", "live_m", "paints", "scale")}
+    # (LG4: the patrol cars' slots at the pool's end, a model the fleet has, in the livery)
+    pmodel = next((m for m in P.POLICE["car_models"] if m in models), None) or \
+        (max(models, key=lambda m: (count[models.index(m)], m)) if models else None)
+    pslots = []
+    if police_cars and pmodel is not None:
+        pslots = list(range(pool, pool + police_cars))
+        slots = slots + [models.index(pmodel)] * police_cars
+    livery = [v for c in P.POLICE["livery"] for v in _lin(c)]
     return hashed({
-        "hour": hour, "pool": pool, "live_m": float(tr["live_m"]), "scale": float(tr["scale"]),
+        "hour": hour, "pool": pool + len(pslots), "live_m": float(tr["live_m"]),
+        "scale": float(tr["scale"]),
         "models": models, "slots": slots, "weights": weights, "paints": paints,
+        "police_slots": pslots, "police_model": pmodel if pslots else None,
+        "police_paint": [round(v, 4) for v in livery] if pslots else [],
         "drive": {k: (list(v) if isinstance(v, list) else v) for k, v in sorted(P.DRIVE.items())},
         "drive_speeds": dict(sorted(P.DRIVE_SPEEDS.items())), "follow": follow,
         "totals": {"lanes": len(rows),
@@ -1064,6 +1098,267 @@ def traffic_checks(model: dict, rows: list[dict], hours: dict, filled: dict, sig
         f"to {max(cnt.values()) if cnt else 0} pool slots; every district with cars has a "
         f"fleet; no Vex or Aurel" if not ex and not empty and ms else
         f"excluded {ex}, districts without a fleet {empty}")}
+    return out
+
+
+# ---------------------------------------------------------------------------
+# LG4: life at places
+# ---------------------------------------------------------------------------
+
+def role_counts(filled: dict, rows: list[dict], drows: list[dict], slots: list[dict]) -> dict:
+    """The pools' slots kept for gang members, police on foot and patrol cars
+    (`places.reserve`): the most wanted within the crowd's (the traffic's) live radius of any
+    tile, at any hour band. {role: (slots, wanted)}."""
+    pool = int(filled["crowd"]["pool"])
+    cars = int(filled["traffic"]["pool"])
+    live = float(P.CROWD["live_m"])
+    tlive = float(filled["traffic"]["live_m"])
+    want = {"gang": 0.0, "police": 0.0, "cars": 0.0}
+    for b in range(len(P.BANDS)):
+        g, po, ca = defaultdict(float), defaultdict(float), defaultdict(float)
+        for r in rows:
+            if r.get("gang"):
+                g[r["tile"]] += r["gang"][b]
+            if r.get("police"):
+                po[r["tile"]] += r["police"][b]
+        for s in slots:
+            if s.get("role") == "gang":
+                g[tile_of(s["pos"][0], s["pos"][1])] += s["use"][b]
+        for r in drows:
+            if r.get("police"):
+                ca[r["tile"]] += r["police"][b]
+        want["gang"] = max(want["gang"], PL4.most_near(g, live))
+        want["police"] = max(want["police"], PL4.most_near(po, live))
+        want["cars"] = max(want["cars"], PL4.most_near(ca, tlive))
+    out = {}
+    for k, n, share in (("gang", pool, P.ROLES["gang_max_share"]),
+                        ("police", pool, P.ROLES["police_max_share"]),
+                        ("cars", cars, P.ROLES["car_max_share"])):
+        w = want[k]
+        if w <= 0.0:
+            out[k] = (0, 0.0)
+            continue
+        keep = int(math.ceil(w * P.ROLES["margin"]))
+        out[k] = (max(P.ROLES["min"], min(keep, int(share * n))), _r(w, 1))
+    return out
+
+
+def places_plan(filled: dict, slot_rows: list[dict], place_rows: list[dict],
+                left: dict) -> dict:
+    """LG4's `places` record: the slot kinds and place kinds, their totals."""
+    kinds = list(P.SLOT_KINDS)
+    by = {k: {"slots": 0, "points": 0, "use": [0.0] * 5} for k in kinds}
+    for s in slot_rows:
+        r = by[s["kind"]]
+        r["slots"] += 1
+        r["points"] += s["capacity"]
+        for b in range(5):
+            r["use"][b] += (s.get("use") or [0.0] * 5)[b]
+    for r in by.values():
+        r["use"] = [_r(v, 1) for v in r["use"]]
+    pk = defaultdict(lambda: {"places": 0, "open": [0] * P.HOURS, "occupancy": [0.0] * 5})
+    for p in place_rows:
+        r = pk[p["kind"]]
+        r["places"] += 1
+        for h in range(P.HOURS):
+            r["open"][h] += p["open"][h]
+        for b in range(5):
+            r["occupancy"][b] += p["occupancy"][b]
+    for r in pk.values():
+        r["occupancy"] = [_r(v, 1) for v in r["occupancy"]]
+    return hashed({
+        "hour": int(filled["crowd"]["hour"]),
+        "slot_kinds": {k: {**v, "code": i} for i, (k, v) in enumerate(P.SLOT_KINDS.items())},
+        "kinds": kinds, "behaviors": list(P.SLOT_BEHAVIORS), "anims": list(P.SLOT_ANIMS),
+        "place_kinds": {**P.PLACE_KINDS, "default": P.PLACE_DEFAULT}, "visit_p": P.VISIT_P,
+        "totals": {"slots": by, "places": dict(sorted(pk.items())),
+                   "slots_all": len(slot_rows), "places_all": len(place_rows),
+                   "left_out": left}})
+
+
+def gangs_plan(turfs: list[dict], gm: dict, slot_rows: list[dict], roles: dict) -> dict:
+    """LG4's `gangs` record: each gang turf with its faction's colors, members by band, spots."""
+    out = []
+    for t in turfs:
+        m = gm["turfs"][t["id"]]
+        spots = [s for s in slot_rows if s.get("turf_id") == t["id"]]
+        out.append({"id": t["id"], "name": t["name"], "district_id": t["district_id"],
+                    "faction_id": t["faction"]["id"], "faction": t["faction"]["name"],
+                    "colors": PL4.faction_colors(t["faction"]["color"]),
+                    "walkways": m["walkways"], "walking": [_r(v, 2) for v in m["walk"]],
+                    "loitering": [_r(v, 2) for v in m["loiter"]],
+                    "spots": [s["id"] for s in spots],
+                    "hideouts": sorted({s["owner_id"] for s in spots
+                                        if ".hideout." in s["id"]})})
+    return hashed({"turfs": out, "groups": list(P.GANG["groups"]),
+                   "loiter": list(P.GANG["loiter"]), "pool": roles["gang"][0],
+                   "want_near": roles["gang"][1], "left_out": gm["left"]})
+
+
+def police_record(pol: dict, roles: dict) -> dict:
+    po = P.POLICE
+    return hashed({"precincts": pol["precincts"], "patrol_min": po["patrol_min"],
+                   "car_share": po["car_share"], "per_car": po["per_car"], "pair": 2,
+                   "pool": roles["police"][0], "cars": roles["cars"][0],
+                   "want_near": {"foot": roles["police"][1], "cars": roles["cars"][1]},
+                   "left_out": pol["left"]})
+
+
+def places_checks(model, filled, slots, place_rows, rows, drows, turfs, gm, pol, crowd,
+                  traffic, roles, spawns, hours) -> dict:
+    """LG4's checks: slots on their walkways, clear of buildings and facing their objects; their
+    use within their points; places' hours and their doors' rates by them; gang members and
+    spots only on their own turf; patrols within the police field and every district's police
+    kept; the pools' roles."""
+    import shapely
+    out = {}
+    walks = {w["id"]: w for w in model.get("walkways", [])}
+    fp = PL4.Footprints(model)
+    bad = []
+    for s in slots:
+        w = walks.get(s.get("walkway_id"))
+        pts = s.get("points") or []
+        if not pts or s["capacity"] != len(pts):
+            bad.append(f"{s['id']}: {len(pts)} points for capacity {s['capacity']}")
+        elif w is None:
+            bad.append(f"{s['id']}: no walkway")
+        elif any(fp.inside(p[0], p[1]) for p in pts):
+            bad.append(f"{s['id']}: a point in a building")
+        elif PL4._nearest_on(w["line"], pts[0][0], pts[0][1])[2] > P.SLOT_REACH_M + 1.0 and \
+                s["kind"] not in ("gang_spot",):
+            bad.append(f"{s['id']}: {PL4._nearest_on(w['line'], pts[0][0], pts[0][1])[2]:.1f} m "
+                       f"off its walkway")
+        elif not PL4._facing_ok(s["kind"], s["_obj"], pts, s.get("_center")):
+            bad.append(f"{s['id']}: a user not facing its object")
+    kinds = defaultdict(int)
+    for s in slots:
+        kinds[s["kind"]] += 1
+    out["slots_placed"] = {"ok": not bad, "detail": (
+        f"{len(slots)} slots ({', '.join(f'{k} {v}' for k, v in sorted(kinds.items()))}), "
+        f"each on its walkway (its first point within {P.SLOT_REACH_M:.0f} m), its points out "
+        f"of every building, each user facing its object (a bench's away from its back, a "
+        f"ring's to its middle)" if not bad else "; ".join(bad[:5]))}
+    ubad = [s["id"] for s in slots if any(u < 0.0 or u > s["capacity"] + 1e-6
+                                          for u in s.get("use") or [])]
+    use = [sum((s.get("use") or [0.0] * 5)[b] for s in slots) for b in range(5)]
+    out["slot_use"] = {"ok": not ubad, "detail": (
+        f"users per band within their slots' points: "
+        + ", ".join(f"{P.BANDS[b]} {use[b]:.0f}" for b in range(5))
+        if not ubad else f"{len(ubad)} slots used past their points, first {ubad[:3]}")}
+    # places by their hours: open hours from their hours, closed doors sending no one, every
+    # district's doors keeping its people every hour
+    pbad = []
+    rate = {s["id"]: s["rates"] for s in spawns}
+    for p in place_rows:
+        if p["open"] != PL4.open_hours(p["hours"]):
+            pbad.append(f"{p['id']}: open hours not its hours")
+        r = rate.get(p["spawn_id"]) or [0.0] * P.HOURS
+        if any(r[h] > 0.0 and not p["open"][h] for h in range(P.HOURS)):
+            pbad.append(f"{p['id']}: people out of its door while closed")
+    got = defaultdict(lambda: [0.0] * P.HOURS)
+    for s in spawns:
+        for h in range(P.HOURS):
+            got[s["district_id"]][h] += s["rates"][h]
+    turn = 60.0 / P.TRIP_MIN
+    for d, h in hours.items():
+        if d not in got:
+            continue
+        for k in range(P.HOURS):
+            want = h["people"][k] * turn
+            if abs(got[d][k] - want) > max(0.5, 0.01 * want):
+                pbad.append(f"{d} {k}:00 doors {got[d][k]:.1f} != {want:.1f}")
+                break
+    hour = int(filled["crowd"]["hour"])
+    opened = defaultdict(lambda: [0, 0])
+    for p in place_rows:
+        opened[p["kind"]][0] += p["open"][hour]
+        opened[p["kind"]][1] += 1
+    out["places_hours"] = {"ok": not pbad, "detail": (
+        f"{len(place_rows)} places by their hours, their doors closed while they are; every "
+        f"district's doors keep its people every hour; open at {hour}:00: "
+        + ", ".join(f"{k} {a} of {n}" for k, (a, n) in sorted(opened.items()))
+        if not pbad else "; ".join(pbad[:5]))}
+    # gangs on their turf
+    gbad = []
+    shape = {t["id"]: t["shape"] for t in turfs}
+    for r in rows:
+        if r.get("gang") and any(v > 0.0 for v in r["gang"]):
+            w = walks.get(r["id"]) or {}
+            mx, my = PL4._mid(w.get("line") or [[0, 0]])
+            if r.get("turf") not in shape or not shapely.contains_xy(shape[r["turf"]], mx, my):
+                gbad.append(f"{r['id']}: gang members off their turf")
+    for s in slots:
+        if s["role"] == "gang":
+            if s.get("turf_id") not in shape or not all(
+                    shapely.contains_xy(shape[s["turf_id"]], p[0], p[1]) for p in s["points"][:1]):
+                gbad.append(f"{s['id']}: a gang spot off its turf")
+    nturf = sum(1 for t in turfs if gm["turfs"][t["id"]]["walkways"])
+    walk_m = sum(max(r["gang"]) for r in rows if r.get("gang"))
+    out["gang_turf"] = {"ok": not gbad, "detail": (
+        f"{len(turfs)} gang turfs ({nturf} with walkways), their members only on their own "
+        f"turf's walkways and spots ({sum(1 for s in slots if s['role'] == 'gang')} spots); up "
+        f"to {walk_m:.0f} walking; {max(gm['left']['members']):.0f} of M11's gang members "
+        f"outside every gang turf left out" if not gbad else "; ".join(gbad[:5]))}
+    # police patrols within the police field, every district's police kept
+    obad = []
+    pmin = P.POLICE["patrol_min"]
+    for r in rows:
+        if r.get("police") and any(v > 0.0 for v in r["police"]):
+            if not r.get("patrol") or (r.get("field") or 0.0) < pmin:
+                obad.append(f"{r['id']}: police off the patrol walkways")
+    for r in drows:
+        if r.get("police") and any(v > 0.0 for v in r["police"]) and not r["main"]:
+            obad.append(f"{r['id']}: a patrol car off the lane graph's main part")
+    foot = defaultdict(lambda: [0.0] * 5)
+    cars = defaultdict(lambda: [0.0] * 5)
+    for r in rows:
+        if r.get("police"):
+            for b in range(5):
+                foot[r["district_id"]][b] += r["police"][b]
+    for r in drows:
+        if r.get("police"):
+            for b in range(5):
+                cars[r["district_id"]][b] += r["police"][b]
+    pc = P.POLICE
+    for d, tot in pol["total"].items():
+        for b in range(5):
+            have = foot[d][b] + cars[d][b] * pc["per_car"]
+            if abs(have - tot[b]) > max(0.5, 0.01 * tot[b]) and \
+                    not (pol["left"]["foot"][b] or pol["left"]["cars"][b]):
+                obad.append(f"{d} {P.BANDS[b]}: police {have:.1f} != {tot[b]:.1f}")
+                break
+    stations = sum(1 for p in pol["precincts"] if p["station_doors"])
+    out["police_patrols"] = {"ok": not obad, "detail": (
+        f"every district's police (M11's) on foot on its patrol walkways (the police field at "
+        f"least {pmin}) and in patrol cars on its main lanes; {stations} of "
+        f"{len(pol['precincts'])} precincts with a station's doors; at {hour}:00 "
+        f"{sum(v[P.band_of(hour)] for v in foot.values()):.0f} on foot, "
+        f"{sum(v[P.band_of(hour)] for v in cars.values()):.0f} patrol cars"
+        if not obad else "; ".join(obad[:5]))}
+    # the pools' roles
+    ps = crowd["persons"]
+    role = ps.get("role") or []
+    g = G.GROUPS
+    rbad = []
+    for k, r in enumerate(role):
+        if r and g[ps["group"][k]] != P.ROLE_CODES[r]:
+            rbad.append(f"pool slot {k}: a {P.ROLE_CODES[r]} in a {g[ps['group'][k]]} look")
+    kept = sum(1 for r in role if r)
+    if kept > 0.25 * crowd["pool"]:
+        rbad.append(f"{kept} of the pool's {crowd['pool']} kept for gangs and police")
+    ps_ = traffic.get("police_slots") or []
+    if any(traffic["slots"][k] != traffic["models"].index(traffic["police_model"])
+           for k in ps_):
+        rbad.append("a patrol car's slot not of the police model")
+    notes = []
+    for k, name in (("gang", "gang members"), ("police", "police on foot"),
+                    ("cars", "patrol cars")):
+        n, w = roles[k]
+        notes.append(f"{name} {n} kept ({w:.0f} wanted near the view at most"
+                     + (", scaled down there" if w > n else "") + ")")
+    out["places_budget"] = {"ok": not rbad, "detail": (
+        "; ".join(notes) + f"; patrol cars {traffic.get('police_model')}"
+        if not rbad else "; ".join(rbad[:5]))}
     return out
 
 
@@ -1290,7 +1585,7 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     for rec, w in raw_spawns:
         wsum[rec["district_id"]] += w
     turn = 60.0 / P.TRIP_MIN
-    spawns = []
+    recs = []
     for rec, w in sorted(raw_spawns, key=lambda rw: rw[0]["id"]):
         d = rec["district_id"]
         ppl = hours[d]["people"] if d in hours else [0.0] * P.HOURS
@@ -1299,30 +1594,55 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
         # (LG1: the people a spawn point sends out are drawn from its seed and their count,
         # `library.person((seed, n), ...)`)
         rec["seed"] = L.person((rec["id"],), 1)["seed"]
-        spawns.append(hashed(rec))
+        recs.append(rec)
+    # LG4: the shop doors as places by their hours, their doors' rates by them
+    places = PL4.make_places(model, recs)
+    PL4.apply_hours(recs, places)
+    spawns = [hashed(r) for r in recs]
+
+    # LG3: the signals, every walkway's people
+    sigs, sig_of = signals(model)
+    rows, left = crowd_walks(model, filled, polys, sig_of, {s["walkway_id"] for s in spawns})
+    # LG5: every lane's cars
+    drows, dleft = traffic_lanes(model, filled, sigs)
+    # LG4: the slots, gangs on their turf, police patrols, the pools' roles
+    row_by = {r["id"]: r for r in rows}
+    wi = PL4.WalkIndex(model.get("walkways", []))
+    fp = PL4.Footprints(model)
+    slot_raw, sleft = PL4.make_slots(model, wi, fp, row_by, places)
+    turfs = PL4.gang_turfs(model)
+    gm = PL4.gang_walks(model, filled, rows, turfs)
+    slot_raw += PL4.gang_spots(model, turfs, gm, row_by, wi, fp)
+    pol = PL4.police_plan(model, filled, rows, drows, spawns)
+    roles = role_counts(filled, rows, drows, slot_raw)
+    crowd = crowd_plan(model, filled, rows, sigs, left,
+                       roles=(roles["gang"][0], roles["police"][0]))
+    traffic = traffic_plan(model, filled, drows, dleft, police_cars=roles["cars"][0])
+    walk_rows = [hashed({k: v for k, v in r.items() if k != "tile"}) for r in rows]
+    drive_rows = [hashed({k: v for k, v in r.items() if k != "tile"}) for r in drows]
     slot_rows = []
-    for s in sorted(slots(model), key=lambda s: s["id"]):
+    for s in sorted(slot_raw, key=lambda s: s["id"]):
         if s["district_id"] is None or s["district_id"] not in hours:
             s["district_id"] = _district_at(polys, s["pos"][0], s["pos"][1])
         s["tile"] = tile_of(s["pos"][0], s["pos"][1])
-        slot_rows.append(hashed(s))
-
-    # LG3: the signals, every walkway's people, the crowd
-    sigs, sig_of = signals(model)
-    rows, left = crowd_walks(model, filled, polys, sig_of, {s["walkway_id"] for s in spawns})
-    walk_rows = [hashed({k: v for k, v in r.items() if k != "tile"}) for r in rows]
-    crowd = crowd_plan(model, filled, rows, sigs, left)
-    # LG5: every lane's cars, the traffic
-    drows, dleft = traffic_lanes(model, filled, sigs)
-    drive_rows = [hashed({k: v for k, v in r.items() if k != "tile"}) for r in drows]
-    traffic = traffic_plan(model, filled, drows, dleft)
+        slot_rows.append(hashed({k: v for k, v in s.items() if not k.startswith("_")}))
+    place_rows = []
+    for pl in sorted(places, key=lambda p: p["id"]):
+        pl["tile"] = tile_of(pl["pos"][0], pl["pos"][1])
+        place_rows.append(hashed(pl))
+    places_rec = places_plan(filled, slot_rows, place_rows, sleft)
+    gangs_rec = gangs_plan(turfs, gm, slot_rows, roles)
+    police_rec = police_record(pol, roles)
 
     # per tile
-    by_tile = defaultdict(lambda: {"spawns": [], "slots": [], "walks": [], "drives": []})
+    by_tile = defaultdict(lambda: {"spawns": [], "slots": [], "walks": [], "drives": [],
+                                   "places": []})
     for s in spawns:
         by_tile[s["tile"]]["spawns"].append(s)
     for s in slot_rows:
         by_tile[s["tile"]]["slots"].append(s)
+    for p in place_rows:
+        by_tile[p["tile"]]["places"].append(p)
     for r, w in sorted(zip(rows, walk_rows), key=lambda rw: rw[1]["id"]):
         by_tile[r["tile"]]["walks"].append(w)
     for r, w in sorted(zip(drows, drive_rows), key=lambda rw: rw[1]["id"]):
@@ -1338,6 +1658,7 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
         tiles.append({"tile": t, "file": f"spawns/{t}.json", "spawns": len(by_tile[t]["spawns"]),
                       "slots": len(by_tile[t]["slots"]), "walks": len(by_tile[t]["walks"]),
                       "drives": len(by_tile[t]["drives"]),
+                      "places": len(by_tile[t]["places"]),
                       "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()})
     if (out / "spawns").is_dir():
         for f in sorted((out / "spawns").glob("*.json")):
@@ -1365,6 +1686,8 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     checks = run_checks(model, spawns, slot_rows, hours, filled, spike)
     checks.update(crowd_checks(model, rows, hours, filled, sigs, crowd, spawns))
     checks.update(traffic_checks(model, drows, hours, filled, sigs, traffic))
+    checks.update(places_checks(model, filled, slot_raw, place_rows, rows, drows, turfs, gm,
+                                pol, crowd, traffic, roles, spawns, hours))
     sdata = PM.Signals(city=city, derived=True, signals=sigs)
     write(out / "signals.json", canon(json.loads(sdata.model_dump_json())), wrote)
     asks = A.status(model, {"doors": (build / "assets" / "unreal_contribution.buildings.json")
@@ -1378,15 +1701,17 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
               "doors": sum(1 for s in spawns if s["kind"] == "door"),
               "walkways": len(rows), "signals": len(sigs),
               "lanes": len(drows),
-              "cars_at_hour": traffic["totals"]["cars_by_hour"][traffic["hour"]]}
+              "cars_at_hour": traffic["totals"]["cars_by_hour"][traffic["hour"]],
+              "places": len(place_rows)}
     body = {"city": city, "model_sha256": hashlib.sha256(raw).hexdigest(),
             "spec": {k: v for k, v in filled.items() if k != "districts"},
             "bands": list(P.BANDS), "districts": districts, "tiles": tiles, "asks": asks,
-            "spike": spike, "crowd": crowd, "traffic": traffic, "checks": checks,
-            "totals": totals}
+            "spike": spike, "crowd": crowd, "traffic": traffic, "places": places_rec,
+            "gangs": gangs_rec, "police": police_rec, "checks": checks, "totals": totals}
     plan_hash = _sha([body["spec"], [d["hash"] for d in districts],
                       [t["sha256"] for t in tiles], spike and spike["hash"], crowd["hash"],
-                      sdata.model_dump(mode="json"), traffic["hash"]])
+                      sdata.model_dump(mode="json"), traffic["hash"], places_rec["hash"],
+                      gangs_rec["hash"], police_rec["hash"]])
     plan = PM.LifePlan(plan_hash=plan_hash, **body)
     pdata = json.loads(plan.model_dump_json())
     write(out / "life_plan.json", canon(pdata), wrote)
@@ -1430,11 +1755,33 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
                        "cars_peak": max(traffic["totals"]["cars_by_hour"]),
                        "left_out": {k: traffic["totals"]["left_out"][k]
                                     for k in ("lanes", "segments", "vehicles")}},
+           "places": {"slots": {k: v for k, v in places_rec["totals"]["slots"].items()
+                                if v["slots"]},
+                      "places": {k: {"places": v["places"],
+                                     "open_at_hour": v["open"][crowd["hour"]]}
+                                 for k, v in places_rec["totals"]["places"].items()},
+                      "left_out": places_rec["totals"]["left_out"]},
+           "gangs": {"turfs": [{"id": t["id"], "faction": t["faction"], "walkways": t["walkways"],
+                                "walking": t["walking"][P.band_of(crowd["hour"])],
+                                "loitering": t["loitering"][P.band_of(crowd["hour"])],
+                                "spots": len(t["spots"])} for t in gangs_rec["turfs"]],
+                     "pool": gangs_rec["pool"], "want_near": gangs_rec["want_near"],
+                     "left_out": gangs_rec["left_out"]},
+           "police": {"precincts": [{"id": p["id"], "station_doors": len(p["station_doors"]),
+                                     "foot": p["foot"][P.band_of(crowd["hour"])],
+                                     "cars": p["cars"][P.band_of(crowd["hour"])]}
+                                    for p in police_rec["precincts"]],
+                      "pool": police_rec["pool"], "cars": police_rec["cars"],
+                      "want_near": police_rec["want_near"], "model": traffic["police_model"]},
            "asks": {a["id"]: a["status"] for a in asks}}
     write(out / "life_report.json", canon(rep), wrote)
     write(out / "life_report.txt", report_text(rep), wrote)
     if preview:
         img = preview_crowds(model, hours, filled, spike, out / "preview_crowds.png")
+        if img:
+            wrote.append(img)
+        img = PL4.preview_places(model, slot_rows, place_rows, rows, turfs, pol, crowd["hour"],
+                                 out / "preview_places.png")
         if img:
             wrote.append(img)
     rep["wrote"] = wrote
@@ -1471,6 +1818,28 @@ def report_text(rep: dict) -> str:
                   f"of the view; {c['signalized']} lanes stop at signals; left out: "
                   f"{lo['lanes']} lanes off the lane graph's main part, {lo['segments']} "
                   f"segments without a lane"]
+    if rep.get("places"):
+        c = rep["places"]
+        L += ["", "slots: " + ", ".join(f"{k} {v['slots']} ({v['points']} points, users by "
+                                        f"band {v['use']})" for k, v in c["slots"].items())]
+        L.append("places (open at the crowd's hour): " + ", ".join(
+            f"{k} {v['open_at_hour']}/{v['places']}" for k, v in c["places"].items()))
+        L.append(f"slots left out: {c['left_out']}")
+    if rep.get("gangs"):
+        c = rep["gangs"]
+        L += ["", f"gangs: {len(c['turfs'])} turfs, {c['pool']} pool slots kept "
+                  f"({c['want_near']:.0f} wanted near the view at most); left out "
+                  f"{c['left_out']}"]
+        for t in c["turfs"]:
+            L.append(f"  {t['id']} {t['faction']}: {t['walkways']} walkways, "
+                     f"{t['walking']:.0f} walking, {t['loitering']:.0f} at {t['spots']} spots")
+    if rep.get("police"):
+        c = rep["police"]
+        L += ["", f"police: {c['pool']} pool slots on foot, {c['cars']} patrol cars "
+                  f"({c['model']}), wanted near the view {c['want_near']}"]
+        for p in c["precincts"]:
+            L.append(f"  {p['id']}: {p['foot']:.0f} on foot, {p['cars']:.1f} cars, "
+                     f"{p['station_doors']} station doors")
     if rep.get("spike"):
         s = rep["spike"]
         L += ["", f"spike: {s['name']} ({s['district_id']}) at {s['hour']}:00, {s['people']} "

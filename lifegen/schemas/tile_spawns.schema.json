@@ -47,6 +47,25 @@
      "description": "The phase it moves in.",
      "title": "Phase"
     },
+    "police": {
+     "anyOf": [
+      {
+       "description": "A value per M11 hour band.",
+       "items": {
+        "type": "number"
+       },
+       "maxItems": 5,
+       "minItems": 5,
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "LG4: patrol cars on it per band.",
+     "title": "Police"
+    },
     "road_class": {
      "description": "Its cruise speed's class (`presets.DRIVE_SPEEDS`).",
      "title": "Road Class",
@@ -105,21 +124,224 @@
    "title": "Drive",
    "type": "object"
   },
+  "Place": {
+   "additionalProperties": false,
+   "description": "LG4: a place by its hours (scope 6.4): an AG3 shop door (a unit's use, M11's POI where it\nis one), open per hour, how busy by hour band, how long a visit lasts and its chance, its\noccupancy (people inside on a visit) by band.",
+   "properties": {
+    "building_id": {
+     "title": "Building Id",
+     "type": "string"
+    },
+    "busy": {
+     "description": "How busy by band (its door's share while open).",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 5,
+     "minItems": 5,
+     "title": "Busy",
+     "type": "array"
+    },
+    "district_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "District Id"
+    },
+    "dwell_s": {
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 2,
+     "minItems": 2,
+     "title": "Dwell S",
+     "type": "array"
+    },
+    "hash": {
+     "title": "Hash",
+     "type": "string"
+    },
+    "hours": {
+     "description": "Open from, to (to < from runs past midnight; 0, 24 always).",
+     "items": {
+      "type": "integer"
+     },
+     "maxItems": 2,
+     "minItems": 2,
+     "title": "Hours",
+     "type": "array"
+    },
+    "id": {
+     "description": "`place.<door>`.",
+     "title": "Id",
+     "type": "string"
+    },
+    "kind": {
+     "description": "The POI's sub (bar, club, arcade, food, clinic, ...) else the unit's use.",
+     "title": "Kind",
+     "type": "string"
+    },
+    "level": {
+     "default": 0,
+     "title": "Level",
+     "type": "integer"
+    },
+    "name": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Name"
+    },
+    "occupancy": {
+     "description": "People inside on a visit by band.",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 5,
+     "minItems": 5,
+     "title": "Occupancy",
+     "type": "array"
+    },
+    "open": {
+     "items": {
+      "type": "integer"
+     },
+     "maxItems": 24,
+     "minItems": 24,
+     "title": "Open",
+     "type": "array"
+    },
+    "poi_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Poi Id"
+    },
+    "pos": {
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 3,
+     "minItems": 3,
+     "title": "Pos",
+     "type": "array"
+    },
+    "slot": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Its door's slot kind (a club's queue, a bar's smokers).",
+     "title": "Slot"
+    },
+    "spawn_id": {
+     "description": "Its door's spawn point.",
+     "title": "Spawn Id",
+     "type": "string"
+    },
+    "tile": {
+     "title": "Tile",
+     "type": "string"
+    },
+    "use": {
+     "title": "Use",
+     "type": "string"
+    },
+    "visit": {
+     "description": "A passer-by's chance to go in by band.",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 5,
+     "minItems": 5,
+     "title": "Visit",
+     "type": "array"
+    },
+    "walkway_id": {
+     "title": "Walkway Id",
+     "type": "string"
+    },
+    "yaw_deg": {
+     "title": "Yaw Deg",
+     "type": "number"
+    }
+   },
+   "required": [
+    "id",
+    "spawn_id",
+    "building_id",
+    "kind",
+    "use",
+    "tile",
+    "pos",
+    "yaw_deg",
+    "walkway_id",
+    "hours",
+    "open",
+    "busy",
+    "visit",
+    "dwell_s",
+    "occupancy",
+    "hash"
+   ],
+   "title": "Place",
+   "type": "object"
+  },
   "Slot": {
    "additionalProperties": false,
-   "description": "A place slot (scope 6.4): a Smart Object to be (LG4) at a bench, a stop, a stall.",
+   "description": "A place slot (scope 6.4): a Smart Object in the runtime (LG4) at a bench, a bus stop, a\nkiosk, a vending machine, a food stall, a taxi stand, a club's door (its queue), a bar's\ndoor (its smokers), a gang's spot; its use points, the walkway its users leave and come\nback to, how many use it by hour band.",
    "properties": {
+    "anim": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "LG4: what its users play: sit, idle, talk.",
+     "title": "Anim"
+    },
     "behavior": {
      "enum": [
       "sit",
       "wait",
       "buy",
-      "queue"
+      "eat",
+      "queue",
+      "smoke",
+      "talk"
      ],
      "title": "Behavior",
      "type": "string"
     },
     "capacity": {
+     "description": "Its use points (LG4: `len(points)`).",
      "title": "Capacity",
      "type": "integer"
     },
@@ -135,12 +357,42 @@
      "default": null,
      "title": "District Id"
     },
+    "dwell_s": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "number"
+       },
+       "maxItems": 2,
+       "minItems": 2,
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "LG4: how long a user stays (s, from, to).",
+     "title": "Dwell S"
+    },
+    "faction_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Faction Id"
+    },
     "hash": {
      "title": "Hash",
      "type": "string"
     },
     "id": {
-     "description": "`slot.<owner id>`.",
+     "description": "`slot.<owner id>` (a door's: `slot.<door>.<kind>`; a gang spot's: `slot.<turf>.<hideout or corner>`).",
      "title": "Id",
      "type": "string"
     },
@@ -151,16 +403,51 @@
       "kiosk",
       "vending",
       "stall",
-      "taxi_stand"
+      "taxi_stand",
+      "bar_queue",
+      "smoke",
+      "gang_spot"
      ],
      "title": "Kind",
      "type": "string"
+    },
+    "level": {
+     "default": 0,
+     "title": "Level",
+     "type": "integer"
     },
     "owner_id": {
      "title": "Owner Id",
      "type": "string"
     },
+    "place_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "LG4: a door slot's place.",
+     "title": "Place Id"
+    },
+    "points": {
+     "description": "LG4: its use points: x, y, z and the way its user faces (degrees counterclockwise from east).",
+     "items": {
+      "items": {
+       "type": "number"
+      },
+      "maxItems": 4,
+      "minItems": 4,
+      "type": "array"
+     },
+     "title": "Points",
+     "type": "array"
+    },
     "pos": {
+     "description": "The object (a door, a gang spot's middle).",
      "items": {
       "type": "number"
      },
@@ -169,12 +456,80 @@
      "title": "Pos",
      "type": "array"
     },
+    "reach_m": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "LG4: its first point to that walkway.",
+     "title": "Reach M"
+    },
+    "role": {
+     "default": "crowd",
+     "enum": [
+      "crowd",
+      "gang",
+      "police"
+     ],
+     "title": "Role",
+     "type": "string"
+    },
     "tile": {
      "title": "Tile",
      "type": "string"
     },
+    "turf_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "LG4: a gang spot's turf.",
+     "title": "Turf Id"
+    },
+    "use": {
+     "anyOf": [
+      {
+       "description": "A value per M11 hour band.",
+       "items": {
+        "type": "number"
+       },
+       "maxItems": 5,
+       "minItems": 5,
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "LG4: its points in use per hour band.",
+     "title": "Use"
+    },
+    "walkway_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "LG4: the walkway its users leave to use it and come back to.",
+     "title": "Walkway Id"
+    },
     "yaw_deg": {
-     "description": "The way its user faces, degrees counterclockwise from east.",
+     "description": "The object's facing, degrees counterclockwise from east (LG0: the way its user faces).",
      "title": "Yaw Deg",
      "type": "number"
     }
@@ -348,6 +703,38 @@
      "default": null,
      "title": "District Id"
     },
+    "field": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "LG4: M11's police field at its middle.",
+     "title": "Field"
+    },
+    "gang": {
+     "anyOf": [
+      {
+       "description": "A value per M11 hour band.",
+       "items": {
+        "type": "number"
+       },
+       "maxItems": 5,
+       "minItems": 5,
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "LG4: gang members walking on it per band.",
+     "title": "Gang"
+    },
     "hash": {
      "title": "Hash",
      "type": "string"
@@ -369,6 +756,12 @@
      "default": 0,
      "title": "Level",
      "type": "integer"
+    },
+    "patrol": {
+     "default": false,
+     "description": "LG4: police patrol it (the police field at least the patrol minimum, on the ground).",
+     "title": "Patrol",
+     "type": "boolean"
     },
     "people": {
      "description": "People on it per hour band (M11's bands, the district's busy and the crowd's scale in).",
@@ -393,6 +786,25 @@
      "description": "The phase it walks in.",
      "title": "Phase"
     },
+    "police": {
+     "anyOf": [
+      {
+       "description": "A value per M11 hour band.",
+       "items": {
+        "type": "number"
+       },
+       "maxItems": 5,
+       "minItems": 5,
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "LG4: police on foot on it per band.",
+     "title": "Police"
+    },
     "signal": {
      "anyOf": [
       {
@@ -410,6 +822,19 @@
      "description": "On a road segment with M11's density (its sidewalks, alleys, promenades, pedestrian streets), else off-street (`presets.OFFSTREET`).",
      "title": "Street",
      "type": "boolean"
+    },
+    "turf": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "LG4: the gang turf its middle is in (its gang members walk only their turf's walkways).",
+     "title": "Turf"
     }
    },
    "required": [
@@ -446,6 +871,14 @@
     "$ref": "#/$defs/Drive"
    },
    "title": "Drives",
+   "type": "array"
+  },
+  "places": {
+   "description": "LG4: the places (shop doors by their hours) in the tile.",
+   "items": {
+    "$ref": "#/$defs/Place"
+   },
+   "title": "Places",
    "type": "array"
   },
   "slots": {
