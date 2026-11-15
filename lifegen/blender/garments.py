@@ -474,8 +474,10 @@ def neck_cut(bm, body, c, ease=0.015):
     for f in bm.faces:
         m = f.calc_center_median()
         part = get(f.verts[0], L)[0]
+        # (the neck's own tube above the neckline goes, however far out the ease put it)
         if (part == "neck" and m.z > zline(m) - 0.01) or \
-                (ratio(m) < 1.0 and m.z > zline(m) - 0.04 and part in ("torso", "neck")):
+                (ratio(m) < 1.0 and m.z > zline(m) - 0.04 and part in ("torso", "neck")) or \
+                (ratio(m) < 1.7 and m.z > zline(m) + 0.005 and part in ("torso", "neck")):
             dele.append(f)
     if dele:
         bmesh.ops.delete(bm, geom=dele, context="FACES")
@@ -749,7 +751,7 @@ def collar(bm, body, draft):
         return
     nb = body.bones["neck_01"]
     up = (body.bones["head"] - nb).normalized()
-    h = 0.04 if kind == "stand" else 0.03
+    h = 0.026 if kind == "stand" else 0.018
     top, low = {}, {}
     for e in edges:
         for v in e.verts:
@@ -761,7 +763,7 @@ def collar(bm, body, draft):
             put(t, L, ("collar", "", v.co.z))
             top[v] = t
             if kind == "fold":
-                w = bm.verts.new(t.co + dn * 0.04 - up * 0.035)
+                w = bm.verts.new(t.co + dn * 0.035 - up * 0.03)
                 put(w, L, ("collar", "", v.co.z))
                 low[v] = w
     for e in edges:
@@ -947,6 +949,13 @@ def rim(ob, thick):
     """A rim of the cloth's thickness at every open edge (hems, cuffs, openings)."""
     if thick <= 0:
         return
+    me = ob.data
+    n0 = len(me.vertices)
+    vcol = {}
+    if "Col" in me.color_attributes:
+        col = me.color_attributes["Col"].data
+        for li, lp in enumerate(me.loops):
+            vcol.setdefault(lp.vertex_index, tuple(col[li].color))
     m = ob.modifiers.new("rim", "SOLIDIFY")
     m.thickness = thick
     m.offset = -1.0
@@ -954,6 +963,20 @@ def rim(ob, thick):
     m.use_rim_only = True
     select_only(ob)
     bpy.ops.object.modifier_apply(modifier="rim")
+    # (the rim's corners take the colors of the edge they hang from: the solidify leaves them
+    # unset, which read as undyed white)
+    me = ob.data
+    if vcol and "Col" in me.color_attributes:
+        col = me.color_attributes["Col"].data
+        for poly in me.polygons:
+            known = [vcol[me.loops[li].vertex_index] for li in poly.loop_indices
+                     if me.loops[li].vertex_index < n0 and me.loops[li].vertex_index in vcol]
+            if not known:
+                continue
+            for li in poly.loop_indices:
+                c = tuple(col[li].color)
+                if c == (0.0, 0.0, 0.0, 0.0) or me.loops[li].vertex_index >= n0:
+                    col[li].color = vcol.get(me.loops[li].vertex_index, known[0])
 
 
 def set_slots(ob, slots):
@@ -1288,6 +1311,11 @@ def compose(look, obs, accs, slots):
         parts.append(copy_object(obs[gid], f"{look['id']}.{gid}"))
     for aid in look.get("accessories", []):
         parts.append(copy_object(accs[aid], f"{look['id']}.{aid}"))
+    # (a piece its cuts left empty, as an accessory on a head too small for it, is left out)
+    empty = [p for p in parts if not p.data.vertices]
+    for p in empty:
+        parts.remove(p)
+        bpy.data.objects.remove(p)
     layered(parts, look)
     for k, p in enumerate(parts):
         me = p.data

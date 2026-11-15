@@ -181,7 +181,10 @@ def dress(spec: dict, bodies_dir: Path, out_dir: Path, textiles_dir: Path, log_d
         h = hashlib.sha256(json.dumps(job, sort_keys=True).encode("utf-8") +
                            script.read_bytes()).hexdigest()[:16]
         done = od / "done.json"
-        if done.is_file() and json.loads(done.read_text(encoding="utf-8")).get("hash") == h:
+        # ($CITYGEN_PEOPLE_KEEP_DRESS keeps every character dressed before, whatever changed:
+        # for working on the editor's steps)
+        if done.is_file() and (os.environ.get("CITYGEN_PEOPLE_KEEP_DRESS") or json.loads(
+                done.read_text(encoding="utf-8")).get("hash") == h):
             kept += 1
             continue
         od.mkdir(parents=True, exist_ok=True)

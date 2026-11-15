@@ -43,25 +43,25 @@ GLOW = ("led", "visor")                        # slots the mid tier draws emissi
 # thickness
 KINDS = {
     "tee":         {"layer": "base", "parts": ["torso", "neck", "uarm", "thigh"],
-                    "ease": (0.016, 0.012), "sleeve": 0.36},
+                    "ease": (0.012, 0.010), "sleeve": 0.36},
     "longtee":     {"layer": "base", "parts": ["torso", "neck", "uarm", "farm", "thigh"],
-                    "ease": (0.016, 0.012), "sleeve": 0.95},
+                    "ease": (0.012, 0.010), "sleeve": 0.95},
     "shirt":       {"layer": "base", "parts": ["torso", "neck", "uarm", "farm", "thigh"],
-                    "ease": (0.018, 0.014), "sleeve": 0.95, "collar": "fold"},
+                    "ease": (0.013, 0.011), "sleeve": 0.95, "collar": "fold"},
     "hoodie":      {"layer": "base", "parts": ["torso", "neck", "uarm", "farm", "thigh"],
-                    "ease": (0.03, 0.024), "sleeve": 0.96},
+                    "ease": (0.022, 0.018), "sleeve": 0.96},
     "coveralls":   {"layer": "base", "parts": ["torso", "neck", "uarm", "farm", "thigh", "calf"],
-                    "ease": (0.03, 0.025, 0.03), "sleeve": 0.95, "collar": "stand"},
+                    "ease": (0.022, 0.018, 0.022), "sleeve": 0.95, "collar": "stand"},
     "bomber":      {"layer": "outer", "parts": ["torso", "neck", "uarm", "farm", "thigh"],
-                    "ease": (0.045, 0.035), "sleeve": 0.96, "collar": "stand"},
+                    "ease": (0.032, 0.026), "sleeve": 0.96, "collar": "stand"},
     "jacket":      {"layer": "outer", "parts": ["torso", "neck", "uarm", "farm", "thigh"],
-                    "ease": (0.04, 0.032), "sleeve": 0.95, "collar": "fold"},
+                    "ease": (0.028, 0.022), "sleeve": 0.95, "collar": "fold"},
     "trench":      {"layer": "outer", "parts": ["torso", "neck", "uarm", "farm", "thigh"],
-                    "ease": (0.045, 0.035), "sleeve": 0.95, "collar": "fold"},
+                    "ease": (0.032, 0.026), "sleeve": 0.95, "collar": "fold"},
     "raincoat":    {"layer": "outer", "parts": ["torso", "neck", "uarm", "farm", "thigh"],
-                    "ease": (0.05, 0.04), "sleeve": 0.97},
+                    "ease": (0.036, 0.03), "sleeve": 0.97},
     "cargo":       {"layer": "bottom", "parts": ["torso", "thigh", "calf"],
-                    "ease": (0.008, 0.0, 0.03)},
+                    "ease": (0.008, 0.0, 0.022)},
     "trousers":    {"layer": "bottom", "parts": ["torso", "thigh", "calf"],
                     "ease": (0.008, 0.0, 0.016)},
     "skirt":       {"layer": "bottom", "parts": ["torso", "thigh"], "ease": (0.008,)},
@@ -347,7 +347,7 @@ def draft(rec: dict, m: dict, gid: str) -> dict:
                        "rgb": 0.95 if kind == "sneakers" else 0.15}]
         return d
     e = K["ease"]
-    grow = 0.7 + 0.6 * fit                       # fitted to loose
+    grow = 0.75 + 0.45 * fit                     # fitted to loose
     d["parts"] = list(K["parts"])
     d["ease"] = {"torso": round(e[0] * grow, 4)}
     if len(e) > 1 and e[1]:
@@ -475,8 +475,17 @@ def blender_job(character: dict, looks: list[dict], body_path: str, out_dir: str
             if aid not in accs:
                 accs[aid] = {**a, "id": aid}
             aids.append(aid)
+        # (the renders' colors: three of its group's, as a person of it might wear)
+        cols = P.GROUP_COLORS.get("street" if lk["group"] == "rain" else lk["group"],
+                                  ("#808080",))
+        dyes = []
+        for k in range(3):
+            h = cols[int(_u("lg2.dye", lk["id"], k) * len(cols))]
+            dyes.append([round((int(h[1 + 2 * j:3 + 2 * j], 16) / 255.0) ** 2.2, 4)
+                         for j in range(3)])
         out_looks.append({"id": lk["id"], "garments": gids, "accessories": aids,
-                          "tucked": lk.get("tucked", False), "hide_hair": lk["hide_hair"]})
+                          "tucked": lk.get("tucked", False), "hide_hair": lk["hide_hair"],
+                          "dyes": dyes})
     colors = {k: {"rgb": v["mean"], "rough": v["rough"],
                   "emit": 4.0 if v["kind"] == "emissive" else 0.0}
               for k, v in TX.record()["textiles"].items()}

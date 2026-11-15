@@ -106,6 +106,13 @@ def test_exporter_packs_persons_and_library():
     # (a library whose characters are not the plan's: the stand-ins, and why)
     assert "people_skipped" in UL.people_library(_lib(2), spike)
     assert UL.people_library(None, spike) == {} and UL.persons({}) == {}
+    # (LG2: a library of looks; the plan's persons wear looks, the unit the runtime draws)
+    lib3 = {**_lib(3), "looks": True}
+    spike2 = {**spike, "library": {**spike["library"], "characters": 1, "looks": 3},
+              "persons": {**spike["persons"], "look": [2, 1], "group": [0, 3]}}
+    p2 = UL.persons(spike2)
+    assert p2["person_char"] == [2, 1] and p2["person_group"] == [0, 3]
+    assert UL.people_library(lib3, spike2)["near_mesh_starts"] == [0, 2, 4, 6]
 
 
 def test_library_in_a_project_from_the_cache(tmp_path, monkeypatch):

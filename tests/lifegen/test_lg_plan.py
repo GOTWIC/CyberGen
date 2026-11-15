@@ -509,6 +509,16 @@ def test_exporter_packs_the_crowd(build: Path):
     assert len(c["district_palettes"]) == 2 * 3 * P.SPIKE_PALETTE
     assert len(c["person_char"]) == P.CROWD["pool"] == c["people"]
     assert len(c["person_tint_index"]) == P.CROWD["pool"]
+    # (LG2: each person's look and group; per district and group its dye colors, its people
+    # by group and its wear)
+    from lifegen import garments as G
+    assert len(c["person_group"]) == P.CROWD["pool"]
+    assert max(c["person_char"]) < 24 * G.LOOKS
+    ng, nc = c["outfit_groups"], c["outfit_colors"]
+    assert ng == len(G.GROUPS) and nc == P.OUTFIT_COLORS
+    assert len(c["outfit_palettes"]) == 2 * ng * nc * 3
+    assert len(c["district_groups"]) == 2 * ng and len(c["district_wear"]) == 2
+    assert abs(sum(c["district_groups"][:ng]) - 1.0) < 1e-3
     assert c["crowd"]["hour"] == P.CROWD["hour"] and c["crowd"]["live_m"] == P.CROWD["live_m"]
     # (the spike's cars keep their drive lanes)
     assert c["drive_startable"] == [1]
