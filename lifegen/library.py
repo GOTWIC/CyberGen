@@ -5,7 +5,10 @@ is here, deterministic and offline (blake2b draws from the character's index): a
 characters, each a MetaHuman made by script in the user's project from Epic's presets (the
 engine's optional MetaHuman content: decision 2, never the repo), its face a blend of two
 presets' face models, its body from a height and a build, its skin tone; the preset's own
-hair, eyebrows and plain wardrobe (decision 5: MetaHuman's own outfit; LG2 dresses them).
+hair and eyebrows; LG2 dresses them: each character has `garments.LOOKS` looks (whole
+outfits of a fashion group, `lifegen/garments.py`), its garments cut, built and draped on its
+own body by Blender (`lifegen/blender/garments.py`), in textiles of `lifegen/textiles.py`. The
+runtime's unit is a look: its character's body and face, its garments, its mid mesh and card.
 The animation is Epic's Game Animation Sample (Swagnik, 2026-11-14: Unreal's own animations
 for now), copied into the project from the user's sample by a step he runs, retargeted onto
 the MetaHuman body by script.
@@ -27,7 +30,7 @@ import json
 import math
 from pathlib import Path
 
-LIB_VERSION = "lg1.1"
+LIB_VERSION = "lg2.1"
 ROOT = Path(__file__).resolve().parent.parent
 
 # The engine's MetaHuman presets (MetaHumanCharacter's optional content, /MetaHumanCharacter/
@@ -85,7 +88,7 @@ FAR_LOD = 3
 FAR_FPS = 15.0
 IMPOSTOR_VIEWS = 8
 IMPOSTOR_FRAMES = 8
-IMPOSTOR_CELL = (128, 256)
+IMPOSTOR_CELL = (64, 128)     # (LG2: a look's sheet; a far person is 20 to 60 px tall)
 
 # the runtime's tiers (m from the view) and how many people each may draw: near people as
 # skeletal meshes with their clips, mid as their baked walk, far as cards; the counts are
@@ -137,7 +140,11 @@ def characters(n: int = CHARACTERS) -> list[dict]:
 
 def spec(n: int = CHARACTERS) -> dict:
     """The library's spec, everything the build depends on but the code."""
-    return {"version": LIB_VERSION, "characters": characters(n), "presets": PRESET_PATH,
+    from . import garments as G
+    from . import textiles as TX
+    chars = characters(n)
+    return {"version": LIB_VERSION, "characters": chars, "presets": PRESET_PATH,
+            "looks": G.spec(chars)["looks"], "textiles": TX.record(),
             "pipeline": list(BUILD_PIPELINE), "clips": dict(sorted(CLIPS.items())),
             "walks": list(WALKS), "gas": {"mesh": GAS_MESH, "skeleton": GAS_SKELETON,
                                           "ik_rig": GAS_IK_RIG},
@@ -146,7 +153,8 @@ def spec(n: int = CHARACTERS) -> dict:
                          "cell": list(IMPOSTOR_CELL)}}
 
 
-CODE_FILES = ("lifegen/library.py", "citygen/ue/people_library.py", "citygen/ue/people_gas.py")
+CODE_FILES = ("lifegen/library.py", "citygen/ue/people_library.py", "citygen/ue/people_gas.py",
+              "lifegen/garments.py", "lifegen/textiles.py", "lifegen/blender/garments.py")
 
 
 def library_hash(n: int = CHARACTERS, engine: str = "") -> str:

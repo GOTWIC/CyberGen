@@ -32,7 +32,7 @@ from assetgen.materials import pbr as P
 from assetgen.materials.surfaces import Surface
 
 F = np.float32
-VERSION = "lg2.1"
+VERSION = "lg2.2"
 SIZE = 512
 
 # name: tile (m), kind, roughness, metal, sheen, thickness (mm), dyed, base rgb (sRGB) for
@@ -93,14 +93,14 @@ def weave(name: str, n: int = SIZE) -> tuple[np.ndarray, np.ndarray, np.ndarray]
         shade = F(0.72) + F(0.22) * h + F(0.12) * (slub - F(0.5))
         shade = shade + wear * F(0.25)                           # faded where worn
     elif name == "knit":
-        col = (xx % 6).astype(F) / F(6.0)
+        col = (xx % 8).astype(F) / F(8.0)
         row = (yy % 8).astype(F) / F(8.0)
         v = np.abs(col - F(0.5)) * F(2.0)
         h = F(1.0) - np.abs(v - row) * F(1.2)
         h = np.clip(h, 0, 1).astype(F) * F(0.85) + slub * F(0.15)
         shade = F(0.8) + F(0.18) * h
     elif name == "rib":
-        r = (xx % 10).astype(F) / F(10.0)
+        r = (xx % 8).astype(F) / F(8.0)
         h = (F(1.0) - np.abs(r - F(0.5)) * F(2.0)) * F(0.9) + slub * F(0.1)
         shade = F(0.74) + F(0.24) * h
     elif name == "canvas":
@@ -112,7 +112,7 @@ def weave(name: str, n: int = SIZE) -> tuple[np.ndarray, np.ndarray, np.ndarray]
         stripe = ((xx % 64) < 2).astype(F) * F(0.06)
         shade = F(0.84) + F(0.12) * (h - F(0.5)) + stripe
     elif name == "nylon":
-        grid = (((xx % 24) < 2) | ((yy % 24) < 2)).astype(F)
+        grid = (((xx % 32) < 2) | ((yy % 32) < 2)).astype(F)
         fine = (((xx + yy) % 3) == 0).astype(F)
         h = grid * F(0.8) + fine * F(0.15) + slub * F(0.05)
         shade = F(0.86) + F(0.08) * grid + F(0.04) * fine

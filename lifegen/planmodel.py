@@ -178,11 +178,16 @@ class CrowdPlan(_Model):
     kinds: list[str] = Field(description="Walkway kinds by the runtime's code.")
     palettes: dict[str, list[str]] = Field(description="Per district its clothes' colors "
                                                        "(sRGB, by its style).")
+    outfits: dict = Field(default_factory=dict, description=(
+        "LG2: the look groups, each district's people by group, per district and group the "
+        "colors a person's three dye channels draw from (sRGB), each district's wear, the "
+        "weather the outfits are drawn for, the looks per character."))
     library: dict = Field(default_factory=dict)
     persons: dict[str, list[float]] = Field(
         default_factory=dict, description="Per pool slot its draws (seed, character, scale, "
                                           "gait, pace, tint: an index into the district's "
-                                          "palette where it comes out).")
+                                          "palette where it comes out; LG2: look, the "
+                                          "library's look it wears, and group, its group).")
     totals: dict
     hash: str
 

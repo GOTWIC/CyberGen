@@ -89,6 +89,19 @@
      "maximum": 7200.0,
      "title": "Trip S",
      "type": "number"
+    },
+    "weather": {
+     "default": "clear",
+     "description": "LG2: the weather the outfits are drawn for (raincoats in rain); LG8 takes atmosgen's state.",
+     "enum": [
+      "clear",
+      "drizzle",
+      "rain",
+      "fog",
+      "smog"
+     ],
+     "title": "Weather",
+     "type": "string"
     }
    },
    "title": "Crowd",

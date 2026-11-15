@@ -235,6 +235,16 @@ public:
 	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") int32 PaletteSize = 24;
 	/** Per pool slot its tint's index into its district's palette (where it comes out). */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") TArray<int32> PersonTintIndex;
+	/** LG2: per pool slot its look's group (a person is spawned in a district by the
+	 *  district's people by group, DistrictGroups, OutfitGroupCount floats each); per district
+	 *  and group the colors a person's three dye channels draw from (OutfitColors linear RGB
+	 *  colors each) and per district its wear (0 new, 1 worn). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") TArray<int32> PersonGroup;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") TArray<float> OutfitPalettes;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") int32 OutfitColors = 0;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") int32 OutfitGroupCount = 0;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") TArray<float> DistrictGroups;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Crowd") TArray<float> DistrictWear;
 	/** The doors (spawn and sink points: AG3's doors, station stairs, garages, taxi stands):
 	 *  per door its walkway lane, distance along it (m), point (citygen m, on the facade) and
 	 *  people a hour coming out at the plan's hour. */
@@ -409,6 +419,7 @@ private:
 	TArray<float> DoorRatesSorted;
 	TArray<FVector> LaneMid, DoorStreet, DoorInside;
 	TArray<uint8> WalkState, PersonStill;
+	TArray<float> PersonWear;
 	FVector LastLiveView = FVector(1.0e12);
 	float LiveClock = 0.f, DoorAcc = 0.f, LiveScale = 1.f, WantLive = 0.f;
 	int32 LiveLanes = 0, ActiveNow = 0, GroupCounter = 0, Spawned = 0, DoorOut = 0, DoorIn = 0, Lost = 0;
@@ -438,7 +449,12 @@ private:
 	// person holds, the walk's passing pose, found from the clip's thighs. The instances'
 	// custom data for a person walking or standing, mid and far.)
 	void MakeMidLoops();
-	void LookData(int32 Person, bool bStill, float Mid[7], float Far[5]) const;
+	// (LG2: the instances' custom data carry the person's three dye colors and wear: mid
+	// 4 anim + 9 + 1 floats, far 2 + 9 + 1; TintOf a person's dye channel's color)
+	void LookData(int32 Person, bool bStill, float Mid[14], float Far[12]) const;
+	void TintOf(int32 Person, int32 Channel, float Out[3]) const;
+	int32 TakeSlot(int32 District, FRandomStream& Rng);
+	void DressSlot(int32 Slot, int32 District, FRandomStream& Rng);
 	TArray<float> MidFirst, MidLast, MidStand, StandShare;
 	// (lifegen_clothing_toggle)
 	void ApplyClothing();

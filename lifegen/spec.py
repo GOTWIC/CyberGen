@@ -122,6 +122,9 @@ class Crowd(_Model):
     pool: Annotated[int, Field(ge=0, le=20000)] = P.CROWD["pool"]
     scale: Annotated[float, Field(ge=0.0, le=10.0)] = 1.0
     trip_s: Annotated[float, Field(gt=0.0, le=7200.0)] = P.CROWD["trip_s"]
+    weather: Literal["clear", "drizzle", "rain", "fog", "smog"] = Field(
+        "clear", description="LG2: the weather the outfits are drawn for (raincoats in rain); "
+                             "LG8 takes atmosgen's state.")
 
 
 class Traffic(_Model):

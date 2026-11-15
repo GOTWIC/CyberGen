@@ -14,7 +14,12 @@ Epic's animations never go in the repo):
    the run never opens a sign-in: `-NoMetaHumanAccountPortalLoginFallback`), assembled by the
    creator's Optimized build; the clips retargeted onto its body; its walk baked to textures
    for the mid crowd (AnimToTexture) and drawn into an impostor sheet for the far crowd.
-3. **The cache** (`cache_dir`): the library's built assets (`/Game/CityGen/People`) are kept
+3. **The clothing** (LG2, `dress`): between two editor runs, the textiles drawn
+   (`lifegen/textiles.py`) and every character's garments cut, built and draped on its body
+   in Blender (`lifegen/blender/garments.py`, a process per character, `BLENDER_JOBS` at once),
+   from the bodies the first run exported; the second run makes the looks' skeletal meshes,
+   mid meshes and cards from them. Both kept in the cache (`<hash>/textiles`, `garments`).
+4. **The cache** (`cache_dir`): the library's built assets (`/Game/CityGen/People`) are kept
    outside the repo, `~/.cache/cybergen/people/<hash>/` (or `$CITYGEN_PEOPLE_CACHE`), as AG6's
    texture library is, with its manifest (`library.json`). A project whose stamp names the
    hash has it; another project gets it copied from the cache, so the cloud steps and the
@@ -42,6 +47,8 @@ PLUGINS = ("MetaHumanCharacter", "AnimToTexture", "IKRig", "HairStrands", "RigLo
            "GeometryScripting")
 CACHE_SKIP = ("Characters",)
 RUNS_MAX = 12
+BLENDER_JOBS = 4
+PHASE_A = ("characters", "clips", "bodies")
 DEFAULT_GAS =Path.home() / "CityGen" / "UnrealProjects" / "GameAnimationSample" / \
     "GameAnimationSample.uproject"
 
@@ -142,7 +149,75 @@ def run_library(root: Path, uproject: Path, job: dict, log: Path,
                                        "-nop4"])
 
 
-# --- 3. the cache ---------------------------------------------------------------------------
+# --- 3. the clothing (LG2) ------------------------------------------------------------------
+
+def dress(spec: dict, bodies_dir: Path, out_dir: Path, textiles_dir: Path, log_dir: Path,
+          renders: bool = True, jobs: int = BLENDER_JOBS) -> dict:
+    """The textiles and every character's looks built in Blender from its exported body; a
+    character whose job is unchanged since its last run (`done.json` names the job's hash) is
+    kept. {characters, built, kept, failed, seconds}."""
+    import hashlib
+    import subprocess
+    from lifegen import garments as G
+    from lifegen import textiles as TX
+    from .blockout import find_blender
+    t0 = time.time()
+    if not (Path(textiles_dir) / "textiles.json").is_file() or json.loads(
+            (Path(textiles_dir) / "textiles.json").read_text(encoding="utf-8")).get("version") \
+            != TX.VERSION:
+        TX.build(Path(textiles_dir))
+    blender = find_blender(os.environ.get("BLENDER"))
+    if not blender:
+        return {"ok": False, "error": "no Blender (set BLENDER)"}
+    script = Path(__file__).resolve().parent.parent / "lifegen" / "blender" / "garments.py"
+    todo, kept = [], 0
+    for c, looks in zip(spec["characters"], spec["looks"]):
+        bp = Path(bodies_dir) / f"{c['id']}.json"
+        if not bp.is_file():
+            return {"ok": False, "error": f"no exported body for {c['id']} ({bp})"}
+        body = json.loads(bp.read_text(encoding="utf-8"))
+        od = Path(out_dir) / c["id"]
+        job = G.blender_job(c, looks, str(bp), str(od), body, render=renders)
+        h = hashlib.sha256(json.dumps(job, sort_keys=True).encode("utf-8") +
+                           script.read_bytes()).hexdigest()[:16]
+        done = od / "done.json"
+        if done.is_file() and json.loads(done.read_text(encoding="utf-8")).get("hash") == h:
+            kept += 1
+            continue
+        od.mkdir(parents=True, exist_ok=True)
+        jp = od / "job.json"
+        jp.write_text(json.dumps(job, indent=1), encoding="utf-8")
+        todo.append((c["id"], jp, od, h))
+    running, failed, built = [], [], 0
+    log_dir = Path(log_dir)
+    log_dir.mkdir(parents=True, exist_ok=True)
+    while todo or running:
+        while todo and len(running) < jobs:
+            cid, jp, od, h = todo.pop(0)
+            lf = open(log_dir / f"garments_{cid}.log", "w", encoding="utf-8")
+            pr = subprocess.Popen([blender, "-b", "--factory-startup", "-P", str(script), "--",
+                                   str(jp)], stdout=lf, stderr=subprocess.STDOUT)
+            running.append((pr, lf, cid, od, h))
+        time.sleep(2.0)
+        for item in list(running):
+            pr, lf, cid, od, h = item
+            if pr.poll() is None:
+                continue
+            lf.close()
+            running.remove(item)
+            ok = (od / "report.json").is_file() and "CGGARMENT_DONE" in \
+                (log_dir / f"garments_{cid}.log").read_text(encoding="utf-8", errors="replace")
+            if ok:
+                (od / "done.json").write_text(json.dumps({"hash": h}), encoding="utf-8")
+                built += 1
+            else:
+                failed.append(cid)
+            print(f"CITYGEN_PEOPLE dressed {cid} ok={ok}", flush=True)
+    return {"ok": not failed, "characters": len(spec["characters"]), "built": built,
+            "kept": kept, "failed": failed, "seconds": round(time.time() - t0, 1)}
+
+
+# --- 4. the cache ---------------------------------------------------------------------------
 
 def _copy_tree(src: Path, dest: Path, skip: tuple[str, ...] = ()) -> tuple[int, int]:
     """Every file of `src` into `dest` where it differs, but those under a folder named in
@@ -183,7 +258,8 @@ def ensure_library(root: Path, uproject: Path, gas: Path | None = None,
     up = Path(uproject).resolve()
     n = characters or L.CHARACTERS
     eng = Path(root).resolve().as_posix()
-    h = L.library_hash(n, engine=_engine_version(root))
+    # ($CITYGEN_PEOPLE_HASH pins a library while its code is worked on)
+    h = os.environ.get("CITYGEN_PEOPLE_HASH") or L.library_hash(n, engine=_engine_version(root))
     saved = up.parent / "Saved" / "CityGenPeople"
     stamp = up.parent / "Saved" / STAMP
     people = content_dir(up, L.CONTENT)
@@ -227,18 +303,36 @@ def ensure_library(root: Path, uproject: Path, gas: Path | None = None,
             clo = gas_closure(Path(root), gas, log_dir / "gas", pk)
         res["migrate"] = {**migrate(clo, up), "packages": len(clo["keep"]),
                           "skipped": len(clo["skipped"]), "gas": str(gas)}
-    # (2) the build in the project's editor
+    # (2) the build in the project's editor: the characters, clips and bodies first, then the
+    # clothing in Blender (LG2), then the looks, mid meshes and cards
+    work = cache_dir(h)
     job = {"result": str(log_dir / "library_result.json"), "spec": spec, "hash": h,
            "manifest": str(saved / MANIFEST), "sheets_dir": str(log_dir / "sheets"),
-           "tiers": dict(L.TIERS)}
+           "tiers": dict(L.TIERS), "bodies_dir": str(log_dir / "bodies"),
+           "garments_dir": str(work / "garments"), "textiles_dir": str(work / "textiles")}
     # (an editor run makes a few characters and ends, `restart`: the assembly's memory grows
     # with each one; the next run goes on where it ended, every step keeping what is made)
     runs = []
-    for k in range(RUNS_MAX):
-        r = run_library(Path(root), up, job, log_dir / f"library_log_{k}.txt")
-        runs.append({"ok": r.get("ok"), "restart": r.get("restart"),
-                     "wall_s": r.get("wall_s")})
-        if not r.get("restart"):
+    k = 0
+    for phase in ("a", "dress", "b"):
+        if phase == "dress":
+            res["dress"] = dress(spec, log_dir / "bodies", work / "garments", work / "textiles",
+                                 log_dir / "garments")
+            if not res["dress"].get("ok"):
+                return {**res, "ok": False, "how": "build",
+                        "error": f"the clothing failed: {res['dress']}"}
+            continue
+        job["steps"] = list(PHASE_A) if phase == "a" else None
+        if job["steps"] is None:
+            job.pop("steps")
+        while k < RUNS_MAX * 2:
+            r = run_library(Path(root), up, job, log_dir / f"library_log_{k}.txt")
+            k += 1
+            runs.append({"phase": phase, "ok": r.get("ok"), "restart": r.get("restart"),
+                         "wall_s": r.get("wall_s")})
+            if not r.get("restart"):
+                break
+        if not r.get("ok"):
             break
     res["build"] = {k: r.get(k) for k in ("ok", "error", "steps", "wall_s", "log", "missing")
                     if k in r}
