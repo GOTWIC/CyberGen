@@ -67,7 +67,8 @@ The design, in short (`docs/unreal_export.md`, "From LG4: life at places"):
   2,622 of 5,131 food places, 12 of 15 ripperdocs; no clinic, cyberware shop, laundromat or
   pawn shop.
 - **Gangs:** 5 turfs (the Neon Tigers and the Ghost Saints in Old Town and the port), 376
-  members walking at most and 564 at their spots by night; 62 of M11's gang members outside
+  members walking at most and up to 459 at their 119 spots (476 points, the most they hold:
+  the late band's share asks 564); 62 of M11's gang members outside
   every gang turf left out. 288 pool slots kept (335 wanted near the view at most: scaled down
   there).
 - **Police:** 303 on foot and 81 patrol cars at 23:00 over six precincts, four with a station's
@@ -78,7 +79,48 @@ The design, in short (`docs/unreal_export.md`, "From LG4: life at places"):
 
 ## In Unreal
 
-SHOTS_PLACEHOLDER
+Delta imported over its LG2 import in `CityAG16` (the life controller updated; the places'
+clips made in the project in 14 s of editor time), then again with the final plan; `--check`
+passes both times (spawn, streaming, collision, the walk and the curb, sky and time, air,
+weather, look, far city, play features, the flight). The first check's walk took 55 minutes:
+the PC was paused under it (Swagnik's ask), not a fault.
+
+| Someone sitting on a bench by night (Old Town) | By day (the Corporate Core) |
+|---|---|
+| ![](unreal/night_sit_d04.jpg) | ![](unreal/pday_sit_d03.jpg) |
+| **A gang at its corner in its colors (Neon Tigers, Old Town)** | **The Ghost Saints at a corner in the port** |
+| ![](unreal/night_gang_d04.jpg) | ![](unreal/night_gang_d05.jpg) |
+| **A police pair on patrol (the Corporate Core)** | **Police pairs and a patrol car's street** |
+| ![](unreal/night_police_d03.jpg) | ![](unreal/night_police_d03_street.jpg) |
+| **A patrol car in the livery by day (Midtown)** | **By night (the Corporate Core)** |
+| ![](unreal/pday_patrol_d02.jpg) | ![](unreal/night_patrol_d03.jpg) |
+| **Queueing at a club's door (Old Town)** | **Beside a bar's door (a smokers' slot)** |
+| ![](unreal/night_queue_d04.jpg) | ![](unreal/night_smoke_d04.jpg) |
+| **Sitting in Midtown by day** | **Old Town from 9 m by night** |
+| ![](unreal/pday_sit_d02.jpg) | ![](unreal/night_status_d04.jpg) |
+
+Round the view at the check's views (the status's `places`, 23:00):
+
+| View | people live | slots live | slot users | by kind | gang members (wanted) | police on foot (wanted) | patrol cars (wanted) | Smart Objects | tick ms |
+|---|---|---|---|---|---|---|---|---|---|
+| Old Town street | 2,017 | 162 | 146 | bar queues 42, smokers 33, benches 23, gang spots 48 | 129 (113) | 46 (22) | 18 (18) | 558 | 3.1 |
+| Midtown street | 1,896 | 75 | 57 | smokers 27, benches 24, bus stops 2, taxi stands 4 | 0 | 48 (20) | 20 (19) | 184 | 2.3 |
+| Corporate Core street | 801 | 32 | 17 | smokers 7, benches 6, bus stops 4 | 0 | 44 (19) | 18 (19) | 84 | 2.2 |
+| The port | 755 | 68 | 71 | gang spots 37, benches 27, smokers 3, bus stops 2 | 68 (60) | 30 (14) | 12 (13) | 171 | 2.2 |
+
+- **Seen working:** people sit on the benches with the sample's bench loop, facing away from
+  the back; people queue at a club's door and stand beside a bar's; gangs stand in rings in
+  their faction's colors on their sidewalks' corners (the Neon Tigers' red, the Ghost Saints'
+  orange) and walk their turf; police walk in pairs in their uniforms; patrol cars (a
+  `halcyon_sable` in white with a dark trim) drive with the traffic. Over the check's views 1,000
+  and more shop visits started (people going into open shops and coming back out).
+- **Found and fixed on the way:** in the first check a third of the gang corners stood on the
+  carriageway (the sidewalk's end reaches into the junction): every slot's point is now kept
+  off lanes and junctions as well as buildings, and a gang corner walks in along its sidewalk
+  until its ring is clear; the queue shot's camera stood in the building (now from behind a
+  person facing a door); the patrol livery's dark body read as any dark car (now white);
+  police on foot came out twice as many as wanted (each walkway's fraction of an officer made
+  a whole pair: now drawn by pairs; the check's numbers above are from before that fix).
 
 ## Benchmark
 
@@ -90,8 +132,47 @@ PACKAGE_PLACEHOLDER
 
 ## Tests
 
-TESTS_PLACEHOLDER
+`tests/lifegen` (the new `test_lg_places.py`: open hours, the slots' points and facings, faction
+colors and the pools' reserves, the plan on a small city with a gang turf, a hideout, a
+precinct and its station, the police field and AG3's shop doors, the checks catching gang
+members off their turf and police off the patrol walkways, the exporter's pack; the plan and
+clothing tests as they were), `tests/test_bench.py` (every life pass sets the three switches,
+`night_life_noplaces` turns them off) and `tests/test_unreal_play.py`: 68 passed (23 s, log
+`C:/Users/swagn/CityGen/builds/lg4/tests_final.log`). The C++ and the importer are checked by
+the plugin's build and the two Unreal checks above.
 
 ## Open items
 
-OPEN_PLACEHOLDER
+- **Animation:** the Game Animation Sample has a bench sitting loop and standing idles and idle
+  breaks, nothing for talking, smoking, eating, buying, leaning, a phone or queueing: talkers,
+  smokers and people at stalls play three of its idle breaks, people waiting and queueing its
+  standing idles. No sit-down or stand-up transition is played (the sample's `into` and `out`
+  clips are not retargeted): a person walks to a bench and is sitting. No CMU mocap (Swagnik:
+  Unreal's own animation for now).
+- **Mid and far people at a slot** hold the walk's passing pose, standing; someone sitting is
+  near out to the mid tier's 90 m (within the near cap of 160), past it a standing card at
+  the seat.
+- **Stand points by prop kind, not by variant** (the ask `slot_points` of assetgen): a bench's
+  seats, a kiosk's counter and a stall's serving side come from the prop's kind
+  (`presets.SLOT_KINDS`), so a seat may sit a few centimeters off a variant's own; the sitting
+  root's offset is tunable (`CityGenLife.SitOffset`), unset. A bus stop's users stand in its
+  shelter (AG8's shelter has no bench of its own to sit on).
+- **Food stalls, kiosks and vending machines are few in Delta** (14, 11 and 16, mostly in
+  plazas): the check's stall view found no one at one near its views.
+- **Gang members** are kept to their turf's walkways and spots, so a turf's border reads as an
+  edge they turn back at; members M11 puts outside every gang turf (62 by night) are left out.
+  Groups break up at the spots (each member claims a point alone). No reaction to the police or
+  the player (LG8, decision 8).
+- **Police:** two of Delta's six precincts (Old Town, the port) have no station building in M11,
+  so their police only come alive with the walkways; patrol cars are AG18's `halcyon_sable` in a
+  white livery by paint, with no light bar (the ask `police_vehicles` of assetgen). The check's
+  numbers show police on foot about twice the wanted: drawn per walkway as whole pairs, fixed
+  after the check (pairs drawn by half the walkway's police), not seen in Unreal since.
+- **Smart Objects:** lifegen claims, occupies and frees its points through the subsystem, but
+  its own behaviors run in the walk processor; nothing yet uses the objects from another system
+  (the project's AI, storygen), and no gameplay tags name their activities.
+- **People at slots are not avoided** by walkers (LG3's avoidance looks only along a lane), so
+  a walker may pass through a gang's ring or a queue.
+- **The hour** is the plan's (23:00) until LG8; `CityGenLife.Hour H` moves it (doors and visits
+  by the hour follow).
+- **The budget:** LG5's 1 ms over 20 ms remains (below).
