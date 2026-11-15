@@ -726,7 +726,8 @@ def mid_mesh(c, clips):
     sm_path = f"{folder}/SM_{c['id']}_Mid"
     da_path = f"{folder}/DA_{c['id']}_Mid"
     if EAL.does_asset_exist(sm_path) and EAL.does_asset_exist(da_path) and \
-            meta(unreal.load_asset(da_path)) == HASH:
+            meta(unreal.load_asset(da_path)) == HASH and \
+            unreal.load_asset(da_path).get_editor_property("bone_position_texture") is not None:
         da = unreal.load_asset(da_path)
         return {"mesh": sm_path, "start": 0, "end": int(da.get_editor_property("num_frames")) - 1,
                 "fps": float(SPEC["far"]["fps"]), "data": da_path,
@@ -760,6 +761,16 @@ def mid_mesh(c, clips):
     n_uv = smes.get_num_uv_channels(mesh, 0)
     info = unreal.AnimToTextureAnimSequenceInfo()
     info.set_editor_property("anim_sequence", walk)
+    # (one loop of the clip at the bake's rate: AnimToTexture takes the clip's own key count,
+    # its 30 fps keys, as the samples, which at 15 fps ran twice the clip's length and held its
+    # last pose for the second half; lifegen_people_fixes)
+    loop = max(2, int(round(unreal.AnimationLibrary.get_sequence_length(walk)
+                            * float(SPEC["far"]["fps"]))))
+    for k, v in (("use_custom_range", True), ("start_frame", 0), ("end_frame", loop - 1)):
+        try:
+            info.set_editor_property(k, v)
+        except Exception as e:                                      # noqa: BLE001
+            log(f"mid {c['id']}: the bake's range ({k}): {e}")
     for k, v in (("skeletal_mesh", body), ("skeletal_lod_index", _lod(body, lod - 2)),
                  ("static_mesh", mesh), ("static_lod_index", 0), ("uv_channel", min(3, n_uv)),
                  ("mode", unreal.AnimToTextureMode.BONE),
@@ -770,6 +781,13 @@ def mid_mesh(c, clips):
         da.set_editor_property(k, v)
     if not unreal.AnimToTextureBPLibrary.animation_to_texture(da):
         raise RuntimeError(f"{c['id']}: AnimToTexture's bake failed")
+    # (the bone textures saved, then the data asset that names them: LG1's build saved only the
+    # data asset, so on reload its textures and the mid materials' were the engine's default
+    # texture and every mid person stood crouched with its arms out; lifegen_people_fixes)
+    for k, t in texs.items():
+        if not EAL.save_loaded_asset(t, False):
+            raise RuntimeError(f"{c['id']}: the bake's {k} was not saved")
+    EAL.save_loaded_asset(da, False)
     base = mid_material()
     mats = mesh.get_editor_property("static_materials")
     for i, sm_mat in enumerate(mats):

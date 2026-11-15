@@ -67,6 +67,15 @@ struct FCgLifeWalker : public FMassFragment
 	FVector From = FVector::ZeroVector;   // where it left its walkway for the door
 	float HoldBack = 0.f;          // cm short of a crosswalk's curb it waits
 	float Pending = 0.f;           // s held back by a far person's skipped frames
+
+	// --- lifegen_people_fixes: turning ----------------------------------------------------------
+	uint8 Faced = 0;               // its yaw set once (a new person faces its way at once)
+	uint8 NextAtStart = 1;         // it enters Next at Next's start (else at its end)
+	uint8 bPrev = 0;               // PrevHead is the heading it left its last lane on
+	int32 Next = INDEX_NONE;       // the walkway it goes on to, chosen as it nears its lane's end
+	FVector3f PrevHead = FVector3f::ZeroVector;
+	float PrevSegLen = 0.f;        // cm: that lane's last stretch
+	float PrevHW = 0.f;            // cm: that lane's half width
 };
 
 /** A car driving: on a lane of the lane graph (directed), its next lane chosen ahead, its

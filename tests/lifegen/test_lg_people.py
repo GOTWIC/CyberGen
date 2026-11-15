@@ -50,6 +50,29 @@ def test_person_draws():
     assert len({p["seed"] for p in ps}) > 1990
 
 
+def test_crowd_draws_heavy_builds_rarely():
+    """lifegen_people_fixes: the plan draws a person's character by its preset's body weight
+    (`presets.BODY_WEIGHT`): heavy builds about 5% of a crowd, every character still drawn,
+    the other draws `library.person`'s; the library's hash does not move with it."""
+    from lifegen import plan as PL
+    from lifegen import presets as P
+    n = L.CHARACTERS
+    ps = [PL.draw_person(("lg3.person", k), n, palette=[0] * 4) for k in range(4000)]
+    assert ps[7] == PL.draw_person(("lg3.person", 7), n, palette=[0] * 4)
+    base = L.person(("lg3.person", 7), n, palette=[0] * 4)
+    assert {k: v for k, v in ps[7].items() if k != "character"} == \
+        {k: v for k, v in base.items() if k != "character"}
+    chars = [p["character"] for p in ps]
+    assert set(chars) == set(range(n))
+    heavy = {k for k in range(n) if L.character(k)["preset"] in P.BODY_WEIGHT}
+    assert len(heavy) == 6
+    share = sum(1 for c in chars if c in heavy) / len(chars)
+    assert 0.02 < share < 0.08
+    assert max(chars.count(k) for k in range(n)) / len(chars) < PL.PEOPLE_SHARE_MAX
+    w = PL.character_weights(n)
+    assert sum(1 for v in w if v < 1.0) == 6 and min(w) > 0.0
+
+
 def _lib(n):
     return {"hash": "abc", "walks": list(L.WALKS), "idles": ["idle_neutral"],
             "clips": {"walk_neutral": {"anim": "/Game/CityGen/People/Anim/A_walk_neutral",

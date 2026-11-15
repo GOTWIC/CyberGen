@@ -21,6 +21,9 @@
 #include "Algo/Sort.h"
 #include "AnimationRuntime.h"
 #include "Animation/AnimSequence.h"
+#include "Animation/AnimationAsset.h"
+#include "Animation/Skeleton.h"
+#include "BoneIndices.h"
 #include "Components/StaticMeshComponent.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -159,9 +162,158 @@ float ACityGenLife::PhaseOffset(const int32 P) const
 	return (Mix(S) % 10000u) / 1000.f;      // seconds, 0 to 10
 }
 
+namespace
+{
+	/** The frame (at `Fps` from the clip's start, within its first `N`) of a walk's passing
+	 *  pose: where both thighs are nearest their mean turn over the loop (the legs together
+	 *  under the body), a pose a person can stand in; -1 when the clip has no thighs. */
+	float PassingFrame(const UAnimSequence* Clip, const float Fps, const int32 N)
+	{
+		const USkeleton* Sk = Clip ? Clip->GetSkeleton() : nullptr;
+		if (!Sk || N < 2)
+		{
+			return -1.f;
+		}
+		const FReferenceSkeleton& Ref = Sk->GetReferenceSkeleton();
+		const int32 Bones[2] = {Ref.FindBoneIndex(TEXT("thigh_l")), Ref.FindBoneIndex(TEXT("thigh_r"))};
+		if (Bones[0] == INDEX_NONE || Bones[1] == INDEX_NONE)
+		{
+			return -1.f;
+		}
+		TArray<FQuat> Q[2];
+		FQuat Mean[2];
+		for (int32 B = 0; B < 2; ++B)
+		{
+			FVector4 Sum(0.0, 0.0, 0.0, 0.0);
+			for (int32 K = 0; K < N; ++K)
+			{
+				FTransform T;
+				Clip->GetBoneTransform(T, FSkeletonPoseBoneIndex(Bones[B]), FAnimExtractContext((double)K / Fps), false);
+				FQuat R = T.GetRotation();
+				if (Q[B].Num() && (Q[B][0] | R) < 0.0)
+				{
+					R = -R;
+				}
+				Q[B].Add(R);
+				Sum += FVector4(R.X, R.Y, R.Z, R.W);
+			}
+			Mean[B] = FQuat(Sum.X, Sum.Y, Sum.Z, Sum.W).GetNormalized();
+		}
+		int32 Best = 0;
+		double BestDev = 1.0e9;
+		for (int32 K = 0; K < N; ++K)
+		{
+			const double Dev = Q[0][K].AngularDistance(Mean[0]) + Q[1][K].AngularDistance(Mean[1]);
+			if (Dev < BestDev)
+			{
+				BestDev = Dev;
+				Best = K;
+			}
+		}
+		return (float)Best;
+	}
+}
+
+void ACityGenLife::MakeMidLoops()
+{
+	// (lifegen_people_fixes) Per character its baked walk's loop and standing frame. The bake
+	// sampled the clip's own frame count (its 30 fps keys) at the bake's 15 fps, so it ran
+	// twice the clip's length and its second half held the clip's last pose: mid people walked
+	// half the time and slid frozen the rest. The loop is the clip's length at the bake's
+	// rate from its first frame (a library baked since lifegen_people_fixes bakes just that
+	// loop). A person standing holds the walk's passing pose, not LG3's frozen first frame (mid
+	// stride).
+	const int32 NC = MidMeshes.Num();
+	MidFirst.SetNum(NC);
+	MidLast.SetNum(NC);
+	MidStand.SetNum(NC);
+	StandShare.SetNum(NC);
+	TMap<const UAnimSequence*, float> Passing;
+	for (int32 C = 0; C < NC; ++C)
+	{
+		const float Start = MidFrames.IsValidIndex(4 * C) ? MidFrames[4 * C] : 0.f;
+		const float End = MidFrames.IsValidIndex(4 * C + 1) ? MidFrames[4 * C + 1] : Start;
+		const float Fps = MidFrames.IsValidIndex(4 * C + 2) && MidFrames[4 * C + 2] > 1.f ? MidFrames[4 * C + 2] : 15.f;
+		const float Cycle = MidFrames.IsValidIndex(4 * C + 3) && MidFrames[4 * C + 3] > 0.05f ? MidFrames[4 * C + 3] : 1.f;
+		// (the bake's clip: the group's first walk)
+		const int32 Group = CharClipGroup.IsValidIndex(C) ? CharClipGroup[C] : 0;
+		const int32 G = FMath::Clamp(Group * FMath::Max(1, Gaits), 0, FMath::Max(0, WalkClips.Num() - 1));
+		const UAnimSequence* Clip = WalkClips.IsValidIndex(G) ? WalkClips[G].Get() : nullptr;
+		int32 N = FMath::Max(1, FMath::RoundToInt(End - Start) + 1);
+		if (Clip)
+		{
+			N = FMath::Clamp(FMath::RoundToInt(Clip->GetPlayLength() * Fps), 2, N);
+		}
+		MidFirst[C] = Start;
+		MidLast[C] = Start + (float)(N - 1);
+		float K = -1.f;
+		if (const float* Have = Passing.Find(Clip))
+		{
+			K = *Have;
+		}
+		else
+		{
+			K = PassingFrame(Clip, Fps, N);
+			Passing.Add(Clip, K);
+			UE_LOG(LogTemp, Display, TEXT("CityGenLife: the walk %s loops %d frames at %.0f fps, its passing pose at frame %.0f"),
+				Clip ? *Clip->GetName() : TEXT("(none)"), N, Fps, K);
+		}
+		K = K >= 0.f ? K : 0.f;
+		MidStand[C] = Start + K;
+		// (the far card's cell nearest that pose: its sheet steps through one stride, Cycle s,
+		// in CardFrames cells)
+		const int32 F = FMath::Max(1, CardFrames);
+		const float At = FMath::Fmod(K / Fps, Cycle) / Cycle;
+		const int32 Cell = FMath::RoundToInt(At * F) % F;
+		StandShare[C] = ((float)Cell + 0.5f) / (float)F;
+	}
+}
+
+void ACityGenLife::LookData(const int32 P, const bool bStill, float Mid[7], float Far[5]) const
+{
+	// (the mid instance: time offset, rate, first and last frame of its loop, the tint; the far
+	// card: time offset, strides a second, the tint. Standing, the mid instance loops its one
+	// passing frame at the walk's rate; the card shows that pose's cell: a
+	// stride rate so slow it does not move, its offset putting the cell's middle at now)
+	const int32 NC = FMath::Max(1, MidMeshes.Num());
+	const int32 C = PersonChar.IsValidIndex(P) ? FMath::Clamp(PersonChar[P], 0, NC - 1) : P % NC;
+	const float Rate = FMath::Max(0.05f, WalkRate(P));
+	const float T0 = PhaseOffset(P);
+	const float Tint[3] = {
+		PersonTint.IsValidIndex(3 * P) ? PersonTint[3 * P] : 0.5f,
+		PersonTint.IsValidIndex(3 * P + 1) ? PersonTint[3 * P + 1] : 0.5f,
+		PersonTint.IsValidIndex(3 * P + 2) ? PersonTint[3 * P + 2] : 0.5f};
+	const float First = MidFirst.IsValidIndex(C) ? MidFirst[C] : (MidFrames.IsValidIndex(4 * C) ? MidFrames[4 * C] : 0.f);
+	const float Last = MidLast.IsValidIndex(C) ? MidLast[C] : (MidFrames.IsValidIndex(4 * C + 1) ? MidFrames[4 * C + 1] : First);
+	const float Stand = MidStand.IsValidIndex(C) ? MidStand[C] : First;
+	Mid[0] = T0;
+	Mid[1] = Rate;
+	Mid[2] = bStill ? Stand : First;
+	Mid[3] = bStill ? Stand : Last;
+	const float Cycle = MidFrames.IsValidIndex(4 * C + 3) && MidFrames[4 * C + 3] > 0.05f ? MidFrames[4 * C + 3] : 1.f;
+	if (bStill)
+	{
+		constexpr float Slow = 1.0e-5f;
+		const float Now = GetWorld() ? (float)GetWorld()->GetTimeSeconds() : 0.f;
+		Far[0] = (StandShare.IsValidIndex(C) ? StandShare[C] : 0.0625f) / Slow - Now;
+		Far[1] = Slow;
+	}
+	else
+	{
+		Far[0] = T0;
+		Far[1] = Rate / Cycle;
+	}
+	for (int32 K = 0; K < 3; ++K)
+	{
+		Mid[4 + K] = Tint[K];
+		Far[2 + K] = Tint[K];
+	}
+}
+
 void ACityGenLife::MakePeople()
 {
 	const int32 NC = MidMeshes.Num();
+	MakeMidLoops();
 	MidComps.Reset();
 	FarComps.Reset();
 	auto Make = [this](const FString& Name, UStaticMesh* Mesh, UMaterialInterface* Mat, const int32 Floats, const bool bShadow, const float CullM)
@@ -248,7 +400,6 @@ void ACityGenLife::SpawnPeople(const int32 NP)
 	}
 	// (each character's instances: one per person of it, hidden until drawn; their custom data
 	// once, since a person's walk, pace and tint stay theirs)
-	TArray<float> Data;
 	for (int32 K = 0; K < NC; ++K)
 	{
 		MidXf[K].Init(Hidden, CharCount[K]);
@@ -265,24 +416,15 @@ void ACityGenLife::SpawnPeople(const int32 NP)
 	for (int32 P = 0; P < NP; ++P)
 	{
 		const int32 C = PersonChar.IsValidIndex(P) ? FMath::Clamp(PersonChar[P], 0, NC - 1) : P % NC;
-		const float Rate = WalkRate(P);
-		const float T0 = PhaseOffset(P);
-		const float Tint[3] = {
-			PersonTint.IsValidIndex(3 * P) ? PersonTint[3 * P] : 0.5f,
-			PersonTint.IsValidIndex(3 * P + 1) ? PersonTint[3 * P + 1] : 0.5f,
-			PersonTint.IsValidIndex(3 * P + 2) ? PersonTint[3 * P + 2] : 0.5f};
+		float MidData[7], FarData[5];
+		LookData(P, false, MidData, FarData);
 		if (UInstancedStaticMeshComponent* Mid = MidComps.IsValidIndex(C) ? MidComps[C].Get() : nullptr)
 		{
-			const float First = MidFrames.IsValidIndex(4 * C) ? MidFrames[4 * C] : 0.f;
-			const float Last = MidFrames.IsValidIndex(4 * C + 1) ? MidFrames[4 * C + 1] : 0.f;
-			Data = {T0, Rate, First, Last, Tint[0], Tint[1], Tint[2]};
-			Mid->SetCustomData(PersonInst[P], Data, false);
+			Mid->SetCustomData(PersonInst[P], MakeArrayView(MidData, 7), false);
 		}
 		if (UInstancedStaticMeshComponent* Far = FarComps.IsValidIndex(C) ? FarComps[C].Get() : nullptr)
 		{
-			const float Cycle = MidFrames.IsValidIndex(4 * C + 3) && MidFrames[4 * C + 3] > 0.05f ? MidFrames[4 * C + 3] : 1.f;
-			Data = {T0, Rate / Cycle, Tint[0], Tint[1], Tint[2]};
-			Far->SetCustomData(PersonInst[P], Data, false);
+			Far->SetCustomData(PersonInst[P], MakeArrayView(FarData, 5), false);
 		}
 	}
 	for (UInstancedStaticMeshComponent* Comp : MidComps)

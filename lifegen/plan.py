@@ -472,6 +472,27 @@ def crowd_walks(model: dict, filled: dict, polys: list, sig_of: dict,
 CROWD_COLUMNS = PERSON_COLUMNS
 
 
+def character_weights(n: int) -> list[float]:
+    """lifegen_people_fixes: each of the library's `n` characters' weight in a crowd, by the
+    preset it is made from (`presets.BODY_WEIGHT`: heavy builds rare)."""
+    return [float(P.BODY_WEIGHT.get(L.character(k)["preset"], 1.0)) for k in range(n)]
+
+
+def draw_person(seed_parts: tuple, n: int, palette: list | None = None) -> dict:
+    """A person of the crowd (`library.person`), its character drawn by `character_weights`
+    from the same uniform draw (the plan stays a function of the seeds; kept out of
+    `library.py`, whose hash names the built library)."""
+    p = L.person(seed_parts, n, palette=palette)
+    w = character_weights(n)
+    x = L._u(*seed_parts, "char") * sum(w)
+    k = 0
+    while k < n - 1 and x >= w[k]:
+        x -= w[k]
+        k += 1
+    p["character"] = k
+    return p
+
+
 def crowd_plan(model: dict, filled: dict, rows: list[dict], sigs: list[dict],
                left: dict) -> dict:
     """The crowd's record in the plan: its settings, the pool's people by their seeds, the
@@ -481,7 +502,7 @@ def crowd_plan(model: dict, filled: dict, rows: list[dict], sigs: list[dict],
     pool = int(cr["pool"])
     cols = {k: [] for k in CROWD_COLUMNS}
     for k in range(pool):
-        p = L.person(("lg3.person", k), n, palette=[0] * P.SPIKE_PALETTE)
+        p = draw_person(("lg3.person", k), n, palette=[0] * P.SPIKE_PALETTE)
         for c in CROWD_COLUMNS:
             cols[c].append(p[c])
     shapes = {d: fd["shape"] for d, fd in filled["districts"].items()}
@@ -782,7 +803,7 @@ def spike_plan(model: dict, filled: dict, hours: dict) -> dict | None:
     n = L.CHARACTERS
     cols = {k: [] for k in PERSON_COLUMNS}
     for k in range(int(people)):
-        p = L.person(("lg1.person", did, k), n, palette=palette)
+        p = draw_person(("lg1.person", did, k), n, palette=palette)
         for c in PERSON_COLUMNS:
             cols[c].append(p[c])
     return hashed({"district_id": did, "name": ds[did].get("name"), "hour": sp["hour"],

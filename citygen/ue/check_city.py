@@ -1139,6 +1139,17 @@ def play_views(world, a, slug, prefix):
         # through the play menu's clothing row, the world's time held between, so both show the
         # same people at the same step; the clothes on and the time running again after it)
         noclothes = "_noclothes" in v["name"]
+        # (lifegen_people_fixes: $CITYGEN_UE_VIEW_CMDS, a JSON object of view names and the
+        # console commands, `;` between them, run as the camera reaches that view, e.g. the
+        # people's tiers set for one view; `<name>@after` runs after its shot)
+        vcmds = json.loads(os.environ.get("CITYGEN_UE_VIEW_CMDS") or "{}")
+        for c in (vcmds.get(v["name"]) or "").split(";"):
+            if c.strip():
+                unreal.SystemLibrary.execute_console_command(world, c.strip())
+                log(f"view {v['name']} command: {c.strip()}")
+        # (a view named `*_seq<N>` is shot N times with the world slowed to
+        # $CITYGEN_UE_SEQ_DILATION (0.05) between them: `<name>_<k>`, a short sequence)
+        seq = re.search(r"_seq(\d+)$", v["name"])
         eye, tg = ue(*v["eye"]), ue(*v["target"])
         cam.set_actor_location(eye, False, True)
         pc.set_control_rotation(unreal.MathLibrary.find_look_at_rotation(eye, tg))
@@ -1168,7 +1179,19 @@ def play_views(world, a, slug, prefix):
             yield from wait(1.5)
             RES.setdefault("clothing_views", {})[v["name"]] = {"menu_row": row}
             log(f"clothing off at view {v['name']}: menu row {row}")
-        yield from ui_shot(world, v["name"], f"HighResShot {res}", 600)
+        if seq:
+            dil = float(os.environ.get("CITYGEN_UE_SEQ_DILATION") or 0.05)
+            unreal.GameplayStatics.set_global_time_dilation(world, dil)
+            for k in range(int(seq.group(1))):
+                yield from ui_shot(world, f"{v['name']}_{k}", f"HighResShot {res}", 600)
+                RES.setdefault("seq_times", {}).setdefault(v["name"], []).append(
+                    round(unreal.GameplayStatics.get_time_seconds(world), 3))
+            unreal.GameplayStatics.set_global_time_dilation(world, 1.0)
+        else:
+            yield from ui_shot(world, v["name"], f"HighResShot {res}", 600)
+        for c in (vcmds.get(v["name"] + "@after") or "").split(";"):
+            if c.strip():
+                unreal.SystemLibrary.execute_console_command(world, c.strip())
         # (LG3: lifegen's crowd at each view, in the log: CITYGEN_LIFE_STATUS after the view's
         # name; a level without the CityGenLife plugin only warns)
         log(f"life at view {v['name']}")

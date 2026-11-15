@@ -151,6 +151,177 @@ namespace CgLife
 		return Cands[N - 1];
 	}
 
+	// --- lifegen_people_fixes: turning ----------------------------------------------------------
+
+	/** A person's yaw turned toward `Want` (deg) at most F.TurnDegS a second; a new person
+	 *  faces it at once. */
+	void TurnTo(const FCgLifeFrame& F, FCgLifeWalker& W, const float Want, const float Dt)
+	{
+		if (!W.Faced)
+		{
+			W.Yaw = Want;
+			W.Faced = 1;
+			return;
+		}
+		const float Step = F.TurnDegS * FMath::Max(Dt, 0.f);
+		const float D = FMath::FindDeltaAngleDegrees(W.Yaw, Want);
+		W.Yaw = FRotator::NormalizeAxis(W.Yaw + FMath::Clamp(D, -Step, Step));
+	}
+
+	/** A walkway lane's points in a walker's order (its first the one it walks from): the k-th
+	 *  point and how far along it is (cm). */
+	struct FWalkPath
+	{
+		const FZoneGraphStorage& S;
+		int32 B = 0, E = 0;
+		float Len = 0.f;
+		bool bFwd = true;
+		FWalkPath(const FZoneGraphStorage& InS, const int32 Lane, const float Dir)
+			: S(InS)
+		{
+			const FZoneLaneData& L = S.Lanes[Lane];
+			B = L.PointsBegin;
+			E = L.PointsEnd;
+			Len = S.LanePointProgressions[E - 1];
+			bFwd = Dir > 0.f;
+		}
+		int32 Num() const { return E - B; }
+		int32 Index(const int32 K) const { return bFwd ? B + K : E - 1 - K; }
+		FVector P(const int32 K) const { return S.LanePoints[Index(K)]; }
+		float At(const int32 K) const
+		{
+			const float Q = S.LanePointProgressions[Index(K)];
+			return bFwd ? Q : Len - Q;
+		}
+	};
+
+	/** How far along each leg a corner between headings D1 and D2 (unit) is rounded: at most
+	 *  F.CornerCm and F.CornerLeg of the shorter leg, and so that it cuts the corner by at
+	 *  most F.CornerCut of the half width `HW` (a quadratic curve over 2s cuts it by
+	 *  s |D2 - D1| / 4); none on a straight run or a turn back. */
+	float CornerS(const FCgLifeFrame& F, const FVector& D1, const float L1, const FVector& D2,
+	              const float L2, const float HW)
+	{
+		const float Turn = (float)(D2 - D1).Size();
+		if (Turn < 0.03f || FVector::DotProduct(D1, D2) < -0.85)
+		{
+			return 0.f;
+		}
+		return FMath::Max(0.f, FMath::Min3(F.CornerCm, F.CornerLeg * FMath::Min(L1, L2),
+		                                   F.CornerCut * HW / (0.25f * Turn)));
+	}
+
+	/** The first leg (unit heading, length) and half width of the walkway a person goes on to
+	 *  (W.Next); false without one. */
+	bool NextLeg(const FCgLifeFrame& F, const FCgLifeWalker& W, FVector& D2, float& L2, float& HW2)
+	{
+		if (W.Next == INDEX_NONE || !F.Storage->Lanes.IsValidIndex(W.Next))
+		{
+			return false;
+		}
+		const FZoneGraphStorage& S = *F.Storage;
+		const FZoneLaneData& L = S.Lanes[W.Next];
+		if (L.PointsEnd - L.PointsBegin < 2)
+		{
+			return false;
+		}
+		const FVector A = S.LanePoints[W.NextAtStart ? L.PointsBegin : L.PointsEnd - 1];
+		const FVector B = S.LanePoints[W.NextAtStart ? L.PointsBegin + 1 : L.PointsEnd - 2];
+		L2 = (float)FVector::Dist(A, B);
+		if (L2 < 1.f)
+		{
+			return false;
+		}
+		D2 = (B - A) / L2;
+		HW2 = 0.5f * (*F.Widths)[W.Next];
+		return true;
+	}
+
+	/** Where on its walkway's line a person is and which way it heads (unit, the walker's
+	 *  way): the line's corners, between its stretches and between its walkway and the one
+	 *  before or after it, rounded by a quadratic curve over CornerS each way, so its place
+	 *  and heading change smoothly round them (no jump of its side offset, no snap of its
+	 *  heading); the line itself elsewhere. */
+	void PathAt(const FCgLifeFrame& F, const FCgLifeWalker& W, FVector& OutPos, FVector& OutHead)
+	{
+		const FZoneGraphStorage& S = *F.Storage;
+		const FWalkPath P(S, W.Lane, W.Dir);
+		const int32 N = P.Num();
+		const float Wd = FMath::Clamp(W.Dir > 0.f ? W.Dist : P.Len - W.Dist, 0.f, P.Len);
+		int32 K = 0;
+		while (K + 2 < N && P.At(K + 1) <= Wd)
+		{
+			++K;
+		}
+		const FVector A = P.P(K);
+		const FVector B = P.P(K + 1);
+		const float Seg = FMath::Max(1.f, P.At(K + 1) - P.At(K));
+		const FVector Dk = (B - A).GetSafeNormal();
+		OutPos = A + Dk * FMath::Clamp(Wd - P.At(K), 0.f, Seg);
+		OutHead = Dk;
+		const float HW = 0.5f * (*F.Widths)[W.Lane];
+		auto Round = [&](const FVector& V, const FVector& D1, const FVector& D2, const float Sc, const float U)
+		{
+			const FVector P0 = V - D1 * Sc;
+			const FVector P2 = V + D2 * Sc;
+			OutPos = P0 * FMath::Square(1.f - U) + V * (2.f * U * (1.f - U)) + P2 * FMath::Square(U);
+			const FVector T = D1 * (1.f - U) + D2 * U;
+			if (!T.IsNearlyZero(1.0e-3))
+			{
+				OutHead = T.GetSafeNormal();
+			}
+		};
+		// (the corner it has just come round: its stretch's start)
+		{
+			FVector D1;
+			float L1 = 0.f, HW1 = HW;
+			bool bHave = false;
+			if (K > 0)
+			{
+				D1 = (A - P.P(K - 1)).GetSafeNormal();
+				L1 = P.At(K) - P.At(K - 1);
+				bHave = true;
+			}
+			else if (W.bPrev)
+			{
+				D1 = FVector(W.PrevHead);
+				L1 = W.PrevSegLen;
+				HW1 = FMath::Min(HW, W.PrevHW);
+				bHave = true;
+			}
+			const float Past = Wd - P.At(K);
+			const float Sc = bHave ? CornerS(F, D1, L1, Dk, Seg, HW1) : 0.f;
+			if (Sc > 1.f && Past < Sc)
+			{
+				Round(A, D1, Dk, Sc, 0.5f + 0.5f * Past / Sc);
+				return;
+			}
+		}
+		// (the corner ahead: its stretch's end)
+		{
+			FVector D2;
+			float L2 = 0.f, HW2 = HW;
+			bool bHave = false;
+			if (K + 2 < N)
+			{
+				D2 = (P.P(K + 2) - B).GetSafeNormal();
+				L2 = P.At(K + 2) - P.At(K + 1);
+				bHave = true;
+			}
+			else
+			{
+				bHave = NextLeg(F, W, D2, L2, HW2);
+				HW2 = FMath::Min(HW, HW2);
+			}
+			const float To = P.At(K + 1) - Wd;
+			const float Sc = bHave ? CornerS(F, Dk, Seg, D2, L2, HW2) : 0.f;
+			if (Sc > 1.f && To < Sc)
+			{
+				Round(B, Dk, D2, Sc, 0.5f - 0.5f * To / Sc);
+			}
+		}
+	}
+
 	void Place(FCgLifeFrame& F, const FCgLifeWalker& W, const uint8 Show)
 	{
 		if (F.WalkPos->IsValidIndex(W.Instance))
@@ -199,7 +370,7 @@ namespace CgLife
 			const FVector D = To - From;
 			if (D.SizeSquared2D() > 1.0)
 			{
-				W.Yaw = FMath::RadiansToDegrees(FMath::Atan2(D.Y, D.X));
+				TurnTo(F, W, FMath::RadiansToDegrees(FMath::Atan2(D.Y, D.X)), Dt);
 			}
 			if (U < 1.f)
 			{
@@ -313,14 +484,19 @@ namespace CgLife
 				}
 				const bool bEnd = W.Dist > L;
 				const float Over = FMath::Min(bEnd ? W.Dist - L : -W.Dist, 200.f);
-				const int32 To = PickWalk(F, W.Lane, bEnd ? EZoneLaneLinkType::Outgoing : EZoneLaneLinkType::Incoming, W.PrevLane, W.Seed);
+				// (the walkway chosen as it neared the end, if it is still live; else one now)
+				const bool bChosen = W.Next != INDEX_NONE && W.Next < F.WalkLanes && (*F.InRegion)[W.Next];
+				const int32 To = bChosen ? W.Next : PickWalk(F, W.Lane, bEnd ? EZoneLaneLinkType::Outgoing : EZoneLaneLinkType::Incoming, W.PrevLane, W.Seed);
+				W.Next = INDEX_NONE;
 				if (To == INDEX_NONE)
 				{
-					// (a dead end, or the edge of the live walkways: turn back)
+					// (a dead end, or the edge of the live walkways: turn back, turning on the
+					// spot: its side offset is the lane's, so it stays where it is)
 					W.Dir = -W.Dir;
 					W.Dist = bEnd ? FMath::Max(0.f, L - Over) : FMath::Min(L, Over);
 					W.PrevLane = INDEX_NONE;
 					W.Crossed = 0;
+					W.bPrev = 0;
 					continue;
 				}
 				const FZoneLaneData& Cur = S.Lanes[W.Lane];
@@ -328,29 +504,60 @@ namespace CgLife
 				const FZoneLaneData& Nx = S.Lanes[To];
 				const bool bAtStart = FVector::DistSquared(Here, S.LanePoints[Nx.PointsBegin]) <=
 					FVector::DistSquared(Here, S.LanePoints[Nx.PointsEnd - 1]);
+				// (the heading it leaves this walkway on, for the corner into the next; its side
+				// offset kept on the walker's own right, so it does not jump across)
+				{
+					const FVector Last = S.LanePoints[bEnd ? Cur.PointsEnd - 2 : Cur.PointsBegin + 1];
+					const FVector Leg = Here - Last;
+					W.PrevSegLen = (float)Leg.Size();
+					W.PrevHead = FVector3f(Leg.GetSafeNormal());
+					W.PrevHW = 0.5f * (*F.Widths)[W.Lane];
+					W.bPrev = W.PrevSegLen > 1.f ? 1 : 0;
+				}
+				const float NewDir = bAtStart ? 1.f : -1.f;
+				W.Lat *= W.Dir * NewDir;
 				--(*F.LaneHave)[W.Lane];
 				++(*F.LaneHave)[To];
 				W.PrevLane = W.Lane;
 				W.Lane = To;
-				W.Dir = bAtStart ? 1.f : -1.f;
+				W.Dir = NewDir;
 				W.Dist = bAtStart ? Over : Len[To] - Over;
 				W.Crossed = 0;
 				W.Door = INDEX_NONE;
 			}
+			// (nearing its walkway's end: the next one chosen now, so it rounds the corner into
+			// it rather than turning on the spot)
+			if (W.Next == INDEX_NONE && (W.Dir > 0.f ? Len[W.Lane] - W.Dist : W.Dist) < F.CornerCm + 50.f)
+			{
+				const bool bEnd = W.Dir > 0.f;
+				W.Next = PickWalk(F, W.Lane, bEnd ? EZoneLaneLinkType::Outgoing : EZoneLaneLinkType::Incoming, W.PrevLane, W.Seed);
+				if (W.Next != INDEX_NONE)
+				{
+					const FZoneLaneData& Cur = S.Lanes[W.Lane];
+					const FVector Here = S.LanePoints[bEnd ? Cur.PointsEnd - 1 : Cur.PointsBegin];
+					const FZoneLaneData& Nx = S.Lanes[W.Next];
+					W.NextAtStart = FVector::DistSquared(Here, S.LanePoints[Nx.PointsBegin]) <=
+						FVector::DistSquared(Here, S.LanePoints[Nx.PointsEnd - 1]) ? 1 : 0;
+				}
+			}
 		}
 		W.Dist = FMath::Clamp(W.Dist, 0.f, Len[W.Lane]);
-		FZoneGraphLaneLocation Loc;
-		if (!UE::ZoneGraph::Query::CalculateLocationAlongLane(S, W.Lane, W.Dist, Loc))
+		if (S.Lanes[W.Lane].PointsEnd - S.Lanes[W.Lane].PointsBegin < 2)
 		{
 			return;
 		}
-		// (keep to its side, out of the others' way and the player's; across at most 0.7 m/s)
-		const FVector Right = FVector::CrossProduct(Loc.Up, Loc.Direction).GetSafeNormal();
+		// (lifegen_people_fixes: on its walkway's line with the corners rounded, its heading
+		// the curve's, so it turns as it walks: no snap of its heading, no jump of its side)
+		FVector At, Head;
+		PathAt(F, W, At, Head);
+		// (keep to its side, out of the others' way and the player's; across at most 0.7 m/s;
+		// the side offset is on the lane's own right, the walker's right times its direction)
+		const FVector Right = FVector::CrossProduct(FVector::UpVector, Head * W.Dir).GetSafeNormal();
 		const float HW = 0.5f * (*F.Widths)[W.Lane];
 		float Goal = W.Side * HW * W.Dir + W.Push;
 		if (F.bPlayer)
 		{
-			const FVector Rel = F.Player - Loc.Position;
+			const FVector Rel = F.Player - At;
 			const float Room = 0.6f * F.PlayerCm;
 			// (in 3D: a pawn flying over them is no one to step aside from)
 			if (Rel.SizeSquared() < FMath::Square(F.PlayerCm))
@@ -363,12 +570,20 @@ namespace CgLife
 			}
 		}
 		Goal = FMath::Clamp(Goal, -0.85f * HW, 0.85f * HW);
+		const float Lat0 = W.Lat;
 		W.Lat = FMath::FInterpConstantTo(W.Lat, Goal, Dt, 70.f);
-		W.Pos = Loc.Position + Right * W.Lat + FVector(0.f, 0.f, W.ZOff);
-		const FVector Fwd = Loc.Direction * W.Dir;
+		W.Pos = At + Right * W.Lat + FVector(0.f, 0.f, W.ZOff);
+		// (facing where it goes: along the walkway, and toward the side it is stepping to; turned
+		// at most F.TurnDegS a second)
+		FVector Fwd = Head;
+		if (!bStill && Dt > 1.0e-4f)
+		{
+			const float V = KindSpeed(F, Kind, W.Speed) * W.SpeedMul;
+			Fwd = Head * V + Right * ((W.Lat - Lat0) / Dt);
+		}
 		if (Fwd.SizeSquared2D() > 1.0e-4)
 		{
-			W.Yaw = FMath::RadiansToDegrees(FMath::Atan2(Fwd.Y, Fwd.X));
+			TurnTo(F, W, FMath::RadiansToDegrees(FMath::Atan2(Fwd.Y, Fwd.X)), Dt);
 		}
 		Place(F, W, Kind == CgKind::Elevator ? CgShow::Hidden : (bStill ? CgShow::Still : CgShow::Moving));
 	}

@@ -187,6 +187,8 @@ void ACityGenLife::BuildCrowd()
 	Frame.EscAddCm = 100.f * (float)Escalator.Y;
 	Frame.ElevatorCm = 100.f * ElevatorMS;
 	Frame.Jaywalk = Jaywalk;
+	Frame.TurnDegS = TurnDegS;
+	Frame.CornerCm = 100.f * CornerM;
 }
 
 void ACityGenLife::SpawnPool()
@@ -499,32 +501,23 @@ void ACityGenLife::SetCrowdScale(const float InScale)
 
 void ACityGenLife::ApplyLook(const int32 P, const bool bStill)
 {
-	// (the mid and far instances' custom data: the walk's time offset and rate, frozen while
-	// the person stands; the outfit's tint)
+	// (the mid and far instances' custom data: the walk's loop, time offset and rate, its
+	// passing pose held while the person stands; the outfit's tint: LookData)
 	const int32 NC = MidMeshes.Num();
 	if (NC == 0 || !PersonInst.IsValidIndex(P))
 	{
 		return;
 	}
 	const int32 C = PersonChar.IsValidIndex(P) ? FMath::Clamp(PersonChar[P], 0, NC - 1) : P % NC;
-	const float Rate = bStill ? 0.f : WalkRate(P);
-	const float T0 = PhaseOffset(P);
-	const float Tint[3] = {
-		PersonTint.IsValidIndex(3 * P) ? PersonTint[3 * P] : 0.5f,
-		PersonTint.IsValidIndex(3 * P + 1) ? PersonTint[3 * P + 1] : 0.5f,
-		PersonTint.IsValidIndex(3 * P + 2) ? PersonTint[3 * P + 2] : 0.5f};
+	float MidData[7], FarData[5];
+	LookData(P, bStill, MidData, FarData);
 	if (UInstancedStaticMeshComponent* Mid = MidComps.IsValidIndex(C) ? MidComps[C].Get() : nullptr)
 	{
-		const float First = MidFrames.IsValidIndex(4 * C) ? MidFrames[4 * C] : 0.f;
-		const float Last = MidFrames.IsValidIndex(4 * C + 1) ? MidFrames[4 * C + 1] : 0.f;
-		const float Data[7] = {T0, Rate, First, Last, Tint[0], Tint[1], Tint[2]};
-		Mid->SetCustomData(PersonInst[P], MakeArrayView(Data, 7), false);
+		Mid->SetCustomData(PersonInst[P], MakeArrayView(MidData, 7), false);
 	}
 	if (UInstancedStaticMeshComponent* Far = FarComps.IsValidIndex(C) ? FarComps[C].Get() : nullptr)
 	{
-		const float Cycle = MidFrames.IsValidIndex(4 * C + 3) && MidFrames[4 * C + 3] > 0.05f ? MidFrames[4 * C + 3] : 1.f;
-		const float Data[5] = {T0, Rate / Cycle, Tint[0], Tint[1], Tint[2]};
-		Far->SetCustomData(PersonInst[P], MakeArrayView(Data, 5), false);
+		Far->SetCustomData(PersonInst[P], MakeArrayView(FarData, 5), false);
 	}
 }
 
