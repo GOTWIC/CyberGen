@@ -380,13 +380,18 @@ def test_life_passes():
         life = [c for c in cmds if c.startswith("CityGenLife.")]
         assert [c.split()[0] for c in life] == ["CityGenLife.Enable", "CityGenLife.Shadows",
                                                 "CityGenLife.Rebuild", "CityGenLife.Lumen",
-                                                "CityGenLife.Tiers", "CityGenLife.Traffic"]
+                                                "CityGenLife.Tiers", "CityGenLife.Traffic",
+                                                "CityGenLife.Clothing"]
         assert set(cmds) - set(life) == base and cmds[-1].startswith("CityGenAtmos.Hour")
     assert "CityGenLife.Enable 0" in by["night_life_off"][3]
     assert "CityGenLife.Lumen 1" in by["night_life_lumen"][3]
     # (LG5: the traffic on in every life pass but the one that measures it off)
     assert "CityGenLife.Traffic 0 1" in by["night_traffic_off"][3]
     assert "CityGenLife.Traffic 1 0.5" in by["night_traffic_half"][3]
+    # (LG2: every life pass sets the clothing switch, off only in its own pass)
+    assert "CityGenLife.Clothing 0" in by["night_life_noclothes"][3]
+    assert all("CityGenLife.Clothing 1" in by[n][3] for n, *_ in B.LIFE_PASSES
+               if n != "night_life_noclothes")
     assert all("CityGenLife.Traffic 1 1" in by[n][3] for n, *_ in B.LIFE_PASSES
                if n not in ("night_traffic_off", "night_traffic_half"))
     # (LG1: the people library's tiers, every pass setting them, the near pass none near)

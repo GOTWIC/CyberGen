@@ -514,9 +514,55 @@ def garment_instances(rec, made):
     return out
 
 
+def manifold(rec):
+    """The JSON's triangles as a dynamic mesh takes them: no triangle twice or with a corner
+    twice, no edge of more than two triangles and none two triangles run the same way (such a
+    triangle's corners copied, so it stands on its own: a dynamic mesh refuses it otherwise,
+    and the slots after it would shift). In place."""
+    T, M = rec["triangles"], rec["mats"]
+    per = {k: rec[k] for k in ("vertices", "normals", "uv0", "colors")}
+    width = {"vertices": 3, "normals": 3, "uv0": 2, "colors": 4}
+    rb, rw = rec.get("rigid_bone"), rec.get("rigid_w")
+    seen, use, heads = set(), {}, set()
+    tris, mats = [], []
+    for k in range(len(T) // 3):
+        t = (T[3 * k], T[3 * k + 1], T[3 * k + 2])
+        key = tuple(sorted(t))
+        if len(set(t)) < 3 or key in seen:
+            continue
+        edges = [tuple(sorted((t[i], t[(i + 1) % 3]))) for i in range(3)]
+        half = [(t[i], t[(i + 1) % 3]) for i in range(3)]
+        # (an edge of two triangles already, or one a triangle runs the same way: wound
+        # against its neighbor, which a dynamic mesh refuses as well)
+        if any(use.get(e, 0) >= 2 for e in edges) or any(h in heads for h in half):
+            # (its own corners)
+            nt = []
+            for v in t:
+                n = len(per["vertices"]) // 3
+                for f, arr in per.items():
+                    w = width[f]
+                    arr += arr[w * v:w * v + w]
+                if rb is not None:
+                    rb.append(rb[v])
+                    rw.append(rw[v])
+                nt.append(n)
+            t = tuple(nt)
+            edges = [tuple(sorted((t[i], t[(i + 1) % 3]))) for i in range(3)]
+            half = [(t[i], t[(i + 1) % 3]) for i in range(3)]
+        seen.add(key)
+        heads.update(half)
+        for e in edges:
+            use[e] = use.get(e, 0) + 1
+        tris += list(t)
+        mats.append(M[k])
+    rec["triangles"], rec["mats"] = tris, mats
+    return rec
+
+
 def dyn_from_json(rec):
     """A dynamic mesh from the Blender stage's JSON (`garments.export`): vertices, normals,
     uv0, colors, triangles, each triangle's slot."""
+    manifold(rec)
     V, N, U, C, T = rec["vertices"], rec["normals"], rec["uv0"], rec["colors"], rec["triangles"]
     nv = len(V) // 3
     buf = unreal.GeometryScriptSimpleMeshBuffers()
