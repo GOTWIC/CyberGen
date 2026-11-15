@@ -359,6 +359,11 @@ void ACityGenLife::BuildLanes()
 		// (LG3: the whole walkway graph, live round the view)
 		BuildCrowd();
 	}
+	if (IsTraffic())
+	{
+		// (LG5: the whole lane graph, live round the view)
+		BuildTraffic();
+	}
 	bBuilt = true;
 }
 
@@ -408,6 +413,12 @@ void ACityGenLife::MakeComponents()
 	for (int32 P = 0; P < CarPartMeshes.Num(); ++P)
 	{
 		CarParts.Add(CarPartMeshes[P] ? Make(*FString::Printf(TEXT("CarPart%d"), P), CarPartMeshes[P], nullptr, PaintFloats, bShadows && (!CarPartShadows.IsValidIndex(P) || CarPartShadows[P] != 0)) : nullptr);
+		// (LG5: each part drawn out to its own distance: a body far, its glass, wheels and
+		// small parts nearer, as the parked cars')
+		if (CarParts.Last() && CarPartCull.IsValidIndex(P) && CarPartCull[P] > 0.f)
+		{
+			CarParts.Last()->SetCullDistances(0, (int32)(100.f * CarPartCull[P]));
+		}
 	}
 }
 
@@ -518,7 +529,9 @@ void ACityGenLife::SpawnAll()
 
 	// (the cars on the region's lanes, apart by their gap)
 	// (more cars than the plan drew: its models and paints again in turn)
-	const int32 NC = CarStarts.Num() && CarModels.Num() ? FMath::Max(0, Cars) : 0;
+	// (LG5: the city's traffic has a pool of its own, SpawnCarPool, below)
+	const bool bTrafficPool = IsTraffic();
+	const int32 NC = !bTrafficPool && CarStarts.Num() && CarModels.Num() ? FMath::Max(0, Cars) : 0;
 	CarOf.SetNumZeroed(NC);
 	for (int32 K = 0; K < NC; ++K)
 	{
@@ -615,6 +628,11 @@ void ACityGenLife::SpawnAll()
 		}
 		Comp->MarkRenderStateDirty();
 	}
+	if (bTrafficPool)
+	{
+		SpawnCarPool();
+		return;
+	}
 	for (int32 P = 0; P < CarParts.Num(); ++P)
 	{
 		UInstancedStaticMeshComponent* Comp = CarParts[P];
@@ -662,7 +680,7 @@ void ACityGenLife::SetEnabled(bool bOn)
 	}
 	for (UInstancedStaticMeshComponent* C : CarParts)
 	{
-		if (C) { C->SetVisibility(bOn); }
+		if (C) { C->SetVisibility(bOn && (bTraffic || !IsTraffic())); }
 	}
 	for (UInstancedStaticMeshComponent* C : MidComps)
 	{
@@ -758,6 +776,11 @@ void ACityGenLife::FindGround()
 		}
 		else if (FCgLifeCar* C = EM.GetFragmentDataPtr<FCgLifeCar>(H))
 		{
+			// (LG5: only the live cars within 300 m of the view need their ground)
+			if (IsTraffic() && (!C->Active || FVector::DistSquared(C->Pos, Frame.View) > 9.0e8))
+			{
+				continue;
+			}
 			ZOff = &C->ZOff;
 			At = C->Pos;
 		}
@@ -804,6 +827,15 @@ void ACityGenLife::UpdateInstances()
 			Scratch[K] = FTransform(FRotator(0.f, WalkYaw[K], 0.f), WalkPos[K] + FVector(0.f, 0.f, 166.f), Shown(K) ? FVector(0.22f, 0.20f, 0.25f) : FVector::ZeroVector);
 		}
 		Heads->BatchUpdateInstancesTransforms(0, Scratch, false, bRebuildRenderState, false);
+	}
+	if (IsTraffic())
+	{
+		// (LG5: the traffic's pool, by model)
+		if (bTraffic)
+		{
+			UpdateCarInstances();
+		}
+		return;
 	}
 	const int32 NC = CarPos.Num();
 	for (int32 P = 0; P < CarParts.Num(); ++P)
@@ -869,6 +901,25 @@ void ACityGenLife::Tick(float DeltaSeconds)
 		Frame.Time = GetWorld()->GetTimeSeconds();
 		Frame.FrameNo = Frames++;
 	}
+	// (LG5: the live lanes round the view, every LiveStep s; the pawns the cars stop for)
+	const bool bTrafficOn = IsTraffic() && bTraffic;
+	if (bTrafficOn)
+	{
+		if (!bCity)
+		{
+			FVector View;
+			Frame.View = ViewPoint(View) ? View : FVector(Center.X * 100.0, -Center.Y * 100.0, 0.0);
+			Frame.Time = GetWorld()->GetTimeSeconds();
+			Frame.FrameNo = Frames++;
+		}
+		TrafficClock += DeltaSeconds;
+		if (TrafficClock >= 0.25f)
+		{
+			UpdateTraffic(TrafficClock, LastTrafficView.X > 1.0e11);
+			TrafficClock = 0.f;
+		}
+		GatherPlayers();
+	}
 	FindGround();
 	{
 		UE::Mass::FProcessingContext Ctx(EM, DeltaSeconds);
@@ -878,9 +929,14 @@ void ACityGenLife::Tick(float DeltaSeconds)
 	{
 		TakeFreed();
 	}
+	if (bTrafficOn || !IsTraffic())
 	{
 		UE::Mass::FProcessingContext Ctx(EM, DeltaSeconds);
 		UE::Mass::Executor::Run(*DriveProc, Ctx);
+	}
+	if (bTrafficOn)
+	{
+		TakeFreedCars();
 	}
 	UpdateInstances();
 	const double Ms = (FPlatformTime::Seconds() - T0) * 1000.0;
@@ -921,5 +977,5 @@ FString ACityGenLife::GetStatus() const
 		bEnabled ? TEXT("true") : TEXT("false"), bBuilt ? TEXT("true") : TEXT("false"), *DistrictId,
 		WalkLaneCount, DriveLaneCount, CarStarts.Num(), WalkPos.Num(), CarPos.Num(), Entities.Num(), Placed,
 		Bodies ? Bodies->GetInstanceCount() : -1, CarParts.Num(), P0.X, -P0.Y, P0.Z, C0.X, -C0.Y, C0.Z,
-		TickMs, TickMsMax, (long long)Ticks, *(Lib + CrowdStatus()));
+		TickMs, TickMsMax, (long long)Ticks, *(Lib + CrowdStatus() + TrafficStatus()));
 }

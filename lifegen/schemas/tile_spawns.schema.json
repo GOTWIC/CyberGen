@@ -1,5 +1,110 @@
 {
  "$defs": {
+  "Drive": {
+   "additionalProperties": false,
+   "description": "LG5: a lane's traffic (scope 6.5): how many cars drive on it in each of M11's hour bands\n(the district's day shapes the hours within a band), its road's class, and the signal it\nstops at.",
+   "properties": {
+    "district_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "District Id"
+    },
+    "hash": {
+     "title": "Hash",
+     "type": "string"
+    },
+    "id": {
+     "description": "The lane's id (M2's lane graph; a lane, not a junction's connector).",
+     "title": "Id",
+     "type": "string"
+    },
+    "length_m": {
+     "title": "Length M",
+     "type": "number"
+    },
+    "main": {
+     "description": "On the lane graph's largest strongly connected part (cars drive only there; a lane off it is left empty).",
+     "title": "Main",
+     "type": "boolean"
+    },
+    "phase": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The phase it moves in.",
+     "title": "Phase"
+    },
+    "road_class": {
+     "description": "Its cruise speed's class (`presets.DRIVE_SPEEDS`).",
+     "title": "Road Class",
+     "type": "string"
+    },
+    "segment_id": {
+     "title": "Segment Id",
+     "type": "string"
+    },
+    "signal": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The signal its end stops at (`sig.<junction id>`).",
+     "title": "Signal"
+    },
+    "stop_back_m": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Where a car's front stops on red: this far back from the lane's end (short of the crosswalk it crosses).",
+     "title": "Stop Back M"
+    },
+    "vehicles": {
+     "description": "Cars on it per hour band (M11's bands, the fleet's busy and the traffic's scale in).",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 5,
+     "minItems": 5,
+     "title": "Vehicles",
+     "type": "array"
+    }
+   },
+   "required": [
+    "id",
+    "segment_id",
+    "road_class",
+    "length_m",
+    "main",
+    "vehicles",
+    "hash"
+   ],
+   "title": "Drive",
+   "type": "object"
+  },
   "Slot": {
    "additionalProperties": false,
    "description": "A place slot (scope 6.4): a Smart Object to be (LG4) at a bench, a stop, a stall.",
@@ -334,6 +439,14 @@
   "city": {
    "title": "City",
    "type": "string"
+  },
+  "drives": {
+   "description": "LG5: the lanes whose middle is in the tile.",
+   "items": {
+    "$ref": "#/$defs/Drive"
+   },
+   "title": "Drives",
+   "type": "array"
   },
   "slots": {
    "items": {

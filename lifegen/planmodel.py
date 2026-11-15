@@ -94,6 +94,31 @@ class Walk(_Model):
     hash: str
 
 
+class Drive(_Model):
+    """LG5: a lane's traffic (scope 6.5): how many cars drive on it in each of M11's hour bands
+    (the district's day shapes the hours within a band), its road's class, and the signal it
+    stops at."""
+    id: str = Field(description="The lane's id (M2's lane graph; a lane, not a junction's "
+                                "connector).")
+    segment_id: str
+    district_id: str | None = None
+    road_class: str = Field(description="Its cruise speed's class (`presets.DRIVE_SPEEDS`).")
+    length_m: float
+    main: bool = Field(description="On the lane graph's largest strongly connected part "
+                                   "(cars drive only there; a lane off it is left empty).")
+    vehicles: Annotated[list[float], Field(min_length=5, max_length=5,
+                                           description="Cars on it per hour band (M11's bands, "
+                                                       "the fleet's busy and the traffic's "
+                                                       "scale in).")]
+    signal: str | None = Field(None, description="The signal its end stops at "
+                                                 "(`sig.<junction id>`).")
+    phase: int | None = Field(None, description="The phase it moves in.")
+    stop_back_m: float | None = Field(None, description="Where a car's front stops on red: "
+                                                        "this far back from the lane's end "
+                                                        "(short of the crosswalk it crosses).")
+    hash: str
+
+
 class TileSpawns(_Model):
     version: Literal[1] = PLAN_VERSION
     city: str
@@ -103,6 +128,8 @@ class TileSpawns(_Model):
     slots: list[Slot]
     walks: list[Walk] = Field(default_factory=list, description="LG3: the walkways whose "
                                                                 "middle is in the tile.")
+    drives: list[Drive] = Field(default_factory=list, description="LG5: the lanes whose "
+                                                                  "middle is in the tile.")
 
 
 class Phase(_Model):
@@ -160,12 +187,40 @@ class CrowdPlan(_Model):
     hash: str
 
 
+class TrafficPlan(_Model):
+    """LG5: the city's traffic (scope 6.5): the pool of cars the runtime simulates round the
+    view (each slot a model of AG18's fleet, shared out by the districts' fleets), how they
+    drive (the car following model, signals, junctions, yielding), the districts' fleets and
+    paints, its totals by hour."""
+    hour: int
+    pool: int
+    live_m: float
+    scale: float
+    models: list[str] = Field(description="AG18's models the traffic draws from (no Vex or "
+                                          "Aurel: `assetgen.parked.table.EXCLUDED`).")
+    slots: list[int] = Field(description="Per pool slot its model (an index into `models`).")
+    weights: dict[str, list[float]] = Field(description="Per district its fleet: a weight per "
+                                                        "model (in `models`' order).")
+    paints: dict[str, list[list[float]]] = Field(
+        description="Per district, per model, `paints` paints of 9 floats (three linear "
+                    "colors, AG18's step H's draw by the district's archetype).")
+    drive: dict[str, float | str | list[float]] = Field(
+        description="cars_steam's speeds: `junction`, `lateral`, `brake`, `crawl`, `vary`, "
+                    "`default`.")
+    drive_speeds: dict[str, float]
+    follow: dict[str, float] = Field(description="The car following model and the signals, "
+                                                 "junctions and yielding (`presets.TRAFFIC`).")
+    totals: dict
+    hash: str
+
+
 class TileIndex(_Model):
     tile: str
     file: str = Field(description="`spawns/<tile>.json`, relative to the plan.")
     spawns: int
     slots: int
     walks: int = 0
+    drives: int = 0
     sha256: str = Field(description="sha256 of the tile file's bytes.")
 
 
@@ -265,6 +320,7 @@ class LifePlan(_Model):
     asks: list[Ask]
     spike: SpikePlan | None = None
     crowd: CrowdPlan | None = Field(None, description="LG3: the city's crowd.")
+    traffic: TrafficPlan | None = Field(None, description="LG5: the city's traffic.")
     checks: dict[str, Check]
     totals: dict
 

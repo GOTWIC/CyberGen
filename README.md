@@ -674,6 +674,18 @@ has at the hour, in groups, at their own pace, waiting at crosswalks for the sig
 out of shop and building doors and going back in; they come and go round you past where you
 can see them, so the whole city is lived in at the cost of one district.
 
+LG5 (traffic) is in: the hand-designed cars drive every lane of the city, each district's own
+mix of models and paint, following the car in front, queueing at red lights, taking turns
+through junctions, and stopping for people crossing and for you standing in the road; they
+come and go 800 m round you, from the street and from the air. `CityGenLife.Traffic 0`, or the
+Tab menu's Traffic row, turns them off.
+
+| A queue at a red light (LG5) | A car stopped for you in its lane (LG5) |
+|---|---|
+| <img src="docs/progress/LG5/unreal/pday_traffic_red.jpg" width="420"> | <img src="docs/progress/LG5/unreal/pday_traffic_player.jpg" width="420"> |
+| Stopped for someone crossing (LG5) | Night traffic (LG5) |
+| <img src="docs/progress/LG5/unreal/pday_traffic_person.jpg" width="420"> | <img src="docs/progress/LG5/unreal/night_traffic_red.jpg" width="420"> |
+
 | People on an Old Town street | The walk by night |
 |---|---|
 | <img src="docs/progress/LG1/unreal/pday_people_close_0.jpg" width="420"> | <img src="docs/progress/LG1/unreal/night_people_close_0.jpg" width="420"> |
@@ -704,7 +716,7 @@ Plan: [`docs/lifegen_scope.md`](docs/lifegen_scope.md); what each milestone did:
 | LG2 | Clothing | Garments generated from sewing patterns and draped on each body, generated fabrics, prints and wear, accessories and cyberware; outfits by district, gang, job, wealth and weather; long coats that move near the view | Planned |
 | LG3 | Crowds on the streets | People walking every sidewalk of the city, crossing at crosswalks with the signals, taking stairs and elevators between levels, in groups and at their own pace, as many as each street has at each hour, coming out of doors and going back in | Done |
 | LG4 | Life at places | People at benches, stalls, vending machines and bus stops, queueing at shop doors, going in and out of buildings, bars and clinics by their opening hours; gangs on their turf and police patrols | Planned |
-| LG5 | Traffic | The hand-designed cars, and trucks, buses, taxis and bikes, on the lanes, stopping at signals and turning by the rules, parking and leaving, rush hour and night traffic; their lights by night | Planned |
+| LG5 | Traffic | The hand-designed cars on every lane of the city, following each other, stopping at red lights and taking turns through junctions, stopping for people and for you in the road, as many as each street has at each hour; their lights by night | Done |
 | LG6 | Transit | Trains, metro, monorail, maglev and sky tube pods running their lines to timetables, stopping at stations, people boarding and leaving | Planned |
 | LG7 | Air and water | Flying cars on air lanes between towers and landing pads, drones, aircraft and shuttles over the spaceport, helicopters at helipads, boats and ferries on the water | Planned |
 | LG8 | Weather, reactions and release | People and traffic that follow the hour and the weather (umbrellas and shelter in rain, nightlife), step aside for the player and react to what happens near them; a performance pass for crowds and traffic; every sample city alive, checked in Unreal | Planned |

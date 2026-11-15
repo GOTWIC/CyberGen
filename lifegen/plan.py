@@ -22,12 +22,18 @@ From the city model (read only) and the life spec:
   `signal_phases` derived: `signals.json`), AG3's doors as the spawn points where the build
   has them (`door_points`), the pool of people the runtime simulates round the view
   (`crowd_plan`), checks (`crowd_checks`).
+- **The traffic** (LG5, scope 6.5): every lane's cars per hour band (`traffic_lanes`: a road
+  segment's M11 vehicles on its lanes by length, none off the lane graph's largest strongly
+  connected part), the signal each lane's end stops at and where (`lane_signals`: LG3's derived
+  phases, short of the crosswalk), the pool of cars the runtime simulates round the view, its
+  slots by the districts' fleets and their paints (`traffic_plan`), checks
+  (`traffic_checks`). LG0's spike cars go (`presets.SPIKE["cars"]` 0).
 - **The asks of citygen** (`asks.py`) and their state.
 - **Checks** (scope 8, the ones LG0 can make): spawns on the graphs, spawns reaching each
   other, densities kept, slots placed, the spike within the budgets.
 
 Outputs (written only when their bytes change): `life_plan.json`, `spawns/<tile>.json` (LG3:
-with its walkways' people), `signals.json`, `life_report.json`, `life_report.txt`,
+with its walkways' people; LG5: its lanes' cars), `signals.json`, `life_report.json`, `life_report.txt`,
 `unreal_contribution.life.json`, `preview_crowds.png`.
 """
 
@@ -637,6 +643,277 @@ def crowd_checks(model: dict, rows: list[dict], hours: dict, filled: dict, sigs:
 
 
 # ---------------------------------------------------------------------------
+# LG5: the city's traffic
+# ---------------------------------------------------------------------------
+
+def _cross_at(line, a, b) -> float | None:
+    """The distance along a polyline (plan) where it first crosses the segment a-b, or
+    None."""
+    run = 0.0
+    for p, q in zip(line, line[1:]):
+        rx, ry = q[0] - p[0], q[1] - p[1]
+        sx, sy = b[0] - a[0], b[1] - a[1]
+        den = rx * sy - ry * sx
+        seg = math.hypot(rx, ry)
+        if abs(den) > 1e-9:
+            t = ((a[0] - p[0]) * sy - (a[1] - p[1]) * sx) / den
+            u = ((a[0] - p[0]) * ry - (a[1] - p[1]) * rx) / den
+            if 0.0 <= t <= 1.0 and 0.0 <= u <= 1.0:
+                return run + t * seg
+        run += seg
+    return None
+
+
+def lane_signals(model: dict, sigs: list[dict]) -> dict[str, tuple[str, int, float]]:
+    """Per lane (a lane, not a connector) that ends at a signalized junction on one of its legs:
+    its signal, the phase its leg moves in and where its cars stop on red (m back from the
+    lane's end: `presets.TRAFFIC["stop_margin_m"]` short of the crosswalk across it, else of
+    its end)."""
+    tr = P.TRAFFIC
+    segs = {s["id"]: s for s in model.get("road_segments", [])}
+    juncs = {j["id"]: j for j in model.get("junctions", [])}
+    cws = {c["id"]: c for c in model.get("crosswalks", [])}
+    at_node: dict[str, tuple[dict, dict]] = {}
+    for s in sigs:
+        j = juncs.get(s["junction_id"])
+        if j is None:
+            continue
+        phase_of = {leg: p["index"] for p in s["phases"] for leg in p["legs"]}
+        for n in [j["node_id"], *((j.get("attrs") or {}).get("nodes") or [])]:
+            at_node[n] = (s, phase_of, j)
+    out = {}
+    for ln in model.get("lanes", []):
+        if ln.get("kind") != "lane" or ln.get("segment_id") not in segs:
+            continue
+        seg = segs[ln["segment_id"]]
+        end = seg.get("end") if ln.get("forward", True) else seg.get("start")
+        hit = at_node.get(end)
+        if hit is None or ln["segment_id"] not in hit[1]:
+            continue
+        s, phase_of, j = hit
+        line = ln["centerline"]
+        L = _length(line)
+        stop = L - tr["stop_margin_m"]
+        for cid in j.get("crosswalk_ids") or []:
+            c = cws.get(cid)
+            if c is None or c.get("segment_id") != ln["segment_id"]:
+                continue
+            at = _cross_at(line, c["line"][0], c["line"][-1])
+            if at is not None:
+                stop = min(stop, at - 0.5 * float(c.get("width_m") or 3.0) - tr["stop_margin_m"])
+        back = min(max(L - stop, 0.0), max(0.0, L - 1.0))
+        out[ln["id"]] = (s["id"], phase_of[ln["segment_id"]], _r(back, 2))
+    return out
+
+
+def traffic_lanes(model: dict, filled: dict, sigs: list[dict]) -> tuple[list[dict], dict]:
+    """Every lane's cars per hour band (scope 6.5): a road segment's vehicles (M11's per 100 m
+    over its length, the fleet's busy, the traffic's scale) on its lanes by length; none on a
+    lane off the lane graph's largest strongly connected part (cars that drive there could
+    never leave: said in what is left out), nor on a segment with no lane. Returns the rows
+    and what was left out."""
+    from citygen.unreal_life import main_component
+    scale = float(filled["traffic"]["scale"]) * float(filled["fleet_busy"])
+    segs = {s["id"]: s for s in model.get("road_segments", [])}
+    seg_len = {sid: float((s.get("attrs") or {}).get("length_m") or
+                          _length(s.get("centerline") or [])) for sid, s in segs.items()}
+    dens = {}
+    for row in model.get("densities", []):
+        d = row.get("district_id")
+        if d in filled["districts"]:
+            dens[row["segment_id"]] = (d, [float(v) * seg_len.get(row["segment_id"], 0.0)
+                                           / 100.0 * scale
+                                           for v in (row.get("vehicles_per_100m") or [0.0] * 5)])
+    lanes = model.get("lanes", [])
+    idx = {ln["id"]: k for k, ln in enumerate(lanes)}
+    main = main_component([[idx[s] for s in ln.get("successors") or [] if s in idx]
+                           for ln in lanes])
+    on_seg = defaultdict(float)
+    for k, ln in enumerate(lanes):
+        if ln.get("kind") == "lane" and ln.get("segment_id") in dens:
+            on_seg[ln["segment_id"]] += _length(ln["centerline"])
+    sig_of = lane_signals(model, sigs)
+    left = {"lanes": 0, "segments": 0, "vehicles": [0.0] * 5, "district": {}}
+
+    def lose(d, band):
+        st = left["district"].setdefault(d, [0.0] * 5)
+        for i in range(5):
+            st[i] += band[i]
+            left["vehicles"][i] += band[i]
+
+    for sid, (d, band) in sorted(dens.items()):
+        if on_seg[sid] <= 0.0 and any(v > 0.0 for v in band):
+            left["segments"] += 1
+            lose(d, band)
+    rows = []
+    for k, ln in enumerate(lanes):
+        if ln.get("kind") != "lane" or not ln.get("segment_id"):
+            continue
+        sid = ln["segment_id"]
+        L = _length(ln["centerline"])
+        d, band = dens.get(sid, (None, [0.0] * 5))
+        veh = [v * L / on_seg[sid] for v in band] if on_seg[sid] > 0.0 else [0.0] * 5
+        if k not in main and any(v > 0.0 for v in veh):
+            left["lanes"] += 1
+            lose(d, veh)
+            veh = [0.0] * 5
+        rc = (segs.get(sid) or {}).get("road_class") or P.DRIVE["default"]
+        mx, my = _mid(ln["centerline"])
+        sg = sig_of.get(ln["id"])
+        rows.append({"id": ln["id"], "segment_id": sid, "district_id": d,
+                     "road_class": rc if rc in P.DRIVE_SPEEDS else P.DRIVE["default"],
+                     "length_m": _r(L, 2), "main": k in main,
+                     "vehicles": [_r(v, 4) for v in veh],
+                     "signal": sg[0] if sg else None, "phase": sg[1] if sg else None,
+                     "stop_back_m": sg[2] if sg else None, "tile": tile_of(mx, my)})
+    left["vehicles"] = [_r(v, 2) for v in left["vehicles"]]
+    left["district"] = {d: [_r(v, 3) for v in vs] for d, vs in sorted(left["district"].items(),
+                                                                     key=lambda kv: str(kv[0]))}
+    left["main_lanes"] = sum(1 for k, ln in enumerate(lanes) if k in main)
+    left["all_lanes"] = len(lanes)
+    return rows, left
+
+
+def traffic_plan(model: dict, filled: dict, rows: list[dict], left: dict) -> dict:
+    """The traffic's record in the plan: its settings, the pool's slots by model (shared out by
+    the districts' fleets: half the city's mix at the hour, half each model's most in any
+    district, so a district's own fleet finds its models free), the districts' fleets and
+    paints, its totals by hour."""
+    from assetgen.parked.table import EXCLUDED, paint
+    tr = filled["traffic"]
+    hour = int(filled["crowd"]["hour"])
+    pool = int(tr["pool"])
+    dists = filled["districts"]
+    models = sorted({m for fd in dists.values() for m, w in fd["fleet"].items()
+                     if w > 0 and m not in EXCLUDED})
+    weights = {d: [float(fd["fleet"].get(m, 0.0)) for m in models] for d, fd in dists.items()}
+    veh = defaultdict(float)
+    for r in rows:
+        if r["district_id"] in dists:
+            veh[r["district_id"]] += r["vehicles"][P.band_of(hour)] * \
+                dists[r["district_id"]]["shape"][hour]
+    share = [0.0] * len(models)
+    most = [0.0] * len(models)
+    tot = sum(veh.values())
+    for d, w in weights.items():
+        s = sum(w)
+        if s <= 0.0:
+            continue
+        for i, v in enumerate(w):
+            if tot > 0.0:
+                share[i] += veh[d] / tot * v / s
+            if veh[d] > 0.0 or tot <= 0.0:
+                most[i] = max(most[i], v / s)
+    mix = [0.5 * a + 0.5 * b for a, b in zip(share, most)]
+    ms = sum(mix) or 1.0
+    want = [pool * v / ms for v in mix]
+    count = [int(v) for v in want]
+    if pool >= len(models):
+        count = [max(1, c) for c in count]
+    # (largest remainders, then the most drawn first, to the pool exactly)
+    order = sorted(range(len(models)), key=lambda i: (-(want[i] - int(want[i])), models[i]))
+    k = 0
+    while models and sum(count) < pool:
+        count[order[k % len(order)]] += 1
+        k += 1
+    while models and sum(count) > pool:
+        i = max(range(len(models)), key=lambda i: (count[i], models[i]))
+        count[i] -= 1
+    slots = [i for i, c in enumerate(count) for _ in range(c)]
+    slots =[s for _, s in sorted(((_u("lg5.slot", models[s], n), s)
+                                   for n, s in enumerate(slots)))]
+    kp = int(P.TRAFFIC["paints"])
+    paints = {}
+    for d, fd in dists.items():
+        paints[d] = [[round(float(v), 4) for k2 in range(kp)
+                      for c in paint(m, fd["archetype"], f"lg5.{d}.{m}.{k2}")[0] for v in c]
+                     for m in models]
+    at_hour = [0.0] * P.HOURS
+    for r in rows:
+        shp = (dists.get(r["district_id"]) or {}).get("shape") or [1.0] * P.HOURS
+        for h in range(P.HOURS):
+            at_hour[h] += r["vehicles"][P.band_of(h)] * shp[h]
+    follow = {k: float(v) for k, v in P.TRAFFIC.items()
+              if k not in ("pool", "live_m", "paints", "scale")}
+    return hashed({
+        "hour": hour, "pool": pool, "live_m": float(tr["live_m"]), "scale": float(tr["scale"]),
+        "models": models, "slots": slots, "weights": weights, "paints": paints,
+        "drive": {k: (list(v) if isinstance(v, list) else v) for k, v in sorted(P.DRIVE.items())},
+        "drive_speeds": dict(sorted(P.DRIVE_SPEEDS.items())), "follow": follow,
+        "totals": {"lanes": len(rows),
+                   "with_cars": sum(1 for r in rows if any(v > 0.0 for v in r["vehicles"])),
+                   "main_lanes": left["main_lanes"], "graph_lanes": left["all_lanes"],
+                   "signalized": sum(1 for r in rows if r["signal"]),
+                   "slots": dict(zip(models, count)),
+                   "cars_by_hour": [_r(v, 1) for v in at_hour], "left_out": left}})
+
+
+def traffic_checks(model: dict, rows: list[dict], hours: dict, filled: dict, sigs: list[dict],
+                   traffic: dict) -> dict:
+    """LG5's checks: the lanes' cars keep M11's vehicle densities per district and band (what
+    is left out said so), every car on the lane graph's largest strongly connected part, the
+    signals' approaches, the pool within the budget, the fleet."""
+    out = {}
+    scale = float(filled["traffic"]["scale"]) * float(filled["fleet_busy"])
+    got = defaultdict(lambda: [0.0] * 5)
+    for r in rows:
+        for i in range(5):
+            got[r["district_id"]][i] += r["vehicles"][i]
+    lost = traffic["totals"]["left_out"]
+    bad = []
+    for d, h in hours.items():
+        for i in range(5):
+            want = h["band"]["vehicles"][i] * scale
+            have = got[d][i] + (lost["district"].get(d) or [0.0] * 5)[i]
+            if abs(have - want) > max(0.5, 0.01 * want):
+                bad.append(f"{d} {P.BANDS[i]} {have:.1f} != {want:.1f}")
+    out["traffic_densities"] = {"ok": not bad, "detail": (
+        f"every district's lanes carry M11's vehicles per hour band (times the fleet's busy "
+        f"and the traffic's scale) within 1%; left out: {lost['lanes']} lanes off the lane "
+        f"graph's main part and {lost['segments']} segments without a lane "
+        f"({max(lost['vehicles']):.1f} cars at the most)" if not bad else "; ".join(bad[:5]))}
+    off = [r["id"] for r in rows if not r["main"] and any(v > 0.0 for v in r["vehicles"])]
+    tot_m = sum(r["length_m"] for r in rows) or 1.0
+    main_m = sum(r["length_m"] for r in rows if r["main"])
+    out["traffic_lanes"] = {"ok": not off and main_m >= 0.5 * tot_m, "detail": (
+        f"every car on the lane graph's largest strongly connected part "
+        f"({traffic['totals']['main_lanes']} of {traffic['totals']['graph_lanes']} lanes and "
+        f"connectors, {main_m / tot_m:.1%} of the lanes' length)" if not off else
+        f"{len(off)} lanes with cars off the main part, first {off[:3]}")}
+    # every signal with lanes that stop at it, each stopping within its lane
+    with_lanes = {r["signal"] for r in rows if r["signal"]}
+    sbad = [r["id"] for r in rows if r["signal"] and
+            not 0.0 <= (r["stop_back_m"] or 0.0) <= r["length_m"]]
+    none = [s["id"] for s in sigs if s["id"] not in with_lanes]
+    # (a signal no lane ends at, every leg leaving it, is noted, not failed)
+    out["traffic_signals"] = {"ok": not sbad, "detail": (
+        f"{len(with_lanes)} of {len(sigs)} signals with lanes stopping at them "
+        f"({traffic['totals']['signalized']} lanes, each stopping within its lane, short of "
+        f"its crosswalk)" + (f"; {len(none)} signals no lane ends at, first {none[:3]}"
+                             if none else "")
+        if not sbad else f"{len(sbad)} lanes stopping off their lane, first {sbad[:3]}")}
+    bud = filled["budgets"]
+    pool, live = traffic["pool"], traffic["live_m"]
+    in_view = pool * min(1.0, (bud["view_m"] / live) ** 2)
+    out["traffic_budget"] = {"ok": in_view <= bud["vehicles_view"] + 0.5, "detail": (
+        f"a pool of {pool} cars live within {live:.0f} m of the view, about {in_view:.0f} "
+        f"within {bud['view_m']:.0f} m (the budget's {bud['vehicles_view']})")}
+    from assetgen.parked.table import EXCLUDED
+    ms = traffic["models"]
+    ex = [m for m in ms if m in EXCLUDED]
+    empty = [d for d, w in traffic["weights"].items()
+             if sum(w) <= 0.0 and any((got.get(d) or [0.0])[i] > 0.0 for i in range(5))]
+    cnt = traffic["totals"]["slots"]
+    out["traffic_fleet"] = {"ok": not ex and not empty and bool(ms) and
+                            all(c > 0 for c in cnt.values()), "detail": (
+        f"{len(ms)} of AG18's models ({', '.join(ms)}), each in {min(cnt.values()) if cnt else 0} "
+        f"to {max(cnt.values()) if cnt else 0} pool slots; every district with cars has a "
+        f"fleet; no Vex or Aurel" if not ex and not empty and ms else
+        f"excluded {ex}, districts without a fleet {empty}")}
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Checks
 # ---------------------------------------------------------------------------
 
@@ -881,15 +1158,21 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     rows, left = crowd_walks(model, filled, polys, sig_of, {s["walkway_id"] for s in spawns})
     walk_rows = [hashed({k: v for k, v in r.items() if k != "tile"}) for r in rows]
     crowd = crowd_plan(model, filled, rows, sigs, left)
+    # LG5: every lane's cars, the traffic
+    drows, dleft = traffic_lanes(model, filled, sigs)
+    drive_rows = [hashed({k: v for k, v in r.items() if k != "tile"}) for r in drows]
+    traffic = traffic_plan(model, filled, drows, dleft)
 
     # per tile
-    by_tile = defaultdict(lambda: {"spawns": [], "slots": [], "walks": []})
+    by_tile = defaultdict(lambda: {"spawns": [], "slots": [], "walks": [], "drives": []})
     for s in spawns:
         by_tile[s["tile"]]["spawns"].append(s)
     for s in slot_rows:
         by_tile[s["tile"]]["slots"].append(s)
     for r, w in sorted(zip(rows, walk_rows), key=lambda rw: rw[1]["id"]):
         by_tile[r["tile"]]["walks"].append(w)
+    for r, w in sorted(zip(drows, drive_rows), key=lambda rw: rw[1]["id"]):
+        by_tile[r["tile"]]["drives"].append(w)
     tiles = []
     keep = set()
     for t in sorted(by_tile):
@@ -900,6 +1183,7 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
         write(f, text, wrote)
         tiles.append({"tile": t, "file": f"spawns/{t}.json", "spawns": len(by_tile[t]["spawns"]),
                       "slots": len(by_tile[t]["slots"]), "walks": len(by_tile[t]["walks"]),
+                      "drives": len(by_tile[t]["drives"]),
                       "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()})
     if (out / "spawns").is_dir():
         for f in sorted((out / "spawns").glob("*.json")):
@@ -926,6 +1210,7 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     spike = spike_plan(model, filled, hours)
     checks = run_checks(model, spawns, slot_rows, hours, filled, spike)
     checks.update(crowd_checks(model, rows, hours, filled, sigs, crowd, spawns))
+    checks.update(traffic_checks(model, drows, hours, filled, sigs, traffic))
     sdata = PM.Signals(city=city, derived=True, signals=sigs)
     write(out / "signals.json", canon(json.loads(sdata.model_dump_json())), wrote)
     asks = A.status(model, {"doors": (build / "assets" / "unreal_contribution.buildings.json")
@@ -937,14 +1222,17 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
                                       for k in range(P.HOURS)), 1),
               "spawns_without_walkway": 0,
               "doors": sum(1 for s in spawns if s["kind"] == "door"),
-              "walkways": len(rows), "signals": len(sigs)}
+              "walkways": len(rows), "signals": len(sigs),
+              "lanes": len(drows),
+              "cars_at_hour": traffic["totals"]["cars_by_hour"][traffic["hour"]]}
     body = {"city": city, "model_sha256": hashlib.sha256(raw).hexdigest(),
             "spec": {k: v for k, v in filled.items() if k != "districts"},
             "bands": list(P.BANDS), "districts": districts, "tiles": tiles, "asks": asks,
-            "spike": spike, "crowd": crowd, "checks": checks, "totals": totals}
+            "spike": spike, "crowd": crowd, "traffic": traffic, "checks": checks,
+            "totals": totals}
     plan_hash = _sha([body["spec"], [d["hash"] for d in districts],
                       [t["sha256"] for t in tiles], spike and spike["hash"], crowd["hash"],
-                      sdata.model_dump(mode="json")])
+                      sdata.model_dump(mode="json"), traffic["hash"]])
     plan = PM.LifePlan(plan_hash=plan_hash, **body)
     pdata = json.loads(plan.model_dump_json())
     write(out / "life_plan.json", canon(pdata), wrote)
@@ -953,7 +1241,8 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     if spike is not None:
         entries.append({"key": "life", "kind": "life_controller", "hash": _sha([plan_hash]),
                         "tile": None,
-                        "count": spike["people"] + spike["cars"] + crowd["pool"]})
+                        "count": spike["people"] + spike["cars"] + crowd["pool"] +
+                        traffic["pool"]})
     for t in tiles:
         entries.append({"key": f"life.spawns.{t['tile']}", "kind": "spawner",
                         "hash": t["sha256"][:16], "tile": t["tile"], "count": t["spawns"]})
@@ -978,6 +1267,15 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
                                           crowd["totals"]["offstreet_people"][crowd["hour"]],
                                           1),
                      "left_out": crowd["totals"]["left_out"]},
+           "traffic": {"hour": traffic["hour"], "pool": traffic["pool"],
+                       "live_m": traffic["live_m"], "models": len(traffic["models"]),
+                       **{k: traffic["totals"][k] for k in ("lanes", "with_cars",
+                                                            "main_lanes", "graph_lanes",
+                                                            "signalized")},
+                       "cars_at_hour": traffic["totals"]["cars_by_hour"][traffic["hour"]],
+                       "cars_peak": max(traffic["totals"]["cars_by_hour"]),
+                       "left_out": {k: traffic["totals"]["left_out"][k]
+                                    for k in ("lanes", "segments", "vehicles")}},
            "asks": {a["id"]: a["status"] for a in asks}}
     write(out / "life_report.json", canon(rep), wrote)
     write(out / "life_report.txt", report_text(rep), wrote)
@@ -1010,6 +1308,15 @@ def report_text(rep: dict) -> str:
                   f"of {c['pool']} live within {c['live_m']:.0f} m of the view; "
                   f"{c['signals']} signals; left out: {lo['walkways']} walkways no spawn "
                   f"reaches, {lo['segments']} segments without a walkway"]
+    if rep.get("traffic"):
+        c = rep["traffic"]
+        lo = c["left_out"]
+        L += ["", f"traffic: {c['cars_at_hour']:.0f} cars on {c['with_cars']} of {c['lanes']} "
+                  f"lanes at {c['hour']}:00 ({c['cars_peak']:.0f} at the busiest hour), "
+                  f"{c['models']} models; a pool of {c['pool']} live within {c['live_m']:.0f} m "
+                  f"of the view; {c['signalized']} lanes stop at signals; left out: "
+                  f"{lo['lanes']} lanes off the lane graph's main part, {lo['segments']} "
+                  f"segments without a lane"]
     if rep.get("spike"):
         s = rep["spike"]
         L += ["", f"spike: {s['name']} ({s['district_id']}) at {s['hour']}:00, {s['people']} "

@@ -163,8 +163,9 @@ public:
 	 *  weather+ and weather- (the next or the previous state, blended) and weather=NAME
 	 *  (`weather=rain!` at once); dlss_lamps_flicker's upscaler+, upscaler- and
 	 *  upscaler=NAME (default, native, tsr, dlss_quality, dlss_balanced, dlss_performance) and
-	 *  framegen (framegen=1 or 0); lifegen_clothing_toggle's clothing (clothing=1 or 0) with a
-	 *  life controller (the overlay's clicks and the console's CityGen.MenuRow).
+	 *  framegen (framegen=1 or 0); lifegen_clothing_toggle's clothing (clothing=1 or 0) and
+	 *  LG5's traffic (traffic=1 or 0) with a life controller (the overlay's clicks and the
+	 *  console's CityGen.MenuRow).
 	 *  False for a row the menu does not show. */
 	UFUNCTION(BlueprintCallable, Category = "CityGen")
 	bool ClickMenuRow(const FString& Row);
@@ -196,6 +197,12 @@ public:
 	bool HasLifeClothing() const;
 	bool GetLifeClothing() const;
 	void SetLifeClothing(bool bOn);
+	/** LG5: whether the life controller has the traffic's switch (bTraffic, with a traffic of
+	 *  its own: IsTraffic is not a UFUNCTION, so a traffic pool, TrafficPool > 0), its state,
+	 *  and SetTraffic on it (the menu's Traffic row, traffic=1 or 0). */
+	bool HasLifeTraffic() const;
+	bool GetLifeTraffic() const;
+	void SetLifeTraffic(bool bOn);
 
 	/** The controller's hour (0 to 24), and SetHour. */
 	float GetAtmosHour() const;

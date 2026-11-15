@@ -2844,6 +2844,37 @@ LG3 (crowds on the streets, built before LG2 at Swagnik's ask) is in place:
   characters rarely (`presets.BODY_WEIGHT`, `plan.draw_person`: 26% of people to 5%; the
   library unchanged). `docs/progress/lifegen_people_fixes/README.md`.
 
+LG5 (traffic, built before LG2 at Swagnik's ask: "I want cars everywhere") is in place:
+- **The plan** (`lifegen/plan.py`): every lane's cars per hour band (`traffic_lanes`: a
+  segment's M11 vehicles per 100 m over its lanes by length, times the fleet's busy and the
+  spec's `traffic.scale`, 2 by default: M11's late band is 0.7 cars per 100 m of lane, which
+  read as empty roads; none on a lane off the lane graph's largest strongly connected part,
+  `citygen.unreal_life.main_component`), each lane's signal, phase and stop point
+  (`lane_signals`: LG3's derived phases, `presets.TRAFFIC["stop_margin_m"]` short of the
+  crosswalk), each tile file's `drives`; the traffic (`traffic_plan`, `planmodel.TrafficPlan`,
+  the spec's `traffic`: pool 1,800 slots of AG18's models shared out by the districts' fleets,
+  no Vex or Aurel, live within 800 m, the districts' paints, the car following settings);
+  checks `traffic_densities`, `traffic_lanes`, `traffic_signals`, `traffic_budget`,
+  `traffic_fleet`. LG0's spike cars go (`SPIKE["cars"]` 0).
+- **Exporter and runtime** (`unreal_life.pack_traffic`, `conflicts`, `traffic_cars`,
+  `PACK_VERSION` 4; `import_city.traffic_props`, `LIFE_VERSION` life5;
+  `CityGenLifeTraffic.cpp`, the drive processor's `ExecuteTraffic`): the whole lane graph live
+  round the view as LG3's crowd (a fixed pool, lanes filled and emptied past 800 m, refilled
+  far from the view, the density scaled evenly past 92% of the pool); cars by the intelligent
+  driver model behind the car in front, stopping at red (and amber where they can), holding a
+  junction connector only while no crossing one is driven (GEOS's conflicts; a car waiting 6 s
+  claims it, past 25 s it goes) and with room past the junction, stopping for the crowd's
+  people and every pawn but the free camera on their line; cars_steam's speeds; wheels roll;
+  the packs' lamps emissive by Night. `CityGenLife.Traffic [0|1] [SCALE]`, the Tab menu's
+  Traffic row, the status's `traffic`; `CityGenLife.TrafficShow`, `BlockPlayer`, `Jaywalk`
+  and the check's `@late`, `wait`, `dilate`, `until` view commands for the shots; bench passes
+  `night_traffic_off`, `night_traffic_half`. `docs/unreal_export.md`, "From LG5: traffic".
+- Delta: every check passes, 550 to 860 cars live round the view in every district;
+  `night_plan_all` 21.2 ms p95 native (walk 25.5), traffic off 18.9, half the cars 20.1: over
+  the 20 ms budget by about 1 ms after a tuning round, the engine's cost of 92 moving instanced
+  components (lifegen's tick 1.3 to 2 ms), left for the performance pass.
+  `docs/progress/LG5/README.md`.
+
 ## Gallery site (GitHub Pages)
 
 `site/` is the public gallery at https://gotwic.github.io/CyberGen/ (served at

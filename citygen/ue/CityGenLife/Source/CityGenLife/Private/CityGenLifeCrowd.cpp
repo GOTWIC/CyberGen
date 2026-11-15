@@ -488,6 +488,11 @@ void ACityGenLife::SetHour(const int32 InHour)
 	{
 		UpdateLive(0.f, true);
 	}
+	if (bBuilt && IsTraffic() && bTraffic)
+	{
+		// (LG5: the traffic at the hour too)
+		UpdateTraffic(0.f, true);
+	}
 }
 
 void ACityGenLife::SetCrowdScale(const float InScale)

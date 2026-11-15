@@ -271,7 +271,124 @@ public:
 	/** The density's multiplier (CityGenLife.Crowd SCALE): filled again at once. */
 	UFUNCTION(BlueprintCallable, Category = "CityGen") void SetCrowdScale(float InScale);
 
+	// --- LG5: the city's traffic (set by the importer from the plan's traffic) ------------------
+	// Every lane and junction connector of the city's lane graph is a drive lane (DrivePoints
+	// ... as above, the whole graph). The plan gives each lane its cars per hour band
+	// (DriveCars, 5 a lane) and its district (DriveDistrict, whose day DistrictShape holds).
+	// Round the view every drive lane within TrafficLiveM is live: it gets its cars when it
+	// comes alive (past where they are seen), loses them when it goes, and a car driving onto a
+	// lane that is not live leaves there; cars come in on the live lanes far from the view to
+	// keep their number. At most TrafficPool cars live at once (each slot a model of AG18's
+	// fleet, TrafficSlots), past that the density scaled down evenly. They follow the car in
+	// front (the intelligent driver model), stop at red lights (DriveSignal, DriveWindows,
+	// DriveStopBack), never drive two crossing connectors of a junction at once
+	// (DriveConflicts), never enter a junction without room past it, and stop for people and
+	// the player in their way.
+
+	/** Per drive lane: cars per hour band (5 floats), district (-1 none), on the lane graph's
+	 *  largest strongly connected part (1), the signal window it stops at (-1 none; 5 floats
+	 *  each in DriveWindows: cycle, offset, green from, green to, amber to, s) and where (m back
+	 *  from its end), the drive lanes it may not be driven at once with (a connector's
+	 *  crossing, merging and leaving connectors: [DriveConflictStarts[l],
+	 *  DriveConflictStarts[l + 1]) of DriveConflicts). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") TArray<float> DriveCars;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") TArray<int32> DriveDistrict;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") TArray<uint8> DriveMain;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") TArray<int32> DriveSignal;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") TArray<float> DriveStopBack;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") TArray<float> DriveWindows;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") TArray<int32> DriveConflicts;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") TArray<int32> DriveConflictStarts;
+	/** Per pool slot its model (an index of the car models: CarPartModels'); per district its
+	 *  fleet (a weight per model) and paints (PaintsPer paints of PaintFloats per model); per
+	 *  model its length (m); per part the radius its wheel rolls on (m, 0 none) and how far it
+	 *  is drawn (m). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") TArray<int32> TrafficSlots;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") TArray<float> TrafficWeights;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") TArray<float> TrafficPaints;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") int32 PaintsPer = 6;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") TArray<float> CarLengths;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") TArray<float> CarPartSpin;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") TArray<float> CarPartCull;
+	/** The pool, the live radius (m, 3D), its margin, how far off the view cars come in to keep
+	 *  their number (m), a multiplier on the plan's density. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") int32 TrafficPool = 0;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") float TrafficLiveM = 800.f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") float TrafficMarginM = 60.f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") float TrafficRefillM = 450.f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") float TrafficScale = 1.f;
+	/** The car following model (the intelligent driver model): acceleration, comfortable and
+	 *  hardest braking (m/s2), the gap kept standing (m), the time headway (s), the free road
+	 *  exponent; signals (the hardest braking for an amber); junctions (s waiting before a car
+	 *  claims its connector, and before it goes regardless); yielding (m from the view within
+	 *  which cars look ahead for people, how far ahead: s of speed, at least and at most m;
+	 *  how near their line, m; s people are looked ahead; the gap kept to them, m). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") float TrafficAccel = 1.8f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") float TrafficBrake = 2.6f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") float TrafficBrakeMax = 8.f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") float TrafficGapM = 2.2f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") float TrafficHeadwayS = 1.2f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") float TrafficDelta = 4.f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") float AmberBrake = 3.5f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") float StarveS = 6.f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") float ForceS = 25.f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") float YieldM = 180.f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") float LookS = 1.6f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") float LookMinM = 8.f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") float LookMaxM = 45.f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") float LateralM = 1.45f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") float PredictS = 1.f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") float YieldMarginM = 2.f;
+	/** The traffic on or off (CityGenLife.Traffic [0|1], the play menu's row). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") bool bTraffic = true;
+
+	/** Whether this is LG5's city traffic (else LG0's spike cars). */
+	bool IsTraffic() const { return DriveLaneCount > 0 && DriveCars.Num() == 5 * DriveLaneCount && TrafficPool > 0 && TrafficSlots.Num() > 0; }
+	UFUNCTION(BlueprintCallable, Category = "CityGen") void SetTraffic(bool bOn);
+	/** The density's multiplier (CityGenLife.Traffic 1 SCALE): the live lanes filled again. */
+	UFUNCTION(BlueprintCallable, Category = "CityGen") void SetTrafficScale(float InScale);
+	/** For the check's shots: the camera moved to look at the nearest car stopped at a red
+	 *  light with a queue behind it (`red`), stopped for a person (`person`), for the player
+	 *  (`player`), or any moving car (`moving`); false when there is none. */
+	UFUNCTION(BlueprintCallable, Category = "CityGen") bool ShowTraffic(const FString& What);
+	/** For the check's shots: the walker (the play features' pawn) stood in the lane of the
+	 *  nearest moving car ahead of it, as far ahead as it needs to stop; false without one. */
+	UFUNCTION(BlueprintCallable, Category = "CityGen") bool BlockPlayer();
+	/** LG3's share of people crossing against the signal at danger 0 and 1 (CityGenLife.Jaywalk). */
+	UFUNCTION(BlueprintCallable, Category = "CityGen") void SetJaywalk(float AtSafe, float AtDanger);
+
 private:
+	// (LG5, CityGenLifeTraffic.cpp)
+	void BuildTraffic();
+	void SpawnCarPool();
+	void UpdateTraffic(float Dt, bool bRefill);
+	bool SpawnCar(int32 Lane, float Dist, FRandomStream& Rng);
+	void FreeCarsOnDeadLanes();
+	void TakeFreedCars();
+	void FreeCar(int32 Slot, FCgLifeCar& C);
+	float TrafficWant(int32 J) const;
+	void UpdateCarInstances();
+	void GatherPlayers();
+	FString TrafficStatus() const;
+	bool FrameCar(const FVector& At, const FVector& Toward, float Back, float Up, float Side);
+	TArray<uint8> DriveMainG, DriveIsConnector, CarShow;
+	TArray<int32> DriveSignalG, ConflictStartsG, ConflictsG, CarFreed, CarSlotModel, CarDistrict;
+	TArray<float> DriveStopBackG, CarSpin, DriveHalf;
+	TArray<FVector> DriveMid;
+	TArray<TArray<int32>> ModelSlots, FreeByModel, PartsOfModel;
+	TArray<TArray<uint8>> PartShown;          // (per part, per instance: drawn now)
+	int32 InstancesSent = 0;
+	TArray<int32> TrafficLaneHave;
+	TArray<FMassEntityHandle> CarEnts;
+	FRandomStream TrafficRng;
+	FVector LastTrafficView = FVector(1.0e12);
+	float TrafficClock = 0.f, TrafficLiveScale = 1.f, TrafficWantLive = 0.f, RefillAcc = 0.f;
+	int32 TrafficLiveLanes = 0, CarsActive = 0, CarsSpawned = 0, CarsRefilled = 0, CarsLost = 0, CarsLeftTotal = 0;
+	int32 CarsWhyNow[7] = {0, 0, 0, 0, 0, 0, 0};
+	int32 CarsMovingNow = 0, CarsForcedTotal = 0;
+	double TrafficMs = 0.0, TrafficMsMax = 0.0, CarDrawMs = 0.0, LiveMs = 0.0, LiveMsMax = 0.0;
+	FString LastShow;
+
 	// (LG3, CityGenLifeCrowd.cpp)
 	void BuildCrowd();
 	void SpawnPool();

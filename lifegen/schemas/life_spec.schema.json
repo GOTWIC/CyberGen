@@ -286,7 +286,7 @@
    "description": "LG0's spike: plain stand-ins on one district's walkways and a few cars on its lanes.",
    "properties": {
     "cars": {
-     "default": 40,
+     "default": 0,
      "maximum": 2000,
      "minimum": 0,
      "title": "Cars",
@@ -352,6 +352,35 @@
     }
    },
    "title": "Styles",
+   "type": "object"
+  },
+  "Traffic": {
+   "additionalProperties": false,
+   "description": "LG5: the city's traffic (scope 6.5): how many cars the runtime simulates at once round\nthe view, how far round it, how much busier or quieter than M11's densities (times the\nfleet's `busy`).",
+   "properties": {
+    "live_m": {
+     "default": 800.0,
+     "exclusiveMinimum": 50.0,
+     "maximum": 3000.0,
+     "title": "Live M",
+     "type": "number"
+    },
+    "pool": {
+     "default": 1800,
+     "maximum": 10000,
+     "minimum": 0,
+     "title": "Pool",
+     "type": "integer"
+    },
+    "scale": {
+     "default": 2.0,
+     "maximum": 10.0,
+     "minimum": 0.0,
+     "title": "Scale",
+     "type": "number"
+    }
+   },
+   "title": "Traffic",
    "type": "object"
   },
   "Transit": {
@@ -443,6 +472,9 @@
   },
   "styles": {
    "$ref": "#/$defs/Styles"
+  },
+  "traffic": {
+   "$ref": "#/$defs/Traffic"
   },
   "transit": {
    "$ref": "#/$defs/Transit"

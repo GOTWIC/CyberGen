@@ -120,6 +120,51 @@ namespace
 			}
 		}));
 
+	FAutoConsoleCommandWithWorldAndArgs TrafficCmd(TEXT("CityGenLife.Traffic"),
+		TEXT("CityGenLife.Traffic [0|1] [SCALE]: LG5's traffic on or off (toggling without an argument), at SCALE times the plan's density (within the pool), the live lanes filled again"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (ACityGenLife* A = LifeIn(World))
+			{
+				A->SetTraffic(Args.Num() ? FCString::Atoi(*Args[0]) != 0 : !A->bTraffic);
+				if (Args.Num() > 1)
+				{
+					A->SetTrafficScale(FCString::Atof(*Args[1]));
+				}
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs ShowCmd(TEXT("CityGenLife.TrafficShow"),
+		TEXT("CityGenLife.TrafficShow red|person|player|moving: the camera moved to the nearest car stopped at a red light with a queue behind it, stopped for a person, for the player, or moving (the check's shots)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (ACityGenLife* A = LifeIn(World))
+			{
+				A->ShowTraffic(Args.Num() ? Args[0] : FString(TEXT("moving")));
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs BlockCmd(TEXT("CityGenLife.BlockPlayer"),
+		TEXT("CityGenLife.BlockPlayer: the walker stood in the lane of the nearest moving car, ahead of it (the check's shots)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (ACityGenLife* A = LifeIn(World))
+			{
+				A->BlockPlayer();
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs JaywalkCmd(TEXT("CityGenLife.Jaywalk"),
+		TEXT("CityGenLife.Jaywalk AT_0 AT_1: the share of people crossing against the signal at danger 0 and 1 (LG3's, from the plan)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenLife* A = LifeIn(World);
+			if (A && Args.Num() >= 2)
+			{
+				A->SetJaywalk(FCString::Atof(*Args[0]), FCString::Atof(*Args[1]));
+			}
+		}));
+
 	FAutoConsoleCommandWithWorldAndArgs StatusCmd(TEXT("CityGenLife.Status"),
 		TEXT("CityGenLife.Status: log the state as one JSON line"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
