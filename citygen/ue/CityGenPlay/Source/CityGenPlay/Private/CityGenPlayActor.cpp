@@ -747,6 +747,15 @@ bool ACityGenPlay::ClickMenuRow(const FString& Row)
 		}
 		SetLifeTraffic(R == TEXT("traffic") ? !GetLifeTraffic() : R.EndsWith(TEXT("1")));
 	}
+	else if (R == TEXT("places") || R.StartsWith(TEXT("places=")))
+	{
+		// LG4: lifegen's life at places (slots, shop visits, gangs, police) on or off
+		if (!HasLifePlaces())
+		{
+			return false;
+		}
+		SetLifePlaces(R == TEXT("places") ? !GetLifePlaces() : R.EndsWith(TEXT("1")));
+	}
 	else if (!GetAtmos())
 	{
 		return false;                           // (the weather rows are hidden)
@@ -964,6 +973,33 @@ bool ACityGenPlay::GetLifeTraffic() const
 void ACityGenPlay::SetLifeTraffic(bool bOn)
 {
 	CallOne(GetLife(), TEXT("SetTraffic"), bOn, 0.f);
+}
+
+bool ACityGenPlay::HasLifePlaces() const
+{
+	const AActor* A = GetLife();
+	const FArrayProperty* Slots = A ? FindFProperty<FArrayProperty>(A->GetClass(), TEXT("SlotKinds")) : nullptr;
+	if (!A || !Slots || FindFProperty<FBoolProperty>(A->GetClass(), TEXT("bPlaces")) == nullptr)
+	{
+		return false;
+	}
+	FScriptArrayHelper H(Slots, Slots->ContainerPtrToValuePtr<void>(A));
+	return H.Num() > 0;
+}
+
+bool ACityGenPlay::GetLifePlaces() const
+{
+	const AActor* A = GetLife();
+	const FBoolProperty* P = A ? FindFProperty<FBoolProperty>(A->GetClass(), TEXT("bPlaces")) : nullptr;
+	return P && P->GetPropertyValue_InContainer(A);
+}
+
+void ACityGenPlay::SetLifePlaces(bool bOn)
+{
+	AActor* A = GetLife();
+	CallOne(A, TEXT("SetPlaces"), bOn, 0.f);
+	CallOne(A, TEXT("SetGangs"), bOn, 0.f);
+	CallOne(A, TEXT("SetPolice"), bOn, 0.f);
 }
 
 void ACityGenPlay::SetAtmosHour(float InHour)

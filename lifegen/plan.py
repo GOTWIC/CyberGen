@@ -28,6 +28,12 @@ From the city model (read only) and the life spec:
   phases, short of the crosswalk), the pool of cars the runtime simulates round the view, its
   slots by the districts' fleets and their paints (`traffic_plan`), checks
   (`traffic_checks`). LG0's spike cars go (`presets.SPIKE["cars"]` 0).
+- **Life at places** (LG4, scope 6.4, `places.py`): the shop doors as places by their hours
+  (their doors' rates by them), the slots people use (props, taxi stands, a club's queue, a
+  bar's smokers, a gang's spots) with their use points, walkways and users per band, the gangs
+  on their turfs, the police on foot and in patrol cars by the police field, the pools' slots
+  kept for gang members, police and patrol cars (`role_counts`, `assign_roles`), checks
+  (`places_checks`), `preview_places.png`.
 - **The asks of citygen** (`asks.py`) and their state.
 - **Checks** (scope 8, the ones LG0 can make): spawns on the graphs, spawns reaching each
   other, densities kept, slots placed, the spike within the budgets.

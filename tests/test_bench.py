@@ -381,7 +381,8 @@ def test_life_passes():
         assert [c.split()[0] for c in life] == ["CityGenLife.Enable", "CityGenLife.Shadows",
                                                 "CityGenLife.Rebuild", "CityGenLife.Lumen",
                                                 "CityGenLife.Tiers", "CityGenLife.Traffic",
-                                                "CityGenLife.Clothing"]
+                                                "CityGenLife.Clothing", "CityGenLife.Places",
+                                                "CityGenLife.Gangs", "CityGenLife.Police"]
         assert set(cmds) - set(life) == base and cmds[-1].startswith("CityGenAtmos.Hour")
     assert "CityGenLife.Enable 0" in by["night_life_off"][3]
     assert "CityGenLife.Lumen 1" in by["night_life_lumen"][3]
@@ -394,6 +395,11 @@ def test_life_passes():
                if n != "night_life_noclothes")
     assert all("CityGenLife.Traffic 1 1" in by[n][3] for n, *_ in B.LIFE_PASSES
                if n not in ("night_traffic_off", "night_traffic_half"))
+    # (LG4: life at places on in every life pass but its own, which turns the three off)
+    assert all(f"CityGenLife.{k} 0" in by["night_life_noplaces"][3]
+               for k in ("Places", "Gangs", "Police"))
+    assert all("CityGenLife.Places 1" in by[n][3] for n, *_ in B.LIFE_PASSES
+               if n != "night_life_noplaces")
     # (LG1: the people library's tiers, every pass setting them, the near pass none near)
     from lifegen.library import TIERS
     assert f"CityGenLife.Tiers {TIERS['near_m']:g} 0 {TIERS['mid_m']:g} {TIERS['far_m']:g}" \

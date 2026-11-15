@@ -648,12 +648,14 @@ bool ACityGenLife::ShowPlace(const FString& What)
 		}
 		if (Best == INDEX_NONE)
 		{
+			LastShow = What + TEXT(":none");
 			UE_LOG(LogTemp, Display, TEXT("CITYGEN_LIFE_SHOW {\"what\":\"%s\",\"found\":false}"), *What);
 			return false;
 		}
 		const FCgLifeCar& C = EM.GetFragmentDataChecked<FCgLifeCar>(CarEnts[Best]);
 		const FVector Fwd(FMath::Cos(FMath::DegreesToRadians(C.Yaw)), FMath::Sin(FMath::DegreesToRadians(C.Yaw)), 0.0);
 		const FVector P = C.Pos / 100.0;
+		LastShow = FString::Printf(TEXT("%s:%d"), *What, Best);
 		UE_LOG(LogTemp, Display, TEXT("CITYGEN_LIFE_SHOW {\"what\":\"%s\",\"found\":true,\"car\":%d,\"at\":[%.1f,%.1f,%.1f],\"speed\":%.2f}"),
 			*What, Best, P.X, -P.Y, P.Z, C.Speed / 100.0);
 		return FrameCar(C.Pos + Fwd * 1200.0, -Fwd, 1100.0, 350.0, 500.0);
@@ -716,12 +718,14 @@ bool ACityGenLife::ShowPlace(const FString& What)
 	}
 	if (Best == INDEX_NONE)
 	{
+		LastShow = What + TEXT(":none");
 		UE_LOG(LogTemp, Display, TEXT("CITYGEN_LIFE_SHOW {\"what\":\"%s\",\"found\":false}"), *What);
 		return false;
 	}
 	const FCgLifeWalker& W = EM.GetFragmentDataChecked<FCgLifeWalker>(Entities[Best]);
 	const FVector Face(FMath::Cos(FMath::DegreesToRadians(W.Yaw)), FMath::Sin(FMath::DegreesToRadians(W.Yaw)), 0.0);
 	const FVector P = W.Pos / 100.0;
+	LastShow = FString::Printf(TEXT("%s:%d"), *What, Best);
 	UE_LOG(LogTemp, Display, TEXT("CITYGEN_LIFE_SHOW {\"what\":\"%s\",\"found\":true,\"person\":%d,\"at\":[%.1f,%.1f,%.1f],\"slot\":%d,\"users\":%d,\"role\":%d}"),
 		*What, Best, P.X, -P.Y, P.Z, W.Slot, W.Slot != INDEX_NONE ? SlotUsersNow[W.Slot] : 0, (int32)W.Role);
 	// (from in front of them, a little to the side and above)

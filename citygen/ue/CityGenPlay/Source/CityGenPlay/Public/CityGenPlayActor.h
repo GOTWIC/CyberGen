@@ -203,6 +203,12 @@ public:
 	bool HasLifeTraffic() const;
 	bool GetLifeTraffic() const;
 	void SetLifeTraffic(bool bOn);
+	/** LG4: whether the life controller has life at places (bPlaces, with slots of its own:
+	 *  SlotKinds not empty), its state, and SetPlaces, SetGangs and SetPolice on it together (the
+	 *  menu's Places row, places=1 or 0). */
+	bool HasLifePlaces() const;
+	bool GetLifePlaces() const;
+	void SetLifePlaces(bool bOn);
 
 	/** The controller's hour (0 to 24), and SetHour. */
 	float GetAtmosHour() const;
