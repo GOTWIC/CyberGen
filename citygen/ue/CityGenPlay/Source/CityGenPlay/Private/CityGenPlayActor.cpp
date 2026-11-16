@@ -756,6 +756,15 @@ bool ACityGenPlay::ClickMenuRow(const FString& Row)
 		}
 		SetLifePlaces(R == TEXT("places") ? !GetLifePlaces() : R.EndsWith(TEXT("1")));
 	}
+	else if (R == TEXT("transit") || R.StartsWith(TEXT("transit=")))
+	{
+		// LG6: lifegen's transit (trains, boarding) on or off
+		if (!HasLifeTransit())
+		{
+			return false;
+		}
+		SetLifeTransit(R == TEXT("transit") ? !GetLifeTransit() : R.EndsWith(TEXT("1")));
+	}
 	else if (!GetAtmos())
 	{
 		return false;                           // (the weather rows are hidden)
@@ -1000,6 +1009,30 @@ void ACityGenPlay::SetLifePlaces(bool bOn)
 	CallOne(A, TEXT("SetPlaces"), bOn, 0.f);
 	CallOne(A, TEXT("SetGangs"), bOn, 0.f);
 	CallOne(A, TEXT("SetPolice"), bOn, 0.f);
+}
+
+bool ACityGenPlay::HasLifeTransit() const
+{
+	const AActor* A = GetLife();
+	const FArrayProperty* Lines = A ? FindFProperty<FArrayProperty>(A->GetClass(), TEXT("TransitLineMode")) : nullptr;
+	if (!A || !Lines || FindFProperty<FBoolProperty>(A->GetClass(), TEXT("bTransit")) == nullptr)
+	{
+		return false;
+	}
+	FScriptArrayHelper H(Lines, Lines->ContainerPtrToValuePtr<void>(A));
+	return H.Num() > 0;
+}
+
+bool ACityGenPlay::GetLifeTransit() const
+{
+	const AActor* A = GetLife();
+	const FBoolProperty* P = A ? FindFProperty<FBoolProperty>(A->GetClass(), TEXT("bTransit")) : nullptr;
+	return P && P->GetPropertyValue_InContainer(A);
+}
+
+void ACityGenPlay::SetLifeTransit(bool bOn)
+{
+	CallOne(GetLife(), TEXT("SetTransit"), bOn, 0.f);
 }
 
 void ACityGenPlay::SetAtmosHour(float InHour)

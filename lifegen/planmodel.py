@@ -456,6 +456,89 @@ class SpikePlan(_Model):
     hash: str
 
 
+class TransitPlan(_Model):
+    """LG6: transit (scope 6.6): the modes' runs and trains, the settings, per line its
+    summary (its cycle, trains and headways by band, stops, train ids); the timetables
+    themselves in `timetables.json` (`Timetables`)."""
+    hour: int
+    modes: dict = Field(description="`presets.TRANSIT_MODES`: speeds, dwells, cars, tracks.")
+    settings: dict = Field(description="`presets.TRANSIT`.")
+    lines: list[dict]
+    file: str = Field(description="`timetables.json`, relative to the plan.")
+    sha256: str = Field(description="sha256 of its bytes.")
+    totals: dict
+    hash: str
+
+
+class Stop(_Model):
+    """LG6: a station's stop on a line: where along the track (m) its platform's middle is, how
+    far off and to which side (+1 left of the track's way), the walkway people board from and
+    the height they stand at, the people leaving and boarding a train calling there per band."""
+    station_id: str
+    name: str | None = None
+    kind: str | None = None
+    s: float
+    off_m: float
+    dz_m: float
+    side: float
+    walkway_id: str | None = None
+    platform_m: float
+    point: Vec3
+    board_z: float
+    board_level: bool = Field(description="People board at the doors' level (else at the "
+                                          "point over a door: a concourse, a pylon sky "
+                                          "station's platforms over the tube).")
+    half_m: float = Field(description="The platform deck's half width across the track (0: a "
+                                      "concourse over it).")
+    clear_m: float = Field(description="People on the platform keep this far off the line's "
+                                       "middle (its trains), 0 none.")
+    riders_h: PerBand = Field(description="The station's street accesses' people a hour.")
+    calls_h: PerBand = Field(description="Trains calling there a hour (every line and way).")
+    board: PerBand
+    alight: PerBand
+
+
+class Timetable(_Model):
+    """LG6: a line's timetable. Its track (`points`, its length along them in 3D), the turn
+    points (an open line runs between them there and back; a loop's start and its end round),
+    the cycle (`cycle_s`) sampled every `sample_s` s (`samples`: the cycle's coordinate c, along
+    the track from the first turn point, out and then back for an open line), the stop events
+    on it ([arrive, depart, stop index or -1 for a turn without a station, way]), the trains
+    round the cycle per band (evenly spaced), their ids."""
+    id: str
+    name: str
+    mode: str
+    color: str
+    loop: bool
+    length_m: float
+    closing_gap_m: float
+    turn: Annotated[list[float], Field(min_length=2, max_length=2)]
+    D: float = Field(description="One way's length between the turn points (m).")
+    cycle_s: float
+    train_m: float
+    cars: int
+    car: dict = Field(description="The train as drawn and run (`presets.TRANSIT_MODES`): its "
+                                  "cars' size, floor, base over the line, its track off the "
+                                  "line's middle, its doors, which sides open (1 its right, 2 "
+                                  "both), whether people board from the walkway's level.")
+    points: list[Vec3]
+    stops: list[Stop]
+    headway_asked_min: PerBand
+    trains: Annotated[list[int], Field(min_length=5, max_length=5)]
+    headway_min: PerBand
+    notes: list[str]
+    train_ids: list[str]
+    sample_s: float
+    samples: list[float]
+    events: list[list[float]]
+    runs: dict
+
+
+class Timetables(_Model):
+    city: str
+    lines: list[Timetable]
+
+
 class Check(_Model):
     ok: bool
     detail: str
@@ -478,6 +561,7 @@ class LifePlan(_Model):
     places: PlacesPlan | None = Field(None, description="LG4: slots and places by their hours.")
     gangs: GangPlan | None = Field(None, description="LG4: gangs on their turf.")
     police: PolicePlan | None = Field(None, description="LG4: police patrols.")
+    transit: TransitPlan | None = Field(None, description="LG6: transit's timetables.")
     checks: dict[str, Check]
     totals: dict
 
@@ -485,7 +569,7 @@ class LifePlan(_Model):
 class Entry(_Model):
     """A layer 4 entry, keyed by what it belongs to."""
     key: str
-    kind: Literal["life_controller", "spawner", "slots"]
+    kind: Literal["life_controller", "spawner", "slots", "train"]
     hash: str
     tile: str | None = None
     count: int = 0
@@ -503,6 +587,7 @@ class Contribution(_Model):
 SCHEMAS = {"life_plan": (LifePlan, "lifegen life plan"),
            "tile_spawns": (TileSpawns, "lifegen tile spawns"),
            "signals": (Signals, "lifegen signal phases"),
+           "timetables": (Timetables, "lifegen transit timetables"),
            "contribution": (Contribution, "lifegen layer 4 contribution")}
 
 

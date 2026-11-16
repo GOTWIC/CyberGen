@@ -1,0 +1,360 @@
+{
+ "$defs": {
+  "Stop": {
+   "additionalProperties": false,
+   "description": "LG6: a station's stop on a line: where along the track (m) its platform's middle is, how\nfar off and to which side (+1 left of the track's way), the walkway people board from and\nthe height they stand at, the people leaving and boarding a train calling there per band.",
+   "properties": {
+    "alight": {
+     "description": "A value per M11 hour band.",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 5,
+     "minItems": 5,
+     "title": "Alight",
+     "type": "array"
+    },
+    "board": {
+     "description": "A value per M11 hour band.",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 5,
+     "minItems": 5,
+     "title": "Board",
+     "type": "array"
+    },
+    "board_level": {
+     "description": "People board at the doors' level (else at the point over a door: a concourse, a pylon sky station's platforms over the tube).",
+     "title": "Board Level",
+     "type": "boolean"
+    },
+    "board_z": {
+     "title": "Board Z",
+     "type": "number"
+    },
+    "calls_h": {
+     "description": "Trains calling there a hour (every line and way).",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 5,
+     "minItems": 5,
+     "title": "Calls H",
+     "type": "array"
+    },
+    "clear_m": {
+     "description": "People on the platform keep this far off the line's middle (its trains), 0 none.",
+     "title": "Clear M",
+     "type": "number"
+    },
+    "dz_m": {
+     "title": "Dz M",
+     "type": "number"
+    },
+    "half_m": {
+     "description": "The platform deck's half width across the track (0: a concourse over it).",
+     "title": "Half M",
+     "type": "number"
+    },
+    "kind": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Kind"
+    },
+    "name": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Name"
+    },
+    "off_m": {
+     "title": "Off M",
+     "type": "number"
+    },
+    "platform_m": {
+     "title": "Platform M",
+     "type": "number"
+    },
+    "point": {
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 3,
+     "minItems": 3,
+     "title": "Point",
+     "type": "array"
+    },
+    "riders_h": {
+     "description": "The station's street accesses' people a hour.",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 5,
+     "minItems": 5,
+     "title": "Riders H",
+     "type": "array"
+    },
+    "s": {
+     "title": "S",
+     "type": "number"
+    },
+    "side": {
+     "title": "Side",
+     "type": "number"
+    },
+    "station_id": {
+     "title": "Station Id",
+     "type": "string"
+    },
+    "walkway_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Walkway Id"
+    }
+   },
+   "required": [
+    "station_id",
+    "s",
+    "off_m",
+    "dz_m",
+    "side",
+    "platform_m",
+    "point",
+    "board_z",
+    "board_level",
+    "half_m",
+    "clear_m",
+    "riders_h",
+    "calls_h",
+    "board",
+    "alight"
+   ],
+   "title": "Stop",
+   "type": "object"
+  },
+  "Timetable": {
+   "additionalProperties": false,
+   "description": "LG6: a line's timetable. Its track (`points`, its length along them in 3D), the turn\npoints (an open line runs between them there and back; a loop's start and its end round),\nthe cycle (`cycle_s`) sampled every `sample_s` s (`samples`: the cycle's coordinate c, along\nthe track from the first turn point, out and then back for an open line), the stop events\non it ([arrive, depart, stop index or -1 for a turn without a station, way]), the trains\nround the cycle per band (evenly spaced), their ids.",
+   "properties": {
+    "D": {
+     "description": "One way's length between the turn points (m).",
+     "title": "D",
+     "type": "number"
+    },
+    "car": {
+     "additionalProperties": true,
+     "description": "The train as drawn and run (`presets.TRANSIT_MODES`): its cars' size, floor, base over the line, its track off the line's middle, its doors, which sides open (1 its right, 2 both), whether people board from the walkway's level.",
+     "title": "Car",
+     "type": "object"
+    },
+    "cars": {
+     "title": "Cars",
+     "type": "integer"
+    },
+    "closing_gap_m": {
+     "title": "Closing Gap M",
+     "type": "number"
+    },
+    "color": {
+     "title": "Color",
+     "type": "string"
+    },
+    "cycle_s": {
+     "title": "Cycle S",
+     "type": "number"
+    },
+    "events": {
+     "items": {
+      "items": {
+       "type": "number"
+      },
+      "type": "array"
+     },
+     "title": "Events",
+     "type": "array"
+    },
+    "headway_asked_min": {
+     "description": "A value per M11 hour band.",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 5,
+     "minItems": 5,
+     "title": "Headway Asked Min",
+     "type": "array"
+    },
+    "headway_min": {
+     "description": "A value per M11 hour band.",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 5,
+     "minItems": 5,
+     "title": "Headway Min",
+     "type": "array"
+    },
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "length_m": {
+     "title": "Length M",
+     "type": "number"
+    },
+    "loop": {
+     "title": "Loop",
+     "type": "boolean"
+    },
+    "mode": {
+     "title": "Mode",
+     "type": "string"
+    },
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "notes": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Notes",
+     "type": "array"
+    },
+    "points": {
+     "items": {
+      "items": {
+       "type": "number"
+      },
+      "maxItems": 3,
+      "minItems": 3,
+      "type": "array"
+     },
+     "title": "Points",
+     "type": "array"
+    },
+    "runs": {
+     "additionalProperties": true,
+     "title": "Runs",
+     "type": "object"
+    },
+    "sample_s": {
+     "title": "Sample S",
+     "type": "number"
+    },
+    "samples": {
+     "items": {
+      "type": "number"
+     },
+     "title": "Samples",
+     "type": "array"
+    },
+    "stops": {
+     "items": {
+      "$ref": "#/$defs/Stop"
+     },
+     "title": "Stops",
+     "type": "array"
+    },
+    "train_ids": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Train Ids",
+     "type": "array"
+    },
+    "train_m": {
+     "title": "Train M",
+     "type": "number"
+    },
+    "trains": {
+     "items": {
+      "type": "integer"
+     },
+     "maxItems": 5,
+     "minItems": 5,
+     "title": "Trains",
+     "type": "array"
+    },
+    "turn": {
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 2,
+     "minItems": 2,
+     "title": "Turn",
+     "type": "array"
+    }
+   },
+   "required": [
+    "id",
+    "name",
+    "mode",
+    "color",
+    "loop",
+    "length_m",
+    "closing_gap_m",
+    "turn",
+    "D",
+    "cycle_s",
+    "train_m",
+    "cars",
+    "car",
+    "points",
+    "stops",
+    "headway_asked_min",
+    "trains",
+    "headway_min",
+    "notes",
+    "train_ids",
+    "sample_s",
+    "samples",
+    "events",
+    "runs"
+   ],
+   "title": "Timetable",
+   "type": "object"
+  }
+ },
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": false,
+ "properties": {
+  "city": {
+   "title": "City",
+   "type": "string"
+  },
+  "lines": {
+   "items": {
+    "$ref": "#/$defs/Timetable"
+   },
+   "title": "Lines",
+   "type": "array"
+  }
+ },
+ "required": [
+  "city",
+  "lines"
+ ],
+ "title": "lifegen transit timetables",
+ "type": "object"
+}

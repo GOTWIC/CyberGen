@@ -75,12 +75,14 @@ HASH_TAG = "cg.hash"
 # unchanged build applies the change (stored hashes are "<version>.<content hash>")
 MESH_VERSION = "3"
 ACTOR_VERSION = "1"
-LIFE_VERSION = "life7"   # LG0: lifegen's controller (CityGenLife) and its stand-in material;
+LIFE_VERSION = "life8"   # LG0: lifegen's controller (CityGenLife) and its stand-in material;
                          # LG1: the people library's properties; LG3: the city's crowd;
                          # 4, lifegen_clothing_toggle: the clothing switch's hidden material
                          # and whole body; 5, LG5: the city's traffic; 6, LG2: the looks,
                          # their dye colors, groups and wear; 7, LG4: life at places (slots,
-                         # places by their hours, gangs, police, the places' clips)
+                         # places by their hours, gangs, police, the places' clips); 8, LG6:
+                         # transit (lines, timetables, stops, the trains' stand-ins and
+                         # their material M_CgTransit)
 ATMOS_VERSION = "atmos7"  # the atmos controller's and cells' actors (2, AT2: the high tier,
                           # blinks and sweeps in the packed lights; 3, AT3: the sky and time;
                           # 4, AT4: the air, a cell's fog volumes and emitters; 5, the visible
@@ -1331,6 +1333,83 @@ def places_props(d, missing):
            "talk_count": int(d.get("talk_count") or 0),
            "drive_police": fl("drive_police"), "traffic_police": it("traffic_police"),
            "police_paint": fl("police_paint"), "places": True, "gangs": True, "police": True}
+    return out
+
+
+def transit_material():
+    """LG6: /Game/CityGen/Core/Life/M_CgTransit, the trains' stand-ins: the base color from each
+    instance's custom data (0 to 2) and its emission from 3 to 5, shown at TransitGlowDay by
+    day and TransitGlowNight by night (MPC_CityGen's Night: lit windows, the line's glowing
+    band); for instanced static meshes only (no Nanite: they move every frame)."""
+    folder = f"{CORE}/Life"
+    path = f"{folder}/M_CgTransit"
+    m = unreal.load_asset(path) if EAL.does_asset_exist(path) else None
+    if m is not None and meta(m, "cg.life") == LIFE_VERSION:
+        return m
+    if m is None:
+        m = AT.create_asset("M_CgTransit", folder, unreal.Material,
+                            unreal.MaterialFactoryNew())
+    else:
+        clear_material(m)
+    MP = unreal.MaterialProperty
+    col = expr(m, unreal.MaterialExpressionPerInstanceCustomData3Vector, -700, 0, data_index=0)
+    emi = expr(m, unreal.MaterialExpressionPerInstanceCustomData3Vector, -700, 200, data_index=3)
+    lerp = expr(m, unreal.MaterialExpressionLinearInterpolate, -450, 320)
+    link(sparam(m, "TransitGlowDay", -700, 320, 0.4), "", lerp, "A")
+    link(sparam(m, "TransitGlowNight", -700, 400, 3.0), "", lerp, "B")
+    link(night(m, -700, 480), "", lerp, "Alpha")
+    mul = expr(m, unreal.MaterialExpressionMultiply, -250, 220)
+    link(emi, "", mul, "A")
+    link(lerp, "", mul, "B")
+    rough = expr(m, unreal.MaterialExpressionConstant, -450, 520, r=0.38)
+    metal = expr(m, unreal.MaterialExpressionConstant, -450, 600, r=0.25)
+    MEL.connect_material_property(col, "", MP.MP_BASE_COLOR)
+    MEL.connect_material_property(mul, "", MP.MP_EMISSIVE_COLOR)
+    MEL.connect_material_property(rough, "", MP.MP_ROUGHNESS)
+    MEL.connect_material_property(metal, "", MP.MP_METALLIC)
+    m.set_editor_property("used_with_instanced_static_meshes", True)
+    MEL.recompile_material(m)
+    EAL.set_metadata_tag(m, "cg.life", LIFE_VERSION)
+    EAL.save_loaded_asset(m, only_if_is_dirty=False)
+    return m
+
+
+def transit_props(d, missing):
+    """LG6: the life controller's transit properties from its packed data (`unreal_life.
+    pack_transit`): every line's mode, color, track, train, turn points, cycle and its
+    samples, stop events and trains per band; every stop's platform walkway, where along the
+    track, boarding by band and height; the stand-ins' meshes, material and parts per mode;
+    per walkway how far off its middle people keep; the doors that are a served station's
+    street accesses. All empty (no trains) for a plan before LG6."""
+    fl = lambda k: [float(v) for v in d.get(k) or []]     # noqa: E731
+    it = lambda k: [int(v) for v in d.get(k) or []]       # noqa: E731
+
+    def load(path):
+        a = unreal.load_asset(path) if path else None
+        if a is None and path:
+            missing.append(path)
+        return a
+
+    on = bool(d.get("transit_line_mode"))
+    out = {k: (it(k) if k in ("transit_line_mode", "transit_line_loop", "transit_line_trains",
+                              "transit_point_starts", "transit_sample_starts",
+                              "transit_event_starts", "transit_stop_starts",
+                              "transit_stop_lane", "transit_stop_level",
+                              "transit_part_starts", "door_transit") else fl(k))
+           for k in ("transit_line_mode", "transit_line_color", "transit_line_loop",
+                     "transit_line_car", "transit_line_turn", "transit_line_cycle",
+                     "transit_line_dt", "transit_line_trains", "transit_point_starts",
+                     "transit_points", "transit_sample_starts", "transit_samples",
+                     "transit_event_starts", "transit_events", "transit_stop_starts",
+                     "transit_stop_lane", "transit_stop_s", "transit_stop_board",
+                     "transit_stop_alight", "transit_stop_z", "transit_stop_level",
+                     "transit_part_starts", "transit_parts", "walk_clear", "door_transit")}
+    out["transit_line_ids"] = [str(v) for v in d.get("transit_line_ids") or []]
+    out["transit_modes"] = [str(v) for v in d.get("transit_modes") or []]
+    out["transit_meshes"] = [load(p) for p in d.get("transit_meshes") or []] if on else []
+    out["transit_material"] = transit_material() if on else None
+    out["transit_cross_m"] = float((d.get("transit") or {}).get("cross_m", 90.0))
+    out["transit"] = on
     return out
 
 
@@ -4587,6 +4666,9 @@ class Importer:
                 a.set_editor_property(k, v)
             # (LG4: life at places; empty for a plan before it)
             for k, v in places_props(d, missing).items():
+                a.set_editor_property(k, v)
+            # (LG6: transit; empty for a plan before it)
+            for k, v in transit_props(d, missing).items():
                 a.set_editor_property(k, v)
             a.tags = self.tags(info["key"], hv, [], "life", "life", "", d["district"])
 

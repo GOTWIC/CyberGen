@@ -17,7 +17,7 @@ grows here as it lands, as in [`citygen_milestones.md`](citygen_milestones.md),
 | LG3 | Crowds on the streets: every walkway of the city at its street's density by hour, live round the view from a fixed pool (people come alive and go past the far tier, out of sight), trips out of and into AG3's doors, stations, garages and taxi stands, groups, pace, signals with derived phases at the crosswalks, jaywalking by danger, local avoidance and stepping aside from the player, stairs and elevators; Delta walked city-wide | Done | [`docs/progress/LG3`](progress/LG3) |
 | LG4 | Life at places: every bench, bus shelter, kiosk, vending machine, food stall and taxi stand of the city a place slot (its use points Smart Objects of the world's subsystem while its walkway is live), clubs' queues and bars' smokers at their doors; people walking by sit, wait, buy, eat, queue, smoke or talk there and walk on; AG3's shop doors as places by their hours (closed doors send no one, open shops take visitors in and let them out); gang members on their own turf's walkways and spots in their faction's colors; police pairs on the patrol walkways out of their stations and patrol cars in a police livery; the Game Animation Sample's bench loop and idle breaks retargeted onto the library's bodies; Delta city-wide | Done | [`docs/progress/LG4`](progress/LG4) |
 | LG5 | Traffic: every lane of the city at its street's density by hour (twice M11's by default), live round the view from a fixed pool of AG18's cars by the districts' fleets and paints; following the car in front, red lights, junctions taken in turn with room past them, stopping for people and the player; Delta driven city-wide | Done | [`docs/progress/LG5`](progress/LG5) |
-| LG6 | Transit | Planned | |
+| LG6 | Transit: a timetable per line from the model's tracks and stations (the fastest runs by the mode's speeds, rates and the track's curves, dwells, turns at an open line's ends), its trains per hour band evenly round its cycle, each station's stop and board walkway, people boarding and leaving by the station's riders; the trains (stand-ins of the exporter's per mode model table until the Mac's designs) running every line city-wide by the world's time, doors open at the stops, the crowd leaving and boarding them round the view; Delta's five lines | Done | [`docs/progress/LG6`](progress/LG6) |
 | LG7 | Air and water | Planned | |
 | LG8 | Weather, reactions and release | Planned | |
 
@@ -310,6 +310,65 @@ open items: [`docs/progress/LG4/README.md`](progress/LG4/README.md).
   colors and reserves, the plan on a small city with a gang turf, hideout, precinct, station and
   shop doors, the checks catching members off their turf and police off their walkways, the
   exporter's pack; `tests/test_bench.py` the places pass).
+
+## LG6: transit
+
+Built on the Windows PC (2026-11-16), on main after the crossings fix's Unreal run (#234).
+Report, shots, benchmark, decisions and open items:
+[`docs/progress/LG6/README.md`](progress/LG6/README.md).
+
+- **Timetables** (`lifegen/transit.py`, `presets.TRANSIT_MODES`, `TRANSIT_HEADWAY_MIN`,
+  `TRANSIT`; `timetables.json`, `planmodel.Timetables`): per line of the model its track (M5's
+  path in 3D; a loop closing on itself), its stops (each station's platform walkway, M5's
+  `platform`, a metro's `concourse`, else its first access, projected onto the track within
+  25 m in plan and 12 m in height), the fastest runs between them (a forward and a backward
+  pass on a 2 m grid at the mode's cruise, acceleration and braking, at most sqrt(lateral R)
+  wherever the train is, R the track's radius in plan), dwells by mode, the cycle (a loop one
+  way round from its first stop; an open line the whole track there and back, turning at its
+  ends with a 60 s layover, a terminal station within a train's length of an end the turn
+  point, the train crossing to the other way's track over the 90 m before it), sampled every
+  half second at constant acceleration per grid step; per hour band ceil(cycle / headway)
+  trains evenly round it (the spec's `transit.headway_min` by line name, else the mode's),
+  fewer where two would come within a train's length and 60 m or into a terminal at once (the
+  raised headway in `notes`); ids `train.<line id>.<n>`, a layer 4 entry each.
+- **Boarding** (`boarding`, `station_riders`): a station's riders are its street accesses'
+  people (LG3's spawn rates by hour); per stop and band as many leave each train calling there
+  as board it, those riders over the trains calling there (every line and way), at least
+  `board_min`, at most the mode's `board_max`. The platform deck's half width across the track
+  (M5's `platform` deck) and the keep-out `clear_m` its people keep off the line's middle (its
+  trains); where people board (the doors' level; from a metro's concourse 8 m over the track
+  and a pylon sky station's platforms level with the tube's axis, at the point over a door).
+- **Checks:** `timetables` (speeds, curve limits, acceleration and braking read back from the
+  samples; dwells kept; a run no shorter than its distance at cruise; a loop closing, an open
+  line turning back at both ends; trains a train's length and 60 m apart, none two in a
+  terminal at once), `transit_stops` (every station on its line's track, within the run, a
+  train calling there; trains longer than their platforms noted), `transit_boarding` (every
+  stop's board walkway in the walkway graph and reaching its station's street accesses),
+  `transit_budget` (120 trains and 600 cars at once); `preview_transit.png` (the lines,
+  stations and trains at the crowd's hour; each line's trains over one cycle on a time and
+  distance graph); the ask `train_models` of assetgen.
+- **Exporter and runtime** (`unreal_life.pack_transit`, the stand-ins' per mode model table
+  `TRANSIT_MODELS`, `PACK_VERSION` 7; `import_city.transit_props`, `M_CgTransit`,
+  `LIFE_VERSION` life8; `CityGenLifeTransit.cpp`; the walk processor's `CgWalk::Board` and the
+  platforms' keep-out `WalkClear`): every line's trains placed each frame by the world's time
+  from the sampled cycle (nothing simulated: every line runs city-wide, a far train costs a
+  lookup, its instances sent every fourth frame past 1.5 km); each car by the track's points at
+  its ends, on its way's own track; doors opening at the stops (leaves and lit doorways near
+  the view); at a stop whose platform walkway is live the stop's people come out of the doors
+  and walk on (`FromSlot` with no slot) and the crowd on the platform walks into the doors and
+  is gone; a served station's street accesses send no one while transit runs. Console
+  `CityGenLife.Transit`, `.TransitShow`; the Tab menu's Transit row; the status's `transit`;
+  the check's `until` reads `transit.show`; bench pass `night_life_notransit`.
+- **Delta:** five lines (Metro Line, Maglev Line, Waterfront Monorail, Skyline Loop and Delta
+  Loop, both sky tube loops), 20 stops, 14 trains (53 cars) at 23:00, 19 at the busiest
+  bands; every plan check and the Unreal check pass; shots of trains at the stations with
+  their doors open and people boarding, and running on the maglev, the monorail, the sky tubes
+  and in the metro's tunnel.
+- **Tests** (`tests/lifegen/test_lg_transit.py`: the timetable on the small city's metro, a sky
+  tube loop, speeds kept to a tight curve and the rates, a headway too close raised, the checks
+  catching a bad timetable, too many trains, a station off its track, boarding by the riders,
+  the exporter's pack; `tests/test_bench.py` the transit pass; LG0's small city's metro has a
+  track now).
 
 ## LG5: traffic
 

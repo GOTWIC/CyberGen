@@ -1,0 +1,74 @@
+lifegen plan: Delta Megacity (ok), plan 37beb16e7ee2e4d0
+
+spawn points 21188, slots 1673, tiles 132; people on the streets at the peak hour 58189, vehicles 3394
+
+district  people@23  people peak  vehicles peak  spawns  slots  name
+d01            2060         6042            461     738     81  Transit Nexus
+d02            5421        10685            771    3294    217  Midtown
+d03            1664         8785            971    2027    209  Corporate Core
+d04           23373        33786            931   14858    967  Old Town
+d05             480         2692            698     215    149  Industrial Port
+d06             147         1672            118      54     49  Research Campus
+
+crowd: 38359 people on 20008 of 20666 walkways at 23:00 (levels [0]), a pool of 2400 live within 340 m of the view; 150 signals; left out: 0 walkways no spawn reaches, 0 segments without a walkway
+
+traffic: 3331 cars on 4849 of 4875 lanes at 23:00 (6712 at the busiest hour), 15 models; a pool of 1800 live within 800 m of the view; 907 lanes stop at signals; left out: 26 lanes off the lane graph's main part, 0 segments without a lane
+
+slots: bench 533 (1065 points, users by band [69.8, 295.9, 523.7, 529.7, 236.7]), bus_stop 87 (261 points, users by band [12.9, 128.4, 104.0, 119.0, 49.4]), kiosk 12 (36 points, users by band [2.3, 18.0, 20.6, 21.6, 9.7]), vending 16 (32 points, users by band [2.1, 9.5, 10.8, 11.0, 6.6]), stall 15 (45 points, users by band [5.8, 16.1, 31.3, 36.0, 24.5]), taxi_stand 26 (77 points, users by band [10.8, 21.7, 21.8, 28.5, 34.6]), bar_queue 357 (1736 points, users by band [607.6, 0.0, 0.0, 0.0, 527.4]), smoke 510 (1493 points, users by band [209.0, 0.0, 0.0, 92.6, 597.2]), gang_spot 117 (468 points, users by band [281.4, 84.4, 131.1, 400.8, 452.9])
+places (open at the crowd's hour): arcade 784/784, bar 1700/1700, clinic 0/1092, club 368/368, convenience 2573/2573, cyberware 0/1869, fixer 5/5, food 2620/5129, laundromat 0/1379, pawn 0/1208, ripperdoc 12/15
+slots left out: {'no_walkway': 25, 'blocked': 26, 'points_dropped': 188}
+
+gangs: 5 turfs, 288 pool slots kept (341 wanted near the view at most); left out {'members': [38.19, 19.08, 24.96, 50.45, 62.78], 'walkways': 3139}
+  d04.turf1 Neon Tigers: 6387 walkways, 126 walking, 190 at 40 spots
+  d04.turf2 Ghost Saints: 7693 walkways, 156 walking, 235 at 40 spots
+  d05.turf1 Ghost Saints: 280 walkways, 28 walking, 42 at 12 spots
+  d05.turf2 Ghost Saints: 196 walkways, 25 walking, 38 at 8 spots
+  d05.turf3 Neon Tigers: 390 walkways, 39 walking, 59 at 17 spots
+
+police: 81 pool slots on foot, 60 patrol cars (halcyon_sable), wanted near the view {'foot': 64.3, 'cars': 47.8}
+  d01.police: 36 on foot, 9.8 cars, 10 station doors
+  d02.police: 82 on foot, 21.9 cars, 4 station doors
+  d03.police: 66 on foot, 17.7 cars, 16 station doors
+  d04.police: 78 on foot, 21.1 cars, 0 station doors
+  d05.police: 21 on foot, 5.5 cars, 0 station doors
+  d06.police: 20 on foot, 5.3 cars, 1 station doors
+
+transit: 5 lines, 14 trains (53 cars) at the crowd's hour, 4377 people boarding a hour; left out {'stations': [], 'lines': []}
+  tl.delta_loop Delta Loop (sky_tube, loop): 4973 m, 4 stops, a 373 s cycle, trains by band [2, 4, 3, 4, 3], every [3.112, 1.556, 2.074, 1.556, 2.074] min, top 30.0 m/s
+  tl.maglev_line Maglev Line (maglev): 2703 m, 3 stops, a 627 s cycle, trains by band [1, 3, 2, 3, 2], every [10.455, 3.485, 5.228, 3.485, 5.228] min, top 34.4 m/s
+  tl.metro_line Metro Line (metro): 2300 m, 3 stops, a 695 s cycle, trains by band [2, 4, 3, 4, 3], every [5.792, 2.896, 3.861, 2.896, 3.861] min, top 20.8 m/s
+  tl.skyline_loop Skyline Loop (sky_tube, loop): 5046 m, 5 stops, a 427 s cycle, trains by band [2, 4, 3, 4, 3], every [3.56, 1.78, 2.373, 1.78, 2.373] min, top 30.0 m/s
+  tl.waterfront_monorail Waterfront Monorail (monorail): 2284 m, 5 stops, a 723 s cycle, trains by band [2, 4, 3, 4, 3], every [6.026, 3.013, 4.018, 3.013, 4.018] min, top 16.0 m/s
+
+spike: Old Town (d04) at 23:00, 0 people, 0 cars
+
+checks:
+  ok   spawns_on_graph: 21188 spawn points, each on a walkway (and a drive lane where it has one)
+  ok   spawns_reach: every spawn point's walkway reaches another spawn point (1 walkway components with spawns; the largest holds 21188 of 21188)
+  ok   densities: every district's people per hour band keep M11's densities (times its busy) within 1%
+  ok   slots: 1673 slots, each facing its object's way
+  ok   spike_budget: the spike's 0 people and 0 cars within the budget's 2000 and 500
+  ok   crowd_densities: every district's sidewalks carry M11's people per hour band (times its busy and the crowd's scale) within 1%; off-street walkways 8838 more at the most; 0 walkways no spawn reaches left empty (0.0 people)
+  ok   crowd_levels: levels 0: 20008 of 20008 walkways with people on the main walkway graph
+  ok   signals: 150 signalized junctions, two phases each (derived: the ask), no crosswalk walking across a moving leg, the phases filling each cycle; 543 crosswalk walkways served
+  ok   crowd_budget: a pool of 2400 people live within 340 m of the view, about 1869 within 300 m (the budget's 2000)
+  ok   people_draws: the crowd's pool of 2400 people drawn from 24 characters, each 4 to 170 of them (at most 12%), 2400 distinct seeds
+  ok   variety: 130 looks among the pool's 2400 people; d01 52 within 50 m, 0.16 alike pairs, its commonest look 3.0%; d02 52 within 50 m, 0.16 alike pairs, its commonest look 3.0%; d03 52 within 50 m, 0.25 alike pairs, its commonest look 5.1%; d04 52 within 50 m, 0.25 alike pairs, its commonest look 5.7%; d05 52 within 50 m, 0.45 alike pairs, its commonest look 10.4%; d06 22 within 50 m, 0.04 alike pairs, its commonest look 4.1%
+  ok   crowd_spawns: 21188 spawn points open to the crowd's walkways
+  ok   traffic_densities: every district's lanes carry M11's vehicles per hour band (times the fleet's busy and the traffic's scale) within 1%; left out: 26 lanes off the lane graph's main part and 0 segments without a lane (70.3 cars at the most)
+  ok   traffic_lanes: every car on the lane graph's largest strongly connected part (14727 of 14779 lanes and connectors, 99.2% of the lanes' length)
+  ok   traffic_signals: 150 of 150 signals with lanes stopping at them (907 lanes, each stopping within its lane, short of its crosswalk)
+  ok   traffic_budget: a pool of 1800 cars live within 800 m of the view, about 253 within 300 m (the budget's 500)
+  ok   traffic_fleet: 15 of AG18's models (brakk_bastion, brakk_hauler, brakk_mule, halcyon_ridge, halcyon_sable, kestrel_atlas, kestrel_dart, kestrel_meridian, orrin_aria, orrin_lumen, orrin_pebble, tanager_cab, tanager_mino, tanager_porter, vanta_r), each in 7 to 352 pool slots; every district with cars has a fleet; no Vex or Aurel
+  ok   slots_placed: 1673 slots (bar_queue 357, bench 533, bus_stop 87, gang_spot 117, kiosk 12, smoke 510, stall 15, taxi_stand 26, vending 16), each on its walkway (its first point within 15 m), its points out of every building and carriageway, each user facing its object (a bench's away from its back, a ring's to its middle)
+  ok   slot_use: users per band within their slots' points: night 1202, morning 574, day 843, evening 1239, late 1939
+  ok   places_hours: 16122 places by their hours, their doors closed while they are; every district's doors keep its people every hour; open at 23:00: arcade 784 of 784, bar 1700 of 1700, clinic 0 of 1092, club 368 of 368, convenience 2573 of 2573, cyberware 0 of 1869, fixer 5 of 5, food 2620 of 5129, laundromat 0 of 1379, pawn 0 of 1208, ripperdoc 12 of 15
+  ok   gang_turf: 5 gang turfs (5 with walkways), their members only on their own turf's walkways and spots (117 spots); up to 375 walking; 63 of M11's gang members outside every gang turf left out
+  ok   police_patrols: every district's police (M11's) on foot on its patrol walkways (the police field at least 0.25) and in patrol cars on its main lanes; 4 of 6 precincts with a station's doors; at 23:00 303 on foot, 81 patrol cars
+  ok   places_budget: gang members 288 kept (341 wanted near the view at most, scaled down there); police on foot 81 kept (64 wanted near the view at most); patrol cars 60 kept (48 wanted near the view at most); patrol cars halcyon_sable
+  ok   timetables: 5 lines: runs within their speeds, curves, acceleration and braking, dwells kept, loops closing and open lines turning back at both ends, trains a train's length and 60 m apart at least
+  ok   transit_stops: 20 stations, 20 stops on their lines' tracks (within 25 m in plan and 12 m in height)
+  ok   transit_boarding: 20 stops: each boards from its platform walkway, which reaches its station's street accesses; people a train 2 to 50
+  ok   transit_budget: at most 19 trains and 72 cars at once (budget 120 and 600)
+
+asks: signal_phases derived, bus_routes missing, turn_restrictions derived, lobby_points derived, piers missing, air_corridors derived, doors met, slot_points derived, police_vehicles derived, fleet_kinds derived, train_models derived

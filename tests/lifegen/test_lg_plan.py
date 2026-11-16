@@ -111,7 +111,7 @@ def _model() -> dict:
             {"id": "d02.lot.e320n20.bld", "district_id": "d02", "floors": 3,
              "footprint": _sq(305, 10, 325, 40), "entrances": []}],
         "stations": [{"id": "stn.x", "kind": "underground", "position": [150.0, -6.0, -8.0],
-                      "access_ids": ["wk.s"]}],
+                      "access_ids": ["wk.s"], "line_ids": ["tl.m"]}],
         "parking": [{"id": "d01.lot.e10n50.bld.garage", "kind": "garage", "district_id": "d01",
                      "capacity": 100,
                      "entrances": [{"position": [10.0, -4.5], "walkway_id": "wk.a",
@@ -129,7 +129,10 @@ def _model() -> dict:
              "position": [330.0, -8.0, 0.0], "yaw_deg": 0.0}],
         "factions": [{"id": "fac.red", "kind": "gang", "home_district_id": "d02",
                       "color": "#aa2233"}],
-        "transit_lines": [{"id": "tl.m", "name": "Metro Line"}],
+        # (LG6: a metro under rs.a's sidewalk, its station's stairs the board walkway)
+        "transit_lines": [{"id": "tl.m", "name": "Metro Line", "mode": "metro",
+                           "color": "#2f7bff", "loop": False, "station_ids": ["stn.x"],
+                           "path": [[-20.0, -6.0, -12.0], [420.0, -6.0, -12.0]]}],
     }
 
 

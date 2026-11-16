@@ -27,6 +27,12 @@ band, district, whether it is on the graph's largest strongly connected part, th
 stops at and where, the connectors it may not share (`conflicts`); the signals' windows for
 cars; the pool's slots by model, the districts' fleets and paints (`traffic_cars`).
 
+LG6: a plan with `transit` packs every transit line (`pack_transit`): its track, timetable
+(the cycle sampled, the stop events, the trains per band), the train as drawn (the stand-ins'
+parts per mode, `TRANSIT_MODELS`), its stops (platform walkway, boarding by band); the
+platforms' walkways as wide as their decks, people keeping off their trains (`walk_clear`);
+which doors are a served station's street accesses (`door_transit`).
+
 The runtime builds ZoneGraph lanes from these at BeginPlay (no hand-drawn shapes). A plan
 whose checks failed is named and left out (`skipped`); a build without a plan gets no
 section, and its manifest is what it was.
@@ -39,12 +45,13 @@ import json
 import math
 from pathlib import Path
 
-PACK_VERSION = 6            # 2 (cars_steam): smoothed drive lanes, their speeds; 3 (LG3): the
+PACK_VERSION = 7            # 2 (cars_steam): smoothed drive lanes, their speeds; 3 (LG3): the
                             # city's crowd (every walkway, doors, signals, the pool); 4 (LG5):
                             # the city's traffic (every lane, signals, conflicts, the pool); 5 (LG2):
                             # looks for people, their groups, dye colors and wear; 6 (LG4): slots,
                             # places by their hours, gangs, police patrols and cars, the
-                            # places' clips
+                            # places' clips; 7 (LG6): transit's lines, timetables, stops and
+                            # trains, the platforms' walkways kept off their trains
 DATA = "life.json"
 CONTROLLER_KEY = "life"
 MARGIN_M = 60.0             # lanes this far past the live radius come along (links out of it)
@@ -565,6 +572,11 @@ def pack_crowd(plan: dict, pdir: Path, graphs: dict) -> dict:
     door_index = {}
     stations = {d for p in ((plan.get("police") or {}).get("precincts") or [])
                 for d in p.get("station_doors") or []}
+    # (LG6: a transit station's street accesses, whose people the trains bring while transit
+    # runs)
+    served = {sid for ln in ((plan.get("transit") or {}).get("lines") or [])
+              for sid in ln.get("stops") or []}
+    dtransit = []
     for s in sorted(doors, key=lambda s: s["id"]):
         k = lane_of.get(s.get("walkway_id"))
         if k is None:
@@ -581,6 +593,7 @@ def pack_crowd(plan: dict, pdir: Path, graphs: dict) -> dict:
         dvisit += [round(float(v), 4) for v in (pl["visit"] if pl else [0.0] * 5)]
         ddwell += [float(v) for v in (pl["dwell_s"] if pl else [0.0, 0.0])]
         dpolice.append(1 if s["id"] in stations else 0)
+        dtransit.append(1 if s.get("kind") == "station" and s.get("owner_id") in served else 0)
     shape, danger, pal = [], [], []
     size = max((len(v) for v in crowd["palettes"].values()), default=0)
     for d in plan["districts"]:
@@ -621,6 +634,7 @@ def pack_crowd(plan: dict, pdir: Path, graphs: dict) -> dict:
                 "outfit_groups": len(of.get("groups") or []), "district_groups": ogrp,
                 "district_wear": owear,
                 "door_lanes": dl, "door_dists": dd, "door_points": dp, "door_rates": dr,
+                **({"door_transit": dtransit} if served else {}),
                 "crowd": {"hour": hour, "pool": int(crowd["pool"]),
                           "live_m": float(crowd["live_m"]), "trip_s": float(crowd["trip_s"]),
                           "groups": [float(v) for v in crowd["groups"]],
@@ -850,6 +864,148 @@ def pack_traffic(plan: dict, pdir: Path, graphs: dict, veh: dict | None) -> dict
     return out
 
 
+# LG6: the trains' stand-ins (decision 6: the Mac designs the trains; lifegen generates no
+# vehicle geometry): per mode the parts of a car, each a mesh of the engine's basic shapes (1 m
+# across, its pivot at its middle) at its middle in the car's frame (m: x forward, y left, z up
+# from the body's bottom) and its size, of a kind the runtime colors: `body` (light, the line's
+# color in it), `window` (dark glass lit by night), `accent` (a band in the line's color, glowing),
+# `dark` (gear). A mode's pack replaces its parts here (its meshes, `scale` 1) when the Mac's
+# designs are in; the runtime adds each car's door leaves and the lit doorways between them.
+TRANSIT_MESHES = {"cube": "/Engine/BasicShapes/Cube", "cylinder": "/Engine/BasicShapes/Cylinder"}
+TRANSIT_KINDS = ("body", "window", "accent", "dark")
+
+
+def transit_model(mode: str) -> list[dict]:
+    """A car's parts for `mode` (`TRANSIT_MODELS`)."""
+    from lifegen.presets import TRANSIT_MODES
+    m = TRANSIT_MODES[mode]
+    L, W, H, f = m["car_m"], m["width_m"], m["height_m"], m["floor_m"]
+    win = min(1.0, H - f - 1.3)
+    parts = [{"mesh": "cube", "kind": "body", "at": [0.0, 0.0, H / 2.0], "size": [L, W, H]},
+             {"mesh": "cube", "kind": "window", "at": [0.0, 0.0, f + 1.0 + win / 2.0],
+              "size": [L * 0.88, W + 0.04, win]},
+             {"mesh": "cube", "kind": "accent", "at": [0.0, 0.0, f + 0.45],
+              "size": [L * 0.995, W + 0.03, 0.14]},
+             {"mesh": "cube", "kind": "dark", "at": [0.0, 0.0, H + 0.1],
+              "size": [L * 0.7, W * 0.55, 0.2]}]
+    # (a lamp band across each end, lit: a train seen from ahead or behind in the dark)
+    for x in (-L / 2.0 - 0.01, L / 2.0 + 0.01):
+        parts.append({"mesh": "cube", "kind": "window", "at": [x, 0.0, f + 0.7],
+                      "size": [0.04, W * 0.7, 0.18]})
+    if mode in ("metro", "elevated_rail"):
+        for x in (-0.33 * L, 0.33 * L):
+            parts.append({"mesh": "cube", "kind": "dark", "at": [x, 0.0, -0.4],
+                          "size": [3.0, W * 0.8, 0.8]})
+    elif mode == "maglev":
+        parts.append({"mesh": "cube", "kind": "dark", "at": [0.0, 0.0, -0.2],
+                      "size": [L * 0.96, W * 0.9, 0.4]})
+        parts.append({"mesh": "cube", "kind": "accent", "at": [0.0, 0.0, H - 0.25],
+                      "size": [L * 0.98, W + 0.02, 0.08]})
+    elif mode == "monorail":
+        # (the car beside the beam, its arms over the beam's top: the beam is on its left)
+        y0, y1 = W / 2.0 - 0.1, m["track_m"] + 0.55
+        for x in (-0.3 * L, 0.3 * L):
+            parts.append({"mesh": "cube", "kind": "dark", "at": [x, (y0 + y1) / 2.0,
+                                                                  -m["base_m"] + 0.25],
+                          "size": [1.8, y1 - y0, 0.5]})
+    elif mode == "sky_tube":
+        parts.append({"mesh": "cylinder", "kind": "accent", "at": [0.0, 0.0, H + 0.02],
+                      "size": [W * 0.5, W * 0.5, 0.04]})
+    return parts
+
+
+TRANSIT_MODELS = {k: transit_model(k) for k in ("metro", "elevated_rail", "monorail", "maglev",
+                                                "sky_tube")}
+
+
+def pack_transit(plan: dict, pdir: Path, graphs: dict) -> dict:
+    """LG6: transit, flat: per line its mode, color (linear), loop, track (its points, citygen
+    m), turn points, the train as run and drawn (cars, car size, floor, base over the line, its
+    track off the middle, doors, sides), the cycle and its samples, the stop events, the trains
+    per band; per stop its platform walkway (a walkway lane), where along the track, the
+    people boarding and leaving per band, the height they board at, whether at the walkway's
+    level; per walkway lane how far off its middle people keep (a platform's trains) and its
+    width; the meshes and per mode the parts of a car (`TRANSIT_MODELS`); the settings."""
+    tr = plan.get("transit") or {}
+    f = pdir / (tr.get("file") or "timetables.json")
+    if not tr.get("lines") or not f.is_file():
+        return {}
+    tt = json.loads(f.read_text(encoding="utf-8"))
+    walk = [e for e in _elements(graphs["walkways"]) if len(e[2]) >= 2]
+    gids = graphs["walkways"].get("ids") or [str(e[0]) for e in walk]
+    lane_of = {gids[e[0]]: k for k, e in enumerate(walk)}
+    modes = [m for m in TRANSIT_MODELS if any(ln["mode"] == m for ln in tt["lines"])]
+    mesh_names = list(TRANSIT_MESHES)
+    out = {k: [] for k in (
+        "transit_line_mode", "transit_line_color", "transit_line_loop", "transit_line_car",
+        "transit_line_turn", "transit_line_cycle", "transit_line_dt", "transit_line_trains",
+        "transit_point_starts", "transit_points", "transit_sample_starts", "transit_samples",
+        "transit_event_starts", "transit_events", "transit_stop_starts", "transit_stop_lane",
+        "transit_stop_s", "transit_stop_board", "transit_stop_alight", "transit_stop_z",
+        "transit_stop_level", "transit_part_starts", "transit_parts")}
+    clear = [0.0] * len(walk)
+    width = [float(e[3]) for e in walk]
+    for key in ("transit_point_starts", "transit_sample_starts", "transit_event_starts",
+                "transit_stop_starts"):
+        out[key].append(0)
+    ids, names = [], []
+    for ln in tt["lines"]:
+        c = ln["car"]
+        ids.append(ln["id"])
+        names.append(ln["name"])
+        out["transit_line_mode"].append(modes.index(ln["mode"]))
+        out["transit_line_color"] += _lin(ln["color"])
+        out["transit_line_loop"].append(1 if ln["loop"] else 0)
+        # (12 floats a line: cars, car length, gap, width, height, floor, base, track, doors a
+        # side, door width, sides open (1 the right, 2 both), at the walkway's level)
+        out["transit_line_car"] += [float(ln["cars"]), float(c["car_m"]), float(c["gap_m"]),
+                                    float(c["width_m"]), float(c["height_m"]),
+                                    float(c["floor_m"]), float(c["base_m"]),
+                                    float(c["track_m"]), float(c["doors"]),
+                                    float(c["door_m"]), float(c["sides"]),
+                                    1.0 if c["board_level"] else 0.0]
+        out["transit_line_turn"] += [float(v) for v in ln["turn"]]
+        out["transit_line_cycle"].append(float(ln["cycle_s"]))
+        out["transit_line_dt"].append(float(ln["sample_s"]))
+        out["transit_line_trains"] += [int(v) for v in ln["trains"]]
+        for p in ln["points"]:
+            out["transit_points"] += [float(v) for v in p]
+        out["transit_point_starts"].append(len(out["transit_points"]) // 3)
+        out["transit_samples"] += [float(v) for v in ln["samples"]]
+        out["transit_sample_starts"].append(len(out["transit_samples"]))
+        for e in ln["events"]:
+            out["transit_events"] += [float(e[0]), float(e[1]), float(e[2]), float(e[3])]
+        out["transit_event_starts"].append(len(out["transit_events"]) // 4)
+        for st in ln["stops"]:
+            k = lane_of.get(st.get("walkway_id"), -1)
+            out["transit_stop_lane"].append(k)
+            out["transit_stop_s"].append(float(st["s"]))
+            out["transit_stop_board"] += [float(v) for v in st["board"]]
+            out["transit_stop_alight"] += [float(v) for v in st["alight"]]
+            out["transit_stop_z"].append(float(st["board_z"]))
+            out["transit_stop_level"].append(1 if st.get("board_level", c["board_level"]) else 0)
+            if k >= 0 and st.get("clear_m"):
+                clear[k] = max(clear[k], float(st["clear_m"]))
+                width[k] = max(width[k], 2.0 * float(st.get("half_m") or 0.0))
+        out["transit_stop_starts"].append(len(out["transit_stop_lane"]))
+    out["transit_part_starts"].append(0)
+    for m in modes:
+        for p in TRANSIT_MODELS[m]:
+            # (8 floats a part: mesh, kind, middle (3), scale (3): the basic shapes are 1 m)
+            out["transit_parts"] += [float(mesh_names.index(p["mesh"])),
+                                     float(TRANSIT_KINDS.index(p["kind"]))] + \
+                [float(v) for v in p["at"]] + [float(v) for v in p["size"]]
+        out["transit_part_starts"].append(len(out["transit_parts"]) // 8)
+    st_ = tr.get("settings") or {}
+    out.update({"transit_meshes": [TRANSIT_MESHES[k] for k in mesh_names],
+                "transit_modes": modes, "transit_line_ids": ids, "transit_line_names": names,
+                "walk_clear": [round(v, 3) for v in clear],
+                "walk_transit_width": [round(v, 3) for v in width],
+                "transit": {"lines": len(ids), "cross_m": float(st_.get("cross_m", 90.0)),
+                            "hour": int(tr.get("hour", 23))}})
+    return out
+
+
 def life_data(pdir: Path, graphs: dict | None, veh: dict | None,
               lib: dict | None = None) -> tuple[dict | None, str]:
     plan = json.loads((pdir / "life_plan.json").read_text(encoding="utf-8"))
@@ -874,6 +1030,15 @@ def life_data(pdir: Path, graphs: dict | None, veh: dict | None,
             lanes.update(traffic)
         else:
             lanes.update(pack_drive(graphs, spike))
+        # (LG6: every transit line's timetable, its stops and trains; a plan before it none)
+        tpack = pack_transit(plan, pdir, graphs)
+        if tpack:
+            # (the platforms' walkways as wide as their decks, people keeping off their
+            # trains; the other walkways as they were)
+            w = tpack.pop("walk_transit_width")
+            lanes["walk_widths"] = [round(max(float(a), float(b)), 3)
+                                    for a, b in zip(lanes["walk_widths"], w)]
+            lanes.update(tpack)
         crowd = plan["crowd"]
         spike = {**spike, "people": int(crowd["pool"]), "library": crowd.get("library") or {},
                  "persons": {}}
@@ -942,7 +1107,13 @@ def write_life(build: str | Path, given: str | Path | None = None,
                            "patrol_cars": sum(c.get("traffic_police") or []),
                            "clips": bool(c.get("sit_clips"))}}
                if c.get("slot_kinds") is not None else {}),
-            "library": ({"characters": len(c["mid_meshes"]), "hash": c.get("library_hash"),
+            **({"transit": {"lines": len(c["transit_line_mode"]), "modes": c["transit_modes"],
+                            "stops": len(c["transit_stop_lane"]),
+                            "trains": [sum(c["transit_line_trains"][5 * k + b]
+                                           for k in range(len(c["transit_line_mode"])))
+                                       for b in range(5)]}}
+               if c.get("transit_line_mode") else {}),
+            "library":({"characters": len(c["mid_meshes"]), "hash": c.get("library_hash"),
                         "tiers": c.get("tiers")} if c.get("mid_meshes") else
                        {"stand_ins": True, "why": c.get("people_skipped") or
                         "no people library in the project (--people)"})}
