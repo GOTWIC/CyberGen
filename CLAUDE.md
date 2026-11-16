@@ -1531,7 +1531,8 @@ took them, faceted at street level) is in place: no chord of a road's curve sags
 `G.ROAD_SAG_M` 2 cm at its outer edge (`geom.arc_steps(r, sweep, sag)`, M21's rule; plain
 arithmetic, dmath):
 - **Arcs at their source:** M1b's fillets (`roads._arc_line(..., hw=)`: the class's half width;
-  transit keeps M1b's 6 degree or 12 m steps), M7's turns and loops (`elevated._turn`,
+  transit keeps M1b's 6 degree or 12 m steps; a fillet under `roads.ARC_OK` 0.98 of its
+  class's minimum radius too, as `curve_radius` passed it on main), M7's turns and loops (`elevated._turn`,
   `_loop`), M2's ring streets (`streets._ring_pts`, `RING_HW_M`), junction corners
   (`junctions._arc`, also the map's `_core`), cul-de-sac bulbs and bend faces
   (`pavement._circle`, `fold_poly`). M7's diamond ramps keep their 10 m stations (finer ones
@@ -1557,11 +1558,14 @@ arithmetic, dmath):
 - **Found on the new layouts:** `ground_cover` leaves out overlap parts thinner than
   `water_checks.GRID_SLIVER_M` 5 cm (a 1 cm sliver along a 322 m lot edge by a canal);
   an elevated station's stair whose run passes through a building mass at its height gets an
-  elevator and a path (`transit.Builder._stair_blocked`, the check's own masses); a failing
+  elevator and a path (`transit.Builder._stair_blocked`, the check's own masses);
+  `walkway_building_clash` passes an entrance whose link to any of its walkway's pieces within
+  `network_checks.TIE_M` 5 cm of the nearest is clear (a later split's centimeter piece); park
+  path benches keep off the carriageways their path crosses (`CARRIAGE`); a failing
   city tries `build.LAYOUT_SALTS` 7 layouts (3 before) on its roads before another road
-  network, `CITY_RETRIES` 11 (a city passing within four is unchanged).
+  network, `CITY_RETRIES` 23 (8 before; a city passing within four layouts is unchanged).
 Every city's layout moves (its later stages meet layouts main never had: Delta builds on
-layout salt 4, Saltreach and Cragmouth 1, Greyhook 2, the pinned demo 1); pavement vertices
+layout salt 4, Saltreach and Cragmouth 1, Greyhook 2, the pinned demo 1, the stack demo 2); pavement vertices
 +15%, street pack triangles +8% (Delta 1.59 to 1.72 million); the cars' lanes
 (`unreal_life.fillet`, `smooth`) now run on roads as smooth as they are. Outputs and
 measures: `docs/progress/fix_road_curves/`.

@@ -74,7 +74,7 @@ at most 0.7 cm and is not where the facets come from.
     sidewalk piece whose end lay a millimeter nearer the entrance than the foot on the piece
     beside it, and the link to that end clipped a shop row (the stack demo's third layout).
   - **Seven layouts on a city's roads before another road network** (`build.LAYOUT_SALTS` 3
-    to 7, `CITY_RETRIES` 8 to 15). A city's later stages pass on some of its layouts and fail
+    to 7, `CITY_RETRIES` 8 to 23). A city's later stages pass on some of its layouts and fail
     on others, and main's samples sit on a lucky one: replayed on main, Delta's layouts 1 and 3
     fail (`transit_supports`), Vesper Bay's 1, 2 and 3 fail (a station stair through a
     building, a sky tube's profile, a crossing on a carriageway, an entrance walled in). Every
@@ -109,7 +109,7 @@ fillets under `ARC_OK`, traced roads, M7's diamond ramps). Layout: the try a cit
 | Cragmouth | salt 1 (2) | 23,226 | 362,249 | 69 | 1.8 / 2.0 / 99 | 86 | 2.0 / 2.2 / 194 | 75 |
 | Vesper Bay Pinned | salt 1 (2) | 22,505 | 346,923 | 77 | 1.8 / 2.2 / 299 | 167 | 2.0 / 2.2 / 106 | 66 |
 DECKS_ROW
-STACKS_ROW
+| Vesper Bay Stacks | salt 2 (3) | 21,498 | 341,339 | 80 | 1.8 / 2.7 / 156 | 251 | 2.0 / 2.2 / 106 | 50 |
 
 On main, Saltreach, Nexus and Greyhook measured (from the play fixes' builds, the same
 pavement): road edges p95 18.1, 14.2 and 13.0 cm, junction curbs p95 6.9, 6.8 and 9.3 cm.

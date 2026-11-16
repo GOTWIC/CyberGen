@@ -51,9 +51,9 @@ from .validate import Result, dump_spec
 MAX_VARIANTS = 20
 GOOD_QUALITY = 0.10
 ROAD_CANDIDATES = 3
-CITY_RETRIES = 15      # M7: layouts or road networks a failing full city tries next (M8a: 4 -> 8,
+CITY_RETRIES = 23      # M7: layouts or road networks a failing full city tries next (M8a: 4 -> 8,
                        # so the next road network gets its own layouts too; the road curves
-                       # fix: 15, with LAYOUT_SALTS 7, the second network all its layouts)
+                       # fix: 23, with LAYOUT_SALTS 7, three networks all their layouts)
 LAYOUT_SALTS = 7       # of them, local layouts on the same roads first (the road curves fix:
                        # 3 -> 7: a layout drawn again is a far smaller change to a city than
                        # another road network, and a later stage's checks pass about every
