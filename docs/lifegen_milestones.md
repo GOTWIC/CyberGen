@@ -18,7 +18,7 @@ grows here as it lands, as in [`citygen_milestones.md`](citygen_milestones.md),
 | LG4 | Life at places: every bench, bus shelter, kiosk, vending machine, food stall and taxi stand of the city a place slot (its use points Smart Objects of the world's subsystem while its walkway is live), clubs' queues and bars' smokers at their doors; people walking by sit, wait, buy, eat, queue, smoke or talk there and walk on; AG3's shop doors as places by their hours (closed doors send no one, open shops take visitors in and let them out); gang members on their own turf's walkways and spots in their faction's colors; police pairs on the patrol walkways out of their stations and patrol cars in a police livery; the Game Animation Sample's bench loop and idle breaks retargeted onto the library's bodies; Delta city-wide | Done | [`docs/progress/LG4`](progress/LG4) |
 | LG5 | Traffic: every lane of the city at its street's density by hour (twice M11's by default), live round the view from a fixed pool of AG18's cars by the districts' fleets and paints; following the car in front, red lights, junctions taken in turn with room past them, stopping for people and the player; Delta driven city-wide | Done | [`docs/progress/LG5`](progress/LG5) |
 | LG6 | Transit: a timetable per line from the model's tracks and stations (the fastest runs by the mode's speeds, rates and the track's curves, dwells, turns at an open line's ends), its trains per hour band evenly round its cycle, each station's stop and board walkway, people boarding and leaving by the station's riders; the trains (stand-ins of the exporter's per mode model table until the Mac's designs) running every line city-wide by the world's time, doors open at the stops, the crowd leaving and boarding them round the view; Delta's five lines | Done | [`docs/progress/LG6`](progress/LG6) |
-| LG7 | Air and water | Planned | |
+| LG7 | Air and water: routes for everything that flies and floats, city-wide, each a closed path run to a timetable by the world's time (as LG6's trains): flying cars between M3's pads (landing and taking off vertically) and round circuits over the avenues and highways on layers by heading, clear of every mass, tube, line, skybridge and sign; delivery drones from roof to roof; police orbits by danger; media fliers round the landmarks; aircraft high over the map; a spaceport's shuttles down onto their launch pads; boats keeping right on every river, channel and canal; water taxis between piers derived from M16's quays; double-ended ferries across the rivers; ships at the port's berths and one offshore. AG18's hover cars as the flying cars and police fliers, stand-ins for the rest; Delta city-wide | Done | [`docs/progress/LG7`](progress/LG7) |
 | LG8 | Weather, reactions and release | Planned | |
 
 ## LG0: groundwork and spike
@@ -369,6 +369,75 @@ Report, shots, benchmark, decisions and open items:
   catching a bad timetable, too many trains, a station off its track, boarding by the riders,
   the exporter's pack; `tests/test_bench.py` the transit pass; LG0's small city's metro has a
   track now).
+
+## LG7: air and water
+
+Built on the Windows PC (2026-11-16), on main after LG6 (#235). Report, shots, benchmark,
+decisions and open items: [`docs/progress/LG7/README.md`](progress/LG7/README.md).
+
+- **Routes** (`lifegen/airwater.py`, `presets.AW_VEHICLES`, `AIR`, `WATER`, `AW_BUDGET`; the
+  spec's `air` and `water` with `busy` and per kind `kinds` multipliers): everything that flies
+  or floats runs a closed route, its points carrying the heading the vehicle faces there, its
+  speed profile on a 4 m grid (the kind's cruise, acceleration and braking, at most
+  sqrt(lateral R) in a turn, its climb rate on a vertical stretch), dwells where it lands or
+  berths, the cycle sampled every second; per hour band its vehicles evenly round the cycle,
+  fewer where two would come within the kind's spacing. Ids from what a route serves
+  (`air.car.<pad>`, `air.lane.<node>`, `air.drone.<hub>.<drop>`, `air.police.<district>.<k>`,
+  `water.boat.<water>`, `water.taxi.<pier>`, `water.ferry.<pier>`, `water.ship.<berth>`), a
+  layer 4 entry each.
+- **The airspace** (`AirSpace`, `obstacles`): building masses and roof items, skybridges,
+  structures (sky tubes, decks, beams, pylons, columns), transit lines, megasite masses and signs
+  in front of a facade or over a roof, widened 3 m in plan and 3 m in height, on a 4 m raster of
+  63 height slabs of 8 m; a kind's cells at a height grown by its own margin (cars 8 m, police
+  10, media 12) and, for cars, police and media, on 8 m cells. Routes by a windowed A* costing
+  1 over the avenues and highways and 2.2 elsewhere (between the towers, over lower roofs),
+  pulled straight on cells no dearer than the path crossed, corners rounded by the kind's
+  turn radius where clear.
+- **Fliers:** flying cars between M3's pads (paired 500 to 2,200 m apart; a pad something
+  stands over left out with what), up from one pad, across on the layer of the leg's heading
+  (`car_layers` 48 to 450 m: east-bound the even layers, west-bound the odd, at least
+  `pad_over_m` over both roofs), down onto the other, a dwell, back on the other heading's
+  layer; circuits round three avenue or highway nodes of each district (the change of layer at
+  each corner along `ramp_m`), as many as its cars per km2 by band need (`car_density` times its
+  busy, the spec's and 0.5 plus its wealth, at most `per_circuit` a circuit); AG18's hover cars
+  (Kestrel's three) by the district's fleet. Delivery drones from a hub roof to a drop roof on
+  `drone_layers` and 4 m cells, hovering down onto each. Police orbits (110 to 330 m) over
+  each district by its danger, more by night; media fliers round the tallest landmarks;
+  aircraft crossing the map at 760 and 820 m, turning off it; a spaceport's shuttle per launch
+  pad, in along its flight cone and down onto it.
+- **The water** (`WaterSpace`, `piers`, `_water_route`, `ship_routes`): M16's bodies (not the
+  ornamental ones) on a 4 m raster with a surface and a depth per cell (M16's bed rule, linear
+  from the nearest bank's toe); a kind's water as exact geometry (shrunk by its half beam and
+  margin, less the banks' slopes, quays' bands, M6's moored boats, columns and AG7's bridge
+  piers grown by as much), its draft under it, a bridge too low for its height out. Boats up and
+  down every river, channel and canal keeping right (each way offset from the middle by the
+  most both ways fit, a half turn at each end; a body cut by bridge piers its longest stretch
+  from an end); water taxis on tours of up to four piers (one beside each quay's middle, clear
+  of the moored boats); double-ended ferries across the rivers between piers where walkways
+  reach both shores; ships in to the port's berths on water deep and wide enough, else lying
+  at them, and one offshore between two far points of the map's edge.
+- **Checks:** `air_lanes` (each flier's path read back every 4 m against the airspace at its
+  kind's margin; a pad's column at the drones'), `air_pads`, `water_lanes` (every boat within
+  1 m of its kind's water, exactly, and at the surface), `airwater_timing` (speeds, turns,
+  climbs, acceleration and braking read back, dwells, routes closed, vehicles apart),
+  `airwater_budget` (500 fliers, 300 drones, 160 boats at once); `preview_airwater.png`; the
+  asks `piers` and `air_corridors` derived, `fleet_kinds` naming the kinds still to design.
+- **Exporter and runtime** (`unreal_life.pack_airwater`, the per kind model table
+  `AIRWATER_MODELS`, `PACK_VERSION` 8; `import_city.airwater_props`, `LIFE_VERSION` life9;
+  `CityGenLifeAir.cpp`): every vehicle by the world's time from its route's samples, its
+  heading interpolated, fliers banking and pitching, boats rolling and bobbing; AG18's hover
+  cars with nav lights and, police fliers, a flashing bar in LG4's livery; stand-ins for the
+  rest, lit by night, strobes and beacons flashing. Console `CityGenLife.Air`, `.Water`,
+  `.AirShow`; the Tab menu's Air traffic and Boats rows; the status's `airwater`; bench pass
+  `night_life_noairwater`.
+- **Delta:** DELTA_NUMBERS_LONG
+- **Tests** (`tests/lifegen/test_lg_airwater.py`: a small city with two roof pads and a tower
+  between them, a river, a canal with quays and a moored boat, the sea and a basin, a
+  spaceport; the airspace by height, A* round a wall, the pad flight clear of the tower on
+  layers by heading, circuits, police, aircraft, the shuttle on its launch pad, boats keeping
+  right and turning at their ends, piers and the double-ended ferry, ships, the checks failing
+  where they should, vehicles kept apart, the spec's kinds, the plan's file, contribution and
+  the exporter's pack with and without AG18's hover cars).
 
 ## LG5: traffic
 

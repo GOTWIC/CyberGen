@@ -548,13 +548,13 @@ AIR = {
     "open_cost": 2.2,              # ... and elsewhere (between the towers, over lower roofs)
     "pad_over_m": 14.0,            # a flight to or from a pad cruises this far over its roof
     "ramp_m": 120.0,               # a change of layer along this much of a leg at most
-    "car_density": [7.0, 16.0, 14.0, 18.0, 12.0],
+    "car_density": [12.0, 28.0, 24.0, 32.0, 22.0],
     "drone_density": [1.5, 6.0, 7.0, 6.0, 3.0],
     "police": {"base": 0.5, "danger": 2.5, "band": [1.0, 0.6, 0.6, 0.8, 1.0]},
     "media": 2,
     "aircraft": 2,
     "lane_triangle_m": [700.0, 2200.0],   # a circuit's sides
-    "per_circuit": 6,              # cars a circuit at most per band (the rest more circuits)
+    "per_circuit": 8,              # cars a circuit at most per band (the rest more circuits)
     "drone_reach_m": [150.0, 650.0],
     "drone_drop_h_m": [12.0, 45.0],
     "drone_hub_h_m": [15.0, 70.0],

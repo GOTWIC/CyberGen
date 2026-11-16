@@ -1039,7 +1039,7 @@ def _p(mesh, kind, at, size, cull=0.0) -> dict:
 def nav_lights(L: float, W: float, H: float, cull: float = 0.0) -> list[dict]:
     """A flier's lights: red on its left, green on its right, a white strobe on top and a lamp
     ahead (`cull` past which the small ones are not drawn)."""
-    s = max(0.08, 0.02 * max(L, W))
+    s = max(0.16, 0.035 * max(L, W))
     return [_p("sphere", "nav_red", [0.0, W / 2.0 + s / 2.0, H * 0.45], [s, s, s], cull),
             _p("sphere", "nav_green", [0.0, -W / 2.0 - s / 2.0, H * 0.45], [s, s, s], cull),
             _p("sphere", "strobe", [-L * 0.3, 0.0, H + s / 2.0], [s * 1.3] * 3, cull),
@@ -1154,7 +1154,7 @@ def aw_model(kind: str) -> list[dict]:
         parts = [_p("cube", "hull", [0.0, 0.0, -1.5], [120.0, 20.0, 9.0]),
                  _p("cube", "dark", [0.0, 0.0, -5.2], [120.2, 20.2, 1.8]),
                  _p("cube", "dark", [0.0, 0.0, 3.2], [118.0, 19.0, 0.4])]
-        cols = ("accent", "body", "dark", "accent", "body")
+        cols = ("hull", "body", "dark", "hull", "body")
         for q in range(5):
             parts.append(_p("cube", cols[q], [-28.0 + q * 14.5, 0.0, 6.4], [13.5, 17.0, 6.0]))
         parts += [_p("cube", "body", [48.0, 0.0, 10.5], [10.0, 18.0, 14.0]),
@@ -1186,6 +1186,8 @@ def _hover_parts(rec: dict, police: bool) -> list[dict]:
                     "at": [float(v) for v in p.get("pivot", [0.0, 0.0, 0.0])],
                     "size": [1.0, 1.0, 1.0],
                     "cull_m": 300.0 if p.get("kind") == "glass" else 0.0})
+    # (an underglow in the route's color under its body: a flier read by night from afar)
+    out.append(_p("cube", "accent", [0.0, 0.0, 0.06], [L * 0.7, W * 0.55, 0.05]))
     out += nav_lights(L, W, H)
     if police:
         out += [_p("cube", "police_red", [-0.2, 0.28, H + 0.06], [0.35, 0.45, 0.12]),

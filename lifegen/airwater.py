@@ -1963,6 +1963,8 @@ def _pick(weights: dict, *salt) -> str | None:
 
 
 HOVER = ("kestrel_dart", "kestrel_meridian", "kestrel_atlas")
+# (a flying car's underglow by its route: neon, read by night from afar)
+CAR_GLOW = ("#21e6ff", "#ff2bd6", "#ffb21c", "#7dff3a", "#8a5bff", "#ff3b3b")
 STANDIN_COLORS = {
     "drone": ["#f2f2f2", "#ff8a1c", "#ffd21c", "#1cc6ff"],
     "police": ["#1f3cff"], "media": ["#f4f4f4"], "aircraft": ["#e3e8ee"],
@@ -2090,6 +2092,7 @@ def airwater_plan(model: dict, filled: dict, build: Path | None = None,
             did = a.get("district_id") or _district_of(polys, *a["pos"][:2])
             rec["district_id"] = did
             rec["model"] = hover_model(did, a["id"])
+            rec["color"] = CAR_GLOW[int(_u("glow", rec["id"]) * len(CAR_GLOW)) % len(CAR_GLOW)]
             rec["counts"] = [1, 2, 2, 2, 1]
             served |= {a["id"], b["id"]}
             for bb in range(5):
@@ -2123,6 +2126,8 @@ def airwater_plan(model: dict, filled: dict, build: Path | None = None,
                 if rec is None or any(r["id"] == rec["id"] for r in routes + got):
                     continue
                 rec["model"] = hover_model(did, rec["id"])
+                rec["color"] = CAR_GLOW[int(_u("glow", rec["id"]) * len(CAR_GLOW)) %
+                                        len(CAR_GLOW)]
                 got.append(rec)
                 ncirc += 1
             for k, rec in enumerate(got):

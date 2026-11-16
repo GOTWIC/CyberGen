@@ -40,7 +40,7 @@ namespace
 	const float BankMax[10] = {22.f, 12.f, 18.f, 10.f, 25.f, 20.f, 0.f, 0.f, 0.f, 0.f};
 	const float RollAmp[10] = {0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 1.6f, 1.2f, 0.5f, 0.25f};
 	const float BobAmp[10] = {0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.05f, 0.05f, 0.03f, 0.02f};
-	const float ShowDist[10] = {14.f, 4.f, 14.f, 22.f, 160.f, 140.f, 14.f, 20.f, 48.f, 170.f};
+	const float ShowDist[10] = {12.f, 3.f, 14.f, 22.f, 160.f, 140.f, 14.f, 20.f, 48.f, 170.f};
 
 	/** A stand-in part's colors by its kind (0 body, 1 window, 2 accent, 3 dark, 4 nav red, 5 nav
 	 *  green, 6 strobe, 7 police red, 8 police blue, 9 lamp, 10 hull, 11 beacon) and its route's
@@ -52,13 +52,13 @@ namespace
 		{
 		case 0: Base = FMath::Lerp(FLinearColor(0.6f, 0.62f, 0.65f), Col, 0.35f); break;
 		case 1: Base = FLinearColor(0.02f, 0.025f, 0.03f); Emit = FLinearColor(1.0f, 0.8f, 0.55f) * 0.05f; break;
-		case 2: Base = Col; Emit = Col * 0.5f; break;
+		case 2: Base = Col; Emit = Col * 1.2f; break;
 		case 4: Base = FLinearColor(0.3f, 0.01f, 0.01f); Emit = FLinearColor(1.0f, 0.04f, 0.02f) * 3.f; break;
 		case 5: Base = FLinearColor(0.01f, 0.3f, 0.05f); Emit = FLinearColor(0.05f, 1.0f, 0.25f) * 3.f; break;
-		case 6: Base = FLinearColor(0.8f, 0.8f, 0.8f); Emit = FLinearColor(1.0f, 1.0f, 1.0f) * 10.f; break;
+		case 6: Base = FLinearColor(0.8f, 0.8f, 0.8f); Emit = FLinearColor(1.0f, 1.0f, 1.0f) * 6.f; break;
 		case 7: Base = FLinearColor(0.4f, 0.02f, 0.02f); Emit = FLinearColor(1.0f, 0.03f, 0.03f) * 7.f; break;
 		case 8: Base = FLinearColor(0.02f, 0.05f, 0.4f); Emit = FLinearColor(0.05f, 0.18f, 1.0f) * 7.f; break;
-		case 9: Base = FLinearColor(0.8f, 0.8f, 0.75f); Emit = FLinearColor(1.0f, 0.95f, 0.85f) * 5.f; break;
+		case 9: Base = FLinearColor(0.8f, 0.8f, 0.75f); Emit = FLinearColor(1.0f, 0.95f, 0.85f) * 2.f; break;
 		case 10: Base = Col; break;
 		case 11: Base = FLinearColor(0.4f, 0.02f, 0.02f); Emit = FLinearColor(1.0f, 0.05f, 0.03f) * 6.f; break;
 		default: break;
@@ -481,13 +481,13 @@ bool ACityGenLife::ShowAirWater(const FString& What)
 		double Arr = 0.0;
 		if (What == TEXT("landing"))
 		{
-			// (a car coming down onto its pad: its next pad dwell 4 to 25 s off)
+			// (a car coming down onto its pad: its next pad dwell 2 to 9 s off, over it)
 			if (Kind == KCar && V.Event == INDEX_NONE)
 			{
 				for (int32 E = AwEventStarts[V.Route]; E < AwEventStarts[V.Route + 1]; ++E)
 				{
 					const double Dt = AwEvents[3 * E] - V.U;
-					if (AwEvents[3 * E + 2] == 0.f && Dt > 4.0 && Dt < 25.0)
+					if (AwEvents[3 * E + 2] == 0.f && Dt > 2.0 && Dt < 9.0)
 					{
 						bWant = true;
 						Arr = AwEvents[3 * E];
@@ -541,19 +541,24 @@ bool ACityGenLife::ShowAirWater(const FString& What)
 	FVector Eye, At;
 	if (What == TEXT("landing"))
 	{
-		// (on the pad's roof edge, the car coming down onto it)
+		// (beside the pad, a little over its roof, the car coming down onto it in the frame)
 		FVector Pad;
 		float Yw;
 		AwPathAt(V.Route, AwSampleAt(V.Route, PadU), Pad, Yw);
 		const FVector PadUe(Pad.X * 100.0, -Pad.Y * 100.0, Pad.Z * 100.0);
-		Eye = PadUe + Right * 1700.0 - Fwd * 1400.0 + FVector(0.0, 0.0, 350.0);
-		At = PadUe + FVector(0.0, 0.0, 900.0);
+		FVector Side = FVector::CrossProduct(FVector::UpVector, (P - PadUe).GetSafeNormal2D());
+		if (Side.IsNearlyZero())
+		{
+			Side = Right;
+		}
+		Eye = PadUe + Side * 1600.0 + FVector(0.0, 0.0, 450.0);
+		At = 0.5 * (PadUe + P);
 	}
 	else if (What == TEXT("layers"))
 	{
-		// (behind and over a car on a circuit, along its way: the layers ahead)
-		Eye = P - Fwd * 9000.0 + Right * 2500.0 + FVector(0.0, 0.0, 2500.0);
-		At = P + Fwd * 8000.0;
+		// (behind and over a car on a circuit, along its way: the cars ahead on its layer)
+		Eye = P - Fwd * 3000.0 + Right * 900.0 + FVector(0.0, 0.0, 700.0);
+		At = P + Fwd * 12000.0;
 	}
 	else if (Kind >= AwAirKinds)
 	{
