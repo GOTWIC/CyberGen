@@ -1549,14 +1549,22 @@ arithmetic, dmath):
   another vertex, than its widest band edge's mitre reaches along it (`Path.reach`,
   `_reach`) is left out, so no edge steps back between a mitre point and a square one (a
   centimeters-long zigzag that `Road.folds` took for a fold: Vesper Bay's bend faces 81 on
-  main, 137 with the fine arcs alone, 64 with this).
+  main, 137 with the fine arcs alone, 86 with this).
 - **AG17:** draws the map as it is (no change); its junction corner barriers keep off the
   crosswalks (`barriers._keep_out`: the crossings fix put a highway's crosswalks at its
   corners, 33 of Delta's and 11 of Vesper Bay's guard walls stood on them, failing
   `asset_clash`).
-Every city's layout moves (the cities' later stages are chaotic in their streets: Delta builds
-on layout salt 2, Greyhook on 3); the cars' lanes (`unreal_life.fillet`, `smooth`) now run on
-roads as smooth as they are. Outputs and measures: `docs/progress/fix_road_curves/`.
+- **Found on the new layouts:** `ground_cover` leaves out overlap parts thinner than
+  `water_checks.GRID_SLIVER_M` 5 cm (a 1 cm sliver along a 322 m lot edge by a canal);
+  an elevated station's stair whose run passes through a building mass at its height gets an
+  elevator and a path (`transit.Builder._stair_blocked`, the check's own masses); a failing
+  city tries `build.LAYOUT_SALTS` 7 layouts (3 before) on its roads before another road
+  network, `CITY_RETRIES` 11 (a city passing within four is unchanged).
+Every city's layout moves (its later stages meet layouts main never had: Delta builds on
+layout salt 4, Saltreach and Cragmouth 1, Greyhook 2, the pinned demo 1); pavement vertices
++15%, street pack triangles +8% (Delta 1.59 to 1.72 million); the cars' lanes
+(`unreal_life.fillet`, `smooth`) now run on roads as smooth as they are. Outputs and
+measures: `docs/progress/fix_road_curves/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
