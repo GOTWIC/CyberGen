@@ -443,6 +443,9 @@ ROAD_LIGHTS = {
     "service": ("cobra_head", 30.0, 8.0, 1.5),
 }
 POLE_OUT_M = 0.5                  # an edge pole's foot past its road's edge (dlss_lamps_flicker)
+XWALK_CLEAR_M = 1.0               # a road light's free column (a median's, a parapet's) keeps this off a
+                                  # crosswalk, and off every junction (the crossings fix, #232)
+COLUMN_SHIFT_M = 2.0              # ... a median column moved along its road this far at a time
 ALLEY_STEP_M = (9.0, 10.0)        # wall packs every a + b * the mood's alley darkness (m)
 ALLEY_PACK_Z_M = 4.0
 CORNER_POLE_Z_M = 8.0             # a corner pole's head over the ground

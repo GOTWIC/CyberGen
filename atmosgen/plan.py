@@ -624,6 +624,36 @@ class Plan:
         did = self.c.district_of(rid)
         return did if did is not None else self.c.district_at(*_center(ring))
 
+    def _keep_out(self):
+        """The ground a road light's column standing where no fixture test follows (a twin
+        column in a highway's median, a raised road's parapet line) keeps off: every
+        junction's outline and every crosswalk's rectangle grown by `XWALK_CLEAR_M`, as an
+        STRtree over shapes (the crossings fix, #232, stood a highway's crosswalk between its
+        corners, across the median's last stretch, where Delta's twin column stood in it)."""
+        got = getattr(self, "_keep", None)
+        if got is None:
+            from shapely import STRtree
+            from shapely.geometry import LineString, Polygon
+            gs = []
+            for j in self.c.m.get("junctions", []):
+                ring = ((j.get("polygon") or {}).get("exterior") or [])
+                if len(ring) >= 3:
+                    g = Polygon([q[:2] for q in ring])
+                    gs.append(g if g.is_valid else g.buffer(0))
+            for cw in self.c.m.get("crosswalks", []):
+                ln = cw.get("line") or []
+                if len(ln) >= 2:
+                    gs.append(LineString([ln[0][:2], ln[-1][:2]]).buffer(
+                        float(cw.get("width_m", 3.0)) / 2.0 + P.XWALK_CLEAR_M,
+                        cap_style="flat"))
+            got = self._keep = (STRtree(gs) if gs else None, gs)
+        return got
+
+    def _kept_out(self, x: float, y: float) -> bool:
+        from shapely.geometry import Point
+        tree, gs = self._keep_out()
+        return tree is not None and bool(tree.query(Point(x, y), predicate="intersects").size)
+
     def roads(self) -> None:
         for sid in sorted(self.c.segments):
             s = self.c.segments[sid]
@@ -662,7 +692,28 @@ class Plan:
                 nx, ny = -ty, tx                          # (left)
                 z = self.c.ground(x, y) + seg_z(s, sv) + h
                 if key == "highway" and med >= 1.5:
-                    # a twin arm column in the median, a head over each carriageway
+                    # a twin arm column in the median, a head over each carriageway (off the
+                    # junctions and crosswalks, `_kept_out`: moved along the road by up to
+                    # half a spacing, the nearest station first, else none)
+                    if self._kept_out(x, y):
+                        moved = None
+                        for d in [P.COLUMN_SHIFT_M * i for i in
+                                  range(1, int(st / 2.0 / P.COLUMN_SHIFT_M) + 1)]:
+                            for s1 in (sv - d, sv + d):
+                                if 2.0 <= s1 <= ln.L - 2.0:
+                                    q = ln.at(s1)
+                                    if not self._kept_out(q[0], q[1]):
+                                        moved = s1
+                                        break
+                            if moved is not None:
+                                break
+                        if moved is None:
+                            self.skip("road: a median column on a junction or crosswalk")
+                            k += 1
+                            continue
+                        x, y, _, tx, ty = ln.at(moved)
+                        nx, ny = -ty, tx
+                        z = self.c.ground(x, y) + seg_z(s, moved) + h
                     for side, sfx in ((1.0, "a"), (-1.0, "b")):
                         o = side * (med / 2.0 + arm)
                         self.spot(cls, owner=sid, suffix=f"light{k:03d}{sfx}", kind="road",
@@ -678,6 +729,10 @@ class Plan:
                     # (on a raised road its parapet line, on the deck's edge)
                     raised = seg_z(s, sv) > 1.0
                     fo = side * (half + (0.0 if raised else P.POLE_OUT_M))
+                    if raised and self._kept_out(x + nx * fo, y + ny * fo):
+                        self.skip("road: a parapet column on a junction or crosswalk")
+                        k += 1
+                        continue
                     self.spot(cls, owner=sid, suffix=f"light{k:03d}", kind="road", did=did,
                               x=x + nx * o, y=y + ny * o, z=z,
                               yaw=math.degrees(math.atan2(-ny * side, -nx * side)),

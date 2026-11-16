@@ -172,6 +172,26 @@ def test_plan_lights_junctions_roads_alleys_and_structures(build):
     assert rep["mounts"]["prop"] == 1                  # (the one street light)
 
 
+def test_highway_median_column_keeps_off_a_crosswalk(tmp_path):
+    """The crossings fix (#232) stands a highway's crosswalk between its corners, across its
+    median: a twin column there (a free fixture, no test follows) moves along the road off
+    the crosswalk by `XWALK_CLEAR_M`, keeping the road's count of columns."""
+    def plan(m, name):
+        b = tmp_path / name
+        b.mkdir()
+        (b / "city_model.json").write_text(json.dumps(m), encoding="utf-8")
+        PL.build_plan(b)
+        return {k: v for k, v in _lights(b).items() if k.startswith("rs.e150n200.")}
+    before = plan(_model(), "a")
+    x0 = min(v["pos"][0] for v in before.values())
+    m = _model()
+    m["crosswalks"].append({"id": "cw.hw", "junction_id": None, "width_m": 4.0,
+                            "line": [[x0, 184.0], [x0, 216.0]]})
+    after = plan(m, "b")
+    assert len(after) == len(before)
+    assert all(abs(v["pos"][0] - x0) >= 2.0 + P.XWALK_CLEAR_M for v in after.values())
+
+
 def test_occlusion_against_masses():
     m = {"bounds": [0.0, 0.0, 40.0, 40.0],
          "buildings": [{"id": "b", "masses": [{"footprint": _sq(18.0, 0.0, 22.0, 40.0),

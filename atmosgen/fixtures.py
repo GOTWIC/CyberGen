@@ -388,8 +388,13 @@ class Fixtures:
             yaw = math.degrees(math.atan2(hy - py, hx - px)) if armed else back
             for st, k, s, stretch, (lx, ly, lz) in self.poles(st0, reach, H, L["id"], mast):
                 at_signal = arm and dx == 0.0 and dy == 0.0
+                # (tested as the record will hold it, rounded as `add` rounds it, so the
+                # check, which measures the record, sees what was tested: a footprint at the
+                # edge of a carriageway passed unrounded and failed rounded on Delta's
+                # alley fill pole after the crossings fix)
                 if not (free or at_signal or
-                        self.clear(STREET, st, k, px, py, fz, yaw, s, sx=s * stretch)):
+                        self.clear(STREET, st, k, _r(px), _r(py), _r(fz), _r(yaw, 2),
+                                   _r(s, 4), sx=_r(s * stretch, 4))):
                     continue
                 f = self.add(L, STREET, st, k, (px, py, fz), yaw, (s * stretch, s, s), "main")
                 if free:
