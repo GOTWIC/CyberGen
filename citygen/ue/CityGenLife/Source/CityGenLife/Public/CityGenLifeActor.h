@@ -539,6 +539,108 @@ public:
 	 *  `moving` any), within 2 km of the view; false without one. */
 	UFUNCTION(BlueprintCallable, Category = "CityGen") bool ShowTransit(const FString& What);
 
+	// --- LG7: air and water (set by the importer from the plan's airwater.json) --------------
+	// Everything that flies or floats runs a route: a closed path (points with the heading the
+	// vehicle faces there), its place along it by the world's time as LG6's trains (the route's
+	// sampled cycle at (time + its phase) modulo the cycle, the band's vehicles evenly round it),
+	// dwells where it lands on a pad, sets down on a roof, berths at a pier or lies at a berth.
+	// A flier banks into its turns and pitches with its climb; a boat rolls and bobs on the water.
+	// Drawn as instanced parts (AG18's hover cars' meshes in their paint, the stand-ins' basic
+	// shapes in M_CgTransit), their nav lights, strobes, beacons and police bars flashing; far
+	// vehicles' instances sent every fourth frame.
+
+	/** Per route: its kind (an index of AwKinds: car, drone, police, media, aircraft, shuttle,
+	 *  boat, taxi, ferry, ship), model (of AwModels), color (linear RGB), cycle (s), its samples'
+	 *  step (s), vehicles per hour band (5), its points [AwPointStarts[r], ...) of AwPoints (4
+	 *  floats: x, y, z citygen m absolute, heading degrees counterclockwise from east), samples
+	 *  [AwSampleStarts[r], ...) of AwSamples (m along the path), dwells [AwEventStarts[r], ...)
+	 *  of AwEvents (3 floats: arrive, depart, what: 0 pad, 1 roof, 2 pier, 3 berth, 4 launch
+	 *  pad), its vehicles' paints [AwPaintStarts[r], ...) of AwPaints (9 floats each, a painted
+	 *  model's). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") TArray<int32> AwRouteKind;
+	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") TArray<int32> AwRouteModel;
+	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") TArray<float> AwRouteColor;
+	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") TArray<float> AwRouteCycle;
+	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") TArray<float> AwRouteDt;
+	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") TArray<int32> AwRouteCount;
+	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") TArray<FString> AwRouteIds;
+	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") TArray<int32> AwPointStarts;
+	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") TArray<float> AwPoints;
+	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") TArray<int32> AwSampleStarts;
+	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") TArray<float> AwSamples;
+	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") TArray<int32> AwEventStarts;
+	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") TArray<float> AwEvents;
+	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") TArray<int32> AwPaintStarts;
+	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") TArray<float> AwPaints;
+	/** The kinds and models by their index; per model its parts [AwModelPartStarts[m], ...) of
+	 *  AwParts (9 floats: mesh (of AwMeshes), kind (-1 painted: an AG18 mesh in its vehicle's
+	 *  paint; else 0 body, 1 window, 2 accent, 3 dark, 4 nav red, 5 nav green, 6 strobe, 7 police
+	 *  red, 8 police blue, 9 lamp, 10 hull, 11 beacon), middle (3: m in the vehicle's frame, x
+	 *  forward, y left, z up), scale (3: the basic shapes are 1 m; 1 for a painted mesh, the
+	 *  middle its pivot), cull distance (m, 0 none)); per mesh the custom floats its instances
+	 *  carry (9 painted, 6 the stand-ins': base color and emission in AwMaterial). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") TArray<FString> AwKinds;
+	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") TArray<FString> AwModels;
+	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") TArray<int32> AwModelPartStarts;
+	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") TArray<float> AwParts;
+	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") TArray<TObjectPtr<UStaticMesh>> AwMeshes;
+	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") TArray<int32> AwMeshFloats;
+	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") TObjectPtr<UMaterialInterface> AwMaterial;
+	/** Vehicles past AwFarM have their instances sent every fourth frame. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") float AwFarM = 1500.f;
+	/** What flies and what floats on or off (CityGenLife.Air, CityGenLife.Water, the play menu's
+	 *  rows). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") bool bAir = true;
+	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") bool bWater = true;
+
+	/** Whether this is LG7's air and water (routes with points and samples). */
+	bool IsAirWater() const { return AwRouteKind.Num() > 0 && AwPointStarts.Num() == AwRouteKind.Num() + 1 && AwSampleStarts.Num() == AwRouteKind.Num() + 1; }
+	UFUNCTION(BlueprintCallable, Category = "CityGen") void SetAir(bool bOn);
+	UFUNCTION(BlueprintCallable, Category = "CityGen") void SetWater(bool bOn);
+	/** For the check's shots: the camera moved beside the nearest vehicle of a kind (`car`,
+	 *  `drone`, `police`, `media`, `aircraft`, `shuttle`, `boat`, `taxi`, `ferry`, `ship`), a
+	 *  car coming down onto its pad (`landing`), a boat at a pier (`pier`), the cars' layers
+	 *  over an avenue from behind one (`layers`); false without one. */
+	UFUNCTION(BlueprintCallable, Category = "CityGen") bool ShowAirWater(const FString& What);
+
+private:
+	// (LG7, CityGenLifeAir.cpp)
+	struct FCgAwVehicle
+	{
+		int32 Route = INDEX_NONE;
+		int32 K = 0;                // its index among the route's vehicles
+		bool bOn = false;
+		bool bAir = true;
+		int32 Event = INDEX_NONE;   // the dwell it is in, else none
+		double U = 0.0;             // s into the cycle
+		double Sm = 0.0;            // m along the path
+		float Speed = 0.f;          // m/s
+		FTransform Xf;              // its frame (UE)
+		int64 Sent = -100;
+		int32 Paint = INDEX_NONE;   // its paint (of AwPaints), a painted model's
+	};
+	void BuildAirWater();
+	void UpdateAirWater(float Dt);
+	void PlaceAw(FCgAwVehicle& V, double Time);
+	void AwPathAt(int32 Route, double Sm, FVector& Pos, float& YawDeg) const;
+	double AwSampleAt(int32 Route, double U) const;
+	FString AirWaterStatus() const;
+	TArray<FCgAwVehicle> AwVehicles;
+	TArray<TArray<double>> AwCum;                      // per route its points' distances (3D)
+	// (one component per mesh and cull distance; per vehicle per part its component and
+	// instance)
+	UPROPERTY(Transient) TArray<TObjectPtr<UInstancedStaticMeshComponent>> AwComps;
+	TArray<int32> AwVehPartStart;                      // per vehicle its first of AwPartComp/Inst
+	TArray<int32> AwPartComp, AwPartInst, AwPartIdx;
+	TArray<TArray<FTransform>> AwXf;                   // per component its instances' transforms
+	TArray<TPair<int32, int32>> AwBlinkers;            // (component, instance) of flashing parts
+	TArray<int32> AwBlinkKind, AwBlinkVeh;
+	TArray<uint8> AwBlinkOn;
+	int64 AwFrame = 0;
+	int32 AwAirOn = 0, AwWaterOn = 0, AwDwelling = 0, AwNear = 0;
+	double AwMs = 0.0, AwMsMax = 0.0;
+	FString LastAwShow;
+
 private:
 	// (LG6, CityGenLifeTransit.cpp)
 	struct FCgTrack

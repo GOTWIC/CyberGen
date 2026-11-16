@@ -1,5 +1,40 @@
 {
  "$defs": {
+  "Air": {
+   "additionalProperties": false,
+   "description": "LG7: what flies (scope 6.7): how busy, and a multiplier per kind (`car`, `drone`,\n`police`, `media`, `aircraft`, `shuttle`; 0 leaves a kind out).",
+   "properties": {
+    "busy": {
+     "default": 1.0,
+     "description": "A multiplier of how busy (LG7).",
+     "maximum": 5.0,
+     "minimum": 0.0,
+     "title": "Busy",
+     "type": "number"
+    },
+    "kinds": {
+     "additionalProperties": {
+      "maximum": 10.0,
+      "minimum": 0.0,
+      "type": "number"
+     },
+     "propertyNames": {
+      "enum": [
+       "car",
+       "drone",
+       "police",
+       "media",
+       "aircraft",
+       "shuttle"
+      ]
+     },
+     "title": "Kinds",
+     "type": "object"
+    }
+   },
+   "title": "Air",
+   "type": "object"
+  },
   "Budgets": {
    "additionalProperties": false,
    "description": "Decision 12.7 (2026-11-13): 20 ms p95 at native 2560 x 1440 on the PC.",
@@ -41,21 +76,6 @@
     }
    },
    "title": "Budgets",
-   "type": "object"
-  },
-  "Busy": {
-   "additionalProperties": false,
-   "properties": {
-    "busy": {
-     "default": 1.0,
-     "description": "A multiplier of how busy (LG7).",
-     "maximum": 5.0,
-     "minimum": 0.0,
-     "title": "Busy",
-     "type": "number"
-    }
-   },
-   "title": "Busy",
    "type": "object"
   },
   "Crowd": {
@@ -415,6 +435,39 @@
    },
    "title": "Transit",
    "type": "object"
+  },
+  "Water": {
+   "additionalProperties": false,
+   "description": "LG7: what floats (scope 6.7): how busy, and a multiplier per kind (`boat`, `taxi`,\n`ferry`, `ship`; 0 leaves a kind out).",
+   "properties": {
+    "busy": {
+     "default": 1.0,
+     "description": "A multiplier of how busy (LG7).",
+     "maximum": 5.0,
+     "minimum": 0.0,
+     "title": "Busy",
+     "type": "number"
+    },
+    "kinds": {
+     "additionalProperties": {
+      "maximum": 10.0,
+      "minimum": 0.0,
+      "type": "number"
+     },
+     "propertyNames": {
+      "enum": [
+       "boat",
+       "taxi",
+       "ferry",
+       "ship"
+      ]
+     },
+     "title": "Kinds",
+     "type": "object"
+    }
+   },
+   "title": "Water",
+   "type": "object"
   }
  },
  "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -433,7 +486,7 @@
    "title": "$Schema"
   },
   "air": {
-   "$ref": "#/$defs/Busy"
+   "$ref": "#/$defs/Air"
   },
   "budgets": {
    "$ref": "#/$defs/Budgets"
@@ -499,7 +552,7 @@
    "type": "integer"
   },
   "water": {
-   "$ref": "#/$defs/Busy"
+   "$ref": "#/$defs/Water"
   }
  },
  "title": "lifegen life spec",

@@ -1,0 +1,387 @@
+{
+ "$defs": {
+  "AwPad": {
+   "additionalProperties": false,
+   "description": "LG7: a pad (M3's av pads and helipads, a spaceport's launch pads): its top.",
+   "properties": {
+    "building_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Building Id"
+    },
+    "district_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "District Id"
+    },
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "kind": {
+     "title": "Kind",
+     "type": "string"
+    },
+    "megasite_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Megasite Id"
+    },
+    "pos": {
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 3,
+     "minItems": 3,
+     "title": "Pos",
+     "type": "array"
+    },
+    "served": {
+     "title": "Served",
+     "type": "boolean"
+    },
+    "size_m": {
+     "title": "Size M",
+     "type": "number"
+    }
+   },
+   "required": [
+    "id",
+    "kind",
+    "pos",
+    "size_m",
+    "served"
+   ],
+   "title": "AwPad",
+   "type": "object"
+  },
+  "AwPier": {
+   "additionalProperties": false,
+   "description": "LG7: a pier (the ask `piers`, derived): where a water taxi or ferry berths, the quay or\nbank it is at, its walkway, the water and its depth there.",
+   "properties": {
+    "bank_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Bank Id"
+    },
+    "berth_m": {
+     "title": "Berth M",
+     "type": "number"
+    },
+    "depth_m": {
+     "title": "Depth M",
+     "type": "number"
+    },
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "kind": {
+     "enum": [
+      "taxi",
+      "ferry"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "pair": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Pair"
+    },
+    "pos": {
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 3,
+     "minItems": 3,
+     "title": "Pos",
+     "type": "array"
+    },
+    "quay_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Quay Id"
+    },
+    "walkway_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Walkway Id"
+    },
+    "water_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Water Id"
+    },
+    "yaw_deg": {
+     "title": "Yaw Deg",
+     "type": "number"
+    }
+   },
+   "required": [
+    "id",
+    "kind",
+    "pos",
+    "yaw_deg",
+    "berth_m",
+    "depth_m"
+   ],
+   "title": "AwPier",
+   "type": "object"
+  },
+  "AwRoute": {
+   "additionalProperties": false,
+   "description": "LG7: a route something flies or sails, a closed path run to a timetable: its points (x,\ny, z absolute: over the ground datum on a flat city, over sea level on a terrain one; and\nthe heading the vehicle faces there, degrees counterclockwise from east), its length (3D),\nits cycle sampled every `sample_s` s (`samples`: m along the path), its dwells\n([arrive, depart, what (`airwater.EVENT_CODES`), the pad, roof, pier or berth]), its\nvehicles per hour band, evenly round the cycle.",
+   "properties": {
+    "color": {
+     "title": "Color",
+     "type": "string"
+    },
+    "counts": {
+     "items": {
+      "type": "integer"
+     },
+     "maxItems": 5,
+     "minItems": 5,
+     "title": "Counts",
+     "type": "array"
+    },
+    "cut": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A body's route cut short (why).",
+     "title": "Cut"
+    },
+    "cycle_s": {
+     "title": "Cycle S",
+     "type": "number"
+    },
+    "district_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "District Id"
+    },
+    "events": {
+     "items": {
+      "items": {},
+      "type": "array"
+     },
+     "title": "Events",
+     "type": "array"
+    },
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "kind": {
+     "enum": [
+      "car",
+      "drone",
+      "police",
+      "media",
+      "aircraft",
+      "shuttle",
+      "boat",
+      "taxi",
+      "ferry",
+      "ship"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "length_m": {
+     "title": "Length M",
+     "type": "number"
+    },
+    "model": {
+     "description": "AG18's hover car (a car's, a police flier's) or the kind's stand-in (the exporter's `AIRWATER_MODELS`).",
+     "title": "Model",
+     "type": "string"
+    },
+    "moored": {
+     "default": false,
+     "title": "Moored",
+     "type": "boolean"
+    },
+    "points": {
+     "items": {
+      "items": {
+       "type": "number"
+      },
+      "maxItems": 4,
+      "minItems": 4,
+      "type": "array"
+     },
+     "title": "Points",
+     "type": "array"
+    },
+    "sample_s": {
+     "title": "Sample S",
+     "type": "number"
+    },
+    "samples": {
+     "items": {
+      "type": "number"
+     },
+     "title": "Samples",
+     "type": "array"
+    },
+    "serves": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Serves",
+     "type": "array"
+    },
+    "top_mps": {
+     "title": "Top Mps",
+     "type": "number"
+    },
+    "vehicle_ids": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Vehicle Ids",
+     "type": "array"
+    },
+    "water_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Water Id"
+    }
+   },
+   "required": [
+    "id",
+    "kind",
+    "model",
+    "color",
+    "serves",
+    "points",
+    "length_m",
+    "cycle_s",
+    "sample_s",
+    "samples",
+    "events",
+    "counts",
+    "top_mps",
+    "vehicle_ids"
+   ],
+   "title": "AwRoute",
+   "type": "object"
+  }
+ },
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": false,
+ "properties": {
+  "city": {
+   "title": "City",
+   "type": "string"
+  },
+  "pads": {
+   "items": {
+    "$ref": "#/$defs/AwPad"
+   },
+   "title": "Pads",
+   "type": "array"
+  },
+  "piers": {
+   "items": {
+    "$ref": "#/$defs/AwPier"
+   },
+   "title": "Piers",
+   "type": "array"
+  },
+  "routes": {
+   "items": {
+    "$ref": "#/$defs/AwRoute"
+   },
+   "title": "Routes",
+   "type": "array"
+  }
+ },
+ "required": [
+  "city",
+  "routes",
+  "pads",
+  "piers"
+ ],
+ "title": "lifegen air and water routes",
+ "type": "object"
+}

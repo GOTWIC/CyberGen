@@ -82,7 +82,7 @@ def main(argv=None) -> int:
                                   "file)")
     pp.add_argument("--which", default="life_plan", choices=("life_plan", "tile_spawns",
                                                              "contribution", "signals",
-                                                             "timetables"))
+                                                             "timetables", "airwater"))
     pp.add_argument("--no-preview", action="store_true", help="skip preview_crowds.png")
     args = ap.parse_args(argv)
     return {"spec": cmd_spec, "plan": cmd_plan}[args.cmd](args)

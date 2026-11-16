@@ -33,6 +33,11 @@ parts per mode, `TRANSIT_MODELS`), its stops (platform walkway, boarding by band
 platforms' walkways as wide as their decks, people keeping off their trains (`walk_clear`);
 which doors are a served station's street accesses (`door_transit`).
 
+LG7: a plan with `airwater` packs every route of what flies and floats (`pack_airwater`): its
+kind, model, color, points with headings, cycle and samples, dwells, vehicles per band and their
+paints; the models (AG18's hover cars with nav lights where the project has them, else the
+stand-ins of `AIRWATER_MODELS`) as parts, their meshes.
+
 The runtime builds ZoneGraph lanes from these at BeginPlay (no hand-drawn shapes). A plan
 whose checks failed is named and left out (`skipped`); a build without a plan gets no
 section, and its manifest is what it was.
@@ -45,13 +50,14 @@ import json
 import math
 from pathlib import Path
 
-PACK_VERSION = 7            # 2 (cars_steam): smoothed drive lanes, their speeds; 3 (LG3): the
+PACK_VERSION = 8            # 2 (cars_steam): smoothed drive lanes, their speeds; 3 (LG3): the
                             # city's crowd (every walkway, doors, signals, the pool); 4 (LG5):
                             # the city's traffic (every lane, signals, conflicts, the pool); 5 (LG2):
                             # looks for people, their groups, dye colors and wear; 6 (LG4): slots,
                             # places by their hours, gangs, police patrols and cars, the
                             # places' clips; 7 (LG6): transit's lines, timetables, stops and
-                            # trains, the platforms' walkways kept off their trains
+                            # trains, the platforms' walkways kept off their trains; 8
+                            # (LG7): air and water routes, their models and paints
 DATA = "life.json"
 CONTROLLER_KEY = "life"
 MARGIN_M = 60.0             # lanes this far past the live radius come along (links out of it)
@@ -1006,6 +1012,292 @@ def pack_transit(plan: dict, pdir: Path, graphs: dict) -> dict:
     return out
 
 
+# LG7: what flies and floats, drawn (decision 6: the Mac designs the missing kinds; lifegen
+# generates no vehicle geometry): flying cars and police fliers are AG18's hover cars where the
+# project has them (`HOVER`), with nav lights and a police light bar added; every other kind a
+# stand-in of the engine's basic shapes (1 m across, pivot at the middle) per kind in its frame
+# (m: x forward, y left, z up from its keel or skids: a boat's z 0 is the water's surface), a
+# part `[mesh, kind, middle, size, cull_m]` of a kind the runtime colors (`AW_PART_KINDS`: body
+# (light, the route's color in it), window (dark glass lit by night), accent (the route's color,
+# glowing), dark (gear), nav red, nav green, strobe (white, flashing), police red and blue
+# (flashing in turn), lamp (bright white), hull (the route's color), beacon (red, flashing));
+# `cull_m` 0 drawn as far as the vehicle is. A kind's pack replaces its parts here when the
+# Mac's designs are in; the runtime is unchanged.
+AW_MESHES = {"cube": "/Engine/BasicShapes/Cube", "cylinder": "/Engine/BasicShapes/Cylinder",
+             "sphere": "/Engine/BasicShapes/Sphere"}
+AW_PART_KINDS = ("body", "window", "accent", "dark", "nav_red", "nav_green", "strobe",
+                 "police_red", "police_blue", "lamp", "hull", "beacon")
+HOVER = ("kestrel_dart", "kestrel_meridian", "kestrel_atlas")
+AW_PAINT = [0.35, 0.36, 0.38, 0.08, 0.08, 0.09, 0.8, 0.1, 0.1]
+
+
+def _p(mesh, kind, at, size, cull=0.0) -> dict:
+    return {"mesh": mesh, "kind": kind, "at": [float(v) for v in at],
+            "size": [float(v) for v in size], "cull_m": float(cull)}
+
+
+def nav_lights(L: float, W: float, H: float, cull: float = 0.0) -> list[dict]:
+    """A flier's lights: red on its left, green on its right, a white strobe on top and a lamp
+    ahead (`cull` past which the small ones are not drawn)."""
+    s = max(0.08, 0.02 * max(L, W))
+    return [_p("sphere", "nav_red", [0.0, W / 2.0 + s / 2.0, H * 0.45], [s, s, s], cull),
+            _p("sphere", "nav_green", [0.0, -W / 2.0 - s / 2.0, H * 0.45], [s, s, s], cull),
+            _p("sphere", "strobe", [-L * 0.3, 0.0, H + s / 2.0], [s * 1.3] * 3, cull),
+            _p("cube", "lamp", [L / 2.0 + 0.01, 0.0, H * 0.35], [0.03, W * 0.5, s * 0.8], cull)]
+
+
+def aw_model(kind: str) -> list[dict]:
+    """A kind's stand-in (`AIRWATER_MODELS`)."""
+    if kind in ("car", "police"):
+        L, W, H = 4.8, 2.0, 1.5
+        parts = [_p("cube", "body", [0.0, 0.0, 0.65], [L, W, 0.9]),
+                 _p("cube", "window", [-0.2, 0.0, 1.25], [2.2, W * 0.85, 0.5]),
+                 _p("cube", "accent", [0.0, 0.0, 0.18], [L * 0.85, W * 0.8, 0.05])]
+        for x in (-1.6, 1.6):
+            for y in (-1.15, 1.15):
+                parts.append(_p("cylinder", "dark", [x, y, 0.3], [0.9, 0.9, 0.3], 300.0))
+        parts.append(_p("cube", "beacon", [-L / 2.0 - 0.01, 0.0, 0.7], [0.03, W * 0.7, 0.12]))
+        return parts + nav_lights(L, W, H)
+    if kind == "drone":
+        parts = [_p("cube", "body", [0.0, 0.0, 0.22], [0.5, 0.5, 0.16], 600.0),
+                 _p("cube", "dark", [0.0, 0.0, 0.25], [0.95, 0.06, 0.04], 400.0),
+                 _p("cube", "dark", [0.0, 0.0, 0.25], [0.06, 0.95, 0.04], 400.0),
+                 _p("cube", "hull", [0.0, 0.0, 0.07], [0.32, 0.32, 0.14], 400.0),
+                 _p("cube", "accent", [0.26, 0.0, 0.22], [0.02, 0.3, 0.04], 900.0)]
+        for x in (-0.42, 0.42):
+            for y in (-0.42, 0.42):
+                parts.append(_p("cylinder", "dark", [x, y, 0.29], [0.36, 0.36, 0.015], 250.0))
+        parts.append(_p("sphere", "nav_red", [0.0, 0.3, 0.2], [0.07] * 3, 1200.0))
+        parts.append(_p("sphere", "nav_green", [0.0, -0.3, 0.2], [0.07] * 3, 1200.0))
+        return parts
+    if kind == "media":
+        L, W, H = 3.6, 1.8, 1.4
+        parts = [_p("cube", "body", [0.0, 0.0, 0.8], [L, W, 1.1]),
+                 _p("cube", "window", [0.9, 0.0, 1.0], [1.4, W + 0.02, 0.5]),
+                 _p("cube", "accent", [0.0, 0.0, 0.5], [L + 0.02, W + 0.02, 0.18]),
+                 _p("sphere", "dark", [L / 2.0 - 0.3, 0.0, 0.2], [0.6, 0.6, 0.6]),
+                 _p("sphere", "lamp", [L / 2.0 - 0.1, 0.0, 0.05], [0.3, 0.3, 0.3])]
+        for x in (-2.2, 2.2):
+            for y in (-2.0, 2.0):
+                parts.append(_p("cylinder", "dark", [x * 0.8, y, 1.0], [1.6, 1.6, 0.35]))
+                parts.append(_p("cube", "dark", [x * 0.4, y * 0.5, 1.0], [abs(x) * 0.8, 0.12, 0.1]))
+        return parts + nav_lights(L, W * 2.2, H + 0.2)
+    if kind == "aircraft":
+        L, W, H = 42.0, 36.0, 12.0
+        parts = [_p("cube", "body", [0.0, 0.0, 2.8], [L, 4.6, 4.6]),
+                 _p("cube", "window", [2.0, 0.0, 3.6], [32.0, 4.65, 0.45]),
+                 _p("cube", "body", [-1.0, 0.0, 1.6], [7.0, W, 0.7]),
+                 _p("cube", "body", [-L / 2.0 + 3.0, 0.0, 7.5], [5.5, 0.5, 7.0]),
+                 _p("cube", "body", [-L / 2.0 + 2.5, 0.0, 3.6], [3.5, 13.0, 0.4]),
+                 _p("cube", "dark", [1.0, 6.5, 0.6], [4.5, 2.2, 2.2]),
+                 _p("cube", "dark", [1.0, -6.5, 0.6], [4.5, 2.2, 2.2]),
+                 _p("cube", "accent", [0.0, 0.0, 2.2], [L * 0.9, 4.65, 0.3]),
+                 _p("sphere", "nav_red", [-1.0, W / 2.0, 1.6], [0.6] * 3),
+                 _p("sphere", "nav_green", [-1.0, -W / 2.0, 1.6], [0.6] * 3),
+                 _p("sphere", "strobe", [-1.5, W / 2.0, 1.6], [0.7] * 3),
+                 _p("sphere", "strobe", [-1.5, -W / 2.0, 1.6], [0.7] * 3),
+                 _p("sphere", "strobe", [-L / 2.0, 0.0, 3.0], [0.7] * 3),
+                 _p("sphere", "beacon", [0.0, 0.0, 5.2], [0.7] * 3),
+                 _p("sphere", "beacon", [0.0, 0.0, 0.4], [0.7] * 3),
+                 _p("cube", "lamp", [L / 2.0, 0.0, 2.0], [0.1, 1.0, 0.4])]
+        return parts
+    if kind == "shuttle":
+        L, W = 38.0, 22.0
+        parts = [_p("cube", "body", [-2.0, 0.0, 3.5], [30.0, 8.0, 5.5]),
+                 _p("cube", "body", [16.0, 0.0, 3.0], [8.0, 5.5, 3.6]),
+                 _p("cube", "window", [17.0, 0.0, 4.2], [4.0, 5.6, 0.9]),
+                 _p("cube", "body", [-6.0, 0.0, 1.6], [16.0, W, 0.7]),
+                 _p("cube", "body", [-15.0, 4.0, 7.5], [6.0, 0.5, 5.0]),
+                 _p("cube", "body", [-15.0, -4.0, 7.5], [6.0, 0.5, 5.0]),
+                 _p("cube", "dark", [-6.0, 0.0, 0.5], [24.0, 7.0, 1.0]),
+                 _p("cube", "accent", [-17.2, 0.0, 3.5], [0.4, 6.0, 4.0]),
+                 _p("cube", "accent", [-2.0, 0.0, 6.3], [26.0, 8.05, 0.2]),
+                 _p("sphere", "nav_red", [-6.0, W / 2.0, 1.6], [0.5] * 3),
+                 _p("sphere", "nav_green", [-6.0, -W / 2.0, 1.6], [0.5] * 3),
+                 _p("sphere", "strobe", [-17.0, 0.0, 10.2], [0.6] * 3),
+                 _p("sphere", "beacon", [0.0, 0.0, 6.5], [0.6] * 3),
+                 _p("cube", "lamp", [20.0, 0.0, 1.6], [0.1, 2.0, 0.4])]
+        return parts
+    if kind == "boat":
+        return [_p("cube", "hull", [0.0, 0.0, 0.1], [7.0, 2.2, 0.9]),
+                _p("cube", "dark", [3.6, 0.0, 0.2], [0.8, 1.2, 0.7]),
+                _p("cube", "body", [-0.6, 0.0, 1.0], [2.6, 1.8, 0.9]),
+                _p("cube", "window", [-0.4, 0.0, 1.15], [2.4, 1.84, 0.35]),
+                _p("cube", "lamp", [3.95, 0.0, 0.55], [0.05, 0.3, 0.15], 800.0),
+                _p("sphere", "nav_red", [2.5, 1.12, 0.6], [0.12] * 3, 800.0),
+                _p("sphere", "nav_green", [2.5, -1.12, 0.6], [0.12] * 3, 800.0),
+                _p("sphere", "lamp", [-3.4, 0.0, 1.0], [0.12] * 3, 800.0)]
+    if kind == "taxi":
+        return [_p("cube", "hull", [0.0, 0.0, 0.15], [9.0, 2.8, 1.0]),
+                _p("cube", "body", [-0.3, 0.0, 1.3], [6.0, 2.5, 1.3]),
+                _p("cube", "window", [-0.3, 0.0, 1.45], [5.8, 2.54, 0.6]),
+                _p("cube", "accent", [-0.3, 0.0, 2.1], [1.6, 0.6, 0.35]),
+                _p("cube", "dark", [-0.3, 0.0, 0.7], [9.05, 2.85, 0.12]),
+                _p("cube", "lamp", [4.55, 0.0, 0.7], [0.05, 0.5, 0.2]),
+                _p("sphere", "nav_red", [3.0, 1.42, 0.9], [0.14] * 3),
+                _p("sphere", "nav_green", [3.0, -1.42, 0.9], [0.14] * 3)]
+    if kind == "ferry":
+        parts = [_p("cube", "hull", [0.0, 0.0, 0.2], [26.0, 9.0, 1.8]),
+                 _p("cube", "dark", [0.0, 0.0, 1.15], [26.1, 9.1, 0.15]),
+                 _p("cube", "body", [0.0, 0.0, 2.4], [16.0, 7.6, 2.4]),
+                 _p("cube", "window", [0.0, 0.0, 2.6], [15.6, 7.65, 1.0]),
+                 _p("cube", "body", [0.0, 0.0, 4.4], [6.0, 5.0, 1.6]),
+                 _p("cube", "window", [0.0, 0.0, 4.6], [5.8, 5.05, 0.7]),
+                 _p("cube", "accent", [0.0, 0.0, 3.65], [16.05, 7.66, 0.15]),
+                 _p("cube", "lamp", [13.05, 0.0, 1.3], [0.05, 1.0, 0.25]),
+                 _p("cube", "lamp", [-13.05, 0.0, 1.3], [0.05, 1.0, 0.25]),
+                 _p("sphere", "nav_red", [0.0, 3.85, 5.3], [0.25] * 3),
+                 _p("sphere", "nav_green", [0.0, -3.85, 5.3], [0.25] * 3),
+                 _p("sphere", "lamp", [0.0, 0.0, 6.2], [0.25] * 3)]
+        return parts
+    if kind == "ship":
+        parts = [_p("cube", "hull", [0.0, 0.0, -1.5], [120.0, 20.0, 9.0]),
+                 _p("cube", "dark", [0.0, 0.0, -5.2], [120.2, 20.2, 1.8]),
+                 _p("cube", "dark", [0.0, 0.0, 3.2], [118.0, 19.0, 0.4])]
+        cols = ("accent", "body", "dark", "accent", "body")
+        for q in range(5):
+            parts.append(_p("cube", cols[q], [-28.0 + q * 14.5, 0.0, 6.4], [13.5, 17.0, 6.0]))
+        parts += [_p("cube", "body", [48.0, 0.0, 10.5], [10.0, 18.0, 14.0]),
+                  _p("cube", "window", [48.5, 0.0, 15.0], [9.6, 18.05, 1.2]),
+                  _p("cube", "dark", [44.0, 0.0, 19.0], [3.0, 3.0, 4.0]),
+                  _p("sphere", "nav_red", [50.0, 9.3, 17.0], [0.6] * 3),
+                  _p("sphere", "nav_green", [50.0, -9.3, 17.0], [0.6] * 3),
+                  _p("sphere", "lamp", [-59.5, 0.0, 6.0], [0.6] * 3),
+                  _p("sphere", "lamp", [55.0, 0.0, 23.0], [0.6] * 3),
+                  _p("sphere", "beacon", [44.0, 0.0, 21.4], [0.5] * 3)]
+        return parts
+    return [_p("cube", "body", [0.0, 0.0, 0.5], [2.0, 2.0, 1.0])]
+
+
+AIRWATER_MODELS = {k: aw_model(k) for k in ("car", "drone", "police", "media", "aircraft",
+                                            "shuttle", "boat", "taxi", "ferry", "ship")}
+
+
+def _hover_parts(rec: dict, police: bool) -> list[dict]:
+    """An AG18 hover car's own parts (its meshes, kind -1: painted) with nav lights and, a
+    police flier's, a light bar on its roof."""
+    dim = rec.get("dimensions") or {}
+    L = float(dim.get("length") or 4.8)
+    W = float(dim.get("width") or 2.0)
+    H = float(dim.get("height") or 1.4)
+    out = []
+    for p in rec["parts"]:
+        out.append({"mesh": f"{rec['folder']}/SM_{rec['car']}_{p['name']}", "kind": -1,
+                    "at": [float(v) for v in p.get("pivot", [0.0, 0.0, 0.0])],
+                    "size": [1.0, 1.0, 1.0],
+                    "cull_m": 300.0 if p.get("kind") == "glass" else 0.0})
+    out += nav_lights(L, W, H)
+    if police:
+        out += [_p("cube", "police_red", [-0.2, 0.28, H + 0.06], [0.35, 0.45, 0.12]),
+                _p("cube", "police_blue", [-0.2, -0.28, H + 0.06], [0.35, 0.45, 0.12]),
+                _p("cube", "lamp", [L / 2.0 - 0.2, 0.0, 0.15], [0.3, 0.4, 0.1])]
+    return out
+
+
+def pack_airwater(plan: dict, pdir: Path, veh: dict | None) -> dict:
+    """LG7: the city's air and water routes, flat: per route its kind (an index of
+    `presets.AW_KINDS`), model (an index of the models packed), color (linear), cycle and its
+    samples' step, vehicles per band, points (x, y, z citygen m, absolute; heading, degrees
+    counterclockwise from east), samples (m along the path), dwells (arrive, depart, what), the
+    paints of its vehicles (9 floats each: AG18's hover cars'); per model its parts (9 floats:
+    mesh, kind (-1 painted, else `AW_PART_KINDS`), middle (3), size (3), cull m); the meshes
+    and how many custom floats each one's instances carry (9 painted, 6 the stand-ins')."""
+    from lifegen.presets import AW_KINDS
+    aw = plan.get("airwater") or {}
+    f = pdir / (aw.get("file") or "airwater.json")
+    if not f.is_file():
+        return {}
+    data = json.loads(f.read_text(encoding="utf-8"))
+    routes = data.get("routes") or []
+    if not routes:
+        return {}
+    have = (veh or {}).get("cars") or {}
+    tr = plan.get("traffic") or {}
+    tmodels = tr.get("models") or []
+    models, model_of = [], {}
+    meshes = list(AW_MESHES.values())
+    mesh_floats = [6] * len(meshes)
+    parts_flat, part_starts = [], [0]
+
+    def mesh_index(path: str, painted: bool) -> int:
+        if path not in meshes:
+            meshes.append(path)
+            mesh_floats.append(9 if painted else 6)
+        return meshes.index(path)
+
+    def model_index(name: str, kind: str) -> int:
+        key = name if name in HOVER and name in have else kind
+        key = f"{key}@police" if kind == "police" else key
+        if key in model_of:
+            return model_of[key]
+        if name in HOVER and name in have:
+            parts = _hover_parts(have[name], kind == "police")
+        else:
+            parts = AIRWATER_MODELS.get(kind) or AIRWATER_MODELS["car"]
+            if kind == "police":
+                parts = parts + [_p("cube", "police_red", [-0.2, 0.28, 1.56], [0.35, 0.45, 0.12]),
+                                 _p("cube", "police_blue", [-0.2, -0.28, 1.56], [0.35, 0.45, 0.12])]
+        for p in parts:
+            if p["kind"] == -1:
+                mi = mesh_index(p["mesh"], True)
+                kd = -1.0
+            else:
+                mi = mesh_index(AW_MESHES[p["mesh"]], False)
+                kd = float(AW_PART_KINDS.index(p["kind"]))
+            parts_flat.extend([float(mi), kd] + [round(v, 4) for v in p["at"]] +
+                              [round(v, 4) for v in p["size"]] + [float(p["cull_m"])])
+        part_starts.append(len(parts_flat) // 9)
+        model_of[key] = len(models)
+        models.append(key)
+        return model_of[key]
+    out = {k: [] for k in ("aw_route_kind", "aw_route_model", "aw_route_color", "aw_route_cycle",
+                           "aw_route_dt", "aw_route_count", "aw_point_starts", "aw_points",
+                           "aw_sample_starts", "aw_samples", "aw_event_starts", "aw_events",
+                           "aw_paint_starts", "aw_paints")}
+    for key in ("aw_point_starts", "aw_sample_starts", "aw_event_starts", "aw_paint_starts"):
+        out[key].append(0)
+    ids = []
+    pol = [float(v) for v in (tr.get("police_paint") or [])]
+    for r in routes:
+        ids.append(r["id"])
+        out["aw_route_kind"].append(AW_KINDS.index(r["kind"]))
+        out["aw_route_model"].append(model_index(r.get("model") or r["kind"], r["kind"]))
+        out["aw_route_color"] += _lin(r.get("color") or "#ffffff")
+        out["aw_route_cycle"].append(float(r["cycle_s"]))
+        out["aw_route_dt"].append(float(r["sample_s"]))
+        out["aw_route_count"] += [int(v) for v in r["counts"]]
+        for p in r["points"]:
+            out["aw_points"] += [float(v) for v in p]
+        out["aw_point_starts"].append(len(out["aw_points"]) // 4)
+        out["aw_samples"] += [float(v) for v in r["samples"]]
+        out["aw_sample_starts"].append(len(out["aw_samples"]))
+        for e in r["events"]:
+            out["aw_events"] += [float(e[0]), float(e[1]), float(e[2])]
+        out["aw_event_starts"].append(len(out["aw_events"]) // 3)
+        # (each vehicle's paint: a police flier the livery; a hover car one of its district's
+        # paints for its model, by its id, as LG5's traffic paints a car)
+        m = r.get("model")
+        if m in HOVER and m in have:
+            rows = ((tr.get("paints") or {}).get(r.get("district_id") or "") or [])
+            row = rows[tmodels.index(m)] if m in tmodels and tmodels.index(m) < len(rows) else []
+            kp = len(row) // 9
+            for k in range(max(r["counts"])):
+                if r["kind"] == "police" and len(pol) >= 9:
+                    out["aw_paints"] += pol[:9]
+                elif kp:
+                    q = int(hashlib.blake2b(f"{r['id']}|{k}".encode(), digest_size=4)
+                            .hexdigest(), 16) % kp
+                    out["aw_paints"] += [float(v) for v in row[9 * q:9 * q + 9]]
+                else:
+                    out["aw_paints"] += AW_PAINT
+        out["aw_paint_starts"].append(len(out["aw_paints"]) // 9)
+    out.update({"aw_route_ids": ids, "aw_models": models, "aw_model_part_starts": part_starts,
+                "aw_parts": parts_flat, "aw_meshes": meshes, "aw_mesh_floats": mesh_floats,
+                "aw_kinds": list(AW_KINDS),
+                "airwater": {"routes": len(ids), "hour": int(aw.get("hour", 23))}})
+    return out
+
+
 def life_data(pdir: Path, graphs: dict | None, veh: dict | None,
               lib: dict | None = None) -> tuple[dict | None, str]:
     plan = json.loads((pdir / "life_plan.json").read_text(encoding="utf-8"))
@@ -1039,6 +1331,10 @@ def life_data(pdir: Path, graphs: dict | None, veh: dict | None,
             lanes["walk_widths"] = [round(max(float(a), float(b)), 3)
                                     for a, b in zip(lanes["walk_widths"], w)]
             lanes.update(tpack)
+        # (LG7: every route of what flies and floats; a plan before it none)
+        apack = pack_airwater(plan, pdir, veh)
+        if apack:
+            lanes.update(apack)
         crowd = plan["crowd"]
         spike = {**spike, "people": int(crowd["pool"]), "library": crowd.get("library") or {},
                  "persons": {}}
@@ -1113,6 +1409,12 @@ def write_life(build: str | Path, given: str | Path | None = None,
                                            for k in range(len(c["transit_line_mode"])))
                                        for b in range(5)]}}
                if c.get("transit_line_mode") else {}),
+            **({"airwater": {"routes": len(c["aw_route_kind"]), "models": c["aw_models"],
+                             "meshes": len(c["aw_meshes"]),
+                             "vehicles": [sum(c["aw_route_count"][5 * k + b]
+                                              for k in range(len(c["aw_route_kind"])))
+                                          for b in range(5)]}}
+               if c.get("aw_route_kind") else {}),
             "library":({"characters": len(c["mid_meshes"]), "hash": c.get("library_hash"),
                         "tiers": c.get("tiers")} if c.get("mid_meshes") else
                        {"stand_ins": True, "why": c.get("people_skipped") or

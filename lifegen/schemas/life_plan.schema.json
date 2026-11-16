@@ -1,5 +1,63 @@
 {
  "$defs": {
+  "AirWaterPlan": {
+   "additionalProperties": false,
+   "description": "LG7: air and water (scope 6.7): the kinds' runs and sizes, the settings, per kind its\nroutes and vehicles by band; the routes themselves in `airwater.json` (`AirWater`).",
+   "properties": {
+    "file": {
+     "description": "`airwater.json`, relative to the plan.",
+     "title": "File",
+     "type": "string"
+    },
+    "hash": {
+     "title": "Hash",
+     "type": "string"
+    },
+    "hour": {
+     "title": "Hour",
+     "type": "integer"
+    },
+    "kinds": {
+     "additionalProperties": true,
+     "title": "Kinds",
+     "type": "object"
+    },
+    "settings": {
+     "additionalProperties": true,
+     "description": "`presets.AIR` and `presets.WATER`.",
+     "title": "Settings",
+     "type": "object"
+    },
+    "sha256": {
+     "description": "sha256 of its bytes.",
+     "title": "Sha256",
+     "type": "string"
+    },
+    "totals": {
+     "additionalProperties": true,
+     "title": "Totals",
+     "type": "object"
+    },
+    "vehicles": {
+     "additionalProperties": true,
+     "description": "`presets.AW_VEHICLES`: speeds, rates, dwells, sizes.",
+     "title": "Vehicles",
+     "type": "object"
+    }
+   },
+   "required": [
+    "hour",
+    "vehicles",
+    "settings",
+    "kinds",
+    "file",
+    "sha256",
+    "totals",
+    "hash"
+   ],
+   "title": "AirWaterPlan",
+   "type": "object"
+  },
   "Ask": {
    "additionalProperties": false,
    "description": "An ask of another stage (scope 4.1): what lifegen needs that the model does not record\nyet, and what the plan derives meanwhile.",
@@ -1222,6 +1280,18 @@
  "$schema": "https://json-schema.org/draft/2020-12/schema",
  "additionalProperties": false,
  "properties": {
+  "airwater": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/AirWaterPlan"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "description": "LG7: air and water routes."
+  },
   "asks": {
    "items": {
     "$ref": "#/$defs/Ask"
