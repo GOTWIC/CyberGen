@@ -2469,6 +2469,300 @@ def _jrow(lg: list):
     return g
 
 
+CURB_OFF_M = 0.3    # crossings fix: a walk led round a junction's carriageway keeps this far
+#                     off its curb (on the corner pad)
+ATTACH_MAX_M = 2.0  # ... a crossing's end joins its sidewalk this near it, else its corner
+SPLIT_GAP_M = 0.05  # ... a crossing's end this near a sidewalk's vertex joins it there
+DEEP_M = 0.05       # ... a point this far inside the carriageway (taken out) is in it
+ROW_IN_WALK_M = 0.2  # ... a corner moved onto the carriageway's edge, and a way round it,
+#                      stay this far inside its right of way (else there is no pad there to
+#                      walk on: never at the lots' edge, where the buildings stand)
+OFFSET_STEP_M = 0.25  # ... two roads meeting with no junction whose sidewalks are this far apart
+STEP_REACH_M = 40.0   # ... (their carriageways taken this far from the node)
+OFF_REACH_M = 30.0  # ... a corner inside it moved at most this far onto its edge
+OFF_STEP_M = 0.5    # ... (the edge searched at points this far apart)
+END_M = 1.0         # ... (a walk's ends this near the region's edge may leave it)
+OPEN_M = 0.6        # ... a needle of the carriageway thinner than this is not walked round
+WAY_LONG = 4.0      # ... a way round at most this many times as long as the way across
+WAY_LONG_M = 60.0   # ... and this (round a bulb)
+
+
+class _Carriage:
+    """A junction's carriageway (its unit's region less the corner pads, M22's `Plan`, less
+    its pedestrian legs' stubs, `peds`) taken out by CURB_OFF_M: what the walks round it keep
+    off, and the rings they are led along. `ports`: the middle of each leg's carriageway
+    across its cut, which a way round never crosses (it would walk along the road's end);
+    `R` the junction's right of way, which a corner moved off the carriageway stays on."""
+
+    def __init__(self, C, ports=(), R=None, peds=None):
+        if peds is not None and not peds.is_empty:
+            C = G.polygonal(shapely.difference(C, peds, grid_size=G.GRID_M))
+        # (opened: a needle of the carriageway thinner than OPEN_M is no edge to walk round)
+        B = G.qpoly(C.buffer(-OPEN_M / 2, join_style="mitre", mitre_limit=2.0).buffer(
+            OPEN_M / 2 + CURB_OFF_M, join_style="mitre", mitre_limit=2.0)) \
+            if not C.is_empty else C
+        self.B = B
+        self.Bin = B.buffer(-DEEP_M) if not B.is_empty else B
+        self.R = R.buffer(-ROW_IN_WALK_M, join_style="mitre") \
+            if R is not None and not R.is_empty else None
+        self.ports = [LineString(p) for p in ports if len(p) == 2 and p[0] != p[1]]
+        self.rings = []
+        for p in PV.polys(B):
+            for ring in [p.exterior] + list(p.interiors):   # (round an island too)
+                r = ST._dedupe(ring.coords)
+                if len(r) >= 4:
+                    self.rings.append(r)
+        for g in (self.B, self.Bin, self.R):
+            if g is not None and not g.is_empty:
+                shapely.prepare(g)
+
+    def in_row(self, pts) -> bool:
+        """A polyline on the right of way (ROW_IN_WALK_M inside it), off the lots beside; its
+        ends (a sidewalk's end on a leg's port, at the region's edge) within END_M of it."""
+        pts = ST._dedupe(pts)
+        if self.R is None or len(pts) < 2:
+            return True
+        ln = LineString(pts)
+        if self.R.contains(ln):
+            return True
+        rest = shapely.difference(ln, self.R)
+        ends = Point(pts[0]).buffer(END_M).union(Point(pts[-1]).buffer(END_M))
+        return rest.is_empty or ends.contains(rest)
+
+    def hits(self, pts) -> bool:
+        return not self.B.is_empty and len(pts) >= 2 and self.B.intersects(LineString(pts))
+
+    def inside(self, p) -> bool:
+        return not self.Bin.is_empty and self.Bin.contains(Point(p))
+
+    def outside(self, pts) -> list[tuple[float, list]]:
+        """The stretches of a polyline outside, in order along it: (distance along, points);
+        an end on the carriageway's edge (not inside) a stretch of its own."""
+        ln = LineString(pts)
+        rest = shapely.difference(ln, self.B, grid_size=G.GRID_M)
+        out = []
+        for g in shapely.get_parts(shapely.line_merge(rest) if rest.geom_type ==
+                                   "MultiLineString" else rest):
+            if g.geom_type != "LineString" or g.length < 1e-3:
+                continue
+            c = ST._dedupe(g.coords)
+            if len(c) < 2:
+                continue
+            s0 = ST._project(pts, c[0])[0]
+            s1 = ST._project(pts, c[-1])[0]
+            if s1 < s0:
+                c = c[::-1]
+                s0 = s1
+            out.append((s0, c))
+        out.sort(key=lambda t: (t[0], t[1]))    # (in order along it: no GEOS order)
+        L = ST._plen(pts)
+        if not self.inside(pts[0]) and (not out or out[0][0] > 1e-3):
+            out.insert(0, (0.0, [pts[0]]))
+        if not self.inside(pts[-1]) and (not out or ST._project(pts, out[-1][1][-1])[0] <
+                                         L - 1e-3):
+            out.append((L, [pts[-1]]))
+        return out
+
+    def ring_of(self, e, f=None):
+        """The ring nearest e (and f): (distance, ring, e on it, f on it), as `_project`."""
+        best = None
+        for r in self.rings:
+            pe = ST._project(r, e)
+            pf = ST._project(r, f) if f is not None else pe
+            d = pe[1] + pf[1]
+            if best is None or d < best[0] - 1e-9:
+                best = (d, r, pe, pf)
+        return best
+
+    def off(self, X):
+        """X, or where it is inside, the nearest point of the carriageway's edge on the right
+        of way (X where there is none)."""
+        if not self.inside(X):
+            return X
+        got = self.ring_of(X)
+        if got is None:
+            return X
+        q = _pt(*got[2][2])
+        if self.R is None or self.R.contains(Point(q)):
+            return q
+        # (the nearest edge has no pad beside it: the nearest point of the edge that has,
+        # within OFF_REACH_M)
+        best = None
+        for r in self.rings:
+            L = ST._plen(r)
+            n = max(int(L / OFF_STEP_M), 1)
+            for k in range(n):
+                p = _pt(*ST._along(r, L * k / n)[0])
+                d = _dist(p, X)
+                if d <= OFF_REACH_M and (best is None or d < best[0] - 1e-9) and \
+                        self.R.contains(Point(p)):
+                    best = (d, p)
+        return best[1] if best is not None else X
+
+    def way(self, e, f) -> list:
+        """The way from e to f along the ring both lie on (e, f on its edge): the shorter of
+        the two that crosses no leg's port."""
+        got = self.ring_of(e, f)
+        if got is None or got[0] > 0.1:
+            return [e, f]
+        _, r, pe, pf = got
+        de, df = pe[0], pf[0]
+        L = ST._plen(r)
+        two = r + r[1:]
+        fwd = (df - de) % L
+        ways = [(fwd, [e] + ST._substring(two, de, de + fwd) + [f]),
+                (L - fwd, [e] + ST._substring(two, df, df + (L - fwd))[::-1] + [f])]
+
+        def crosses(w):
+            w = ST._dedupe(w)
+            return len(w) >= 2 and any(LineString(w).intersects(p) for p in self.ports)
+
+        def leaves(w):
+            w = ST._dedupe(w)
+            return self.R is not None and len(w) >= 2 and \
+                not self.R.contains(LineString(w))
+
+        straight = _dist(e, f)
+        ok = [t for t in ways if not crosses(t[1]) and not leaves(t[1]) and
+              t[0] <= WAY_LONG * straight + WAY_LONG_M]
+        if not ok:
+            return [e, f]
+        ok.sort(key=lambda t: t[0])
+        return ok[0][1]
+
+
+def _round(pts, cx: _Carriage | None) -> list:
+    """A polyline led round a junction's carriageway: each stretch of it inside, between two
+    stretches outside (or an end on its edge), replaced by the shorter way round the
+    carriageway's edge (CURB_OFF_M out); a stretch inside at either end is kept (no way off
+    it from there)."""
+    pts = ST._dedupe(pts)
+    if cx is None or len(pts) < 2 or not cx.hits(pts):
+        return pts
+    parts = cx.outside(pts)
+    if not parts:
+        return pts
+    L = ST._plen(pts)
+    out: list = []
+    if parts[0][0] > 1e-3:
+        out += ST._substring(pts, 0.0, parts[0][0])
+    for k, (s0, c) in enumerate(parts):
+        if k:
+            out += cx.way(out[-1], c[0])
+        out += c
+    end = ST._project(pts, out[-1])[0]
+    if L - end > 1e-3:
+        out += ST._substring(pts, end, L)
+    out = ST._dedupe(out)
+    out[0], out[-1] = pts[0], pts[-1]
+    old = set(pts)
+    if cx.R is not None and any(p not in old and not cx.R.contains(Point(p)) and
+                                _dist(p, pts[0]) > END_M and _dist(p, pts[-1]) > END_M
+                                for p in out):
+        return pts          # (no way round on the right of way: never into the lots)
+    return out
+
+
+def _until_in(pts, cx: _Carriage | None) -> list | None:
+    """A polyline from its start up to where it first runs into a junction's carriageway
+    (CURB_OFF_M round it), or None where it starts inside."""
+    pts = ST._dedupe(pts)
+    if cx is None or not cx.hits(pts):
+        return pts
+    if cx.inside(pts[0]):
+        return None
+    parts = cx.outside(pts)
+    if not parts or parts[0][0] > 1e-3 or len(parts[0][1]) < 2:
+        return None
+    return parts[0][1]
+
+
+def _halves(path: list) -> tuple[tuple, list, list]:
+    """A polyline's middle by length and its two halves from the middle (to its start, to its
+    end)."""
+    L = ST._plen(path)
+    mid = _pt(*ST._along(path, L / 2.0)[0])
+    a = ST._dedupe([mid] + ST._substring(path, 0.0, L / 2.0)[::-1])
+    b = ST._dedupe([mid] + ST._substring(path, L / 2.0, L))
+    return mid, a, b
+
+
+def _corner_walk(X, pa, pb, cx: _Carriage | None) -> tuple[tuple, list, list]:
+    """Crossings fix: the walk round a junction's corner, off its carriageway. `pa` and `pb`
+    are the two legs' sidewalk ends at their ports (None for a leg with no sidewalk walkway
+    of its own: a highway, alley, service road or path, a road inside a cluster), X the
+    sidewalks' corner (`_corner_point`). Returns the corner's walk node and the walk from it
+    to each sidewalk end (leg a's, leg b's: [node] where there is none). Where the corner
+    and the ways to it are off the carriageway (most corners) the node is X. Else, between
+    two sidewalks, the middle of their walk led round the carriageway's edge; beside a leg
+    with no sidewalk, where the sidewalk's way to X first reaches the carriageway (its curb
+    ramp at the fillet); else X moved onto the carriageway's edge (`_Carriage.off`)."""
+    pts = ([pa] if pa else []) + [X] + ([pb] if pb else [])
+    if cx is None or not cx.hits(pts):
+        return X, ST._dedupe([X, pa]) if pa else [X], ST._dedupe([X, pb]) if pb else [X]
+    same = (X, ST._dedupe([X, pa]) if pa else [X], ST._dedupe([X, pb]) if pb else [X])
+    if pa and pb:
+        for way in (pts, [pa, pb]):     # (by X, else straight from end to end)
+            path = _round(way, cx)
+            if not cx.inside(pa) and not cx.inside(pb) and cx.in_row(path) and not \
+                    any(cx.inside(p) for p in path[1:-1]):
+                mid, ta, tb = _halves(path)
+                return mid, ta, tb
+        if not cx.inside(pa) and not cx.inside(pb) and cx.in_row([pa, pb]):
+            # (no corner pad to walk round on: each sidewalk ends where it is, and a
+            # crossing joins the two, `build`)
+            return None, [pa], [pb]
+        return same         # (else M2's corner, its walks led round the lots later)
+    if pa or pb:
+        way = _until_in([pa or pb, X], cx)
+        if way is not None and len(way) >= 2 and cx.in_row(way):
+            c = way[-1]
+            t = ST._dedupe(way[::-1])
+            return c, t if pa else [c], t if pb else [c]
+        p = pa or pb
+        if not cx.inside(p):
+            # (the sidewalk's end itself: its way to X runs on the carriageway at once)
+            return p, [p] if pa else [p], [p] if pb else [p]
+        return same
+    c = cx.off(X)
+    return c, [c], [c]
+
+
+def _split_at(chain: list, cuts: list) -> tuple[list[list], list]:
+    """A polyline split at points near it (each moved onto it, joining a vertex within
+    SPLIT_GAP_M): its pieces in order and each cut's point on it."""
+    marks = []
+    for q in cuts:
+        s, _, p, i = ST._project(chain, q)
+        p = _pt(*p)
+        for v in (chain[i], chain[i + 1]):
+            if _dist(v, p) <= SPLIT_GAP_M:
+                p = v
+        marks.append((s, p, i))
+    if not marks:
+        return [chain], []
+    order = sorted(set((s, p) for s, p, _ in marks))
+    pieces, cur, k = [], [chain[0]], 0
+    acc = 0.0
+    for i in range(len(chain) - 1):
+        a, b = chain[i], chain[i + 1]
+        L = _dist(a, b)
+        while k < len(order) and order[k][0] <= acc + L + 1e-9:
+            p = order[k][1]
+            if p != cur[-1]:
+                cur.append(p)
+            if len(cur) >= 2:
+                pieces.append(cur)
+            cur = [p]
+            k += 1
+        if b != cur[-1]:
+            cur.append(b)
+        acc += L
+    if len(cur) >= 2:
+        pieces.append(cur)
+    return [ST._dedupe(c) for c in pieces if len(ST._dedupe(c)) >= 2], [p for _, p, _ in marks]
+
+
 def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
           control: dict | None = None) -> dict:
     """Junctions, sidewalks, crosswalks, lanes and walkways for a street network (`gr`, the
@@ -2568,6 +2862,84 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
     cutx = {(x.seg["id"], x.at_start): x.cut for lg in legs.values() for x in lg}
     signals, _ = plan_signals(legs, node_arch, lambda nid: node_ctl[nid])
     av_marked = plan_crossings(legs, node_arch, lambda nid: node_ctl[nid], signals)
+    # (crossings fix: every sidewalk's middle line, from port to port, before the corners,
+    # which lead their walks off the junction's carriageway to these lines' ends)
+    swl = {}
+    for s in net.segments:
+        if s["attrs"].get("role") == "deck_ramp":
+            continue
+        cs = s["cross_section"]
+        side = cs["sidewalk_m"][0] if cs.get("sidewalk_m") else 0.0
+        if ST.street_class(s) not in ("avenue", "street") or side <= 0:
+            continue
+        pts = [tuple(p) for p in s["centerline"]]
+        L = ST._plen(pts)
+        rd = plan.roads.get(s["id"])
+        # (M22: the sidewalk's middle from port to port, square to the road at its ends
+        # as its right of way ends: the map's mitred frame where a road goes on as
+        # another reaches past it, into the lots there; a road inside a cluster, whose
+        # sidewalks are its junction's corner pads, end to end, as stations' stairs and
+        # the props find sidewalks by their records)
+        ra, rb = (0.0, 0.0) if s["id"] in inner or rd is None else (rd.a, rd.b)
+        base = ST._substring(pts, ra, L - rb) if L - ra - rb > 1.0 else pts
+        h = s["width_m"] / 2 - side / 2
+        for sd, sign in (("L", 1.0), ("R", -1.0)):
+            line = _offset(base, sign * h)
+            if len(line) >= 2:
+                swl[(s["id"], sd)] = line
+    cxs: dict = {}
+
+    def carriage(k):
+        if k is None:
+            return None
+        jid = units[k]["id"]
+        if jid not in cxs:
+            C, R = plan.regions[jid]
+            ports, ped, road = [], [], []
+            for nd in units[k]["nodes"]:
+                for x in legs[nd]:
+                    if x.seg["id"] in inner or x.L <= 0.0:
+                        continue
+                    if x.cls in ST.PEDESTRIAN:
+                        # (a pedestrian street's stub in the junction is walked on)
+                        ped.append(strip(x, x.cut, x.row))
+                        continue
+                    road.append(strip(x, x.cut, x.h))
+                    p, t = ST._along(x.pts, min(x.cut, x.L))
+                    nrm = _left(t)
+                    w = 0.9 * x.h
+                    ports.append((_pt(p[0] - nrm[0] * w, p[1] - nrm[1] * w),
+                                  _pt(p[0] + nrm[0] * w, p[1] + nrm[1] * w)))
+            peds = None
+            ped = [g for g in ped if not g.is_empty]
+            if ped:
+                peds = G.union(ped)
+                road = [g for g in road if not g.is_empty]
+                if road:
+                    peds = G.polygonal(shapely.difference(peds, G.union(road),
+                                                          grid_size=G.GRID_M))
+            cxs[jid] = _Carriage(C, ports, R, peds) if not C.is_empty else None
+        return cxs[jid]
+
+    def side_end(nid, x, sd):
+        """A leg's sidewalk end at its node (None: no sidewalk walkway; a road inside a
+        cluster keeps M2's corners)."""
+        if x.seg["id"] in inner:
+            return None
+        line = swl.get((x.seg["id"], sd))
+        if line is None:
+            return None
+        return line[0] if x.at_start else line[-1]
+
+    pending: list = []        # crossings: [W, kind, width, junction, marked, right end, a, b,
+    #                           left end] (an end its corner until its sidewalk is split for it)
+    attach: dict = {}         # (node, seg id, side) -> [(point, crossing, its end's index)]
+    ends: dict = {}           # crossing -> its corners (right, left)
+    far_x: set = set()        # crossings a sidewalk does not reach where they cross
+    corner_x: dict = {}       # (node, seg id, side) -> where the sidewalks' lines meet (M2's)
+    corner_tail: dict = {}    # (node, seg id, side) -> the walk from its corner node to the
+    #                           sidewalk's end (crossings fix)
+    dead_ends = []            # (W, right end, left end): a dead end with no junction
     for nid in sorted(legs):
         lg = legs[nid]
         P = pos[nid]
@@ -2576,21 +2948,68 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
             cut[(x.seg["id"], nid)] = x.cut
             cut_row[(x.seg["id"], nid)] = x.cut_row
         n = len(lg)
+        k = unit_of.get(nid)
+        cx = carriage(k)
         if n == 1:
             x = lg[0]
-            q = W.node(P)
-            corner_of[(nid, x.seg["id"], "L")] = q
-            corner_of[(nid, x.seg["id"], "R")] = q
+            kl = (nid, x.seg["id"], "L")
+            kr = (nid, x.seg["id"], "R")
+            pl, pr = side_end(nid, x, "L"), side_end(nid, x, "R")
+            c = None
+            if pl is not None and pr is not None and cx is not None:
+                # (crossings fix: round a cul-de-sac's bulb, off it)
+                c, tr, tl = _corner_walk(P, pr if x.at_start else pl,
+                                         pl if x.at_start else pr, cx)
+            if c is not None:
+                q = W.node(c)
+                corner_of[kl] = corner_of[kr] = q
+                corner_tail[kr if x.at_start else kl] = tr
+                corner_tail[kl if x.at_start else kr] = tl
+            elif pl is not None and pr is not None:
+                # (a dead end with no junction: its sidewalks end where they are, joined by
+                # a crossing of the road's end)
+                corner_of[kl] = W.node(pl)
+                corner_of[kr] = W.node(pr)
+                corner_tail[kl] = [pl]
+                corner_tail[kr] = [pr]
+                dead_ends.append((W, pr, pl, {"segment": x.seg["id"]}))
+            else:
+                q = W.node(P)
+                corner_of[kl] = q
+                corner_of[kr] = q
             continue
-        # corners between neighbors (sidewalk center points)
-        k = unit_of.get(nid)
+        # corners between neighbors (sidewalk center points), off the junction's carriageway
         jrow = jrows.get(units[k]["id"]) if k is not None else None
+        if cx is None and n == 2 and abs(_walk_offset(lg[0]) - _walk_offset(lg[1])) > \
+                OFFSET_STEP_M:
+            # (crossings fix: a road going on as one of another cross-section, no junction
+            # between: its sidewalks' step kept off both carriageways)
+            car = [strip(x, min(x.L, STEP_REACH_M), x.h) for x in lg
+                   if x.cls not in ST.PEDESTRIAN]
+            row = [strip(x, min(x.L, STEP_REACH_M), x.row) for x in lg]
+            car = G.union(car)
+            if not car.is_empty:
+                cx = _Carriage(car, R=G.union(row))
         for i in range(n):
             a, b = lg[i], lg[(i + 1) % n]
             c, _, _ = _corner_point(P, a, b, jrow)
-            q = W.node(c)
-            corner_of[(nid, a.seg["id"], "L" if a.at_start else "R")] = q
-            corner_of[(nid, b.seg["id"], "R" if b.at_start else "L")] = q
+            ka = (nid, a.seg["id"], "L" if a.at_start else "R")
+            kb = (nid, b.seg["id"], "R" if b.at_start else "L")
+            corner_x[ka] = corner_x[kb] = c
+            c, ta, tb = _corner_walk(c, side_end(nid, a, ka[2]), side_end(nid, b, kb[2]), cx)
+            if c is None:
+                # (no pad round the corner: the sidewalks end at their ports, a crossing of
+                # the junction's corner between them)
+                corner_of[ka], corner_of[kb] = W.node(ta[0]), W.node(tb[0])
+                dead_ends.append((W, ta[0], tb[0], {"junction": units[k]["id"],
+                                                    "crosswalk": False} if k is not None
+                                  else {"node": nid}))
+            else:
+                q = W.node(c)
+                corner_of[ka] = q
+                corner_of[kb] = q
+            corner_tail[ka] = ta
+            corner_tail[kb] = tb
     for u in units:
         jid, nodes = u["id"], u["nodes"]
         C, R = plan.regions[jid]
@@ -2641,20 +3060,35 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
                 far = cutx.get((x.seg["id"], not x.at_start), 0.0)
                 xw = crosswalk_w(x.cls, node_arch[nid0])
                 marked = xw > 0.0 and xws != "none" and (sig or (av and x.cls == "avenue"))
-                s = x.cut + CROSSWALK_SETBACK_M + (xw / 2 if marked else 2.0)
-                if marked and s + xw / 2 > x.L - far - XWALK_PAD_M:
-                    # (no room on the road's face between its cuts: on the junction's face,
-                    # inside its port)
-                    s = max(x.cut - xw / 2 - XWALK_PAD_M, xw / 2)
+                sd_r = "R" if x.at_start else "L"
+                sd_l = "L" if x.at_start else "R"
+                right_corner = corner_of[(nd, x.seg["id"], sd_r)]
+                left_corner = corner_of[(nd, x.seg["id"], sd_l)]
+                walks = side_end(nd, x, sd_r) is not None and \
+                    side_end(nd, x, sd_l) is not None
+                if walks:
+                    s = x.cut + CROSSWALK_SETBACK_M + (xw / 2 if marked else 2.0)
+                    if marked and s + xw / 2 > x.L - far - XWALK_PAD_M:
+                        # (no room on the road's face between its cuts: on the junction's
+                        # face, inside its port)
+                        s = max(x.cut - xw / 2 - XWALK_PAD_M, xw / 2)
+                else:
+                    # (crossings fix: a road with no sidewalk (a highway, an alley, a service
+                    # road) is crossed between its corners, where the sidewalks round them
+                    # reach its curb; a crosswalk there wholly on one face)
+                    tr = ST._project(x.pts, right_corner)[0]
+                    tl = ST._project(x.pts, left_corner)[0]
+                    s = max((tr + tl) / 2.0, xw / 2 if marked else 0.0)
+                    if marked and abs(s - x.cut) < xw / 2 + XWALK_PAD_M:
+                        lo = max(x.cut - xw / 2 - XWALK_PAD_M, xw / 2)
+                        hi = x.cut + xw / 2 + XWALK_PAD_M
+                        s = lo if s - lo <= hi - s or \
+                            hi + xw / 2 > x.L - far - XWALK_PAD_M else hi
                 s = min(s, max(x.L - far - 0.5, x.cut), 0.95 * x.L)
                 p, t = ST._along(x.pts, s)
                 nrm = _left(t)
                 a_ = _pt(p[0] - nrm[0] * x.h, p[1] - nrm[1] * x.h)
                 b_ = _pt(p[0] + nrm[0] * x.h, p[1] + nrm[1] * x.h)
-                prev = lg[i - 1]
-                nxt = lg[(i + 1) % n]
-                right_corner = W.node(_corner_point(P, prev, x, jrow)[0])
-                left_corner = W.node(_corner_point(P, x, nxt, jrow)[0])
                 if marked:
                     cid = f"cw{len(crosswalks) + 1:05d}"
                     xa = {"road_class": x.cls}
@@ -2665,9 +3099,23 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
                                        "width_m": xw, "signalized": sig,
                                        "attrs": xa})
                     xw_ids.append(cid)
-                W.add("crosswalk" if marked else "crossing",
-                      [right_corner, a_, b_, left_corner], xw if marked else 2.0,
-                      junction=jid, crosswalk=marked)
+                kind_ = "crosswalk" if marked else "crossing"
+                if walks:
+                    # (crossings fix: straight across from sidewalk to sidewalk, each end
+                    # joined to its sidewalk's walk where it is square across from the curb:
+                    # split there, `_split_at`, with the sidewalks)
+                    o = _walk_offset(x)
+                    q_r = (p[0] - nrm[0] * o, p[1] - nrm[1] * o)
+                    q_l = (p[0] + nrm[0] * o, p[1] + nrm[1] * o)
+                    k_ = len(pending)
+                    ends[k_] = (right_corner, left_corner)
+                    pending.append([W, kind_, xw if marked else 2.0, jid, marked,
+                                    right_corner, a_, b_, left_corner])
+                    attach.setdefault((nd, x.seg["id"], sd_r), []).append((q_r, k_, 5))
+                    attach.setdefault((nd, x.seg["id"], sd_l), []).append((q_l, k_, 8))
+                else:
+                    pending.append([W, kind_, xw if marked else 2.0, jid, marked,
+                                    right_corner, None, None, left_corner])
         attrs = {"type": kind, "shape": shape, "legs": len(ext),
                  "corner_radius_m": min(x.r for x in allg), "archetype": node_arch[nid0],
                  "classes": sorted({x.cls for x in ext or allg},
@@ -2730,27 +3178,18 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
         cs = s["cross_section"]
         side = cs["sidewalk_m"][0] if cs.get("sidewalk_m") else 0.0
         if cls in ("avenue", "street") and side > 0:
-            h = s["width_m"] / 2 - side / 2
             curb = min(cs.get("curb_m", 0.15), side)
             furn = min(max(cs.get("furniture_m", 1.5 if cls == "avenue" else 0.0), 0.0),
                        side - curb)
-            rd = plan.roads.get(s["id"])
-            # (M22: the sidewalk's middle from port to port, square to the road at its ends
-            # as its right of way ends: the map's mitred frame where a road goes on as
-            # another reaches past it, into the lots there; a road inside a cluster, whose
-            # sidewalks are its junction's corner pads, end to end, as stations' stairs and
-            # the props find sidewalks by their records)
-            L = ST._plen(pts)
-            ra, rb = (0.0, 0.0) if s["id"] in inner or rd is None else (rd.a, rd.b)
-            base = ST._substring(pts, ra, L - rb) if L - ra - rb > 1.0 else pts
+            # (its sidewalks' middle lines, `swl`, from port to port)
             cw = None
             if s["id"] in inner and s["start"] in unit_of:
                 # (an inner road's sidewalk records lie on its cluster's corner pads, off its
                 # carriageway, where AG7 draws them; its walkers go on along it)
                 cw = plan.regions.get(units[unit_of[s["start"]]]["id"], (None, None))[0]
-            for sd, sign in (("L", 1.0), ("R", -1.0)):
-                line = _offset(base, sign * h)
-                if len(line) < 2:
+            for sd in ("L", "R"):
+                line = swl.get((s["id"], sd))
+                if line is None:
                     continue
                 pieces = [line]
                 if cw is not None and not cw.is_empty:
@@ -2771,24 +3210,62 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
                                       "furniture_m": furn})
                 c0 = corner_of.get((s["start"], s["id"], sd))
                 c1 = corner_of.get((s["end"], s["id"], sd))
-                chain = ([c0] if c0 else []) + line + ([c1] if c1 else [])
-                if cw is not None:
-                    W.add("sidewalk", chain, side, segment=s["id"])
-                else:
-                    W.add("sidewalk", chain, side, sidewalk=sid, segment=s["id"])
+                # (crossings fix: from its corner node along the walk round the junction's
+                # carriageway to its end, `_corner_walk`; an inner road's led round its
+                # cluster's carriageway)
+                t0 = corner_tail.get((s["start"], s["id"], sd)) or ([c0] if c0 else [])
+                t1 = corner_tail.get((s["end"], s["id"], sd)) or ([c1] if c1 else [])
+                chain = ST._dedupe(t0 + line + t1[::-1])
+                for nd_ in (s["start"], s["end"]):
+                    chain = _round(chain, carriage(unit_of.get(nd_)))
+                reqs = attach.get((s["start"], s["id"], sd), []) + \
+                    attach.get((s["end"], s["id"], sd), [])
+                near = []
+                for r in reqs:
+                    if ST._project(chain, r[0])[1] <= ATTACH_MAX_M:
+                        near.append(r)
+                    else:
+                        far_x.add(r[1])   # (its sidewalk does not reach it there)
+                pieces_w, at = _split_at(chain, [r[0] for r in near])
+                for (_, k_, idx), q in zip(near, at):
+                    pending[k_][idx] = W.node(q)
+                for pw in pieces_w:
+                    if cw is not None:
+                        W.add("sidewalk", pw, side, segment=s["id"])
+                    else:
+                        W.add("sidewalk", pw, side, sidewalk=sid, segment=s["id"])
         elif cls != "highway":
             kind = {"pedestrian": "pedestrian_street", "footbridge": "footbridge"}.get(
                 cls, "alley" if cls in ("alley", "service") else "path")
             if s["attrs"].get("role") == "promenade":
                 kind = "promenade"
             z = max((p["z"] for p in s["z_profile"]), default=0.0)
-            W.add(kind, pts, s["width_m"] if cls != "service" else 2.0, z=z, segment=s["id"])
+            line = pts
+            W.add(kind, line, s["width_m"] if cls != "service" else 2.0, z=z, segment=s["id"])
             # link the centerline ends to the corners on both sides of this leg
-            for end, nid in ((pts[0], s["start"]), (pts[-1], s["end"])):
+            for end, nid in ((line[0], s["start"]), (line[-1], s["end"])):
                 for sd in ("L", "R"):
                     c = corner_of.get((nid, s["id"], sd))
                     if c is not None and c != _pt(*end):
-                        W.add("path", [end, c], 2.0)
+                        # (by where the sidewalks' lines meet, M2's corner: on the road's
+                        # own strip and the sidewalk's line, not across a corner lot)
+                        X = corner_x.get((nid, s["id"], sd))
+                        way = [end] + ([X] if X is not None else []) + [c]
+                        W.add("path", ST._dedupe(way), 2.0,
+                              link=s["id"])
+    # (crossings fix: the crossings, their ends on the sidewalks split for them, else at the
+    # corners)
+    for k_, (W, kind_, w_, jid, marked, r_end, a_, b_, l_end) in enumerate(pending):
+        if k_ in far_x:
+            line = list(ends[k_])     # (between its corners, as a road with no sidewalk)
+        elif a_ is None:
+            line = [r_end, l_end]
+        else:
+            line = ([r_end] if r_end is not None else []) + [a_, b_] + \
+                ([l_end] if l_end is not None else [])
+        W.add(kind_, line, w_, junction=jid, crosswalk=marked)
+    for W, pr, pl, at_ in dead_ends:
+        W.add("crossing", [pr, pl], 2.0, **at_)
     stranded = one_way_stranded(net)
     T.detail("junctions/stranded", stranded)
     lanes = build_lanes(net, legs, cut)
