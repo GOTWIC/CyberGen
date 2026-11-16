@@ -137,8 +137,9 @@ def test_walkways_keep_off_the_carriageway_on_a_sample():
 def test_check_walk_roads_fails():
     b, _, _ = built_sample(VESPER_BAY)
     d = b.model.model_dump(mode="json")
-    # (a crossing that runs along an avenue's carriageway, in three stretches)
-    seg = next(s for s in d["road_segments"] if s["road_class"] == "avenue" and
+    # (a crossing that runs along a street's carriageway (no median), in three stretches)
+    seg = next(s for s in d["road_segments"] if s["road_class"] == "street" and
+               not (s["cross_section"].get("median_m") or 0.0) and
                not any(p["z"] for p in s["z_profile"]) and
                ST._plen([tuple(p[:2]) for p in s["centerline"]]) > 60.0)
     pts = [tuple(p[:2]) for p in seg["centerline"]]
