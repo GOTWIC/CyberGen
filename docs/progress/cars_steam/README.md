@@ -88,7 +88,8 @@ points, never at one.
 few stations, a junction's corner a few vertices. The fix rounds the cars' lanes, not the
 asphalt under them, so on a tight corner a car's line can run up to the fillet's cut inside the
 lane's drawn corner. Smoother road geometry (more stations on a bend, arcs in the pavement
-map's junction faces) is a later issue for M22 and AG17.
+map's junction faces) is a later issue for M22 and AG17. (Done since: the road curves fix,
+`docs/progress/fix_road_curves/`.)
 
 ## 3. Steam and smoke off by default (issue #223)
 

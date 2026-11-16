@@ -4089,25 +4089,29 @@ def _reconnect(B: Builder, edges, find, weight, vehicle: bool = False):
 
 ROUND_DEV_M = 0.5           # a corner is rounded off by at most this (the arc's middle from it)
 ROUND_TURN_MAX_DEG = 75.0   # a sharper turn stays a corner
-ROUND_GAP_M = 0.02          # arcs keep this much of a chord straight between them
 ROUND_PAD_M = 0.5           # an arc's radius keeps the road's inner edge this far from its center
+ROUND_JOIN_M = 0.5          # two arcs leaving less of a chord than this straight meet
 NO_ROUND = ("pinned_road",)  # traced roads stay as drawn
 
 
 def round_corners(pts, hw: float) -> list:
     """A polyline with each inner vertex that turns (up to ROUND_TURN_MAX_DEG) replaced by a
-    circular arc tangent to its two chords: its tangent run at most half of each chord (less
-    ROUND_GAP_M), and short enough that the arc's middle is within ROUND_DEV_M of the
-    vertex; the arc in chords within G.ROAD_SAG_M of its circle at the road's outer edge (hw
-    out). A vertex whose arc would be one chord (its turn already within the sag), or whose
-    radius would leave the inner edge under ROUND_PAD_M from the center, stays. The ends stay
-    (they are nodes). Plain arithmetic and dmath, points on the grid."""
+    circular arc tangent to its two chords: its tangent run at most half of each chord, and
+    short enough that the arc's middle is within ROUND_DEV_M of the vertex; two arcs on one
+    chord that would leave less than ROUND_JOIN_M of it straight between them meet at one
+    point (their runs grown in proportion, where their other chords leave room), so no stub
+    is left whose offsets step back; the arc in chords within G.ROAD_SAG_M of its circle at
+    the road's outer edge (hw out). A vertex whose arc would be one chord (its turn already
+    within the sag), or whose radius would leave the inner edge under ROUND_PAD_M from the
+    center, stays. The ends stay (they are nodes). Plain arithmetic and dmath, points on the
+    grid."""
     n = len(pts)
     if n < 3:
         return list(pts)
     L = [_dist(pts[i], pts[i + 1]) for i in range(n - 1)]
     lim = M.radians(ROUND_TURN_MAX_DEG)
-    out = [pts[0]]
+    T = [0.0] * n           # each vertex's tangent run (0: it stays)
+    geo: dict = {}
     for i in range(1, n - 1):
         a, p, c = pts[i - 1], pts[i], pts[i + 1]
         ua = _unit(p[0] - a[0], p[1] - a[1])
@@ -4115,21 +4119,54 @@ def round_corners(pts, hw: float) -> list:
         cross = ua[0] * uc[1] - ua[1] * uc[0]
         th = float(M.atan2(abs(cross), ua[0] * uc[0] + ua[1] * uc[1]))
         if th <= 1e-6 or th > lim:
-            out.append(p)
             continue
-        t = min(0.5 * L[i - 1] - ROUND_GAP_M, 0.5 * L[i] - ROUND_GAP_M,
-                ROUND_DEV_M / float(M.tan(th / 4.0)))
+        t = min(0.5 * L[i - 1], 0.5 * L[i], ROUND_DEV_M / float(M.tan(th / 4.0)))
         if t <= 0.0:
-            out.append(p)
             continue
         R = t / float(M.tan(th / 2.0))
-        k = G.arc_steps(R + hw, th)
-        if R < hw + ROUND_PAD_M or k < 2:
+        if R < hw + ROUND_PAD_M or G.arc_steps(R + hw, th) < 2:
+            continue
+        T[i] = t
+        geo[i] = (ua, uc, cross, th)
+    # (two arcs on one chord with a stub between them meet: their runs grown in proportion)
+    shared: dict = {}
+    for i in range(1, n - 2):
+        j = i + 1
+        if not (T[i] and T[j]):
+            continue
+        gap = L[i] - T[i] - T[j]
+        if gap <= 0.0 or gap >= ROUND_JOIN_M:
+            if gap <= 0.0:
+                shared[i] = ((pts[i][0] + pts[j][0]) / 2.0, (pts[i][1] + pts[j][1]) / 2.0)
+            continue
+        # (room on their other chords: half a chord at a node, else what the arc beyond
+        # leaves)
+        ri = (0.5 * L[0] if i == 1 else L[i - 1] - T[i - 1]) - T[i]
+        rj = (0.5 * L[j] if j == n - 2 else L[j] - T[j + 1]) - T[j]
+        if gap > max(ri, 0.0) + max(rj, 0.0):
+            continue
+        gi = min(max(ri, 0.0), gap * T[i] / (T[i] + T[j]))
+        gj = gap - gi
+        if gj > max(rj, 0.0):
+            gj = max(rj, 0.0)
+            gi = gap - gj
+        ti, tj = T[i] + gi, L[i] - (T[i] + gi)
+        T[i], T[j] = ti, tj
+        ua = geo[i][1]
+        shared[i] = (pts[i][0] + ua[0] * ti, pts[i][1] + ua[1] * ti)
+    out = [pts[0]]
+    for i in range(1, n - 1):
+        p = pts[i]
+        if not T[i]:
             out.append(p)
             continue
+        ua, uc, cross, th = geo[i]
+        t = T[i]
+        R = t / float(M.tan(th / 2.0))
+        k = G.arc_steps(R + hw, th)
         side = 1.0 if cross > 0 else -1.0
-        t0 = (p[0] - ua[0] * t, p[1] - ua[1] * t)
-        t1 = (p[0] + uc[0] * t, p[1] + uc[1] * t)
+        t0 = shared[i - 1] if i - 1 in shared else (p[0] - ua[0] * t, p[1] - ua[1] * t)
+        t1 = shared[i] if i in shared else (p[0] + uc[0] * t, p[1] + uc[1] * t)
         cx, cy = t0[0] - ua[1] * side * R, t0[1] + ua[0] * side * R
         a0 = float(M.atan2(t0[1] - cy, t0[0] - cx))
         out.append(_pt(*t0))

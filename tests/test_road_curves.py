@@ -64,8 +64,10 @@ def test_round_corners_on_arcs():
     from shapely.geometry import LineString, Point
     line = LineString(pts)
     assert max(line.distance(Point(p)) for p in out) <= ST.ROUND_DEV_M + 0.01
-    # idempotent: a rounded line rounds to itself (held roads in a regeneration stay)
-    assert ST.round_corners(out, 5.0) == out
+    # rounded again it moves by no more than the sag (held roads in a regeneration are not
+    # rounded again at all, `round_edges`)
+    again = ST.round_corners(out, 5.0)
+    assert max(LineString(out).distance(Point(p)) for p in again) <= 0.021
     # sharp corners and roads too wide for the arc stay
     sq = [(0.0, 0.0), (30.0, 0.0), (30.0, 30.0)]
     assert ST.round_corners(sq, 4.0) == sq

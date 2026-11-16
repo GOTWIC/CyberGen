@@ -152,6 +152,8 @@ class Path:
         self.start = None       # (nx, ny, k) at s = 0 where it goes on as another road
         self.end = None
         self.knots: list = []   # (#147) stations its profile turns at (a footbridge's stairs)
+        self.reach = 0.0        # its widest band edge's offset (`stations`)
+        self._reaches: dict = {}
 
     def seg(self, s: float) -> int:
         i = bisect.bisect_right(self.cum, s) - 1
@@ -193,7 +195,23 @@ class Path:
         return self.frame(s)[4]
 
     def stations(self, a: float, b: float) -> list[float]:
-        key = [a] + sorted({c for c in self.cum[1:-1] + self.knots if a < c < b}) + [b]
+        # (the road curves fix: a vertex nearer a stretch's end than its widest edge's mitre
+        # reaches along it is left out, so that edge does not step back between the mitre
+        # point and the end's square one, which `folds` took for a fold: on a curve cut in
+        # fine chords a cut often falls within a few centimeters of a vertex)
+        # (and of two vertices nearer each other than their mitres reach, the one that turns
+        # less: the short chord between two arcs)
+        knots = {c for c in self.knots if a < c < b}
+        vs: list = []
+        for i, c in enumerate(self.cum[1:-1], 1):
+            if not a < c < b or c in knots or min(c - a, b - c) <= self._reach(i):
+                continue
+            if vs and c - vs[-1][0] <= vs[-1][1] + self._reach(i):
+                if self._reach(i) <= vs[-1][1]:
+                    continue
+                vs.pop()
+            vs.append((c, self._reach(i)))
+        key = [a] + sorted(knots | {c for c, _ in vs}) + [b]
         out = [key[0]]
         for u, v in zip(key, key[1:]):
             n = max(1, math.ceil((v - u) / STEP_M - 1e-9))
@@ -201,6 +219,18 @@ class Path:
                 out.append(u + (v - u) * j / n)
             out.append(v)
         return out
+
+    def _reach(self, i: int) -> float:
+        """How far along its chords the mitre point of vertex i, `reach` out, lies from the
+        point square to them: reach tan(half the turn), from the mitre factor (plain
+        arithmetic), and a centimeter."""
+        if not self.reach:
+            return 0.0
+        got = self._reaches.get(i)
+        if got is None:
+            k = self.frame(self.cum[i])[4]
+            got = self._reaches[i] = self.reach * math.sqrt(max(k * k - 1.0, 0.0)) + 0.01
+        return got
 
     def project(self, x: float, y: float, s0: float = 0.0, s1: float | None = None) -> float:
         """Distance along the path of the point nearest (x, y), searched between s0 and
@@ -521,6 +551,7 @@ class Road:
         self.path = Path(seg["centerline"])
         self.bands = bands(seg)
         self.ws = offsets(self.bands)
+        self.path.reach = max(abs(w) for w in self.ws) if self.ws else 0.0
         self.row = seg["width_m"] / 2.0
         self.zp = [(p["s"], p["z"]) for p in seg.get("z_profile") or []]
         if self.cls == "footbridge":
