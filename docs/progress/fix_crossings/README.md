@@ -73,15 +73,15 @@ straight span (for sidewalks, all of it). Delta Megacity:
 | Kind | Walkways | Length | On a carriageway | Past the span | Walkways past 1 m |
 |---|---|---|---|---|---|
 | crossing, before | 3,235 | 89.0 km | 43.2 km (48.5%) | 15.4 km (17.3%) | 1,131 |
-| crossing, after | 3,298 | 32.0 km | 23.5 km (73.4%) | 8 m (0.0%) | 0 |
+| crossing, after | 3,298 | 31.2 km | 22.7 km (72.7%) | 8 m (0.0%) | 0 |
 | crosswalk, before | 564 | 25.0 km | 8.9 km (35.6%) | 2.0 km (8.0%) | 90 |
-| crosswalk, after | 560 | 11.3 km | 6.7 km (59.3%) | 4 m (0.0%) | 0 |
+| crosswalk, after | 560 | 11.3 km | 6.7 km (59.4%) | 4 m (0.0%) | 0 |
 | sidewalk, before | 4,014 | 176.1 km | 10.0 km (5.7%) | | 487 |
-| sidewalk, after | 9,685 | 170.6 km | 1.8 km (1.1%) | | 78 |
+| sidewalk, after | 9,685 | 170.6 km | 1.8 km (1.0%) | | 75 |
 
 A crossing is now mostly its span across the road (so its share on a carriageway rose as its
 tails went); what ran past the span went from 17.3% to nothing. Crossings over 30 m long:
-922 to 9 (the longest 179 m to 46 m); crosswalks 403 to 58 (the longest 172 m to 72 m: the
+922 to 9 (the longest 179 m to 46 m); crosswalks 403 to 56 (the longest 172 m to 78 m: the
 ones left are across wide avenues and highways with medians). The sidewalk walkways are split
 where crossings join them (4,014 to 9,685). The 1.8 km of sidewalk left on a carriageway is
 mostly on junction faces (roads inside M22's clusters, junction faces over a road's sidewalk
@@ -93,19 +93,19 @@ after:
 
 | City | Crossings past the span | Crosswalks past the span | Sidewalks on a carriageway |
 |---|---|---|---|
-| Delta Megacity | 15,385 to 8 m | 2,006 to 4 m | 10,016 to 1,830 m (5.7 to 1.1%) |
-| Vesper Bay | 17,774 to 10 m | 1,518 to 3 m | 10,020 to 1,839 m (5.5 to 1.0%) |
-| Nexus City | 16,179 to 11 m | 1,714 to 5 m | 12,063 to 2,546 m (5.9 to 1.3%) |
-| Greyhook | 7,004 to 5 m | 1,035 to 1 m | 5,494 to 973 m (4.5 to 0.8%) |
-| Saltreach Free Port | 8,747 to 9 m | 600 to 2 m | 5,911 to 1,243 m (6.3 to 1.4%) |
-| Vesper Bay Decks | 18,226 to 11 m | 1,518 to 3 m | 10,031 to 1,854 m (5.5 to 1.0%) |
-| Cragmouth | 22,997 to 9 m | 1,976 to 3 m | 10,796 to 1,656 m (5.3 to 0.8%) |
+| Delta Megacity | 15,385 to 8 m | 2,006 to 4 m | 10,016 to 1,787 m (5.7 to 1.0%) |
+| Vesper Bay | 17,774 to 9 m | 1,518 to 3 m | 10,020 to 1,792 m (5.5 to 1.0%) |
+| Nexus City | 16,179 to 11 m | 1,714 to 5 m | 12,063 to 2,752 m (5.9 to 1.4%) |
+| Greyhook | 7,004 to 5 m | 1,035 to 1 m | 5,494 to 957 m (4.5 to 0.8%) |
+| Saltreach Free Port | 8,747 to 10 m | 600 to 2 m | 5,911 to 1,274 m (6.3 to 1.4%) |
+| Vesper Bay Decks | 18,226 to 10 m | 1,518 to 3 m | 10,031 to 1,807 m (5.5 to 1.0%) |
+| Cragmouth | 22,997 to 9 m | 1,976 to 3 m | 10,796 to 1,584 m (5.3 to 0.8%) |
 
 Unchanged: alleys and service roads (no sidewalk: their walkway is their carriageway, 64 to
 80% of an alley walkway's length), pedestrian streets and promenades. The `path` walkways
 that link an alley's or path's centerline end (its node, in the junction) to its corners grew
 by 1 to 3 km a city: they now go by M2's corner point to the corner on the sidewalk (Delta's
-paths on a carriageway 8.7 to 11.1 km, nearly all of it on alleys' stubs).
+paths on a carriageway 8.7 to 10.6 km, nearly all of it on alleys' stubs).
 
 LG3's derived signal phases (`lifegen.plan.signals`, read only) on Delta: 150 signals, 552
 signalized crosswalks, 544 crosswalk walkways found in their phases, before and after.
