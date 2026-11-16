@@ -517,6 +517,33 @@ namespace CgLife
 	{
 		const FZoneGraphStorage& S = *F.Storage;
 		const TArray<float>& Len = *F.Lengths;
+		// (LG6: into a train's open door from where it left its platform, then gone; waiting
+		// its turn first, T under 0)
+		if (W.State == CgWalk::Board)
+		{
+			W.T += Dt;
+			if (W.T < 0.f)
+			{
+				Place(F, W, CgShow::Still);
+				return;
+			}
+			const float Dur = FMath::Max(0.3f, (float)FVector::Dist(W.From, W.To) / FMath::Max(50.f, W.Speed));
+			const float U = FMath::Clamp(W.T / Dur, 0.f, 1.f);
+			W.Pos = FMath::Lerp(W.From, W.To, U);
+			const FVector D = W.To - W.From;
+			if (D.SizeSquared2D() > 1.0)
+			{
+				TurnTo(F, W, FMath::RadiansToDegrees(FMath::Atan2(D.Y, D.X)), Dt);
+			}
+			if (U < 1.f)
+			{
+				Place(F, W, CgShow::Moving);
+				return;
+			}
+			++F.Boarded;
+			Free(F, W);
+			return;
+		}
 		// (LG4: in a shop on a visit, not drawn; then out of its door again)
 		if (W.State == CgWalk::Inside)
 		{
@@ -833,6 +860,17 @@ namespace CgLife
 			}
 		}
 		Goal = FMath::Clamp(Goal, -0.85f * HW, 0.85f * HW);
+		// (LG6: on a platform whose walkway runs down its tracks' middle, off the trains: out to
+		// the side it keeps to)
+		if (F.WalkClear && F.WalkClear->IsValidIndex(W.Lane))
+		{
+			const float Cl = FMath::Min((*F.WalkClear)[W.Lane], 0.8f * HW);
+			if (Cl > 0.f && FMath::Abs(Goal) < Cl)
+			{
+				const float Sg = Goal != 0.f ? FMath::Sign(Goal) : ((W.Side * W.Dir) >= 0.f ? 1.f : -1.f);
+				Goal = Sg * Cl;
+			}
+		}
 		const float Lat0 = W.Lat;
 		W.Lat = FMath::FInterpConstantTo(W.Lat, Goal, Dt, 70.f);
 		W.Pos = At + Right * W.Lat + FVector(0.f, 0.f, W.ZOff);
@@ -963,7 +1001,7 @@ void UCityGenLifeWalkProcessor::ExecuteCity(FMassExecutionContext& Context)
 			// (LG4: someone sitting, standing at a slot or inside a shop far off as seldom as a
 			// far walker; going through a door or to and from a slot every frame)
 			const bool bMoving = W.State == CgWalk::Enter || W.State == CgWalk::Exit ||
-				W.State == CgWalk::ToSlot || W.State == CgWalk::FromSlot;
+				W.State == CgWalk::ToSlot || W.State == CgWalk::FromSlot || W.State == CgWalk::Board;
 			const int32 Every = (Tier <= 1 || bMoving) ? 1 : (Tier == 2 ? 2 : 4);
 			W.Pending += Dt0;
 			if (Every > 1 && ((F.FrameNo + W.Instance) % Every) != 0)

@@ -509,6 +509,8 @@ void ACityGenLife::TakeFreed()
 	JaywalkTotal += Frame.Jaywalked;
 	WaitingNow = Frame.Waiting;
 	VisitsTotal += Frame.Visits;
+	TransitBoarded += Frame.Boarded;
+	Frame.Boarded = 0;
 	Frame.Entered = Frame.Exited = Frame.Jaywalked = 0;
 	Frame.SlotsTaken = Frame.SlotsLeft = Frame.Visits = 0;
 }
@@ -646,7 +648,10 @@ void ACityGenLife::UpdateLive(const float Dt, const bool bRefill)
 		for (int32 K = 0; K < DoorDists.Num(); ++K)
 		{
 			const int32 Ln = DoorLanesSorted[K];
-			if (InRegion[Ln] && DoorRatesSorted[K] > 0.f)
+			// (LG6: a served station's street accesses send no one out while transit runs: its
+			// people come off the trains)
+			const bool bByTrain = bTransit && IsTransit() && DoorTransitSorted.IsValidIndex(K) && DoorTransitSorted[K];
+			if (InRegion[Ln] && DoorRatesSorted[K] > 0.f && !bByTrain)
 			{
 				Tot += DoorRatesSorted[K];
 				DoorLive.Add(K);

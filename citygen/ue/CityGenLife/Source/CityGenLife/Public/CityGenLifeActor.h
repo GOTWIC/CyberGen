@@ -449,6 +449,148 @@ public:
 	 *  police pair walking (`police`), a patrol car (`patrol`); false without one. */
 	UFUNCTION(BlueprintCallable, Category = "CityGen") bool ShowPlace(const FString& What);
 
+	// --- LG6: transit (set by the importer from the plan's timetables) --------------------------
+	// Every transit line of the city runs its timetable, driven by the world's time (so where a
+	// train is depends on the time alone): a train's place along its line's cycle is the cycle's
+	// sampled coordinate at (time + its phase) modulo the cycle, its phases spread evenly round
+	// it by the hour band's trains. Its cars follow the track (each car by the track's points at
+	// its ends), each way on its own track (its right), crossing over before a turn; they are
+	// instanced stand-ins (TransitParts per mode). At a stop the doors open after it halts and
+	// close before it leaves; at a stop whose platform walkway is live (LG3's live region) people
+	// leave the train through its open doors onto the platform and walk on, and people of the
+	// crowd on the platform walk into its doors and are gone. Far trains move as often as the
+	// near ones (their place is read off the timetable, not simulated), their instances sent
+	// every fourth frame.
+
+	/** Per line: its mode (an index of the modes in TransitPartStarts' order), color (linear RGB),
+	 *  loop (1), the train (12 floats: cars, car length, gap, width, height, floor, base over
+	 *  the line, track off the middle, doors a side, door width, sides open (1 its right, 2
+	 *  both), boarding at the walkway's level), the turn points (2: m along the track), the
+	 *  cycle (s) and its samples' step (s), the trains per hour band (5). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<int32> TransitLineMode;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<float> TransitLineColor;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<int32> TransitLineLoop;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<float> TransitLineCar;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<float> TransitLineTurn;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<float> TransitLineCycle;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<float> TransitLineDt;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<int32> TransitLineTrains;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<FString> TransitLineIds;
+	/** The modes by their index (metro, elevated_rail, monorail, maglev, sky_tube: those the city
+	 *  has, in the exporter's order). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<FString> TransitModes;
+	/** Per line its track's points [TransitPointStarts[l], TransitPointStarts[l + 1]) of
+	 *  TransitPoints (x, y, z citygen m; a loop closes on its first), its cycle's samples
+	 *  [TransitSampleStarts[l], ...) of TransitSamples (m along the cycle), its stop events
+	 *  [TransitEventStarts[l], ...) of TransitEvents (4 floats: arrive, depart (s into the
+	 *  cycle), its stop (an index of the line's stops, -1 a turn without one), way (0 out, 1
+	 *  back)), its stops [TransitStopStarts[l], ...). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<int32> TransitPointStarts;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<float> TransitPoints;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<int32> TransitSampleStarts;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<float> TransitSamples;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<int32> TransitEventStarts;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<float> TransitEvents;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<int32> TransitStopStarts;
+	/** Per stop: its platform walkway (a walkway lane, -1), where along the track (m), people
+	 *  boarding and leaving a train per band (5 each), the height they board at (citygen m),
+	 *  whether at the walkway's level (1; 0: a concourse over the track, they go at the point
+	 *  over a door). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<int32> TransitStopLane;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<float> TransitStopS;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<float> TransitStopBoard;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<float> TransitStopAlight;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<float> TransitStopZ;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<int32> TransitStopLevel;
+	/** The stand-ins (the exporter's per mode model table): per mode its parts
+	 *  [TransitPartStarts[m], TransitPartStarts[m + 1]) of TransitParts (8 floats: mesh (an index
+	 *  of TransitMeshes), kind (0 body, 1 window, 2 accent, 3 dark), middle (3: m in the car's
+	 *  frame, x forward, y left, z up from its body's bottom), scale (3)); their material
+	 *  (Core/Life/M_CgTransit: base color and emission from per-instance custom data). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<int32> TransitPartStarts;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<float> TransitParts;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<TObjectPtr<UStaticMesh>> TransitMeshes;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TObjectPtr<UMaterialInterface> TransitMaterial;
+	/** Per walkway lane how far off its middle people keep (m: a platform's trains), 0 none;
+	 *  per door (as DoorLanes) 1 where it is a served station's street access (its people come
+	 *  off the trains while transit runs). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<float> WalkClear;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") TArray<int32> DoorTransit;
+	/** A train crosses to the other way's track over this before it turns (m). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") float TransitCrossM = 90.f;
+	/** Doors open this long after a train halts and close this long before it leaves (s),
+	 *  sliding over TransitDoorSlideS; door leaves are drawn within TransitDoorsM of the view,
+	 *  people board within the crowd's live region; trains past TransitFarM have their
+	 *  instances sent every fourth frame. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") float TransitDoorOpenS = 2.f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") float TransitDoorCloseS = 4.f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") float TransitDoorSlideS = 1.5f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") float TransitDoorsM = 300.f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") float TransitFarM = 1500.f;
+	/** Transit on or off (CityGenLife.Transit [0|1], the play menu's row). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Transit") bool bTransit = true;
+
+	/** Whether this is LG6's transit (lines with tracks and timetables). */
+	bool IsTransit() const { return TransitLineMode.Num() > 0 && TransitPointStarts.Num() == TransitLineMode.Num() + 1 && TransitSampleStarts.Num() == TransitLineMode.Num() + 1; }
+	UFUNCTION(BlueprintCallable, Category = "CityGen") void SetTransit(bool bOn);
+	/** For the check's shots: the camera moved to the nearest train standing at a stop with its
+	 *  doors open and people boarding or leaving (`board`), standing at a stop (`dwell`), or
+	 *  moving on a line of a mode (`metro`, `monorail`, `maglev`, `sky_tube`, `elevated_rail`,
+	 *  `moving` any); false without one. */
+	UFUNCTION(BlueprintCallable, Category = "CityGen") bool ShowTransit(const FString& What);
+
+private:
+	// (LG6, CityGenLifeTransit.cpp)
+	struct FCgTrack
+	{
+		TArray<FVector> P;          // citygen m, a loop's first again at its end
+		TArray<double> S;           // m along it (3D)
+		double L = 0.0;
+		bool bLoop = false;
+		FVector At(double Sm) const;
+	};
+	struct FCgTrain
+	{
+		int32 Line = INDEX_NONE;
+		int32 K = 0;                // its index among the line's trains
+		bool bOn = false;           // running in this hour band
+		int32 Event = INDEX_NONE;   // the stop event it stands at (the line's), else none
+		float Open = 0.f;           // its doors open (0 shut, 1 open)
+		int32 Way = 0;
+		double Sm = 0.0;            // m along the track (its middle)
+		double U = 0.0;             // s into the cycle
+		FVector Mid = FVector::ZeroVector;   // UE cm, its middle car's
+		FVector Fwd = FVector::ForwardVector;
+		bool bNear = false;
+		int64 Sent = -100;          // the frame its instances were last sent
+		TArray<FTransform> Cars;    // per car: its body's bottom middle, travel heading (UE)
+		int32 InstStart = 0;        // its parts' first instance in each mesh's component (per mesh)
+	};
+	void BuildTransit();
+	void UpdateTransit(float Dt);
+	void PlaceTrain(FCgTrain& T, double Time);
+	void TrainArrives(FCgTrain& T);
+	void DrawTrains();
+	void DrawDoors();
+	bool DoorPoint(const FCgTrain& T, int32 Car, int32 Door, float Side, FVector& Out) const;
+	float LatOf(int32 Line, int32 Way, double Sm) const;
+	FString TransitStatus() const;
+	TArray<FCgTrack> Tracks;
+	TArray<FCgTrain> Trains;
+	TArray<int32> LineTrainStart;                      // (per line its first train)
+	TArray<TArray<int32>> TrainInst;                   // (per train, per mesh its first instance)
+	TArray<uint8> DoorTransitSorted;
+	TArray<float> WalkClearCm;
+	UPROPERTY(Transient) TArray<TObjectPtr<UInstancedStaticMeshComponent>> TransitComps;
+	UPROPERTY(Transient) TObjectPtr<UInstancedStaticMeshComponent> DoorComp;
+	int32 DoorInstUsed = 0;
+	int32 TransitArrivals = 0, TransitBoarded = 0, TransitAlighted = 0, TransitBoardingNow = 0;
+	int32 TrainsOn = 0, TrainsMoving = 0, TrainsDwelling = 0, TrainsNear = 0;
+	int64 TransitFrame = 0;
+	double TransitMs = 0.0, TransitMsMax = 0.0;
+	FString LastTransitShow;
+	FRandomStream TransitRng;
+
 private:
 	// (LG4, CityGenLifePlaces.cpp)
 	void BuildPlaces();

@@ -21,6 +21,8 @@ namespace CgWalk
 		AtSlot = 5,    // using it (sitting, waiting, queueing, buying, eating, talking)
 		FromSlot = 6,  // back to its walkway
 		Inside = 7,    // in a shop on a visit (not drawn), then out of its door again
+		// --- LG6: transit
+		Board = 8,     // from its platform walkway into a train's open door, then gone
 	};
 }
 
@@ -115,6 +117,9 @@ struct FCgLifeWalker : public FMassFragment
 	int32 Point = INDEX_NONE;      // the slot's use point it claimed
 	float Dwell = 0.f;             // s left at a slot or inside on a visit
 	int32 PassedSlot = INDEX_NONE; // the last slot it passed (and chose not to use)
+
+	// --- LG6: transit ------------------------------------------------------------------------------
+	FVector To = FVector::ZeroVector;   // the train door it boards at (UE cm)
 };
 
 /** LG5: why a car drives slower than its lane allows now (FCgLifeCar::Why). */

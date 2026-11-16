@@ -38,7 +38,9 @@ namespace
 		// LG5: lifegen's traffic on or off
 		RowTraffic = 21,
 		// LG4: lifegen's life at places (slots, shop visits, gangs, police) on or off
-		RowPlaces = 22 };
+		RowPlaces = 22,
+		// LG6: lifegen's transit (trains on their timetables, boarding) on or off
+		RowTransit = 23 };
 
 	/** A row's name for ACityGenPlay::ClickMenuRow (the console's CityGen.MenuRow). */
 	const TCHAR* RowName(int32 Row)
@@ -65,6 +67,7 @@ namespace
 		case RowClothing: return TEXT("clothing");
 		case RowTraffic: return TEXT("traffic");
 		case RowPlaces: return TEXT("places");
+		case RowTransit: return TEXT("transit");
 		default: return TEXT("hour+");    // the hour row and its > arrow
 		}
 	}
@@ -370,6 +373,11 @@ int32 SCityGenOverlay::PaintMenu(FSlateWindowElementList& Out, int32 Layer, cons
 	{
 		// LG4: with lifegen's life at places, people at places, gangs and police on or off
 		Rows.Add({RowPlaces, TEXT("Places, gangs, police"), P->GetLifePlaces() ? TEXT("On") : TEXT("Off")});
+	}
+	if (P->HasLifeTransit())
+	{
+		// LG6: with lifegen's transit, the trains and boarding on or off
+		Rows.Add({RowTransit, TEXT("Transit"), P->GetLifeTransit() ? TEXT("On") : TEXT("Off")});
 	}
 	constexpr double BarH = 30.0;
 	const double Extra = bAtmos ? BarH : 0.0;

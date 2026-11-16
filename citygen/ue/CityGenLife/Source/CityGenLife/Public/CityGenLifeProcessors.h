@@ -135,6 +135,12 @@ struct FCgLifeFrame
 	/** Out: counts this frame. */
 	int32 SlotsTaken = 0, SlotsLeft = 0, Visits = 0;
 
+	// --- LG6: transit -----------------------------------------------------------------------------
+	/** Per walkway lane how far off its middle people keep (cm: a platform's trains), 0 none. */
+	const TArray<float>* WalkClear = nullptr;
+	/** Out: people gone into a train this frame. */
+	int32 Boarded = 0;
+
 	// --- LG5: the city's traffic ----------------------------------------------------------------
 	bool bTraffic = false;
 	/** Per lane (every lane of the storage; walkways 0): on the lane graph's largest strongly

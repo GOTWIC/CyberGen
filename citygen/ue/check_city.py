@@ -1092,7 +1092,8 @@ def view_cmds(world, text, name):
     """A view's commands ($CITYGEN_UE_VIEW_CMDS), `;` between them: console commands, and
     (LG5) `wait S` (seconds), `dilate X` (the world's time dilation) and `until S COMMAND`
     (the command again every half second, at most S seconds, until lifegen's traffic shows
-    what it was asked for: its status's `traffic.show` not ending in `:none`)."""
+    what it was asked for: its status's `traffic.show` not ending in `:none`; LG6: a
+    `CityGenLife.TransitShow` its `transit.show`)."""
     for c in (text or "").split(";"):
         c = c.strip()
         if not c:
@@ -1108,7 +1109,9 @@ def view_cmds(world, text, name):
             t, cmd, got = 0.0, m.group(2), None
             while t <= float(m.group(1)):
                 unreal.SystemLibrary.execute_console_command(world, cmd)
-                got = ((life_status(world) or {}).get("traffic") or {}).get("show", "")
+                # (LG6: a transit shot reads the transit's own)
+                part = "transit" if "TransitShow" in cmd else "traffic"
+                got = ((life_status(world) or {}).get(part) or {}).get("show", "")
                 if got and not got.endswith(":none"):
                     break
                 yield from wait(0.5)

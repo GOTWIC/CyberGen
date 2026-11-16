@@ -21,7 +21,8 @@
      "enum": [
       "life_controller",
       "spawner",
-      "slots"
+      "slots",
+      "train"
      ],
      "title": "Kind",
      "type": "string"

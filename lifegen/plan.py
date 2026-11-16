@@ -34,13 +34,19 @@ From the city model (read only) and the life spec:
   on their turfs, the police on foot and in patrol cars by the police field, the pools' slots
   kept for gang members, police and patrol cars (`role_counts`, `assign_roles`), checks
   (`places_checks`), `preview_places.png`.
+- **Transit** (LG6, scope 6.6, `transit.py`): every line's timetable (its stops, runs by the
+  mode's speeds and the track's curves, dwells, the cycle sampled, the trains per hour band,
+  the people boarding and leaving a train at each stop), `timetables.json`, checks
+  (`timetables`, `transit_stops`, `transit_boarding`, `transit_budget`),
+  `preview_transit.png`; a layer 4 entry per train (`train.<line id>.<n>`).
 - **The asks of citygen** (`asks.py`) and their state.
 - **Checks** (scope 8, the ones LG0 can make): spawns on the graphs, spawns reaching each
   other, densities kept, slots placed, the spike within the budgets.
 
 Outputs (written only when their bytes change): `life_plan.json`, `spawns/<tile>.json` (LG3:
 with its walkways' people; LG5: its lanes' cars), `signals.json`, `life_report.json`, `life_report.txt`,
-`unreal_contribution.life.json`, `preview_crowds.png`.
+`unreal_contribution.life.json`, `preview_crowds.png`; LG4 `preview_places.png`; LG6
+`timetables.json`, `preview_transit.png`.
 """
 
 from __future__ import annotations
@@ -59,6 +65,7 @@ from . import places as PL4
 from . import planmodel as PM
 from . import presets as P
 from . import spec as S
+from . import transit as TR
 
 TILE_M = 256.0
 # (LG1) a person's draws, kept per person as columns in the spike (`library.person`)
@@ -1639,6 +1646,14 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     places_rec = places_plan(filled, slot_rows, place_rows, sleft)
     gangs_rec = gangs_plan(turfs, gm, slot_rows, roles)
     police_rec = police_record(pol, roles)
+    # LG6: every transit line's timetable, its stops, trains and boarding
+    tlines, tleft = TR.transit_plan(model, filled, spawns)
+    ttab = PM.Timetables(city=city, lines=TR.timetables(tlines))
+    ttext = canon(json.loads(ttab.model_dump_json()))
+    write(out / "timetables.json", ttext, wrote)
+    transit_rec = hashed({**TR.plan_record(tlines, tleft, crowd["hour"]),
+                          "file": "timetables.json",
+                          "sha256": hashlib.sha256(ttext.encode("utf-8")).hexdigest()})
 
     # per tile
     by_tile = defaultdict(lambda: {"spawns": [], "slots": [], "walks": [], "drives": [],
@@ -1694,6 +1709,8 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     checks.update(traffic_checks(model, drows, hours, filled, sigs, traffic))
     checks.update(places_checks(model, filled, slot_raw, place_rows, rows, drows, turfs, gm,
                                 pol, crowd, traffic, roles, spawns, hours))
+    checks.update(TR.checks(model, tlines, tleft, walk_components(model.get("walkways", [])),
+                            spawns))
     sdata = PM.Signals(city=city, derived=True, signals=sigs)
     write(out / "signals.json", canon(json.loads(sdata.model_dump_json())), wrote)
     asks = A.status(model, {"doors": (build / "assets" / "unreal_contribution.buildings.json")
@@ -1708,16 +1725,20 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
               "walkways": len(rows), "signals": len(sigs),
               "lanes": len(drows),
               "cars_at_hour": traffic["totals"]["cars_by_hour"][traffic["hour"]],
-              "places": len(place_rows)}
+              "places": len(place_rows),
+              "transit_lines": len(tlines),
+              "trains_at_hour": transit_rec["totals"]["trains_at_hour"]}
     body = {"city": city, "model_sha256": hashlib.sha256(raw).hexdigest(),
             "spec": {k: v for k, v in filled.items() if k != "districts"},
             "bands": list(P.BANDS), "districts": districts, "tiles": tiles, "asks": asks,
             "spike": spike, "crowd": crowd, "traffic": traffic, "places": places_rec,
-            "gangs": gangs_rec, "police": police_rec, "checks": checks, "totals": totals}
+            "gangs": gangs_rec, "police": police_rec, "transit": transit_rec,
+            "checks": checks, "totals": totals}
     plan_hash = _sha([body["spec"], [d["hash"] for d in districts],
                       [t["sha256"] for t in tiles], spike and spike["hash"], crowd["hash"],
                       sdata.model_dump(mode="json"), traffic["hash"], places_rec["hash"],
-                      gangs_rec["hash"], police_rec["hash"]])
+                      gangs_rec["hash"], police_rec["hash"]] +
+                     ([transit_rec["hash"]] if tlines else []))
     plan = PM.LifePlan(plan_hash=plan_hash, **body)
     pdata = json.loads(plan.model_dump_json())
     write(out / "life_plan.json", canon(pdata), wrote)
@@ -1731,6 +1752,13 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     for t in tiles:
         entries.append({"key": f"life.spawns.{t['tile']}", "kind": "spawner",
                         "hash": t["sha256"][:16], "tile": t["tile"], "count": t["spawns"]})
+    # (LG6: a transit vehicle per train of every line, keyed by its id, its line's timetable's
+    # hash; the controller draws and runs them)
+    for ln in tlines:
+        h = _sha({k: v for k, v in ln.items() if not k.startswith("_")})
+        for tid in ln["train_ids"]:
+            entries.append({"key": tid, "kind": "train", "hash": h, "tile": None,
+                            "count": ln["cars"]})
     con = PM.Contribution(city=city, plan_hash=plan_hash, entries=entries)
     write(out / "unreal_contribution.life.json", canon(json.loads(con.model_dump_json())),
           wrote)
@@ -1773,6 +1801,15 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
                                 "spots": len(t["spots"])} for t in gangs_rec["turfs"]],
                      "pool": gangs_rec["pool"], "want_near": gangs_rec["want_near"],
                      "left_out": gangs_rec["left_out"]},
+           "transit": {"lines": [{"id": ln["id"], "name": ln["name"], "mode": ln["mode"],
+                                  "loop": ln["loop"], "length_m": ln["length_m"],
+                                  "stops": len(ln["stops"]), "cycle_s": ln["cycle_s"],
+                                  "trains": ln["trains"], "headway_min": ln["headway_min"],
+                                  "top_mps": ln["runs"]["top_mps"], "notes": ln["notes"]}
+                                 for ln in tlines],
+                       **{k: transit_rec["totals"][k] for k in
+                          ("trains_at_hour", "cars_at_hour", "boarding_at_hour")},
+                       "left_out": transit_rec["totals"]["left_out"]},
            "police": {"precincts": [{"id": p["id"], "station_doors": len(p["station_doors"]),
                                      "foot": p["foot"][P.band_of(crowd["hour"])],
                                      "cars": p["cars"][P.band_of(crowd["hour"])]}
@@ -1790,6 +1827,10 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
                                  out / "preview_places.png")
         if img:
             wrote.append(img)
+        if tlines:
+            img = TR.preview(model, tlines, crowd["hour"], out / "preview_transit.png")
+            if img:
+                wrote.append(img)
     rep["wrote"] = wrote
     rep["seconds"] = round(time.time() - t0, 1)
     return rep
@@ -1846,6 +1887,18 @@ def report_text(rep: dict) -> str:
         for p in c["precincts"]:
             L.append(f"  {p['id']}: {p['foot']:.0f} on foot, {p['cars']:.1f} cars, "
                      f"{p['station_doors']} station doors")
+    if rep.get("transit") and rep["transit"]["lines"]:
+        c = rep["transit"]
+        L += ["", f"transit: {len(c['lines'])} lines, {c['trains_at_hour']} trains "
+                  f"({c['cars_at_hour']} cars) at the crowd's hour, "
+                  f"{c['boarding_at_hour']:.0f} people boarding a hour; left out "
+                  f"{c['left_out']}"]
+        for ln in c["lines"]:
+            L.append(f"  {ln['id']} {ln['name']} ({ln['mode']}{', loop' if ln['loop'] else ''}): "
+                     f"{ln['length_m']:.0f} m, {ln['stops']} stops, a {ln['cycle_s']:.0f} s "
+                     f"cycle, trains by band {ln['trains']}, every {ln['headway_min']} min, "
+                     f"top {ln['top_mps']:.1f} m/s" +
+                     (f"; {'; '.join(ln['notes'])}" if ln["notes"] else ""))
     if rep.get("spike"):
         s = rep["spike"]
         L += ["", f"spike: {s['name']} ({s['district_id']}) at {s['hour']}:00, {s['people']} "
