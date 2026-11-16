@@ -303,7 +303,9 @@ open items: [`docs/progress/LG4/README.md`](progress/LG4/README.md).
   at 23:00 over six precincts; every plan check and both Unreal checks pass; round the views
   up to 162 slots live with 146 users, 129 gang members, 48 police on foot and 20 patrol cars,
   558 Smart Objects, over 1,000 shop visits; shots of people sitting, queueing, smoking, gangs
-  at their corners, police pairs and patrol cars. BENCH_LINE
+  at their corners, police pairs and patrol cars. The lean
+  benchmark was not run (the PC's heavy work wound down): lifegen's tick 2.2 to 3.1 ms round
+  the views against LG5's 1.3 to 2.
 - **Tests** (`tests/lifegen/test_lg_places.py`: open hours, slot points and facings, faction
   colors and reserves, the plan on a small city with a gang turf, hideout, precinct, station and
   shop doors, the checks catching members off their turf and police off their walkways, the

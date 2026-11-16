@@ -124,11 +124,29 @@ Round the view at the check's views (the status's `places`, 23:00):
 
 ## Benchmark
 
-BENCH_PLACEHOLDER
+Not run. The lean benchmark (`night_plan_all` and `night_life_noplaces`, one run at native
+2560 x 1440) waited twice on `bench.busy` behind another session's builds and tests, and then
+Swagnik asked for the heavy work on the PC to be wound down, so it was left for later:
+
+```
+bash C:/Users/swagn/CityGen/builds/lg4/bench.sh final night_plan_all,night_life_noplaces
+```
+
+(results into `docs/progress/LG4/bench/final`). What the check's views show of the cost:
+lifegen's tick at 2.2 to 3.1 ms round the views (LG5's 1.3 to 2 ms with the traffic alone),
+558 Smart Objects at most; the people drawn are LG3's pool, so no more of them than before.
+LG2's after, the baseline: `night_plan_all` 20.8 ms p95 (walk 23.8).
 
 ## Package
 
-PACKAGE_PLACEHOLDER
+`C:/Users/swagn/CityGen/builds/packaged/Delta_lg4` (Development, Win64, 5.1 GB; cooked from a
+copy of `CityAG16` without its Saved, Intermediate and derived data, 23 min 40 s). The smoke
+launch (`-userdir` outside the package, 60 s, then closed) loads Delta in 14.6 s, builds the
+life controller (29,515 lanes, 2,400 people, 1,800 cars, 125 ms) and runs the places in the
+cooked game: 1,641 slots, 67 live round the start with 64 users (benches 21, gang spots 36,
+bus stops 4, smokers 2, a taxi stand 1), 168 Smart Objects, 60 gang members (59.9 wanted), 10
+police on foot (13.3 wanted: the pairs fix after the check holds, police no longer twice the
+wanted). No error; no `Saved` folder left in the package.
 
 ## Tests
 
@@ -167,7 +185,8 @@ the plugin's build and the two Unreal checks above.
   so their police only come alive with the walkways; patrol cars are AG18's `halcyon_sable` in a
   white livery by paint, with no light bar (the ask `police_vehicles` of assetgen). The check's
   numbers show police on foot about twice the wanted: drawn per walkway as whole pairs, fixed
-  after the check (pairs drawn by half the walkway's police), not seen in Unreal since.
+  after the check (pairs drawn by half the walkway's police); the packaged game's smoke launch
+  shows 10 for 13.3 wanted, so fixed, but no shot was taken of it.
 - **Smart Objects:** lifegen claims, occupies and frees its points through the subsystem, but
   its own behaviors run in the walk processor; nothing yet uses the objects from another system
   (the project's AI, storygen), and no gameplay tags name their activities.
@@ -175,4 +194,5 @@ the plugin's build and the two Unreal checks above.
   a walker may pass through a gang's ring or a queue.
 - **The hour** is the plan's (23:00) until LG8; `CityGenLife.Hour H` moves it (doors and visits
   by the hour follow).
-- **The budget:** LG5's 1 ms over 20 ms remains (below).
+- **The benchmark** was not run (above): LG4's frame cost is unmeasured; LG5's 1 ms over the
+  20 ms budget remains, and lifegen's tick grew by about 1 ms round the views.
