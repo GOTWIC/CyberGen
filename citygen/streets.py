@@ -1771,13 +1771,18 @@ def pattern_grid(B: Builder, name: str, cell, fam: GridFamily, clearance: float,
 
 
 def _ring_pts(c, r: float, step: float = 14.0):
-    n = max(24, int(2 * math.pi * r / step))
+    # (the road curves fix: chords that keep a street's outer edge, RING_HW_M out, within
+    # G.ROAD_SAG_M of its circle)
+    n = max(24, int(2 * math.pi * r / step), G.arc_steps(r + RING_HW_M, 2.0 * M.PI))
     k = np.arange(n + 1, dtype=np.float64) * (2.0 * M.PI / n)
     xs = c[0] + r * M.cos(k)
     ys = c[1] + r * M.sin(k)
     pts = [_pt(x, y) for x, y in zip(xs, ys)]
     pts[-1] = pts[0]
     return pts
+
+
+RING_HW_M = 10.0    # a radial pattern's ring street's half width, for its circle's chords
 
 
 def pattern_radial(B: Builder, name: str, cell, center, r0: float, lo: float, hi: float,
@@ -4078,6 +4083,82 @@ def _reconnect(B: Builder, edges, find, weight, vehicle: bool = False):
     return n, edges
 
 
+# ---------------------------------------------------------------------------
+# The road curves fix: local roads' corners on arcs
+# ---------------------------------------------------------------------------
+
+ROUND_DEV_M = 0.5           # a corner is rounded off by at most this (the arc's middle from it)
+ROUND_TURN_MAX_DEG = 75.0   # a sharper turn stays a corner
+ROUND_GAP_M = 0.02          # arcs keep this much of a chord straight between them
+ROUND_PAD_M = 0.5           # an arc's radius keeps the road's inner edge this far from its center
+NO_ROUND = ("pinned_road",)  # traced roads stay as drawn
+
+
+def round_corners(pts, hw: float) -> list:
+    """A polyline with each inner vertex that turns (up to ROUND_TURN_MAX_DEG) replaced by a
+    circular arc tangent to its two chords: its tangent run at most half of each chord (less
+    ROUND_GAP_M), and short enough that the arc's middle is within ROUND_DEV_M of the
+    vertex; the arc in chords within G.ROAD_SAG_M of its circle at the road's outer edge (hw
+    out). A vertex whose arc would be one chord (its turn already within the sag), or whose
+    radius would leave the inner edge under ROUND_PAD_M from the center, stays. The ends stay
+    (they are nodes). Plain arithmetic and dmath, points on the grid."""
+    n = len(pts)
+    if n < 3:
+        return list(pts)
+    L = [_dist(pts[i], pts[i + 1]) for i in range(n - 1)]
+    lim = M.radians(ROUND_TURN_MAX_DEG)
+    out = [pts[0]]
+    for i in range(1, n - 1):
+        a, p, c = pts[i - 1], pts[i], pts[i + 1]
+        ua = _unit(p[0] - a[0], p[1] - a[1])
+        uc = _unit(c[0] - p[0], c[1] - p[1])
+        cross = ua[0] * uc[1] - ua[1] * uc[0]
+        th = float(M.atan2(abs(cross), ua[0] * uc[0] + ua[1] * uc[1]))
+        if th <= 1e-6 or th > lim:
+            out.append(p)
+            continue
+        t = min(0.5 * L[i - 1] - ROUND_GAP_M, 0.5 * L[i] - ROUND_GAP_M,
+                ROUND_DEV_M / float(M.tan(th / 4.0)))
+        if t <= 0.0:
+            out.append(p)
+            continue
+        R = t / float(M.tan(th / 2.0))
+        k = G.arc_steps(R + hw, th)
+        if R < hw + ROUND_PAD_M or k < 2:
+            out.append(p)
+            continue
+        side = 1.0 if cross > 0 else -1.0
+        t0 = (p[0] - ua[0] * t, p[1] - ua[1] * t)
+        t1 = (p[0] + uc[0] * t, p[1] + uc[1] * t)
+        cx, cy = t0[0] - ua[1] * side * R, t0[1] + ua[0] * side * R
+        a0 = float(M.atan2(t0[1] - cy, t0[0] - cx))
+        out.append(_pt(*t0))
+        for j in range(1, k):
+            ang = a0 + side * th * j / k
+            out.append(_pt(cx + R * float(M.cos(ang)), cy + R * float(M.sin(ang))))
+        out.append(_pt(*t1))
+    out.append(pts[-1])
+    return _dedupe(out)
+
+
+def round_edges(B: Builder, edges) -> tuple[list, int]:
+    """The road curves fix: every local road's corners on arcs (`round_corners`), after the
+    graph is settled and before the segments are written, so its junctions, lanes, sidewalks,
+    blocks and everything after are built on the curve. Primary roads (M1b's own fillets),
+    footbridges, traced roads and, in a regeneration, held roads (as they were) stay."""
+    out, n = [], 0
+    for pts, li in edges:
+        ln = B.lines[li]
+        if li < B.n_primary or ln.cls == "footbridge" or ln.role in NO_ROUND or                 len(pts) < 3 or _held(B, pts):
+            out.append((pts, li))
+            continue
+        new = round_corners(pts, ln.width / 2.0)
+        if new != list(pts):
+            n += 1
+        out.append((new, li))
+    return out, n
+
+
 def _held(B: Builder, pts) -> bool:
     """M10: an edge that is a held segment of the old city (never dropped)."""
     return B.frame is not None and B.frame.match(pts) is not None
@@ -4411,6 +4492,9 @@ def build_streets(spec: CitySpec, h, polygons: dict, district_ids: dict, waterwa
                        "old city ran them on")
     edges, n1 = node_lines(B)
     edges, n2 = clean_graph(B, edges)
+    edges, n_round = round_edges(B, edges)
+    if n_round:
+        n2 = n2 + [f"{n_round} local roads' corners rounded off on arcs"]
     build_output(B, edges)
     net = B.net
     net.lines = B.lines

@@ -129,6 +129,21 @@ def q(v: float) -> float:
     return round(float(v), 2) + 0.0
 
 
+ROAD_SAG_M = 0.02   # the road curves fix: no chord of a road's curve sags more than this
+
+
+def arc_steps(r: float, sweep: float, sag: float = ROAD_SAG_M) -> int:
+    """Chords of an arc of radius r over `sweep` radians (sign ignored) such that none sags
+    more than `sag` from it: a step of 2 sqrt(2 sag / r) never does, since 1 - cos x is at
+    most x^2 / 2 (M21's rule, `massing.arc_steps`; plain arithmetic, so every machine cuts
+    the same count)."""
+    sweep = abs(float(sweep))
+    if r <= 2.0 * sag or sweep <= 0.0:
+        return 1
+    step = 2.0 * math.sqrt(2.0 * sag / r)
+    return max(1, int(math.ceil(sweep / step - 1e-9)))
+
+
 def _jitter(geom):
     if not JITTER_M or geom is None or geom.is_empty or shapely.get_precision(geom) > 0:
         return geom  # (a geometry that carries the grid precision is exact grid output)

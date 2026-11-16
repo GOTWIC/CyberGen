@@ -306,7 +306,7 @@ def junction_plan(cx, j) -> dict:
 
     def lanes():
         if not got_lanes:
-            got_lanes.append(_lane_corridors(cx, j))
+            got_lanes.append(_keep_out(cx, j, fids))
         return got_lanes[0]
     if fids and len(legs) >= 1 and j.shape != "cul_de_sac":
         tops = [f for f in fids if PI.cls[f] == "top"]
@@ -431,6 +431,30 @@ def _lane_corridors(cx, j):
         return None
     with G.canonical():
         return G.union([G.qpoly(g) for g in gs])
+
+
+def _keep_out(cx, j, fids):
+    """What a junction's corner barriers keep out of: its connector lanes' corridors and,
+    since the crossings fix put a road's crosswalks at its corners (a highway's between
+    them), every crosswalk near its faces grown by `XWALK_CLEAR_M` (as a road's runs keep
+    off them); one shape (meters), or None."""
+    corr = _lane_corridors(cx, j)
+    tree, xs = _crosswalks(cx)
+    PI = cx.pave
+    if tree is None or not fids:
+        return corr
+    pts = [PI.V[v] for f in fids for r in PI.rings(f) for v in r]
+    if not pts:
+        return corr
+    xs_ = [p[0] / 1000.0 for p in pts]
+    ys_ = [p[1] / 1000.0 for p in pts]
+    near = sorted(int(k) for k in tree.query(shapely.box(min(xs_), min(ys_), max(xs_),
+                                                         max(ys_)).buffer(1.0)))
+    if not near:
+        return corr
+    gs = ([corr] if corr is not None else []) + [G.qpoly(xs[k][1]) for k in near]
+    with G.canonical():
+        return G.union(gs)
 
 
 def _off_lanes(pts, corr, reach: float) -> list:

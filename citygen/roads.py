@@ -662,7 +662,9 @@ class Fitter:
             if not changed:
                 break
         radii, tans = _fillet_radii(pts, r_pref, closed_ring, r_min)
-        line = _arc_line(pts, radii, tans, closed_ring)
+        # (the road curves fix: arcs cut so no chord of the road's outer edge sags over
+        # G.ROAD_SAG_M)
+        line = _arc_line(pts, radii, tans, closed_ring, hw=CLASSES[cls]["width"] / 2.0)
         used = [r for r in radii if r is not None]
         return line, (min(used) if used else math.inf)
 
@@ -749,7 +751,10 @@ def _fillet_radii(pts, r_pref: float, closed_ring: bool, r_min: float = 0.0):
     return radii, tans
 
 
-def _arc_line(pts, radii, tans, closed_ring: bool) -> LineString:
+def _arc_line(pts, radii, tans, closed_ring: bool, hw: float | None = None) -> LineString:
+    """The polyline with each corner's arc; `hw` (a road's half width, the road curves fix):
+    each arc in at least as many chords as keep its outer edge within G.ROAD_SAG_M (else
+    M1b's 6 degree or 12 m steps, which transit keeps)."""
     n = len(pts)
     out: list[tuple] = []
     idx = range(n) if closed_ring else range(n)
@@ -772,6 +777,8 @@ def _arc_line(pts, radii, tans, closed_ring: bool) -> LineString:
         a0 = M.atan2(t0[1] - cy, t0[0] - cx)
         th = _turn(a, p, c)
         steps = max(int(math.ceil(max(M.degrees(th) / 6.0, r * th / 12.0))), 1)
+        if hw is not None:
+            steps = max(steps, G.arc_steps(r + hw, th))
         for k in range(steps + 1):
             ang = a0 + side * th * k / steps
             out.append((cx + r * M.cos(ang), cy + r * M.sin(ang)))

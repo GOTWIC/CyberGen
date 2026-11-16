@@ -168,7 +168,9 @@ def _arc(O, A, Bp, r: float) -> list:
     sweep = (a1 - a0) % (2 * M.PI)
     if sweep > M.PI:
         sweep -= 2 * M.PI
-    n = max(2, int(abs(sweep) / M.radians(15.0)) + 1)
+    # (the road curves fix: chords within G.ROAD_SAG_M of the corner's circle, not 15
+    # degrees each)
+    n = max(2, int(abs(sweep) / M.radians(15.0)) + 1, G.arc_steps(r, sweep))
     out = []
     for k in range(1, n):
         a = a0 + sweep * k / n

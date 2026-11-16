@@ -66,6 +66,7 @@ FLAT_M = 20.0                   # flat landing at a ground end
 CURVE_M = 30.0                  # vertical curves (moving average of this length)
 STEP_M = 5.0                    # profile sampling
 TAPER_M = 60.0                  # ramp taper on the deck
+RAMP_STEP_M = 2.5               # the road curves fix: a ramp's stations along its taper
 RAMP_W = 7.0
 RAMP_LANE = 4.0
 RAMP_GAP = 1.0                  # between the deck edge and a ramp
@@ -279,7 +280,8 @@ def _turn(Q, a, b, R: float):
     side = 1.0 if phi > 0 else -1.0
     K = (S[0] - a[1] * R * side, S[1] + a[0] * R * side)
     rx, ry = S[0] - K[0], S[1] - K[1]
-    n = max(int(abs(phi) * R / STEP_M) + 1, 2)
+    # (the road curves fix: chords that keep the ramp's outer edge within G.ROAD_SAG_M)
+    n = max(int(abs(phi) * R / STEP_M) + 1, 2, G.arc_steps(R + RAMP_W / 2.0, phi))
     pts = []
     for i in range(n + 1):
         al = phi * i / n
@@ -944,7 +946,10 @@ class Elev:
             if G.dist(Point(P), self.ctx.wet) < 30.0:
                 why = "diverge over water"
                 continue
-            n_st = max(int(abs(sT - s_far) / 10.0), 2)
+            # (the road curves fix: stations every RAMP_STEP_M, not 10 m, so the taper's
+            # S-bend and the turn to the terminal keep their chords within a few cm)
+            n_st = max(int(abs(sT - s_far) / 10.0), 2,
+                       int(math.ceil(abs(sT - s_far) / RAMP_STEP_M)))
             pts = []
             for i in range(n_st + 1):
                 st = s_far + (sT - s_far) * i / n_st
@@ -1081,7 +1086,7 @@ class Elev:
             s1 = sN + dirn * mirror * x1
             if not 0.0 < s1 < r.L:
                 break
-            nt = max(int((x1 - x_d) / STEP_M), 2)
+            nt = max(int((x1 - x_d) / STEP_M), 2, int(math.ceil((x1 - x_d) / RAMP_STEP_M)))
             pts = []
             for i in range(nt + 1):
                 st = s_far + (s1 - s_far) * i / nt
@@ -1095,8 +1100,11 @@ class Elev:
             rx, ry = -u1[1] * sigma, u1[0] * sigma      # outward there
             P1 = pts[-1]
             cx_, cy_ = P1[0] + rx * R, P1[1] + ry * R
-            for deg in range(5, 271, 5):
-                a = M.radians(float(deg))
+            # (the road curves fix: chords that keep its outer edge within G.ROAD_SAG_M,
+            # 5 degrees at most as before)
+            na = max(54, G.arc_steps(R + RAMP_W / 2.0, 1.5 * M.PI))
+            for j in range(1, na + 1):
+                a = M.radians(270.0 * j / na)
                 # from P1 (radial -r) round toward the heading and outward
                 pts.append((cx_ + R * (M.sin(a) * hx - M.cos(a) * rx),
                             cy_ + R * (M.sin(a) * hy - M.cos(a) * ry)))

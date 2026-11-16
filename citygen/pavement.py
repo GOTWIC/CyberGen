@@ -49,6 +49,7 @@ import shapely
 from shapely.geometry import Point, Polygon
 
 from . import dmath as M
+from . import geom as G
 from . import streets as ST
 from .model import CrossSection
 
@@ -575,7 +576,9 @@ class Road:
         whole stretch, whose mitres at a turn near a reversal reach hundreds of meters out)."""
         ss = self.path.stations(a, b)
         line = shapely.LineString([self.path.frame(st)[:2] for st in ss])
-        g = shapely.buffer(line, w, cap_style="flat", join_style="round", quad_segs=4)
+        # (the road curves fix: its round turns in chords within G.ROAD_SAG_M)
+        g = shapely.buffer(line, w, cap_style="flat", join_style="round",
+                           quad_segs=max(4, G.arc_steps(w, M.HALF_PI)))
         # (each end strip short of the path's first vertex inside the stretch, whose mitre
         # may be the fold itself)
         inside = [c for c in self.path.cum[1:-1] if a + 1e-6 < c < b - 1e-6]
@@ -910,6 +913,8 @@ def _fill_small(g):
 
 
 def _circle(P, r: float, n: int = 24):
+    # (the road curves fix: a bulb's rim in chords within G.ROAD_SAG_M of its circle)
+    n = max(n, G.arc_steps(r, 2.0 * M.PI))
     pts = [(P[0] + r * M.cos(a), P[1] + r * M.sin(a))
            for a in [k * 2 * M.PI / n for k in range(n)]]
     return Polygon(pts)
