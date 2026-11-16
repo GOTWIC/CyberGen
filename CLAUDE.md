@@ -3014,6 +3014,48 @@ LG4 (life at places) is in place:
 - Delta: every check passes; `night_plan_all` 21.2 ms p95 native on the lean route (walk
   26.2), places off 20.9 (walk 23.5). Results: `docs/progress/LG4/README.md`.
 
+LG6 (transit) is in place:
+- **The plan** (`lifegen/transit.py`, called by `plan.build_plan`; `presets.TRANSIT_MODES`,
+  `TRANSIT_HEADWAY_MIN`, `TRANSIT`): per line of the model (`transit_lines`) its track (the
+  path in 3D, a loop closing on itself), its stops (each station's platform walkway, M5's
+  `platform` or a metro's `concourse`, else its first access, projected onto the track; the
+  platform deck's half width and the keep-out `clear_m` its people keep off the middle; where
+  people board: at the doors' level, or at the point over a door from a metro's concourse or a
+  pylon sky station's platforms over the tube), the fastest runs between stops (a forward and
+  a backward pass on a 2 m grid: the mode's cruise, acceleration and braking, at most
+  sqrt(lateral R) over the train's length), dwells; the cycle (a loop one way round from its
+  first stop; an open line the whole track there and back, turning at its ends with a
+  layover, a terminal station within a train's length of an end the turn, crossing to the
+  other way's track over `cross_m` first), sampled at constant acceleration per grid step;
+  per band ceil(cycle / headway) trains evenly round it (the spec's `transit.headway_min` by
+  line name, else the mode's), fewer where two would come within a train's length and
+  `safety_m` or into a terminal at once (said in `notes`); ids `train.<line id>.<n>`; per stop
+  people leaving and boarding a train by band (the station's street accesses' LG3 rates over
+  the trains calling there, `board_min` to the mode's `board_max`). `timetables.json`
+  (`planmodel.Timetables`), the plan's `transit` (`TransitPlan`), a layer 4 entry per train;
+  checks `timetables` (speeds, curves and rates read back from the samples, dwells, a loop
+  closing, an open line turning at both ends, trains apart), `transit_stops`,
+  `transit_boarding` (the board walkway reaching the station's street accesses),
+  `transit_budget`; `preview_transit.png`; the ask `train_models` of assetgen.
+- **Exporter and runtime** (`unreal_life.pack_transit`, the stand-ins' model table
+  `TRANSIT_MODELS`, `PACK_VERSION` 7; `import_city.transit_props`, `M_CgTransit`,
+  `LIFE_VERSION` life8; `CityGenLifeTransit.cpp`): every line's trains by the world's time
+  (the sampled cycle at time plus each train's phase: nothing simulated, every line city-wide;
+  instances past 1.5 km sent every fourth frame), each car by the track's points at its ends on
+  its way's track; doors open at the stops (leaves and lit doorways near the view); where a
+  stop's platform walkway is live, the stop's people come out of the doors onto the platform
+  (`FromSlot` with no slot) and the crowd on it walks into the doors and is gone
+  (`CgWalk::Board`); a served station's street accesses send no one while transit runs
+  (`DoorTransit`); people on a platform keep off its tracks (`WalkClear`). The trains are
+  stand-ins of `/Engine/BasicShapes` in the line's color, windows lit by night (decision 6:
+  the Mac designs them; a mode's pack replaces its parts in the table). Console
+  `CityGenLife.Transit`, `.TransitShow`; the Tab menu's Transit row; the status's `transit`;
+  bench pass `night_life_notransit`. `docs/unreal_export.md`, "From LG6: transit".
+- Delta: five lines (metro, monorail, maglev, two sky tube loops), 20 stops, 14 trains at
+  23:00 (19 at the busiest bands); every plan check and the Unreal check pass; transit's step
+  0.06 to 0.09 ms; `night_plan_all` 22.1 ms p95 native, transit off 22.0 (both under about 3
+  cores of other load). Results: `docs/progress/LG6/README.md`.
+
 ## Gallery site (GitHub Pages)
 
 `site/` is the public gallery at https://gotwic.github.io/CyberGen/ (served at

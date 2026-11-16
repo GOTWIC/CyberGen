@@ -1,0 +1,1016 @@
+{
+ "label": "final",
+ "city": "Delta Megacity",
+ "route_version": 1,
+ "districts": [
+  "d04"
+ ],
+ "resolution": [
+  2560,
+  1440
+ ],
+ "runs": 1,
+ "viewport": [
+  2560,
+  1440
+ ],
+ "adapter": "NVIDIA GeForce RTX 4070 Ti",
+ "rhi": "D3D12",
+ "scalability": {
+  "resolution": 0.0,
+  "view_distance": 3,
+  "anti_aliasing": 3,
+  "shadow": 3,
+  "global_illumination": 3,
+  "reflection": 3,
+  "post_process": 3,
+  "texture": 3,
+  "effects": 3,
+  "foliage": 3,
+  "shading": 3
+ },
+ "nanite_max_root_pages": 49152,
+ "segments": [
+  {
+   "name": "walk_d04",
+   "group": "walk",
+   "length_m": 149.6
+  },
+  {
+   "name": "drive",
+   "group": "drive",
+   "length_m": 1199.3
+  },
+  {
+   "name": "fly_150m",
+   "group": "fly",
+   "length_m": 3430.7
+  },
+  {
+   "name": "warm_fly",
+   "group": "warm",
+   "length_m": 1143.6
+  }
+ ],
+ "passes": [
+  {
+   "name": "night_plan_all",
+   "night": true,
+   "screen_percentage": 100.0,
+   "upscaler": {
+    "mode": "default",
+    "screen_percentage": 100.0,
+    "dlss": true,
+    "dlss_supported": true,
+    "framegen": true,
+    "framegen_supported": true,
+    "framegen_on": false,
+    "framegen_hz": 72.8,
+    "framegen_presented": 1,
+    "latency_ms": 42.32
+   },
+   "walk": {
+    "frames": 1758,
+    "frame_ms": {
+     "p50": 15.22,
+     "p95": 26.76,
+     "p99": 35.6,
+     "max": 897.74,
+     "mean": 17.03
+    },
+    "game_ms": {
+     "p50": 14.91,
+     "p95": 26.07,
+     "p99": 34.82,
+     "max": 894.78,
+     "mean": 16.09
+    },
+    "render_ms": {
+     "p50": 10.97,
+     "p95": 14.71,
+     "p99": 15.64,
+     "max": 54.94,
+     "mean": 11.43
+    },
+    "rhi_ms": {
+     "p50": 3.29,
+     "p95": 4.18,
+     "p99": 4.5,
+     "max": 5.11,
+     "mean": 3.36
+    },
+    "gpu_ms": {
+     "p50": 12.56,
+     "p95": 13.29,
+     "p99": 13.89,
+     "max": 15.69,
+     "mean": 12.57
+    },
+    "draws": {
+     "p50": 2410.0,
+     "p95": 2696.0,
+     "p99": 2806.86,
+     "max": 3853.0,
+     "mean": 2412.73
+    },
+    "prims": {
+     "p50": 786322.0,
+     "p95": 1299301.7,
+     "p99": 1397214.24,
+     "max": 1514663.0,
+     "mean": 811045.81
+    },
+    "frame_ms_p95_spread": {
+     "median": 26.76,
+     "min": 26.76,
+     "max": 26.76
+    },
+    "frame_ms_p50_spread": {
+     "median": 15.22,
+     "min": 15.22,
+     "max": 15.22
+    },
+    "hitches": {
+     "median": 5,
+     "min": 5,
+     "max": 5
+    },
+    "big_hitches": {
+     "median": 2,
+     "min": 2,
+     "max": 2
+    },
+    "slow_streaming_frames": {
+     "median": 489,
+     "min": 489,
+     "max": 489
+    },
+    "unstreamed_share": 0.0,
+    "vram_mb_max": 10245,
+    "ram_mb_max": 16660,
+    "nanite_root_pages_max": 43008,
+    "bound_by": "game",
+    "latency_ms": {
+     "p50": 41.06,
+     "p95": 45.23,
+     "p99": 52.98,
+     "max": 76.51,
+     "mean": 41.14
+    },
+    "gpu_passes_ms": {
+     "TemporalSuperResolution": 1.67,
+     "ShadowDepths": 1.37,
+     "LumenReflections": 1.22,
+     "Lights": 1.11,
+     "NaniteBasePass": 0.81,
+     "Unaccounted": 0.65,
+     "Basepass": 0.62,
+     "NaniteVisBuffer": 0.56,
+     "RenderDeferredLighting": 0.55,
+     "ShadowProjection": 0.45,
+     "VolumetricFog": 0.39,
+     "RenderVelocities": 0.34
+    }
+   },
+   "drive": {
+    "frames": 3002,
+    "frame_ms": {
+     "p50": 15.21,
+     "p95": 21.44,
+     "p99": 28.54,
+     "max": 403.15,
+     "mean": 15.98
+    },
+    "game_ms": {
+     "p50": 8.39,
+     "p95": 18.35,
+     "p99": 24.04,
+     "max": 353.33,
+     "mean": 10.38
+    },
+    "render_ms": {
+     "p50": 10.62,
+     "p95": 16.05,
+     "p99": 17.41,
+     "max": 167.88,
+     "mean": 11.44
+    },
+    "rhi_ms": {
+     "p50": 3.09,
+     "p95": 3.9,
+     "p99": 4.41,
+     "max": 5.39,
+     "mean": 3.15
+    },
+    "gpu_ms": {
+     "p50": 13.91,
+     "p95": 15.49,
+     "p99": 16.11,
+     "max": 21.33,
+     "mean": 14.03
+    },
+    "draws": {
+     "p50": 1674.0,
+     "p95": 1984.0,
+     "p99": 2068.0,
+     "max": 2175.0,
+     "mean": 1681.65
+    },
+    "prims": {
+     "p50": 520193.0,
+     "p95": 618897.5,
+     "p99": 689253.8,
+     "max": 794489.0,
+     "mean": 518255.57
+    },
+    "frame_ms_p95_spread": {
+     "median": 21.44,
+     "min": 21.44,
+     "max": 21.44
+    },
+    "frame_ms_p50_spread": {
+     "median": 15.21,
+     "min": 15.21,
+     "max": 15.21
+    },
+    "hitches": {
+     "median": 7,
+     "min": 7,
+     "max": 7
+    },
+    "big_hitches": {
+     "median": 3,
+     "min": 3,
+     "max": 3
+    },
+    "slow_streaming_frames": {
+     "median": 58,
+     "min": 58,
+     "max": 58
+    },
+    "unstreamed_share": 0.0,
+    "vram_mb_max": 10267,
+    "ram_mb_max": 16756,
+    "nanite_root_pages_max": 43008,
+    "bound_by": "game",
+    "latency_ms": {
+     "p50": 38.16,
+     "p95": 48.94,
+     "p99": 53.7,
+     "max": 62.06,
+     "mean": 39.07
+    },
+    "gpu_passes_ms": {
+     "Lights": 2.76,
+     "ShadowDepths": 2.16,
+     "TemporalSuperResolution": 1.67,
+     "LumenReflections": 1.04,
+     "NaniteBasePass": 0.8,
+     "NaniteVisBuffer": 0.76,
+     "Unaccounted": 0.64,
+     "RenderDeferredLighting": 0.47,
+     "Basepass": 0.46,
+     "VolumetricFog": 0.4,
+     "ShadowProjection": 0.36,
+     "Postprocessing": 0.31
+    }
+   },
+   "fly": {
+    "frames": 5119,
+    "frame_ms": {
+     "p50": 12.8,
+     "p95": 21.0,
+     "p99": 27.93,
+     "max": 493.53,
+     "mean": 13.4
+    },
+    "game_ms": {
+     "p50": 8.53,
+     "p95": 19.57,
+     "p99": 26.25,
+     "max": 430.55,
+     "mean": 10.56
+    },
+    "render_ms": {
+     "p50": 10.99,
+     "p95": 14.42,
+     "p99": 15.1,
+     "max": 60.07,
+     "mean": 11.25
+    },
+    "rhi_ms": {
+     "p50": 3.05,
+     "p95": 3.8,
+     "p99": 4.23,
+     "max": 6.33,
+     "mean": 3.11
+    },
+    "gpu_ms": {
+     "p50": 12.0,
+     "p95": 13.18,
+     "p99": 13.47,
+     "max": 14.19,
+     "mean": 11.39
+    },
+    "draws": {
+     "p50": 1672.0,
+     "p95": 2308.1,
+     "p99": 2424.64,
+     "max": 2682.0,
+     "mean": 1602.62
+    },
+    "prims": {
+     "p50": 488879.0,
+     "p95": 601439.4,
+     "p99": 624158.36,
+     "max": 631688.0,
+     "mean": 487362.59
+    },
+    "frame_ms_p95_spread": {
+     "median": 21.0,
+     "min": 21.0,
+     "max": 21.0
+    },
+    "frame_ms_p50_spread": {
+     "median": 12.8,
+     "min": 12.8,
+     "max": 12.8
+    },
+    "hitches": {
+     "median": 7,
+     "min": 7,
+     "max": 7
+    },
+    "big_hitches": {
+     "median": 2,
+     "min": 2,
+     "max": 2
+    },
+    "slow_streaming_frames": {
+     "median": 0,
+     "min": 0,
+     "max": 0
+    },
+    "unstreamed_share": 0.0,
+    "vram_mb_max": 10111,
+    "ram_mb_max": 16170,
+    "nanite_root_pages_max": 43008,
+    "bound_by": "game",
+    "latency_ms": {
+     "p50": 36.53,
+     "p95": 44.36,
+     "p99": 45.46,
+     "max": 111.63,
+     "mean": 36.75
+    },
+    "gpu_passes_ms": {
+     "TemporalSuperResolution": 1.67,
+     "ShadowDepths": 1.14,
+     "NaniteVisBuffer": 1.12,
+     "NaniteBasePass": 1.03,
+     "LumenReflections": 0.94,
+     "ShadowProjection": 0.67,
+     "VolumetricFog": 0.63,
+     "Unaccounted": 0.56,
+     "Basepass": 0.41,
+     "RenderDeferredLighting": 0.41,
+     "Postprocessing": 0.32,
+     "Lights": 0.28
+    }
+   },
+   "teleport": {
+    "frames": 0
+   },
+   "all": {
+    "frames": 9879,
+    "frame_ms": {
+     "p50": 14.05,
+     "p95": 22.06,
+     "p99": 30.25,
+     "max": 897.74,
+     "mean": 14.83
+    },
+    "game_ms": {
+     "p50": 10.22,
+     "p95": 20.26,
+     "p99": 28.85,
+     "max": 894.78,
+     "mean": 11.49
+    },
+    "render_ms": {
+     "p50": 10.89,
+     "p95": 15.09,
+     "p99": 16.49,
+     "max": 167.88,
+     "mean": 11.34
+    },
+    "rhi_ms": {
+     "p50": 3.1,
+     "p95": 3.91,
+     "p99": 4.39,
+     "max": 6.33,
+     "mean": 3.16
+    },
+    "gpu_ms": {
+     "p50": 12.69,
+     "p95": 14.84,
+     "p99": 15.69,
+     "max": 21.33,
+     "mean": 12.4
+    },
+    "draws": {
+     "p50": 1735.0,
+     "p95": 2478.0,
+     "p99": 2682.22,
+     "max": 3853.0,
+     "mean": 1770.8
+    },
+    "prims": {
+     "p50": 518323.0,
+     "p95": 937968.0,
+     "p99": 1266078.2,
+     "max": 1514663.0,
+     "mean": 554350.73
+    },
+    "frame_ms_p95_spread": {
+     "median": 22.06,
+     "min": 22.06,
+     "max": 22.06
+    },
+    "frame_ms_p50_spread": {
+     "median": 14.05,
+     "min": 14.05,
+     "max": 14.05
+    },
+    "hitches": {
+     "median": 19,
+     "min": 19,
+     "max": 19
+    },
+    "big_hitches": {
+     "median": 7,
+     "min": 7,
+     "max": 7
+    },
+    "slow_streaming_frames": {
+     "median": 547,
+     "min": 547,
+     "max": 547
+    },
+    "unstreamed_share": 0.0,
+    "vram_mb_max": 10267,
+    "ram_mb_max": 16756,
+    "nanite_root_pages_max": 43008,
+    "bound_by": "game",
+    "latency_ms": {
+     "p50": 37.99,
+     "p95": 46.36,
+     "p99": 52.35,
+     "max": 111.63,
+     "mean": 38.23
+    },
+    "gpu_passes_ms": {
+     "TemporalSuperResolution": 1.67,
+     "ShadowDepths": 1.51,
+     "Lights": 1.23,
+     "LumenReflections": 1.02,
+     "NaniteBasePass": 0.92,
+     "NaniteVisBuffer": 0.9,
+     "Unaccounted": 0.6,
+     "ShadowProjection": 0.53,
+     "VolumetricFog": 0.51,
+     "Basepass": 0.46,
+     "RenderDeferredLighting": 0.45,
+     "Postprocessing": 0.32
+    }
+   },
+   "load_s": {
+    "median": 8.13,
+    "min": 8.13,
+    "max": 8.13
+   },
+   "hitches_any_phase": {
+    "median": 29,
+    "min": 29,
+    "max": 29
+   },
+   "max_frame_any_phase_ms": {
+    "median": 897.7,
+    "min": 897.7,
+    "max": 897.7
+   }
+  },
+  {
+   "name": "night_life_notransit",
+   "night": true,
+   "screen_percentage": 100.0,
+   "upscaler": {
+    "mode": "default",
+    "screen_percentage": 100.0,
+    "dlss": true,
+    "dlss_supported": true,
+    "framegen": true,
+    "framegen_supported": true,
+    "framegen_on": false,
+    "framegen_hz": 114.59,
+    "framegen_presented": 1,
+    "latency_ms": 26.2
+   },
+   "walk": {
+    "frames": 1853,
+    "frame_ms": {
+     "p50": 14.5,
+     "p95": 25.66,
+     "p99": 32.91,
+     "max": 485.14,
+     "mean": 16.16
+    },
+    "game_ms": {
+     "p50": 11.66,
+     "p95": 25.02,
+     "p99": 31.0,
+     "max": 437.56,
+     "mean": 14.33
+    },
+    "render_ms": {
+     "p50": 10.02,
+     "p95": 14.0,
+     "p99": 15.09,
+     "max": 49.33,
+     "mean": 10.54
+    },
+    "rhi_ms": {
+     "p50": 3.12,
+     "p95": 3.91,
+     "p99": 4.28,
+     "max": 4.65,
+     "mean": 3.19
+    },
+    "gpu_ms": {
+     "p50": 12.5,
+     "p95": 13.06,
+     "p99": 13.44,
+     "max": 14.7,
+     "mean": 12.5
+    },
+    "draws": {
+     "p50": 2379.0,
+     "p95": 2686.0,
+     "p99": 2748.36,
+     "max": 3641.0,
+     "mean": 2405.2
+    },
+    "prims": {
+     "p50": 855045.0,
+     "p95": 1503973.8,
+     "p99": 1714331.0,
+     "max": 1728779.0,
+     "mean": 931752.87
+    },
+    "frame_ms_p95_spread": {
+     "median": 25.66,
+     "min": 25.66,
+     "max": 25.66
+    },
+    "frame_ms_p50_spread": {
+     "median": 14.5,
+     "min": 14.5,
+     "max": 14.5
+    },
+    "hitches": {
+     "median": 2,
+     "min": 2,
+     "max": 2
+    },
+    "big_hitches": {
+     "median": 2,
+     "min": 2,
+     "max": 2
+    },
+    "slow_streaming_frames": {
+     "median": 510,
+     "min": 510,
+     "max": 510
+    },
+    "unstreamed_share": 0.0,
+    "vram_mb_max": 10142,
+    "ram_mb_max": 14860,
+    "nanite_root_pages_max": 43008,
+    "bound_by": "game",
+    "latency_ms": {
+     "p50": 37.91,
+     "p95": 44.09,
+     "p99": 44.89,
+     "max": 128.77,
+     "mean": 39.03
+    },
+    "gpu_passes_ms": {
+     "TemporalSuperResolution": 1.67,
+     "Lights": 1.45,
+     "ShadowDepths": 1.27,
+     "LumenReflections": 1.16,
+     "NaniteBasePass": 0.82,
+     "Unaccounted": 0.67,
+     "Basepass": 0.63,
+     "NaniteVisBuffer": 0.55,
+     "RenderDeferredLighting": 0.54,
+     "ShadowProjection": 0.43,
+     "VolumetricFog": 0.39,
+     "RenderVelocities": 0.35
+    }
+   },
+   "drive": {
+    "frames": 3021,
+    "frame_ms": {
+     "p50": 15.05,
+     "p95": 21.55,
+     "p99": 28.49,
+     "max": 426.77,
+     "mean": 15.88
+    },
+    "game_ms": {
+     "p50": 8.29,
+     "p95": 18.35,
+     "p99": 22.33,
+     "max": 370.88,
+     "mean": 10.17
+    },
+    "render_ms": {
+     "p50": 10.33,
+     "p95": 15.81,
+     "p99": 17.07,
+     "max": 144.11,
+     "mean": 11.34
+    },
+    "rhi_ms": {
+     "p50": 3.06,
+     "p95": 3.77,
+     "p99": 4.27,
+     "max": 18.71,
+     "mean": 3.12
+    },
+    "gpu_ms": {
+     "p50": 13.8,
+     "p95": 15.35,
+     "p99": 15.88,
+     "max": 99.01,
+     "mean": 13.95
+    },
+    "draws": {
+     "p50": 1680.0,
+     "p95": 1987.0,
+     "p99": 2181.8,
+     "max": 2333.0,
+     "mean": 1675.39
+    },
+    "prims": {
+     "p50": 504565.0,
+     "p95": 634755.0,
+     "p99": 753170.0,
+     "max": 864270.0,
+     "mean": 513960.67
+    },
+    "frame_ms_p95_spread": {
+     "median": 21.55,
+     "min": 21.55,
+     "max": 21.55
+    },
+    "frame_ms_p50_spread": {
+     "median": 15.05,
+     "min": 15.05,
+     "max": 15.05
+    },
+    "hitches": {
+     "median": 9,
+     "min": 9,
+     "max": 9
+    },
+    "big_hitches": {
+     "median": 4,
+     "min": 4,
+     "max": 4
+    },
+    "slow_streaming_frames": {
+     "median": 56,
+     "min": 56,
+     "max": 56
+    },
+    "unstreamed_share": 0.0,
+    "vram_mb_max": 10210,
+    "ram_mb_max": 14707,
+    "nanite_root_pages_max": 43008,
+    "bound_by": "game",
+    "latency_ms": {
+     "p50": 38.26,
+     "p95": 47.7,
+     "p99": 57.63,
+     "max": 86.58,
+     "mean": 39.03
+    },
+    "gpu_passes_ms": {
+     "Lights": 2.77,
+     "ShadowDepths": 2.09,
+     "TemporalSuperResolution": 1.69,
+     "LumenReflections": 1.03,
+     "NaniteBasePass": 0.8,
+     "NaniteVisBuffer": 0.77,
+     "Unaccounted": 0.62,
+     "RenderDeferredLighting": 0.46,
+     "Basepass": 0.43,
+     "VolumetricFog": 0.4,
+     "ShadowProjection": 0.36,
+     "Postprocessing": 0.31
+    }
+   },
+   "fly": {
+    "frames": 5171,
+    "frame_ms": {
+     "p50": 12.55,
+     "p95": 20.8,
+     "p99": 27.62,
+     "max": 506.47,
+     "mean": 13.27
+    },
+    "game_ms": {
+     "p50": 7.99,
+     "p95": 19.39,
+     "p99": 26.04,
+     "max": 446.2,
+     "mean": 10.1
+    },
+    "render_ms": {
+     "p50": 11.25,
+     "p95": 14.4,
+     "p99": 15.29,
+     "max": 56.33,
+     "mean": 11.38
+    },
+    "rhi_ms": {
+     "p50": 2.99,
+     "p95": 3.81,
+     "p99": 4.24,
+     "max": 5.19,
+     "mean": 3.06
+    },
+    "gpu_ms": {
+     "p50": 11.98,
+     "p95": 13.15,
+     "p99": 13.4,
+     "max": 14.24,
+     "mean": 11.39
+    },
+    "draws": {
+     "p50": 1667.0,
+     "p95": 2273.5,
+     "p99": 2404.2,
+     "max": 2685.0,
+     "mean": 1595.36
+    },
+    "prims": {
+     "p50": 487593.0,
+     "p95": 601484.0,
+     "p99": 624262.6,
+     "max": 631546.0,
+     "mean": 486913.11
+    },
+    "frame_ms_p95_spread": {
+     "median": 20.8,
+     "min": 20.8,
+     "max": 20.8
+    },
+    "frame_ms_p50_spread": {
+     "median": 12.55,
+     "min": 12.55,
+     "max": 12.55
+    },
+    "hitches": {
+     "median": 7,
+     "min": 7,
+     "max": 7
+    },
+    "big_hitches": {
+     "median": 1,
+     "min": 1,
+     "max": 1
+    },
+    "slow_streaming_frames": {
+     "median": 0,
+     "min": 0,
+     "max": 0
+    },
+    "unstreamed_share": 0.0,
+    "vram_mb_max": 10086,
+    "ram_mb_max": 14284,
+    "nanite_root_pages_max": 43008,
+    "bound_by": "game",
+    "latency_ms": {
+     "p50": 36.85,
+     "p95": 44.13,
+     "p99": 45.63,
+     "max": 74.8,
+     "mean": 36.77
+    },
+    "gpu_passes_ms": {
+     "TemporalSuperResolution": 1.68,
+     "ShadowDepths": 1.14,
+     "NaniteVisBuffer": 1.13,
+     "NaniteBasePass": 1.02,
+     "LumenReflections": 0.94,
+     "ShadowProjection": 0.67,
+     "VolumetricFog": 0.64,
+     "Unaccounted": 0.56,
+     "Basepass": 0.41,
+     "RenderDeferredLighting": 0.41,
+     "Postprocessing": 0.32,
+     "Lights": 0.28
+    }
+   },
+   "teleport": {
+    "frames": 0
+   },
+   "all": {
+    "frames": 10045,
+    "frame_ms": {
+     "p50": 13.9,
+     "p95": 21.96,
+     "p99": 29.56,
+     "max": 506.47,
+     "mean": 14.59
+    },
+    "game_ms": {
+     "p50": 9.62,
+     "p95": 20.48,
+     "p99": 27.21,
+     "max": 446.2,
+     "mean": 10.9
+    },
+    "render_ms": {
+     "p50": 10.8,
+     "p95": 14.88,
+     "p99": 16.26,
+     "max": 144.11,
+     "mean": 11.21
+    },
+    "rhi_ms": {
+     "p50": 3.04,
+     "p95": 3.83,
+     "p99": 4.27,
+     "max": 18.71,
+     "mean": 3.1
+    },
+    "gpu_ms": {
+     "p50": 12.69,
+     "p95": 14.7,
+     "p99": 15.48,
+     "max": 99.01,
+     "mean": 12.37
+    },
+    "draws": {
+     "p50": 1741.0,
+     "p95": 2514.8,
+     "p99": 2683.12,
+     "max": 3641.0,
+     "mean": 1768.82
+    },
+    "prims": {
+     "p50": 516379.0,
+     "p95": 1075926.2,
+     "p99": 1461620.6,
+     "max": 1728779.0,
+     "mean": 577107.11
+    },
+    "frame_ms_p95_spread": {
+     "median": 21.96,
+     "min": 21.96,
+     "max": 21.96
+    },
+    "frame_ms_p50_spread": {
+     "median": 13.9,
+     "min": 13.9,
+     "max": 13.9
+    },
+    "hitches": {
+     "median": 18,
+     "min": 18,
+     "max": 18
+    },
+    "big_hitches": {
+     "median": 7,
+     "min": 7,
+     "max": 7
+    },
+    "slow_streaming_frames": {
+     "median": 566,
+     "min": 566,
+     "max": 566
+    },
+    "unstreamed_share": 0.0,
+    "vram_mb_max": 10210,
+    "ram_mb_max": 14860,
+    "nanite_root_pages_max": 43008,
+    "bound_by": "game",
+    "latency_ms": {
+     "p50": 37.53,
+     "p95": 44.89,
+     "p99": 52.76,
+     "max": 128.77,
+     "mean": 37.87
+    },
+    "gpu_passes_ms": {
+     "TemporalSuperResolution": 1.68,
+     "ShadowDepths": 1.46,
+     "Lights": 1.3,
+     "LumenReflections": 1.02,
+     "NaniteBasePass": 0.91,
+     "NaniteVisBuffer": 0.89,
+     "Unaccounted": 0.6,
+     "ShadowProjection": 0.52,
+     "VolumetricFog": 0.51,
+     "Basepass": 0.46,
+     "RenderDeferredLighting": 0.46,
+     "Postprocessing": 0.32
+    }
+   },
+   "load_s": {
+    "median": 18.2,
+    "min": 18.2,
+    "max": 18.2
+   },
+   "hitches_any_phase": {
+    "median": 27,
+    "min": 27,
+    "max": 27
+   },
+   "max_frame_any_phase_ms": {
+    "median": 525.0,
+    "min": 525.0,
+    "max": 525.0
+   }
+  }
+ ],
+ "targets": {
+  "p95_60fps": [
+   "night_plan_all/walk 26.8 ms",
+   "night_plan_all/drive 21.4 ms",
+   "night_plan_all/fly 21.0 ms",
+   "night_life_notransit/walk 25.7 ms",
+   "night_life_notransit/drive 21.6 ms",
+   "night_life_notransit/fly 20.8 ms"
+  ],
+  "p95_40fps": [
+   "night_plan_all/walk 26.8 ms",
+   "night_life_notransit/walk 25.7 ms"
+  ],
+  "big_hitches": [
+   "night_plan_all/walk 2 a run (at most 2)",
+   "night_plan_all/drive 3 a run (at most 3)",
+   "night_plan_all/fly 2 a run (at most 2)",
+   "night_life_notransit/walk 2 a run (at most 2)",
+   "night_life_notransit/drive 4 a run (at most 4)",
+   "night_life_notransit/fly 1 a run (at most 1)"
+  ],
+  "vram": [
+   "night_plan_all/walk 10245 MB",
+   "night_plan_all/drive 10267 MB"
+  ]
+ },
+ "starved": [],
+ "others": [
+  {
+   "samples": 21,
+   "front": 0.95,
+   "unthrottle": {
+    "no_power_throttling": true,
+    "above_normal": true
+   },
+   "lost_to": {
+    "claude.exe": 2
+   },
+   "retaken": 1,
+   "cores_mean": 3.02,
+   "cores_max": 5.23,
+   "top": [
+    [
+     "python",
+     2.64
+    ],
+    [
+     "zenserver",
+     0.07
+    ],
+    [
+     "claude",
+     0.06
+    ],
+    [
+     "opera",
+     0.03
+    ],
+    [
+     "RSI Launcher",
+     0.03
+    ]
+   ]
+  }
+ ]
+}

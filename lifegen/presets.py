@@ -429,7 +429,7 @@ TRANSIT_HEADWAY_MIN = {
 # R the track's radius over the train's length), its dwell at a station (s), its cars, each
 # car's length, gap, width and height (m), the car's floor over its body's bottom (m), its
 # body's bottom over the line's z (`base_m`: the model's line is the rails' level, a monorail's
-# beam top, a sky tube's top), how far each way's track is off the line (m: two ways on the
+# beam top, a sky tube's axis: its tube 7 m across, M19), how far each way's track is off the line (m: two ways on the
 # drawn deck's two tracks, a maglev's and a sky tube's two cars side by side on their deck or in
 # their tube, a monorail's cars beside its one beam: `loop_m` a loop's one way), the platform's
 # floor under its walkway (`platform_dz`, m: a sky station's platforms flank the tube at its
@@ -459,8 +459,8 @@ TRANSIT_MODES = {
                "board_max": 50},
     "sky_tube": {"cruise": 30.0, "accel": 1.2, "brake": 1.2, "lateral": 1.2, "dwell_s": 20.0,
                  "cars": 3, "car_m": 9.0, "gap_m": 0.5, "width_m": 2.4, "height_m": 2.7,
-                 "floor_m": 0.05, "base_m": -5.95, "track_m": 1.25, "loop_m": 0.0,
-                 "platform_dz": -6.0, "board_level": True, "doors": 1, "door_m": 1.4,
+                 "floor_m": 0.05, "base_m": -2.45, "track_m": 1.25, "loop_m": 0.0,
+                 "platform_dz": -2.5, "board_level": True, "doors": 1, "door_m": 1.4,
                  "board_max": 20},
 }
 TRANSIT = {

@@ -253,7 +253,7 @@ def stops_of(model: dict, line: dict, track: Track, mode: dict) -> tuple[list[di
                "platform_m": _r(plen, 1), "point": [_r(px, 2), _r(py, 2), _r(pz, 2)]}
         # (where people stand to board: the platform's level; a sky station in a tower's portal
         # has its platforms at the tube's floor (AG4), a pylon station's flank the tube at its
-        # top (M5, AG7), over the pods: people board there at the point over a door, as from a
+        # axis (M5, AG7), over the pods' floor: people board there at the point over a door, as from a
         # metro's concourse)
         portal = bool(st.get("building_id"))
         rec["board_level"] = bool(mode["board_level"] and (line["mode"] != "sky_tube" or portal))

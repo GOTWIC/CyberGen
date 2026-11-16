@@ -536,7 +536,7 @@ public:
 	/** For the check's shots: the camera moved to the nearest train standing at a stop with its
 	 *  doors open and people boarding or leaving (`board`), standing at a stop (`dwell`), or
 	 *  moving on a line of a mode (`metro`, `monorail`, `maglev`, `sky_tube`, `elevated_rail`,
-	 *  `moving` any); false without one. */
+	 *  `moving` any), within 2 km of the view; false without one. */
 	UFUNCTION(BlueprintCallable, Category = "CityGen") bool ShowTransit(const FString& What);
 
 private:

@@ -2864,6 +2864,90 @@ none of it and its crowd and traffic run as before.
 - **Benchmark:** every life pass sets `CityGenLife.Places`, `.Gangs` and `.Police` (1), the
   pass `night_life_noplaces` turns the three off (`bench.LIFE_PASSES`).
 
+### From LG6: transit
+
+A life plan with `transit` (`lifegen plan` since LG6, its `timetables.json`) adds every transit
+line's trains to LG3's crowd, LG4's places and LG5's traffic: the trains run their lines to
+their timetables over the whole city, stop at the stations with their doors open, and the crowd
+leaves and boards them at the stops round the view (`citygen/unreal_life.py` `pack_transit`,
+`TRANSIT_MODELS`, `PACK_VERSION` 7; `import_city.transit_props`, `transit_material`,
+`LIFE_VERSION` life8; `CityGenLifeTransit.cpp`). A plan before LG6 packs none of it and the rest
+runs as before.
+
+- **The pack** (`BUILD/unreal/life.json`, the controller's properties):
+  - per line its mode (`TransitLineMode`, an index of `TransitModes`: the modes the city has),
+    color (`TransitLineColor`, linear), loop (`TransitLineLoop`), id (`TransitLineIds`), the
+    train as run and drawn (`TransitLineCar`, 12 floats: cars, car length, gap, width, height,
+    floor, base over the line's z, track off the line's middle, doors a side, door width, sides
+    open (1 its right, 2 both), boarding at the walkway's level), the turn points
+    (`TransitLineTurn`, m along the track), the cycle (`TransitLineCycle`, s) and its samples'
+    step (`TransitLineDt`), the trains per hour band (`TransitLineTrains`);
+  - per line its track (`TransitPointStarts`, `TransitPoints`: citygen m; a loop closes on its
+    first point), the cycle's samples (`TransitSampleStarts`, `TransitSamples`: m along the
+    cycle, out and then back for an open line), its stop events (`TransitEventStarts`,
+    `TransitEvents`, 4 floats: arrive and depart (s into the cycle), the stop (-1 a turn
+    without one), the way) and stops (`TransitStopStarts`);
+  - per stop its platform walkway (`TransitStopLane`, a walkway lane), where along the track
+    (`TransitStopS`), people leaving and boarding a train per band (`TransitStopAlight`,
+    `TransitStopBoard`), the height they board at (`TransitStopZ`) and whether at the doors'
+    level (`TransitStopLevel`; 0: a metro's concourse over the track, a pylon sky station's
+    platforms over its tube, where people go at the point over a door);
+  - the stand-ins (`TransitMeshes`: `/Engine/BasicShapes/Cube` and `Cylinder`;
+    `TransitPartStarts`, `TransitParts`, 8 floats a part: mesh, kind (body, window, accent,
+    dark), middle in the car's frame, size; `TransitMaterial`: `Core/Life/M_CgTransit`, base
+    color and emission from per-instance custom data, emission by `MPC_CityGen`'s Night);
+  - per walkway lane how far off its middle people keep (`WalkClear`, m: M5's platform walkway
+    runs down its tracks' middle, its deck flanks them) and, for a platform, its width widened
+    to its deck's; per door (as `DoorLanes`) whether it is a served station's street access
+    (`DoorTransit`).
+- **The model table** (`unreal_life.TRANSIT_MODELS`, per mode a car's parts: decision 6 leaves
+  the trains to the Mac's designs, lifegen generates no vehicle geometry): stand-ins of the
+  engine's basic shapes (a body lightened toward the line's color, a band of lit windows, an
+  accent band in the line's color glowing by night, roof gear, bogies under a metro or rail
+  car, a maglev's skirt, a monorail's arms over its beam, a sky pod's roof light). A mode's
+  game pack, when the Mac's designs are in, replaces its parts here (its meshes, scale 1); the
+  runtime is the same.
+- **The runtime** (`CityGenLifeTransit.cpp`, built at BeginPlay after the crowd and the
+  traffic):
+  - *By the world's time:* a train's place along its line's cycle is the sampled cycle at (the
+    world's time + its phase) modulo the cycle, the phases spread evenly by the hour band's
+    trains (`TransitLineTrains`); nothing is simulated, so a far train costs a lookup and every
+    line runs city-wide. A band's change of trains (`CityGenLife.Hour`) moves them at once.
+  - *On the track:* each car by the track's points at its two ends (its heading, its pitch),
+    on its way's own track (its right: `track` off the middle; a loop's one way), crossing to
+    the other way's over `TransitCrossM` (90 m) before an open line's turn, so it stands at the
+    end on the track it leaves on.
+  - *At a stop:* the doors open `TransitDoorOpenS` (2 s) after it halts and shut
+    `TransitDoorCloseS` (4 s) before it leaves, sliding over `TransitDoorSlideS`; door leaves
+    and a lit doorway between them are drawn for trains within `TransitDoorsM` (300 m) standing
+    at a stop (a cube's instances taken as needed). On the right only where the train runs off
+    the middle (its platform the side one), both sides where it runs on it.
+  - *Boarding and leaving* where the stop's platform walkway is live (LG3's live region): as
+    the train halts, the stop's people a train at the hour (`TransitStopAlight`, times the
+    crowd's scale) come out of its doors in turn (pool slots spawned at the doors, walking onto
+    the platform beside them: the walk processor's `FromSlot` with no slot) and walk on, and
+    as many of the crowd on the platform walkway as board (`TransitStopBoard`), the nearest a
+    door on their side who reach it before the doors shut, walk into the doors and are gone
+    (`CgWalk::Board`, their slot freed). While transit runs, a served station's street
+    accesses send no one out (`DoorTransit`): its people come off the trains.
+  - *The platforms' keep-out:* people on a platform walkway keep `WalkClear` off its middle,
+    on the side they walk (the walk processor's goal pushed out), so they walk the side
+    platforms, not the tracks.
+  - *Drawn:* one instanced component per basic shape (`TransitMesh0`, `1`), a run of instances
+    per train; the trains past `TransitFarM` (1.5 km) have their instances sent every fourth
+    frame, the rest every frame; no collision, out of Lumen's scene; the door leaves in
+    `TransitDoors`.
+- **Console:** `CityGenLife.Transit [0|1]` (toggling without an argument), the play menu's
+  **Transit** row (`transit`, `transit=0|1`; `ACityGenPlay::HasLifeTransit`), and for the
+  check's shots `CityGenLife.TransitShow board|dwell|moving|metro|monorail|maglev|sky_tube|
+  elevated_rail` (the camera to the nearest train within 2 km standing at a stop with people
+  boarding or leaving, standing with its doors open, moving, or moving on a line of a mode:
+  the status's `transit.show`, which the check's `until` waits for). `CityGenLife.Status` adds
+  `transit` (lines, trains, running, moving, standing, near, arrivals, boarded, boarding,
+  alighted, instances, door instances, its time a frame).
+- **Benchmark:** every life pass sets `CityGenLife.Transit` (1); the pass `night_life_notransit`
+  turns it off (`bench.LIFE_PASSES`).
+
 ## Milestones and checks
 
 - **Every milestone** updates the exporter in its own PR for what it adds or changes (a new
@@ -2940,3 +3024,4 @@ none of it and its crowd and traffic run as before.
 | Packaged game (a fix on its own, 2026-11-10) | "A packaged game" above: `unreal.ALWAYS_COOK` written to the project's DefaultGame.ini by every import (`set_project_ini`, `set_engine_ini(..., file, entries)`), so the atmos assets loaded by path are cooked; the play module puts a game with no saved resolution at the monitor's native resolution, windowed fullscreen; the Tab menu's Fog, Rain, Wet streets and hour rows drive the atmos controller. | Delta imported again into the AT1 project, packaged (Development Win64) and played: no missing CityGen package, a 2560 x 1440 window, the weather rows by night. |
 | Play fixes (2026-11-12, after the packaged Delta) | Play's default is walking (`--play walk`; `fly` and `project` the others): the play plugin's `ACityGenWalker` (`CityGenWalker.h`, a character with a camera in front of the face and a body its player sees, keys bound on its own input component, `-CityGenSelfie=SECONDS` for a packaged game's proof), made into `Core/BP_CityGenWalker` wearing the project's own character's body (`import_city.project_body`) and spawned by `Core/GM_CityGenWalk` (`walk_classes`), the level's game mode override; `--check` walks with it (its spawn and body, a curb climbed: checks `spawn` and `curb`); `M_CgVehicleGlass` darker, coated and covered toward grazing angles (`VEHICLE_VERSION` 10, every car made again; two-sided, the far side's faces left out); the Aurels never imported (`unreal_vehicles.EXCLUDED`, a placement naming one refused) | Delta Megacity imported into CityAG16 and checked, a packaged game (`docs/progress/fix_play_cars/`) |
 | LG4 | Life at places ("From LG4: life at places" above): `unreal_life.pack_places` and the door, drive and pool fields LG4 adds (`PACK_VERSION` 6), `import_city.places_props` (`LIFE_VERSION` life7), the places' clips made in the project after the people library (`unreal_people.ensure_place_clips`, `ue/people_places.py`, `Saved/CityGenPeople/places.json`), the `SmartObjects` plugin a dependency of `CityGenLife`, slots' use points as Smart Objects of the world's subsystem while their walkways are live, gangs, police pairs and patrol cars in a livery; console `CityGenLife.Places`, `.Gangs`, `.Police`, `.PlaceShow`, `.SitOffset`, the play menu's Places row, the status's `places`; bench pass `night_life_noplaces`. A plan without `places` exports and runs as before. |
+| LG6 | Transit ("From LG6: transit" above): `unreal_life.pack_transit` and the stand-ins' model table `TRANSIT_MODELS` (`PACK_VERSION` 7), `import_city.transit_props` and `M_CgTransit` (`LIFE_VERSION` life8), every line's trains by the world's time on their timetables, doors at the stops, people leaving and boarding at the live stops, a served station's street accesses quiet while transit runs, the platforms' keep-out (`WalkClear`); console `CityGenLife.Transit`, `.TransitShow`, the play menu's Transit row, the status's `transit`; bench pass `night_life_notransit`. A plan without `transit` exports and runs as before. | Delta imported into CityAG16, checked with shots of trains at the stations and running (`docs/progress/LG6/`) |

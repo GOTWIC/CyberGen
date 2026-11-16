@@ -66,10 +66,10 @@ namespace
 		switch (Kind)
 		{
 		case 0: Base = FMath::Lerp(FLinearColor(0.62f, 0.64f, 0.67f), Line, 0.28f); break;
-		case 1: Base = FLinearColor(0.02f, 0.025f, 0.03f); Emit = FLinearColor(1.0f, 0.8f, 0.55f) * 0.55f; break;
-		case 2: Base = Line; Emit = Line * 0.9f; break;
+		case 1: Base = FLinearColor(0.02f, 0.025f, 0.03f); Emit = FLinearColor(1.0f, 0.8f, 0.55f) * 0.035f; break;
+		case 2: Base = Line; Emit = Line * 0.2f; break;
 		case 4: Base = FMath::Lerp(FLinearColor(0.62f, 0.64f, 0.67f), Line, 0.28f) * 0.7f; break;
-		case 5: Base = FLinearColor(0.2f, 0.2f, 0.2f); Emit = FLinearColor(1.0f, 0.85f, 0.65f) * 1.2f; break;
+		case 5: Base = FLinearColor(0.2f, 0.2f, 0.2f); Emit = FLinearColor(1.0f, 0.85f, 0.65f) * 0.15f; break;
 		default: Base = FLinearColor(0.035f, 0.035f, 0.04f); break;
 		}
 		Out[0] = Base.R; Out[1] = Base.G; Out[2] = Base.B;
@@ -119,7 +119,8 @@ void ACityGenLife::BuildTransit()
 		}
 		if (T.bLoop && T.P.Num() > 1)
 		{
-			T.P.Add(T.P[0]);
+			const FVector First = T.P[0];      // (a copy: Add may move the array)
+			T.P.Add(First);
 		}
 		double Run = 0.0;
 		for (int32 P = 0; P < T.P.Num(); ++P)
@@ -821,7 +822,8 @@ bool ACityGenLife::ShowTransit(const FString& What)
 		{
 			bWant = T.Event == INDEX_NONE && Mode == What;
 		}
-		if (!bWant)
+		// (within 2 km of the view: the city there is streamed in)
+		if (!bWant || FVector::DistSquared(T.Mid, View) > FMath::Square(200000.0))
 		{
 			continue;
 		}
@@ -852,6 +854,8 @@ bool ACityGenLife::ShowTransit(const FString& What)
 		return false;
 	}
 	FVector Eye, At;
+	// (half the train's length, cm: a camera behind it stands clear of its last car)
+	const double Half = 50.0 * ((double)C[CNum] * (C[CLen] + C[CGap]));
 	const bool bStop = T.Event != INDEX_NONE && TransitEvents[4 * T.Event + 2] >= 0.f;
 	if (bStop)
 	{
@@ -870,19 +874,19 @@ bool ACityGenLife::ShowTransit(const FString& What)
 	else if (Mode == TEXT("metro"))
 	{
 		// (in its tunnel, behind it between the tracks' rails)
-		Eye = T.Mid - Fwd * 5500.0 + Right * 150.0 + FVector(0.0, 0.0, 250.0);
+		Eye = T.Mid - Fwd * (Half + 1800.0) + Right * 120.0 + FVector(0.0, 0.0, 220.0);
 		At = T.Mid + FVector(0.0, 0.0, 150.0);
 	}
 	else if (Mode == TEXT("sky_tube"))
 	{
 		// (beside the tube, level with it)
-		Eye = T.Mid - Fwd * 2200.0 + Right * 1600.0 + FVector(0.0, 0.0, 250.0);
+		Eye = T.Mid - Fwd * (Half * 0.5 + 900.0) + Right * 800.0 + FVector(0.0, 0.0, 150.0);
 		At = T.Mid + FVector(0.0, 0.0, 120.0);
 	}
 	else
 	{
 		// (beside the line and over it, back along the train)
-		Eye = T.Mid - Fwd * 3500.0 + Right * 2400.0 + FVector(0.0, 0.0, 900.0);
+		Eye = T.Mid - Fwd * (Half + 1500.0) + Right * 2200.0 + FVector(0.0, 0.0, 900.0);
 		At = T.Mid + FVector(0.0, 0.0, 150.0);
 	}
 	Cam->SetActorLocation(Eye, false, nullptr, ETeleportType::TeleportPhysics);

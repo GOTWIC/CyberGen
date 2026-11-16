@@ -258,7 +258,8 @@ def test_every_mode_has_a_model_and_a_headway():
         assert parts[0]["kind"] == "body"
         assert all(p["kind"] in UL.TRANSIT_KINDS and p["mesh"] in UL.TRANSIT_MESHES
                    for p in parts)
-    # (a sky tube's pods inside its 7 m tube, two side by side on an open line)
+    # (a sky tube's pods inside its 7 m tube round the line (M19's axis), two side by side on
+    # an open line: their bottom corners and top inside it)
     st = P.TRANSIT_MODES["sky_tube"]
-    corner = math.hypot(st["track_m"] + st["width_m"] / 2.0, 7.0 / 2.0 + st["base_m"])
-    assert corner < 3.5
+    assert math.hypot(st["track_m"] + st["width_m"] / 2.0, st["base_m"]) < 3.5
+    assert math.hypot(st["track_m"] + st["width_m"] / 2.0, st["base_m"] + st["height_m"]) < 3.5

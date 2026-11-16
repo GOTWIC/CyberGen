@@ -888,6 +888,10 @@ def transit_model(mode: str) -> list[dict]:
               "size": [L * 0.995, W + 0.03, 0.14]},
              {"mesh": "cube", "kind": "dark", "at": [0.0, 0.0, H + 0.1],
               "size": [L * 0.7, W * 0.55, 0.2]}]
+    # (a lamp band across each end, lit: a train seen from ahead or behind in the dark)
+    for x in (-L / 2.0 - 0.01, L / 2.0 + 0.01):
+        parts.append({"mesh": "cube", "kind": "window", "at": [x, 0.0, f + 0.7],
+                      "size": [0.04, W * 0.7, 0.18]})
     if mode in ("metro", "elevated_rail"):
         for x in (-0.33 * L, 0.33 * L):
             parts.append({"mesh": "cube", "kind": "dark", "at": [x, 0.0, -0.4],
