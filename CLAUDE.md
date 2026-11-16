@@ -1551,11 +1551,13 @@ arithmetic, dmath):
   `_reach`) is left out, so no edge steps back between a mitre point and a square one (a
   centimeters-long zigzag that `Road.folds` took for a fold: Vesper Bay's bend faces 81 on
   main, 137 with the fine arcs alone, 86 with this).
-- **AG17:** draws the map as it is (no change); its junction corner barriers keep off the
+- **AG17:** draws the map as it is; a barrier run's stations leave out the vertices its mitre
+  overreaches, as the map's faces do (`barriers._clear_of_ends`); its junction corner barriers keep off the
   crosswalks (`barriers._keep_out`: the crossings fix put a highway's crosswalks at its
   corners, 33 of Delta's and 11 of Vesper Bay's guard walls stood on them, failing
   `asset_clash`).
-- **Found on the new layouts:** `ground_cover` leaves out overlap parts thinner than
+- **Found on the new layouts:** a cluster's inner sidewalk cut and the crossings fix's
+  `_Carriage` buffers on the grid (`test_m2_stages_ignore_ulp_noise`); `ground_cover` leaves out overlap parts thinner than
   `water_checks.GRID_SLIVER_M` 5 cm (a 1 cm sliver along a 322 m lot edge by a canal);
   an elevated station's stair whose run passes through a building mass at its height gets an
   elevator and a path (`transit.Builder._stair_blocked`, the check's own masses);

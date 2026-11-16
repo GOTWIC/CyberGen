@@ -10,18 +10,18 @@
     "confirmed_on": "M8b: x86_64 Linux container citygen-x86 (same sha256 for all five and the pinned demo); M8d: produced on x86_64 Linux (cloud container, Python 3.13.17), Mac identity to be confirmed; M11: produced on the M4 Mac and confirmed byte for byte on x86_64 Linux (container citygen-x86, CITYGEN_WORKERS=3), all five and the pinned demo, stage traces identical; M9 with M11: produced on the M4 Mac and, byte for byte, on x86_64 Linux (container citygen-x86, CITYGEN_WORKERS=3); M12 on M9 and M11: produced on the M4 Mac and confirmed byte for byte on x86_64 Linux (container citygen-x86, CITYGEN_WORKERS=3), all five, the pinned demo and the stack demo, stage traces identical; M10 on M12, M9 and M11: produced on the M4 Mac and confirmed byte for byte on x86_64 Linux (container citygen-x86, CITYGEN_WORKERS=3), all five, the pinned demo and the stack demo, stage traces identical; M13 on M10: all five, the pinned demo, the stack demo and cragmouth produced on the M4 Mac and confirmed byte for byte on x86_64 Linux (container citygen-x86, CITYGEN_WORKERS=3)"
   },
   "cities": {
-    "archipelago_free_port": "bf87553e536365cc2d1e12bba5283d7440f33d271196d3d60d557d7335061375",
-    "delta_megacity": "6d75a74844a93eca386492e322458a77b2f48d4b1c5131f09b544a6d550e35c6",
-    "nexus_city": "de8c162e9a11d6881aa4bac0e59028c7864426eaf0274795e5a27e3774c0a781",
-    "peninsula_city": "1ca55c234a341f0a6141f2cd4eb2cd831fd392b3b81f2bf68a4c85fd422625b8",
-    "vesper_bay": "1689c470013d56084061320ef991251271186fab3abf271a197e3fd9abca5c13"
+    "archipelago_free_port": "2bbb116d8cbb58efd7139d730d74e2290f02d2071f1053d51e00a47eafee6159",
+    "delta_megacity": "32e879ecaa2545435fc2f525d8361133f15b783731f12bf6ea947f5db5e162f5",
+    "nexus_city": "d8a28f60c14d095b470996f8cdedb59f050794f27b22d9d3ff202d3403cd18b5",
+    "peninsula_city": "256c825533e3cd85fee1485c15839df8df7d4ea3d52aa78c86676580cc108686",
+    "vesper_bay": "90d5c47b8e8f1b457aed0898bdadbe2fdb11879c48acb7dbe1ec285fb210e211"
   },
   "blockout_plans": {
-    "archipelago_free_port": "6e3f38e77224f34b1399241b7b64ad03b6d7f32144110db834d2581dd915336e",
-    "delta_megacity": "1ad3e1da688a971245d42e381797a12b738cb555d50a6b1a9167bd3df3953a55",
-    "nexus_city": "8f14634357ee1e5ead6bebc03b83e303ef284d85f8078fcf5785d38d02b7e4f7",
-    "peninsula_city": "fddc08c7d933088891de3870d20e1f2cbb1322851c6530675032e06dc2052c46",
-    "vesper_bay": "0ce562327a0e1428322677b4bd1f3f57563ae0129f9612d053d1ff0edb770b4b",
+    "archipelago_free_port": "9df24074a48b9438cb2541cc9a58d895ce3d9b206ce64655216582d8b1828d01",
+    "delta_megacity": "fad4d685407dbcb4783351eec5588c536d2bf95266fa93e00963fa395c5dc2b0",
+    "nexus_city": "5e93895975438ffe17d2fa46822b257a587600b7d7e4f958b66895e88b08258b",
+    "peninsula_city": "be6b2a0f034bb232175acb40578caf7d69274ead7eca47e4aa2859f1c3ef35e6",
+    "vesper_bay": "b741c54aecb46f8d31491161026395502e1014f1aa3e896a046bff1697e1eb3c",
     "cragmouth": "7b82c1125a5bb73724435bb0e9c1e1263eea6fcac7218b0b89af39712d3763bd",
     "vesper_bay_decks": "605742db6b568d8e962d749c865255007e2f7343736a8af580189f8e32c6c74b"
   },

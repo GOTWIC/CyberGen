@@ -53,7 +53,9 @@ at most 0.7 cm and is not where the facets come from.
   bend faces went from 81 to 137 with the fine arcs alone). A vertex nearer a stretch's end,
   or another vertex, than its widest edge's mitre reaches along it (`Path.reach`, `_reach`:
   reach times tan of half the turn, from the mitre factor) is left out of the stations.
-- **AG17** draws the map as it is (no change to the street stage's drawing). Its junction
+- **AG17** draws the map as it is. A barrier run's stations leave out the vertices its mitre
+  overreaches, as the map's faces do (`barriers._clear_of_ends`: a parapet poked 0.56 m into
+  its junction in the small test city). Its junction
   corner barriers keep off the crosswalks (`barriers._keep_out`): since the crossings fix put
   a road's crosswalks at its corners, guard walls stood on them, and AG14's `asset_clash`
   failed on main (Delta 33 `barrier_on_crosswalk`, Vesper Bay 11).
@@ -66,6 +68,10 @@ at most 0.7 cm and is not where the facets come from.
   - An elevated station's stair whose straight run down passes through a building mass at its
     height (a mass on an arcade, which the ground test missed) gets an elevator and a path, as
     round the buildings (`transit.Builder._stair_blocked`, the check's own `_Masses`).
+  - `test_m2_stages_ignore_ulp_noise` (Greyhook built twice, with 4-ULP noise in GEOS) found
+    an inner road's sidewalk piece of about a meter kept or dropped by a floating buffer's last
+    bits (`junctions`: the cluster's carriageway buffer on the grid; the crossings fix's
+    carriageway and right of way buffers too, `_Carriage`).
   - Park path benches and their trash cans keep off the carriageway of a road the path
     crosses (`props.park_benches`, `CARRIAGE`): AG14's fit check found one on a highway's
     median in the small test city.
