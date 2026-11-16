@@ -116,7 +116,14 @@ The lean benchmark ([`bench/final`](bench/final): one run at native 2560 x 1440,
 
 ## Package
 
-PACKAGE_PLACEHOLDER
+`C:/Users/swagn/CityGen/builds/packaged/Delta_lg6/Windows/CityAG16.exe` (Development, Win64,
+5.1 GB; `builds/packaged/package_lg6.cmd`, cooked in 18 minutes from `CityAG16` itself: see the
+decisions). Its smoke launch (60 s, `-userdir` outside the package, the game closed after)
+loads Delta in 17 s, builds the life controller with its 5 lines and 19 trains (146 ms), and
+runs them in the cooked game: 14 trains running, 7 moving and 7 standing at stops, 42 door
+leaf instances drawn near the start, transit's step 0.06 ms; no error of lifegen's, no `Saved`
+folder left in the package. The cook's `Saved/Cooked` and `Saved/StagedBuilds` were deleted
+from `CityAG16`, and the superseded `Delta_main` package with them (`Delta_lg6` passed).
 
 ## Decisions (made without asking: Swagnik asleep)
 
