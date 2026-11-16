@@ -66,7 +66,6 @@ FLAT_M = 20.0                   # flat landing at a ground end
 CURVE_M = 30.0                  # vertical curves (moving average of this length)
 STEP_M = 5.0                    # profile sampling
 TAPER_M = 60.0                  # ramp taper on the deck
-RAMP_STEP_M = 2.5               # the road curves fix: a ramp's stations along its taper
 RAMP_W = 7.0
 RAMP_LANE = 4.0
 RAMP_GAP = 1.0                  # between the deck edge and a ramp
@@ -946,10 +945,7 @@ class Elev:
             if G.dist(Point(P), self.ctx.wet) < 30.0:
                 why = "diverge over water"
                 continue
-            # (the road curves fix: stations every RAMP_STEP_M, not 10 m, so the taper's
-            # S-bend and the turn to the terminal keep their chords within a few cm)
-            n_st = max(int(abs(sT - s_far) / 10.0), 2,
-                       int(math.ceil(abs(sT - s_far) / RAMP_STEP_M)))
+            n_st = max(int(abs(sT - s_far) / 10.0), 2)
             pts = []
             for i in range(n_st + 1):
                 st = s_far + (sT - s_far) * i / n_st
@@ -1086,7 +1082,7 @@ class Elev:
             s1 = sN + dirn * mirror * x1
             if not 0.0 < s1 < r.L:
                 break
-            nt = max(int((x1 - x_d) / STEP_M), 2, int(math.ceil((x1 - x_d) / RAMP_STEP_M)))
+            nt = max(int((x1 - x_d) / STEP_M), 2)
             pts = []
             for i in range(nt + 1):
                 st = s_far + (s1 - s_far) * i / nt
