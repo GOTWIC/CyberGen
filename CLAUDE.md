@@ -3010,7 +3010,9 @@ LG4 (life at places) is in place:
   walk processor's step; StateTree on Mass needs MassGameplay and MassAI). Console
   `CityGenLife.Places`, `.Gangs`, `.Police`, `.SitOffset`, `.PlaceShow`; the Tab menu's Places,
   gangs, police row; the status's `places`; bench pass `night_life_noplaces`.
-  `docs/unreal_export.md`, "From LG4: life at places". Results: `docs/progress/LG4/README.md`.
+  `docs/unreal_export.md`, "From LG4: life at places".
+- Delta: every check passes; `night_plan_all` 21.2 ms p95 native on the lean route (walk
+  26.2), places off 20.9 (walk 23.5). Results: `docs/progress/LG4/README.md`.
 
 ## Gallery site (GitHub Pages)
 

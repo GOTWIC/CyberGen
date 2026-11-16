@@ -124,18 +124,18 @@ Round the view at the check's views (the status's `places`, 23:00):
 
 ## Benchmark
 
-Not run. The lean benchmark (`night_plan_all` and `night_life_noplaces`, one run at native
-2560 x 1440) waited twice on `bench.busy` behind another session's builds and tests, and then
-Swagnik asked for the heavy work on the PC to be wound down, so it was left for later:
+The lean benchmark (`docs/progress/LG4/bench/final`: one run at native 2560 x 1440, no DLSS,
+nothing else busy), run by the coordinating session after the PR:
 
-```
-bash C:/Users/swagn/CityGen/builds/lg4/bench.sh final night_plan_all,night_life_noplaces
-```
+| Pass | All, p95 ms | Walk | Drive | Fly |
+|---|---|---|---|---|
+| `night_plan_all` | 21.2 | 26.2 | 21.2 | 20.1 |
+| `night_life_noplaces` | 20.9 | 23.5 | 21.1 | 19.8 |
 
-(results into `docs/progress/LG4/bench/final`). What the check's views show of the cost:
-lifegen's tick at 2.2 to 3.1 ms round the views (LG5's 1.3 to 2 ms with the traffic alone),
-558 Smart Objects at most; the people drawn are LG3's pool, so no more of them than before.
-LG2's after, the baseline: `night_plan_all` 20.8 ms p95 (walk 23.8).
+The places cost about 0.3 ms over the route (2.7 ms on the walk, through Old Town's slots and
+gangs; the walk also had 4 hitches over 100 ms in that pass), game-thread bound as before.
+LG2's after was 20.8 ms p95 (walk 23.8) and LG5's 21.2: the city stays about 1 ms over the
+20 ms budget, left for the performance pass.
 
 ## Package
 
