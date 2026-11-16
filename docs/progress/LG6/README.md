@@ -125,6 +125,18 @@ leaf instances drawn near the start, transit's step 0.06 ms; no error of lifegen
 folder left in the package. The cook's `Saved/Cooked` and `Saved/StagedBuilds` were deleted
 from `CityAG16`, and the superseded `Delta_main` package with them (`Delta_lg6` passed).
 
+## Tests
+
+`tests/lifegen/` (with the new `test_lg_transit.py`: the small city's metro timetable, a sky
+tube loop, speeds kept to a tight curve and the rates, a headway too close raised, the checks
+catching a bad timetable, too many trains and a station off its track, boarding by the riders,
+the exporter's pack, every mode's model and headway), `tests/test_bench.py`,
+`tests/test_unreal.py` and `tests/test_unreal_play.py`: 104 passed, 1 failed
+(`test_unreal_import_stage2_small_city`: its only failing line is the play walker's spawn, "no
+body it sees", in the test's own throwaway project; LG6 does not touch the walker). Logs
+`C:/Users/swagn/CityGen/builds/lg6/tests1.log` to `tests5.log`. The C++ is checked by the
+plugin's build, the Unreal check and the package.
+
 ## Decisions (made without asking: Swagnik asleep)
 
 - **The trains are stand-ins** (decision 6: the Mac designs vehicles; lifegen generates no
