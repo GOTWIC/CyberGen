@@ -157,8 +157,9 @@ lines) and a T of alleys and a road with no sidewalks:
   crosswalks' walkways found in their phases (544 on main), on Vesper Bay 407 of 415 (411):
   the ones missed are highways' crosswalks between far corners (open items).
 
-The Unreal check (an import of the cities and the crowd walking them) is the coordinating
-session's to decide.
+The Unreal check (Delta from main imported and checked, the crowd crossing by night, the
+benchmark, the package, and three faults it exposed in AG7's junction barriers and atmosgen's
+road lights, fixed): `unreal/README.md`.
 
 ## Open items
 

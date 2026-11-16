@@ -201,6 +201,38 @@ def test_small_city_runs_end_at_their_junctions():
     assert spans and ported
 
 
+def test_a_junction_barrier_keeps_off_a_crosswalk():
+    """The crossings fix (#232) stands a highway's crosswalk between its corners, on its
+    junction's faces: a junction's barriers keep `XWALK_CLEAR_M` off every crosswalk that
+    reaches it (cut there, `_keepout`), as a road's runs do. A guard wall along a corner with
+    a crosswalk over its middle is cut in two, each part a meter clear of it."""
+    xw = shapely.LineString([(10.0, -3.0), (10.0, 3.0)]).buffer(
+        2.0 + BR.XWALK_CLEAR_M, cap_style="flat")
+    pts = [[0, 0, 0], [20000, 0, 0]]                        # (mm)
+    parts = BR._off_lanes(pts, xw, 0.35)
+    assert len(parts) == 2
+    (a, a0, a1), (b, b0, b1) = parts
+    assert a0 and not a1 and b1 and not b0
+    assert a[-1][0] <= 7000 and b[0][0] >= 13000            # (2 m half width plus 1 m clear)
+    # on the small city every junction barrier is clear of every crosswalk
+    from assetgen import brief as B
+    from assetgen.streets.ctx import Ctx
+
+    model, _, _ = B.load_model(small_build() / "base")
+    cx = Ctx(model)
+    xs = {c.id: shapely.LineString([c.line[0][:2], c.line[-1][:2]]).buffer(
+        c.width_m / 2.0, cap_style="flat") for c in model.crosswalks if len(c.line) >= 2}
+    for j in sorted(model.junctions, key=lambda j: j.id):
+        plan = BR.junction_plan(cx, j)
+        chains = [c["pts"] for c in plan["corners"]]
+        if plan["median"]:
+            chains.append([[p[0] * 1000.0, p[1] * 1000.0] for p in plan["median"]["pts"]])
+        for pts in chains:
+            ln = shapely.LineString([(p[0] / 1000.0, p[1] / 1000.0) for p in pts])
+            for cid, g in xs.items():
+                assert ln.distance(g) > 0.5, (j.id, cid)
+
+
 def test_small_city_footbridge_railings_run_along_its_faces():
     """#147: a footbridge's faces are the map's, from its ports (its cuts, at its stairs'
     feet): its railings (the bridge piece's) run along them from cut to cut, off the

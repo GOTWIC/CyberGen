@@ -29,8 +29,9 @@ map tiles the pavement, `pave.py`), so a run needs no keep-outs round its juncti
     apart), with no connector lane across the line between their ports' middles, carries
     the median across; their medians join it.
   Each junction barrier starts and ends on its legs' port lines, so it meets the legs' runs
-  on the same section; it keeps out of the junction's connector lanes (cut there and
-  capped, `_off_lanes`) and is split where its edge turns back (`_split_sharp`).
+  on the same section; it keeps out of the junction's connector lanes and `XWALK_CLEAR_M`
+  off its crosswalks (cut there and capped, `_off_lanes`, `_keepout`; a median across that
+  a crosswalk crosses is left out) and is split where its edge turns back (`_split_sharp`).
 
 Every value handed on is rounded to the centimeter (heights to the millimeter).
 """
@@ -306,7 +307,7 @@ def junction_plan(cx, j) -> dict:
 
     def lanes():
         if not got_lanes:
-            got_lanes.append(_lane_corridors(cx, j))
+            got_lanes.append(_keepout(cx, j))
         return got_lanes[0]
     if fids and len(legs) >= 1 and j.shape != "cul_de_sac":
         tops = [f for f in fids if PI.cls[f] == "top"]
@@ -433,6 +434,28 @@ def _lane_corridors(cx, j):
         return G.union([G.qpoly(g) for g in gs])
 
 
+def _keepout(cx, j):
+    """What a junction's barriers keep out of: its connector lanes' corridors and (the
+    crossings fix, #232: a highway's crosswalk stands between its corners, on the junction's
+    faces) every crosswalk within its reach grown by `XWALK_CLEAR_M`, one shape (meters), or
+    None."""
+    corr = _lane_corridors(cx, j)
+    xws = _junction_crosswalks(cx, j)
+    if not xws:
+        return corr
+    with G.canonical():
+        return G.union(([corr] if corr is not None else []) + [G.qpoly(g) for g in xws])
+
+
+def _junction_crosswalks(cx, j) -> list:
+    """The crosswalks (grown by `XWALK_CLEAR_M`) that reach a junction's outline."""
+    tree, xs = _crosswalks(cx)
+    if tree is None or j.polygon is None:
+        return []
+    area = G.from_model_poly(j.polygon).buffer(XWALK_CLEAR_M + 1.0)
+    return [xs[k][1] for k in sorted(tree.query(area, predicate="intersects").tolist())]
+
+
 def _off_lanes(pts, corr, reach: float) -> list:
     """A junction barrier's chain (points in millimeters) less where its section (`reach`
     to the left of travel) would stand in a connector lane's corridor: [(points, reaches
@@ -523,6 +546,9 @@ def _median_across(cx, j, PI, legs: dict, fids) -> dict | None:
     if corr is not None and shapely.intersection(
             shapely.LineString([pa, pb]).buffer(0.3, cap_style="flat"), corr).area > 0.01:
         return None     # (a lane runs along it: no room for a median there)
+    line = shapely.LineString([pa, pb]).buffer(0.3, cap_style="flat")
+    if any(line.intersects(g) for g in _junction_crosswalks(cx, j)):
+        return None     # (a crosswalk crosses it: the median stops at its legs' ports)
     tops = [f for f in fids if PI.cls[f] == "top"]
     polys = []
     for f in tops:
