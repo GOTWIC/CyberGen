@@ -88,7 +88,10 @@ at most 0.7 cm and is not where the facets come from.
     roads Delta's first four fail (a sky tube's flat station under a portal cap with buildings
     past it, `transit_profile_smooth`; transit clearance and supports; a station path), and
     with three layouts a network it went to another hydrology variant and failed all nine.
-    Every city that passes within four layouts is unchanged by this.
+    Now Delta builds on its fifth layout; Vesper Bay Decks failed all sixteen layouts of its
+    first two networks (road overlaps where an organic street hairpins beside an avenue, a deck
+    ramp's walkway clipping a building on the deck, sky tube profiles) and builds on its third
+    network. Every city that passes within four layouts is unchanged by this.
   - M1b's fillets: only arcs of at least `roads.ARC_OK` 0.98 of the class minimum are cut
     fine (`_arc_line`'s `r_ok`; a joint of a highway and an avenue holds the highway's):
     measured on its true arc a fillet the corners left under the minimum fails
@@ -114,7 +117,7 @@ fillets under `ARC_OK`, traced roads, M7's diamond ramps). Layout: the try a cit
 | Greyhook | salt 2 (3) | 11,195 | 216,042 | 25 | 1.9 / 2.0 / 92 | 18 | 2.0 / 2.0 / 57 | 20 |
 | Cragmouth | salt 1 (2) | 23,226 | 362,249 | 69 | 1.8 / 2.0 / 99 | 86 | 2.0 / 2.2 / 194 | 75 |
 | Vesper Bay Pinned | salt 1 (2) | 22,505 | 346,923 | 77 | 1.8 / 2.2 / 299 | 167 | 2.0 / 2.2 / 106 | 66 |
-DECKS_ROW
+| Vesper Bay Decks | road variant 3, salt 1 (18) | 21,994 | 358,085 | 69 | 1.8 / 2.0 / 721 | 66 | 2.0 / 2.1 / 103 | 69 |
 | Vesper Bay Stacks | salt 2 (3) | 21,498 | 341,339 | 80 | 1.8 / 2.7 / 156 | 251 | 2.0 / 2.2 / 106 | 50 |
 
 On main, Saltreach, Nexus and Greyhook measured (from the play fixes' builds, the same
@@ -132,10 +135,10 @@ branch. Vesper Bay 12,471, p95 47 cm, 4,939 over 2 cm; 23,515, p95 2.0 cm, 851.
 | lane vertices | 89,602 | 106,745 | 93,369 | 108,416 |
 | pavement vertices | 278,502 | 321,081 (+15%) | 292,212 | 330,516 (+13%) |
 | `city_model.json` | 93.9 MB | 100.6 MB | 94.2 MB | 99.2 MB |
-| street packs, triangles | 1,591,515 | 1,735,819 (+9%) | 1,457,942 | 1,581,297 (+8%) |
-| roads, junctions and sidewalks, triangles | 1,098,019 | 1,234,310 (+12%) | 1,123,931 | 1,245,169 (+11%) |
-| street packs on disk | 100.0 MB | 108.2 MB | 90.1 MB | 96.6 MB |
-| most triangles in a tile | 34,726 | 44,847 | 31,045 | 30,071 |
+| street packs, triangles | 1,591,515 | 1,735,516 (+9%) | 1,457,942 | 1,580,672 (+8%) |
+| roads, junctions and sidewalks, triangles | 1,098,019 | 1,234,007 (+12%) | 1,123,931 | 1,244,544 (+11%) |
+| street packs on disk | 100.0 MB | 108.1 MB | 90.1 MB | 96.6 MB |
+| most triangles in a tile | 34,726 | 44,847 | 31,045 | 29,969 |
 
 Within `street_budgets` (20 million a city, 2.5 million a tile) by far.
 

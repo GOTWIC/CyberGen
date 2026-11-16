@@ -1566,11 +1566,14 @@ arithmetic, dmath):
   path benches keep off the carriageways their path crosses (`CARRIAGE`); a failing
   city tries `build.LAYOUT_SALTS` 7 layouts (3 before) on its roads before another road
   network, `CITY_RETRIES` 23 (8 before; a city passing within four layouts is unchanged).
-Every city's layout moves (its later stages meet layouts main never had: Delta builds on
-layout salt 4, Saltreach and Cragmouth 1, Greyhook 2, the pinned demo 1, the stack demo 2); pavement vertices
-+15%, street pack triangles +8% (Delta 1.59 to 1.72 million); the cars' lanes
-(`unreal_life.fillet`, `smooth`) now run on roads as smooth as they are. Outputs and
-measures: `docs/progress/fix_road_curves/`.
+Every city's layout moves and falls on another draw (main's samples sit on lucky ones:
+replayed on main, Delta's layouts 1 and 3 and Vesper Bay's 1 to 3 fail): Delta builds on
+layout salt 4, Vesper Bay 7, Greyhook 2, Cragmouth, the pinned demo 1, the stack demo 2,
+Vesper Bay Decks on its third road network (road variant 3, salt 1), Saltreach and Nexus on
+their first. Road edges 1.8 to 1.9 cm of sag at p95 (15 to 19 on main), junction curbs 2.0
+(6.8); pavement vertices +13 to 15%, street pack triangles +8 to 9% (Delta 1.59 to 1.74
+million); the cars' lanes (`unreal_life.fillet`, `smooth`) now run on roads as smooth as
+they are. Outputs and measures: `docs/progress/fix_road_curves/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
