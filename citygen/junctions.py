@@ -2504,8 +2504,11 @@ class _Carriage:
             OPEN_M / 2 + CURB_OFF_M, join_style="mitre", mitre_limit=2.0)) \
             if not C.is_empty else C
         self.B = B
-        self.Bin = B.buffer(-DEEP_M) if not B.is_empty else B
-        self.R = R.buffer(-ROW_IN_WALK_M, join_style="mitre") \
+        # (the road curves fix: both on the grid, as every decision's geometry: a walk point
+        # on their edge, which the curved roads made common, came out inside or outside by
+        # the last bits of a floating buffer, and a sidewalk's end moved by meters)
+        self.Bin = G.qpoly(B.buffer(-DEEP_M)) if not B.is_empty else B
+        self.R = G.qpoly(R.buffer(-ROW_IN_WALK_M, join_style="mitre")) \
             if R is not None and not R.is_empty else None
         self.ports = [LineString(p) for p in ports if len(p) == 2 and p[0] != p[1]]
         self.rings = []
@@ -2527,8 +2530,8 @@ class _Carriage:
         ln = LineString(pts)
         if self.R.contains(ln):
             return True
-        rest = shapely.difference(ln, self.R)
-        ends = Point(pts[0]).buffer(END_M).union(Point(pts[-1]).buffer(END_M))
+        rest = shapely.difference(ln, self.R, grid_size=G.GRID_M)
+        ends = G.qpoly(Point(pts[0]).buffer(END_M).union(Point(pts[-1]).buffer(END_M)))
         return rest.is_empty or ends.contains(rest)
 
     def hits(self, pts) -> bool:
@@ -3196,7 +3199,10 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
                 pieces = [line]
                 if cw is not None and not cw.is_empty:
                     ln = LineString(line)
-                    left = shapely.difference(ln, cw.buffer(side / 2.0), grid_size=G.GRID_M)
+                    # (the road curves fix: the buffer on the grid, as the cut: a piece of
+                    # about a meter came out kept or dropped by its last bits)
+                    left = shapely.difference(ln, G.qpoly(cw.buffer(side / 2.0)),
+                                              grid_size=G.GRID_M)
                     # (in order along the line: no GEOS order reaches the model)
                     got = sorted((ln.project(shapely.Point(g.coords[0])), g)
                                  for g in shapely.get_parts(left)
