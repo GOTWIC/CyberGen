@@ -2481,6 +2481,7 @@ OFFSET_STEP_M = 0.25  # ... two roads meeting with no junction whose sidewalks a
 STEP_REACH_M = 40.0   # ... (their carriageways taken this far from the node)
 OFF_REACH_M = 30.0  # ... a corner inside it moved at most this far onto its edge
 OFF_STEP_M = 0.5    # ... (the edge searched at points this far apart)
+END_M = 1.0         # ... (a walk's ends this near the region's edge may leave it)
 OPEN_M = 0.6        # ... a needle of the carriageway thinner than this is not walked round
 WAY_LONG = 4.0      # ... a way round at most this many times as long as the way across
 WAY_LONG_M = 60.0   # ... and this (round a bulb)
@@ -2516,9 +2517,17 @@ class _Carriage:
                 shapely.prepare(g)
 
     def in_row(self, pts) -> bool:
-        """A polyline on the right of way (ROW_IN_WALK_M inside it), off the lots beside."""
+        """A polyline on the right of way (ROW_IN_WALK_M inside it), off the lots beside; its
+        ends (a sidewalk's end on a leg's port, at the region's edge) within END_M of it."""
         pts = ST._dedupe(pts)
-        return self.R is None or len(pts) < 2 or self.R.contains(LineString(pts))
+        if self.R is None or len(pts) < 2:
+            return True
+        ln = LineString(pts)
+        if self.R.contains(ln):
+            return True
+        rest = shapely.difference(ln, self.R)
+        ends = Point(pts[0]).buffer(END_M).union(Point(pts[-1]).buffer(END_M))
+        return rest.is_empty or ends.contains(rest)
 
     def hits(self, pts) -> bool:
         return not self.B.is_empty and len(pts) >= 2 and self.B.intersects(LineString(pts))
@@ -2647,7 +2656,9 @@ def _round(pts, cx: _Carriage | None) -> list:
     out = ST._dedupe(out)
     out[0], out[-1] = pts[0], pts[-1]
     old = set(pts)
-    if cx.R is not None and any(p not in old and not cx.R.contains(Point(p)) for p in out):
+    if cx.R is not None and any(p not in old and not cx.R.contains(Point(p)) and
+                                _dist(p, pts[0]) > END_M and _dist(p, pts[-1]) > END_M
+                                for p in out):
         return pts          # (no way round on the right of way: never into the lots)
     return out
 
