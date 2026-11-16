@@ -795,6 +795,35 @@ def _port_z(rd, at: str, run: Run) -> float | None:
     return z + ROAD_DZ + run.base
 
 
+RUN_HALF_M = 0.5        # a run's section reaches this far either side of its line
+
+
+def _clear_of_ends(path, sts: list, a: float, b: float, reach: float) -> list:
+    """A run's stations less the path's vertices nearer its ends, or another vertex, than
+    their mitre reaches along it at the run's offset, of two the one that turns less (the
+    road curves fix: on a curve cut fine a cut often falls centimeters from a vertex, or two
+    vertices lie centimeters apart, and a mitred frame there reached past the port line, the
+    run poking into the junction; M22's map leaves those vertices out of the faces too,
+    `pavement.Path.stations`)."""
+    out: list = []
+    last = None           # (index in out, reach) of the last vertex kept
+    for s, vi in sts:
+        if vi is not None:
+            k = path.frame(s, vi)[4]
+            r = reach * math.sqrt(max(k * k - 1.0, 0.0)) + 0.01
+            if min(s - a, b - s) <= r:
+                continue
+            if last is not None and s - out[last[0]][0] <= last[1] + r:
+                if r <= last[1]:
+                    continue
+                out.pop(last[0])
+            out.append((s, vi))
+            last = (len(out) - 1, r)
+            continue
+        out.append((s, vi))
+    return out
+
+
 def draw_run(mesh, rd, run: Run, spans: list, step: float = 6.0):
     """A run over its spans, with its ends (`join`, `stop`, `open`), each end on the port
     line where it is at the road's cut."""
@@ -814,7 +843,9 @@ def draw_run(mesh, rd, run: Run, spans: list, step: float = 6.0):
                     extra.append(s_ + sgn * ramp)
         frames, scales = [], []
         tc = run.tc
-        for s, vi in rd.path.stations(a, b, step, extra + rd.knots(a, b)):
+        for s, vi in _clear_of_ends(rd.path, rd.path.stations(a, b, step,
+                                                               extra + rd.knots(a, b)),
+                                    a, b, abs(tc) + RUN_HALF_M):
             x, y, nx, ny, k = rd.path.frame(s, vi)
             z = rd.zxy(x + nx * k * tc, y + ny * k * tc) + run.base
             frames.append((x, y, z, nx, ny, k, s))
