@@ -97,18 +97,22 @@ def test_walkways_keep_off_the_carriageway_on_a_sample():
     checks = {c.id: c for c in b.checks}
     assert checks["walkway_carriageway"].passed, checks["walkway_carriageway"].failures[:5]
     st = NC.walk_road_stats(m)
-    for kind in NC.WALK_ROAD_KINDS:
+    for kind in NC.CROSS_KINDS:
         d = st[kind]
-        assert d["past_span_m"] <= 0.01 * d["length_m"], (kind, d)
-    # every crosswalk record has its walkway: square across it, from sidewalk to sidewalk
-    walks = [w for w in m.walkways if w.kind == "crosswalk"]
+        assert d["past_span_m"] <= 0.001 * d["length_m"] and not d["past_tol"], (kind, d)
+    d = st["sidewalk"]          # (main's: 5.5%; what is left mostly on clusters' faces)
+    assert d["on_carriageway_m"] <= 0.02 * d["length_m"], d
+    # every crosswalk record of a road with sidewalks has its walkway: square across it, from
+    # sidewalk to sidewalk (a highway's runs between its corners)
+    walks = [w for w in m.walkways if w.kind == "crosswalk" and len(w.line) >= 4]
     side_ends: dict = {}
     for w in m.walkways:
         if w.kind == "sidewalk":
             for p in (w.line[0], w.line[-1]):
                 side_ends.setdefault((round(p[0], 2), round(p[1], 2)), 0)
     joined = 0
-    for x in m.crosswalks:
+    xs = [x for x in m.crosswalks if x.attrs.get("road_class") != "highway"]
+    for x in xs:
         a, c = x.line
         mid = ((a[0] + c[0]) / 2, (a[1] + c[1]) / 2)
         best = min(walks, key=lambda w: min(ST._dist(mid, ((p[0] + q[0]) / 2, (p[1] + q[1]) / 2))
@@ -127,17 +131,21 @@ def test_walkways_keep_off_the_carriageway_on_a_sample():
             for e, f in ((best.line[0], best.line[1]), (best.line[2], best.line[3])):
                 along = abs((f[0] - e[0]) * dy - (f[1] - e[1]) * dx) / L
                 assert along < 1.0, (x.id, along)
-    assert joined >= 0.9 * len(m.crosswalks)
+    assert joined >= 0.9 * len(xs)
 
 
 def test_check_walk_roads_fails():
     b, _, _ = built_sample(VESPER_BAY)
     d = b.model.model_dump(mode="json")
+    # (a crossing that runs along an avenue's carriageway, in three stretches)
     seg = next(s for s in d["road_segments"] if s["road_class"] == "avenue" and
-               not any(p["z"] for p in s["z_profile"]) and len(s["centerline"]) >= 2)
-    line = seg["centerline"]
-    d["walkways"].append({"id": "wk.test", "kind": "sidewalk", "type": "walkway.sidewalk",
-                          "line": [[p[0], p[1], 0.0] for p in line], "width_m": 3.0,
+               not any(p["z"] for p in s["z_profile"]) and
+               ST._plen([tuple(p[:2]) for p in s["centerline"]]) > 60.0)
+    pts = [tuple(p[:2]) for p in seg["centerline"]]
+    L = ST._plen(pts)
+    line = [ST._along(pts, L * k / 6)[0] for k in (2, 3, 4)] + [ST._along(pts, L * 5 / 6)[0]]
+    d["walkways"].append({"id": "wk.test", "kind": "crossing", "type": "walkway.crossing",
+                          "line": [[p[0], p[1], 0.0] for p in line], "width_m": 2.0,
                           "neighbors": [], "attrs": {}})
     c = NC.check_walk_roads(load_spec(VESPER_BAY).filled, CityModel.model_validate(d))
     assert not c.passed and "wk.test" in " ".join(c.failures)

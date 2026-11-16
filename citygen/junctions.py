@@ -2388,13 +2388,9 @@ class WalkGraph:
 
 
 def _walk_offset(x: Leg) -> float:
-    """How far from a leg's centerline its walkers go: the sidewalk's middle, 1 m inside the
-    edge of a walk with no sidewalk (a path's, a pedestrian street's), the carriageway's edge
-    of a road with none (an alley, a service road, a highway: crossings fix, its corners on
-    the curb, not in its lane)."""
-    if x.sw > 0:
-        return x.h + x.sw / 2
-    return max(x.h - 1.0, x.h / 2) if x.cls in ST.PEDESTRIAN else x.h
+    """How far from a leg's centerline its walkers go: the sidewalk's middle, or 1 m inside
+    the edge of a road with no sidewalk (a path's, an alley's)."""
+    return x.h + x.sw / 2 if x.sw > 0 else max(x.h - 1.0, x.h / 2)
 
 
 def _corner_point(P, a: Leg, b: Leg, jrow=None):
@@ -2478,8 +2474,9 @@ CURB_OFF_M = 0.3    # crossings fix: a walk led round a junction's carriageway k
 ATTACH_MAX_M = 2.0  # ... a crossing's end joins its sidewalk this near it, else its corner
 SPLIT_GAP_M = 0.05  # ... a crossing's end this near a sidewalk's vertex joins it there
 DEEP_M = 0.05       # ... a point this far inside the carriageway (taken out) is in it
-ROW_OUT_M = 0.1     # ... a corner moved onto the carriageway's edge, and a way round it, stay
-#                     this near its right of way (else there is no pad there to walk on)
+ROW_IN_WALK_M = 0.2  # ... a corner moved onto the carriageway's edge, and a way round it,
+#                      stay this far inside its right of way (else there is no pad there to
+#                      walk on: never at the lots' edge, where the buildings stand)
 OFFSET_STEP_M = 0.25  # ... two roads meeting with no junction whose sidewalks are this far apart
 STEP_REACH_M = 40.0   # ... (their carriageways taken this far from the node)
 OFF_REACH_M = 30.0  # ... a corner inside it moved at most this far onto its edge
@@ -2505,7 +2502,8 @@ class _Carriage:
             if not C.is_empty else C
         self.B = B
         self.Bin = B.buffer(-DEEP_M) if not B.is_empty else B
-        self.R = R.buffer(ROW_OUT_M) if R is not None and not R.is_empty else None
+        self.R = R.buffer(-ROW_IN_WALK_M, join_style="mitre") \
+            if R is not None and not R.is_empty else None
         self.ports = [LineString(p) for p in ports if len(p) == 2 and p[0] != p[1]]
         self.rings = []
         for p in PV.polys(B):
@@ -2518,7 +2516,7 @@ class _Carriage:
                 shapely.prepare(g)
 
     def in_row(self, pts) -> bool:
-        """A polyline on the right of way (ROW_OUT_M round it), off the lots beside."""
+        """A polyline on the right of way (ROW_IN_WALK_M inside it), off the lots beside."""
         pts = ST._dedupe(pts)
         return self.R is None or len(pts) < 2 or self.R.contains(LineString(pts))
 

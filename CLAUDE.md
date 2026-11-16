@@ -1514,8 +1514,8 @@ carriageway) is in place, in `citygen/junctions.py` (check in `network_checks.py
   led round the carriageways of the junctions at its ends; a road going on as one of another
   cross-section with no junction gets the same corner walk over both carriageways
   (`OFFSET_STEP_M`); a dead end with no junction a crossing of its end; links from an alley's
-  or path's centerline go by M2's corner point (`corner_x`). `_walk_offset` puts a highway's,
-  alley's or service road's corners on its curb.
+  or path's centerline go by M2's corner point (`corner_x`). A way round and a moved corner
+  keep `ROW_IN_WALK_M` 0.2 m inside the right of way (never at the lots' edge).
 - **Check** `walkway_carriageway` (with the street checks: 108 on a flat sample, 113 with
   decks): `walk_on_roads` measures each walkway's length on the pavement map's carriageway
   faces at its level and height (`ROAD_FACES`; not a pedestrian junction or its pedestrian

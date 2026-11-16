@@ -99,7 +99,7 @@ after:
 | Greyhook | 7,004 to 5 m | 1,035 to 1 m | 5,494 to 973 m (4.5 to 0.8%) |
 | Saltreach Free Port | 8,747 to 9 m | 600 to 2 m | 5,911 to 1,243 m (6.3 to 1.4%) |
 | Vesper Bay Decks | 18,226 to 11 m | 1,518 to 3 m | 10,031 to 1,854 m (5.5 to 1.0%) |
-CRAGMOUTH
+| Cragmouth | 22,997 to 9 m | 1,976 to 3 m | 10,796 to 1,656 m (5.3 to 0.8%) |
 
 Unchanged: alleys and service roads (no sidewalk: their walkway is their carriageway, 64 to
 80% of an alley walkway's length), pedestrian streets and promenades. The `path` walkways
@@ -134,4 +134,18 @@ session's to decide.
 
 ## Open items
 
-OPEN
+- **A highway's crosswalks** (a highway has no sidewalk) run between the leg's two corners,
+  which at a big junction of highways can lie far apart: the crosswalk walkway then crosses
+  the junction diagonally (one straight span, so the check lets it pass), and LG3's
+  `signals` does not find the few whose middle lies over 6 m from their record's (Delta: 8
+  of 552 signalized crosswalks, as on main, other junctions).
+- **Sidewalks on junction faces:** the sidewalks of roads inside an M22 cluster run on the
+  cluster's carriageway where its corner pads are cut, and a few junction faces cover a
+  road's sidewalk bands (Delta 1.6 km, noted by the check). A walk round the cluster on its
+  pads, from outer leg to outer leg, would replace them.
+- **Sidewalk lines across their own road:** a sidewalk's offset line folding across a tight
+  bend, and two roads of different cross-sections meeting with no junction, still put a
+  few meters of sidewalk on a carriageway (a handful a city).
+- **Alleys and links into them** share their carriageway by design; the links from an
+  alley's centerline end (its node, in the junction) to its corners go by M2's corner point
+  and so grew a little.
