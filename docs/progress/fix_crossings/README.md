@@ -58,8 +58,9 @@ Three more faults put walkers on the carriageway:
 M22's pavement map at its level and height (a road's carriageway, a junction's, a bulb; not a
 junction of pedestrian streets, nor its pedestrian legs' stubs), and for a crosswalk or
 crossing the most of it on one stretch (its straight span). `walkway_carriageway` (with the
-street checks; 108 on a flat sample, 113 with decks) fails a crosswalk or crossing that runs
-more than 5 m on a carriageway past its span, and a city whose sidewalk walkways run more than
+finished checks, on the final walkways; 108 on a flat sample, 113 with decks) fails a
+crosswalk or crossing that runs more than 5 m on a carriageway past its span, and a city
+whose sidewalk walkways run more than
 0.5% of their length on a road's carriageway; it notes the sidewalks on a junction's face
 (cluster roads, junction faces over a road's sidewalk bands, no pad), and the alleys' and
 links' length on their own shared carriageway.
@@ -108,7 +109,7 @@ by 1 to 3 km a city: they now go by M2's corner point to the corner on the sidew
 paths on a carriageway 8.7 to 10.6 km, nearly all of it on alleys' stubs).
 
 LG3's derived signal phases (`lifegen.plan.signals`, read only) on Delta: 150 signals, 552
-signalized crosswalks, 544 crosswalk walkways found in their phases, before and after.
+signalized crosswalks, 544 crosswalk walkways found in their phases before, 543 after.
 
 ## Junctions before and after
 
@@ -127,7 +128,34 @@ lines) and a T of alleys and a road with no sidewalks:
 
 ## Validation
 
-VALIDATION
+- **Builds** (Windows PC, `CITYGEN_WORKERS=2`): every sample and demo (Delta Megacity,
+  Vesper Bay, Nexus City, Greyhook, Saltreach Free Port, Vesper Bay Decks, Cragmouth, the
+  pinned and the stack demo) builds on the same try as on main with every check passing (108
+  on a flat sample, 113 with decks). Two layouts the builds discard failed the walkway clash
+  on the way (Vesper Bay Stacks' second, Cragmouth's first, which fails `junction_levels` and
+  `road_overlaps` on main too); the first was fixed (ways round kept 0.2 m inside the right
+  of way, M2's walk offsets kept), the stack demo's second layout now passes, as on main.
+- **Goldens:** every sample's model and blockout plan (`tests/data/golden_hashes.json`), and
+  assetgen's: the samples' and the small city's briefs, the small city's asset files and
+  materials (`golden_hashes.json`), the streets (`golden_streets.json`), props
+  (`golden_props.json`) and ground (`golden_ground.json`); the water goldens keep their bytes.
+  The props golden is known to differ between Windows and the Mac (it was made on the Mac):
+  this one is Windows', to be rewritten on the Mac.
+- **Tests:** `tests/test_crossings.py` (new: the helpers on small shapes, the sample, the
+  check's failing case), and the test files of the modules touched and the tests that run the
+  code: `test_streets`, `test_park_paths`, `test_road_repair`, `test_pavement`,
+  `test_junctions_ramps`, `test_buildings`, `test_decks`, `test_roads`, `test_blockout`,
+  `test_terrain`, `test_edit` (211: 209 passed; the 2 failures, the check's failing case on
+  an avenue's median and the check run on the M2 model differing from a fresh run on the
+  final one, were fixed: the check runs with the finished checks; `test_crossings`,
+  `test_buildings` and `test_streets` again: 62 passed; Saltreach built again, the same
+  model); `tests/lifegen/test_lg_plan.py` (19 passed: signal phases and crowd walks);
+  `tests/assetgen/test_ag_streets.py` and `test_ag_junctions.py` (18 passed, the new street
+  goldens). Logs in `C:/Users/swagn/CityGen/builds/fix_crossings/` (`tests_citygen2.log`,
+  `tests_citygen3.log`, `tests_lifegen.log`, `tests_assetgen.log`).
+- **LG3's signals** (`lifegen.plan.signals`, read only): on Delta 543 of 552 signalized
+  crosswalks' walkways found in their phases (544 on main), on Vesper Bay 407 of 415 (411):
+  the ones missed are highways' crosswalks between far corners (open items).
 
 The Unreal check (an import of the cities and the crowd walking them) is the coordinating
 session's to decide.
@@ -137,8 +165,10 @@ session's to decide.
 - **A highway's crosswalks** (a highway has no sidewalk) run between the leg's two corners,
   which at a big junction of highways can lie far apart: the crosswalk walkway then crosses
   the junction diagonally (one straight span, so the check lets it pass), and LG3's
-  `signals` does not find the few whose middle lies over 6 m from their record's (Delta: 8
-  of 552 signalized crosswalks, as on main, other junctions).
+  `signals` does not find the few whose middle lies over 6 m from their record's (Delta 9 of
+  552 signalized crosswalks, 8 on main; Vesper Bay 8 of 415, 4 on main). A walkway
+  `[corner, curb, curb, corner]` with the record's line as its middle would match them, at the
+  cost of tails along the highway's curb.
 - **Sidewalks on junction faces:** the sidewalks of roads inside an M22 cluster run on the
   cluster's carriageway where its corner pads are cut, and a few junction faces cover a
   road's sidewalk bands (Delta 1.6 km, noted by the check). A walk round the cluster on its

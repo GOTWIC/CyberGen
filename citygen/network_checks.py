@@ -991,10 +991,11 @@ def run_streets(spec: CitySpec, m: CityModel) -> list:
     """The checks a city with local streets has (M2 on)."""
     return [check_dead_ends(spec, m), check_overlaps(spec, m),
             check_junction_levels(spec, m), check_crossing_spacing(spec, m),
-            check_park_access(spec, m), check_walk_roads(spec, m)]
+            check_park_access(spec, m)]
 
 
 def run_finished(spec: CitySpec, m: CityModel) -> list:
-    """The checks that need the buildings and the transit structures (M3 and M5 on)."""
+    """The checks that need the buildings and the transit structures (M3 and M5 on); the
+    crossings fix's on the finished walkways (later stages split and add to them)."""
     return [check_bridge_clash(spec, m), check_building_clash(spec, m),
-            check_walkway_clash(spec, m)]
+            check_walkway_clash(spec, m), check_walk_roads(spec, m)]
