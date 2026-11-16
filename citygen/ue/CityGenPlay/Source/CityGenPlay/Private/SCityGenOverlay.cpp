@@ -36,7 +36,9 @@ namespace
 		// lifegen_clothing_toggle: the people's clothes (a debug switch until LG2's garments)
 		RowClothing = 20,
 		// LG5: lifegen's traffic on or off
-		RowTraffic = 21 };
+		RowTraffic = 21,
+		// LG4: lifegen's life at places (slots, shop visits, gangs, police) on or off
+		RowPlaces = 22 };
 
 	/** A row's name for ACityGenPlay::ClickMenuRow (the console's CityGen.MenuRow). */
 	const TCHAR* RowName(int32 Row)
@@ -62,6 +64,7 @@ namespace
 		case RowSteam: return TEXT("steam");
 		case RowClothing: return TEXT("clothing");
 		case RowTraffic: return TEXT("traffic");
+		case RowPlaces: return TEXT("places");
 		default: return TEXT("hour+");    // the hour row and its > arrow
 		}
 	}
@@ -362,6 +365,11 @@ int32 SCityGenOverlay::PaintMenu(FSlateWindowElementList& Out, int32 Layer, cons
 	{
 		// LG5: with lifegen's traffic, the cars on or off
 		Rows.Add({RowTraffic, TEXT("Traffic"), P->GetLifeTraffic() ? TEXT("On") : TEXT("Off")});
+	}
+	if (P->HasLifePlaces())
+	{
+		// LG4: with lifegen's life at places, people at places, gangs and police on or off
+		Rows.Add({RowPlaces, TEXT("Places, gangs, police"), P->GetLifePlaces() ? TEXT("On") : TEXT("Off")});
 	}
 	constexpr double BarH = 30.0;
 	const double Extra = bAtmos ? BarH : 0.0;

@@ -1,4 +1,4 @@
-# lifegen: people, traffic, transit and air (scope, v1: decided 2026-11-13, LG0 done)
+# lifegen: people, traffic, transit and air (scope, v1: decided 2026-11-13; LG0 to LG5 done)
 
 Stage 4 (lifegen) of CyberGen's five stages. It takes a built city with its assets (and,
 once stage 3 is there, its hours and weather) and fills it with life: varied, realistic
@@ -364,7 +364,7 @@ by the player (a later option); seasons.
 | LG1 | People | the population library: bodies, faces, skin and hair by seed, the animation set retargeted, LODs and far stand-ins (baked animation, impostors), assembly (Mutable or lifegen's merge); people in a plain base outfit | LG0 |
 | LG2 | Clothing | garments from sewing patterns draped in Blender, generated textiles, accessories and cyberware, outfits by district, group, job, wealth and weather, the variety check, cloth simulation near the view | LG1 |
 | LG3 | Crowds on the streets | people on every walkway at each street's density by hour, every level, stairs, escalators and elevators, crosswalks with the signals, groups, pace, avoidance; trips spawned and ended at doors, stations and garages | LG1 |
-| LG4 | Life at places | Smart Object slots at benches, stops, stalls, kiosks, vending machines and doors; places by their hours; gangs on their turf, police patrols | LG3 |
+| LG4 | Life at places (done, 2026-11-15) | Smart Object slots at benches, stops, stalls, kiosks, vending machines and doors; places by their hours; gangs on their turf, police patrols | LG3 |
 | LG5 | Traffic | AG18's fleet (cars and vans now; buses, trucks, motorbikes and bikes as the Mac designs them) on the lanes; signal phases; parking; bus routes; taxis; densities by hour; lights at night | LG0 |
 | LG6 | Transit | trains, metro, monorail, maglev and sky tube pods on their lines to timetables, stations, boarding | LG3, LG5 |
 | LG7 | Air and water | flying cars on air lanes and pads, drones, police fliers, aircraft over the spaceport, boats, water taxis, ships and ferries | LG5 |

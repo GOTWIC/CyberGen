@@ -1925,7 +1925,15 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
                                                   log_dir=build / OUT_DIR / "people")
         if not people_res.get("ok"):
             raise RuntimeError(f"the people library: {people_res.get('error')}")
+        # (LG4: the places' clips, the sample's bench loop and idle breaks on the library's
+        # bodies; without them the people at places stand)
+        people_res["place_clips"] = {k: v for k, v in unreal_people.ensure_place_clips(
+            root, up, gas=gas, log_dir=build / OUT_DIR / "people").items() if k != "manifest"}
     lib = (people_res or {}).get("manifest") or unreal_people.read_manifest(up)
+    if lib:
+        pclips = unreal_people.read_places(up)
+        if pclips:
+            lib = {**lib, "place_clips": pclips}
     t = time.time()
     man_path = write_manifest(build, name, assets, play=plugin["ok"],
                               atmos=atmos if plugin["ok"] else False, vehicles=vehicles,

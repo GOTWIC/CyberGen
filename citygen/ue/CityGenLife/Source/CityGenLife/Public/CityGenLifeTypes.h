@@ -16,6 +16,35 @@ namespace CgWalk
 		Wait = 1,      // at a crosswalk's curb for the signal
 		Enter = 2,     // from its walkway through a door, then gone (a trip's end)
 		Exit = 3,      // out of a door onto its walkway (a trip's start)
+		// --- LG4: life at places
+		ToSlot = 4,    // from its walkway to a place slot's point it claimed
+		AtSlot = 5,    // using it (sitting, waiting, queueing, buying, eating, talking)
+		FromSlot = 6,  // back to its walkway
+		Inside = 7,    // in a shop on a visit (not drawn), then out of its door again
+	};
+}
+
+/** LG4: what a person plays (ACityGenLife's WalkAnim, per instance): the near tier's clip, the
+ *  mid and far tiers' held pose. */
+namespace CgAnim
+{
+	enum : uint8
+	{
+		Walk = 0,      // walking (or LG3's idle while standing)
+		Idle = 1,      // standing at a slot (a bus stop, a queue, a kiosk)
+		Sit = 2,       // a bench
+		Talk = 3,      // talking, smoking, eating (the sample's idle breaks)
+	};
+}
+
+/** LG4: a person's role (the plan's pool slots kept for gangs and police). */
+namespace CgRole
+{
+	enum : uint8
+	{
+		Crowd = 0,
+		Gang = 1,
+		Police = 2,
 	};
 }
 
@@ -76,6 +105,16 @@ struct FCgLifeWalker : public FMassFragment
 	FVector3f PrevHead = FVector3f::ZeroVector;
 	float PrevSegLen = 0.f;        // cm: that lane's last stretch
 	float PrevHW = 0.f;            // cm: that lane's half width
+
+	// --- LG4: life at places ------------------------------------------------------------------
+	uint8 Role = 0;                // CgRole
+	uint8 Visit = 0;               // through its door on a visit (it comes back out)
+	uint8 Anim = 0;                // CgAnim, at a slot
+	int32 Turf = INDEX_NONE;       // a gang member's turf (it walks only its walkways)
+	int32 Slot = INDEX_NONE;       // the place slot it claimed
+	int32 Point = INDEX_NONE;      // the slot's use point it claimed
+	float Dwell = 0.f;             // s left at a slot or inside on a visit
+	int32 PassedSlot = INDEX_NONE; // the last slot it passed (and chose not to use)
 };
 
 /** LG5: why a car drives slower than its lane allows now (FCgLifeCar::Why). */

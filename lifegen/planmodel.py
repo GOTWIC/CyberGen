@@ -29,7 +29,10 @@ Vec3 = Annotated[list[float], Field(min_length=3, max_length=3)]
 Hours = Annotated[list[float], Field(min_length=24, max_length=24,
                                      description="A value per hour, 0 to 23.")]
 SpawnKind = Literal["door", "station", "garage", "taxi_stand"]
-SlotKind = Literal["bench", "bus_stop", "kiosk", "vending", "stall", "taxi_stand"]
+SlotKind = Literal["bench", "bus_stop", "kiosk", "vending", "stall", "taxi_stand", "bar_queue",
+                   "smoke", "gang_spot"]
+PerBand = Annotated[list[float], Field(min_length=5, max_length=5,
+                                       description="A value per M11 hour band.")]
 
 
 class _Model(BaseModel):
@@ -59,17 +62,67 @@ class Spawn(_Model):
 
 
 class Slot(_Model):
-    """A place slot (scope 6.4): a Smart Object to be (LG4) at a bench, a stop, a stall."""
-    id: str = Field(description="`slot.<owner id>`.")
+    """A place slot (scope 6.4): a Smart Object in the runtime (LG4) at a bench, a bus stop, a
+    kiosk, a vending machine, a food stall, a taxi stand, a club's door (its queue), a bar's
+    door (its smokers), a gang's spot; its use points, the walkway its users leave and come
+    back to, how many use it by hour band."""
+    id: str = Field(description="`slot.<owner id>` (a door's: `slot.<door>.<kind>`; a gang "
+                                "spot's: `slot.<turf>.<hideout or corner>`).")
     owner_id: str
     kind: SlotKind
-    behavior: Literal["sit", "wait", "buy", "queue"]
-    capacity: int
+    behavior: Literal["sit", "wait", "buy", "eat", "queue", "smoke", "talk"]
+    capacity: int = Field(description="Its use points (LG4: `len(points)`).")
+    district_id: str | None = None
+    tile: str
+    pos: Vec3 = Field(description="The object (a door, a gang spot's middle).")
+    yaw_deg: float = Field(description="The object's facing, degrees counterclockwise from east "
+                                       "(LG0: the way its user faces).")
+    level: int = 0
+    walkway_id: str | None = Field(None, description="LG4: the walkway its users leave to use "
+                                                     "it and come back to.")
+    reach_m: float | None = Field(None, description="LG4: its first point to that walkway.")
+    points: list[Annotated[list[float], Field(min_length=4, max_length=4)]] = Field(
+        default_factory=list, description="LG4: its use points: x, y, z and the way its user "
+                                          "faces (degrees counterclockwise from east).")
+    use: PerBand | None = Field(None, description="LG4: its points in use per hour band.")
+    dwell_s: Annotated[list[float], Field(min_length=2, max_length=2)] | None = Field(
+        None, description="LG4: how long a user stays (s, from, to).")
+    anim: str | None = Field(None, description="LG4: what its users play: sit, idle, talk.")
+    role: Literal["crowd", "gang", "police"] = "crowd"
+    place_id: str | None = Field(None, description="LG4: a door slot's place.")
+    turf_id: str | None = Field(None, description="LG4: a gang spot's turf.")
+    faction_id: str | None = None
+    hash: str
+
+
+class Place(_Model):
+    """LG4: a place by its hours (scope 6.4): an AG3 shop door (a unit's use, M11's POI where it
+    is one), open per hour, how busy by hour band, how long a visit lasts and its chance, its
+    occupancy (people inside on a visit) by band."""
+    id: str = Field(description="`place.<door>`.")
+    spawn_id: str = Field(description="Its door's spawn point.")
+    building_id: str
+    poi_id: str | None = None
+    name: str | None = None
+    kind: str = Field(description="The POI's sub (bar, club, arcade, food, clinic, ...) else the "
+                                  "unit's use.")
+    use: str
     district_id: str | None = None
     tile: str
     pos: Vec3
-    yaw_deg: float = Field(description="The way its user faces, degrees counterclockwise "
-                                       "from east.")
+    yaw_deg: float
+    level: int = 0
+    walkway_id: str
+    hours: Annotated[list[int], Field(min_length=2, max_length=2,
+                                      description="Open from, to (to < from runs past "
+                                                  "midnight; 0, 24 always).")]
+    open: Annotated[list[int], Field(min_length=24, max_length=24)]
+    busy: PerBand = Field(description="How busy by band (its door's share while open).")
+    visit: PerBand = Field(description="A passer-by's chance to go in by band.")
+    dwell_s: Annotated[list[float], Field(min_length=2, max_length=2)]
+    occupancy: PerBand = Field(description="People inside on a visit by band.")
+    slot: str | None = Field(None, description="Its door's slot kind (a club's queue, a bar's "
+                                               "smokers).")
     hash: str
 
 
@@ -91,6 +144,13 @@ class Walk(_Model):
     signal: str | None = Field(None, description="A signalized crosswalk's signal "
                                                  "(`sig.<junction id>`).")
     phase: int | None = Field(None, description="The phase it walks in.")
+    turf: str | None = Field(None, description="LG4: the gang turf its middle is in (its gang "
+                                               "members walk only their turf's walkways).")
+    gang: PerBand | None = Field(None, description="LG4: gang members walking on it per band.")
+    patrol: bool = Field(False, description="LG4: police patrol it (the police field at least "
+                                            "the patrol minimum, on the ground).")
+    field: float | None = Field(None, description="LG4: M11's police field at its middle.")
+    police: PerBand | None = Field(None, description="LG4: police on foot on it per band.")
     hash: str
 
 
@@ -116,6 +176,7 @@ class Drive(_Model):
     stop_back_m: float | None = Field(None, description="Where a car's front stops on red: "
                                                         "this far back from the lane's end "
                                                         "(short of the crosswalk it crosses).")
+    police: PerBand | None = Field(None, description="LG4: patrol cars on it per band.")
     hash: str
 
 
@@ -130,6 +191,9 @@ class TileSpawns(_Model):
                                                                 "middle is in the tile.")
     drives: list[Drive] = Field(default_factory=list, description="LG5: the lanes whose "
                                                                   "middle is in the tile.")
+    places: list[Place] = Field(default_factory=list, description="LG4: the places (shop "
+                                                                  "doors by their hours) in "
+                                                                  "the tile.")
 
 
 class Phase(_Model):
@@ -187,7 +251,12 @@ class CrowdPlan(_Model):
         default_factory=dict, description="Per pool slot its draws (seed, character, scale, "
                                           "gait, pace, tint: an index into the district's "
                                           "palette where it comes out; LG2: look, the "
-                                          "library's look it wears, and group, its group).")
+                                          "library's look it wears, and group, its group; "
+                                          "LG4: role, its index in `roles`' names: 0 the "
+                                          "crowd, 1 a gang member, 2 police).")
+    roles: dict = Field(default_factory=dict, description=(
+        "LG4: the role names (`presets.ROLE_CODES`) and how many pool slots each keeps (gang "
+        "members and police wear their group's looks)."))
     totals: dict
     hash: str
 
@@ -215,6 +284,11 @@ class TrafficPlan(_Model):
     drive_speeds: dict[str, float]
     follow: dict[str, float] = Field(description="The car following model and the signals, "
                                                  "junctions and yielding (`presets.TRAFFIC`).")
+    police_slots: list[int] = Field(default_factory=list, description=(
+        "LG4: the pool slots kept for patrol cars (of `police_model`, in `police_paint`)."))
+    police_model: str | None = None
+    police_paint: list[float] = Field(default_factory=list, description=(
+        "LG4: the patrol cars' livery, 9 floats (three linear colors, AG18's paint channels)."))
     totals: dict
     hash: str
 
@@ -226,7 +300,82 @@ class TileIndex(_Model):
     slots: int
     walks: int = 0
     drives: int = 0
+    places: int = 0
     sha256: str = Field(description="sha256 of the tile file's bytes.")
+
+
+class PlacesPlan(_Model):
+    """LG4: life at places (scope 6.4): the slot kinds (behavior, clip, points, dwell, use by
+    band), the place kinds by their hours, a visit's chance; totals (slots and their users by
+    kind and band, places open by hour by kind) and what was left out."""
+    hour: int
+    slot_kinds: dict = Field(description="`presets.SLOT_KINDS`, and each kind's code.")
+    kinds: list[str] = Field(description="Slot kinds by the runtime's code.")
+    behaviors: list[str]
+    anims: list[str]
+    place_kinds: dict
+    visit_p: float
+    totals: dict
+    hash: str
+
+
+class Turf(_Model):
+    """LG4: a gang's turf (M11's territory of a gang faction)."""
+    id: str
+    name: str | None = None
+    district_id: str
+    faction_id: str
+    faction: str
+    colors: list[str] = Field(description="Its members' dye colors (sRGB), its own first.")
+    walkways: int = Field(description="Walkways whose middle is in it (its members walk only "
+                                      "these).")
+    walking: PerBand = Field(description="Its members walking per band.")
+    loitering: PerBand = Field(description="Its members at its spots per band.")
+    spots: list[str]
+    hideouts: list[str]
+
+
+class GangPlan(_Model):
+    """LG4: gangs on their turf: each turf, its members' groups, the loitering share, the pool's
+    slots kept for gang members, what was left out (M11's gang members outside every gang
+    turf)."""
+    turfs: list[Turf]
+    groups: list[float] = Field(description="Shares of groups of 1 to 4.")
+    loiter: PerBand
+    pool: int = Field(description="The crowd's pool slots kept for gang members.")
+    want_near: float = Field(description="The most gang members wanted within the live radius "
+                                         "of any tile (any band).")
+    left_out: dict
+    hash: str
+
+
+class Precinct(_Model):
+    id: str
+    name: str | None = None
+    district_id: str
+    level: float
+    station_building_id: str | None = None
+    station_doors: list[str] = Field(description="The station's doors: its pairs go out and "
+                                                 "come back in there.")
+    police: PerBand = Field(description="M11's police in the district per band.")
+    foot: PerBand
+    cars: PerBand
+
+
+class PolicePlan(_Model):
+    """LG4: police patrols by the police field: per precinct its police on foot (in pairs) and in
+    patrol cars, the patrol minimum, the pool slots kept (crowd and traffic), the livery."""
+    precincts: list[Precinct]
+    patrol_min: float
+    car_share: float
+    per_car: float
+    pair: int = 2
+    pool: int = Field(description="The crowd's pool slots kept for police on foot.")
+    cars: int = Field(description="The traffic's pool slots kept for patrol cars.")
+    want_near: dict = Field(description="The most police on foot and patrol cars wanted within "
+                                        "the live radii of any tile (any band).")
+    left_out: dict
+    hash: str
 
 
 class DistrictLife(_Model):
@@ -326,6 +475,9 @@ class LifePlan(_Model):
     spike: SpikePlan | None = None
     crowd: CrowdPlan | None = Field(None, description="LG3: the city's crowd.")
     traffic: TrafficPlan | None = Field(None, description="LG5: the city's traffic.")
+    places: PlacesPlan | None = Field(None, description="LG4: slots and places by their hours.")
+    gangs: GangPlan | None = Field(None, description="LG4: gangs on their turf.")
+    police: PolicePlan | None = Field(None, description="LG4: police patrols.")
     checks: dict[str, Check]
     totals: dict
 

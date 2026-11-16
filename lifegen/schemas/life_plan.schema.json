@@ -154,13 +154,19 @@
       },
       "type": "array"
      },
-     "description": "Per pool slot its draws (seed, character, scale, gait, pace, tint: an index into the district's palette where it comes out; LG2: look, the library's look it wears, and group, its group).",
+     "description": "Per pool slot its draws (seed, character, scale, gait, pace, tint: an index into the district's palette where it comes out; LG2: look, the library's look it wears, and group, its group; LG4: role, its index in `roles`' names: 0 the crowd, 1 a gang member, 2 police).",
      "title": "Persons",
      "type": "object"
     },
     "pool": {
      "title": "Pool",
      "type": "integer"
+    },
+    "roles": {
+     "additionalProperties": true,
+     "description": "LG4: the role names (`presets.ROLE_CODES`) and how many pool slots each keeps (gang members and police wear their group's looks).",
+     "title": "Roles",
+     "type": "object"
     },
     "scale": {
      "title": "Scale",
@@ -363,6 +369,294 @@
     "hash"
    ],
    "title": "DistrictLife",
+   "type": "object"
+  },
+  "GangPlan": {
+   "additionalProperties": false,
+   "description": "LG4: gangs on their turf: each turf, its members' groups, the loitering share, the pool's\nslots kept for gang members, what was left out (M11's gang members outside every gang\nturf).",
+   "properties": {
+    "groups": {
+     "description": "Shares of groups of 1 to 4.",
+     "items": {
+      "type": "number"
+     },
+     "title": "Groups",
+     "type": "array"
+    },
+    "hash": {
+     "title": "Hash",
+     "type": "string"
+    },
+    "left_out": {
+     "additionalProperties": true,
+     "title": "Left Out",
+     "type": "object"
+    },
+    "loiter": {
+     "description": "A value per M11 hour band.",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 5,
+     "minItems": 5,
+     "title": "Loiter",
+     "type": "array"
+    },
+    "pool": {
+     "description": "The crowd's pool slots kept for gang members.",
+     "title": "Pool",
+     "type": "integer"
+    },
+    "turfs": {
+     "items": {
+      "$ref": "#/$defs/Turf"
+     },
+     "title": "Turfs",
+     "type": "array"
+    },
+    "want_near": {
+     "description": "The most gang members wanted within the live radius of any tile (any band).",
+     "title": "Want Near",
+     "type": "number"
+    }
+   },
+   "required": [
+    "turfs",
+    "groups",
+    "loiter",
+    "pool",
+    "want_near",
+    "left_out",
+    "hash"
+   ],
+   "title": "GangPlan",
+   "type": "object"
+  },
+  "PlacesPlan": {
+   "additionalProperties": false,
+   "description": "LG4: life at places (scope 6.4): the slot kinds (behavior, clip, points, dwell, use by\nband), the place kinds by their hours, a visit's chance; totals (slots and their users by\nkind and band, places open by hour by kind) and what was left out.",
+   "properties": {
+    "anims": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Anims",
+     "type": "array"
+    },
+    "behaviors": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Behaviors",
+     "type": "array"
+    },
+    "hash": {
+     "title": "Hash",
+     "type": "string"
+    },
+    "hour": {
+     "title": "Hour",
+     "type": "integer"
+    },
+    "kinds": {
+     "description": "Slot kinds by the runtime's code.",
+     "items": {
+      "type": "string"
+     },
+     "title": "Kinds",
+     "type": "array"
+    },
+    "place_kinds": {
+     "additionalProperties": true,
+     "title": "Place Kinds",
+     "type": "object"
+    },
+    "slot_kinds": {
+     "additionalProperties": true,
+     "description": "`presets.SLOT_KINDS`, and each kind's code.",
+     "title": "Slot Kinds",
+     "type": "object"
+    },
+    "totals": {
+     "additionalProperties": true,
+     "title": "Totals",
+     "type": "object"
+    },
+    "visit_p": {
+     "title": "Visit P",
+     "type": "number"
+    }
+   },
+   "required": [
+    "hour",
+    "slot_kinds",
+    "kinds",
+    "behaviors",
+    "anims",
+    "place_kinds",
+    "visit_p",
+    "totals",
+    "hash"
+   ],
+   "title": "PlacesPlan",
+   "type": "object"
+  },
+  "PolicePlan": {
+   "additionalProperties": false,
+   "description": "LG4: police patrols by the police field: per precinct its police on foot (in pairs) and in\npatrol cars, the patrol minimum, the pool slots kept (crowd and traffic), the livery.",
+   "properties": {
+    "car_share": {
+     "title": "Car Share",
+     "type": "number"
+    },
+    "cars": {
+     "description": "The traffic's pool slots kept for patrol cars.",
+     "title": "Cars",
+     "type": "integer"
+    },
+    "hash": {
+     "title": "Hash",
+     "type": "string"
+    },
+    "left_out": {
+     "additionalProperties": true,
+     "title": "Left Out",
+     "type": "object"
+    },
+    "pair": {
+     "default": 2,
+     "title": "Pair",
+     "type": "integer"
+    },
+    "patrol_min": {
+     "title": "Patrol Min",
+     "type": "number"
+    },
+    "per_car": {
+     "title": "Per Car",
+     "type": "number"
+    },
+    "pool": {
+     "description": "The crowd's pool slots kept for police on foot.",
+     "title": "Pool",
+     "type": "integer"
+    },
+    "precincts": {
+     "items": {
+      "$ref": "#/$defs/Precinct"
+     },
+     "title": "Precincts",
+     "type": "array"
+    },
+    "want_near": {
+     "additionalProperties": true,
+     "description": "The most police on foot and patrol cars wanted within the live radii of any tile (any band).",
+     "title": "Want Near",
+     "type": "object"
+    }
+   },
+   "required": [
+    "precincts",
+    "patrol_min",
+    "car_share",
+    "per_car",
+    "pool",
+    "cars",
+    "want_near",
+    "left_out",
+    "hash"
+   ],
+   "title": "PolicePlan",
+   "type": "object"
+  },
+  "Precinct": {
+   "additionalProperties": false,
+   "properties": {
+    "cars": {
+     "description": "A value per M11 hour band.",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 5,
+     "minItems": 5,
+     "title": "Cars",
+     "type": "array"
+    },
+    "district_id": {
+     "title": "District Id",
+     "type": "string"
+    },
+    "foot": {
+     "description": "A value per M11 hour band.",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 5,
+     "minItems": 5,
+     "title": "Foot",
+     "type": "array"
+    },
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "level": {
+     "title": "Level",
+     "type": "number"
+    },
+    "name": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Name"
+    },
+    "police": {
+     "description": "M11's police in the district per band.",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 5,
+     "minItems": 5,
+     "title": "Police",
+     "type": "array"
+    },
+    "station_building_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Station Building Id"
+    },
+    "station_doors": {
+     "description": "The station's doors: its pairs go out and come back in there.",
+     "items": {
+      "type": "string"
+     },
+     "title": "Station Doors",
+     "type": "array"
+    }
+   },
+   "required": [
+    "id",
+    "district_id",
+    "level",
+    "station_doors",
+    "police",
+    "foot",
+    "cars"
+   ],
+   "title": "Precinct",
    "type": "object"
   },
   "SpikeCar": {
@@ -577,6 +871,11 @@
      "title": "File",
      "type": "string"
     },
+    "places": {
+     "default": 0,
+     "title": "Places",
+     "type": "integer"
+    },
     "sha256": {
      "description": "sha256 of the tile file's bytes.",
      "title": "Sha256",
@@ -684,6 +983,34 @@
      "title": "Paints",
      "type": "object"
     },
+    "police_model": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Police Model"
+    },
+    "police_paint": {
+     "description": "LG4: the patrol cars' livery, 9 floats (three linear colors, AG18's paint channels).",
+     "items": {
+      "type": "number"
+     },
+     "title": "Police Paint",
+     "type": "array"
+    },
+    "police_slots": {
+     "description": "LG4: the pool slots kept for patrol cars (of `police_model`, in `police_paint`).",
+     "items": {
+      "type": "integer"
+     },
+     "title": "Police Slots",
+     "type": "array"
+    },
     "pool": {
      "title": "Pool",
      "type": "integer"
@@ -734,6 +1061,101 @@
    ],
    "title": "TrafficPlan",
    "type": "object"
+  },
+  "Turf": {
+   "additionalProperties": false,
+   "description": "LG4: a gang's turf (M11's territory of a gang faction).",
+   "properties": {
+    "colors": {
+     "description": "Its members' dye colors (sRGB), its own first.",
+     "items": {
+      "type": "string"
+     },
+     "title": "Colors",
+     "type": "array"
+    },
+    "district_id": {
+     "title": "District Id",
+     "type": "string"
+    },
+    "faction": {
+     "title": "Faction",
+     "type": "string"
+    },
+    "faction_id": {
+     "title": "Faction Id",
+     "type": "string"
+    },
+    "hideouts": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Hideouts",
+     "type": "array"
+    },
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "loitering": {
+     "description": "Its members at its spots per band.",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 5,
+     "minItems": 5,
+     "title": "Loitering",
+     "type": "array"
+    },
+    "name": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Name"
+    },
+    "spots": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Spots",
+     "type": "array"
+    },
+    "walking": {
+     "description": "Its members walking per band.",
+     "items": {
+      "type": "number"
+     },
+     "maxItems": 5,
+     "minItems": 5,
+     "title": "Walking",
+     "type": "array"
+    },
+    "walkways": {
+     "description": "Walkways whose middle is in it (its members walk only these).",
+     "title": "Walkways",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "id",
+    "district_id",
+    "faction_id",
+    "faction",
+    "colors",
+    "walkways",
+    "walking",
+    "loitering",
+    "spots",
+    "hideouts"
+   ],
+   "title": "Turf",
+   "type": "object"
   }
  },
  "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -783,6 +1205,18 @@
    "title": "Districts",
    "type": "array"
   },
+  "gangs": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/GangPlan"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "description": "LG4: gangs on their turf."
+  },
   "model_sha256": {
    "anyOf": [
     {
@@ -795,10 +1229,34 @@
    "default": null,
    "title": "Model Sha256"
   },
+  "places": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/PlacesPlan"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "description": "LG4: slots and places by their hours."
+  },
   "plan_hash": {
    "description": "Hash of the plan's content (every tile's and district's hash, the spike, the spec).",
    "title": "Plan Hash",
    "type": "string"
+  },
+  "police": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/PolicePlan"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "description": "LG4: police patrols."
   },
   "spec": {
    "additionalProperties": true,

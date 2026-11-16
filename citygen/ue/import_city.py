@@ -75,11 +75,12 @@ HASH_TAG = "cg.hash"
 # unchanged build applies the change (stored hashes are "<version>.<content hash>")
 MESH_VERSION = "3"
 ACTOR_VERSION = "1"
-LIFE_VERSION = "life6"   # LG0: lifegen's controller (CityGenLife) and its stand-in material;
+LIFE_VERSION = "life7"   # LG0: lifegen's controller (CityGenLife) and its stand-in material;
                          # LG1: the people library's properties; LG3: the city's crowd;
                          # 4, lifegen_clothing_toggle: the clothing switch's hidden material
                          # and whole body; 5, LG5: the city's traffic; 6, LG2: the looks,
-                         # their dye colors, groups and wear
+                         # their dye colors, groups and wear; 7, LG4: life at places (slots,
+                         # places by their hours, gangs, police, the places' clips)
 ATMOS_VERSION = "atmos7"  # the atmos controller's and cells' actors (2, AT2: the high tier,
                           # blinks and sweeps in the packed lights; 3, AT3: the sky and time;
                           # 4, AT4: the air, a cell's fog volumes and emitters; 5, the visible
@@ -1287,6 +1288,49 @@ def traffic_props(d):
                     "look_max_m": float(t["look_max_m"]), "lateral_m": float(t["lateral_m"]),
                     "predict_s": float(t["predict_s"]),
                     "yield_margin_m": float(t["margin_m"]), "traffic": True})
+    return out
+
+
+def places_props(d, missing):
+    """LG4: the life controller's life at places properties from its packed data
+    (`unreal_life.pack_places`): every slot (kind, walkway lane, distance, points, users per
+    band, stay, role, turf, clip, a queue's door), the kinds' names and behaviors; per walkway
+    lane its gang turf, gang members and police per band, patrol; the turfs' factions and their
+    dye colors; the pool's roles; the doors' hours, rates by hour, visits and stations; the
+    places' clips (the project's, `unreal_people.ensure_place_clips`); patrol cars per lane, the
+    traffic's patrol car slots and livery. All empty (LG3's crowd and LG5's traffic as they
+    were) for a plan before LG4."""
+    fl = lambda k: [float(v) for v in d.get(k) or []]     # noqa: E731
+    it = lambda k: [int(v) for v in d.get(k) or []]       # noqa: E731
+
+    def load(path):
+        a = unreal.load_asset(path) if path and EAL.does_asset_exist(path) else None
+        if a is None and path:
+            missing.append(path)
+        return a
+
+    out = {"slot_kinds": it("slot_kinds"), "slot_lanes": it("slot_lanes"),
+           "slot_dists": fl("slot_dists"), "slot_point_starts": it("slot_point_starts"),
+           "slot_points": fl("slot_points"), "slot_use": fl("slot_use"),
+           "slot_dwell": fl("slot_dwell"), "slot_roles": it("slot_roles"),
+           "slot_turfs": it("slot_turfs"), "slot_anims": it("slot_anims"),
+           "slot_doors": it("slot_doors"),
+           "slot_kind_names": [str(v) for v in d.get("slot_kind_names") or []],
+           "slot_kind_behaviors": [str(v) for v in d.get("slot_kind_behaviors") or []],
+           "walk_turf": it("walk_turf"), "walk_gang": fl("walk_gang"),
+           "walk_police": fl("walk_police"), "walk_patrol": it("walk_patrol"),
+           "turf_faction": it("turf_faction"), "faction_palettes": fl("faction_palettes"),
+           "faction_colors": int(d.get("faction_colors") or 0),
+           "person_role": it("person_role"),
+           "door_rates_h": fl("door_rates_h"), "door_open": it("door_open"),
+           "door_visit": fl("door_visit"), "door_dwell": fl("door_dwell"),
+           "door_police": it("door_police"),
+           "gang_groups": [float(v) for v in (d.get("places") or {}).get("gang_groups") or []],
+           "sit_clips": [load(p) for p in d.get("sit_clips") or []],
+           "talk_clips": [load(p) for p in d.get("talk_clips") or []],
+           "talk_count": int(d.get("talk_count") or 0),
+           "drive_police": fl("drive_police"), "traffic_police": it("traffic_police"),
+           "police_paint": fl("police_paint"), "places": True, "gangs": True, "police": True}
     return out
 
 
@@ -4541,6 +4585,9 @@ class Importer:
             # (LG5: the city's traffic; empty for a plan before it, whose spike drives its cars)
             for k, v in traffic_props(d).items():
                 a.set_editor_property(k, v)
+            # (LG4: life at places; empty for a plan before it)
+            for k, v in places_props(d, missing).items():
+                a.set_editor_property(k, v)
             a.tags = self.tags(info["key"], hv, [], "life", "life", "", d["district"])
 
         self.place(have, info["key"], info["hash"], cls.static_class(), make, update,
@@ -4562,7 +4609,15 @@ class Importer:
                                            "signal_lanes": sum(1 for v in d["drive_signal"]
                                                                if v >= 0),
                                            "models": len(d["models"])}
-                                          if d.get("traffic") else None)}
+                                          if d.get("traffic") else None),
+                              "places": ({"slots": len(d["slot_kinds"]),
+                                          "turfs": len(d.get("turf_faction") or []),
+                                          "roles": [list(d.get("person_role") or []).count(k)
+                                                    for k in range(3)],
+                                          "patrol_cars": sum(d.get("traffic_police") or []),
+                                          "sit_clips": len(d.get("sit_clips") or []),
+                                          "talk_clips": len(d.get("talk_clips") or [])}
+                                         if d.get("slot_kinds") is not None else None)}
 
     # -- what Play puts you in, and how far the level streams around you --
 

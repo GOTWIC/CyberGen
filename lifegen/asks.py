@@ -72,6 +72,24 @@ ASKS = (
      "derived": "M3's entrances (position, walkway id) where the build has no stage 2 "
                 "buildings (LG3 reads AG3's doors where it has)",
      "missing": ""},
+    {"id": "slot_points", "of": "assetgen", "needed_by": "LG4",
+     "what": "where a prop's user stands or sits (a bench's seats and their height, a kiosk's "
+             "counter, a stall's serving side, a shelter's bench), per AG8 variant",
+     "field": ("@assetgen", "slot_points"),
+     "record": {"props/variants/<kind>.json": "per variant its use points in the prop's frame "
+                                               "(x, y, z, facing) and the seat height"},
+     "derived": "LG4's use points by prop kind in the prop's frame (`presets.SLOT_KINDS`: a "
+                "bench's two seats 0.45 m either side of its middle facing away from its back, "
+                "a kiosk's and vending machine's queue out from its front, a stall's at its "
+                "serving side), the same for every variant",
+     "missing": ""},
+    {"id": "police_vehicles", "of": "assetgen", "needed_by": "LG4",
+     "what": "a patrol car (AG18: a model with a light bar, or a livery the packs carry)",
+     "field": ("@vehicles", "police"),
+     "record": {"vehicles/cars/<name>.py": "a police variant (light bar, push bar, decals)"},
+     "derived": "an AG18 car (`presets.POLICE[\"car_models\"]`, the first the traffic has) in "
+                "the police livery by paint (`POLICE[\"livery\"]`)",
+     "missing": ""},
     {"id": "fleet_kinds", "of": "assetgen", "needed_by": "LG5, LG7",
      "what": "AG18's missing kinds: buses, trucks, motorbikes, bikes, flying cars, drones, "
              "boats (decision 6: designed on the Mac as the cars are)",

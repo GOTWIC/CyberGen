@@ -15,7 +15,7 @@ grows here as it lands, as in [`citygen_milestones.md`](citygen_milestones.md),
 | LG1 | People: the population library (24 MetaHumans made, rigged and assembled by script into the user's project, faces blended, bodies and skin by seed), Epic's walks retargeted in place, baked walks and impostor cards for the far crowd, the plan's person draws, the exporter's `--people` and the runtime's near, mid and far tiers; Delta's Old Town walked by them | Done | [`docs/progress/LG1`](progress/LG1) |
 | LG2 | Clothing: 144 looks (6 a character, by fashion group) of garments cut from pattern parameters on each character's own body and draped in Blender's cloth solver (tees, shirts, hoodies, coveralls, bombers, jackets, trench coats, raincoats, cargo pants, trousers, skirts, sneakers, boots, dress shoes), 15 generated textiles, accessories and cyberware; looks' skeletal meshes, mid meshes and cards in the people library; people spawned by their district's groups in its colors and wear; the variety check | Done | [`docs/progress/LG2`](progress/LG2) |
 | LG3 | Crowds on the streets: every walkway of the city at its street's density by hour, live round the view from a fixed pool (people come alive and go past the far tier, out of sight), trips out of and into AG3's doors, stations, garages and taxi stands, groups, pace, signals with derived phases at the crosswalks, jaywalking by danger, local avoidance and stepping aside from the player, stairs and elevators; Delta walked city-wide | Done | [`docs/progress/LG3`](progress/LG3) |
-| LG4 | Life at places | Planned | |
+| LG4 | Life at places: every bench, bus shelter, kiosk, vending machine, food stall and taxi stand of the city a place slot (its use points Smart Objects of the world's subsystem while its walkway is live), clubs' queues and bars' smokers at their doors; people walking by sit, wait, buy, eat, queue, smoke or talk there and walk on; AG3's shop doors as places by their hours (closed doors send no one, open shops take visitors in and let them out); gang members on their own turf's walkways and spots in their faction's colors; police pairs on the patrol walkways out of their stations and patrol cars in a police livery; the Game Animation Sample's bench loop and idle breaks retargeted onto the library's bodies; Delta city-wide | Done | [`docs/progress/LG4`](progress/LG4) |
 | LG5 | Traffic: every lane of the city at its street's density by hour (twice M11's by default), live round the view from a fixed pool of AG18's cars by the districts' fleets and paints; following the car in front, red lights, junctions taken in turn with room past them, stopping for people and the player; Delta driven city-wide | Done | [`docs/progress/LG5`](progress/LG5) |
 | LG6 | Transit | Planned | |
 | LG7 | Air and water | Planned | |
@@ -251,6 +251,65 @@ outfit), on main after LG1 (#226). Report, shots, benchmark and open items:
 - **Tests** (`tests/lifegen/test_lg_plan.py`: every walkway's people, the signals' phases, a
   walkway nobody reaches, AG3's doors as spawn points, the exporter's crowd pack and summary;
   the fixture gained a signalized junction with two crosswalks).
+
+## LG4: life at places
+
+Built on the Windows PC (2026-11-15), on main after LG2 (#231). Report, shots, benchmark and
+open items: [`docs/progress/LG4/README.md`](progress/LG4/README.md).
+
+- **Slots** (`lifegen/places.py` `make_slots`, `presets.SLOT_KINDS`, `planmodel.Slot`, each tile
+  file's `slots`): every M6 bench, bus shelter, kiosk, vending machine and food stall, M11's
+  taxi stands (projected onto their walkway, facing the curb), a club's queue at its door and a
+  share of bars' smokers beside theirs; per slot its use points in the object's frame (x, y, z,
+  the way its user faces), its walkway within `SLOT_REACH_M` 15 m, its behavior and clip (idle,
+  sit, talk), its stay and its users per hour band (the walkway's crowd times the kind's share,
+  at most its points). Points in a building or on a carriageway (lanes, ground-level
+  junctions: `Carriageway`, `Footprints.blocked`) are dropped, a slot with none left out.
+- **Places by their hours** (`make_places`, `apply_hours`, `presets.PLACE_KINDS`): every AG3
+  shop door a place with its hours (M11's POI's own where the door is a POI's unit, else by its
+  use; a food place's drawn among four), open per hour, busy by band (bars fill at night), a
+  visit's chance and stay; the doors' rates by the hours, renormalized per district and hour so
+  a closed door's people leave by the district's open ones.
+- **Gangs** (`gang_turfs`, `gang_walks`, `gang_spots`, `faction_colors`; `presets.GANG`): per
+  gang turf (M11's territories of a gang faction) its walkways, M11's gang members on them by
+  band (walking, and a loitering share at its spots: its hideouts' doors and its busiest
+  corners, a ring of points on the sidewalk walked in from its end until clear of the
+  carriageway), its faction's dye colors; M11's members outside every gang turf left out.
+- **Police** (`police_plan`, `presets.POLICE`): per district its police on foot on the patrol
+  walkways (the police field at least 0.25) and patrol cars on its main lanes (`DrivePolice`,
+  a share of M11's police in cars, two to a car), its precinct's station doors; an AG18 model in
+  a white livery by paint (`halcyon_sable`).
+- **The pool's roles** (`assign_roles`, `CrowdPlan.role`, `TrafficPlan.police_slots`): gang
+  members and police keep slots of the crowd's pool in their group's looks (each role's most
+  near the view times a margin, within a share of the pool), patrol cars slots of the traffic
+  pool.
+- **Checks** (`plan.places_checks`): `slots_placed` (on its walkway, out of every building and
+  carriageway, each user facing its object), `slot_use`, `places_hours`, `gang_turf` (members
+  only on their own turf's walkways and spots), `police_patrols` (within the police field),
+  `places_budget`; `preview_places.png`; asks `slot_points` and `police_vehicles` of assetgen.
+- **Exporter and runtime** (`unreal_life.pack_places`, `PACK_VERSION` 6;
+  `import_city.places_props`, `LIFE_VERSION` life7; `CityGenLifePlaces.cpp`): the places' clips
+  (the Game Animation Sample's bench loop and three idle breaks) retargeted onto the library's
+  bodies in the project (`unreal_people.ensure_place_clips`, `ue/people_places.py`; the
+  library untouched); a live slot's points Smart Objects of the world's subsystem (claimed,
+  occupied, freed; definitions per kind set by reflection); the behaviors five states of the
+  walk processor (`ToSlot`, `AtSlot`, `FromSlot`, `Inside`), not StateTree (MassAI's processors
+  and a tree per entity for a timer and two lerps); gangs on their turf's walkways in their
+  colors, police pairs on the patrol walkways out of and back into their stations, patrol cars
+  in the livery by LG5's rules; sitting people near out to the mid tier; console
+  `CityGenLife.Places`, `.Gangs`, `.Police`, `.PlaceShow`, `.SitOffset`, the Tab menu's Places
+  row, the status's `places`; bench pass `night_life_noplaces`.
+- **Delta**: 1,641 slots, 16,125 places, 5 gang turfs, 303 police on foot and 81 patrol cars
+  at 23:00 over six precincts; every plan check and both Unreal checks pass; round the views
+  up to 162 slots live with 146 users, 129 gang members, 48 police on foot and 20 patrol cars,
+  558 Smart Objects, over 1,000 shop visits; shots of people sitting, queueing, smoking, gangs
+  at their corners, police pairs and patrol cars. Lifegen's
+  tick 2.2 to 3.1 ms round the views against LG5's 1.3 to 2; the lean benchmark
+  `night_plan_all` 21.2 ms p95 native (walk 26.2), places off 20.9 (walk 23.5).
+- **Tests** (`tests/lifegen/test_lg_places.py`: open hours, slot points and facings, faction
+  colors and reserves, the plan on a small city with a gang turf, hideout, precinct, station and
+  shop doors, the checks catching members off their turf and police off their walkways, the
+  exporter's pack; `tests/test_bench.py` the places pass).
 
 ## LG5: traffic
 

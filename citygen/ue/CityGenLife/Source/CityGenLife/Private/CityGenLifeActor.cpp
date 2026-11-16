@@ -771,6 +771,12 @@ void ACityGenLife::FindGround()
 			{
 				continue;
 			}
+			// (LG4: at, to or from a place slot or inside a shop: its ground is its walkway's, as
+			// it was; a trace at a bench would find its seat)
+			if (W->State >= CgWalk::ToSlot)
+			{
+				continue;
+			}
 			ZOff = &W->ZOff;
 			At = W->Pos;
 		}

@@ -2764,6 +2764,106 @@ LG5 drives the spike's cars as before.
   (`bench.LIFE_PASSES`). Delta: `night_plan_all` 21.2 ms p95 native, traffic off 18.9
   (`docs/progress/LG5/README.md`).
 
+### From LG4: life at places
+
+A life plan with `places` (`lifegen plan` since LG4) adds life at places to LG3's crowd and
+LG5's traffic: the place slots people use, the shops by their hours, gangs on their turf and
+police patrols on foot and in cars, all over the city wherever the plan puts them
+(`citygen/unreal_life.py` `pack_places`, `PACK_VERSION` 6; `import_city.places_props`,
+`LIFE_VERSION` life7; `CityGenLifePlaces.cpp`, `CityGenLifePlaces.h`). A plan before LG4 packs
+none of it and its crowd and traffic run as before.
+
+- **The pack** (`BUILD/unreal/life.json`, the controller's properties):
+  - every slot (`SlotKinds`, an index into `SlotKindNames` with its `SlotKindBehaviors`: bench
+    sit, bus stop wait, kiosk and vending buy, stall eat, taxi stand and club queue queue, bar
+    smokers smoke, gang spot talk), its walkway lane (`SlotLanes`) and distance along it
+    (`SlotDists`, m), its use points (`SlotPointStarts`, `SlotPoints`: x, y, z, the way its user
+    faces, citygen's frame), its users per hour band (`SlotUse`), stay (`SlotDwell`, s), role
+    (`SlotRoles`: the crowd, or a gang's members), turf (`SlotTurfs`), clip (`SlotAnims`: idle,
+    sit, talk) and, for a club's queue, the door it goes in at (`SlotDoors`);
+  - per walkway lane its gang turf (`WalkTurf`), gang members and police walking per band
+    (`WalkGang`, `WalkPolice`) and whether police patrol it (`WalkPatrol`);
+  - per turf its faction (`TurfFaction`), per faction its members' dye colors
+    (`FactionPalettes`, `FactionColors` linear colors: its own first); the gangs' group sizes
+    (`GangGroups`);
+  - per pool slot its role (`PersonRole`: 0 the crowd, 1 a gang member, 2 police: the plan's
+    slots kept for them, in their group's looks);
+  - per door (as `DoorLanes`) its people out a hour every hour (`DoorRatesH`, 24: LG3's
+    `DoorRates` at the plan's hour only), its place's open hours (`DoorOpen`, 24 bits), a
+    passer-by's visit chance per band (`DoorVisit`), a visit's stay (`DoorDwell`) and whether
+    it is a precinct station's (`DoorPolice`);
+  - patrol cars per drive lane and band (`DrivePolice`), the traffic pool's patrol car slots
+    (`TrafficPolice`, the plan's `police_slots`, a model the project has) and their livery
+    (`PolicePaint`, 9 floats as AG18's paints);
+  - the places' clips (`SitClips` per clip group, `TalkClips` and `TalkCount` per group): the
+    Game Animation Sample's bench sitting loop and three standing idle breaks, retargeted onto
+    the library's bodies by `unreal_people.ensure_place_clips` (below).
+- **The places' clips** (`citygen/unreal_people.py` `ensure_place_clips`,
+  `citygen/ue/people_places.py`, run by `citygen unreal ... --people` after the library):
+  `lifegen.presets.PLACE_CLIPS` copied from the user's Game Animation Sample (its closure,
+  `gas_closure`, `migrate`), retargeted with the library's own retargeter
+  (`<content>/Anim/<group>/RTG_GasToBody_<library hash>`) onto each clip group's body in the
+  project's editor off screen, notifies stripped, made in place; their manifest
+  `Saved/CityGenPeople/places.json` (per group, per clip, its path) with a hash of its own (the
+  library's hash, the clips, the script), kept while it is the same. The library's own assets,
+  manifest and hash are untouched (its cache stays valid). Without them the people at places
+  stand.
+- **Smart Objects** (the `SmartObjects` plugin, a dependency of `CityGenLife`): every use point
+  of a live slot is a Smart Object of the world's `USmartObjectSubsystem`, made by
+  `CreateSmartObject` (no actor) when its walkway comes alive and destroyed when it goes, one
+  slot each, its definition one per slot kind made at BeginPlay (`USmartObjectDefinition` with
+  one slot at its own transform and a `UCgPlaceBehaviorDefinition` naming the kind, behavior
+  and clip; set through reflection: the engine keeps a definition's slots to the editor). A
+  person claims a point (`MarkSlotAsClaimed`), occupies it on arrival (`MarkSlotAsOccupied`)
+  and frees it when it leaves (`MarkSlotAsFree`); a point another user holds
+  (`CanBeClaimed` false: the game's own AI) is passed over. The behaviors themselves run in the
+  walk processor, not StateTree (below).
+- **The runtime** (`CityGenLifePlaces.cpp`, the walk processor's `StepSlot`):
+  - *A walkway coming alive* (LG3's live region) gets, besides its crowd, its gang members in
+    groups (in their faction's colors, `DressFaction`), its police in pairs and its slots alive
+    with their users at once (sitting, standing, talking there, part way through their stay).
+    The pool's role slots are kept in lists of their own (`FreeGang`, `FreePolice`); each role
+    is scaled down evenly within its own slots (`gang_scale`, `police_scale`).
+  - *Using a slot:* a person walking past a live slot on its walkway that wants another user
+    (its users at the hour, the scale keeping the pool's people within it) claims a free point
+    (a queue from its front), walks to it (`ToSlot`), sits, waits, queues, buys, eats, smokes
+    or talks there for its stay (`AtSlot`, facing the point's way) and walks back to where it
+    left its walkway (`FromSlot`); a club's queue goes in at its door instead (the trip's end).
+    Crowd groups keep together (only people alone use slots); a gang's members break off to
+    their own turf's spots.
+  - *Places by their hours* (`ApplyHour`, at BeginPlay and with `CityGenLife.Hour`): a door
+    closed at the hour sends no one out and takes no one in at a trip's end; an open shop takes
+    a passer-by in for a visit by its chance (`Inside`, not drawn) and lets them out again
+    after it.
+  - *Gangs* walk only their turf's walkways (`WalkTurf`) and stay out for good; *police* walk
+    only the patrol walkways (`WalkPatrol`) at a constable's pace, go back in at their station's
+    doors at a trip's end, and the station's live doors send pairs out while the police round
+    the view are under their number (`PoliceFromStations`).
+  - *Patrol cars* are the traffic pool's police slots (`FreePoliceCars`), filled on a lane
+    coming alive by `DrivePolice` and made up for far from the view like the rest, in the
+    livery; they drive by LG5's rules.
+- **Drawn:** a person at a slot plays its clip near (`WalkAnim`: the bench loop sitting, its
+  root `SitOffset` off its point; one of the talk clips by its seed; the idle standing), each
+  at its own place in the loop; someone sitting stays near out to the mid tier (`MidM`, within
+  `NearMax`: the baked walk has no sitting pose); mid and far people at a slot hold the walk's
+  passing pose (LG3's standing person). The ground under a person at a slot is its walkway's
+  (no trace at a bench, which would find its seat).
+- **Why not StateTree:** the behaviors are five states of the person the walk processor already
+  steps (walk, to a slot, at it, back, inside a shop), on the game thread with the rest of its
+  step; StateTree on Mass needs MassGameplay's and MassAI's processors (LG0 kept the plugin
+  free of them) and a tree instance per entity, for what is here a timer and two lerps.
+- **Console:** `CityGenLife.Places [0|1]`, `CityGenLife.Gangs [0|1]`, `CityGenLife.Police
+  [0|1]` (each on or off, the live walkways filled again), the play menu's **Places, gangs,
+  police** row (`places`, `places=0|1`; `ACityGenPlay::HasLifePlaces`), `CityGenLife.SitOffset
+  FORWARD_CM UP_CM`, and for the check's shots `CityGenLife.PlaceShow sit|queue|stall|smoke|
+  gang|gangwalk|police|patrol` (the camera to the nearest person sitting, queueing, at a stall,
+  smoking at a bar, a gang at its spot or walking, a police pair, a patrol car: the status's
+  `traffic.show`, so the check's `until` waits for it). `CityGenLife.Status` adds `places`
+  (slots, live, Smart Objects, users by kind, taken, left, claims refused, visits, doors open,
+  gang members and police live, free and wanted, their scales, patrol cars).
+- **Benchmark:** every life pass sets `CityGenLife.Places`, `.Gangs` and `.Police` (1), the
+  pass `night_life_noplaces` turns the three off (`bench.LIFE_PASSES`).
+
 ## Milestones and checks
 
 - **Every milestone** updates the exporter in its own PR for what it adds or changes (a new
@@ -2839,3 +2939,4 @@ LG5 drives the spike's cars as before.
 | AT1 | Layer 3 ("From AT1" above): the manifest's `atmos` (`unreal_atmos.write_atmos`: the controller's key and hash, a cell per 128 m cell, `counts.atmos_cells` and `atmos_lights`; the records in `unreal/atmos.json`; a plan whose lux check failed is named and left out, `--atmos DIR` naming a folder without a plan is an error); `actor_hashes`, `actor_kinds` (`atmos`, `atmos_cell`); the importer's `atmos_cells` (a `CityGenAtmosCell` data actor per cell, spatially loaded, among the offloaded actors) and `atmos_controller` (`CityGenAtmos`, always loaded, the plan's settings), `ATMOS_VERSION`; atmosgen's assets made before the import (`make_assets`); the plugin: cells register their lights as they stream, the controller's pooled live set shows them by night (`MPC_CityGen`'s `Night`), its subsystem and `-CityGenAtmosPlan` gone; the play features without AG15's spot lamps and sign washes (`play.json` 3; `GetStatus` without `lamps_lit`), their pools past the live range; the check reads the controller's status by night; `--atmos`, `--no-atmos`, `--bench-atmos` a flag | Delta in CityAG16 (`docs/progress/AT1/`): imported over AG16's import (the controller and 500 cells created, nothing else touched, under 3 min), the check passing by night with views, the night benchmark before and after (three runs each) |
 | Packaged game (a fix on its own, 2026-11-10) | "A packaged game" above: `unreal.ALWAYS_COOK` written to the project's DefaultGame.ini by every import (`set_project_ini`, `set_engine_ini(..., file, entries)`), so the atmos assets loaded by path are cooked; the play module puts a game with no saved resolution at the monitor's native resolution, windowed fullscreen; the Tab menu's Fog, Rain, Wet streets and hour rows drive the atmos controller. | Delta imported again into the AT1 project, packaged (Development Win64) and played: no missing CityGen package, a 2560 x 1440 window, the weather rows by night. |
 | Play fixes (2026-11-12, after the packaged Delta) | Play's default is walking (`--play walk`; `fly` and `project` the others): the play plugin's `ACityGenWalker` (`CityGenWalker.h`, a character with a camera in front of the face and a body its player sees, keys bound on its own input component, `-CityGenSelfie=SECONDS` for a packaged game's proof), made into `Core/BP_CityGenWalker` wearing the project's own character's body (`import_city.project_body`) and spawned by `Core/GM_CityGenWalk` (`walk_classes`), the level's game mode override; `--check` walks with it (its spawn and body, a curb climbed: checks `spawn` and `curb`); `M_CgVehicleGlass` darker, coated and covered toward grazing angles (`VEHICLE_VERSION` 10, every car made again; two-sided, the far side's faces left out); the Aurels never imported (`unreal_vehicles.EXCLUDED`, a placement naming one refused) | Delta Megacity imported into CityAG16 and checked, a packaged game (`docs/progress/fix_play_cars/`) |
+| LG4 | Life at places ("From LG4: life at places" above): `unreal_life.pack_places` and the door, drive and pool fields LG4 adds (`PACK_VERSION` 6), `import_city.places_props` (`LIFE_VERSION` life7), the places' clips made in the project after the people library (`unreal_people.ensure_place_clips`, `ue/people_places.py`, `Saved/CityGenPeople/places.json`), the `SmartObjects` plugin a dependency of `CityGenLife`, slots' use points as Smart Objects of the world's subsystem while their walkways are live, gangs, police pairs and patrol cars in a livery; console `CityGenLife.Places`, `.Gangs`, `.Police`, `.PlaceShow`, `.SitOffset`, the play menu's Places row, the status's `places`; bench pass `night_life_noplaces`. A plan without `places` exports and runs as before. |

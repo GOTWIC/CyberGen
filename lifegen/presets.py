@@ -286,3 +286,128 @@ TRAFFIC = {
 # is stopped; the cycle, its amber and all-red; people start crossing in the first `walk_s`
 # of their phase and not after (the flashing hand); a junction's offset by its id's hash
 SIGNAL = {"cycle_s": 60.0, "amber_s": 3.0, "all_red_s": 2.0, "walk_s": 12.0}
+
+# --- LG4: life at places (scope 6.4) ------------------------------------------------------------
+
+# the place slots people use (Smart Objects in the runtime): per kind its behavior, the clip
+# family its users play (`sit` the sample's bench loop, `idle` a standing idle, `talk` the
+# idle breaks), its use points in the object's own frame (x along its yaw, y to its left, m;
+# each with the way its user faces, degrees from the object's yaw: a bench's sitter faces away
+# from its back, at local -y), how long a user stays (s), and per hour band the share of its
+# points in use where its walkway has `SLOT_REF_PER_M` people a meter (fewer where quieter,
+# never under `SLOT_USE_MIN` of it)
+SLOT_KINDS = {
+    "bench": {"behavior": "sit", "anim": "sit", "dwell_s": [60.0, 300.0],
+              "points": [[-0.45, -0.1, -90.0], [0.45, -0.1, -90.0]],
+              "use": [0.15, 0.35, 0.6, 0.6, 0.35]},
+    "bus_stop": {"behavior": "wait", "anim": "idle", "dwell_s": [30.0, 180.0],
+                 "points": [[-1.0, 0.0, -90.0], [0.0, 0.05, -90.0], [1.0, 0.0, -90.0]],
+                 "use": [0.1, 0.5, 0.4, 0.5, 0.25]},
+    "kiosk": {"behavior": "buy", "anim": "idle", "dwell_s": [15.0, 60.0],
+              "points": [[1.75, 0.0, 180.0], [2.6, 0.15, 180.0], [3.4, -0.1, 180.0]],
+              "use": [0.15, 0.5, 0.6, 0.6, 0.4]},
+    "vending": {"behavior": "buy", "anim": "idle", "dwell_s": [10.0, 30.0],
+                "points": [[0.85, 0.0, 180.0], [1.7, 0.1, 180.0]],
+                "use": [0.15, 0.3, 0.35, 0.35, 0.3]},
+    "stall": {"behavior": "eat", "anim": "talk", "dwell_s": [40.0, 240.0],
+              "points": [[2.05, -0.6, 180.0], [2.05, 0.6, 180.0], [2.9, 0.0, 180.0]],
+              "use": [0.3, 0.4, 0.7, 0.8, 0.7]},
+    "taxi_stand": {"behavior": "queue", "anim": "idle", "dwell_s": [30.0, 120.0],
+                   "points": [[0.0, 0.0, 0.0], [-0.9, 0.0, 0.0], [-1.8, 0.0, 0.0]],
+                   "use": [0.2, 0.3, 0.3, 0.4, 0.5]},
+    # (a club's door at night: a queue out of the door along the facade; a bar's smokers
+    # beside its door)
+    "bar_queue": {"behavior": "queue", "anim": "idle", "dwell_s": [20.0, 120.0],
+                  "points": [[1.2, 0.0, 180.0], [1.2, -0.85, 180.0], [1.2, -1.7, 180.0],
+                             [1.2, -2.55, 180.0], [1.2, -3.4, 180.0]],
+                  "use": [0.35, 0.0, 0.0, 0.1, 0.45]},
+    "smoke": {"behavior": "smoke", "anim": "talk", "dwell_s": [120.0, 420.0],
+              "points": [[0.6, 1.5, 15.0], [1.5, 1.9, 205.0], [0.6, -1.6, -20.0]],
+              "use": [0.3, 0.05, 0.1, 0.25, 0.4]},
+    # (a gang's corner or hideout door: its members in a ring, talking, facing its middle;
+    # its use is the turf's loiterers, `GANG`)
+    "gang_spot": {"behavior": "talk", "anim": "talk", "dwell_s": [120.0, 600.0],
+                  "points": [[0.9, 0.0, 180.0], [0.0, 0.9, -90.0], [-0.9, 0.0, 0.0],
+                             [0.0, -0.9, 90.0]],
+                  "use": [0.0, 0.0, 0.0, 0.0, 0.0]},
+}
+SLOT_PROPS = {"prop.bench": "bench", "prop.bus_stop": "bus_stop", "prop.kiosk": "kiosk",
+              "prop.vending_machine": "vending", "prop.food_stall": "stall"}
+SLOT_BEHAVIORS = ("sit", "wait", "buy", "eat", "queue", "smoke", "talk")
+SLOT_ANIMS = ("idle", "sit", "talk")
+SLOT_REF_PER_M = 0.06          # people a meter on a walkway at which a slot is used fully
+SLOT_USE_MIN = 0.15
+SLOT_REACH_M = 15.0            # a slot's use point at most this far from its walkway
+# walkway kinds people come to a slot from (and gang corners and patrols walk)
+ACCESS_KINDS = ("sidewalk", "path", "promenade", "pedestrian_street", "alley", "footbridge",
+                "skybridge", "elevated", "concourse")
+
+# places (scope 6.4: points of interest by their hours): every shop door of AG3 (a unit's use)
+# and M11's POIs, open from hour to hour (`hours`, to < from runs past midnight; M11's own on a
+# POI), how busy by hour band (`busy`: bars fill at night); a door's people out of and into it
+# are its rate times `busy` while open, none while closed (the district's people kept by its
+# other doors); a passer-by goes in for a visit (and comes back out after `dwell_s`) at
+# `VISIT_P` times `busy`; a bar's or club's slot at its door (`slot`)
+PLACE_KINDS = {
+    "bar": {"hours": [18, 4], "busy": [0.7, 0.0, 0.1, 0.5, 1.0], "dwell_s": [300.0, 900.0],
+            "slot": "smoke"},
+    "club": {"hours": [21, 6], "busy": [1.0, 0.0, 0.0, 0.1, 0.9], "dwell_s": [300.0, 900.0],
+             "slot": "bar_queue"},
+    "arcade": {"hours": [12, 2], "busy": [0.4, 0.0, 0.5, 0.8, 1.0], "dwell_s": [120.0, 600.0]},
+    "food": {"hours": [6, 22], "hours_any": [[6, 22], [0, 24], [10, 2], [7, 23]],
+             "busy": [0.3, 0.6, 1.0, 0.8, 0.6], "dwell_s": [60.0, 300.0]},
+    "convenience": {"hours": [0, 24], "busy": [0.3, 0.6, 0.7, 0.8, 0.6],
+                    "dwell_s": [40.0, 180.0]},
+    "pawn": {"hours": [9, 21], "busy": [0.0, 0.3, 0.6, 0.5, 0.2], "dwell_s": [90.0, 400.0]},
+    "clinic": {"hours": [8, 20], "busy": [0.05, 0.5, 0.7, 0.5, 0.2], "dwell_s": [300.0, 900.0]},
+    "ripperdoc": {"hours": [10, 22], "busy": [0.3, 0.3, 0.6, 0.8, 0.7],
+                  "dwell_s": [300.0, 900.0]},
+    "cyberware": {"hours": [10, 22], "busy": [0.1, 0.4, 0.8, 0.9, 0.6], "dwell_s": [90.0, 500.0]},
+    "laundromat": {"hours": [7, 23], "busy": [0.0, 0.5, 0.6, 0.8, 0.5], "dwell_s": [120.0, 600.0]},
+    "lobby": {"hours": [0, 24], "busy": [1.0, 1.0, 1.0, 1.0, 1.0], "dwell_s": [0.0, 0.0]},
+}
+PLACE_DEFAULT = {"hours": [8, 22], "busy": [0.1, 0.5, 0.8, 0.8, 0.4], "dwell_s": [90.0, 400.0]}
+VISIT_P = 0.12                 # a passer-by's chance to go in at an open shop it passes
+BAR_SLOT_SHARE = 0.3           # of the bars that are no POI, those with a smokers' slot
+
+# gangs on their turf (scope 6.4, M11's factions and territories): the gang members M11 puts
+# on a gang turf's streets (its segments' gang members per 100 m on their walkways in the turf)
+# walk only its walkways, in groups (`groups`: shares of 1 to 4), in their gang's colors (LG2's
+# gang looks, dyed in the faction's colors); a share of them by hour band (`loiter`) stands at
+# its spots (hideout doors and corners: `gang_spot` slots, one per `per_spot` loiterers at the
+# late band, at least one, at most `spots_max` a turf); members M11 puts outside every gang
+# turf are left out (said so)
+GANG = {"loiter": [0.5, 0.3, 0.35, 0.55, 0.6], "per_spot": 3.5, "spots_max": 40,
+        "groups": [0.15, 0.45, 0.3, 0.1], "corner_m": 14.0}
+# a faction's colors: its own first, then shades of it and dark neutrals
+GANG_NEUTRALS = ("#141414", "#2a2a2a", "#3d3a36", "#1c1f26")
+
+# police patrols (scope 6.4, M11's police field and precincts): a district's police (its
+# segments' police per 100 m) walk in pairs on its patrol walkways (the police field at least
+# `patrol_min` there, weighted by the field squared, so they keep near the stations) and drive
+# (`car_share` of them, `per_car` a car) on its main lanes by the same weights; the precinct's
+# station doors send the pairs out; patrol cars are AG18 cars in the police livery (`livery`:
+# three sRGB colors, AG18's paint channels: no model of their own), the first of `car_models`
+# the traffic has
+POLICE = {"patrol_min": 0.25, "car_share": 0.35, "per_car": 2.0,
+          "livery": ["#e8ecf2", "#0d1220", "#1f4fff"],
+          "car_models": ["halcyon_sable", "orrin_lumen", "vanta_r", "halcyon_ridge"]}
+# the pool's people kept for gangs and police (their looks): enough for the most wanted within
+# the crowd's live radius of any tile at the crowd's hour, times `margin`, at most the share of
+# the pool; the traffic's pool likewise for patrol cars
+ROLES = {"margin": 1.25, "gang_max_share": 0.12, "police_max_share": 0.08,
+         "car_max_share": 0.06, "min": 8}
+ROLE_CODES = ("crowd", "gang", "police")
+
+# the clips life at places plays (Epic's Game Animation Sample, the user's, copied into the
+# project and retargeted by `citygen/unreal_people.py`'s `ensure_place_clips`; kept apart from
+# the library's own spec, so its hash and cache stay as they are): a bench's sitting loop and
+# standing idle breaks (talking, smoking, eating at a stall: the sample has no clip of any of
+# these, its idle breaks stand in, an open item)
+GAS_ANIM = "/Game/Characters/UEFN_Mannequin/Animations"
+PLACE_CLIPS = {
+    "sit": f"{GAS_ANIM}/Interactions/Bench/M_interaction_bench_idle_loop",
+    "talk_a": f"{GAS_ANIM}/Idle/M_Relaxed_Stand_Idle_Break_v02",
+    "talk_b": f"{GAS_ANIM}/Idle/M_Relaxed_Stand_Idle_Break_v05",
+    "talk_c": f"{GAS_ANIM}/Idle/M_Neutral_Stand_Idle_Break_v03",
+}

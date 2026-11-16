@@ -11,5 +11,8 @@ public class CityGenLife : ModuleRules
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine" });
 		// Mass (the entities and processors, engine modules) and ZoneGraph (the lanes, a plugin)
 		PrivateDependencyModuleNames.AddRange(new string[] { "MassCore", "MassEntity", "ZoneGraph" });
+		// LG4: the place slots are Smart Objects of the world's subsystem (its definitions' types
+		// are in the public header CityGenLifePlaces.h, hence public)
+		PublicDependencyModuleNames.AddRange(new string[] { "SmartObjectsModule", "GameplayTags", "WorldConditions" });
 	}
 }

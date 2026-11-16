@@ -266,13 +266,25 @@ void ACityGenLife::SpawnCarPool()
 	}
 	FreeByModel.Reset();
 	FreeByModel.SetNum(Models);
+	// (LG4: the slots kept for patrol cars in a list of their own)
+	CarIsPolice.Init(0, NC);
+	FreePoliceCars.Reset();
+	PoliceCarsActive = 0;
 	for (int32 M = 0; M < Models; ++M)
 	{
 		for (int32 I = ModelSlots[M].Num() - 1; I >= 0; --I)
 		{
-			FreeByModel[M].Add(ModelSlots[M][I]);
+			const int32 Slot = ModelSlots[M][I];
+			if (TrafficPolice.IsValidIndex(Slot) && TrafficPolice[Slot] && PolicePaint.Num() >= PaintFloats)
+			{
+				CarIsPolice[Slot] = 1;
+				FreePoliceCars.Add(Slot);
+				continue;
+			}
+			FreeByModel[M].Add(Slot);
 		}
 	}
+	PoliceCarPoolN = FreePoliceCars.Num();
 	CarPos.Init(FVector::ZeroVector, NC);
 	CarYaw.SetNumZeroed(NC);
 	CarShow.Init(0, NC);
@@ -336,14 +348,19 @@ void ACityGenLife::FreeCar(const int32 Slot, FCgLifeCar& C)
 		CarShow[Slot] = 0;
 		CarPos[Slot] = FVector::ZeroVector;
 	}
-	if (FreeByModel.IsValidIndex(C.Model))
+	if (CarIsPolice.IsValidIndex(Slot) && CarIsPolice[Slot])
+	{
+		FreePoliceCars.Add(Slot);
+		--PoliceCarsActive;
+	}
+	else if (FreeByModel.IsValidIndex(C.Model))
 	{
 		FreeByModel[C.Model].Add(Slot);
 	}
 	--CarsActive;
 }
 
-bool ACityGenLife::SpawnCar(const int32 G, float Dist, FRandomStream& Rng)
+bool ACityGenLife::SpawnCar(const int32 G, float Dist, FRandomStream& Rng, const bool bPoliceCar)
 {
 	const int32 J = G - WalkLaneCount;
 	if (J < 0 || J >= DriveLaneCount || !DriveMainG[G] || DriveIsConnector[G] || CarEnts.Num() == 0)
@@ -354,13 +371,24 @@ bool ACityGenLife::SpawnCar(const int32 G, float Dist, FRandomStream& Rng)
 	const int32 Models = FreeByModel.Num();
 	const int32 D = DriveDistrict.IsValidIndex(J) ? DriveDistrict[J] : INDEX_NONE;
 	float Tot = 0.f;
-	for (int32 M = 0; M < Models; ++M)
+	for (int32 M = 0; M < Models && !bPoliceCar; ++M)
 	{
 		const float W = (D >= 0 && TrafficWeights.IsValidIndex(D * Models + M)) ? TrafficWeights[D * Models + M] : 1.f;
 		Tot += FreeByModel[M].Num() ? W : 0.f;
 	}
 	int32 Model = INDEX_NONE;
-	if (Tot > 0.f)
+	int32 PoliceSlot = INDEX_NONE;
+	if (bPoliceCar)
+	{
+		// (LG4: a patrol car: one of the slots kept for them, its model the plan's)
+		if (!FreePoliceCars.Num())
+		{
+			return false;
+		}
+		PoliceSlot = FreePoliceCars.Pop(EAllowShrinking::No);
+		Model = CarSlotModel[PoliceSlot];
+	}
+	else if (Tot > 0.f)
 	{
 		float X = Rng.FRand() * Tot;
 		for (int32 M = 0; M < Models; ++M)
@@ -394,7 +422,7 @@ bool ACityGenLife::SpawnCar(const int32 G, float Dist, FRandomStream& Rng)
 	{
 		return false;
 	}
-	const int32 Slot = FreeByModel[Model].Pop(EAllowShrinking::No);
+	const int32 Slot = PoliceSlot != INDEX_NONE ? PoliceSlot : FreeByModel[Model].Pop(EAllowShrinking::No);
 	FMassEntityManager& EM = GetWorld()->GetSubsystem<UMassEntitySubsystem>()->GetMutableEntityManager();
 	FCgLifeCar& C = EM.GetFragmentDataChecked<FCgLifeCar>(CarEnts[Slot]);
 	const FZoneGraphStorage& S = *Frame.Storage;
@@ -418,16 +446,19 @@ bool ACityGenLife::SpawnCar(const int32 G, float Dist, FRandomStream& Rng)
 	const int32 K = FMath::Max(1, PaintsPer);
 	const int32 Pk = (int32)(Rng.FRand() * K) % K;
 	const int32 At = (((FMath::Max(0, D) * Models + Model) * K) + Pk) * PaintFloats;
-	if (D >= 0 && TrafficPaints.IsValidIndex(At + PaintFloats - 1) && PartsOfModel.IsValidIndex(Model))
+	const float* Paint = PoliceSlot != INDEX_NONE ? PolicePaint.GetData() :
+		((D >= 0 && TrafficPaints.IsValidIndex(At + PaintFloats - 1)) ? &TrafficPaints[At] : nullptr);
+	if (Paint && PartsOfModel.IsValidIndex(Model))
 	{
 		for (const int32 P : PartsOfModel[Model])
 		{
 			if (CarParts.IsValidIndex(P) && CarParts[P])
 			{
-				CarParts[P]->SetCustomData(C.Instance, MakeArrayView(&TrafficPaints[At], PaintFloats), false);
+				CarParts[P]->SetCustomData(C.Instance, MakeArrayView(Paint, PaintFloats), false);
 			}
 		}
 	}
+	PoliceCarsActive += PoliceSlot != INDEX_NONE ? 1 : 0;
 	++CarsActive;
 	++CarsSpawned;
 	return true;
@@ -458,7 +489,12 @@ void ACityGenLife::TakeFreedCars()
 			CarPos[Slot] = FVector::ZeroVector;
 		}
 		const int32 M = CarSlotModel.IsValidIndex(Slot) ? CarSlotModel[Slot] : 0;
-		if (FreeByModel.IsValidIndex(M))
+		if (CarIsPolice.IsValidIndex(Slot) && CarIsPolice[Slot])
+		{
+			FreePoliceCars.Add(Slot);
+			--PoliceCarsActive;
+		}
+		else if (FreeByModel.IsValidIndex(M))
 		{
 			FreeByModel[M].Add(Slot);
 		}
@@ -497,6 +533,20 @@ void ACityGenLife::UpdateTraffic(const float Dt, const bool bRefill)
 	bool bDied = false;
 	TrafficWantLive = 0.f;
 	TrafficLiveLanes = 0;
+	// (LG4: the patrol cars a live lane wants: the plan's by band, its district's day)
+	WantPoliceCars = 0.f;
+	auto PoliceWant = [this](const int32 J)
+	{
+		if (!bPolice || !IsPlaces() || PoliceCarPoolN == 0 || !DrivePolice.IsValidIndex(5 * J + 4))
+		{
+			return 0.f;
+		}
+		const int32 B = BandOf(Hour);
+		const int32 D = DriveDistrict.IsValidIndex(J) ? DriveDistrict[J] : INDEX_NONE;
+		const int32 H = ((Hour % 24) + 24) % 24;
+		const float Shape = (D >= 0 && DistrictShape.IsValidIndex(24 * D + H)) ? DistrictShape[24 * D + H] : 1.f;
+		return DrivePolice[5 * J + B] * Shape;
+	};
 	for (int32 J = 0; J < DriveLaneCount; ++J)
 	{
 		const int32 G = WalkLaneCount + J;
@@ -522,10 +572,12 @@ void ACityGenLife::UpdateTraffic(const float Dt, const bool bRefill)
 		if (bLive)
 		{
 			TrafficWantLive += TrafficWant(J);
+			WantPoliceCars += PoliceWant(J);
 			++TrafficLiveLanes;
 		}
 	}
-	TrafficLiveScale = TrafficWantLive > 0.f ? FMath::Min(1.f, PoolFill * (float)CarEnts.Num() / TrafficWantLive) : 1.f;
+	TrafficLiveScale = TrafficWantLive > 0.f ? FMath::Min(1.f, PoolFill * (float)(CarEnts.Num() - PoliceCarPoolN) / TrafficWantLive) : 1.f;
+	PoliceCarScaleNow = WantPoliceCars > 0.f ? FMath::Min(1.f, PoolFill * (float)PoliceCarPoolN / WantPoliceCars) : 1.f;
 	if (bRefill || bDied)
 	{
 		FreeCarsOnDeadLanes();
@@ -577,14 +629,14 @@ void ACityGenLife::UpdateTraffic(const float Dt, const bool bRefill)
 		}
 		return true;
 	};
-	auto Place = [&](const int32 G)
+	auto Place = [&](const int32 G, const bool bCop = false)
 	{
 		for (int32 Try = 0; Try < 4; ++Try)
 		{
 			const float Dist = TrafficRng.FRand() * Lengths[G];
 			if (Clear(G, Dist))
 			{
-				if (SpawnCar(G, Dist, TrafficRng))
+				if (SpawnCar(G, Dist, TrafficRng, bCop))
 				{
 					Taken.Add(G, Dist);
 					return true;
@@ -607,6 +659,51 @@ void ACityGenLife::UpdateTraffic(const float Dt, const bool bRefill)
 		{
 			Place(G);
 		}
+		// (LG4: its patrol cars)
+		const float NP = PoliceWant(J) * PoliceCarScaleNow;
+		for (int32 Cops = (int32)NP + (TrafficRng.FRand() < NP - FMath::FloorToFloat(NP) ? 1 : 0); Cops > 0; --Cops)
+		{
+			Place(G, true);
+		}
+	}
+	// (LG4: patrol cars that drove out made up for on the lanes far from the view, by their want)
+	const float PoliceTarget = WantPoliceCars * PoliceCarScaleNow;
+	if (Dt > 0.f && (float)PoliceCarsActive < 0.97f * PoliceTarget && FreePoliceCars.Num())
+	{
+		PoliceRefillAcc += (PoliceTarget - (float)PoliceCarsActive) * Dt / 4.f;
+		if (PoliceRefillAcc >= 1.f)
+		{
+			TArray<int32> Cands;
+			TArray<float> Cum;
+			float Tot = 0.f;
+			for (int32 J = 0; J < DriveLaneCount; ++J)
+			{
+				const int32 G = WalkLaneCount + J;
+				const float W = InRegion[G] && !DriveIsConnector[G] ? PoliceWant(J) : 0.f;
+				if (W > 0.f && FVector::Dist(DriveMid[J], View) - DriveHalf[J] > 100.f * TrafficRefillM)
+				{
+					Tot += W;
+					Cands.Add(G);
+					Cum.Add(Tot);
+				}
+			}
+			for (int32 Guard = 0; Guard < 8 && PoliceRefillAcc >= 1.f && Cands.Num(); ++Guard)
+			{
+				const float X = TrafficRng.FRand() * Tot;
+				int32 Lo = 0, Hi = Cum.Num() - 1;
+				while (Lo < Hi)
+				{
+					const int32 M = (Lo + Hi) / 2;
+					if (Cum[M] < X) { Lo = M + 1; } else { Hi = M; }
+				}
+				PoliceRefillAcc -= 1.f;
+				Place(Cands[Lo], true);
+			}
+		}
+	}
+	else
+	{
+		PoliceRefillAcc = 0.f;
 	}
 	// (the cars that drove out of the live region made up for on the lanes far from the view,
 	// by their want)
