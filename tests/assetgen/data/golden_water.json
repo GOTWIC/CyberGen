@@ -1,10 +1,10 @@
 {
   "about": "sha256 goldens of assetgen's water stage (AG12): the small test city's packs (tests/conftest.py SMALL, built by the citygen CLI) as `assetgen.water.build.outputs_digest` measures them (every tile pack, the parts pack and the Unreal contribution without AG6's textures; `all` hashes them together), and Vesper Bay's with the tiles that hold the most triangles. Made on the Windows PC; Mac = x86 deferred (docs/determinism_check.md).",
   "small": {
-    "all": "622cdd2d70f8b4b03d2f0f7aaa3da6cfba001c079cec10f3a22df9637462c6a7"
+    "all": "1a8d91f38b9166982891d3e994c71c5c4713516da69055ad0f28e1cbd563a4b4"
   },
   "vesper_bay": {
-    "all": "b75669214345ff2834dc07fa01c38755d8cdd26767a7c97467574bad18888764",
+    "all": "824b0f2a04b2a343419c4683571d0d5c2bae42a75d626d3473a7cb76f6b70bd9",
     "tiles": {
       "t-03-03": "bcafd35cce08f994b386e0625ec7081aa085f4580b506880a56508f9d485f957",
       "t-03+01": "9d1da12509740b42721f7a7ce9a434ebd6e9745f015889d4903a621296a3e567",
