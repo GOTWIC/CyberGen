@@ -4186,7 +4186,8 @@ def round_edges(B: Builder, edges) -> tuple[list, int]:
     out, n = [], 0
     for pts, li in edges:
         ln = B.lines[li]
-        if li < B.n_primary or ln.cls == "footbridge" or ln.role in NO_ROUND or                 len(pts) < 3 or _held(B, pts):
+        if li < B.n_primary or ln.cls == "footbridge" or ln.role in NO_ROUND or \
+                len(pts) < 3 or _held(B, pts):
             out.append((pts, li))
             continue
         new = round_corners(pts, ln.width / 2.0)
