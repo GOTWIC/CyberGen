@@ -4190,6 +4190,10 @@ def round_edges(B: Builder, edges) -> tuple[list, int]:
                 len(pts) < 3 or _held(B, pts):
             out.append((pts, li))
             continue
+        old = _held_course(B, pts)
+        if old is not None:
+            out.append((old, li))         # (as the old city rounded it: held, restored)
+            continue
         new = round_corners(pts, ln.width / 2.0)
         if new != list(pts):
             n += 1
@@ -4200,6 +4204,32 @@ def round_edges(B: Builder, edges) -> tuple[list, int]:
 def _held(B: Builder, pts) -> bool:
     """M10: an edge that is a held segment of the old city (never dropped)."""
     return B.frame is not None and B.frame.match(pts) is not None
+
+
+HELD_ROUND_TOL_M = 0.05    # a held edge's course off its old rounded one beyond ROUND_DEV_M
+
+
+def _held_course(B: Builder, pts) -> list | None:
+    """M10: under a regeneration's frame, the old city's held segment an edge is before its
+    corners are rounded (the same ends, its course within `ROUND_DEV_M` of the old rounded
+    one): its old centerline, in the edge's direction, so it is held and restored as it was.
+    An edge laid again may have lost a vertex where a street of the district met it once,
+    and rounded anew it came out centimeters off the old one (the hilly test city's
+    promenades beside Old Quarter), no longer matched."""
+    if B.frame is None:
+        return None
+    cands = B.frame.ends.get(_ekey(pts))
+    if not cands:
+        return None
+    line = LineString(pts)
+    for r in cands:
+        o = LineString([p[:2] for p in r.centerline])
+        if o.hausdorff_distance(line) <= ROUND_DEV_M + HELD_ROUND_TOL_M:
+            got = [(float(p[0]), float(p[1])) for p in r.centerline]
+            if (got[0][0], got[0][1]) != (float(pts[0][0]), float(pts[0][1])):
+                got = got[::-1]
+            return got
+    return None
 
 
 PIN_CLEAR_M = 15.0              # street centerline to a traced building (a 20 m street keeps 5 m)

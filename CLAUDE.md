@@ -1563,7 +1563,10 @@ arithmetic, dmath):
   `network_checks.TIE_M` 5 cm of the nearest is clear (a later split's centimeter piece); park
   path benches keep off the carriageways their path crosses (`CARRIAGE`); AG3's moved doors
   try the facades facing a way first (`fronts.OUTER`, of the six nearest; a door moved onto
-  open ground faced a neighbor's back, `asset_access`; `GEN_VERSION` curves.1); a failing
+  open ground faced a neighbor's back, `asset_access`; `GEN_VERSION` curves.1); in a
+  regeneration a held edge laid again whose course is within `ROUND_DEV_M` of an old
+  segment with its ends takes the old centerline (`streets._held_course`: one that lost a
+  vertex where the district's street once met it was rounded anew off its old course); a failing
   city tries `build.LAYOUT_SALTS` 7 layouts (3 before) on its roads before another road
   network, `CITY_RETRIES` 23 (8 before; a city passing within four layouts is unchanged).
 Every city's layout moves and falls on another draw (main's samples sit on lucky ones:

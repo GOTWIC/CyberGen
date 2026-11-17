@@ -81,6 +81,12 @@ at most 0.7 cm and is not where the facets come from.
     wall a shanty stack stands against moved onto open ground facing another stack's back
     6 m off, its walkway walled off (`asset_access` in the small test city). `GEN_VERSION`
     curves.1.
+  - A district regeneration lays the held streets outside the district again and rounds
+    their corners as the old city did; a held edge that lost a vertex where a street of the
+    district once met it came out rounded centimeters off its old course and was no longer
+    matched (the hilly test city's promenades beside Old Quarter). Such an edge (the same
+    ends, its course within `ROUND_DEV_M` plus 5 cm of the old one) now takes the old
+    centerline and is held (`streets._held_course`). A fresh build is unchanged.
   - `walkway_building_clash` tests an entrance's link to each of its walkway's pieces within
     `TIE_M` 5 cm of the nearest and passes when any is clear: a later split left a 22 cm
     sidewalk piece whose end lay a millimeter nearer the entrance than the foot on the piece
@@ -200,3 +206,25 @@ rewritten on the Mac.
   clearance at a nexus core, transit supports, a deck ramp's walkway through a building on the
   deck, road overlaps where an organic street hairpins beside an avenue, a twin tower group
   M3 does not build. Each is a latent fault of its stage, for issues of their own.
+- Found by the tests on the new layouts, left as they are (the tests take them in, said
+  there):
+  - Vesper Bay's crosswalk `cw.e637n26` (a street in the cluster `jn.e600n83`) is walked as
+    the crossings fix's fallback between its leg's corners, a 49 m diagonal across the
+    street: the leg's right sidewalk ends 45 m short of the junction, beside the cluster's
+    inner road. `walkway_carriageway` cannot see it (a crossing of one segment has no
+    stretch past its span). On Delta a crosswalk's tail runs 1.2 m along the curb
+    (`cw.w671n926`).
+  - A metro stair's top lands in the middle of a crosswalk (Vesper Bay's
+    `stn.the_stacks.2` on `cw.e742n634`'s walkway, split there); station stairs end on a
+    crosswalk or crossing's end in every city (`transit.Builder.foot` takes the nearest
+    ground walkway of any kind).
+  - Cul-de-sac bulbs a cluster took in (Vesper Bay's `rn.e1504n676` in `jn.e1504n676`):
+    `road_dead_ends` reads them (`attrs.bulbs`), and now so does
+    `test_every_dead_end_says_what_it_is`.
+  - The hilly test city's regeneration of Old Quarter: two highway segments share one
+    centerline there (`rs.w191n825` ring and `.2` spine, M1b), and the held grade lines
+    come back 0.43 m off at one's end; a curb in Old Quarter steps 2 cm
+    (`jn.e991n180`, `junction_levels`).
+  - `test_small_city_passes` lacked the crossings fix's `walkway_carriageway` (main too),
+    added; `test_sample_city_builds_and_passes` bounds a build's time per full-city try
+    (480 s; Vesper Bay now builds on its eighth, about 33 minutes with 3 workers).
