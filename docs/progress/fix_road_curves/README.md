@@ -162,7 +162,17 @@ Within `street_budgets` (20 million a city, 2.5 million a tile) by far.
   (every shared edge drawn by both faces' pieces on the same millimeters), coverage, meshes,
   budgets, AG14's `asset_grounded` (no road step at a junction over 2 cm) and `asset_clash`
   all pass (on main `asset_clash` failed on the junction barriers on crosswalks, above).
-- The tests of the modules touched and of what runs them: TESTS.
+- The tests of the modules touched and of what runs them (on Windows): citygen's
+  `test_road_curves`, `test_streets`, `test_roads`, `test_elevated`, `test_junctions_ramps`,
+  `test_pavement`, `test_road_repair`, `test_crossings`, `test_park_paths`,
+  `test_water_ground`, `test_transit`, `test_edit`, `test_build`, `test_stack`,
+  `test_pinned`, `test_decks`, `test_terrain`, `test_blockout` (351 tests); assetgen's
+  `test_ag_streets`, `_junctions`, `_barriers`, `_fit`, `_triangulate`, `_water`, `_ground`,
+  `_props`, `_determinism`, `_fronts` (102). All pass but three regeneration tests, left
+  failing and named in the open items: `test_regeneration_of_the_first_district_keeps_the_ones_after_it`
+  and `test_regeneration_with_new_spec_fields` (1247 of 1251 and 1188 of 1192 held segments:
+  the same four in Old Quarter, the same with the corner rounding switched off) and
+  `test_hilly_regeneration_holds_every_road` (415 of 416).
 
 ## Pictures
 
@@ -226,7 +236,15 @@ rewritten on the Mac.
     highway segments share one centerline (`rs.w191n825`, the ring, and `.2`, the spine,
     M1b), and the ring's held grade line comes back 0.43 m off at its end beside
     `jn.w232n783`; a curb in Old Quarter steps 2 cm over its legs (`jn.e991n180`,
-    `junction_levels`). The small test city's regenerations hold every road.
+    `junction_levels`).
+  - The small test city's regenerations of Core and of Uptown with new fields lay Old
+    Quarter (after them) again with one organic street on another course: its dead end
+    ran on to the promenade node `rn.e786n358` in the old city and runs straight on to the
+    footbridge at (808, 347) in the rebuild, so four held segments there come back new
+    (`rs.e798n379`, `rs.e777n369`, `rs.e792n349`, `rs.e811n349`; 1247 of 1251 held). The
+    same happens with the corner rounding switched off: a fault of the replay (`_Ghosts`
+    and M17's run-on) that this layout meets, for an issue of its own. Old Quarter's own
+    regeneration holds every road.
   - `test_small_city_passes` lacked the crossings fix's `walkway_carriageway` (main too),
     added; `test_sample_city_builds_and_passes` bounds a build's time per full-city try
     (480 s; Vesper Bay now builds on its eighth, about 33 minutes with 3 workers).

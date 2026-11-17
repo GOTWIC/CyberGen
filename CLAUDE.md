@@ -1576,7 +1576,10 @@ Vesper Bay Decks on its third road network (road variant 3, salt 1), Saltreach a
 their first. Road edges 1.8 to 1.9 cm of sag at p95 (15 to 19 on main), junction curbs 2.0
 (6.8); pavement vertices +13 to 15%, street pack triangles +8 to 9% (Delta 1.59 to 1.74
 million); the cars' lanes (`unreal_life.fillet`, `smooth`) now run on roads as smooth as
-they are. Outputs and measures: `docs/progress/fix_road_curves/`.
+they are. Open: on the new layouts three regeneration tests fail (the small city's Core and
+Uptown regenerations relay an Old Quarter street's M17 run-on onto a footbridge, four held
+segments new, the same without the rounding; the hilly city's ring and spine highways on one
+centerline, one held grade line off). Outputs and measures: `docs/progress/fix_road_curves/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
