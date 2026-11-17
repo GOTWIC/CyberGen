@@ -238,10 +238,9 @@ def test_hilly_regeneration_holds_every_road(hilly):
     assert out.model.terrain is not None and out.model.terrain.ground
 
 
-@pytest.mark.xfail(reason="issue #241: a bend junction the regeneration lays anew in Old Quarter "
-                          "(jn.e991n180) has its curb 3.7 cm over its level legs "
-                          "(junction_levels), from the pavement map's heights", strict=False)
 def test_hilly_regeneration_passes_every_check(hilly):
+    """#241: a junction laid against another road's sidewalk (Old Quarter's new bend
+    `jn.e991n180`, its node beside that sidewalk) keeps its curb at its legs' heights."""
     out = _hilly_regen(hilly)
     assert all(c.passed for c in out.checks), [(c.id, c.failures[:2]) for c in out.checks
                                               if not c.passed]

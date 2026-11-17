@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import numpy as np
 import shapely
+import shapely.ops
 from shapely.geometry import LineString, Point
 
 from . import geom as G
@@ -802,15 +803,22 @@ SHARED_PEDS = ("pedestrian", "footbridge")
 WALK_LEVEL_M = 2.5      # a face this far under or over a walkway is another level
 
 
-def walk_on_roads(m: CityModel) -> dict:
-    """Crossings fix: each ground or deck walkway's length on the carriageway faces of M22's
-    pavement map at its level (a road's carriageway, a junction's, a bulb; not a junction
-    of pedestrian streets only) and, for a crossing or crosswalk, the most of it on one of
-    its stretches (its straight span across the road): {walkway id: (kind, length, on,
-    past its span, on a road's carriageway face)}. Walkways of a raised road (its
-    sidewalks, at the ground in the walk graph) are left out."""
-    if m.pavement_net is None or not m.walkways:
-        return {}
+def carriageway_w(s) -> float:
+    """A road's carriageway across, curb to curb (its width less its sidewalks; a pedestrian
+    street or footbridge all of it)."""
+    if ST.street_class(s) in SHARED_PEDS:
+        return s.width_m
+    side = s.cross_section.sidewalk_m[0] if s.cross_section.sidewalk_m else 0.0
+    return max(s.width_m - 2.0 * side, 0.0)
+
+
+def road_faces(m: CityModel) -> tuple:
+    """The pavement map's faces cars drive on (`ROAD_FACES`; not a junction of
+    pedestrian streets only, less its pedestrian legs' stubs) as polygons: (polygons,
+    layers, (lowest, highest, vertices, heights), on a junction or bulb, the road id
+    of a road's carriageway else None)."""
+    if m.pavement_net is None:
+        return [], [], [], [], []
     vert = {v.id: tuple(v.p) for v in m.pavement_net.vertices}
     vz = {v.id: v.z for v in m.pavement_net.vertices}
     edge = {e.id: e.v for e in m.pavement_net.edges}
@@ -860,7 +868,7 @@ def walk_on_roads(m: CityModel) -> dict:
         return shapely.difference(g, shapely.union_all(road)) if road else g
 
     jn = {j.id: j for j in m.junctions}
-    polys, layers, zs, jface = [], [], [], []
+    polys, layers, zs, jface, owner = [], [], [], [], []
     for f in m.pavement:
         if f.kind not in ROAD_FACES or (f.kind == "junction" and f.owner_id in peds):
             continue
@@ -878,9 +886,26 @@ def walk_on_roads(m: CityModel) -> dict:
         polys.append(g)
         layers.append(f.layer)
         jface.append(f.kind != "carriageway")
+        owner.append(f.owner_id if f.kind == "carriageway" else None)
         vs = [v for r in f.rings for ref in r for v in edge[ref.lstrip("-")]]
         hz = [vz[v] for v in vs]
         zs.append((min(hz), max(hz), np.array([vert[v] for v in vs]), np.array(hz)))
+    return polys, layers, zs, jface, owner
+
+
+def walk_on_roads(m: CityModel) -> dict:
+    """Crossings fix: each ground or deck walkway's length on the carriageway faces of M22's
+    pavement map at its level (a road's carriageway, a junction's, a bulb; not a junction
+    of pedestrian streets only) and, for a crossing or crosswalk, the most of it on one of
+    its stretches (its straight span across the road), or past it the most of it on one
+    road's carriageway faces beyond that road's carriageway width (curves followups: a
+    crossing of one stretch run along the road): {walkway id: (kind, length, on, past its
+    span, on a road's carriageway face)}. Walkways of a raised road (its sidewalks, at the
+    ground in the walk graph) are left out."""
+    if m.pavement_net is None or not m.walkways:
+        return {}
+    polys, layers, zs, jface, owner = road_faces(m)
+    segs_by = {s.id: s for s in m.road_segments}
     if not polys:
         return {}
     raised = {s.id for s in m.road_segments if any(p.z > WALK_GROUND_M for p in s.z_profile)}
@@ -898,6 +923,7 @@ def walk_on_roads(m: CityModel) -> dict:
             lay.append("d1" if w.level else "g0")
             wz.append((a[2] + b[2]) / 2 if not w.level else None)
     out = {}
+    along: dict = {}        # (walkway index, road id) -> its length on that road's faces
     nw = len(m.walkways)
     won, wmax, wlen, wrd = np.zeros(nw), np.zeros(nw), np.zeros(nw), np.zeros(nw)
     if segs:
@@ -926,15 +952,28 @@ def walk_on_roads(m: CityModel) -> dict:
                     lens[n_] = 0.0
             np.add.at(on, i, lens)
             np.add.at(rd, i, np.where(np.array(jface)[j], 0.0, lens))
+            # (curves followups: a crossing's length on one road's carriageway faces, which
+            # its straight span across that road holds to the road's carriageway width; a
+            # crossing of one stretch run along the road has no other stretch to tell it by)
+            for n_, (a, b) in enumerate(zip(i, j)):
+                if lens[n_] and owner[b] is not None and                         m.walkways[wid[a]].kind in CROSS_KINDS:
+                    key = (wid[a], owner[b])
+                    along[key] = along.get(key, 0.0) + float(lens[n_])
         wid_a = np.array(wid)
         np.add.at(won, wid_a, on)
         np.add.at(wrd, wid_a, rd)
         np.maximum.at(wmax, wid_a, on)
         np.add.at(wlen, wid_a, shapely.length(sarr))
+    over = np.zeros(nw)
+    for (k, sid), on_ in along.items():
+        s = segs_by.get(sid)
+        if s is not None:
+            over[k] = max(over[k], on_ - carriageway_w(s))
     for k, w in enumerate(m.walkways):
         if wlen[k] <= 0.0:
             continue
         past = won[k] - (wmax[k] if w.kind in CROSS_KINDS else 0.0)
+        past = max(past, over[k])
         out[w.id] = (w.kind, float(wlen[k]), float(won[k]), float(max(past, 0.0)),
                      float(wrd[k]))
     return out
@@ -957,6 +996,54 @@ def walk_road_stats(m: CityModel, got: dict | None = None) -> dict:
             for k, (n, L, o, p, t) in sorted(st.items())}
 
 
+STATION_FEET = ("stairs", "elevator")     # a station's ways down to the ground
+FOOT_IN_M = 0.1     # a foot this far inside a crossing's span is on it
+
+
+def station_feet_on_crossings(m: CityModel, faces=None) -> list:
+    """Curves followups: a station's stair or elevator whose foot on the ground stands on a
+    crossing: in a crosswalk record's stripe, or on a road's carriageway face within a
+    crossing or crosswalk walkway's width of its line. [(walkway id, station, crossing)]."""
+    feet = []
+    for w in m.walkways:
+        st = (w.attrs or {}).get("station")
+        if st is None or w.kind not in STATION_FEET or w.level:
+            continue
+        g = [p for p in w.line if abs(p[2]) < 0.01]
+        if g:
+            feet.append((w.id, st, Point(g[0][0], g[0][1])))
+    if not feet:
+        return []
+    stripes, names = [], []
+    for x in m.crosswalks:
+        ln = LineString([p[:2] for p in x.line])
+        if ln.length > 2.0 * FOOT_IN_M:
+            ln = shapely.ops.substring(ln, FOOT_IN_M, ln.length - FOOT_IN_M)
+            stripes.append(ln.buffer(max(x.width_m / 2.0 - FOOT_IN_M, 0.05), cap_style="flat"))
+            names.append(x.id)
+    polys, layers, _, _, _ = road_faces(m) if faces is None else faces
+    road = [g for g, lay in zip(polys, layers) if lay == "g0"]
+    for w in m.walkways:
+        if w.kind in CROSS_KINDS and not w.level and road:
+            band = LineString([p[:2] for p in w.line]).buffer(
+                max(w.width_m / 2.0 - FOOT_IN_M, 0.05), cap_style="flat")
+            stripes.append(band)
+            names.append(w.id)
+    rtree = shapely.STRtree(road) if road else None
+    tree = shapely.STRtree(stripes) if stripes else None
+    out = []
+    for wid, st, pt in feet:
+        if tree is None:
+            break
+        for k in sorted(int(i) for i in tree.query(pt, predicate="intersects")):
+            if names[k].startswith("wk") and (rtree is None or not len(
+                    rtree.query(pt, predicate="intersects"))):
+                continue        # (a crossing walkway's line off the road: its sidewalk end)
+            out.append((wid, st, names[k]))
+            break
+    return out
+
+
 def check_walk_roads(spec: CitySpec, m: CityModel):
     c = _check("walkway_carriageway",
                "Crossings fix: no crosswalk or crossing walkway runs on a carriageway (a "
@@ -964,8 +1051,11 @@ def check_walk_roads(spec: CitySpec, m: CityModel):
                f"more than {WALK_ROAD_TOL_M:g} m past its one straight span across the road; "
                f"the city's sidewalk walkways at most {100 * SIDEWALK_ROAD_SHARE:g}% of their "
                "length on a road's carriageway (on a junction's face, and alleys, service "
-               "roads and the links to them, which share their carriageway: noted)")
+               "roads and the links to them, which share their carriageway: noted); no "
+               "station's stair or elevator with its foot on a crossing")
     got = walk_on_roads(m)
+    for wid, st, x in station_feet_on_crossings(m):
+        _lim(c, f"walkway {wid} (station {st}): its foot on the crossing {x}")
     n_j, m_j, L_sw, m_rd = 0, 0.0, 0.0, 0.0
     worst = []
     for wid in sorted(got):

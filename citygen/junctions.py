@@ -1060,6 +1060,9 @@ def one_way_loops(net, district_arch: dict, seed: int) -> int:
 # Lanes
 # ---------------------------------------------------------------------------
 
+JOIN_GAP_M = 0.015   # curves followups: offset parts whose ends meet this near are one line
+
+
 def _offset(pts, d: float) -> list:
     if abs(d) < 1e-9:
         return [tuple(p) for p in pts]
@@ -1069,7 +1072,34 @@ def _offset(pts, d: float) -> list:
         return []
     best = max(lines, key=lambda x: (ST._plen(x), x[0]))
     # offset_curve keeps the direction of the input (GEOS >= 3.11)
-    return best
+    return _joined(best, lines)
+
+
+def _joined(best: list, lines: list) -> list:
+    """Curves followups: the offset line with the parts GEOS split it into at a joint joined
+    on again. GEOS's offset of a line that turns by a hair at a vertex on the offset's inner
+    side can come back as two parts meeting there (end to end on the grid); the longest
+    alone left a lane or a sidewalk's line up to 57 m short of its road's end (Delta
+    Megacity's `rs.e1589n153`). Only parts meeting end to end join (a loop the offset of a
+    tight curve leaves off stays off), in an order of their own coordinates."""
+    if len(lines) < 2:
+        return best
+    rest = sorted((x for x in lines if x is not best), key=lambda x: (x[0], x[-1]))
+    out = list(best)
+    grown = True
+    while grown and rest:
+        grown = False
+        for x in rest:
+            if ST._dist(x[0], out[-1]) <= JOIN_GAP_M:
+                out = out + list(x[1:])
+            elif ST._dist(x[-1], out[0]) <= JOIN_GAP_M:
+                out = list(x[:-1]) + out
+            else:
+                continue
+            rest.remove(x)
+            grown = True
+            break
+    return ST._dedupe(out)
 
 
 def _z_at(prof: list[dict], s: float) -> float:

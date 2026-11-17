@@ -3947,6 +3947,10 @@ class Keep:
         return True
 
 
+CROSS_WALKS = ("crosswalk", "crossing")   # curves followups: walkways across a road
+ON_SIDE_M = 0.05    # ... a foot this near a sidewalk or path is on it, not on the crossing
+
+
 class Builder:
     def __init__(self, c: Ctx, walks: list):
         self.c = c
@@ -3957,6 +3961,12 @@ class Builder:
         lms = [G.from_model_poly(lm.polygon) for lm in c.m.landmasses]
         self.lms = lms
         self.land_of = _landmass_index(lms, [ln.coords[0] for ln in self.glines])
+        # (curves followups: the ground walkways that are not a crossing, which a station's
+        # stair or elevator lands on where its nearest point on a crossing is not one of
+        # theirs: the road curves fix's Vesper Bay had a metro stair's top in the middle of
+        # a crosswalk, split there)
+        self.side = [h for h, i in enumerate(self.gi) if walks[i]["kind"] not in CROSS_WALKS]
+        self.stree = shapely.STRtree([self.glines[h] for h in self.side]) if self.side             else None
         self.splits: dict = {}
         self.new: list = []          # (key, kind, line3, width, attrs)
         self.structures: list = []
@@ -3970,11 +3980,26 @@ class Builder:
         self.tracks: list = []       # M19: every line's track (`track_rec`)
         self.nsup: dict = {}         # M19: supports numbered per line
 
+    def _mid_cross(self, h: int, f) -> bool:
+        """Whether a foot f on ground walkway h stands on a crossing or crosswalk away from
+        the sidewalks it joins (curves followups)."""
+        if self.walks[self.gi[h]]["kind"] not in CROSS_WALKS or self.stree is None:
+            return False
+        pt = Point(f[:2])
+        k = self.stree.query_nearest(pt, all_matches=False).tolist()
+        return not k or G.dist(self.glines[self.side[int(k[0])]], pt) > ON_SIDE_M
+
     def foot(self, p) -> tuple[tuple, float]:
         lm = _landmass_index(self.lms, [p])[0]
         best = _nearest_on(self.gtree, self.glines, self.walks, self.gi, self.land_of,
                            Point(p), lm)
         f = _foot(self.glines, self.walks, self.gi, best, p)
+        if self._mid_cross(best, f):
+            sl = [self.glines[h] for h in self.side]
+            k = _nearest_on(self.stree, sl, self.walks, [self.gi[h] for h in self.side],
+                            [self.land_of[h] for h in self.side], Point(p), lm)
+            best = self.side[k]
+            f = _foot(self.glines, self.walks, self.gi, best, p)
         host = self.masses.inside(p, 0)
         if host is not None:
             # (an elevator core standing in a building: out through it, round every other
@@ -3987,6 +4012,8 @@ class Builder:
             for h in sorted(ks, key=lambda h: (G.dist(self.glines[h], Point(p)),
                                                self.walks[self.gi[h]]["id"])):
                 f2 = _foot(self.glines, self.walks, self.gi, h, p)
+                if self._mid_cross(h, f2):
+                    continue
                 r = self.masses.inside_round(p, f2, 0, host)
                 if r is not None:
                     best, f = h, f2
@@ -4002,6 +4029,8 @@ class Builder:
             for h in sorted(ks, key=lambda h: (G.dist(self.glines[h], Point(p)),
                                                self.walks[self.gi[h]]["id"])):
                 f2 = _foot(self.glines, self.walks, self.gi, h, p)
+                if self._mid_cross(h, f2):
+                    continue
                 if self.masses.clear(p, f2, 0):
                     best, f = h, f2
                     break
@@ -4010,6 +4039,8 @@ class Builder:
                 for h in sorted(ks, key=lambda h: (G.dist(self.glines[h], Point(p)),
                                                    self.walks[self.gi[h]]["id"])):
                     f2 = _foot(self.glines, self.walks, self.gi, h, p)
+                    if self._mid_cross(h, f2):
+                        continue
                     r = self.masses.round(p, f2, 0)
                     if r is not None:
                         best, f = h, f2

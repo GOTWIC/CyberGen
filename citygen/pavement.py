@@ -1724,6 +1724,16 @@ class Assembly:
                 for r, ids in zip(f.rings, self.vrings[fi]):
                     self._long_curbs(u, r, ids, z)
         fixed = set(z)
+        # (#241: a junction's or pad's vertex that only a road not its own shares (its
+        # outline laid against another road's sidewalk, beside it with no node) takes the
+        # junction's curb rule, not that road's height: else its curb runs off its legs'
+        # heights to the other road's, which `junction_levels` fails; the other road's
+        # face takes the junction's height there. Ports keep their road's height.)
+        foreign = self._foreign(z)
+        for name in foreign:
+            del z[name]
+        if foreign:
+            self.stats["foreign_curbs"] = len(foreign)
         for kinds in (("junction", "bulb", "bend"), ("corner",)):
             for fi, f in ((i, faces[i]) for i in order):
                 if f.kind not in kinds:
@@ -1737,6 +1747,29 @@ class Assembly:
                     if name not in z:
                         z[name] = self.zf(f, m(v[0]), m(v[1]))
         self.abs = z
+
+    def _foreign(self, z: dict) -> list:
+        """#241: the vertices of junction, pad and bulb faces with a height that only roads
+        unrelated to their junction (not its legs or inner roads) gave them, ports left
+        out; sorted."""
+        faces = self.faces
+        users: dict = {}
+        for fi, f in enumerate(faces):
+            if f.road is not None:
+                for ids in self.vrings[fi]:
+                    for name in ids:
+                        users.setdefault(name, []).append(fi)
+        out = set()
+        for fi, f in enumerate(faces):
+            if f.road is not None or f.unit is None or f.kind not in JUNCTION_KINDS:
+                continue
+            for r, ids in zip(f.rings, self.vrings[fi]):
+                for v, name in zip(r, ids):
+                    if name not in z or v in self.ports or name not in users:
+                        continue
+                    if not any(self.related(f, faces[g]) for g in users[name]):
+                        out.add(name)
+        return sorted(out)
 
     def _long_curbs(self, u: Unit, r, ids, z: dict) -> None:
         k = len(ids)
