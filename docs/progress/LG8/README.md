@@ -173,7 +173,11 @@ in the rain (0.6 of the people out, the pace 1.15, 3,917 stretches out of the ra
 
 ## Tests
 
-TESTS_TEXT
+What changed, as the validation rules ask (logs in `builds/lg8` on the PC): `tests/lifegen`
+(with LG8's `test_lg_weather.py`), `tests/test_bench.py` and every `tests/test_unreal*.py` (the
+importer changed): 173 passed in 52 minutes, then the two Unreal import tests of the small
+city (blockout, then stage 2 over it, each in a fresh project) on their own, after the cook:
+2 passed in 72 minutes.
 
 ## Decisions (made without asking: Swagnik asleep)
 
