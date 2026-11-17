@@ -109,7 +109,13 @@ check's views; 68,934 HLOD components left their roots.
 
 ## Package
 
-See the PR (the cook and smoke launch from `CityAG16`, `builds/packaged/Delta_hlod`).
+Delta cooked and packaged (Development, Win64) from `CityAG16` as LG8's and the clothing
+fixes', staged only and moved to `builds/packaged/Delta_hlod` (5.1 GB) in 13.4 minutes. The
+smoke launch (its user folder outside the package, no `Saved` folder left in it, the game
+process closed after) loads Delta in 15.8 s with the life controller ready (2,400 people, 1,800
+cars, five lines, 19 trains) and no missing class (the cooked HLOD actors' components are the
+play plugin's). `builds/packaged/Delta_clothing` and `CityAG16`'s `Saved/Cooked` and
+`Saved/StagedBuilds` were deleted after it. The packaged game was not benchmarked.
 
 ## Tests
 
