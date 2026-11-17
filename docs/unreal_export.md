@@ -3231,6 +3231,22 @@ places' manifest has none of it imports and plays as before.
   a slot from 55 m or 150 m, the view's own lens); the status's `places` adds `sit_downs`,
   `mid_idles` and `still_cards`.
 
+### Slots on their surface (delta_rebuild)
+
+A slot's points stood at their walkway lane's height where the slot leaves it (LG4,
+`BuildPlaces`), plus the ground offset its user last traced walking: a point off its walkway
+on another surface (a raised road's sidewalk beside a door path at the ground, the ground by a
+door beside an embankment's sidewalk) stood its people in it or over it. The plan now stands
+every ground level slot's points on the surface stage 2 draws under them (`lifegen.places.
+Surface`: M22's pavement faces on the ground layer at their vertices' heights, lifted as AG17
+lifts them, else AG13's ground cover or the bare ground; over the datum, as the lanes), says
+so per slot (`seated`) and checks it (`slot_heights`). The exporter packs it per slot
+(`slot_seated`, `PACK_VERSION` 10; `import_city.places_props`, `LIFE_VERSION` life12); the
+controller puts a seated slot's points at their own z (`SlotSeated`, `PointSeatedG`) and a
+person there stands on it without its walking ground offset (`CgLife::PointAt`, `FillSlot`).
+A deck's slots keep their walkway's height. A plan before it packs no `slot_seated`: its slots
+stand as before.
+
 ## Milestones and checks
 
 - **Every milestone** updates the exporter in its own PR for what it adds or changes (a new
@@ -3312,3 +3328,4 @@ places' manifest has none of it imports and plays as before.
 | LG8 | The hour, the weather and reactions ("From LG8" above): `unreal_life.pack_weather`, the walk rows' `walk_cover`, `walk_night` and `walk_road_side`, the run clip (`PACK_VERSION` 9), `import_city.weather_props` (`LIFE_VERSION` life10); the controller follows atmosgen's hour and weather state (people out, pace, raincoats, umbrellas, shelter, nightlife, the cars' share, speed and headway), people look at the player and flee a danger (`Panic`), then gather; every junction exit tested for room, stuck cars far off leave; lifegen's instanced components (`UCgLifeISM`, `CityGenLife.Bounds`); console `CityGenLife.FollowAtmos`, `.Weather`, `.Panic`, `.WeatherShow`, `.Bounds`, the play menu's Scare the crowd row, the status's `weather`; bench passes `night_life_noweather`, `night_life_ownbounds`, `night_life_enginebounds`. A plan without `weather` exports and runs as before (at the plan's hour). | Delta imported into CityAG16 and Vesper Bay into a throwaway project, checked with shots of rain, umbrellas, shelter, people looking and fleeing (`docs/progress/LG8/`) |
 | HLOD streaming (fix_hlod_streaming) | "HLOD streaming" above: the instanced HLODs' component the play plugin's `UCityGenHLODComponent` (`unreal.set_hlod_class`, DefaultEditor.ini's `[/Script/Engine.HLODBuilder]` when the plugin is built; its module reads the builder's config again once its classes exist): in a game it leaves its HLOD actor's root and a visibility flip keeps its proxy, only the drawn flag changed on the render thread; `build_hlods` builds every HLOD again when the class or `HLOD_VERSION` changes (`hlod_stamp`, `-SetupHLODs -RebuildHLODs`); the adaptive AddToWorld time slice in every project (`STREAMING_SETTINGS`); console `CityGen.HLODFastVisibility`, `CityGen.HLODStatus`; bench passes `night_plan_all_hlodslow`, `night_plan_all_stream2`, `night_plan_all_adaptive` | Delta imported again into CityAG16, its 763 HLOD actors built again, checked with shots (151,671 flips in place, 672 recreated); benchmark and package (`docs/progress/fix_hlod_streaming/`) |
 | People idling and sitting down (people_idles) | "People idling and sitting down" above: the places' clips step makes the bench's five sit-downs and its stand-up (in the seat's frame, the stretch near the seat), per look a second mid bake (the walk, a standing idle, the sitting loop) with its material instances and a still sheet on an upright card (`ensure_place_clips`, `IDLE_BAKE`, `idle_key`); `unreal_life.idle_data`; `import_city.people_assets` and `places_props` (`LIFE_VERSION` life11: `MidStillFrames`, `MidIdleMaterials`, `MidIdleStarts`, `CardCells`, `SitInClips`, `SitInCount`, `SitIn`, `SitInStart`, `SitOutClips`, `SitOut`); the walk processor walks a sitter to its sit-down's start and holds it on the seat through the sit-down and stand-up (`CgAnim::SitDown`, `StandUp`), near plays them, mid the baked idle and sitting loop, far a still cell; console `CityGenLife.PlaceShow` sitdown, standup, sitmid, sitfar, idlemid, idlefar | Delta imported again into CityAG16 with `--people`, checked with shots three times, benchmarked and packaged (`docs/progress/people_idles/`) |
+| Slots on their surface (delta_rebuild) | "Slots on their surface" above: the plan seats every ground level slot's points on the drawn surface and says so (`seated`); `unreal_life.pack_places` packs `slot_seated` (`PACK_VERSION` 10), `import_city.places_props` sets `SlotSeated` (`LIFE_VERSION` life12); the controller stands a seated slot's people at its points' own z. A plan without `seated` runs as before. | Delta (rebuilt on main) imported into CityAG16 and checked, with shots of curved roads by day and night (`docs/progress/delta_rebuild/`) |

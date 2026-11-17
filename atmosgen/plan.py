@@ -1670,7 +1670,7 @@ class Plan:
 
     # -- the walkways and lanes the lights so far leave dark --
 
-    def fill(self, S, E: np.ndarray, levels: dict) -> np.ndarray:
+    def fill(self, S, E: np.ndarray, levels: dict, first: int = 0) -> np.ndarray:
         """A light at the darkest point of every walkway or road (outside the junctions,
         which have their corners) the check still finds dark: `FILL_MIN_POINTS` of its points
         under its class's minimum, or an alley point dark; a round at a time, at most
@@ -1699,7 +1699,7 @@ class Plan:
                     k = int(pts[np.lexsort((pts, E[pts]))[0]])
                     if E[k] >= lim:
                         continue               # (lit by a fill light placed this round)
-                    rec = self._fill_light(S, k, c, rnd)
+                    rec = self._fill_light(S, k, c, first + rnd)
                     if rec is None:
                         continue
                     ii, ee = LX.light_on(rec, S.points, occ, self.schedules)
@@ -1823,6 +1823,25 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     if fxs.moved or fxs.dropped:
         E = timed("lux.fixtures", LX.illuminance_points, pl.lights, smp.points, occ,
                   pl.schedules)
+    # (delta_rebuild: a light whose fixture found no clear spot is dropped after the fill, which
+    # can leave a stretch dark (Delta's quay road's last pole); the fill runs again on what is
+    # left, its new lights given fixtures, until none is dropped)
+    fill_rep = dict(pl.fill_report)
+    refill = 0
+    for it in range(P.FILL_ROUNDS):
+        if not fxs.dropped or sum(fxs.dropped.values()) == refill:
+            break
+        refill = sum(fxs.dropped.values())
+        n0 = len(pl.lights)
+        E = timed("refill", pl.fill, smp, E, levels, P.FILL_ROUNDS * (it + 1))
+        for k, v in pl.fill_report.items():
+            fill_rep[k] = fill_rep.get(k, 0) + v
+        new = {L["id"] for L in pl.lights[n0:]}
+        if not new:
+            break
+        fx_rep = timed("fixtures.refill", fxs.place, new)
+        E = timed("lux.refill", LX.illuminance_points, pl.lights, smp.points, occ, pl.schedules)
+    pl.fill_report = dict(sorted(fill_rep.items()))
     lux = timed("check", LX.check, smp, E, levels)
     fx_check = timed("fixtures.check", fxs.check)
     FX.finish(pl.lights)

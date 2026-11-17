@@ -306,3 +306,25 @@ def test_fixtures_under_the_asked_lights(build):
     bad["pos"] = [bad["pos"][0] + 3.0, bad["pos"][1], bad["pos"][2]]
     ck2 = f2.check()
     assert not ck2["ok"] and ck2["unsupported"] == 1
+
+
+def test_dropped_fixtures_are_filled_again(build, monkeypatch):
+    """delta_rebuild: a light whose fixture finds no clear spot is dropped after the fill (Delta's
+    quay road's last pole left an alley stretch dark); the fill runs again on what is left and
+    its new lights get fixtures, so the check still passes and every id stays unique."""
+    from atmosgen import fixtures as FX
+    pole = FX.Fixtures.pole
+    hit = []
+
+    def no_spot(self, L, *a, **k):
+        if L["kind"] == "road" and ".fill" not in L["id"] and len(hit) < 3:
+            hit.append(L["id"])
+            return self.drop(L, "pole: no clear spot")
+        return pole(self, L, *a, **k)
+
+    monkeypatch.setattr(FX.Fixtures, "pole", no_spot)
+    rep = PL.build_plan(build)
+    assert hit and rep["lux"]["ok"] and rep["fixtures"]["check"]["ok"], rep["lux"]["failures"]
+    L = _lights(build)
+    assert not set(hit) & set(L)
+    assert all(f["light_id"] in L for f in rep["fixtures"].get("out", []))

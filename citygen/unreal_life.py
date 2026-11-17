@@ -50,7 +50,7 @@ import json
 import math
 from pathlib import Path
 
-PACK_VERSION = 9            # 2 (cars_steam): smoothed drive lanes, their speeds; 3 (LG3): the
+PACK_VERSION = 10           # 2 (cars_steam): smoothed drive lanes, their speeds; 3 (LG3): the
                             # city's crowd (every walkway, doors, signals, the pool); 4 (LG5):
                             # the city's traffic (every lane, signals, conflicts, the pool); 5 (LG2):
                             # looks for people, their groups, dye colors and wear; 6 (LG4): slots,
@@ -59,7 +59,8 @@ PACK_VERSION = 9            # 2 (cars_steam): smoothed drive lanes, their speeds
                             # trains, the platforms' walkways kept off their trains; 8
                             # (LG7): air and water routes, their models and paints; 9 (LG8):
                             # the weather's table, umbrellas, shelter stretches, nightlife,
-                            # the clear weather's groups, the reactions' settings
+                            # the clear weather's groups, the reactions' settings; 10
+                            # (delta_rebuild): slots seated on their surface (`slot_seated`)
 DATA = "life.json"
 CONTROLLER_KEY = "life"
 MARGIN_M = 60.0             # lanes this far past the live radius come along (links out of it)
@@ -802,7 +803,7 @@ def pack_places(plan: dict, walk: list, gids: list, lane_of: dict, rows: dict, s
         cols = next(t["colors"] for t in turfs if t["faction_id"] == f)
         for k in range(ncol):
             fcols += _lin(cols[k % len(cols)])
-    sk, sl, sd, sps, sp, su, sw, sr, st, sa, sdoor = ([] for _ in range(11))
+    sk, sl, sd, sps, sp, su, sw, sr, st, sa, sdoor, sseat = ([] for _ in range(12))
     roles = {"crowd": 0, "gang": 1, "police": 2}
     for s in sorted(slots, key=lambda s: s["id"]):
         k = lane_of.get(s.get("walkway_id"))
@@ -824,6 +825,8 @@ def pack_places(plan: dict, walk: list, gids: list, lane_of: dict, rows: dict, s
         pid = s.get("place_id") or ""
         sdoor.append(door_index.get("spawn." + pid[len("place."):], -1)
                      if s["kind"] == "bar_queue" else -1)
+        # (delta_rebuild: its points' z the surface under them, over the datum as the lanes)
+        sseat.append(1 if s.get("seated") else 0)
     sps.append(len(sp) // 4)
     wturf, wgang, wpol, wpat = [], [], [], []
     for e in walk:
@@ -836,7 +839,7 @@ def pack_places(plan: dict, walk: list, gids: list, lane_of: dict, rows: dict, s
     po = plan.get("police") or {}
     return {"slot_kinds": sk, "slot_lanes": sl, "slot_dists": sd, "slot_point_starts": sps,
             "slot_points": sp, "slot_use": su, "slot_dwell": sw, "slot_roles": sr,
-            "slot_turfs": st, "slot_anims": sa, "slot_doors": sdoor,
+            "slot_turfs": st, "slot_anims": sa, "slot_doors": sdoor, "slot_seated": sseat,
             "slot_kind_names": list(kinds),
             "slot_kind_behaviors": [pl["slot_kinds"][k]["behavior"] for k in kinds],
             "walk_turf": wturf, "walk_gang": wgang, "walk_police": wpol, "walk_patrol": wpat,

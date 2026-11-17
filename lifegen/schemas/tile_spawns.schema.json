@@ -434,7 +434,7 @@
      "title": "Place Id"
     },
     "points": {
-     "description": "LG4: its use points: x, y, z and the way its user faces (degrees counterclockwise from east).",
+     "description": "LG4: its use points: x, y, z and the way its user faces (degrees counterclockwise from east). Where `seated`, z is the drawn surface's height over the datum under the point (`places.Surface`).",
      "items": {
       "items": {
        "type": "number"
@@ -478,6 +478,12 @@
      ],
      "title": "Role",
      "type": "string"
+    },
+    "seated": {
+     "default": false,
+     "description": "delta_rebuild: its points' z the surface under them (every ground level slot); else the runtime stands its users at their walkway's height.",
+     "title": "Seated",
+     "type": "boolean"
     },
     "tile": {
      "title": "Tile",

@@ -83,7 +83,12 @@ class Slot(_Model):
     reach_m: float | None = Field(None, description="LG4: its first point to that walkway.")
     points: list[Annotated[list[float], Field(min_length=4, max_length=4)]] = Field(
         default_factory=list, description="LG4: its use points: x, y, z and the way its user "
-                                          "faces (degrees counterclockwise from east).")
+                                          "faces (degrees counterclockwise from east). Where "
+                                          "`seated`, z is the drawn surface's height over the "
+                                          "datum under the point (`places.Surface`).")
+    seated: bool = Field(False, description="delta_rebuild: its points' z the surface under "
+                                            "them (every ground level slot); else the runtime "
+                                            "stands its users at their walkway's height.")
     use: PerBand | None = Field(None, description="LG4: its points in use per hour band.")
     dwell_s: Annotated[list[float], Field(min_length=2, max_length=2)] | None = Field(
         None, description="LG4: how long a user stays (s, from, to).")

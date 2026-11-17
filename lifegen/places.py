@@ -92,6 +92,21 @@ def _nearest_on(line, x: float, y: float) -> tuple[float, float, float, float, f
     return best if best is not None else (x, y, 1e9, 1.0, 0.0)
 
 
+def _z_on(line, x: float, y: float) -> float:
+    """A polyline's z at its point nearest (x, y) (0 where it has none)."""
+    best, z = None, 0.0
+    for a, b in zip(line, line[1:]):
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        L2 = dx * dx + dy * dy
+        t = 0.0 if L2 <= 0.0 else max(0.0, min(1.0, ((x - a[0]) * dx + (y - a[1]) * dy) / L2))
+        d = math.hypot(a[0] + dx * t - x, a[1] + dy * t - y)
+        if best is None or d < best:
+            za = a[2] if len(a) > 2 else 0.0
+            zb = b[2] if len(b) > 2 else 0.0
+            best, z = d, za + (zb - za) * t
+    return z
+
+
 def band_hours(b: int) -> range:
     _, a, e = P.HOUR_BANDS[b]
     return range(a, e)
@@ -146,29 +161,48 @@ class WalkIndex:
     """The walkable walkways (`ACCESS_KINDS`, the ground level and every deck) in plan, for
     the walkway nearest a point."""
 
-    def __init__(self, walks: list[dict]):
+    def __init__(self, walks: list[dict], surface: "Surface | None" = None):
         import shapely
         self.walks = [w for w in walks if w.get("kind") in P.ACCESS_KINDS and
                       len(w.get("line") or []) >= 2 and _length(w["line"]) > 0.5]
         self.geoms = [shapely.LineString([(p[0], p[1]) for p in w["line"]]) for w in self.walks]
         self.tree = shapely.STRtree(self.geoms) if self.geoms else None
+        self.surface = surface
 
-    def nearest(self, x: float, y: float, reach: float, level: int | None = None):
+    def height(self, w: dict, x: float, y: float) -> float:
+        """A walkway's height over the datum at its point (x, y): its own (a skybridge's, a
+        platform's) or the surface drawn there where that is higher (a raised road's sidewalk,
+        which the model keeps at the ground)."""
+        z = _z_on(w["line"], x, y)
+        if self.surface is None:
+            return z
+        g = self.surface.ground.one(x, y)
+        return max(z + g, self.surface.at(x, y)[0])
+
+    def nearest(self, x: float, y: float, reach: float, level: int | None = None,
+                z: float | None = None):
         """(walkway, distance, nearest x, y, direction) of the nearest within reach (ties by
-        id), else None."""
+        id), else None. With `z` (delta_rebuild: a slot's surface under its first point) the
+        nearest within `SLOT_STEP_M` of it in height, else the nearest (a bench beside a
+        skybridge leaves from the sidewalk under it, not from the bridge)."""
         import shapely
         if self.tree is None:
             return None
         hits = self.tree.query(shapely.Point(x, y).buffer(reach))
-        best = None
+        best = near = None
         for k in sorted(int(h) for h in hits):
             w = self.walks[k]
             if level is not None and int(w.get("level") or 0) != level:
                 continue
             px, py, d, ux, uy = _nearest_on(w["line"], x, y)
-            if d <= reach and (best is None or (d, w["id"]) < (best[1], best[0]["id"])):
+            if d > reach:
+                continue
+            if best is None or (d, w["id"]) < (best[1], best[0]["id"]):
                 best = (w, d, px, py, ux, uy)
-        return best
+            if z is not None and (near is None or (d, w["id"]) < (near[1], near[0]["id"])) and \
+                    abs(self.height(w, px, py) - z) <= P.SLOT_STEP_M:
+                near = (w, d, px, py, ux, uy)
+        return near if near is not None else best
 
 
 class Footprints:
@@ -236,6 +270,164 @@ class Carriageway:
             if any(self.junc[int(k)].contains(pt) for k in self.jtree.query(pt)):
                 return True
         return False
+
+
+class Surface:
+    """The ground level's drawn surface under a point, as stage 2 draws it (delta_rebuild):
+    a face of M22's pavement map on the ground layer (`g0`: an embankment's raised road and
+    its sidewalks too) at its vertices' heights over the ground by mean value coordinates
+    (`citygen.pavement.mvc`), lifted as AG17 lifts it (`SURFACE_LIFT_M`: a curb band,
+    sidewalk, corner pad or median 0.2 m, the rest 0.05 m); off the map AG13's ground cover
+    (`COVER_LIFT_M` over the ground) or the bare ground. Heights over the datum: the ground
+    (M13) plus the height over it, as the lanes' and walkways' heights in Unreal."""
+
+    def __init__(self, model: dict, ground=None):
+        import shapely
+        from .airwater import Ground
+        self.ground = ground if ground is not None else Ground(model)
+        net = model.get("pavement_net") or {}
+        V = {v["id"]: (float(v["p"][0]), float(v["p"][1]), float(v.get("z") or 0.0))
+             for v in net.get("vertices", [])}
+        E = {e["id"]: e["v"] for e in net.get("edges", [])}
+
+        def ring_of(refs):
+            pts = []
+            for ref in refs:
+                vs = E.get(ref.lstrip("-"))
+                if vs is None:
+                    return []
+                vs = list(reversed(vs)) if ref.startswith("-") else vs
+                for vid in vs:
+                    p = V.get(vid)
+                    if p is not None and (not pts or pts[-1] != p):
+                        pts.append(p)
+            if len(pts) > 1 and pts[0] == pts[-1]:
+                pts.pop()
+            return pts
+
+        self.faces, polys = [], []
+        for f in sorted(model.get("pavement", []) or [], key=lambda f: f["id"]):
+            if f.get("layer", "g0") != "g0":
+                continue
+            rings = [ring_of(r) for r in f.get("rings") or []]
+            rings = [r for r in rings if len(r) >= 3]
+            if not rings:
+                continue
+            try:
+                poly = shapely.Polygon([p[:2] for p in rings[0]], [[p[:2] for p in r] for r in rings[1:]])
+            except Exception:                                        # noqa: BLE001
+                continue
+            if poly.is_empty or poly.area <= 1e-6:
+                continue
+            lift = P.SURFACE_LIFT_M.get(f.get("kind"), P.SURFACE_LIFT_M["default"])
+            self.faces.append((rings, lift))
+            polys.append(poly)
+        self.polys = polys
+        self.tree = shapely.STRtree(polys) if polys else None
+        cover = []
+        for g in model.get("ground_cover", []) or []:
+            poly = g.get("polygon") or {}
+            ext = poly.get("exterior") or []
+            if len(ext) >= 3:
+                try:
+                    c = shapely.Polygon(ext, poly.get("holes") or [])
+                    if c.is_valid and c.area > 0.0:
+                        cover.append(c)
+                except Exception:                                    # noqa: BLE001
+                    continue
+        self.cover = cover
+        self.ctree = shapely.STRtree(cover) if cover else None
+
+    def over_ground(self, x: float, y: float) -> tuple[float, str]:
+        """The drawn surface's height over the ground at (x, y) and what it is (`pavement`,
+        `cover`, `ground`): the highest pavement face containing it."""
+        import numpy as np
+        import shapely
+        from citygen.pavement import mvc
+        pt = shapely.Point(x, y)
+        best = None
+        if self.tree is not None:
+            for k in sorted(int(h) for h in self.tree.query(pt)):
+                if not self.polys[k].covers(pt):
+                    continue
+                rings, lift = self.faces[k]
+                # (a point on a vertex takes its height; else mean value coordinates)
+                z = None
+                for r in rings:
+                    for p in r:
+                        if abs(p[0] - x) < 1e-6 and abs(p[1] - y) < 1e-6:
+                            z = p[2]
+                if z is None:
+                    z = float(mvc(rings, np.array([x]), np.array([y]))[0])
+                    if not math.isfinite(z):
+                        z = min(min(p[2] for p in r) for r in rings)
+                z += lift
+                if best is None or z > best:
+                    best = z
+        if best is not None:
+            return best, "pavement"
+        if self.ctree is not None and any(self.cover[int(k)].covers(pt) for k in self.ctree.query(pt)):
+            return P.COVER_LIFT_M, "cover"
+        return 0.0, "ground"
+
+    def at(self, x: float, y: float) -> tuple[float, str]:
+        """The drawn surface's height over the datum at (x, y), and what it is."""
+        z, what = self.over_ground(x, y)
+        return z + self.ground.one(x, y), what
+
+
+def seat_slots(slots: list[dict], surface: Surface) -> dict:
+    """Every ground level slot's points on the surface under them (`Surface.at`, over the
+    datum: `points[k][2]`, `seated` true), so the runtime stands its users there whatever the
+    height of the walkway they came from (a raised road's sidewalk, the ground by a door);
+    a deck's slots keep their walkway's height. Returns the stats."""
+    stats = {"seated": 0, "points": 0, "pavement": 0, "cover": 0, "ground": 0}
+    for s in slots:
+        if int(s.get("level") or 0) != 0:
+            continue
+        for p in s["points"]:
+            z, what = surface.at(p[0], p[1])
+            p[2] = _r(z, 3)
+            stats["points"] += 1
+            stats[what] += 1
+        s["seated"] = True
+        stats["seated"] += 1
+    return stats
+
+
+def height_check(model: dict, slots: list[dict], surface: Surface, stats: dict) -> dict:
+    """`slot_heights`: every ground level slot seated, each point within `SLOT_SURFACE_TOL_M`
+    of the surface under it; noted, the slots whose first point stands more than 0.3 m off
+    their walkway where they leave it (`WalkIndex.height`: a raised road's sidewalk, a door's
+    path, a skybridge where no walkway at their height is within reach), and more than
+    `SLOT_STEP_M` off."""
+    wi = WalkIndex(model.get("walkways", []), surface)
+    walks = {w["id"]: w for w in wi.walks}
+    bad, off, far = [], 0, 0
+    for s in slots:
+        if int(s.get("level") or 0) != 0:
+            continue
+        if not s.get("seated"):
+            bad.append(f"{s['id']}: not seated")
+            continue
+        for p in s["points"]:
+            z, _ = surface.at(p[0], p[1])
+            if abs(z - p[2]) > P.SLOT_SURFACE_TOL_M:
+                bad.append(f"{s['id']}: a point {p[2] - z:+.2f} m off its surface")
+                break
+        w = walks.get(s.get("walkway_id"))
+        if w is not None:
+            p0 = s["points"][0]
+            px, py, _, _, _ = _nearest_on(w["line"], p0[0], p0[1])
+            dz = abs(p0[2] - wi.height(w, px, py))
+            off += dz > 0.3
+            far += dz > P.SLOT_STEP_M
+    return {"ok": not bad, "detail": (
+        f"{stats['seated']} ground level slots seated, {stats['points']} points on the surface "
+        f"under them (pavement {stats['pavement']}, ground cover {stats['cover']}, bare ground "
+        f"{stats['ground']}) within {P.SLOT_SURFACE_TOL_M * 100:.0f} cm; {off} slots more than "
+        f"0.3 m off their walkway where they leave it, {far} more than {P.SLOT_STEP_M:g} m"
+        if not bad else f"{len(bad)} slots off: " + "; ".join(bad[:5]))}
 
 
 # ---------------------------------------------------------------------------
@@ -359,7 +551,8 @@ def make_slots(model: dict, wi: WalkIndex, fp: Footprints, walk_rows: dict,
                 fx, fy = math.cos(math.radians(yaw - 90.0)), math.sin(math.radians(yaw - 90.0))
                 mirror = fx * to[0] + fy * to[1] < 0.0
         pts = frame_points(kind, x, y, z, yaw, mirror)
-        hit = wi.nearest(pts[0][0], pts[0][1], P.SLOT_REACH_M, lvl)
+        sz = wi.surface.at(pts[0][0], pts[0][1])[0] if wi.surface is not None and lvl == 0 else None
+        hit = wi.nearest(pts[0][0], pts[0][1], P.SLOT_REACH_M, lvl, sz)
         if hit is None:
             left["no_walkway"] += 1
             continue
@@ -379,7 +572,8 @@ def make_slots(model: dict, wi: WalkIndex, fp: Footprints, walk_rows: dict,
         x, y = float(pos[0]), float(pos[1])
         w = walks.get(a.get("walkway_id"))
         if w is None:
-            hit = wi.nearest(x, y, P.SLOT_REACH_M)
+            hit = wi.nearest(x, y, P.SLOT_REACH_M, None,
+                             wi.surface.at(x, y)[0] if wi.surface is not None else None)
             if hit is None:
                 left["no_walkway"] += 1
                 continue

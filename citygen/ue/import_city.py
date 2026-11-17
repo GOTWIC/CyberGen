@@ -75,7 +75,7 @@ HASH_TAG = "cg.hash"
 # unchanged build applies the change (stored hashes are "<version>.<content hash>")
 MESH_VERSION = "3"
 ACTOR_VERSION = "1"
-LIFE_VERSION = "life11"  # LG0: lifegen's controller (CityGenLife) and its stand-in material;
+LIFE_VERSION = "life12"  # LG0: lifegen's controller (CityGenLife) and its stand-in material;
                          # LG1: the people library's properties; LG3: the city's crowd;
                          # 4, lifegen_clothing_toggle: the clothing switch's hidden material
                          # and whole body; 5, LG5: the city's traffic; 6, LG2: the looks,
@@ -86,7 +86,8 @@ LIFE_VERSION = "life11"  # LG0: lifegen's controller (CityGenLife) and its stand
                          # models, AG18's hover cars' meshes, paints); 10, LG8: the weather's
                          # table, umbrellas, shelter, nightlife, the reactions' settings;
                          # 11, people_idles: the mid idles' bakes, the still cards, the
-                         # bench's sit-downs and stand-up
+                         # bench's sit-downs and stand-up; 12, delta_rebuild: slots seated
+                         # on their surface (SlotSeated)
 ATMOS_VERSION = "atmos7"  # the atmos controller's and cells' actors (2, AT2: the high tier,
                           # blinks and sweeps in the packed lights; 3, AT3: the sky and time;
                           # 4, AT4: the air, a cell's fog volumes and emitters; 5, the visible
@@ -1327,7 +1328,7 @@ def places_props(d, missing):
            "slot_points": fl("slot_points"), "slot_use": fl("slot_use"),
            "slot_dwell": fl("slot_dwell"), "slot_roles": it("slot_roles"),
            "slot_turfs": it("slot_turfs"), "slot_anims": it("slot_anims"),
-           "slot_doors": it("slot_doors"),
+           "slot_doors": it("slot_doors"), "slot_seated": it("slot_seated"),
            "slot_kind_names": [str(v) for v in d.get("slot_kind_names") or []],
            "slot_kind_behaviors": [str(v) for v in d.get("slot_kind_behaviors") or []],
            "walk_turf": it("walk_turf"), "walk_gang": fl("walk_gang"),
