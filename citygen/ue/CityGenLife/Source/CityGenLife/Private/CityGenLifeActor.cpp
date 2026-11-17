@@ -1,6 +1,7 @@
 // lifegen's runtime controller (LG0): see CityGenLifeActor.h.
 
 #include "CityGenLifeActor.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "CityGenLifeISM.h"
 #include "CityGenLifeProcessors.h"
 #include "CityGenLifeTypes.h"
@@ -788,6 +789,7 @@ void ACityGenLife::SetLumen(bool bOn)
 
 void ACityGenLife::FindGround()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CityGenLife_FindGround);
 	UWorld* World = GetWorld();
 	UMassEntitySubsystem* Sub = World ? World->GetSubsystem<UMassEntitySubsystem>() : nullptr;
 	if (!Sub || Entities.Num() == 0)
@@ -853,6 +855,7 @@ void ACityGenLife::FindGround()
 
 void ACityGenLife::UpdateInstances()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CityGenLife_UpdateInstances);
 	const int32 NP = WalkPos.Num();
 	if (HasPeople())
 	{
@@ -921,6 +924,7 @@ void ACityGenLife::UpdateInstances()
 
 void ACityGenLife::Tick(float DeltaSeconds)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CityGenLife_Tick);
 	Super::Tick(DeltaSeconds);
 	if (!bBuilt || !bEnabled)
 	{

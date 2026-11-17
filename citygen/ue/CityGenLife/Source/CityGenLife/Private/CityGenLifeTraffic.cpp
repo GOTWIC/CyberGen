@@ -17,6 +17,7 @@
 // (the crowd's people, the player) on its line ahead.
 
 #include "CityGenLifeActor.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "CityGenLifeProcessors.h"
 #include "CityGenLifeTypes.h"
 #include "Algo/Sort.h"
@@ -518,6 +519,7 @@ void ACityGenLife::TakeFreedCars()
 
 void ACityGenLife::UpdateTraffic(const float Dt, const bool bRefill)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CityGenLife_UpdateTraffic);
 	const double T0 = FPlatformTime::Seconds();
 	ON_SCOPE_EXIT
 	{
@@ -778,6 +780,7 @@ void ACityGenLife::GatherPlayers()
 
 void ACityGenLife::UpdateCarInstances()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CityGenLife_UpdateCarInstances);
 	// (the engine's cost is in the instances sent each frame: a part drawn as far as the cars
 	// live (a body) is sent over its model's instances in use, the lowest first (a free slot is
 	// taken lowest first); a part drawn nearer (glass, wheels, trims) only for the cars within
@@ -1128,6 +1131,7 @@ bool ACityGenLife::BlockPlayer()
 
 void UCityGenLifeDriveProcessor::ExecuteTraffic(FMassExecutionContext& Context)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CityGenLife_ExecuteTraffic);
 	FCgLifeFrame& F = *Frame;
 	const double T0 = FPlatformTime::Seconds();
 	const FZoneGraphStorage& S = *F.Storage;

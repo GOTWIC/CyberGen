@@ -17,6 +17,7 @@
 // was (ApplyClothing says why).
 
 #include "CityGenLifeActor.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "CityGenLifeISM.h"
 #include "CityGenLifeTypes.h"
 #include "Algo/Sort.h"
@@ -708,6 +709,7 @@ bool ACityGenLife::ViewPoint(FVector& Out) const
 
 void ACityGenLife::UpdatePeople()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CityGenLife_UpdatePeople);
 	const double T0 = FPlatformTime::Seconds();
 	const int32 NP = WalkPos.Num();
 	const int32 NC = MidMeshes.Num();

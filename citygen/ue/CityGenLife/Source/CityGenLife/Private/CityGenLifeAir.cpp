@@ -13,6 +13,7 @@
 // flashing ones (strobes, beacons, police bars) drawn only while lit.
 
 #include "CityGenLifeActor.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "CityGenLifeISM.h"
 #include "Algo/BinarySearch.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -340,6 +341,7 @@ void ACityGenLife::PlaceAw(FCgAwVehicle& V, const double Time)
 
 void ACityGenLife::UpdateAirWater(const float Dt)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CityGenLife_UpdateAirWater);
 	if (!IsAirWater() || AwVehicles.Num() == 0)
 	{
 		return;

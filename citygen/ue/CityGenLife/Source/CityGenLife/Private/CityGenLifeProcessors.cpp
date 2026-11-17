@@ -1,6 +1,7 @@
 // lifegen's Mass processors (LG0): see CityGenLifeProcessors.h.
 
 #include "CityGenLifeProcessors.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "CityGenLifeTypes.h"
 #include "Algo/Sort.h"
 #include "MassExecutionContext.h"
@@ -1135,6 +1136,7 @@ namespace CgLife
 
 void UCityGenLifeWalkProcessor::ExecuteCity(FMassExecutionContext& Context)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CityGenLife_ExecuteCity);
 	FCgLifeFrame& F = *Frame;
 	const float Dt0 = FMath::Min(0.1f, Context.GetDeltaTimeSeconds());
 	const double Avoid2 = FMath::Square((double)F.AvoidCm);

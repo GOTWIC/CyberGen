@@ -14,6 +14,7 @@
 // a run of instances per train), their door leaves and lit doorways drawn near the view only.
 
 #include "CityGenLifeActor.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "CityGenLifeISM.h"
 #include "CityGenLifeTypes.h"
 #include "Algo/BinarySearch.h"
@@ -365,6 +366,7 @@ bool ACityGenLife::DoorPoint(const FCgTrain& T, const int32 Car, const int32 Doo
 
 void ACityGenLife::UpdateTransit(const float Dt)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CityGenLife_UpdateTransit);
 	if (!IsTransit() || Trains.Num() == 0)
 	{
 		return;

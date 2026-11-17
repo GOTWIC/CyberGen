@@ -14,6 +14,7 @@
 // (not drawn) under a cover. A danger (Panic) is the processor's (CgLife::StepCity).
 
 #include "CityGenLifeActor.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "CityGenLifeISM.h"
 #include "CityGenLifeTypes.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -130,6 +131,7 @@ void ACityGenLife::ApplyWeatherNow()
 
 void ACityGenLife::FollowAtmos(const float Dt, const bool bNow)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CityGenLife_FollowAtmos);
 	AtmosClock += Dt;
 	if (!bNow && AtmosClock < AtmosStep)
 	{
@@ -226,6 +228,7 @@ void ACityGenLife::FollowAtmos(const float Dt, const bool bNow)
 
 void ACityGenLife::ThinOut()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CityGenLife_ThinOut);
 	// (more people out than the hour and the weather want, by a tenth: some of those walking
 	// head in at the next door ahead, as at a trip's end; never in sight of a door's absence:
 	// one who meets none goes where nobody sees, as LG3's)
@@ -350,6 +353,7 @@ void ACityGenLife::MakeUmbrellas()
 
 void ACityGenLife::UpdateUmbrellas(const FVector& View)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CityGenLife_UpdateUmbrellas);
 	if (!UmbCanopy || !UmbShaft || UmbCanXf.Num() == 0)
 	{
 		return;

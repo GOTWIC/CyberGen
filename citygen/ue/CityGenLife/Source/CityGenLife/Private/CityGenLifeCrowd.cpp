@@ -13,6 +13,7 @@
 // destroyed while the game runs.
 
 #include "CityGenLifeActor.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "CityGenLifeTypes.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Engine/World.h"
@@ -522,6 +523,7 @@ void ACityGenLife::TakeFreed()
 
 void ACityGenLife::UpdateLive(const float Dt, const bool bRefill)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CityGenLife_UpdateLive);
 	FVector View;
 	if (!ViewPoint(View))
 	{
@@ -668,6 +670,7 @@ void ACityGenLife::UpdateLive(const float Dt, const bool bRefill)
 
 void ACityGenLife::DoorSpawns(const float Dt)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CityGenLife_DoorSpawns);
 	// (LG4: police pairs out of their stations' doors)
 	PoliceFromStations(Dt);
 	// (as many come out as go in over a trip, more while the live people are under their
