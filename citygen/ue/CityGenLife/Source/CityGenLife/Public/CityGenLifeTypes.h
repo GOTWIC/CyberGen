@@ -23,6 +23,9 @@ namespace CgWalk
 		Inside = 7,    // in a shop on a visit (not drawn), then out of its door again
 		// --- LG6: transit
 		Board = 8,     // from its platform walkway into a train's open door, then gone
+		// --- LG8: the weather and reactions
+		Shelter = 9,   // standing at the side of its walkway under a cover, out of the rain
+		Look = 10,     // standing on its walkway looking at a point (a danger it came back to see)
 	};
 }
 
@@ -36,6 +39,7 @@ namespace CgAnim
 		Idle = 1,      // standing at a slot (a bus stop, a queue, a kiosk)
 		Sit = 2,       // a bench
 		Talk = 3,      // talking, smoking, eating (the sample's idle breaks)
+		Run = 4,       // LG8: running away from a danger
 	};
 }
 
@@ -119,7 +123,14 @@ struct FCgLifeWalker : public FMassFragment
 	int32 PassedSlot = INDEX_NONE; // the last slot it passed (and chose not to use)
 
 	// --- LG6: transit ------------------------------------------------------------------------------
-	FVector To = FVector::ZeroVector;   // the train door it boards at (UE cm)
+	FVector To = FVector::ZeroVector;   // the train door it boards at (UE cm); LG8: what it looks at
+
+	// --- LG8: the weather and reactions ---------------------------------------------------------
+	uint8 Flee = 0;                // running away from a danger
+	uint8 Gawk = 0;                // walking back toward a danger to look at it
+	int32 Panic = 0;               // the last danger it reacted to (each once)
+	int32 CoverK = INDEX_NONE;     // the stretch out of the rain it last chose to pass or stop under
+	float Ring = 0.f;              // cm from the danger it stops to look from
 };
 
 /** LG5: why a car drives slower than its lane allows now (FCgLifeCar::Why). */
@@ -172,4 +183,7 @@ struct FCgLifeCar : public FMassFragment
 	float Pending = 0.f;           // s held back by a far car's skipped frames
 	float PedHit = 1.0e9f;         // cm ahead of its front to someone in its way (last look)
 	uint8 PedPlayer = 0;           // that someone the player
+
+	// --- LG8 -----------------------------------------------------------------------------------
+	float Stuck = 0.f;             // s standing still in a queue (any reason): far from the view, it leaves
 };

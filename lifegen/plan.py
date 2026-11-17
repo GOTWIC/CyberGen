@@ -74,8 +74,10 @@ from . import planmodel as PM
 from . import presets as P
 from . import spec as S
 from . import transit as TR
+from . import weather as WX
 
 TILE_M = 256.0
+POOL_RAIN = 0.6             # LG8: the pool's rain looks at this share of the rainiest state's
 # (LG1) a person's draws, kept per person as columns in the spike (`library.person`)
 PERSON_COLUMNS = ("seed", "character", "scale", "gait", "pace", "tint")
 
@@ -597,10 +599,11 @@ def _hex(rgb) -> str:
     return "#" + "".join(f"{max(0, min(255, int(round(v * 255)))):02x}" for v in rgb)
 
 
-def outfit_groups(filled: dict) -> dict[str, list[float]]:
+def outfit_groups(filled: dict, rain: float | None = None) -> dict[str, list[float]]:
     """LG2: each district's people by look group (`garments.GROUPS`): its style's groups,
-    with the weather's share in the rain looks."""
-    rain = float(P.WEATHER_OUTFITS.get(filled["crowd"].get("weather", "clear"), 0.0))
+    with the weather's share in the rain looks (`rain`, default the plan's own state's)."""
+    if rain is None:
+        rain = float(P.WEATHER_OUTFITS.get(filled["crowd"].get("weather", "clear"), 0.0))
     out = {}
     for d, fd in sorted(filled["districts"].items()):
         w = [float(fd["style"]["groups"].get(g, 0.0)) for g in G.GROUPS]
@@ -677,6 +680,10 @@ def crowd_plan(model: dict, filled: dict, rows: list[dict], sigs: list[dict],
             cols[c].append(p[c])
     # (LG2: each person's look and its group, by the city's people per district and group)
     groups = outfit_groups(filled)
+    # (LG8: the pool holds the rain looks the runtime's rain asks for: its mix is drawn at a
+    # rain share between clear's and the rainiest state's, `POOL_RAIN` of it)
+    pool_groups = outfit_groups(filled, POOL_RAIN * max(
+        v["rain_looks"] for v in P.WEATHER_LIFE.values()))
     band = P.band_of(int(cr["hour"]))
     ppl = defaultdict(float)
     for r in rows:
@@ -685,9 +692,9 @@ def crowd_plan(model: dict, filled: dict, rows: list[dict], sigs: list[dict],
     # people by group, half each group's largest share of any district, so a quiet district's
     # group has people enough when the view is there)
     tot = sum(ppl.values()) or 1.0
-    mix = [0.5 * sum(ppl[d] * groups[d][i] for d in groups) / tot +
-           0.5 * max(groups[d][i] for d in groups) / max(1e-9, sum(
-               max(groups[d][j] for d in groups) for j in range(len(G.GROUPS))))
+    mix = [0.5 * sum(ppl[d] * pool_groups[d][i] for d in pool_groups) / tot +
+           0.5 * max(pool_groups[d][i] for d in pool_groups) / max(1e-9, sum(
+               max(pool_groups[d][j] for d in pool_groups) for j in range(len(G.GROUPS))))
            for i in range(len(G.GROUPS))]
     if not sum(mix):
         mix = [1.0] * len(G.GROUPS)
@@ -722,6 +729,10 @@ def crowd_plan(model: dict, filled: dict, rows: list[dict], sigs: list[dict],
         "kinds": list(P.WALK_KIND_CODES),
         "palettes": {d: district_palette(model, filled, d) for d in filled["districts"]},
         "outfits": {"groups": list(G.GROUPS), "district_groups": groups,
+                    # (LG8: the clear weather's, which the runtime blends with the rain looks
+                    # by atmosgen's rain, `weather.states[...].rain_looks`)
+                    "district_groups_clear": outfit_groups(filled, 0.0),
+                    "rain_group": G.GROUPS.index("rain"),
                     "palettes": outfit_palettes(model, filled),
                     "wear": {d: fd["style"].get("wear", 0.3)
                              for d, fd in sorted(filled["districts"].items())},
@@ -1575,7 +1586,8 @@ def spike_plan(model: dict, filled: dict, hours: dict) -> dict | None:
 
 
 def build_plan(build: str | Path, spec_path: str | Path | None = None,
-               out: str | Path | None = None, preview: bool = True) -> dict:
+               out: str | Path | None = None, preview: bool = True,
+               atmos: str | Path | None = None) -> dict:
     t0 = time.time()
     build = Path(build)
     mpath = build / "city_model.json"
@@ -1635,6 +1647,20 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     gm = PL4.gang_walks(model, filled, rows, turfs)
     slot_raw += PL4.gang_spots(model, turfs, gm, row_by, wi, fp)
     pol = PL4.police_plan(model, filled, rows, drows, spawns)
+    # LG8: each walkway's stretches out of the rain (atmosgen's rain shadow), nightlife round
+    # the bars, clubs and arcades, the weather's table
+    adir = WX.atmos_dir(build, atmos)
+    cover, cstats = WX.walk_cover(model, WX.Masks(adir) if adir else None, AW.Ground(model))
+    night = WX.nightlife(model, places)
+    sides = WX.road_sides(model, cover)
+    for r in rows:
+        if r["id"] in cover:
+            r["cover"] = cover[r["id"]]
+        if r["id"] in sides:
+            r["road_side"] = sides[r["id"]]
+        if r["id"] in night:
+            r["night"] = night[r["id"]]
+    weather = WX.weather_record(filled, cstats, night, adir)
     roles = role_counts(filled, rows, drows, slot_raw)
     crowd = crowd_plan(model, filled, rows, sigs, left,
                        roles=(roles["gang"][0], roles["police"][0]))
@@ -1729,6 +1755,7 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     checks.update(TR.checks(model, tlines, tleft, walk_components(model.get("walkways", [])),
                             spawns))
     checks.update(AW.checks(aw_routes, aw_pads, aw_piers, aw_extra))
+    checks.update(WX.checks(model, rows, place_rows, weather))
     sdata = PM.Signals(city=city, derived=True, signals=sigs)
     write(out / "signals.json", canon(json.loads(sdata.model_dump_json())), wrote)
     asks = A.status(model, {"doors": (build / "assets" / "unreal_contribution.buildings.json")
@@ -1755,13 +1782,14 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
             "bands": list(P.BANDS), "districts": districts, "tiles": tiles, "asks": asks,
             "spike": spike, "crowd": crowd, "traffic": traffic, "places": places_rec,
             "gangs": gangs_rec, "police": police_rec, "transit": transit_rec,
-            "airwater": aw_rec, "checks": checks, "totals": totals}
+            "airwater": aw_rec, "weather": weather, "checks": checks, "totals": totals}
     plan_hash = _sha([body["spec"], [d["hash"] for d in districts],
                       [t["sha256"] for t in tiles], spike and spike["hash"], crowd["hash"],
                       sdata.model_dump(mode="json"), traffic["hash"], places_rec["hash"],
                       gangs_rec["hash"], police_rec["hash"]] +
                      ([transit_rec["hash"]] if tlines else []) +
-                     ([aw_rec["hash"]] if aw_routes else []))
+                     ([aw_rec["hash"]] if aw_routes else []) +
+                     [_sha(weather)])
     plan = PM.LifePlan(plan_hash=plan_hash, **body)
     pdata = json.loads(plan.model_dump_json())
     write(out / "life_plan.json", canon(pdata), wrote)
@@ -1871,6 +1899,10 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
                              out / "preview_airwater.png")
             if img:
                 wrote.append(img)
+        # (LG8: the stretches out of the rain, nightlife, the weather's table)
+        img = WX.preview(model, rows, weather, out / "preview_weather.png")
+        if img:
+            wrote.append(img)
     rep["wrote"] = wrote
     rep["seconds"] = round(time.time() - t0, 1)
     return rep

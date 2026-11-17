@@ -19,7 +19,7 @@ grows here as it lands, as in [`citygen_milestones.md`](citygen_milestones.md),
 | LG5 | Traffic: every lane of the city at its street's density by hour (twice M11's by default), live round the view from a fixed pool of AG18's cars by the districts' fleets and paints; following the car in front, red lights, junctions taken in turn with room past them, stopping for people and the player; Delta driven city-wide | Done | [`docs/progress/LG5`](progress/LG5) |
 | LG6 | Transit: a timetable per line from the model's tracks and stations (the fastest runs by the mode's speeds, rates and the track's curves, dwells, turns at an open line's ends), its trains per hour band evenly round its cycle, each station's stop and board walkway, people boarding and leaving by the station's riders; the trains (stand-ins of the exporter's per mode model table until the Mac's designs) running every line city-wide by the world's time, doors open at the stops, the crowd leaving and boarding them round the view; Delta's five lines | Done | [`docs/progress/LG6`](progress/LG6) |
 | LG7 | Air and water: routes for everything that flies and floats, city-wide, each a closed path run to a timetable by the world's time (as LG6's trains): flying cars between M3's pads (landing and taking off vertically) and round circuits over the avenues and highways on layers by heading, clear of every mass, tube, line, skybridge and sign; delivery drones from roof to roof; police orbits by danger; media fliers round the landmarks; aircraft high over the map; a spaceport's shuttles down onto their launch pads; boats keeping right on every river, channel and canal; water taxis between piers derived from M16's quays; double-ended ferries across the rivers; ships at the port's berths and one offshore. AG18's hover cars as the flying cars and police fliers, stand-ins for the rest; Delta city-wide | Done | [`docs/progress/LG7`](progress/LG7) |
-| LG8 | Weather, reactions and release | Planned | |
+| LG8 | Weather, reactions and release: life by atmosgen's hour and weather state (people out, pace, raincoats and umbrellas, shelter under the covers of atmosgen's rain shadow, nightlife round the open bars, clubs and arcades, the cars' speed and headway), reactions (people near the player look at it; a danger sends them running, then draws a crowd to look), the junction room fix and stuck cars, the crowd and traffic performance pass, every sample city planned with every check passing, Unreal checks of Delta and Vesper Bay, the release package | Done | [`docs/progress/LG8`](progress/LG8) |
 
 ## LG0: groundwork and spike
 
@@ -503,3 +503,67 @@ fixes (#229). Report, shots, benchmark and open items:
   fleets, a lane off the main part, the budget check, strong components, the exporter's
   traffic pack and summary; the fixture's lanes became a ring with a signalized end;
   `tests/test_bench.py` the traffic passes).
+
+## LG8: weather, reactions and release
+
+Built on the Windows PC (2026-11-16 and 17), on main after LG7 (#236); stage 4's last
+milestone. Report, shots, benchmark, decisions and open items:
+[`docs/progress/LG8/README.md`](progress/LG8/README.md).
+
+- **The hour:** the runtime follows atmosgen's controller's hour (read every half second by its
+  class's name): an hour's step as time runs moves the doors' and places' rates and the live
+  walkways' and lanes' numbers (people coming out and going in over their trips), a jump (the
+  play menu's day, dusk or night) fills them again; transit and what flies and floats take
+  their band from it. `CityGenLife.Hour H` holds life at H; `CityGenLife.FollowAtmos`.
+- **The weather** (`lifegen/weather.py`, `presets.WEATHER_LIFE`, `WEATHER_RAIN`): per atmosgen
+  state the share of people out (rain 0.6: past a tenth too many, people walking head in at the
+  next door), their pace (rain 1.15), the rain looks (LG2's raincoats, the pool drawn at 0.6 of
+  the rainiest state's share), umbrellas (rain 0.6 of the others), a passer-by's chance to
+  shelter (rain 0.22), the cars' share, speed (rain 0.88) and added headway (0.45 s); a rain
+  state's values reached by atmosgen's rain over its own rain rate, so life follows a change of
+  state as the rain does. `CityGenLife.Weather STATE|auto|off`.
+- **Umbrellas:** a canopy and a shaft (the engine's basic shapes in `M_CgTransit`) over the
+  right shoulder of the near and mid people who hold one, by each person's hash, in ten canopy
+  colors, a share with a lit shaft (the city's LED umbrellas); folded under a cover, sitting
+  or running.
+- **Shelter** (`weather.walk_cover`, `Masks`): each walkway's stretches out of the rain from
+  atmosgen's rain shadow (AT5's masks: a cover 2.1 m or more over it), underground or enclosed
+  (walk rows' `cover`); in rain a passer-by stops under one by the state's chance and stands at
+  the walkway's side facing out for 25 to 140 s, out soon after the rain stops.
+- **Nightlife** (`weather.nightlife`): the open bars', clubs' and arcades' people (3, 7 and 2 at
+  full busy, LG4's places and M11's POIs) on their door walkways by band (walk rows' `night`),
+  on top of M11's density.
+- **Reactions:** people standing still near the player (6 m) turn to look at it; a danger
+  (`ACityGenLife::Panic`, storygen's hook; `CityGenLife.Panic`, the Tab menu's Scare the crowd
+  row) sends everyone within 35 m but the police running away along their walkways (the way
+  farthest from it at each turn, signals ignored) at 2.9 times their pace for 14 s, near the
+  view on the Game Animation Sample's run (a place clip, retargeted and made in place); after
+  it, for 90 s, half of the people within 80 m come back and stand 8 to 20 m off it looking at
+  it. Cars stop for the player on foot (no horn: no sound in lifegen).
+- **Traffic:** every junction exit tested for room (LG5 tested exits twice a car's length
+  only): a short exit (Old Town's 5.8 m lanes between a cluster's junctions) only while empty
+  and the lanes after it clear by what the car would stick out; a car waiting for room claims
+  nothing and is never forced into the box; a car standing 75 s in a queue past 150 m of the
+  view leaves.
+- **Every sample city:** the five samples, the pinned, stack and deck demos and Cragmouth
+  planned with every check passing; fixed on the way: a gang spot whose ring ran past its
+  turf's edge (Vesper Bay's `gang_turf`), a deep metro's concourse 16.2 m over its track
+  (Vesper Bay's `transit_stops`: the station's own `track_z_m`), a sky tube terminal nearer its
+  track's end than the turn point (Nexus City's `transit_stops`: called at the turn), a media
+  flier's orbit grazing a tower between the points it was tested at (Nexus City's
+  `air_lanes`: the finished route read back as the check reads it).
+- **Checks** (`weather.checks`): `weather`, `shelter`, `nightlife`.
+- **Exporter and runtime** (`unreal_life.pack_weather`, `walk_cover`, `walk_night`, `run_clips`,
+  `PACK_VERSION` 9; `import_city.weather_props`, `LIFE_VERSION` life10;
+  `CityGenLifeWeather.cpp`; the processors; `CityGenPlay`'s Scare the crowd row).
+- **Performance pass** (an Unreal Insights trace of the lean route, the controller's steps in
+  trace scopes): lifegen's instanced components with fixed bounds (`UCgLifeISM`, the lanes'
+  box; `CityGenLife.Bounds` 0 and 2 the engine's and lifegen's own measures), the near
+  garments' material instances kept per slot (the garbage collector had purged them), fixed
+  skeletal bounds near, fewer ground traces, far cards, far cars and idle models' bodies sent
+  less often. The walk's slowest frames are World Partition's instanced HLOD components
+  re-sending their instance data as cells stream (2,362 updates in such a frame), not lifegen's
+  step (1.7 ms median, 2.7 at the 95th percentile).
+- **Delta:** every plan check and the Unreal check pass (Vesper Bay's too, blockout only, in a
+  throwaway project); `night_plan_all` 21.8 ms p95 native on the lean route (walk 24.7), 23.0
+  under 3.4 cores of other load, against LG7's 22.6: over the 20 ms budget.

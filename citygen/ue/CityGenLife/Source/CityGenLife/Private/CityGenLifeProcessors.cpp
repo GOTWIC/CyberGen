@@ -1,6 +1,7 @@
 // lifegen's Mass processors (LG0): see CityGenLifeProcessors.h.
 
 #include "CityGenLifeProcessors.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "CityGenLifeTypes.h"
 #include "Algo/Sort.h"
 #include "MassExecutionContext.h"
@@ -153,6 +154,28 @@ namespace CgLife
 		if (N == 0)
 		{
 			return bAvoided ? Avoid : INDEX_NONE;
+		}
+		// (LG8: running from a danger, the way whose far end is farthest from it; coming back to
+		// look, the nearest)
+		if ((W.Flee || W.Gawk) && F.PanicCm > 0.f)
+		{
+			int32 Best = Cands[0];
+			double BestD = W.Flee ? -1.0 : 1.0e18;
+			for (int32 I = 0; I < N; ++I)
+			{
+				const FZoneLaneData& C = S.Lanes[Cands[I]];
+				const FVector A = S.LanePoints[C.PointsBegin];
+				const FVector B = S.LanePoints[C.PointsEnd - 1];
+				const FVector Here = W.Pos;
+				const FVector Far = FVector::DistSquared(A, Here) > FVector::DistSquared(B, Here) ? A : B;
+				const double D = FVector::DistSquared2D(Far, F.PanicAt);
+				if (W.Flee ? D > BestD : D < BestD)
+				{
+					BestD = D;
+					Best = Cands[I];
+				}
+			}
+			return Best;
 		}
 		float X = (float)(Next(Seed) % 10000u) / 10000.f * Tot;
 		for (int32 I = 0; I < N; ++I)
@@ -346,7 +369,11 @@ namespace CgLife
 			(*F.WalkState)[W.Instance] = Show;
 			if (F.WalkAnim && F.WalkAnim->IsValidIndex(W.Instance))
 			{
-				(*F.WalkAnim)[W.Instance] = W.State == CgWalk::AtSlot ? W.Anim : (uint8)CgAnim::Walk;
+				// (LG8: standing under a cover or looking at a danger, the idle; running from one,
+				// the run)
+				(*F.WalkAnim)[W.Instance] = W.State == CgWalk::AtSlot ? W.Anim :
+					((W.State == CgWalk::Shelter || W.State == CgWalk::Look) ? (uint8)CgAnim::Idle :
+					(W.Flee && W.State == CgWalk::Walk ? (uint8)CgAnim::Run : (uint8)CgAnim::Walk));
 			}
 		}
 	}
@@ -384,6 +411,67 @@ namespace CgLife
 	float Unit(FCgLifeWalker& W)
 	{
 		return (float)(Next(W.Seed) % 10000u) / 10000.f;
+	}
+
+	// --- LG8: the weather and reactions ------------------------------------------------------------
+
+	/** The stretch out of the rain (an index of F.Cover's pairs) a walkway lane has at `Dist`
+	 *  (cm), else INDEX_NONE. */
+	int32 CoverAt(const FCgLifeFrame& F, const int32 Lane, const float Dist)
+	{
+		if (!F.CoverStarts || !F.CoverStarts->IsValidIndex(Lane + 1))
+		{
+			return INDEX_NONE;
+		}
+		const TArray<float>& C = *F.Cover;
+		for (int32 K = (*F.CoverStarts)[Lane]; K < (*F.CoverStarts)[Lane + 1]; ++K)
+		{
+			if (C.IsValidIndex(2 * K + 1) && Dist >= C[2 * K] && Dist <= C[2 * K + 1])
+			{
+				return K;
+			}
+		}
+		return INDEX_NONE;
+	}
+
+	/** A person standing still near the player turns to look at it (true: it did). */
+	bool LookAtPlayer(FCgLifeFrame& F, FCgLifeWalker& W, const float Dt)
+	{
+		if (!F.bLook || !F.bPlayer || W.Flee)
+		{
+			return false;
+		}
+		const FVector D = F.Player - W.Pos;
+		if (D.SizeSquared2D() > FMath::Square((double)F.LookCm) || FMath::Abs(D.Z) > 250.0 || D.SizeSquared2D() < 1.0)
+		{
+			return false;
+		}
+		TurnTo(F, W, FMath::RadiansToDegrees(FMath::Atan2(D.Y, D.X)), Dt);
+		++F.Looking;
+		return true;
+	}
+
+	/** A person coming back to look at a danger turned toward it along its walkway, once. */
+	void FaceDanger(const FCgLifeFrame& F, FCgLifeWalker& W)
+	{
+		if (!F.Storage->Lanes.IsValidIndex(W.Lane) || W.Lane >= F.WalkLanes ||
+			F.Storage->Lanes[W.Lane].PointsEnd - F.Storage->Lanes[W.Lane].PointsBegin < 2)
+		{
+			return;
+		}
+		FVector At, Head;
+		PathAt(F, W, At, Head);
+		if (FVector::DotProduct(Head * W.Dir, F.PanicAt - W.Pos) < 0.0)
+		{
+			W.Dir = -W.Dir;
+		}
+	}
+
+	/** Whether a danger is on now and this person within its reach (3D). */
+	bool InDanger(const FCgLifeFrame& F, const FCgLifeWalker& W)
+	{
+		return F.PanicCm > 0.f && F.Time < F.PanicUntil &&
+			FVector::DistSquared(W.Pos, F.PanicAt) < FMath::Square((double)F.PanicCm);
 	}
 
 	/** LG4: whether a slot wants another user now: under its wanted users (the fraction by
@@ -463,7 +551,11 @@ namespace CgLife
 		if (W.State == CgWalk::AtSlot)
 		{
 			W.Pos = (*F.PointPos)[W.Point] + FVector(0.f, 0.f, W.ZOff);
-			TurnTo(F, W, (*F.PointYaw)[W.Point], Dt);
+			// (LG8: standing, it looks at the player near it; a sitter keeps to its bench)
+			if (W.Anim == CgAnim::Sit || !LookAtPlayer(F, W, Dt))
+			{
+				TurnTo(F, W, (*F.PointYaw)[W.Point], Dt);
+			}
 			W.Dwell -= Dt;
 			if (W.Dwell > 0.f)
 			{
@@ -557,6 +649,64 @@ namespace CgLife
 			W.T = 0.f;
 			W.Visit = 0;
 		}
+		// (LG8: a danger near: everyone but the police runs from it, leaving where it was, once a
+		// danger; out of it, a share comes back to look while the danger draws them)
+		if (W.Panic != F.PanicId && W.Role != CgRole::Police && W.State != CgWalk::Enter &&
+			W.State != CgWalk::Exit && W.State != CgWalk::Board && W.State != CgWalk::Inside && InDanger(F, W) &&
+			S.Lanes.IsValidIndex(W.Lane) && W.Lane < F.WalkLanes &&
+			S.Lanes[W.Lane].PointsEnd - S.Lanes[W.Lane].PointsBegin >= 2)
+		{
+			W.Panic = F.PanicId;
+			W.Flee = 1;
+			W.Gawk = 0;
+			LetGo(F, W);
+			W.State = (W.State == CgWalk::ToSlot || W.State == CgWalk::AtSlot) ? CgWalk::FromSlot : CgWalk::Walk;
+			W.From = W.Pos;
+			W.T = 0.f;
+			W.Crossed = 1;
+			W.Next = INDEX_NONE;
+			FVector At, Head;
+			PathAt(F, W, At, Head);
+			// (away from it along its walkway; its side offset is the lane's, so it turns on the
+			// spot and drifts to its own right as it runs)
+			if (FVector::DotProduct(Head * W.Dir, W.Pos - F.PanicAt) < 0.0)
+			{
+				W.Dir = -W.Dir;
+			}
+		}
+		else if (W.Flee && (F.Time >= F.PanicUntil + 4.0 * (double)(W.Instance % 5) / 5.0 || F.PanicCm <= 0.f))
+		{
+			// (the danger over: it calms down; a share of those near come back to look)
+			W.Flee = 0;
+			if (F.bGather && F.Time < F.GatherUntil && Unit(W) < F.GatherShare &&
+				FVector::DistSquared2D(W.Pos, F.PanicAt) < FMath::Square((double)F.GatherCm))
+			{
+				W.Gawk = 1;
+				W.Ring = FMath::Lerp((float)F.RingCm.X, (float)F.RingCm.Y, Unit(W));
+				W.Next = INDEX_NONE;
+				FaceDanger(F, W);
+			}
+		}
+		else if (F.bGather && W.Panic != F.PanicId && W.Role == CgRole::Crowd && W.State == CgWalk::Walk &&
+			F.PanicCm > 0.f && F.Time >= F.PanicUntil && F.Time < F.GatherUntil &&
+			FVector::DistSquared2D(W.Pos, F.PanicAt) < FMath::Square((double)F.GatherCm))
+		{
+			// (a passer-by after it: drawn to look, by the share)
+			W.Panic = F.PanicId;
+			if (Unit(W) < F.GatherShare)
+			{
+				W.Gawk = 1;
+				W.Ring = FMath::Lerp((float)F.RingCm.X, (float)F.RingCm.Y, Unit(W));
+				W.Next = INDEX_NONE;
+				FaceDanger(F, W);
+			}
+		}
+		if (W.Gawk && (F.Time >= F.GatherUntil || F.PanicCm <= 0.f))
+		{
+			W.Gawk = 0;
+		}
+		F.Fleeing += W.Flee;
+		F.Gawking += W.Gawk;
 		// (LG4: to, at and back from a place slot)
 		if (W.State == CgWalk::ToSlot || W.State == CgWalk::AtSlot || W.State == CgWalk::FromSlot)
 		{
@@ -623,6 +773,52 @@ namespace CgLife
 			Free(F, W);
 			return;
 		}
+		// (LG8: standing at its walkway's side, out of the rain under a cover, or looking at a
+		// danger it came back to see; then on its way again)
+		if (W.State == CgWalk::Shelter || W.State == CgWalk::Look)
+		{
+			W.Dwell -= Dt;
+			if (W.State == CgWalk::Shelter && F.ShelterP <= 0.f && W.Dwell > 8.f)
+			{
+				// (the rain over: out from under it soon)
+				W.Dwell = 2.f + 6.f * Unit(W);
+			}
+			if (W.State == CgWalk::Look && (F.PanicCm <= 0.f || F.Time >= F.GatherUntil))
+			{
+				W.Dwell = FMath::Min(W.Dwell, 1.f + 3.f * Unit(W));
+			}
+			if (W.Dwell > 0.f && S.Lanes[W.Lane].PointsEnd - S.Lanes[W.Lane].PointsBegin >= 2)
+			{
+				FVector At, Head;
+				PathAt(F, W, At, Head);
+				const FVector Right = FVector::CrossProduct(FVector::UpVector, Head * W.Dir).GetSafeNormal();
+				const float HW = 0.5f * (*F.Widths)[W.Lane];
+				// (under a cover on a sidewalk: against the buildings, the side away from its
+				// road, facing the road; else at the side it walked on, facing across)
+				const int32 RS = (W.State == CgWalk::Shelter && F.RoadSide && F.RoadSide->IsValidIndex(W.Lane)) ? (*F.RoadSide)[W.Lane] : 0;
+				const float Sg = RS != 0 ? -(float)RS * W.Dir : (W.Lat >= 0.f ? 1.f : -1.f);
+				W.Lat = FMath::FInterpConstantTo(W.Lat, Sg * 0.8f * HW, Dt, 70.f);
+				W.Pos = At + Right * W.Lat + FVector(0.f, 0.f, W.ZOff);
+				if (!LookAtPlayer(F, W, Dt))
+				{
+					// (under a cover, facing out across its walkway; looking, at the danger)
+					const FVector To = W.State == CgWalk::Look ? (W.To - W.Pos) : (-Right * Sg);
+					if (To.SizeSquared2D() > 1.0e-4)
+					{
+						TurnTo(F, W, FMath::RadiansToDegrees(FMath::Atan2(To.Y, To.X)), Dt);
+					}
+				}
+				if (F.Covered && F.Covered->IsValidIndex(W.Instance))
+				{
+					(*F.Covered)[W.Instance] = W.State == CgWalk::Shelter ? 1 : (CoverAt(F, W.Lane, W.Dist) != INDEX_NONE ? 1 : 0);
+				}
+				F.Sheltering += W.State == CgWalk::Shelter ? 1 : 0;
+				Place(F, W, CgShow::Still);
+				return;
+			}
+			W.State = CgWalk::Walk;
+			W.Gawk = 0;
+		}
 		bool bStill = false;
 		if (W.State == CgWalk::Wait)
 		{
@@ -642,15 +838,65 @@ namespace CgLife
 		if (W.State == CgWalk::Walk)
 		{
 			W.TripLeft -= Dt;
-			const float V = KindSpeed(F, Kind, W.Speed) * (Kind == CgKind::Elevator ? 1.f : W.SpeedMul);
+			// (LG8: coming back to look at a danger: there once on its ring, or level with it on a
+			// walkway that passes it; turned toward it once on its walkway)
+			if (W.Gawk && S.Lanes[W.Lane].PointsEnd - S.Lanes[W.Lane].PointsBegin >= 2)
+			{
+				const double D2 = FVector::DistSquared2D(W.Pos, F.PanicAt);
+				FVector At, Head;
+				PathAt(F, W, At, Head);
+				const bool bAway = FVector::DotProduct(Head * W.Dir, F.PanicAt - W.Pos) < 0.0;
+				if (D2 < FMath::Square((double)W.Ring) || (bAway && D2 < FMath::Square(2.5 * (double)W.Ring)))
+				{
+					W.State = CgWalk::Look;
+					W.To = F.PanicAt;
+					W.Dwell = FMath::Lerp((float)F.StayS.X, (float)F.StayS.Y, Unit(W));
+					W.Gawk = 0;
+					Place(F, W, CgShow::Still);
+					return;
+				}
+				if (bAway)
+				{
+					// (its walkway leads away and it is not near enough to see: it walks on)
+					W.Gawk = 0;
+				}
+			}
+			// (LG8: faster in the rain; running from a danger)
+			const float Mul = Kind == CgKind::Elevator ? 1.f : F.PaceMul * (W.Flee ? F.FleeMul : 1.f);
+			const float V = KindSpeed(F, Kind, W.Speed * Mul) * (Kind == CgKind::Elevator ? 1.f : W.SpeedMul);
 			bStill = V < 25.f;
 			const float DistBefore = W.Dist;
 			W.Dist += W.Dir * V * Dt;
+			// (LG8: under a cover in the rain: by the weather's chance it stops there a while; the
+			// stretch it is under, for its umbrella)
+			if (F.CoverStarts && F.CoverStarts->Num())
+			{
+				const int32 K = CoverAt(F, W.Lane, W.Dist);
+				if (F.Covered && F.Covered->IsValidIndex(W.Instance))
+				{
+					(*F.Covered)[W.Instance] = K != INDEX_NONE ? 1 : 0;
+				}
+				if (K != W.CoverK)
+				{
+					W.CoverK = K;
+					const bool bKind = Kind == CgKind::Sidewalk || Kind == CgKind::Path || Kind == CgKind::Alley ||
+						Kind == CgKind::Promenade || Kind == CgKind::PedestrianStreet || Kind == CgKind::Underpass ||
+						Kind == CgKind::Concourse;
+					if (K != INDEX_NONE && F.ShelterP > 0.f && bKind && !W.Flee && !W.Gawk && W.Role == CgRole::Crowd &&
+						W.Group == INDEX_NONE && W.Door == INDEX_NONE && W.TripLeft > 0.f &&
+						(*F.Cover)[2 * K + 1] - (*F.Cover)[2 * K] >= 300.f && Unit(W) < F.ShelterP)
+					{
+						W.State = CgWalk::Shelter;
+						W.Dwell = FMath::Lerp((float)F.ShelterS.X, (float)F.ShelterS.Y, Unit(W));
+						W.Dist = FMath::Clamp(W.Dist, (*F.Cover)[2 * K] + 100.f, (*F.Cover)[2 * K + 1] - 100.f);
+					}
+				}
+			}
 			// (LG4: a place slot passed on its walkway that wants a user: claimed and gone to;
 			// an open shop's door passed: in for a visit, by its chance; crowd groups keep
 			// together, a gang's members break off)
-			if (F.bPlaces && W.Door == INDEX_NONE && W.Lane < F.WalkLanes &&
-				(W.Group == INDEX_NONE || W.Role == CgRole::Gang))
+			if (F.bPlaces && W.Door == INDEX_NONE && W.Lane < F.WalkLanes && !W.Flee && !W.Gawk &&
+				W.State == CgWalk::Walk && (W.Group == INDEX_NONE || W.Role == CgRole::Gang))
 			{
 				const float Lo = FMath::Min(DistBefore, W.Dist);
 				const float Hi = FMath::Max(DistBefore, W.Dist);
@@ -703,7 +949,7 @@ namespace CgLife
 			// (a signalized crosswalk: wait at its curb until people may start crossing, or
 			// cross against it, more often where the district is dangerous)
 			const int32 Sig = (*F.LaneSignal)[W.Lane];
-			if (Sig >= 0 && !W.Crossed)
+			if (Sig >= 0 && !W.Crossed && !W.Flee && W.State == CgWalk::Walk)
 			{
 				const float Hold = W.Dir > 0.f ? (*F.HoldA)[W.Lane] - W.HoldBack : (*F.HoldB)[W.Lane] + W.HoldBack;
 				if (W.Dir > 0.f ? W.Dist >= Hold : W.Dist <= Hold)
@@ -882,7 +1128,8 @@ namespace CgLife
 			const float V = KindSpeed(F, Kind, W.Speed) * W.SpeedMul;
 			Fwd = Head * V + Right * ((W.Lat - Lat0) / Dt);
 		}
-		if (Fwd.SizeSquared2D() > 1.0e-4)
+		// (LG8: standing, waiting at a signal or held, it looks at the player near it)
+		if (!(bStill && LookAtPlayer(F, W, Dt)) && Fwd.SizeSquared2D() > 1.0e-4)
 		{
 			TurnTo(F, W, FMath::RadiansToDegrees(FMath::Atan2(Fwd.Y, Fwd.X)), Dt);
 		}
@@ -892,11 +1139,13 @@ namespace CgLife
 
 void UCityGenLifeWalkProcessor::ExecuteCity(FMassExecutionContext& Context)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CityGenLife_ExecuteCity);
 	FCgLifeFrame& F = *Frame;
 	const float Dt0 = FMath::Min(0.1f, Context.GetDeltaTimeSeconds());
 	const double Avoid2 = FMath::Square((double)F.AvoidCm);
 	const double Player2 = FMath::Square((double)F.PlayerCm);
 	F.Waiting = 0;
+	F.Fleeing = F.Gawking = F.Looking = F.Sheltering = 0;
 
 	// (1) the avoidance: people near enough the view to see it, sorted by lane and distance
 	// along it; each reacts to those ahead of it on its lane (and slows near the player)

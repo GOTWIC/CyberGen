@@ -1116,7 +1116,10 @@ def orbit(air: Air, rid: str, kind: str, did, centers, radii, alts, k: int) -> d
                     rt = Route(rid, kind, did)
                     rt.add(_abs(air, pts, z))
                     rec = finish(rt)
-                    if rec is not None:
+                    # (LG8: the finished route read back as the check reads it, every 4 m:
+                    # the circle tested every 6 m could graze a tower between two of its points,
+                    # Nexus City's media flier at 280 m)
+                    if rec is not None and _route_clear(air, rec, kind) is None:
                         return rec
     return None
 

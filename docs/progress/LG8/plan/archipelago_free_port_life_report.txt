@@ -1,0 +1,88 @@
+lifegen plan: Saltreach Free Port (ok), plan 4c224aaa50f68135
+
+spawn points 3891, slots 474, tiles 100; people on the streets at the peak hour 36837, vehicles 1978
+
+district  people@23  people peak  vehicles peak  spawns  slots  name
+d01            2052        10833           1244     326    169  Crown Island
+d02             166          932            153     119     46  Kettle Island
+d03           17552        25372            512    2913    202  Westreef
+d04             108         1223             87      45     43  Lumen Key
+d05             235          902            190     488     14  Palm Key
+
+crowd: 22789 people on 11682 of 12019 walkways at 23:00 (levels [0]), a pool of 2400 live within 340 m of the view; 66 signals; left out: 0 walkways no spawn reaches, 0 segments without a walkway
+
+traffic: 1498 cars on 2607 of 2677 lanes at 23:00 (3764 at the busiest hour), 15 models; a pool of 1800 live within 800 m of the view; 396 lanes stop at signals; left out: 70 lanes off the lane graph's main part, 0 segments without a lane
+
+slots: bench 258 (516 points, users by band [34.9, 154.4, 259.4, 265.2, 105.6]), bus_stop 89 (267 points, users by band [9.4, 127.2, 101.6, 124.3, 47.5]), kiosk 6 (18 points, users by band [0.5, 8.9, 9.7, 10.7, 3.0]), vending 16 (32 points, users by band [1.5, 8.1, 9.3, 9.4, 4.4]), taxi_stand 14 (42 points, users by band [4.5, 12.3, 12.4, 16.4, 14.2]), gang_spot 91 (364 points, users by band [166.7, 50.0, 77.6, 244.6, 323.7])
+places (open at the crowd's hour): 
+slots left out: {'no_walkway': 33, 'blocked': 1, 'points_dropped': 3}
+
+gangs: 4 turfs, 288 pool slots kept (371 wanted near the view at most); left out {'members': [14.61, 7.35, 9.85, 18.83, 23.81], 'walkways': 1815}
+  d02.turf1 Jade Kites: 169 walkways, 18 walking, 27 at 8 spots
+  d02.turf2 Red Lotus: 162 walkways, 25 walking, 38 at 7 spots
+  d03.turf1 Jade Kites: 4384 walkways, 94 walking, 142 at 40 spots
+  d03.turf2 Red Lotus: 4229 walkways, 85 walking, 127 at 36 spots
+
+police: 85 pool slots on foot, 50 patrol cars (halcyon_sable), wanted near the view {'foot': 67.9, 'cars': 39.2}
+  d01.police: 76 on foot, 20.4 cars, 1 station doors
+  d02.police: 7 on foot, 2.0 cars, 0 station doors
+  d03.police: 52 on foot, 13.9 cars, 0 station doors
+  d04.police: 16 on foot, 4.2 cars, 1 station doors
+  d05.police: 29 on foot, 7.9 cars, 0 station doors
+
+transit: 2 lines, 6 trains (24 cars) at the crowd's hour, 2009 people boarding a hour; left out {'stations': [], 'lines': []}
+  tl.island_hopper Island Hopper (monorail): 6238 m, 9 stops, a 1598 s cycle, trains by band [4, 7, 6, 7, 5], every [6.659, 3.805, 4.44, 3.805, 5.327] min, top 16.0 m/s
+  tl.mainland_express Mainland Express (maglev): 1981 m, 1 stops, a 307 s cycle, trains by band [1, 2, 1, 2, 1], every [5.118, 2.559, 5.118, 2.559, 5.118] min, top 35.0 m/s
+
+air and water: 124 fliers and 3 boats at the crowd's hour; pads 52 of 65 flown from, piers 0 of 13 called at; left out {'pads': 13, 'routes': 12, 'piers': 4, 'berths': 3}
+  car: 39 routes, vehicles by band [55, 125, 109, 142, 98]
+  drone: 26 routes, vehicles by band [6, 21, 24, 21, 13]
+  police: 7 routes, vehicles by band [7, 5, 5, 7, 7]
+  media: 2 routes, vehicles by band [2, 2, 2, 2, 2]
+  aircraft: 2 routes, vehicles by band [2, 4, 4, 4, 4]
+  shuttle: 0 routes, vehicles by band [0, 0, 0, 0, 0]
+  boat: 0 routes, vehicles by band [0, 0, 0, 0, 0]
+  taxi: 0 routes, vehicles by band [0, 0, 0, 0, 0]
+  ferry: 0 routes, vehicles by band [0, 0, 0, 0, 0]
+  ship: 3 routes, vehicles by band [3, 3, 3, 3, 3]
+
+spike: Westreef (d03) at 23:00, 0 people, 0 cars
+
+checks:
+  ok   spawns_on_graph: 3891 spawn points, each on a walkway (and a drive lane where it has one)
+  ok   spawns_reach: every spawn point's walkway reaches another spawn point (2 walkway components with spawns; the largest holds 3403 of 3891)
+  ok   densities: every district's people per hour band keep M11's densities (times its busy) within 1%
+  ok   slots: 474 slots, each facing its object's way
+  ok   spike_budget: the spike's 0 people and 0 cars within the budget's 2000 and 500
+  ok   crowd_densities: every district's sidewalks carry M11's people per hour band (times its busy and the crowd's scale) within 1%; off-street walkways 4659 more at the most; 0 walkways no spawn reaches left empty (0.0 people)
+  ok   crowd_levels: levels 0: 10574 of 11682 walkways with people on the main walkway graph
+  ok   signals: 66 signalized junctions, two phases each (derived: the ask), no crosswalk walking across a moving leg, the phases filling each cycle; 229 crosswalk walkways served
+  ok   crowd_budget: a pool of 2400 people live within 340 m of the view, about 1869 within 300 m (the budget's 2000)
+  ok   people_draws: the crowd's pool of 2400 people drawn from 24 characters, each 4 to 170 of them (at most 12%), 2400 distinct seeds
+  ok   variety: 125 looks among the pool's 2400 people; d01 52 within 50 m, 0.27 alike pairs, its commonest look 5.9%; d02 40 within 50 m, 0.25 alike pairs, its commonest look 8.2%; d03 52 within 50 m, 0.24 alike pairs, its commonest look 5.5%; d04 20 within 50 m, 0.03 alike pairs, its commonest look 4.2%; d05 13 within 50 m, 0.01 alike pairs, its commonest look 3.8%
+  ok   crowd_spawns: 3891 spawn points open to the crowd's walkways
+  ok   traffic_densities: every district's lanes carry M11's vehicles per hour band (times the fleet's busy and the traffic's scale) within 1%; left out: 70 lanes off the lane graph's main part and 0 segments without a lane (154.3 cars at the most)
+  ok   traffic_lanes: every car on the lane graph's largest strongly connected part (7777 of 7942 lanes and connectors, 92.8% of the lanes' length)
+  ok   traffic_signals: 66 of 66 signals with lanes stopping at them (396 lanes, each stopping within its lane, short of its crosswalk)
+  ok   traffic_budget: a pool of 1800 cars live within 800 m of the view, about 253 within 300 m (the budget's 500)
+  ok   traffic_fleet: 15 of AG18's models (brakk_bastion, brakk_hauler, brakk_mule, halcyon_ridge, halcyon_sable, kestrel_atlas, kestrel_dart, kestrel_meridian, orrin_aria, orrin_lumen, orrin_pebble, tanager_cab, tanager_mino, tanager_porter, vanta_r), each in 6 to 359 pool slots; every district with cars has a fleet; no Vex or Aurel
+  ok   slots_placed: 474 slots (bench 258, bus_stop 89, gang_spot 91, kiosk 6, taxi_stand 14, vending 16), each on its walkway (its first point within 15 m), its points out of every building and carriageway, each user facing its object (a bench's away from its back, a ring's to its middle)
+  ok   slot_use: users per band within their slots' points: night 218, morning 361, day 470, evening 670, late 498
+  ok   places_hours: 0 places by their hours, their doors closed while they are; every district's doors keep its people every hour; open at 23:00: 
+  ok   gang_turf: 4 gang turfs (4 with walkways), their members only on their own turf's walkways and spots (91 spots); up to 222 walking; 24 of M11's gang members outside every gang turf left out
+  ok   police_patrols: every district's police (M11's) on foot on its patrol walkways (the police field at least 0.25) and in patrol cars on its main lanes; 2 of 5 precincts with a station's doors; at 23:00 180 on foot, 48 patrol cars
+  ok   places_budget: gang members 288 kept (371 wanted near the view at most, scaled down there); police on foot 85 kept (68 wanted near the view at most); patrol cars 50 kept (39 wanted near the view at most); patrol cars halcyon_sable
+  ok   timetables: 2 lines: runs within their speeds, curves, acceleration and braking, dwells kept, loops closing and open lines turning back at both ends, trains a train's length and 60 m apart at least
+  ok   transit_stops: 10 stations, 10 stops on their lines' tracks (within 25 m in plan and 12 m in height)
+  ok   transit_boarding: 10 stops: each boards from its platform walkway, which reaches its station's street accesses; people a train 2 to 50
+  ok   transit_budget: at most 9 trains and 36 cars at once (budget 120 and 600)
+  ok   air_lanes: 76 flight routes clear of the masses, roof items, skybridges, sky tubes, transit lines, structures and signs by their kind's margin (cars 8 m, drones 3 m), read every 4 m
+  ok   air_pads: 52 of 65 pads flown from and to, each landing on its pad; left out: d01.lot.e251s73.bld.pad0 (d01.lot.e251s73.bld stands over it (its own building's crown: a citygen conflict)), d01.lot.e258s281.bld.pad0 (d01.lot.e258s281.bld stands over it (its own building's crown: a citygen conflict)), d01.lot.e357s267.bld.pad0 (d01.lot.e357s267.bld stands over it (its own building's crown: a citygen conflict)) and 10 more
+  ok   water_lanes: 3 boat routes on water their hulls clear by their margins (banks' slopes, quays, moored boats, piers, columns), 0.5 to 6 m of draft under them, under every bridge with room; 13 piers derived; left out: air.lane.d04, water.boat.d03.ww.w928s944, water.boat.d03.ww.w1194s1329, water.boat.d03.ww.w1490s1225
+  ok   airwater_timing: 79 routes closed, within their kinds' speeds, turns, climbs, acceleration and braking, dwells kept, vehicles on a route their kind's spacing apart
+  ok   airwater_budget: at most 155 fliers, 24 drones and 3 boats at once (budget 500, 300, 160)
+  ok   weather: 5 states (out of doors 0.60 to 1, umbrellas to 0.60, rain looks to 0.50); the plan's own state clear; reactions step_aside, look, flee, gather
+  ok   shelter: 500 walkways with 8.9 km out of the rain (0.0 km where people shelter, 500 enclosed, 0 underground); no atmos plan: no covers read
+  ok   nightlife: 19 door walkways of bars, clubs and arcades, people by band night 43, morning 0, day 1, evening 14, late 63
+
+asks: signal_phases derived, bus_routes missing, turn_restrictions derived, lobby_points derived, piers derived, air_corridors derived, doors derived, slot_points derived, police_vehicles derived, fleet_kinds derived, train_models derived

@@ -178,7 +178,7 @@ def test_fill_resolves_districts_and_the_fleet():
     assert abs(sum(old["mix"].values()) - 1.0) < 1e-3
     # (decision 12.7: the frame budget is 20 ms p95; 12.8: stepping aside and looking)
     assert f["budgets"]["frame_p95_ms"] == 20.0
-    assert f["reactions"] == {"step_aside": True, "look": True, "flee": False, "gather": False}
+    assert f["reactions"] == {"step_aside": True, "look": True, "flee": True, "gather": True}
     # (wear up where poor and dangerous)
     assert old["style"]["wear"] > core["style"]["wear"]
 

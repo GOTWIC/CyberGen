@@ -43,7 +43,9 @@ namespace
 		RowTransit = 23,
 		// LG7: lifegen's fliers and boats on or off
 		RowAir = 24,
-		RowWater = 25 };
+		RowWater = 25,
+		// LG8: a danger where the player is (people run, then come back to look)
+		RowPanic = 26 };
 
 	/** A row's name for ACityGenPlay::ClickMenuRow (the console's CityGen.MenuRow). */
 	const TCHAR* RowName(int32 Row)
@@ -73,6 +75,7 @@ namespace
 		case RowTransit: return TEXT("transit");
 		case RowAir: return TEXT("air");
 		case RowWater: return TEXT("water");
+		case RowPanic: return TEXT("panic");
 		default: return TEXT("hour+");    // the hour row and its > arrow
 		}
 	}
@@ -389,6 +392,11 @@ int32 SCityGenOverlay::PaintMenu(FSlateWindowElementList& Out, int32 Layer, cons
 		// LG7: with lifegen's air and water, the fliers and the boats on or off
 		Rows.Add({RowAir, TEXT("Air traffic"), P->GetLifeAirWater(true) ? TEXT("On") : TEXT("Off")});
 		Rows.Add({RowWater, TEXT("Boats"), P->GetLifeAirWater(false) ? TEXT("On") : TEXT("Off")});
+	}
+	if (P->HasLifePanic())
+	{
+		// LG8: scare the crowd round the player (storygen's danger hook)
+		Rows.Add({RowPanic, TEXT("Scare the crowd"), TEXT("Run")});
 	}
 	constexpr double BarH = 30.0;
 	const double Extra = bAtmos ? BarH : 0.0;

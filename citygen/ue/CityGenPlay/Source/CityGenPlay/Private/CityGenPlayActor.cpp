@@ -747,6 +747,15 @@ bool ACityGenPlay::ClickMenuRow(const FString& Row)
 		}
 		SetLifeTraffic(R == TEXT("traffic") ? !GetLifeTraffic() : R.EndsWith(TEXT("1")));
 	}
+	else if (R == TEXT("panic"))
+	{
+		// LG8: a danger where the player is: people run from it, then some come back to look
+		if (!HasLifePanic())
+		{
+			return false;
+		}
+		LifePanic();
+	}
 	else if (R == TEXT("places") || R.StartsWith(TEXT("places=")))
 	{
 		// LG4: lifegen's life at places (slots, shop visits, gangs, police) on or off
@@ -993,6 +1002,20 @@ bool ACityGenPlay::GetLifeTraffic() const
 void ACityGenPlay::SetLifeTraffic(bool bOn)
 {
 	CallOne(GetLife(), TEXT("SetTraffic"), bOn, 0.f);
+}
+
+bool ACityGenPlay::HasLifePanic() const
+{
+	const AActor* A = GetLife();
+	return HasLifePlaces() && A && FindFProperty<FBoolProperty>(A->GetClass(), TEXT("bFlee")) != nullptr;
+}
+
+void ACityGenPlay::LifePanic()
+{
+	if (GEngine && GetWorld())
+	{
+		GEngine->Exec(GetWorld(), TEXT("CityGenLife.Panic"));
+	}
 }
 
 bool ACityGenPlay::HasLifePlaces() const

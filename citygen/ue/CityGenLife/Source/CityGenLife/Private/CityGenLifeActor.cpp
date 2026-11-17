@@ -1,6 +1,9 @@
 // lifegen's runtime controller (LG0): see CityGenLifeActor.h.
 
 #include "CityGenLifeActor.h"
+#include "HAL/IConsoleManager.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
+#include "CityGenLifeISM.h"
 #include "CityGenLifeProcessors.h"
 #include "CityGenLifeTypes.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -167,6 +170,11 @@ void ACityGenLife::BeginPlay()
 	{
 		// (LG7: every route of what flies and floats)
 		BuildAirWater();
+	}
+	if (IsCity())
+	{
+		// (LG8: the weather's stretches out of the rain, umbrellas, the reactions' settings)
+		BuildWeather();
 	}
 	UE_LOG(LogTemp, Display, TEXT("CITYGEN_LIFE_READY {\"lanes\":%d,\"walk_lanes\":%d,\"drive_lanes\":%d,\"people\":%d,\"cars\":%d,\"transit_lines\":%d,\"trains\":%d,\"aw_routes\":%d,\"aw_vehicles\":%d,\"ms\":%.1f}"),
 		WalkLaneCount + DriveLaneCount, WalkLaneCount, DriveLaneCount, WalkPos.Num(), CarPos.Num(),
@@ -350,6 +358,10 @@ void ACityGenLife::BuildLanes()
 		S.ZoneBVTree = Tree;
 	}
 	Lanes->UpdateDrawing();
+	// (LG8: the instanced components' fixed bounds: the lanes' box, 1.5 km round it, from under
+	// the metro to over the aircraft)
+	CityBox = S.Bounds.IsValid ? FBox(S.Bounds.Min - FVector(150000.0, 150000.0, 30000.0),
+		S.Bounds.Max + FVector(150000.0, 150000.0, 150000.0)) : FBox(ForceInit);
 
 	Frame.Storage = &S;
 	Frame.WalkLanes = WalkLaneCount;
@@ -379,11 +391,27 @@ void ACityGenLife::BuildLanes()
 
 // --- the stand-ins and the cars ---------------------------------------------------------------
 
+int32 UCgLifeISM::BoundsMode = 1;
+static FAutoConsoleVariableRef CVarCgLifeBounds(TEXT("CityGenLife.Bounds"), UCgLifeISM::BoundsMode,
+	TEXT("CityGenLife.Bounds 0|1|2: lifegen's instanced components' bounds by the engine's measure, "
+		 "the city's fixed box (the default), or lifegen's own measure"));
+
+void ACityGenLife::FixBounds(UInstancedStaticMeshComponent* C) const
+{
+	if (UCgLifeISM* L = Cast<UCgLifeISM>(C))
+	{
+		if (CityBox.IsValid)
+		{
+			L->SetFixedBounds(CityBox);
+		}
+	}
+}
+
 void ACityGenLife::MakeComponents()
 {
 	auto Make = [this](const TCHAR* Name, UStaticMesh* Mesh, UMaterialInterface* Mat, int32 Floats, bool bShadow)
 	{
-		UInstancedStaticMeshComponent* C = NewObject<UInstancedStaticMeshComponent>(this, Name);
+		UInstancedStaticMeshComponent* C = NewObject<UCgLifeISM>(this, Name);
 		C->SetMobility(EComponentMobility::Movable);
 		C->SetupAttachment(RootComponent);
 		C->SetStaticMesh(Mesh);
@@ -401,6 +429,7 @@ void ACityGenLife::MakeComponents()
 		C->SetAffectDynamicIndirectLighting(bInLumen);
 		C->NumCustomDataFloats = Floats;
 		C->RegisterComponent();
+		FixBounds(C);
 		return C;
 	};
 	if (HasPeople())
@@ -766,6 +795,7 @@ void ACityGenLife::SetLumen(bool bOn)
 
 void ACityGenLife::FindGround()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CityGenLife_FindGround);
 	UWorld* World = GetWorld();
 	UMassEntitySubsystem* Sub = World ? World->GetSubsystem<UMassEntitySubsystem>() : nullptr;
 	if (!Sub || Entities.Num() == 0)
@@ -790,8 +820,9 @@ void ACityGenLife::FindGround()
 		FVector At;
 		if (FCgLifeWalker* W = EM.GetFragmentDataPtr<FCgLifeWalker>(H))
 		{
-			// (LG3: only people drawn near or mid need their ground; a free slot none)
-			if (!W->Active || (PersonTier.IsValidIndex(W->Instance) && PersonTier[W->Instance] >= 2))
+			// (LG3: only people drawn near or mid need their ground; a free slot none. LG8: near
+			// only: a mid person's curb or deck step is lost at 30 m, its walkway's height kept)
+			if (!W->Active || (PersonTier.IsValidIndex(W->Instance) && PersonTier[W->Instance] >= 1))
 			{
 				continue;
 			}
@@ -806,8 +837,8 @@ void ACityGenLife::FindGround()
 		}
 		else if (FCgLifeCar* C = EM.GetFragmentDataPtr<FCgLifeCar>(H))
 		{
-			// (LG5: only the live cars within 300 m of the view need their ground)
-			if (IsTraffic() && (!C->Active || FVector::DistSquared(C->Pos, Frame.View) > 9.0e8))
+			// (LG5: only the live cars within 300 m of the view need their ground; LG8: 150 m)
+			if (IsTraffic() && (!C->Active || FVector::DistSquared(C->Pos, Frame.View) > 2.25e8))
 			{
 				continue;
 			}
@@ -830,10 +861,16 @@ void ACityGenLife::FindGround()
 
 void ACityGenLife::UpdateInstances()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CityGenLife_UpdateInstances);
 	const int32 NP = WalkPos.Num();
 	if (HasPeople())
 	{
 		UpdatePeople();
+	}
+	// (LG8: the umbrellas of those near and mid who hold one)
+	if (UmbCanopy)
+	{
+		UpdateUmbrellas(Frame.View);
 	}
 	// (LG3: a free slot of the pool, or a person in an elevator, is not drawn)
 	auto Shown = [this](const int32 K)
@@ -893,6 +930,7 @@ void ACityGenLife::UpdateInstances()
 
 void ACityGenLife::Tick(float DeltaSeconds)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CityGenLife_Tick);
 	Super::Tick(DeltaSeconds);
 	if (!bBuilt || !bEnabled)
 	{
@@ -906,8 +944,16 @@ void ACityGenLife::Tick(float DeltaSeconds)
 	}
 	FMassEntityManager& EM = Sub->GetMutableEntityManager();
 	const bool bCity = IsCity();
+	// (LG8: atmosgen's hour and weather, every half second; at once on the first tick)
+	FollowAtmos(DeltaSeconds, Ticks == 0);
 	if (bCity)
 	{
+		ThinClock += DeltaSeconds;
+		if (ThinClock >= 2.f)
+		{
+			ThinOut();
+			ThinClock = 0.f;
+		}
 		// (LG3: the live walkways round the view, the doors' people, every LiveStep s; the
 		// view, the player and the time for the walk processor)
 		LiveClock += DeltaSeconds;
@@ -1027,5 +1073,5 @@ FString ACityGenLife::GetStatus() const
 		bEnabled ? TEXT("true") : TEXT("false"), bBuilt ? TEXT("true") : TEXT("false"), *DistrictId,
 		WalkLaneCount, DriveLaneCount, CarStarts.Num(), WalkPos.Num(), CarPos.Num(), Entities.Num(), Placed,
 		Bodies ? Bodies->GetInstanceCount() : -1, CarParts.Num(), P0.X, -P0.Y, P0.Z, C0.X, -C0.Y, C0.Z,
-		TickMs, TickMsMax, (long long)Ticks, *(Lib + CrowdStatus() + TrafficStatus() + TransitStatus() + AirWaterStatus()));
+		TickMs, TickMsMax, (long long)Ticks, *(Lib + CrowdStatus() + TrafficStatus() + TransitStatus() + AirWaterStatus() + WeatherStatus()));
 }

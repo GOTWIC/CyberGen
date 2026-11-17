@@ -151,6 +151,15 @@ class Walk(_Model):
                                             "the patrol minimum, on the ground).")
     field: float | None = Field(None, description="LG4: M11's police field at its middle.")
     police: PerBand | None = Field(None, description="LG4: police on foot on it per band.")
+    cover: list[Annotated[list[float], Field(min_length=2, max_length=2)]] | None = Field(
+        None, description="LG8: its stretches out of the rain ([from, to] m along it): under "
+                          "a cover of atmosgen's rain shadow, underground or enclosed.")
+    road_side: int | None = Field(None, description="LG8: a covered sidewalk's road side "
+                                                    "looking along its line (1 right, -1 "
+                                                    "left): people shelter on the other.")
+    night: PerBand | None = Field(None, description="LG8: nightlife's people on it per band "
+                                                    "(round an open bar, club or arcade's "
+                                                    "door), on top of `people`.")
     hash: str
 
 
@@ -640,6 +649,9 @@ class LifePlan(_Model):
     police: PolicePlan | None = Field(None, description="LG4: police patrols.")
     transit: TransitPlan | None = Field(None, description="LG6: transit's timetables.")
     airwater: AirWaterPlan | None = Field(None, description="LG7: air and water routes.")
+    weather: dict | None = Field(None, description="LG8: the crowd and traffic by atmosgen's "
+                                                   "weather state, umbrellas, shelter, "
+                                                   "nightlife and the reactions.")
     checks: dict[str, Check]
     totals: dict
 

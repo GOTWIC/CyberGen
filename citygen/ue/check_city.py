@@ -1094,7 +1094,7 @@ def view_cmds(world, text, name):
     (the command again every half second, at most S seconds, until lifegen's traffic shows
     what it was asked for: its status's `traffic.show` not ending in `:none`; LG6: a
     `CityGenLife.TransitShow` its `transit.show`; LG7: a `CityGenLife.AirShow` its
-    `airwater.show`)."""
+    `airwater.show`; LG8: a `CityGenLife.WeatherShow` its `weather.show`)."""
     for c in (text or "").split(";"):
         c = c.strip()
         if not c:
@@ -1112,7 +1112,8 @@ def view_cmds(world, text, name):
                 unreal.SystemLibrary.execute_console_command(world, cmd)
                 # (LG6: a transit shot reads the transit's own)
                 part = "transit" if "TransitShow" in cmd else \
-                    "airwater" if "AirShow" in cmd else "traffic"
+                    "airwater" if "AirShow" in cmd else \
+                    "weather" if "WeatherShow" in cmd else "traffic"
                 got = ((life_status(world) or {}).get(part) or {}).get("show", "")
                 if got and not got.endswith(":none"):
                     break

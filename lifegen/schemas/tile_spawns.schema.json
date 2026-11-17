@@ -691,6 +691,27 @@
    "additionalProperties": false,
    "description": "LG3: a walkway's crowd (scope 6.3): how many people are on it in each of M11's hour\nbands (the district's day shapes the hours within a band), and the signal it waits for.",
    "properties": {
+    "cover": {
+     "anyOf": [
+      {
+       "items": {
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 2,
+        "minItems": 2,
+        "type": "array"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "LG8: its stretches out of the rain ([from, to] m along it): under a cover of atmosgen's rain shadow, underground or enclosed.",
+     "title": "Cover"
+    },
     "district_id": {
      "anyOf": [
       {
@@ -757,6 +778,25 @@
      "title": "Level",
      "type": "integer"
     },
+    "night": {
+     "anyOf": [
+      {
+       "description": "A value per M11 hour band.",
+       "items": {
+        "type": "number"
+       },
+       "maxItems": 5,
+       "minItems": 5,
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "LG8: nightlife's people on it per band (round an open bar, club or arcade's door), on top of `people`.",
+     "title": "Night"
+    },
     "patrol": {
      "default": false,
      "description": "LG4: police patrol it (the police field at least the patrol minimum, on the ground).",
@@ -804,6 +844,19 @@
      "default": null,
      "description": "LG4: police on foot on it per band.",
      "title": "Police"
+    },
+    "road_side": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "LG8: a covered sidewalk's road side looking along its line (1 right, -1 left): people shelter on the other.",
+     "title": "Road Side"
     },
     "signal": {
      "anyOf": [

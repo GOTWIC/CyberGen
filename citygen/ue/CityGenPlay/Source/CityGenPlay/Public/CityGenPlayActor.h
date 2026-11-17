@@ -207,6 +207,10 @@ public:
 	 *  SlotKinds not empty), its state, and SetPlaces, SetGangs and SetPolice on it together (the
 	 *  menu's Places row, places=1 or 0). */
 	bool HasLifePlaces() const;
+	/** LG8: whether the level's life controller takes a danger (its bFlee), and one where the
+	 *  player is (CityGenLife.Panic). */
+	bool HasLifePanic() const;
+	void LifePanic();
 	bool GetLifePlaces() const;
 	void SetLifePlaces(bool bOn);
 	/** LG6: whether the life controller has transit (bTransit, with lines of its own:

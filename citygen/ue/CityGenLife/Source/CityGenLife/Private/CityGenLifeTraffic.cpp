@@ -17,6 +17,7 @@
 // (the crowd's people, the player) on its line ahead.
 
 #include "CityGenLifeActor.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "CityGenLifeProcessors.h"
 #include "CityGenLifeTypes.h"
 #include "Algo/Sort.h"
@@ -40,7 +41,9 @@ namespace
 	constexpr float LiveStep = 0.25f;      // s between live updates
 	constexpr float PoolFill = 0.92f;      // the live cars at most this share of the pool
 	constexpr float SpawnGapCm = 600.f;    // a new car this far clear of another (plus lengths)
-	constexpr float FarCm = 45000.f;       // cars past this from the view step every second frame
+	constexpr float FarCm = 25000.f;       // cars past this from the view step every second frame
+	constexpr float FarterCm = 55000.f;    // (LG8) and past this every fourth
+	constexpr float BodyNearCm = 30000.f;  // (LG8) a model's bodies sent every frame while one within this moved
 	constexpr float CellCm = 800.f;        // the people's cells for the cars' look ahead
 
 	int32 BandOf(const int32 Hour)
@@ -229,7 +232,8 @@ float ACityGenLife::TrafficWant(const int32 J) const
 	const int32 D = DriveDistrict.IsValidIndex(J) ? DriveDistrict[J] : INDEX_NONE;
 	const int32 H = ((Hour % 24) + 24) % 24;
 	const float Shape = (D >= 0 && DistrictShape.IsValidIndex(24 * D + H)) ? DistrictShape[24 * D + H] : 1.f;
-	return DriveCars.IsValidIndex(5 * J + B) ? DriveCars[5 * J + B] * Shape * TrafficScale : 0.f;
+	// (LG8: the weather's share of the cars)
+	return DriveCars.IsValidIndex(5 * J + B) ? DriveCars[5 * J + B] * Shape * TrafficScale * CarsNow : 0.f;
 }
 
 void ACityGenLife::SpawnCarPool()
@@ -508,12 +512,14 @@ void ACityGenLife::TakeFreedCars()
 	}
 	CarsMovingNow = Frame.CarsMoving;
 	CarsForcedTotal += Frame.CarsForced;
+	CarsStuckTotal += Frame.CarsStuck;
 	TrafficMs = TrafficMs > 0.0 ? 0.95 * TrafficMs + 0.05 * Frame.TrafficMs : Frame.TrafficMs;
 	TrafficMsMax = FMath::Max(TrafficMsMax * 0.999, Frame.TrafficMs);
 }
 
 void ACityGenLife::UpdateTraffic(const float Dt, const bool bRefill)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CityGenLife_UpdateTraffic);
 	const double T0 = FPlatformTime::Seconds();
 	ON_SCOPE_EXIT
 	{
@@ -774,6 +780,7 @@ void ACityGenLife::GatherPlayers()
 
 void ACityGenLife::UpdateCarInstances()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CityGenLife_UpdateCarInstances);
 	// (the engine's cost is in the instances sent each frame: a part drawn as far as the cars
 	// live (a body) is sent over its model's instances in use, the lowest first (a free slot is
 	// taken lowest first); a part drawn nearer (glass, wheels, trims) only for the cars within
@@ -843,15 +850,24 @@ void ACityGenLife::UpdateCarInstances()
 			continue;
 		}
 		int32 Hi = 0;
+		bool bNearCar = false;
 		for (const int32 Slot : Slots)
 		{
 			const int32 I = CarInstance[Slot];
 			if ((bTraffic && CarShow[Slot]) || Shown[I])
 			{
 				Hi = FMath::Max(Hi, I + 1);
+				bNearCar |= bTraffic && CarShow[Slot] && FVector::DistSquared(CarPos[Slot], View) < FMath::Square((double)BodyNearCm);
 			}
 		}
 		if (Hi == 0)
+		{
+			continue;
+		}
+		// (LG8's performance pass: a model's bodies with none of its cars within 300 m are sent
+		// every third frame, the models taking turns: the engine's cost is per component sent,
+		// and those cars move a step every second or fourth frame anyway)
+		if (!bNearCar && ((CarFrame + P) % 3) != 0)
 		{
 			continue;
 		}
@@ -871,6 +887,7 @@ void ACityGenLife::UpdateCarInstances()
 		Sent += Hi;
 	}
 	InstancesSent = Sent;
+	++CarFrame;
 	CarDrawMs = 0.95 * CarDrawMs + 0.05 * (FPlatformTime::Seconds() - T0) * 1000.0;
 }
 
@@ -925,10 +942,10 @@ FString ACityGenLife::TrafficStatus() const
 	{
 		return TEXT(",\"traffic\":null");
 	}
-	return FString::Printf(TEXT(",\"traffic\":{\"on\":%s,\"hour\":%d,\"pool\":%d,\"live_m\":%.0f,\"live_lanes\":%d,\"want\":%.1f,\"scale\":%.3f,\"traffic_scale\":%.2f,\"active\":%d,\"moving\":%d,\"leader\":%d,\"red\":%d,\"person\":%d,\"player\":%d,\"junction\":%d,\"box\":%d,\"spawned\":%d,\"refilled\":%d,\"left_edge\":%d,\"lost\":%d,\"forced\":%d,\"conflicts\":%d,\"signal_lanes\":%d,\"traffic_ms\":%.3f,\"traffic_ms_max\":%.3f,\"draw_ms\":%.3f,\"live_ms\":%.3f,\"live_ms_max\":%.3f,\"instances_sent\":%d,\"show\":\"%s\"}"),
+	return FString::Printf(TEXT(",\"traffic\":{\"on\":%s,\"hour\":%d,\"pool\":%d,\"live_m\":%.0f,\"live_lanes\":%d,\"want\":%.1f,\"scale\":%.3f,\"traffic_scale\":%.2f,\"active\":%d,\"moving\":%d,\"leader\":%d,\"red\":%d,\"person\":%d,\"player\":%d,\"junction\":%d,\"box\":%d,\"spawned\":%d,\"refilled\":%d,\"left_edge\":%d,\"lost\":%d,\"forced\":%d,\"stuck\":%d,\"conflicts\":%d,\"signal_lanes\":%d,\"traffic_ms\":%.3f,\"traffic_ms_max\":%.3f,\"draw_ms\":%.3f,\"live_ms\":%.3f,\"live_ms_max\":%.3f,\"instances_sent\":%d,\"show\":\"%s\"}"),
 		bTraffic ? TEXT("true") : TEXT("false"), Hour, CarEnts.Num(), TrafficLiveM, TrafficLiveLanes, TrafficWantLive, TrafficLiveScale, TrafficScale,
 		CarsActive, CarsMovingNow, CarsWhyNow[CgWhy::Leader], CarsWhyNow[CgWhy::Red], CarsWhyNow[CgWhy::Person], CarsWhyNow[CgWhy::Player],
-		CarsWhyNow[CgWhy::Junction], CarsWhyNow[CgWhy::Box], CarsSpawned, CarsRefilled, CarsLeftTotal, CarsLost, CarsForcedTotal,
+		CarsWhyNow[CgWhy::Junction], CarsWhyNow[CgWhy::Box], CarsSpawned, CarsRefilled, CarsLeftTotal, CarsLost, CarsForcedTotal, CarsStuckTotal,
 		ConflictsG.Num() / 2, DriveSignal.Num() ? DriveSignal.FilterByPredicate([](int32 V) { return V >= 0; }).Num() : 0,
 		TrafficMs, TrafficMsMax, CarDrawMs, LiveMs, LiveMsMax, InstancesSent, *LastShow);
 }
@@ -1114,6 +1131,7 @@ bool ACityGenLife::BlockPlayer()
 
 void UCityGenLifeDriveProcessor::ExecuteTraffic(FMassExecutionContext& Context)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CityGenLife_ExecuteTraffic);
 	FCgLifeFrame& F = *Frame;
 	const double T0 = FPlatformTime::Seconds();
 	const FZoneGraphStorage& S = *F.Storage;
@@ -1132,7 +1150,7 @@ void UCityGenLifeDriveProcessor::ExecuteTraffic(FMassExecutionContext& Context)
 	{
 		F.CarsWhy[K] = 0;
 	}
-	F.CarsMoving = F.CarsActive = F.CarsLeft = F.CarsForced = 0;
+	F.CarsMoving = F.CarsActive = F.CarsLeft = F.CarsForced = F.CarsStuck = 0;
 
 	// (1) the live cars sorted by lane and distance; who drives, holds or claims each connector
 	if (LaneFirst.Num() != NL)
@@ -1187,7 +1205,9 @@ void UCityGenLifeDriveProcessor::ExecuteTraffic(FMassExecutionContext& Context)
 			++Occ[C.Reserved];
 			Touch(C.Reserved);
 		}
-		if (C.Wait > F.StarveS && C.Next != INDEX_NONE && Conn[C.Next] && C.Reserved != C.Next)
+		// (LG8: a car waiting for room past the junction claims nothing: its claim would hold the
+		// crossing cars that make the room)
+		if (C.Wait > F.StarveS && C.Why != CgWhy::Box && C.Next != INDEX_NONE && Conn[C.Next] && C.Reserved != C.Next)
 		{
 			if (ClaimBy[C.Next] == INDEX_NONE || ClaimWait[C.Next] < C.Wait)
 			{
@@ -1257,7 +1277,8 @@ void UCityGenLifeDriveProcessor::ExecuteTraffic(FMassExecutionContext& Context)
 	{
 		FCgLifeCar& C = *Sorted[I];
 		const double DView2 = FVector::DistSquared(C.Pos, F.View);
-		const int32 Every = DView2 > FMath::Square((double)FarCm) ? 2 : 1;
+		// (LG8's performance pass: past 250 m every second frame, past 550 m every fourth)
+		const int32 Every = DView2 > FMath::Square((double)FarterCm) ? 4 : (DView2 > FMath::Square((double)FarCm) ? 2 : 1);
 		C.Pending += Dt0;
 		if (Every > 1 && ((F.FrameNo + C.Index) % Every) != 0)
 		{
@@ -1265,11 +1286,12 @@ void UCityGenLifeDriveProcessor::ExecuteTraffic(FMassExecutionContext& Context)
 			F.CarsMoving += C.Speed > 50.f ? 1 : 0;
 			continue;
 		}
-		const float Dt = FMath::Min(C.Pending, 0.25f);
+		const float Dt = FMath::Min(C.Pending, 0.4f);
 		C.Pending = 0.f;
 		const float L = Len[C.Lane];
 		const float V = C.Speed;
-		const float V0 = FMath::Max(150.f, C.Share * SpeedOn(S, F.PointVmax, C.Lane, C.Dist, FMath::Max(400.f, V * 0.6f)));
+		// (LG8: slower in rain and fog, by the weather's share)
+		const float V0 = FMath::Max(150.f, F.SpeedMul * C.Share * SpeedOn(S, F.PointVmax, C.Lane, C.Dist, FMath::Max(400.f, V * 0.6f)));
 		const float Front = C.Dist + 0.5f * C.Len;
 		const float ToEnd = L - Front;
 		float Term = 0.f;           // the strongest interaction (s* / s)^2
@@ -1287,7 +1309,7 @@ void UCityGenLifeDriveProcessor::ExecuteTraffic(FMassExecutionContext& Context)
 				}
 				return;
 			}
-			const float SStar = F.GapCm + FMath::Max(0.f, V * F.Headway + V * (V - VLead) / (2.f * SqrtAB));
+			const float SStar = F.GapCm + FMath::Max(0.f, V * (F.Headway + F.HeadwayAdd) + V * (V - VLead) / (2.f * SqrtAB));
 			const float T = FMath::Square(SStar / Gap);
 			if (T > Term)
 			{
@@ -1362,10 +1384,16 @@ void UCityGenLifeDriveProcessor::ExecuteTraffic(FMassExecutionContext& Context)
 					}
 				}
 				// (room past the junction: the lane it leads to has the car's length and gap
-				// clear at its start, counting the cars already on the connector)
+				// clear at its start, counting the cars already on the connector; LG8: on every
+				// exit, not only the long ones: an exit lane shorter than the car and its gap (Old
+				// Town's 5.8 m lanes between two junctions of a cluster) has room only while it is
+				// empty and the lanes past it start clear by what the car would stick out of it, so
+				// no car waits inside a junction behind one waiting at the next, the gridlock LG5's
+				// cars met there)
 				const int32 Exit = C.Next2;
-				if (bFree && Exit != INDEX_NONE && !Conn[Exit] && Len[Exit] > 2.f * (C.Len + F.GapCm))
+				if (bFree && Exit != INDEX_NONE && !Conn[Exit])
 				{
+					const float Need = C.Len + F.GapCm;
 					float Room = LaneFirst[Exit] != INDEX_NONE ? Sorted[LaneFirst[Exit]]->Dist - 0.5f * Sorted[LaneFirst[Exit]]->Len : Len[Exit];
 					if (LaneFirst[C.Next] != INDEX_NONE)
 					{
@@ -1374,13 +1402,33 @@ void UCityGenLifeDriveProcessor::ExecuteTraffic(FMassExecutionContext& Context)
 							Room -= Sorted[K]->Len + F.GapCm;
 						}
 					}
-					if (Room < C.Len + F.GapCm)
+					bool bRoom = Room >= FMath::Min(Need, Len[Exit] - 30.f);
+					if (bRoom && Len[Exit] < Need)
+					{
+						// (a short exit: empty, and the lanes after it clear at their starts)
+						bRoom = LaneFirst[Exit] == INDEX_NONE;
+						const FZoneLaneData& XL = S.Lanes[Exit];
+						for (int32 Q = XL.LinksBegin; Q < XL.LinksEnd && bRoom; ++Q)
+						{
+							const FZoneLaneLinkData& Lk = S.LaneLinks[Q];
+							const int32 To = Lk.DestLaneIndex;
+							if (Lk.Type != EZoneLaneLinkType::Outgoing || !LaneFirst.IsValidIndex(To) || LaneFirst[To] == INDEX_NONE)
+							{
+								continue;
+							}
+							const FCgLifeCar& O = *Sorted[LaneFirst[To]];
+							bRoom = O.Dist - 0.5f * O.Len >= Need - Len[Exit];
+						}
+					}
+					if (!bRoom)
 					{
 						bFree = false;
 						Reason = CgWhy::Box;
 					}
 				}
-				if (!bFree && C.Wait > F.ForceS)
+				// (forced after ForceS of waiting for a crossing connector; never into a full box:
+				// that only blocks the junction for the others)
+				if (!bFree && C.Wait > F.ForceS && Reason != CgWhy::Box)
 				{
 					bFree = true;
 					++F.CarsForced;
@@ -1556,6 +1604,14 @@ void UCityGenLifeDriveProcessor::ExecuteTraffic(FMassExecutionContext& Context)
 		C.Spin = FMath::Fmod(C.Spin + 0.5f * (V + NewV) * Dt, 1.0e6f);
 		// onto its next lane at its end; off the live region, it leaves
 		bool bGone = false;
+		// (LG8: standing still too long where nobody sees it (a queue held by a jam), it leaves:
+		// its lane is refilled as any)
+		C.Stuck = NewV < 30.f && C.Why != CgWhy::Red ? C.Stuck + Dt : 0.f;
+		if (C.Stuck > F.StuckS && DView2 > FMath::Square((double)F.StuckFarCm))
+		{
+			bGone = true;
+			++F.CarsStuck;
+		}
 		for (int32 Guard = 0; Guard < 4 && C.Dist > Len[C.Lane]; ++Guard)
 		{
 			const float Over = FMath::Min(C.Dist - Len[C.Lane], 300.f);
