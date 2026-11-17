@@ -8,7 +8,8 @@ counted, and the worst frame rendered from behind and from the back three quarte
 
 The pairs: a vertex of one garment piece (a connected part of the look, welded by position)
 whose ray along its normal meets another piece within `PAIR_M` in the reference pose lies under
-that piece; in a pose it has come through when it lies more than `POKE_M` outside the piece's
+that piece (unless it is within `EDGE_M` of that piece's open edge: the layer under a hem shows
+when walking lifts it, rightly); in a pose it has come through when it lies more than `POKE_M` outside the piece's
 posed surface (its nearest point's normal). The report (`pose_report.json`) gives per look the
 pairs, the worst frame's count and every frame's, all over and in the waist's band (within
 `WAIST_M` of spine_02's height in the reference pose: LG2's open item, a coat's waist over
@@ -25,10 +26,12 @@ from pathlib import Path
 import bpy
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
+from mathutils.kdtree import KDTree
 
 PAIR_M = 0.04
 POKE_M = 0.0015
 WAIST_M = 0.22
+EDGE_M = 0.06            # a vertex this near the open edge of the piece over it is not paired
 
 
 def log(msg):
@@ -105,6 +108,32 @@ def pairs_of(look):
     tris = [tuple(p.vertices) for p in me.polygons]
     ftri = [comp[t[0]] for t in tris]
     bvh = BVHTree.FromPolygons(co, tris)
+    # (each piece's open edges, welded by position: a vertex near the edge of the piece over
+    # it is not counted, as the layer under a hem shows when walking lifts it, rightly)
+    key = [(round(p.x * 1e4), round(p.y * 1e4), round(p.z * 1e4)) for p in co]
+    ecount = {}
+    for t in tris:
+        for a, b in zip(t, t[1:] + t[:1]):
+            ka, kb = key[a], key[b]
+            if ka == kb:
+                continue
+            e = (ka, kb) if ka < kb else (kb, ka)
+            ecount[e] = ecount.get(e, 0) + 1
+    rep = {}
+    for i, k in enumerate(key):
+        rep.setdefault(k, i)
+    edges_of = {}
+    for (ka, kb), c in ecount.items():
+        if c == 1:
+            a, b = rep[ka], rep[kb]
+            edges_of.setdefault(comp[a], []).extend([co[a], co[b]])
+    kds = {}
+    for k, pts in edges_of.items():
+        kd = KDTree(len(pts))
+        for j, p in enumerate(pts):
+            kd.insert(p, j)
+        kd.balance()
+        kds[k] = kd
     out = []
     for i, (p, n) in enumerate(zip(co, no)):
         o = p + n * 0.001
@@ -114,6 +143,9 @@ def pairs_of(look):
             hit = bvh.ray_cast(hit[0] + n * 0.001, n, PAIR_M)
             k += 1
         if hit[0] is not None and ftri[hit[2]] != comp[i]:
+            kd = kds.get(ftri[hit[2]])
+            if kd is not None and kd.find(p)[2] <= EDGE_M:
+                continue
             out.append((i, ftri[hit[2]]))
     return out, comp, tris
 
