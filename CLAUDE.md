@@ -3270,6 +3270,21 @@ them, mid the baked idle and sitting loop, far a still cell (`LookData`, `CgLook
 `LIFE_VERSION` life11). Delta: `night_plan_all` 19.2 ms p95. Results:
 `docs/progress/people_idles/README.md`.
 
+The Delta rebuild (delta_rebuild, after the road curves, #239) is in place: the live Delta build
+(`builds/delta_main`) made again on main, imported and packaged, with the fixes it needed:
+- **Slots on their surface** (`lifegen.places.Surface`, `seat_slots`, check `slot_heights`):
+  every ground level slot's points stand on the surface stage 2 draws under them (M22's ground
+  layer faces lifted as AG17, else the ground cover), and a prop's slot leaves from a walkway at
+  its height (`WalkIndex.height`, `SLOT_STEP_M`); the exporter packs `slot_seated`
+  (`PACK_VERSION` 10, `LIFE_VERSION` life12), the controller stands a seated slot's people on
+  its points without their walking ground offset (`CgLife::PointAt`). People at a slot stood at
+  their walkway lane's height, sunk into a raised sidewalk or up in the air by a skybridge.
+- **Atmos refill** (`atmosgen/plan.py`): a light whose fixture finds no clear spot was dropped
+  after the fill; the fill now runs again on what is left (`Fixtures.place(only)`).
+- **Arcade columns** (`shell._column_at`): a column at an acute corner moves along its edge until
+  its square fits (`GEN_VERSION` drebuild.1).
+Results: `docs/progress/delta_rebuild/README.md`.
+
 ## Gallery site (GitHub Pages)
 
 `site/` is the public gallery at https://gotwic.github.io/CyberGen/ (served at
