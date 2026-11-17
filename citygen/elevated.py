@@ -279,7 +279,8 @@ def _turn(Q, a, b, R: float):
     side = 1.0 if phi > 0 else -1.0
     K = (S[0] - a[1] * R * side, S[1] + a[0] * R * side)
     rx, ry = S[0] - K[0], S[1] - K[1]
-    n = max(int(abs(phi) * R / STEP_M) + 1, 2)
+    # (the road curves fix: chords that keep the ramp's outer edge within G.ROAD_SAG_M)
+    n = max(int(abs(phi) * R / STEP_M) + 1, 2, G.arc_steps(R + RAMP_W / 2.0, phi))
     pts = []
     for i in range(n + 1):
         al = phi * i / n
@@ -1095,8 +1096,11 @@ class Elev:
             rx, ry = -u1[1] * sigma, u1[0] * sigma      # outward there
             P1 = pts[-1]
             cx_, cy_ = P1[0] + rx * R, P1[1] + ry * R
-            for deg in range(5, 271, 5):
-                a = M.radians(float(deg))
+            # (the road curves fix: chords that keep its outer edge within G.ROAD_SAG_M,
+            # 5 degrees at most as before)
+            na = max(54, G.arc_steps(R + RAMP_W / 2.0, 1.5 * M.PI))
+            for j in range(1, na + 1):
+                a = M.radians(270.0 * j / na)
                 # from P1 (radial -r) round toward the heading and outward
                 pts.append((cx_ + R * (M.sin(a) * hx - M.cos(a) * rx),
                             cy_ + R * (M.sin(a) * hy - M.cos(a) * ry)))

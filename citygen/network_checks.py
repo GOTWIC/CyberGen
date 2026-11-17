@@ -514,6 +514,7 @@ def check_crossing_spacing(spec: CitySpec, m: CityModel):
 WALK_PAD_M = 0.1        # a walkway may run along a wall, not this far into its mass
 WALK_HEAD_M = 2.5       # a mass this far over a walkway leaves room under it
 GRAZE_M = 0.05          # a walkway grazing a corner of a mass for less than this passes it
+TIE_M = 0.05            # an entrance's walkway pieces this near the nearest are as near
 WALK_EXEMPT = ("elevator", "skybridge")   # inside or between buildings by design
 LOT_PAD_M = 0.1         # a park path may run along a lot's edge, not this far into it
 BESIDE_M = 3.5          # an open space with a walkway this close is reached from it
@@ -692,16 +693,31 @@ def check_walkway_clash(spec: CitySpec, m: CityModel):
                 fam.append(x)
                 todo += pieces.get(x.id, [])
             fam = [x for x in fam if len(x.line) >= 2]
-            w = min(fam, key=lambda x: (G.dist(LineString([p[:2] for p in x.line]),
-                                               Point(e.position[:2])), x.id))
-            line = LineString([p[:2] for p in w.line])
-            foot = entrance_foot(line, e.position)
-            if tuple(foot) == tuple(e.position[:2]):
-                continue
+            # (the road curves fix: the pieces as near as the nearest within TIE_M, any of
+            # whose links is clear: a later split can leave a piece of a few centimeters
+            # whose end is a millimeter nearer than the foot on the piece beside it)
+            dist = {x.id: G.dist(LineString([p[:2] for p in x.line]), Point(e.position[:2]))
+                    for x in fam}
+            d0 = min(dist.values())
+            near = sorted((x for x in fam if dist[x.id] <= d0 + TIE_M),
+                          key=lambda x: (dist[x.id], x.id))
             link_ms = link_ms or BO._Masses(m.buildings)
-            for hb in link_ms.blockers(e.position, foot, b.level):
-                _lim(c, f"entrance of {b.id} at {tuple(e.position)} links to {w.id} through "
-                        f"building {hb}")
+            hit = None
+            for w in near:
+                foot = entrance_foot(LineString([p[:2] for p in w.line]), e.position)
+                if tuple(foot) == tuple(e.position[:2]):
+                    hit = None
+                    break
+                hbs = link_ms.blockers(e.position, foot, b.level)
+                if not hbs:
+                    hit = None
+                    break
+                if hit is None:
+                    hit = (w, hbs)
+            if hit is not None:
+                for hb in hit[1]:
+                    _lim(c, f"entrance of {b.id} at {tuple(e.position)} links to {hit[0].id} "
+                            f"through building {hb}")
     for b in m.buildings:     # (access fix, #87: every entrance reaches a walkway)
         for ei in (b.attrs or {}).get("walled_in", ()):
             pos = tuple(b.entrances[ei].position) if ei < len(b.entrances) else ()

@@ -2466,10 +2466,11 @@ speeds:
   own share of that (`vary`, 0.9 to 1.08), the lowest speed from where it is to a few meters
   on (`CgLife::SpeedAhead`), still slowing behind the car ahead as in LG0. A plan before
   cars_steam (no speeds) drives at LG0's `DriveSpeed`.
-- **The roads' own curves** are as coarse as M22's pavement map and AG17 draw them (a bend's
-  few stations): the smoothing rounds the lanes, not the roads under them, so on a tight bend
-  a car's line and the asphalt's polygon can part by a few centimeters (`docs/progress/
-  cars_steam/README.md`; a later issue).
+- **The roads' own curves** were as coarse as M22's pavement map and AG17 drew them (a bend's
+  few stations), so on a tight bend a car's line and the asphalt's polygon could part by a few
+  centimeters (`docs/progress/cars_steam/README.md`). Since the road curves fix the roads
+  are arcs within 2 cm of chord sag, their local corners rounded on arcs, and the lanes built
+  on them follow (`docs/progress/fix_road_curves/README.md`). No exporter change.
 
 ### From LG1: people
 

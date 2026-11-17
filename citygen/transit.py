@@ -4192,6 +4192,13 @@ class Builder:
             # (access fix, #87: a sidewalk reached only round the buildings: an elevator
             # down and a path led round, not a stair straight through them)
             rounded = (tuple(map(q, e[:2])), tuple(map(q, f[:2]))) in self.rounds
+            if not (rounded or pylon or d < 1.0) and \
+                    self._stair_blocked([(e[0], e[1], z), (f[0], f[1], 0.0)]):
+                # (the road curves fix: a stair whose straight run down passes through a
+                # building mass at its height, as `walkway_building_clash` measures it, which
+                # the ground test misses where the mass stands on an arcade: an elevator down
+                # and a path, as round the buildings)
+                rounded = True
             if rounded and not pylon and d >= 1.0 and self._over_water(e):
                 continue          # (an end over the water: the station's other end serves it)
             if pylon or d < 1.0 or rounded:
@@ -4222,6 +4229,16 @@ class Builder:
             acc.append(self.walk("elevator", [(e[0], e[1], 0.0), (e[0], e[1], z)], 2.5,
                                  {"station": sid}))
         self._skywalk(sid, seg, foot, z, bld, gone, acc)
+
+    def _stair_blocked(self, line3) -> bool:
+        """Whether a stair's straight run (x, y, z over the ground) passes through a building
+        mass at its height (`network_checks._Masses`, the check's own test)."""
+        from . import network_checks as NC
+
+        if getattr(self, "_chk_masses", None) is None:
+            self._chk_masses = NC._Masses(self.c.m)
+        line = LineString([p[:2] for p in line3])
+        return bool(self._chk_masses.hits(line, NC._walk_z(self.c.m, line3)))
 
     def _over_water(self, p) -> bool:
         """Access fix: whether a point stands in a water body (sea, river, channel,

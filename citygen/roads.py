@@ -626,8 +626,10 @@ class Fitter:
         return wet_new <= wet_old + 2.0
 
     def fillet(self, pts: list[tuple], fixed: set[int], cls: str, closed_ring: bool = False,
-               causeway: bool = False) -> tuple[LineString, float]:
-        """Arcs at every corner. Returns the line and the smallest radius used."""
+               causeway: bool = False, ok_cls: str | None = None) -> tuple[LineString, float]:
+        """Arcs at every corner. Returns the line and the smallest radius used. (`ok_cls`, the
+        road curves fix: the class whose minimum radius an arc must reach to be cut fine,
+        `_arc_line`'s `r_ok`; `cls` by default.)"""
         # aim a little above the class minimum: arcs are polylines, measured on chords
         r_pref, r_min = CLASSES[cls]["r_pref"], 1.06 * CLASSES[cls]["r_min"]
         pts = [tuple(p) for p in pts]
@@ -662,7 +664,10 @@ class Fitter:
             if not changed:
                 break
         radii, tans = _fillet_radii(pts, r_pref, closed_ring, r_min)
-        line = _arc_line(pts, radii, tans, closed_ring)
+        # (the road curves fix: arcs cut so no chord of the road's outer edge sags over
+        # G.ROAD_SAG_M)
+        line = _arc_line(pts, radii, tans, closed_ring, hw=CLASSES[cls]["width"] / 2.0,
+                         r_ok=ARC_OK * CLASSES[ok_cls or cls]["r_min"])
         used = [r for r in radii if r is not None]
         return line, (min(used) if used else math.inf)
 
@@ -749,7 +754,19 @@ def _fillet_radii(pts, r_pref: float, closed_ring: bool, r_min: float = 0.0):
     return radii, tans
 
 
-def _arc_line(pts, radii, tans, closed_ring: bool) -> LineString:
+ARC_OK = 0.98   # the road curves fix: an arc this share of its class's minimum radius or more
+#                is cut fine (`_arc_line`)
+
+
+def _arc_line(pts, radii, tans, closed_ring: bool, hw: float | None = None,
+              r_ok: float = 0.0) -> LineString:
+    """The polyline with each corner's arc; `hw` (a road's half width, the road curves fix):
+    each arc of radius `r_ok` or more in at least as many chords as keep its outer edge
+    within G.ROAD_SAG_M (else M1b's 6 degree or 12 m steps, which transit keeps; a fillet
+    the corners left under `r_ok` (`ARC_OK` of the class minimum: `checks.curve_radius`
+    allows 0.95 of it, and the grid's centimeter moves a radius measured on a fine arc by up
+    to 2%) keeps them too: measured on its true arc it fails the check, where its 12 m
+    chords, measured 20 m apart, passed on main, and the road searches would move)."""
     n = len(pts)
     out: list[tuple] = []
     idx = range(n) if closed_ring else range(n)
@@ -772,6 +789,8 @@ def _arc_line(pts, radii, tans, closed_ring: bool) -> LineString:
         a0 = M.atan2(t0[1] - cy, t0[0] - cx)
         th = _turn(a, p, c)
         steps = max(int(math.ceil(max(M.degrees(th) / 6.0, r * th / 12.0))), 1)
+        if hw is not None and r >= r_ok:
+            steps = max(steps, G.arc_steps(r + hw, th))
         for k in range(steps + 1):
             ang = a0 + side * th * k / steps
             out.append((cx + r * M.cos(ang), cy + r * M.sin(ang)))
@@ -2302,16 +2321,17 @@ def _endpoints(pieces):
     return deg
 
 
-def _smooth_joint(fitter, ca: list, cb: list, cls: str) -> LineString:
+def _smooth_joint(fitter, ca: list, cb: list, cls: str, ok_cls: str | None = None
+                  ) -> LineString:
     """Two pieces joined end to end at an angle: refit the corner (vertices within 80 m of
-    it may go) so it becomes a curve."""
+    it may go) so it becomes a curve (`ok_cls`: `Fitter.fillet`'s)."""
     pts = [tuple(p) for p in ca] + [tuple(p) for p in cb[1:]]
     j = len(ca) - 1
     jp = pts[j]
     zone = 250.0 if cls == "highway" else 90.0
     fixed = {i for i, p in enumerate(pts)
              if M.hypot(p[0] - jp[0], p[1] - jp[1]) > zone} | {0, len(pts) - 1}
-    line, _ = fitter.fillet(pts, fixed, cls)
+    line, _ = fitter.fillet(pts, fixed, cls, ok_cls=ok_cls)
     return G.qline(line)
 
 
@@ -2361,7 +2381,10 @@ def _merge_degree2(pieces, fitter=None):
             merged = LineString(ca + cb[1:])
             if fitter is not None and ra.role != "pinned" and \
                     _turn(ca[-2], ca[-1], cb[1]) > M.radians(12.0):
-                sm = _smooth_joint(fitter, ca, cb, ra.cls if ra.cls == rb.cls else "avenue")
+                # (the road curves fix: an arc cut fine only where it reaches the stricter
+                # class's minimum, which `curve_radius` holds the joined road to)
+                sm = _smooth_joint(fitter, ca, cb, ra.cls if ra.cls == rb.cls else "avenue",
+                                   "highway" if "highway" in (ra.cls, rb.cls) else ra.cls)
                 # the arc's 5 cm cleanup can drop an end point (the line then ends a few cm
                 # off its node) or, on pieces a few cm long, every point: put the ends back
                 # on the nodes, or keep the plain joint
