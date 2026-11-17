@@ -260,9 +260,18 @@ def test_slots_stand_on_their_surface():
     assert slots[0]["seated"] and slots[0]["points"][0][2] == 1.7 and slots[0]["points"][1][2] == 0.1
     assert "seated" not in slots[1] and slots[1]["points"][0][2] == 9.0
     ok = PL4.height_check(model, slots, sf, st)
-    assert ok["ok"] and "1 slots more than 0.3 m off" in ok["detail"], ok
+    assert ok["ok"] and "0 slots more than 0.3 m off" in ok["detail"], ok
     slots[0]["points"][0][2] = 0.0
     assert not PL4.height_check(model, slots, sf, st)["ok"]
+    # (a slot leaves from a walkway at its height: the sidewalk on the raised road, 1.5 m off,
+    # not the skybridge 10 m over it right beside the bench; the walkway's height is the face's
+    # where the model keeps a raised road's sidewalk at the ground)
+    model["walkways"].append({"id": "wk.bridge", "kind": "skybridge",
+                              "line": [[0.0, 2.4, 10.0], [10.0, 2.4, 10.0]]})
+    wi = PL4.WalkIndex(model["walkways"], sf)
+    assert abs(wi.height(wi.walks[0], 5.0, 2.0) - 1.7) < 1e-6
+    assert wi.nearest(5.0, 2.5, 15.0)[0]["id"] == "wk.bridge"
+    assert wi.nearest(5.0, 2.5, 15.0, 0, sf.at(5.0, 2.5)[0])[0]["id"] == "wk.s"
 
 
 # --- the exporter ---------------------------------------------------------------------------

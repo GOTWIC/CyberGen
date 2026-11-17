@@ -92,6 +92,21 @@ def _nearest_on(line, x: float, y: float) -> tuple[float, float, float, float, f
     return best if best is not None else (x, y, 1e9, 1.0, 0.0)
 
 
+def _z_on(line, x: float, y: float) -> float:
+    """A polyline's z at its point nearest (x, y) (0 where it has none)."""
+    best, z = None, 0.0
+    for a, b in zip(line, line[1:]):
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        L2 = dx * dx + dy * dy
+        t = 0.0 if L2 <= 0.0 else max(0.0, min(1.0, ((x - a[0]) * dx + (y - a[1]) * dy) / L2))
+        d = math.hypot(a[0] + dx * t - x, a[1] + dy * t - y)
+        if best is None or d < best:
+            za = a[2] if len(a) > 2 else 0.0
+            zb = b[2] if len(b) > 2 else 0.0
+            best, z = d, za + (zb - za) * t
+    return z
+
+
 def band_hours(b: int) -> range:
     _, a, e = P.HOUR_BANDS[b]
     return range(a, e)
@@ -146,29 +161,48 @@ class WalkIndex:
     """The walkable walkways (`ACCESS_KINDS`, the ground level and every deck) in plan, for
     the walkway nearest a point."""
 
-    def __init__(self, walks: list[dict]):
+    def __init__(self, walks: list[dict], surface: "Surface | None" = None):
         import shapely
         self.walks = [w for w in walks if w.get("kind") in P.ACCESS_KINDS and
                       len(w.get("line") or []) >= 2 and _length(w["line"]) > 0.5]
         self.geoms = [shapely.LineString([(p[0], p[1]) for p in w["line"]]) for w in self.walks]
         self.tree = shapely.STRtree(self.geoms) if self.geoms else None
+        self.surface = surface
 
-    def nearest(self, x: float, y: float, reach: float, level: int | None = None):
+    def height(self, w: dict, x: float, y: float) -> float:
+        """A walkway's height over the datum at its point (x, y): its own (a skybridge's, a
+        platform's) or the surface drawn there where that is higher (a raised road's sidewalk,
+        which the model keeps at the ground)."""
+        z = _z_on(w["line"], x, y)
+        if self.surface is None:
+            return z
+        g = self.surface.ground.one(x, y)
+        return max(z + g, self.surface.at(x, y)[0])
+
+    def nearest(self, x: float, y: float, reach: float, level: int | None = None,
+                z: float | None = None):
         """(walkway, distance, nearest x, y, direction) of the nearest within reach (ties by
-        id), else None."""
+        id), else None. With `z` (delta_rebuild: a slot's surface under its first point) the
+        nearest within `SLOT_STEP_M` of it in height, else the nearest (a bench beside a
+        skybridge leaves from the sidewalk under it, not from the bridge)."""
         import shapely
         if self.tree is None:
             return None
         hits = self.tree.query(shapely.Point(x, y).buffer(reach))
-        best = None
+        best = near = None
         for k in sorted(int(h) for h in hits):
             w = self.walks[k]
             if level is not None and int(w.get("level") or 0) != level:
                 continue
             px, py, d, ux, uy = _nearest_on(w["line"], x, y)
-            if d <= reach and (best is None or (d, w["id"]) < (best[1], best[0]["id"])):
+            if d > reach:
+                continue
+            if best is None or (d, w["id"]) < (best[1], best[0]["id"]):
                 best = (w, d, px, py, ux, uy)
-        return best
+            if z is not None and (near is None or (d, w["id"]) < (near[1], near[0]["id"])) and \
+                    abs(self.height(w, px, py) - z) <= P.SLOT_STEP_M:
+                near = (w, d, px, py, ux, uy)
+        return near if near is not None else best
 
 
 class Footprints:
@@ -363,11 +397,13 @@ def seat_slots(slots: list[dict], surface: Surface) -> dict:
 
 def height_check(model: dict, slots: list[dict], surface: Surface, stats: dict) -> dict:
     """`slot_heights`: every ground level slot seated, each point within `SLOT_SURFACE_TOL_M`
-    of the surface under it; noted, the slots whose points stand more than 0.3 m off their
-    walkway's own height in the model where they leave it (a raised road's sidewalk is at the
-    ground there: those the runtime stood at their walkway's height before)."""
-    walks = {w["id"]: w for w in model.get("walkways", [])}
-    bad, off = [], 0
+    of the surface under it; noted, the slots whose first point stands more than 0.3 m off
+    their walkway where they leave it (`WalkIndex.height`: a raised road's sidewalk, a door's
+    path, a skybridge where no walkway at their height is within reach), and more than
+    `SLOT_STEP_M` off."""
+    wi = WalkIndex(model.get("walkways", []), surface)
+    walks = {w["id"]: w for w in wi.walks}
+    bad, off, far = [], 0, 0
     for s in slots:
         if int(s.get("level") or 0) != 0:
             continue
@@ -380,26 +416,17 @@ def height_check(model: dict, slots: list[dict], surface: Surface, stats: dict) 
                 bad.append(f"{s['id']}: a point {p[2] - z:+.2f} m off its surface")
                 break
         w = walks.get(s.get("walkway_id"))
-        if w is not None and len(w.get("line") or []) >= 2:
+        if w is not None:
             p0 = s["points"][0]
-            line = w["line"]
-            best, wz = None, 0.0
-            for a, b in zip(line, line[1:]):
-                dx, dy = b[0] - a[0], b[1] - a[1]
-                L2 = dx * dx + dy * dy
-                t = 0.0 if L2 <= 0.0 else max(0.0, min(1.0, ((p0[0] - a[0]) * dx + (p0[1] - a[1]) * dy) / L2))
-                d = math.hypot(a[0] + dx * t - p0[0], a[1] + dy * t - p0[1])
-                if best is None or d < best:
-                    za = a[2] if len(a) > 2 else 0.0
-                    zb = b[2] if len(b) > 2 else 0.0
-                    best, wz = d, za + (zb - za) * t
-            if abs(p0[2] - (wz + surface.ground.one(p0[0], p0[1]))) > 0.3:
-                off += 1
+            px, py, _, _, _ = _nearest_on(w["line"], p0[0], p0[1])
+            dz = abs(p0[2] - wi.height(w, px, py))
+            off += dz > 0.3
+            far += dz > P.SLOT_STEP_M
     return {"ok": not bad, "detail": (
         f"{stats['seated']} ground level slots seated, {stats['points']} points on the surface "
         f"under them (pavement {stats['pavement']}, ground cover {stats['cover']}, bare ground "
         f"{stats['ground']}) within {P.SLOT_SURFACE_TOL_M * 100:.0f} cm; {off} slots more than "
-        f"0.3 m off their walkway's height in the model where they leave it"
+        f"0.3 m off their walkway where they leave it, {far} more than {P.SLOT_STEP_M:g} m"
         if not bad else f"{len(bad)} slots off: " + "; ".join(bad[:5]))}
 
 
@@ -524,7 +551,8 @@ def make_slots(model: dict, wi: WalkIndex, fp: Footprints, walk_rows: dict,
                 fx, fy = math.cos(math.radians(yaw - 90.0)), math.sin(math.radians(yaw - 90.0))
                 mirror = fx * to[0] + fy * to[1] < 0.0
         pts = frame_points(kind, x, y, z, yaw, mirror)
-        hit = wi.nearest(pts[0][0], pts[0][1], P.SLOT_REACH_M, lvl)
+        sz = wi.surface.at(pts[0][0], pts[0][1])[0] if wi.surface is not None and lvl == 0 else None
+        hit = wi.nearest(pts[0][0], pts[0][1], P.SLOT_REACH_M, lvl, sz)
         if hit is None:
             left["no_walkway"] += 1
             continue
@@ -544,7 +572,8 @@ def make_slots(model: dict, wi: WalkIndex, fp: Footprints, walk_rows: dict,
         x, y = float(pos[0]), float(pos[1])
         w = walks.get(a.get("walkway_id"))
         if w is None:
-            hit = wi.nearest(x, y, P.SLOT_REACH_M)
+            hit = wi.nearest(x, y, P.SLOT_REACH_M, None,
+                             wi.surface.at(x, y)[0] if wi.surface is not None else None)
             if hit is None:
                 left["no_walkway"] += 1
                 continue

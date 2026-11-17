@@ -345,6 +345,8 @@ SLOT_REACH_M = 15.0            # a slot's use point at most this far from its wa
 SURFACE_LIFT_M = {"curb": 0.2, "sidewalk": 0.2, "corner": 0.2, "median": 0.2, "default": 0.05}
 COVER_LIFT_M = 0.1
 SLOT_SURFACE_TOL_M = 0.03
+SLOT_STEP_M = 1.5             # ... and leave from a walkway this near its surface in height
+                              # (else the nearest: not a skybridge over a bench)
 # walkway kinds people come to a slot from (and gang corners and patrols walk)
 ACCESS_KINDS = ("sidewalk", "path", "promenade", "pedestrian_street", "alley", "footbridge",
                 "skybridge", "elevated", "concourse")
