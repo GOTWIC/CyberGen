@@ -1,8 +1,9 @@
 // The module and its console commands (the benchmark's passes and the checks drive them):
 // CityGenLife.Enable [0|1] (toggling without an argument): the people and cars moving and drawn;
 // CityGenLife.Respawn PEOPLE CARS: as many again on the spike's lanes; CityGenLife.Clothing
-// [0|1]: the people's clothes drawn or not (a debug switch); CityGenLife.Status: the state as
-// one JSON line (CITYGEN_LIFE_STATUS).
+// [0|1]: the people's clothes drawn or not (a debug switch); CityGenLife.Transit [0|1] and
+// CityGenLife.TransitShow WHAT (LG6); CityGenLife.Status: the state as one JSON line
+// (CITYGEN_LIFE_STATUS).
 
 #include "CityGenLifeActor.h"
 #include "HAL/IConsoleManager.h"
@@ -214,6 +215,27 @@ namespace
 			if (A && Args.Num() >= 2)
 			{
 				A->SitOffset = FVector2D(FCString::Atof(*Args[0]), FCString::Atof(*Args[1]));
+			}
+		}));
+
+	// --- LG6: transit
+	FAutoConsoleCommandWithWorldAndArgs TransitCmd(TEXT("CityGenLife.Transit"),
+		TEXT("CityGenLife.Transit [0|1]: LG6's transit (every line's trains on their timetables, boarding and leaving at the stops) on or off (toggling without an argument)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (ACityGenLife* A = LifeIn(World))
+			{
+				A->SetTransit(Args.Num() ? FCString::Atoi(*Args[0]) != 0 : !A->bTransit);
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs TransitShowCmd(TEXT("CityGenLife.TransitShow"),
+		TEXT("CityGenLife.TransitShow board|dwell|moving|metro|monorail|maglev|sky_tube|elevated_rail: the camera moved to the nearest train at a stop with people boarding or leaving, at a stop with its doors open, moving, or moving on a line of a mode (the check's shots)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (ACityGenLife* A = LifeIn(World))
+			{
+				A->ShowTransit(Args.Num() ? Args[0] : FString(TEXT("moving")));
 			}
 		}));
 

@@ -1062,6 +1062,67 @@
    "title": "TrafficPlan",
    "type": "object"
   },
+  "TransitPlan": {
+   "additionalProperties": false,
+   "description": "LG6: transit (scope 6.6): the modes' runs and trains, the settings, per line its\nsummary (its cycle, trains and headways by band, stops, train ids); the timetables\nthemselves in `timetables.json` (`Timetables`).",
+   "properties": {
+    "file": {
+     "description": "`timetables.json`, relative to the plan.",
+     "title": "File",
+     "type": "string"
+    },
+    "hash": {
+     "title": "Hash",
+     "type": "string"
+    },
+    "hour": {
+     "title": "Hour",
+     "type": "integer"
+    },
+    "lines": {
+     "items": {
+      "additionalProperties": true,
+      "type": "object"
+     },
+     "title": "Lines",
+     "type": "array"
+    },
+    "modes": {
+     "additionalProperties": true,
+     "description": "`presets.TRANSIT_MODES`: speeds, dwells, cars, tracks.",
+     "title": "Modes",
+     "type": "object"
+    },
+    "settings": {
+     "additionalProperties": true,
+     "description": "`presets.TRANSIT`.",
+     "title": "Settings",
+     "type": "object"
+    },
+    "sha256": {
+     "description": "sha256 of its bytes.",
+     "title": "Sha256",
+     "type": "string"
+    },
+    "totals": {
+     "additionalProperties": true,
+     "title": "Totals",
+     "type": "object"
+    }
+   },
+   "required": [
+    "hour",
+    "modes",
+    "settings",
+    "lines",
+    "file",
+    "sha256",
+    "totals",
+    "hash"
+   ],
+   "title": "TransitPlan",
+   "type": "object"
+  },
   "Turf": {
    "additionalProperties": false,
    "description": "LG4: a gang's turf (M11's territory of a gang faction).",
@@ -1298,6 +1359,18 @@
    ],
    "default": null,
    "description": "LG5: the city's traffic."
+  },
+  "transit": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/TransitPlan"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "description": "LG6: transit's timetables."
   },
   "version": {
    "const": 1,

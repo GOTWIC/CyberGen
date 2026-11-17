@@ -158,9 +158,14 @@ void ACityGenLife::BeginPlay()
 	DriveProc->CallInitialize(this, EM.AsShared());
 	MakeComponents();
 	SpawnAll();
-	UE_LOG(LogTemp, Display, TEXT("CITYGEN_LIFE_READY {\"lanes\":%d,\"walk_lanes\":%d,\"drive_lanes\":%d,\"people\":%d,\"cars\":%d,\"ms\":%.1f}"),
+	if (IsTransit())
+	{
+		// (LG6: every line's trains, on their timetables)
+		BuildTransit();
+	}
+	UE_LOG(LogTemp, Display, TEXT("CITYGEN_LIFE_READY {\"lanes\":%d,\"walk_lanes\":%d,\"drive_lanes\":%d,\"people\":%d,\"cars\":%d,\"transit_lines\":%d,\"trains\":%d,\"ms\":%.1f}"),
 		WalkLaneCount + DriveLaneCount, WalkLaneCount, DriveLaneCount, WalkPos.Num(), CarPos.Num(),
-		(FPlatformTime::Seconds() - T0) * 1000.0);
+		TransitLineMode.Num(), Trains.Num(), (FPlatformTime::Seconds() - T0) * 1000.0);
 }
 
 void ACityGenLife::EndPlay(const EEndPlayReason::Type Reason)
@@ -690,6 +695,15 @@ void ACityGenLife::SetEnabled(bool bOn)
 	{
 		if (C) { C->SetVisibility(bOn); }
 	}
+	// (LG6: the trains)
+	for (UInstancedStaticMeshComponent* C : TransitComps)
+	{
+		if (C) { C->SetVisibility(bOn && bTransit); }
+	}
+	if (DoorComp && !bOn)
+	{
+		DoorComp->SetVisibility(false);
+	}
 	for (int32 S = 0; S < NearSlots.Num(); ++S)
 	{
 		if (!bOn)
@@ -944,6 +958,16 @@ void ACityGenLife::Tick(float DeltaSeconds)
 	{
 		TakeFreedCars();
 	}
+	if (IsTransit() && (bTransit || TransitFrame == 0 || Trains.ContainsByPredicate([](const FCgTrain& T) { return T.bOn; })))
+	{
+		// (LG6: the trains on their timetables, their stops' boarding)
+		if (!bCity && !bTrafficOn)
+		{
+			FVector View;
+			Frame.View = ViewPoint(View) ? View : FVector(Center.X * 100.0, -Center.Y * 100.0, 0.0);
+		}
+		UpdateTransit(DeltaSeconds);
+	}
 	UpdateInstances();
 	const double Ms = (FPlatformTime::Seconds() - T0) * 1000.0;
 	TickMs = Ticks ? 0.98 * TickMs + 0.02 * Ms : Ms;
@@ -983,5 +1007,5 @@ FString ACityGenLife::GetStatus() const
 		bEnabled ? TEXT("true") : TEXT("false"), bBuilt ? TEXT("true") : TEXT("false"), *DistrictId,
 		WalkLaneCount, DriveLaneCount, CarStarts.Num(), WalkPos.Num(), CarPos.Num(), Entities.Num(), Placed,
 		Bodies ? Bodies->GetInstanceCount() : -1, CarParts.Num(), P0.X, -P0.Y, P0.Z, C0.X, -C0.Y, C0.Z,
-		TickMs, TickMsMax, (long long)Ticks, *(Lib + CrowdStatus() + TrafficStatus()));
+		TickMs, TickMsMax, (long long)Ticks, *(Lib + CrowdStatus() + TrafficStatus() + TransitStatus()));
 }

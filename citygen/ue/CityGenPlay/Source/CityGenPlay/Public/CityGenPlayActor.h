@@ -209,6 +209,12 @@ public:
 	bool HasLifePlaces() const;
 	bool GetLifePlaces() const;
 	void SetLifePlaces(bool bOn);
+	/** LG6: whether the life controller has transit (bTransit, with lines of its own:
+	 *  TransitLineMode not empty), its state, and SetTransit on it (the menu's Transit row,
+	 *  transit=1 or 0). */
+	bool HasLifeTransit() const;
+	bool GetLifeTransit() const;
+	void SetLifeTransit(bool bOn);
 
 	/** The controller's hour (0 to 24), and SetHour. */
 	float GetAtmosHour() const;

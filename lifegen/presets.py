@@ -411,3 +411,68 @@ PLACE_CLIPS = {
     "talk_b": f"{GAS_ANIM}/Idle/M_Relaxed_Stand_Idle_Break_v05",
     "talk_c": f"{GAS_ANIM}/Idle/M_Neutral_Stand_Idle_Break_v03",
 }
+
+# --- LG6: transit (scope 6.6) ------------------------------------------------------------------
+
+# a line's service by mode when the spec gives none (`transit.headway_min` by line name):
+# minutes between trains each way per M11's hour band (night, morning, day, evening, late)
+TRANSIT_HEADWAY_MIN = {
+    "metro": [8.0, 3.0, 4.0, 3.0, 5.0],
+    "elevated_rail": [8.0, 3.0, 4.0, 3.0, 5.0],
+    "monorail": [8.0, 4.0, 5.0, 4.0, 6.0],
+    "maglev": [12.0, 5.0, 6.0, 5.0, 8.0],
+    "sky_tube": [5.0, 2.0, 2.5, 2.0, 3.0],
+}
+# how each mode runs and what its trains are (stand-ins until the Mac's designs: decision 6;
+# the exporter's `unreal_life.TRANSIT_MODELS` draws them): its cruise speed (m/s), acceleration
+# and braking (m/s2), the sideways pull it takes in a curve (m/s2: at most sqrt(lateral R) there,
+# R the track's radius over the train's length), its dwell at a station (s), its cars, each
+# car's length, gap, width and height (m), the car's floor over its body's bottom (m), its
+# body's bottom over the line's z (`base_m`: the model's line is the rails' level, a monorail's
+# beam top, a sky tube's axis: its tube 7 m across, M19), how far each way's track is off the line (m: two ways on the
+# drawn deck's two tracks, a maglev's and a sky tube's two cars side by side on their deck or in
+# their tube, a monorail's cars beside its one beam: `loop_m` a loop's one way), the platform's
+# floor under its walkway (`platform_dz`, m: a sky station's platforms flank the tube at its
+# floor, AG4), whether people board from the walkway's own level (a metro's concourse is 8 m
+# over the track, M5: people go down at the point over a door), its doors a side per car and
+# their width (m), the most people boarding or leaving a train at a station
+TRANSIT_MODES = {
+    "metro": {"cruise": 22.0, "accel": 1.1, "brake": 1.1, "lateral": 1.0, "dwell_s": 25.0,
+              "cars": 5, "car_m": 19.0, "gap_m": 1.0, "width_m": 2.9, "height_m": 3.6,
+              "floor_m": 0.3, "base_m": 0.85, "track_m": 1.6, "loop_m": 1.6,
+              "platform_dz": 0.0, "board_level": False, "doors": 3, "door_m": 1.4,
+              "board_max": 60},
+    "elevated_rail": {"cruise": 20.0, "accel": 1.0, "brake": 1.0, "lateral": 1.0,
+                      "dwell_s": 25.0, "cars": 4, "car_m": 20.0, "gap_m": 1.0,
+                      "width_m": 3.0, "height_m": 3.6, "floor_m": 0.3, "base_m": 0.85,
+                      "track_m": 2.15, "loop_m": 2.15, "platform_dz": 0.0,
+                      "board_level": True, "doors": 3, "door_m": 1.4, "board_max": 50},
+    "monorail": {"cruise": 16.0, "accel": 1.0, "brake": 1.0, "lateral": 1.0, "dwell_s": 20.0,
+                 "cars": 4, "car_m": 11.5, "gap_m": 0.6, "width_m": 2.6, "height_m": 3.1,
+                 "floor_m": 0.3, "base_m": -0.3, "track_m": 1.8, "loop_m": 1.8,
+                 "platform_dz": 0.0, "board_level": True, "doors": 2, "door_m": 1.2,
+                 "board_max": 30},
+    "maglev": {"cruise": 70.0, "accel": 1.0, "brake": 1.0, "lateral": 1.0, "dwell_s": 40.0,
+               "cars": 4, "car_m": 25.0, "gap_m": 0.5, "width_m": 2.9, "height_m": 3.6,
+               "floor_m": 0.3, "base_m": 0.45, "track_m": 1.6, "loop_m": 0.0,
+               "platform_dz": 0.0, "board_level": True, "doors": 2, "door_m": 1.4,
+               "board_max": 50},
+    "sky_tube": {"cruise": 30.0, "accel": 1.2, "brake": 1.2, "lateral": 1.2, "dwell_s": 20.0,
+                 "cars": 3, "car_m": 9.0, "gap_m": 0.5, "width_m": 2.4, "height_m": 2.7,
+                 "floor_m": 0.05, "base_m": -2.45, "track_m": 1.25, "loop_m": 0.0,
+                 "platform_dz": -2.5, "board_level": True, "doors": 1, "door_m": 1.4,
+                 "board_max": 20},
+}
+TRANSIT = {
+    "turnback_s": 60.0,            # an open line's layover where it turns back
+    "cross_m": 90.0,               # it crosses to the other track over this before turning
+    "safety_m": 60.0,              # a train keeps this far behind the one ahead, past its length
+    "step_m": 2.0,                 # the speed profile's grid along the track
+    "sample_s": 0.5,               # the timetable's samples (the runtime interpolates them)
+    "stop_tol_m": 25.0,            # a platform's middle at most this far off its track (plan)
+    "stop_dz_m": 12.0,             # ... and this far in height
+    "board_min": [2, 6, 5, 6, 4],  # people boarding (and leaving) a train at a stop at least
+    "budget_trains": 120,          # trains at once over the city, at the busiest band
+    "budget_cars": 600,            # cars at once
+}
+TRANSIT_MODE_CODES = ("metro", "elevated_rail", "monorail", "maglev", "sky_tube")

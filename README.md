@@ -696,6 +696,16 @@ Tab menu's Traffic row, turns them off.
 | Stopped for someone crossing (LG5) | Night traffic (LG5) |
 | <img src="docs/progress/LG5/unreal/pday_traffic_person.jpg" width="420"> | <img src="docs/progress/LG5/unreal/night_traffic_red.jpg" width="420"> |
 
+LG6 (transit) is in: every transit line runs its trains to a timetable over the whole city,
+the metro in its tunnels, the maglev and the monorail on their viaducts, pods through the sky
+tubes; they stop at the stations with their doors open and people get off and on. The trains
+are simple stand-ins in their line's colors until their models are designed.
+`CityGenLife.Transit 0`, or the Tab menu's Transit row, turns them off.
+
+| Boarding a maglev by night (LG6) | A sky pod in its tube (LG6) |
+|---|---|
+| <img src="docs/progress/LG6/unreal/night_tr_board_maglev.jpg" width="420"> | <img src="docs/progress/LG6/unreal/pday_tr_run_sky.jpg" width="420"> |
+
 | People on an Old Town street | The walk by night |
 |---|---|
 | <img src="docs/progress/LG1/unreal/pday_people_close_0.jpg" width="420"> | <img src="docs/progress/LG1/unreal/night_people_close_0.jpg" width="420"> |
@@ -727,7 +737,7 @@ Plan: [`docs/lifegen_scope.md`](docs/lifegen_scope.md); what each milestone did:
 | LG3 | Crowds on the streets | People walking every sidewalk of the city, crossing at crosswalks with the signals, taking stairs and elevators between levels, in groups and at their own pace, as many as each street has at each hour, coming out of doors and going back in | Done |
 | LG4 | Life at places | People sitting on benches, waiting at bus stops and taxi stands, buying at kiosks and vending machines, eating at food stalls, queueing at clubs and smoking outside bars; shops, bars and clinics open and closed by their hours, people going in and coming back out; gangs in their colors on their own turf; police walking in pairs and driving patrol cars | Done |
 | LG5 | Traffic | The hand-designed cars on every lane of the city, following each other, stopping at red lights and taking turns through junctions, stopping for people and for you in the road, as many as each street has at each hour; their lights by night | Done |
-| LG6 | Transit | Trains, metro, monorail, maglev and sky tube pods running their lines to timetables, stopping at stations, people boarding and leaving | Planned |
+| LG6 | Transit | Trains, metro, monorail, maglev and sky tube pods running their lines to timetables over the whole city, stopping at stations with their doors open, people boarding and leaving | Done |
 | LG7 | Air and water | Flying cars on air lanes between towers and landing pads, drones, aircraft and shuttles over the spaceport, helicopters at helipads, boats and ferries on the water | Planned |
 | LG8 | Weather, reactions and release | People and traffic that follow the hour and the weather (umbrellas and shelter in rain, nightlife), step aside for the player and react to what happens near them; a performance pass for crowds and traffic; every sample city alive, checked in Unreal | Planned |
 

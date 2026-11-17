@@ -98,6 +98,16 @@ ASKS = (
                                            "(vehicles/GAME.md); its kind in the pack"},
      "derived": "cars, taxis, vans and pickups from the 15 packs in the cities",
      "missing": ""},
+    {"id": "train_models", "of": "assetgen", "needed_by": "LG6",
+     "what": "trains and pods per transit mode: metro, elevated rail, monorail, maglev and sky "
+             "tube cars with their doors (decision 6: designed on the Mac as the cars are)",
+     "field": ("@vehicles", "trains"),
+     "record": {"vehicles/cars/<name>.py": "one script a car of a mode, a game pack each, its "
+                                           "doors' places and the way they open"},
+     "derived": "stand-in cars of the exporter's per mode model table "
+                "(`citygen.unreal_life.TRANSIT_MODELS`: boxes of /Engine/BasicShapes in the "
+                "line's color, lit windows by night, sliding door leaves)",
+     "missing": ""},
 )
 
 

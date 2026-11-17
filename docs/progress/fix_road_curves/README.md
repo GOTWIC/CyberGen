@@ -56,9 +56,10 @@ at most 0.7 cm and is not where the facets come from.
 - **AG17** draws the map as it is. A barrier run's stations leave out the vertices its mitre
   overreaches, as the map's faces do (`barriers._clear_of_ends`: a parapet poked 0.56 m into
   its junction in the small test city). Its junction
-  corner barriers keep off the crosswalks (`barriers._keep_out`): since the crossings fix put
-  a road's crosswalks at its corners, guard walls stood on them, and AG14's `asset_clash`
-  failed on main (Delta 33 `barrier_on_crosswalk`, Vesper Bay 11).
+  corner barriers stood on the crosswalks since the crossings fix put a road's crosswalks at
+  its corners (AG14's `asset_clash`: Delta 33 `barrier_on_crosswalk`, Vesper Bay 11); this
+  branch kept them off with a keep-out of its own, and main's crossings follow-up
+  (`barriers._keepout`, #234) did the same meanwhile, so the merge takes main's.
 - **Found on the new layouts** (each city's layout moves, so the later stages met layouts
   main never had):
   - `ground_cover` counted a 1 cm sliver along a 322 m lot edge beside a canal, which snap
