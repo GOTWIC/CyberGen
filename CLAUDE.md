@@ -1588,12 +1588,15 @@ as a pedestrian street one took a held street's dead end), `Frame.ends` every he
 - **#241** (`pavement.Assembly._foreign`): a junction's, pad's or bulb's vertex that only a
   road not its own shares (its outline against another road's sidewalk) takes the curb rule's
   height, not that road's; ports keep theirs.
-- **Station feet** (`transit.Builder.foot`, `_mid_cross`): a stair's or elevator's foot
-  never on a crossing or crosswalk away from the sidewalk it joins.
+- **Station feet** (`transit.Builder.foot`, `_foot_ok`): a stair's or elevator's foot never
+  on a crossing or crosswalk walkway, nor on another walkway inside a crossing's zone on the
+  road (`network_checks.crossing_zones`: crosswalk records' stripes, crossing walkways' bands
+  on a carriageway face; a cluster's inner sidewalk can run along a highway crosswalk): the
+  nearest walkway point off them.
 - **Check** `walkway_carriageway`: a crossing's length on one road's carriageway faces past
   that road's carriageway width (`carriageway_w`) counts past its span (a diagonal of one
-  stretch); a station's stair or elevator with its foot in a crosswalk's stripe or on a
-  crossing on the road fails (`station_feet_on_crossings`).
+  stretch); a station's stair or elevator with its foot in a crossing zone fails
+  (`station_feet_on_crossings`).
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 

@@ -1042,6 +1042,16 @@ def crossing_zones(m: CityModel, walks=None, faces=None) -> tuple[list, list]:
     return zones, names
 
 
+ZONE_EDGE_M = 0.02   # a point this near a crossing zone's edge is on its edge, not in it
+
+
+def in_zone(zones: list, tree, pt) -> list:
+    """The crossing zones (indices, ascending) a point stands in, more than ZONE_EDGE_M in
+    from their edge (a foot put on the edge, on the 1 cm grid, is off it)."""
+    return [i for i in sorted(int(k) for k in tree.query(pt, predicate="within"))
+            if zones[i].boundary.distance(pt) > ZONE_EDGE_M]
+
+
 def station_feet_on_crossings(m: CityModel, faces=None) -> list:
     """Curves followups: a station's stair or elevator whose foot on the ground stands on a
     crossing (`crossing_zones`). [(walkway id, station, crosswalk or crossing)]."""
@@ -1061,7 +1071,7 @@ def station_feet_on_crossings(m: CityModel, faces=None) -> list:
     tree = shapely.STRtree(zones)
     out = []
     for wid, st, pt in feet:
-        hits = sorted(int(i) for i in tree.query(pt, predicate="intersects"))
+        hits = in_zone(zones, tree, pt)
         if hits:
             out.append((wid, st, names[hits[0]]))
     return out

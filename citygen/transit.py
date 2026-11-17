@@ -3987,7 +3987,9 @@ class Builder:
         """Curves followups: whether a point stands on a crossing (`crossing_zones`)."""
         if self.ztree is None:
             return False
-        return bool(len(self.ztree.query(Point(f[:2]), predicate="intersects")))
+        from . import network_checks as NC
+
+        return bool(NC.in_zone(self.zones, self.ztree, Point(f[:2])))
 
     def _foot_ok(self, h: int, p):
         """Where a path from p meets ground walkway h off the crossings (`_foot` where that is
