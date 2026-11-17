@@ -93,7 +93,20 @@ night and in the rain (raincoats are drawn in rain):
 | **Old Town, night, rain** | |
 | [![](unreal/night_cloth_d04_rain__rain.jpg)](unreal/night_cloth_d04_rain__rain.jpg) | |
 
-BENCH_PLACEHOLDER
+The lean benchmark (the near meshes carry 12% more triangles): `night_plan_all`, one run,
+native 2560 x 1440, no DLSS pass ([`bench/bench.md`](bench/bench.md)): **20.6 ms p95** over
+the route (walk 22.9, drive 20.7, fly 19.9; game-thread bound, draws 3,505 at the median),
+against LG8's 21.8 (walk 23.0 under heavier load), with about 1.4 cores of other load. Still
+over the 20 ms budget, as LG8 left it; the clothing costs no measurable frame time.
+
+## The package
+
+`builds/packaged/Delta_clothing` (Development, Win64, 5.1 GB; `package_clothing.cmd`, cooked
+in place from `CityAG16` as LG8's, staged only, 10.6 minutes). Its smoke launch (the user
+folder outside the package, no `Saved` folder left in it, the game process closed after) loads
+Delta in 13.6 s with the library's 144 looks and the clothing on, the life controller ready
+with 2,400 people and 1,800 cars. `Delta_lg8` was deleted before the cook (the disk), and
+`CityAG16`'s `Saved/Cooked` and `Saved/StagedBuilds` after the smoke launch.
 
 ## Tests
 

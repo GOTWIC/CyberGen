@@ -2985,7 +2985,9 @@ LG2 (clothing) is in place:
   one takes its nearest vertex's skin weights in the editor (`follow_pairs`, the JSON's
   `follow`; `people_library.skin_garment`). The look check `lifegen/probes/look_export_ue.py`
   and `look_pose.py` (the looks' FBX posed along the walk in Blender, pokes counted in the
-  waist's band): `docs/progress/clothing_fixes/README.md`.
+  waist's band). Delta (library `5279ccbf5d436abe`): every check passes; inner layers coming
+  through per paired vertex 8.3% to 5.9% (waist 10.4% to 6.3%, trench coats 23.3% to 6.5%);
+  `night_plan_all` 20.6 ms p95 native. `docs/progress/clothing_fixes/README.md`.
 
 LG4 (life at places) is in place:
 - **The plan** (`lifegen/places.py`, called by `plan.build_plan`; `presets.SLOT_KINDS`,

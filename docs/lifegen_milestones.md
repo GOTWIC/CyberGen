@@ -214,7 +214,16 @@ request). Report, contact sheets, the posed look check and shots:
 - **The look check** (`lifegen/probes/look_export_ue.py`, `look_pose.py`): each look with an
   outer layer exported from the project as FBX with its skin weights, posed along the walk in
   Blender, the vertices that came through the piece over them counted (all over and in the
-  waist's band) and the worst frame rendered.
+  waist's band; none within 6 cm of that piece's open edge) and the worst frame rendered.
+- **Delta:** the library rebuilt and imported (the dressing 25 minutes, the looks, mid meshes
+  and cards about 40); every check passes; per paired vertex, inner layers came through
+  8.3% to 5.9% of the time (waist 10.4% to 6.3%; trench coats 23.3% to 6.5%, raincoats 7.2%
+  to 3.4%; the heavy bodies' waist 10.5% to 9.3%); near meshes 28,116 triangles on average
+  (25,089); `night_plan_all` 20.6 ms p95 native on the lean route (walk 22.9). Package
+  `builds/packaged/Delta_clothing` (5.1 GB, its smoke launch loads Delta in 13.6 s).
+- **Open items:** small dents where a pocket's or band's planes cut a heavy belly, a skirt's
+  waistband showing under a short tee's hem, a coat's skirt skinned to the legs (no cloth
+  simulation), a hood down held as built.
 
 ## LG3: crowds on the streets
 
