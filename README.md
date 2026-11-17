@@ -714,7 +714,9 @@ piers, ferries cross the rivers and ships lie at the port. The flying cars are t
 hover cars; the rest are simple stand-ins until their models are designed.
 `CityGenLife.Air 0` and `CityGenLife.Water 0`, or the Tab menu's rows, turn them off.
 
-README_LG7_IMAGES
+| A flying car coming down onto a rooftop pad (LG7) | A boat on the river by day (LG7) |
+|---|---|
+| <img src="docs/progress/LG7/unreal/night_aw_landing.jpg" width="420"> | <img src="docs/progress/LG7/unreal/pday_aw_boat.jpg" width="420"> |
 
 | People on an Old Town street | The walk by night |
 |---|---|
