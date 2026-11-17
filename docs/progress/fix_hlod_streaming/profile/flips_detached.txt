@@ -1,0 +1,1 @@
+[2026.11.17-13.18.07:104][231]LogCityGenHLOD: Display: CityGen.HLODStatus fast=1 in_place=58854 recreated=7365 (off 0, not a game 0, no render state 0, dirty 0, no proxy hidden 0, no proxy shown 7365) detached=68934

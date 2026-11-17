@@ -1,0 +1,43 @@
+frames 1940
+DRU children, ms per frame (calls per frame):
+    0.167  (   2.2)  InstancedStaticMeshComponent
+    0.070  (   0.9)  StaticMeshComponent0
+    0.046  (   0.8)  StaticMesh
+    0.043  (   2.8)  PeopleNear22
+    0.039  (   2.6)  PeopleNear2
+    0.038  (   2.6)  PeopleNear19
+    0.037  (   2.7)  PeopleNear5
+    0.033  (   2.4)  PeopleNear0
+    0.032  (   3.0)  PeopleNear11
+    0.031  (   2.9)  PeopleNear12
+    0.031  (   2.9)  PeopleNear9
+    0.030  (   2.5)  PeopleNear1
+    0.029  (   2.7)  PeopleNear6
+    0.029  (   2.8)  PeopleNear4
+    0.027  (   2.4)  PeopleNear8
+    0.025  (   2.8)  PeopleNear7
+    0.022  (   2.3)  PeopleNear14
+    0.022  (   2.5)  PeopleNear16
+    0.021  (   2.0)  PeopleNear13
+    0.021  (   2.1)  PeopleNear21
+    0.020  (   1.5)  PeopleNear25
+    0.020  (   1.0)  CharacterMesh0
+    0.020  (   2.4)  PeopleNear10
+    0.019  (   2.3)  PeopleNear23
+    0.019  (   2.3)  PeopleNear17
+GetUsedMaterials callers, ms per frame (calls per frame):
+    0.100  (  14.6)  ParallelFor > ParallelFor > AddPrimitive (GT)
+    0.013  (   2.0)  InstancedStaticMeshComponent > Plane > STAT_UInstancedStaticMeshComponent_BuildRenderData
+    0.006  (   1.0)  PeopleMid1 > SM_p00_l1_Mid > STAT_UInstancedStaticMeshComponent_BuildRenderData
+    0.005  (   1.0)  PeopleMid8 > SM_p01_l2_Mid > STAT_UInstancedStaticMeshComponent_BuildRenderData
+    0.005  (   1.0)  PeopleMid43 > SM_p07_l1_Mid > STAT_UInstancedStaticMeshComponent_BuildRenderData
+    0.005  (   1.0)  PeopleMid63 > SM_p10_l3_Mid > STAT_UInstancedStaticMeshComponent_BuildRenderData
+    0.005  (   0.9)  PeopleMid2 > SM_p00_l2_Mid > STAT_UInstancedStaticMeshComponent_BuildRenderData
+    0.005  (   1.0)  PeopleMid136 > SM_p22_l4_Mid > STAT_UInstancedStaticMeshComponent_BuildRenderData
+    0.005  (   1.0)  PeopleMid7 > SM_p01_l1_Mid > STAT_UInstancedStaticMeshComponent_BuildRenderData
+    0.005  (   1.0)  PeopleMid19 > SM_p03_l1_Mid > STAT_UInstancedStaticMeshComponent_BuildRenderData
+    0.005  (   1.0)  PeopleMid129 > SM_p21_l3_Mid > STAT_UInstancedStaticMeshComponent_BuildRenderData
+    0.005  (   1.0)  PeopleMid61 > SM_p10_l1_Mid > STAT_UInstancedStaticMeshComponent_BuildRenderData
+    0.005  (   1.0)  PeopleMid133 > SM_p22_l1_Mid > STAT_UInstancedStaticMeshComponent_BuildRenderData
+    0.005  (   1.0)  PeopleMid10 > SM_p01_l4_Mid > STAT_UInstancedStaticMeshComponent_BuildRenderData
+    0.005  (   0.9)  PeopleMid6 > SM_p01_l0_Mid > STAT_UInstancedStaticMeshComponent_BuildRenderData

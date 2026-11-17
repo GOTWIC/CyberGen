@@ -2248,10 +2248,25 @@ AG16 (performance) is in place (scope 14.17, issue #96; `docs/unreal_export.md`,
   `assets/scene_budget.json`): the scene as the exporter's own manifest makes it (actors,
   components, distinct Nanite meshes, instances, root pages against the pool) per city and
   per 256 m tile (`CITY`, `TILE`).
+- **HLOD streaming** (fix_hlod_streaming, `docs/unreal_export.md`, "HLOD streaming"): the
+  instanced HLODs' component is the play plugin's `UCityGenHLODComponent`
+  (`unreal.set_hlod_class`: DefaultEditor.ini's `[/Script/Engine.HLODBuilder]` when the plugin
+  is built; the module reads the builder's config again once its classes exist): in a game it
+  leaves its HLOD actor's root (the root's flip dirtied every attached component) and a
+  visibility flip keeps its proxy, only the drawn flag changed on the render thread
+  (`UpdatePrimitivesIsDrawn_RenderThread`), not a new render state (instances sent again,
+  `GetUsedMaterials` on the game thread: 800 to 2,400 components in a frame as a row of cells
+  streamed); `build_hlods` builds every HLOD again when the class or `HLOD_VERSION` changes
+  (`hlod_stamp`); `CityGen.HLODFastVisibility`, `CityGen.HLODStatus`, bench pass
+  `night_plan_all_hlodslow`. Every import also turns on the engine's adaptive AddToWorld time
+  slice (`unreal.STREAMING_SETTINGS`, `s.AdaptiveAddToWorld.Enabled=1`: the cells' actors
+  registered 1 to 6 ms a frame by the work in flight, not a fixed 5); exploring passes
+  `night_plan_all_stream2`, `_adaptive`. Delta's `night_plan_all` p95 20.6 to 18.8 ms (walk
+  22.9 to 20.5, drive 20.7 to 19.6, fly 19.9 to 16.4).
 - **Left**: garbage collection in an uncooked game, 70 to 350 ms about every 40 s while
   streaming; UE 5.8's experimental async physics bodies and incremental collection made no
   gain or worse.
-Results: `docs/progress/AG16/`.
+Results: `docs/progress/AG16/`, `docs/progress/fix_hlod_streaming/`.
 
 AG18 (hero vehicles, scope 14.19) is in progress, and is not a generator: vehicles designed
 one by one as Blender scripts in `vehicles/` (kit `carkit.py`, a script per car in `cars/`,

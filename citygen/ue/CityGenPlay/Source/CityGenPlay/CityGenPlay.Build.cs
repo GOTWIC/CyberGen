@@ -12,5 +12,7 @@ public class CityGenPlay : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new string[] { "ApplicationCore", "InputCore", "Slate", "SlateCore" });
 		// AG16's benchmark (CityGenBench): its job as JSON, the RHI's and render thread's timings
 		PrivateDependencyModuleNames.AddRange(new string[] { "Json", "RHI", "RenderCore" });
+		// the instanced HLODs' component (CityGenHLODComponent): a proxy's scene info
+		PrivateDependencyModuleNames.Add("Renderer");
 	}
 }

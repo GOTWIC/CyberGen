@@ -1,0 +1,77 @@
+{
+ "before": {
+  "align_err_ms_per_frame": 0.035,
+  "walk": {
+   "frames": 1947,
+   "trace_p95_ms": 27.17,
+   "hlod_updates": 15044,
+   "gum_calls": 432393,
+   "gum_ms": 1358.9,
+   "deferred_updates_ms": 5489.6,
+   "frames_200_hlod": 40,
+   "max_hlod_frame": 425,
+   "max_dru_ms": 15.2
+  },
+  "drive": {
+   "frames": 3437,
+   "trace_p95_ms": 19.28,
+   "hlod_updates": 28099,
+   "gum_calls": 434756,
+   "gum_ms": 1112.8,
+   "deferred_updates_ms": 4163.2,
+   "frames_200_hlod": 35,
+   "max_hlod_frame": 459,
+   "max_dru_ms": 13.1
+  }
+ },
+ "after": {
+  "align_err_ms_per_frame": 0.031,
+  "walk": {
+   "frames": 2002,
+   "trace_p95_ms": 25.66,
+   "hlod_updates": 14916,
+   "gum_calls": 416495,
+   "gum_ms": 1293.4,
+   "deferred_updates_ms": 5500.3,
+   "frames_200_hlod": 41,
+   "max_hlod_frame": 424,
+   "max_dru_ms": 15.2
+  },
+  "drive": {
+   "frames": 3448,
+   "trace_p95_ms": 19.0,
+   "hlod_updates": 27584,
+   "gum_calls": 431384,
+   "gum_ms": 1105.1,
+   "deferred_updates_ms": 4084.9,
+   "frames_200_hlod": 35,
+   "max_hlod_frame": 458,
+   "max_dru_ms": 35.2
+  }
+ },
+ "after2": {
+  "align_err_ms_per_frame": 0.043,
+  "walk": {
+   "frames": 1940,
+   "trace_p95_ms": 26.28,
+   "hlod_updates": 86,
+   "gum_calls": 432891,
+   "gum_ms": 1365.0,
+   "deferred_updates_ms": 5547.8,
+   "frames_200_hlod": 0,
+   "max_hlod_frame": 49,
+   "max_dru_ms": 16.3
+  },
+  "drive": {
+   "frames": 3453,
+   "trace_p95_ms": 19.21,
+   "hlod_updates": 0,
+   "gum_calls": 410444,
+   "gum_ms": 1078.9,
+   "deferred_updates_ms": 4042.0,
+   "frames_200_hlod": 0,
+   "max_hlod_frame": 0,
+   "max_dru_ms": 13.0
+  }
+ }
+}

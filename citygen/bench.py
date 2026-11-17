@@ -71,7 +71,8 @@ def _atmos(lights: bool = True, fog: bool = False, rain: bool = False, wet: bool
            shadowed: int = 16, hour: str = "23", sky: bool = True, air: bool = False,
            tuned: bool = True, cvars: tuple | None = None,
            weather: str | None = None, post: bool = True,
-           far: bool = True, dlss: bool = False, fg: bool = False) -> tuple[str, ...]:
+           far: bool = True, dlss: bool = False, fg: bool = False,
+           hlod: bool = True) -> tuple[str, ...]:
     """AT3: `hour` a number or the plan's named hour (day, dusk, night); `sky` the sky and
     time (a game with an earlier plugin warns of the unknown command and runs the same).
     AT4: `air` the fog volumes and plumes; `tuned` the plan's engine settings (the
@@ -84,7 +85,9 @@ def _atmos(lights: bool = True, fog: bool = False, rain: bool = False, wet: bool
     cards past the live set (off: the play features' light pools; every pass sets it).
     dlss_lamps_flicker: `dlss` NVIDIA's DLSS Super Resolution (its mode from the pass's
     screen percentage, `DLSS_PERCENT`), `fg` DLSS Frame Generation (every pass sets both; a
-    game without the plugin warns of the unknown variables and runs the same)."""
+    game without the plugin warns of the unknown variables and runs the same).
+    fix_hlod_streaming: `hlod` the instanced HLOD components' flip in place (off: the engine's
+    render state recreated at each flip, as before the fix; every pass sets it)."""
     weather = weather or "rain"
     out = (f"CityGenAtmos.Tiers {live} {range_m:g} {shadowed}",
            f"CityGenAtmos.Lights {int(lights)}", f"CityGenAtmos.Fog {int(fog)}",
@@ -96,7 +99,8 @@ def _atmos(lights: bool = True, fog: bool = False, rain: bool = False, wet: bool
            f"CityGenAtmos.Far {int(far)}")
     if cvars is not None:
         out += tuple(f"{k} {v}" for k, v in zip(TUNABLE, cvars))
-    out += (f"r.NGX.DLSS.Enable {int(dlss)}", f"r.Streamline.DLSSG.Enable {int(fg)}")
+    out += (f"r.NGX.DLSS.Enable {int(dlss)}", f"r.Streamline.DLSSG.Enable {int(fg)}",
+            f"CityGen.HLODFastVisibility {int(hlod)}")
     return out + (f"CityGenAtmos.Hour {hour}",)
 
 
@@ -167,6 +171,23 @@ ATMOS_PASSES = (
     # features' light pools past the live range instead, as before AT7: what the cards cost)
     ("night_plan_nofar", True, 100.0, _atmos(fog=True, air=True, rain=True, wet=True,
                                              far=False)),
+    # fix_hlod_streaming: the night with the instanced HLOD components made anew at each
+    # visibility flip, the engine's way (each of them still on its own, not attached)
+    ("night_plan_all_hlodslow", True, 100.0, _atmos(fog=True, air=True, rain=True, wet=True,
+                                                    hlod=False)),
+    # and exploring passes: the night as delivered with World Partition's cells added to the
+    # world and their packages' game thread loading at most 2 ms a frame each (the engine's 5:
+    # `s.LevelStreamingActorsUpdateTimeLimit`, `s.AsyncLoadingTimeLimit`), and with the
+    # engine's adaptive AddToWorld time slice instead (1 to 6 ms by the work in flight); they
+    # leave them set, so they run after the passes they are compared with
+    ("night_plan_all_stream2", True, 100.0,
+     _atmos(**_ALL)[:-1] + ("s.AdaptiveAddToWorld.Enabled 0",
+                            "s.LevelStreamingActorsUpdateTimeLimit 2",
+                            "s.AsyncLoadingTimeLimit 2") + _atmos(**_ALL)[-1:]),
+    ("night_plan_all_adaptive", True, 100.0,
+     _atmos(**_ALL)[:-1] + ("s.AdaptiveAddToWorld.Enabled 1",
+                            "s.LevelStreamingActorsUpdateTimeLimit 2",
+                            "s.AsyncLoadingTimeLimit 2") + _atmos(**_ALL)[-1:]),
     # AT4's exploring passes: what each engine setting gives back (TUNABLE, by hand)
     ("x_base", True, 100.0, _x()),
     ("x_grid12", True, 100.0, _x(grid=12, z=96)),

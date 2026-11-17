@@ -457,7 +457,8 @@ def test_startup_map(tmp_path):
 def test_nanite_pool(tmp_path, monkeypatch):
     """AG16: the Nanite streaming pool sized from the city: what its distinct Nanite meshes'
     root pages leave of Nanite's buffer, in 64 MB steps, between the minimum and maximum, set
-    in the project's [SystemSettings] (the rest of the file as it was)."""
+    in the project's [SystemSettings] with `PROJECT_SETTINGS` (texture streaming off;
+    fix_hlod_streaming: the adaptive AddToWorld time slice), the rest of the file as it was."""
     up = tmp_path / "P" / "P.uproject"
     (tmp_path / "P" / "Config").mkdir(parents=True)
     ini = tmp_path / "P" / "Config" / "DefaultEngine.ini"
@@ -472,7 +473,7 @@ def test_nanite_pool(tmp_path, monkeypatch):
     assert U.set_nanite_pool(up, man)
     assert ini.read_text() == ("[/Script/Engine.RendererSettings]\nr.Lumen=1\n\n"
                                "[SystemSettings]\nr.Nanite.Streaming.StreamingPoolSize=1024\n"
-                               "r.TextureStreaming=0\n")
+                               "r.TextureStreaming=0\ns.AdaptiveAddToWorld.Enabled=1\n")
     assert not U.set_nanite_pool(up, man)
     # Delta Megacity at AG16 (44,667 meshes, its parts and signs shared across tiles) gets
     # the engine's 512 MB; before (53,911), the minimum

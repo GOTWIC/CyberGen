@@ -1553,7 +1553,15 @@ def set_nanite_pool(uproject: str | Path, man: dict) -> bool:
 # going it made 36 to 48 ms frames at 256 m cells and 1 to 2.8 s ones at 128 m (AG16's hitch
 # dumps on Delta Megacity); a city's textures (AG6's library sets and its sign pages, a few
 # hundred) fit whole: Delta's VRAM stayed at 7 GB.
-PROJECT_SETTINGS = [("r.TextureStreaming", "0")]
+# fix_hlod_streaming: World Partition's cells added to the world (their actors registered, a
+# fixed 5 ms a frame by default, `s.LevelStreamingActorsUpdateTimeLimit`) by the engine's
+# adaptive time slice instead, 1 to 6 ms a frame by how much is in flight
+# (`s.AdaptiveAddToWorld.Enabled`): walking and driving, a step across a row of cells no
+# longer adds 5 ms of registration to each frame after it, and a teleport still gets its
+# cells in about as fast (Delta's night p95 20.6 to 18.8 ms, the walk 22.9 to 20.5; a fixed
+# 2 ms made the drive hitch and the teleports twice as slow).
+STREAMING_SETTINGS = [("s.AdaptiveAddToWorld.Enabled", "1")]
+PROJECT_SETTINGS = [("r.TextureStreaming", "0")] + STREAMING_SETTINGS
 # AT1 (Swagnik: "make sure that the game runs on the monitor's resolution"): a game is
 # DPI-aware, so on a screen scaled 125% a 2560 x 1440 monitor gives the game 2560 x 1440, not
 # a 2048 x 1152 window Windows stretches (the neon strips shimmered); the benchmark's own
@@ -1586,10 +1594,12 @@ def set_project_ini(uproject: str | Path) -> bool:
 
 
 def set_engine_ini(uproject: str | Path, section: str, want: list[tuple[str, str]],
-                   file: str = "DefaultEngine.ini", entries: list[str] = ()) -> bool:
+                   file: str = "DefaultEngine.ini", entries: list[str] = (),
+                   drop: list[str] = ()) -> bool:
     """Set keys of one section of the project's Config/DefaultEngine.ini (or `file`) and
-    have each line of `entries` (array entries, `+Key=Value`) in it, the rest of the file as
-    it was (its encoding and line endings too). True when it changed."""
+    have each line of `entries` (array entries, `+Key=Value`) in it and the keys `drop` out
+    of it, the rest of the file as it was (its encoding and line endings too). True when it
+    changed."""
     ini = Path(uproject).parent / "Config" / file
     raw = ini.read_bytes() if ini.is_file() else b""
     bom = b"\xef\xbb\xbf" if raw.startswith(b"\xef\xbb\xbf") else b""
@@ -1597,6 +1607,13 @@ def set_engine_ini(uproject: str | Path, section: str, want: list[tuple[str, str
     nl = "\r\n" if "\r\n" in text else "\n"
     lines = text.splitlines()
     start = next((i for i, ln in enumerate(lines) if ln.strip() == section), None)
+    if start is not None and drop:
+        end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("[")),
+                   len(lines))
+        lines = lines[:start + 1] + [ln for ln in lines[start + 1:end]
+                                     if ln.split("=", 1)[0].strip() not in drop] + lines[end:]
+    if start is None and not want and not entries:
+        return False
     if start is None:
         lines += ([""] if lines and lines[-1].strip() else []) + [section] + \
             [f"{k}={v}" for k, v in want] + list(entries)
@@ -1918,6 +1935,9 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
     # (with --no-play a plugin built before stays, so the importer can delete its actor)
     plugin = (unreal_play.build_plugin(root, up, build / OUT_DIR / "plugin_build_log.txt")
               if play_features else {"ok": False, "built": False, "error": "--no-play"})
+    # (fix_hlod_streaming: the instanced HLODs' component the plugin's when it is built;
+    # `build_hlods` builds them again when it changes)
+    hlod_changed = set_hlod_class(up, bool(plugin["ok"]))
     from . import unreal_people
     people_res = None
     if people and life is not False:
@@ -1970,6 +1990,8 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
     res["manifest_s"] = manifest_s
     res["plugins_enabled"] = added
     res["play_plugin"] = plugin
+    res["hlod_class"] = hlod_class(up) or "engine"
+    res["hlod_class_changed"] = hlod_changed
     if dlss_res is not None:
         res["dlss"] = dlss_res
     if people_res is not None:
@@ -2024,12 +2046,60 @@ def check_city(build_dir: str | Path, uproject: str | Path, engine: str | None =
                       timeout=timeout, gui=True, extra=["-RenderOffscreen"])
 
 
+# fix_hlod_streaming: the instanced HLODs' component class. World Partition hides an HLOD
+# actor while the main cell it stands for is shown, and the engine's component answers each
+# hide and show by recreating its render state (its instances sent again, its materials
+# gathered on the game thread): a step across a 128 m cell flipped 2,000 and more HLOD
+# components in one frame, Delta's slow frames while walking (LG8's profile). The play
+# plugin's `UCityGenHLODComponent` keeps its scene proxy and flips only whether it is drawn.
+# The HLOD builder takes the class from the project's DefaultEditor.ini; HLODs built with
+# another class (or before this version) are built again whole (`build_hlods`).
+HLOD_SECTION = "[/Script/Engine.HLODBuilder]"
+HLOD_ISM_KEY = "HLODInstancedStaticMeshComponentClass"
+HLOD_ISM_CLASS = "/Script/CityGenPlay.CityGenHLODComponent"
+HLOD_VERSION = "1"
+
+
+def set_hlod_class(uproject: str | Path, play: bool) -> bool:
+    """The instanced HLODs' component class in the project's DefaultEditor.ini: the play
+    plugin's (`HLOD_ISM_CLASS`) when it is built (`play`), else the engine's own (the key
+    out). True when the file changed."""
+    if play:
+        return set_engine_ini(uproject, HLOD_SECTION, [(HLOD_ISM_KEY, HLOD_ISM_CLASS)],
+                              file="DefaultEditor.ini")
+    return set_engine_ini(uproject, HLOD_SECTION, [], file="DefaultEditor.ini",
+                          drop=[HLOD_ISM_KEY])
+
+
+def hlod_class(uproject: str | Path) -> str:
+    """The instanced HLOD component class the project's HLOD builder uses ("" the
+    engine's)."""
+    ini = Path(uproject).parent / "Config" / "DefaultEditor.ini"
+    if not ini.is_file():
+        return ""
+    sect = None
+    for ln in ini.read_text(encoding="utf-8-sig").splitlines():
+        if ln.startswith("["):
+            sect = ln.strip()
+        elif sect == HLOD_SECTION and ln.split("=", 1)[0].strip() == HLOD_ISM_KEY:
+            return ln.split("=", 1)[1].strip()
+    return ""
+
+
+def hlod_stamp(uproject: str | Path, level: str) -> Path:
+    """Where the project records what the HLODs of `level` were last built with."""
+    return (Path(uproject).parent / "Saved" / "CityGenHLOD"
+            / (level.strip("/").replace("/", "_") + ".txt"))
+
+
 def build_hlods(build_dir: str | Path, uproject: str | Path, engine: str | None = None,
                 timeout: float = 7200.0) -> dict:
     """`citygen unreal --hlod`: World Partition's HLOD builder on the imported level (a
     commandlet that renders, so not -nullrhi): the instanced and merged HLOD actors of the
     level's default HLOD layers, set up and built in the HLOD partitions `streaming` sized;
-    a second run rebuilds only those whose actors changed."""
+    a second run rebuilds only those whose actors changed. HLODs last built with another
+    component class or `HLOD_VERSION` (`hlod_stamp`) are all built again (-RebuildHLODs:
+    the builder's hash leaves the class out)."""
     build = Path(build_dir).resolve()
     up = Path(uproject).resolve()
     root = find_engine(engine)
@@ -2042,6 +2112,12 @@ def build_hlods(build_dir: str | Path, uproject: str | Path, engine: str | None 
     cmd = [str(editor_binary(root)), str(up), "-run=WorldPartitionBuilderCommandlet", level,
            "-Builder=WorldPartitionHLODsBuilder", "-AllowCommandletRendering", "-unattended",
            "-nosplash", "-stdout", "-FullStdOutLogOutput"]
+    stamp = hlod_stamp(up, level)
+    want = f"{hlod_class(up) or 'engine'} {HLOD_VERSION}"
+    force = not stamp.is_file() or stamp.read_text(encoding="utf-8").strip() != want
+    if force:
+        # (set up, then every HLOD actor built whatever its hash says)
+        cmd += ["-SetupHLODs", "-RebuildHLODs"]
     t = time.time()
     p = PG.active()
     stage = p.begin(STAGE_LABELS["hlod"])
@@ -2066,7 +2142,11 @@ def build_hlods(build_dir: str | Path, uproject: str | Path, engine: str | None 
            "hlod_actors": int(have[-1]) if have else None,
            # the builder looks at every HLOD actor and rebuilds those whose input changed
            "rebuilt": text.count("final decision: ApproveRebuild"),
+           "component_class": want.rsplit(" ", 1)[0], "forced": force,
            "wall_s": round(time.time() - t, 1), "log": str(log)}
+    if code == 0:
+        stamp.parent.mkdir(parents=True, exist_ok=True)
+        stamp.write_text(want + "\n", encoding="utf-8", newline="\n")
     (out / "hlod_result.json").write_text(json.dumps(res, indent=1) + "\n",
                                           encoding="utf-8", newline="\n")
     return res
@@ -2075,8 +2155,10 @@ def build_hlods(build_dir: str | Path, uproject: str | Path, engine: str | None 
 def hlod_summary(res: dict) -> str:
     if not res.get("ok"):
         return f"FAIL: HLOD build ({res.get('wall_s')} s); log {res.get('log')}"
+    how = ("all built again (a new component class)" if res.get("forced")
+           else f"{res['rebuilt']} built (the rest unchanged)")
     return (f"PASS: HLODs of {res['level']}: {res['hlod_actors']} HLOD actors, "
-            f"{res['rebuilt']} built (the rest unchanged); {res['wall_s']} s")
+            f"{how}; {res['wall_s']} s")
 
 
 def play_features_summary(res: dict) -> str:
