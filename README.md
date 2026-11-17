@@ -12,7 +12,7 @@ your machine.
 | 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M22 done |
 | 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG8, AG10, AG12 to AG17 done, the rest to come |
 | 3 | [atmosgen](#stage-3-atmosgen) | Lighting, sky, weather and atmospherics | AT0 to AT7 done |
-| 4 | [lifegen](#stage-4-lifegen) | Traffic, crowds, trains and aircraft, generated | Planned ([draft plan](docs/lifegen_scope.md)) |
+| 4 | [lifegen](#stage-4-lifegen) | Traffic, crowds, trains and aircraft, generated | LG0 to LG8 done |
 | 5 | [storygen](#stage-5-storygen) | Story, characters and cutscenes | Planned |
 
 ## Showcase
@@ -644,7 +644,7 @@ The city's people and traffic: crowds of varied, realistic people on every sidew
 stair and deck, going in and out of shops, bars and homes by their hours; cars, buses,
 taxis and bikes on the roads, stopping at the signals; trains, metro, monorail, maglev and
 sky tube pods running their lines; flying cars between the towers, drones, aircraft over
-the spaceport and boats on the water. It is planned as a generator like the others: from
+the spaceport and boats on the water. It is a generator like the others: from
 stage 1's walkway, lane and transit graphs, its crowd and traffic densities by street and
 hour, its places and its districts' wealth and danger, it works out who is where, how many
 and doing what, and hands that to Unreal's crowd and traffic simulation through the same
@@ -718,6 +718,17 @@ hover cars; the rest are simple stand-ins until their models are designed.
 |---|---|
 | <img src="docs/progress/LG7/unreal/night_aw_landing.jpg" width="420"> | <img src="docs/progress/LG7/unreal/pday_aw_boat.jpg" width="420"> |
 
+LG8 (weather, reactions and release) is in, which completes stage 4: the people and the
+traffic follow atmosgen's hour and weather. As the evening goes on the offices empty and the
+bars and clubs fill; when it rains fewer people are out, they walk faster, many wear raincoats
+or put up umbrellas (some with lit shafts), some stop under awnings, decks and raised roads to
+wait it out, and the cars slow down and keep further apart. People standing near you turn to
+look at you; scare the crowd (the Tab menu's Scare the crowd, or `CityGenLife.Panic`, a hook
+for the story stage) and they run, then come back to look. Every sample city is planned with
+every check passing.
+
+LG8_IMAGES
+
 | People on an Old Town street | The walk by night |
 |---|---|
 | <img src="docs/progress/LG1/unreal/pday_people_close_0.jpg" width="420"> | <img src="docs/progress/LG1/unreal/night_people_close_0.jpg" width="420"> |
@@ -751,7 +762,7 @@ Plan: [`docs/lifegen_scope.md`](docs/lifegen_scope.md); what each milestone did:
 | LG5 | Traffic | The hand-designed cars on every lane of the city, following each other, stopping at red lights and taking turns through junctions, stopping for people and for you in the road, as many as each street has at each hour; their lights by night | Done |
 | LG6 | Transit | Trains, metro, monorail, maglev and sky tube pods running their lines to timetables over the whole city, stopping at stations with their doors open, people boarding and leaving | Done |
 | LG7 | Air and water | Flying cars in layers over the avenues and between the towers, landing on and taking off from the rooftop pads; delivery drones, police and news fliers, aircraft high overhead and shuttles at a spaceport's pads; boats on every river and canal, water taxis between piers, ferries across the rivers and ships at the port | Done |
-| LG8 | Weather, reactions and release | People and traffic that follow the hour and the weather (umbrellas and shelter in rain, nightlife), step aside for the player and react to what happens near them; a performance pass for crowds and traffic; every sample city alive, checked in Unreal | Planned |
+| LG8 | Weather, reactions and release | People and traffic that follow the hour and the weather (umbrellas and shelter in rain, nightlife), step aside for the player and react to what happens near them; a performance pass for crowds and traffic; every sample city alive, checked in Unreal | Done |
 
 ---
 

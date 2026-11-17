@@ -12,7 +12,9 @@ state); the plan gives it what it reads them by:
   the rain, and fold their umbrellas;
 - **nightlife** (`nightlife`): people round the open bars, clubs and arcades by night (LG4's
   places, their busy per band), on their door walkways, on top of M11's density;
-- **checks** (`checks`): `weather`, `shelter`, `nightlife`.
+- **checks** (`checks`): `weather`, `shelter`, `nightlife`;
+- **the preview** (`preview`, `preview_weather.png`): the stretches out of the rain and the
+  nightlife's walkways over the districts; beside it the weather's table.
 
 Without an atmos plan the walkways have no stretches under a cover (said in the record); the
 runtime still takes the hour and weather from atmosgen's controller where the level has one.
@@ -199,6 +201,41 @@ def walk_cover(model: dict, masks: Masks | None, ground=None) -> tuple[dict, dic
     return out, stats
 
 
+def road_sides(model: dict, cover: dict) -> dict[str, int]:
+    """Which side of a covered walkway its road is on, looking along its line (+1 its right,
+    -1 its left): a sidewalk's segment's centerline from the walkway's middle. People
+    sheltering stand on the other side (under the awnings, against the buildings) facing the
+    road; walkways with no segment are left out (they keep to the side they walk on)."""
+    segs = {s["id"]: s for s in model.get("road_segments", [])}
+    out = {}
+    for w in model.get("walkways", []):
+        if w["id"] not in cover:
+            continue
+        s = segs.get((w.get("attrs") or {}).get("segment"))
+        line = w.get("line") or []
+        cl = (s or {}).get("centerline") or []
+        if not s or len(line) < 2 or len(cl) < 2:
+            continue
+        pts, _ = _samples(line, max(1.0, _cum(line)[-1] / 2.0))
+        _, mx, my, _ = pts[len(pts) // 2]
+        k = min(range(len(line) - 1), key=lambda i: (line[i][0] + line[i + 1][0] - 2 * mx) ** 2 +
+                (line[i][1] + line[i + 1][1] - 2 * my) ** 2)
+        tx, ty = line[k + 1][0] - line[k][0], line[k + 1][1] - line[k][1]
+        best, bq = None, None
+        for a, b in zip(cl, cl[1:]):
+            ax_, ay_ = b[0] - a[0], b[1] - a[1]
+            L2 = ax_ * ax_ + ay_ * ay_
+            t = 0.0 if L2 <= 0 else max(0.0, min(1.0, ((mx - a[0]) * ax_ + (my - a[1]) * ay_) / L2))
+            qx, qy = a[0] + ax_ * t, a[1] + ay_ * t
+            d = (qx - mx) ** 2 + (qy - my) ** 2
+            if best is None or d < best:
+                best, bq = d, (qx, qy)
+        cz = tx * (bq[1] - my) - ty * (bq[0] - mx)
+        if abs(cz) > 1e-9:
+            out[w["id"]] = -1 if cz > 0 else 1
+    return out
+
+
 # ---------------------------------------------------------------------------
 # nightlife
 # ---------------------------------------------------------------------------
@@ -267,6 +304,87 @@ def weather_record(filled: dict, cover_stats: dict, night: dict, adir: Path | No
                           **{k: (list(v) if isinstance(v, (list, tuple)) else float(v))
                              for k, v in P.REACTION.items()}},
             "traffic": dict(P.TRAFFIC_STUCK)}
+
+
+def preview(model: dict, rows: list[dict], rec: dict, path) -> str | None:
+    """`preview_weather.png`: every walkway's stretches out of the rain (cyan: under a cover,
+    where people shelter; grey: enclosed or underground) and the walkways with nightlife late
+    (magenta, by its people) over the districts; beside it the weather's table by state."""
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from matplotlib.collections import LineCollection
+    except ImportError:
+        return None
+    path = Path(path)
+    walks = {w["id"]: w for w in model.get("walkways", [])}
+    fig, (ax, bx) = plt.subplots(1, 2, figsize=(17, 8), dpi=110,
+                                 gridspec_kw={"width_ratios": [1.3, 1]})
+    fig.patch.set_facecolor("#0c111a")
+    for a in (ax, bx):
+        a.set_facecolor("#0c111a")
+        for sp in a.spines.values():
+            sp.set_color("#3a4253")
+        a.tick_params(colors="#9aa6bd")
+    for d in model.get("districts", []):
+        ring = (d.get("polygon") or {}).get("exterior") or []
+        if ring:
+            xs, ys = zip(*(ring + ring[:1]))
+            ax.plot(xs, ys, color="#2c3443", lw=0.8)
+    base, cov, enc, night, nv = [], [], [], [], []
+    for r in rows:
+        w = walks.get(r["id"])
+        if not w or len(w["line"]) < 2:
+            continue
+        line = [(p[0], p[1]) for p in w["line"]]
+        if (w.get("kind") or "") in ("sidewalk", "pedestrian_street", "promenade"):
+            base.append(line)
+        if r.get("cover"):
+            pts, L = _samples(w["line"], 1.0)
+            for a, b in r["cover"]:
+                seg = [(x, y) for s, x, y, _ in pts if a - 0.5 <= s <= b + 0.5]
+                if len(seg) >= 2:
+                    (enc if (w.get("kind") in ENCLOSED or min(p[2] for p in
+                                                             w["line"]) < -1.0)
+                     else cov).append(seg)
+        if r.get("night") and r["night"][4] > 0:
+            night.append(line)
+            nv.append(r["night"][4])
+    ax.add_collection(LineCollection(base, colors="#273041", linewidths=0.35))
+    if night:
+        lc = LineCollection(night, array=nv, cmap="RdPu", linewidths=0.7, alpha=0.75)
+        lc.set_clim(0.0, max(nv))
+        ax.add_collection(lc)
+    ax.add_collection(LineCollection(enc, colors="#9aa3b4", linewidths=1.2))
+    ax.add_collection(LineCollection(cov, colors="#28e6ff", linewidths=1.8))
+    ax.autoscale()
+    ax.set_aspect("equal")
+    sh = rec["shelter"]
+    ax.set_title(f"{model.get('name', '')}: out of the rain {sh['covered_m'] / 1000:.1f} km "
+                 f"(cyan under a cover, grey enclosed or underground); nightlife late "
+                 f"{rec['nightlife']['people'][4]:.0f} people (magenta)", color="#dfe6f3",
+                 fontsize=10)
+    names = list(rec["states"])
+    keys = [k for k in rec["keys"] if k != "headway_s"]
+    import numpy as np
+    x = np.arange(len(keys))
+    wdt = 0.8 / max(1, len(names))
+    cols = {"clear": "#9aa6bd", "drizzle": "#5ad1ff", "rain": "#2f7bff", "fog": "#c7c7c7",
+            "smog": "#c98a3a"}
+    for i, n in enumerate(names):
+        bx.bar(x + i * wdt, [rec["states"][n][k] for k in keys], wdt, label=n,
+               color=cols.get(n, "#888888"))
+    bx.set_xticks(x + 0.4 - wdt / 2)
+    bx.set_xticklabels(keys, color="#9aa6bd", rotation=20)
+    bx.legend(facecolor="#0c111a", labelcolor="#dfe6f3", edgecolor="#3a4253")
+    bx.set_title("life by atmosgen's weather state (shares and multipliers)", color="#dfe6f3",
+                 fontsize=10)
+    fig.tight_layout()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, facecolor=fig.get_facecolor())
+    plt.close(fig)
+    return str(path)
 
 
 def checks(model: dict, rows: list[dict], places: list[dict], rec: dict) -> dict:

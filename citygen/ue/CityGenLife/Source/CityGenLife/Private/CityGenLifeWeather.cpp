@@ -59,6 +59,7 @@ void ACityGenLife::BuildWeather()
 	Frame.CoverStarts = CoverStartsG.Num() ? &CoverStartsG : nullptr;
 	Frame.Cover = &CoverCm;
 	Frame.Covered = &WalkCovered;
+	Frame.RoadSide = WalkRoadSide.Num() == N ? &WalkRoadSide : nullptr;
 	Frame.ShelterS = ShelterS;
 	Frame.bLook = bLook;
 	Frame.LookCm = 100.f * LookM;
@@ -341,7 +342,7 @@ void ACityGenLife::MakeUmbrellas()
 				Sh[Q] = 0.2f * UmbrellaLit[3 * L + Q];
 				Sh[3 + Q] = 6.f * UmbrellaLit[3 * L + Q];
 				// (a lit umbrella's canopy glows a little in its shaft's color)
-				Can[3 + Q] = 0.25f * UmbrellaLit[3 * L + Q];
+				Can[3 + Q] = 0.06f * UmbrellaLit[3 * L + Q];
 			}
 		}
 		UmbCanopy->SetCustomData(P, MakeArrayView(Can, 6), false);

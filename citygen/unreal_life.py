@@ -576,7 +576,7 @@ def pack_crowd(plan: dict, pdir: Path, graphs: dict) -> dict:
                         round(float(p["start_s"]) + float(p["walk_s"]), 3)]
     kinds, dist, ppl, sig = [], [], [], []
     # (LG8: each walkway's stretches out of the rain, [from, to] m, and its nightlife per band)
-    cov_starts, cov, night = [0], [], []
+    cov_starts, cov, night, rside = [0], [], [], []
     any_night = False
     for e in walk:
         r = rows.get(gids[e[0]]) or {}
@@ -587,6 +587,7 @@ def pack_crowd(plan: dict, pdir: Path, graphs: dict) -> dict:
         for a, b in r.get("cover") or []:
             cov += [round(float(a), 2), round(float(b), 2)]
         cov_starts.append(len(cov) // 2)
+        rside.append(int(r.get("road_side") or 0))
         nv = r.get("night")
         any_night |= bool(nv)
         night += [round(float(v), 3) for v in (nv or [0.0] * 5)]
@@ -658,6 +659,7 @@ def pack_crowd(plan: dict, pdir: Path, graphs: dict) -> dict:
     if plan.get("weather"):
         out.update(pack_weather(plan["weather"], of))
         out.update({"walk_cover_starts": cov_starts, "walk_cover": cov,
+                    "walk_road_side": rside,
                     "walk_night": night if any_night else []})
     out.update({"walk_kinds": kinds, "walk_district": dist, "walk_people": ppl,
                 "walk_signal": sig, "signal_windows": windows,

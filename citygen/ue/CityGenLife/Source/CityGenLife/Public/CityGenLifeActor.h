@@ -632,6 +632,9 @@ public:
 	UPROPERTY(EditAnywhere, Category = "CityGen|Weather") TArray<int32> WalkCoverStarts;
 	UPROPERTY(EditAnywhere, Category = "CityGen|Weather") TArray<float> WalkCover;
 	UPROPERTY(EditAnywhere, Category = "CityGen|Weather") TArray<float> WalkNight;
+	/** Per walkway lane the side its road is on along its line (1 right, -1 left, 0 none):
+	 *  people shelter on the other, against the buildings, facing the road. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather") TArray<int32> WalkRoadSide;
 	/** Umbrellas: canopy colors and lit shafts' colors (linear RGB), the settings (lit share,
 	 *  canopy width and height, height over the feet in the person's heights, right, forward
 	 *  (m), tilt (deg), shaft length (m)), the meshes and their material (M_CgTransit's six custom

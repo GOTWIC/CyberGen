@@ -1652,9 +1652,12 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     adir = WX.atmos_dir(build, atmos)
     cover, cstats = WX.walk_cover(model, WX.Masks(adir) if adir else None, AW.Ground(model))
     night = WX.nightlife(model, places)
+    sides = WX.road_sides(model, cover)
     for r in rows:
         if r["id"] in cover:
             r["cover"] = cover[r["id"]]
+        if r["id"] in sides:
+            r["road_side"] = sides[r["id"]]
         if r["id"] in night:
             r["night"] = night[r["id"]]
     weather = WX.weather_record(filled, cstats, night, adir)
@@ -1896,6 +1899,10 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
                              out / "preview_airwater.png")
             if img:
                 wrote.append(img)
+        # (LG8: the stretches out of the rain, nightlife, the weather's table)
+        img = WX.preview(model, rows, weather, out / "preview_weather.png")
+        if img:
+            wrote.append(img)
     rep["wrote"] = wrote
     rep["seconds"] = round(time.time() - t0, 1)
     return rep

@@ -1443,7 +1443,7 @@ def weather_props(d, missing):
            "weather_plan": str(d.get("weather_plan") or "clear"),
            "rain_group": int(d.get("rain_group", -1)),
            "walk_cover_starts": it("walk_cover_starts"), "walk_cover": fl("walk_cover"),
-           "walk_night": fl("walk_night"),
+           "walk_night": fl("walk_night"), "walk_road_side": it("walk_road_side"),
            "umbrella_colors": fl("umbrella_colors"), "umbrella_lit": fl("umbrella_lit"),
            "umbrella": fl("umbrella"),
            "umbrella_canopy": load(um.get("canopy")) if on else None,

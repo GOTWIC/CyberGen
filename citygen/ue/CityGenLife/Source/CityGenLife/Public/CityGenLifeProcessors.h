@@ -146,6 +146,8 @@ struct FCgLifeFrame
 	 *  Cover (pairs: from, to, cm along it); out: per instance 1 while it is under one. */
 	const TArray<int32>* CoverStarts = nullptr;
 	const TArray<float>* Cover = nullptr;
+	/** Per walkway lane its road's side along it (1 right, -1 left, 0 none). */
+	const TArray<int32>* RoadSide = nullptr;
 	TArray<uint8>* Covered = nullptr;
 	/** The weather now (atmosgen's state and rain): the pace's multiplier, a passer-by's chance
 	 *  to stop under a cover it passes, and for how long (s). */

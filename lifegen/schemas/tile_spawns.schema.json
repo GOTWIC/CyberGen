@@ -845,6 +845,19 @@
      "description": "LG4: police on foot on it per band.",
      "title": "Police"
     },
+    "road_side": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "LG8: a covered sidewalk's road side looking along its line (1 right, -1 left): people shelter on the other.",
+     "title": "Road Side"
+    },
     "signal": {
      "anyOf": [
       {

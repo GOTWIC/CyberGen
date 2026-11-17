@@ -793,7 +793,10 @@ namespace CgLife
 				PathAt(F, W, At, Head);
 				const FVector Right = FVector::CrossProduct(FVector::UpVector, Head * W.Dir).GetSafeNormal();
 				const float HW = 0.5f * (*F.Widths)[W.Lane];
-				const float Sg = W.Lat >= 0.f ? 1.f : -1.f;
+				// (under a cover on a sidewalk: against the buildings, the side away from its
+				// road, facing the road; else at the side it walked on, facing across)
+				const int32 RS = (W.State == CgWalk::Shelter && F.RoadSide && F.RoadSide->IsValidIndex(W.Lane)) ? (*F.RoadSide)[W.Lane] : 0;
+				const float Sg = RS != 0 ? -(float)RS * W.Dir : (W.Lat >= 0.f ? 1.f : -1.f);
 				W.Lat = FMath::FInterpConstantTo(W.Lat, Sg * 0.8f * HW, Dt, 70.f);
 				W.Pos = At + Right * W.Lat + FVector(0.f, 0.f, W.ZOff);
 				if (!LookAtPlayer(F, W, Dt))

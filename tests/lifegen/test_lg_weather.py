@@ -214,3 +214,16 @@ def test_terminal_nearer_the_end_than_the_turn_is_called():
     called = {e[2] for e in cyc["events"] if e[2] >= 0}
     assert called == {0, 1}
     assert cyc["turn"][0] > 10.35
+
+
+def test_road_sides_put_shelter_against_the_buildings():
+    # (a sidewalk running east with its road to the south: the road on its right; running west,
+    # on its left)
+    model = {"road_segments": [{"id": "rs.a", "centerline": [[0.0, 0.0], [100.0, 0.0]]}],
+             "walkways": [{"id": "wk.e", "line": [[0.0, 8.0, 0.0], [100.0, 8.0, 0.0]],
+                           "attrs": {"segment": "rs.a"}},
+                          {"id": "wk.w", "line": [[100.0, 8.0, 0.0], [0.0, 8.0, 0.0]],
+                           "attrs": {"segment": "rs.a"}},
+                          {"id": "wk.n", "line": [[0.0, 20.0, 0.0], [10.0, 20.0, 0.0]]}]}
+    sides = WX.road_sides(model, {"wk.e": [[0, 5]], "wk.w": [[0, 5]], "wk.n": [[0, 5]]})
+    assert sides == {"wk.e": 1, "wk.w": -1}

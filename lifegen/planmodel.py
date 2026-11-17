@@ -154,6 +154,9 @@ class Walk(_Model):
     cover: list[Annotated[list[float], Field(min_length=2, max_length=2)]] | None = Field(
         None, description="LG8: its stretches out of the rain ([from, to] m along it): under "
                           "a cover of atmosgen's rain shadow, underground or enclosed.")
+    road_side: int | None = Field(None, description="LG8: a covered sidewalk's road side "
+                                                    "looking along its line (1 right, -1 "
+                                                    "left): people shelter on the other.")
     night: PerBand | None = Field(None, description="LG8: nightlife's people on it per band "
                                                     "(round an open bar, club or arcade's "
                                                     "door), on top of `people`.")

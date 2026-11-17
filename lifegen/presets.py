@@ -617,8 +617,8 @@ WEATHER_RAIN = {"clear": 0.0, "drizzle": 0.3, "rain": 0.8, "fog": 0.0, "smog": 0
 UMBRELLA = {"colors": ("#0e0f12", "#15171c", "#1b2433", "#2a2c30", "#4a1020", "#10302e",
                        "#d8dde6", "#c21d8c", "#17b2c9", "#e0681c"),
             "lit_share": 0.3, "lit": ("#ff2fb4", "#28e6ff", "#b8ff3a", "#ffd23a"),
-            "canopy_m": 1.0, "canopy_h_m": 0.3, "height": 1.2, "side_m": 0.16,
-            "fwd_m": 0.08, "tilt_deg": 8.0, "shaft_m": 0.95}
+            "canopy_m": 1.05, "canopy_h_m": 0.24, "height": 1.13, "side_m": 0.3,
+            "fwd_m": 0.14, "tilt_deg": 6.0, "shaft_m": 0.82}
 # shelter (scope 6.8: under awnings and decks in rain, atmosgen's rain shadow): a walkway's
 # stretches under a cover (AT5's masks: something at least `head_m` over it, on the ground
 # level, of the kinds people walk outdoors), sampled every `step_m`, gaps under `join_m`
@@ -640,7 +640,7 @@ NIGHTLIFE = {"kinds": {"bar": 3.0, "club": 7.0, "arcade": 2.0}}
 # come back and stand `ring_m` off it looking at it for `stay_s`; cars stopped for the player
 # on foot wait (no sound in lifegen: no horn, scope 11)
 REACTION = {"look_m": 6.0, "flee_m": 35.0, "flee_s": 14.0, "flee_pace": 2.9,
-            "gather_m": 60.0, "gather_s": 90.0, "gather_share": 0.35, "ring_m": [9.0, 22.0],
+            "gather_m": 80.0, "gather_s": 90.0, "gather_share": 0.5, "ring_m": [8.0, 20.0],
             "stay_s": [15.0, 60.0]}
 # the traffic: a car stuck this long (s) far from the view (past `stuck_far_m`) leaves, so no
 # jam lasts where nobody looks (its lane refilled as any)
