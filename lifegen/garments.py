@@ -37,6 +37,8 @@ GROUP_LOOKS = {"street": 24, "corporate": 22, "techwear": 20, "nightlife": 16, "
                "industrial": 14, "punk": 10, "gang": 10, "police": 6, "rain": 8}
 GROUPS = tuple(GROUP_LOOKS)
 BONES = ("head", "spine_04", "spine_02")       # what accessories are held to
+TOP_FIT_M = 0.02            # a top's fitted body ends this over the hips when its hem is lower
+TOP_FLARE = 0.04            # ... and hangs from there this much wider at its hem
 GLOW = ("led", "visor")                        # slots the mid tier draws emissive
 
 # what a garment is: its layer, the body parts its pattern covers, its default eases (m) and
@@ -359,13 +361,24 @@ def draft(rec: dict, m: dict, gid: str) -> dict:
         if kind == "coveralls":
             cuts.append({"kind": "z", "z": round(m["ankle"] + 0.05, 4), "keep": "above"})
         else:
+            # (a coat's fitted body ends at the hips, above the crotch, where its skirt flares
+            # out: cut lower, the body's offset folded between the legs; the clothing fixes)
             hem = {"tee": m["hip"] - 0.05, "longtee": m["hip"] - 0.06, "shirt": m["hip"] - 0.07,
                    "hoodie": m["hip"] - 0.06, "bomber": m["waist"] - 0.07,
-                   "jacket": m["hip"] - 0.08, "trench": m["hip"] - 0.03,
-                   "raincoat": m["hip"] - 0.03}[kind] - 0.04 * ln
-            cuts.append({"kind": "z", "z": round(hem, 4), "keep": "above",
+                   "jacket": m["hip"] - 0.08, "trench": m["hip"] + 0.04,
+                   "raincoat": m["hip"] + 0.04}[kind] - 0.04 * ln
+            # (a top whose hem is below the hips has its fitted body cut at the hips and hangs
+            # straight from there (a flare of `TOP_FLARE`): its body offset round the crotch
+            # folded at the hem; not a tucked shirt, which the trousers close over)
+            low = hem < m["hip"] + TOP_FIT_M and kind not in ("trench", "raincoat") and \
+                not rec.get("tucked")
+            cut_z = m["hip"] + TOP_FIT_M if low else hem
+            cuts.append({"kind": "z", "z": round(cut_z, 4), "keep": "above",
                          "parts": ["torso", "thigh"]})
             d["z"]["hem"] = round(hem, 4)
+            if low:
+                d["flare"] = {"from_z": round(cut_z, 4), "to_z": round(hem, 4),
+                              "scale": TOP_FLARE}
         sleeve = K["sleeve"] - (0.06 * ln if K["sleeve"] < 0.5 else 0.0)
         cuts.append({"kind": "limb", "limb": "arm", "t": round(sleeve, 3)})
         cuts.append({"kind": "neck", "scale": 1.08 if K["layer"] == "outer" else 0.96})
@@ -374,9 +387,12 @@ def draft(rec: dict, m: dict, gid: str) -> dict:
                          "z_max": round(m["neck"] + 0.1, 4)})
             d["open"] = True
         elif K["layer"] == "outer" or kind in ("shirt", "coveralls"):
-            d["trims"].append({"where": "front", "width": 0.012, "textile": "metal"
-                               if kind in ("bomber", "raincoat", "coveralls") else rec["textile"],
-                               "rgb": 0.75})
+            # (a zip of metal, or a placket of the garment's own textile in its own color,
+            # darker: LG2's undyed placket read as a white line; the clothing fixes)
+            zip_ = kind in ("bomber", "raincoat", "coveralls")
+            d["trims"].append({"where": "front", "width": 0.008 if zip_ else 0.012,
+                               "textile": "metal" if zip_ else rec["textile"],
+                               "rgb": 0.75 if zip_ else 0.72, "dyed": not zip_})
         if kind in ("trench", "raincoat"):
             d["flare"] = {"from_z": round(d["z"]["hem"], 4),
                           "to_z": round(m["knee"] - 0.05 - 0.12 * ln, 4),
@@ -418,9 +434,10 @@ def draft(rec: dict, m: dict, gid: str) -> dict:
         d["trims"].append({"where": "band_torso", "z": round(top - 0.02, 4), "width": 0.035,
                            "textile": rec["textile"], "rgb": 0.75, "dyed": True})
         if kind == "skirt":
-            cuts.append({"kind": "z", "z": round(m["hip"] - 0.04, 4), "keep": "above",
+            # (from the hips, above the crotch: the clothing fixes)
+            cuts.append({"kind": "z", "z": round(m["hip"] + TOP_FIT_M, 4), "keep": "above",
                          "parts": ["torso", "thigh"]})
-            d["flare"] = {"from_z": round(m["hip"] - 0.04, 4),
+            d["flare"] = {"from_z": round(m["hip"] + TOP_FIT_M, 4),
                           "to_z": round(m["knee"] + 0.08 - 0.25 * ln, 4),
                           "scale": round(0.12 + 0.3 * fit, 3)}
             d["loose"] = ["skirt"]
