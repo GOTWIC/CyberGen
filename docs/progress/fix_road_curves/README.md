@@ -75,6 +75,11 @@ at most 0.7 cm and is not where the facets come from.
   - Park path benches and their trash cans keep off the carriageway of a road the path
     crosses (`props.park_benches`, `CARRIAGE`): AG14's fit check found one on a highway's
     median in the small test city.
+  - AG3's moved doors (`fronts.Band.rehome`) try the facades facing a way (`OUTER`: front,
+    street, alley, plaza, park, canal) of the six nearest first: a shopfront row's unit on a
+    wall a shanty stack stands against moved onto open ground facing another stack's back
+    6 m off, its walkway walled off (`asset_access` in the small test city). `GEN_VERSION`
+    curves.1.
   - `walkway_building_clash` tests an entrance's link to each of its walkway's pieces within
     `TIE_M` 5 cm of the nearest and passes when any is clear: a later split left a 22 cm
     sidewalk piece whose end lay a millimeter nearer the entrance than the foot on the piece
