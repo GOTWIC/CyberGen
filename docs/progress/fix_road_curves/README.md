@@ -221,10 +221,12 @@ rewritten on the Mac.
   - Cul-de-sac bulbs a cluster took in (Vesper Bay's `rn.e1504n676` in `jn.e1504n676`):
     `road_dead_ends` reads them (`attrs.bulbs`), and now so does
     `test_every_dead_end_says_what_it_is`.
-  - The hilly test city's regeneration of Old Quarter: two highway segments share one
-    centerline there (`rs.w191n825` ring and `.2` spine, M1b), and the held grade lines
-    come back 0.43 m off at one's end; a curb in Old Quarter steps 2 cm
-    (`jn.e991n180`, `junction_levels`).
+  - The hilly test city's regeneration of Old Quarter (`test_hilly_regeneration_holds_every_road`
+    fails): 415 of its 416 held segments come back as they were; on its new layout two
+    highway segments share one centerline (`rs.w191n825`, the ring, and `.2`, the spine,
+    M1b), and the ring's held grade line comes back 0.43 m off at its end beside
+    `jn.w232n783`; a curb in Old Quarter steps 2 cm over its legs (`jn.e991n180`,
+    `junction_levels`). The small test city's regenerations hold every road.
   - `test_small_city_passes` lacked the crossings fix's `walkway_carriageway` (main too),
     added; `test_sample_city_builds_and_passes` bounds a build's time per full-city try
     (480 s; Vesper Bay now builds on its eighth, about 33 minutes with 3 workers).

@@ -4186,10 +4186,10 @@ def round_edges(B: Builder, edges) -> tuple[list, int]:
     out, n = [], 0
     for pts, li in edges:
         ln = B.lines[li]
-        if li < B.n_primary or ln.cls == "footbridge" or ln.role in NO_ROUND or \
-                len(pts) < 3 or _held(B, pts):
+        if li < B.n_primary or ln.cls == "footbridge" or ln.role in NO_ROUND or len(pts) < 3:
             out.append((pts, li))
             continue
+        # (a held edge, matched or not: the old city's course, its length as the old row's)
         old = _held_course(B, pts)
         if old is not None:
             out.append((old, li))         # (as the old city rounded it: held, restored)
