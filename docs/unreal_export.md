@@ -1117,6 +1117,24 @@ exist, so the plugin's module reads them again as it starts (editor builds only)
 out; the result's `forced` and `component_class` say so. Delta's 763 HLOD actors built again
 in 6.5 minutes.
 
+**What it gave, and what made the rest** (Delta, the lean route): in the measured walk and
+drive the HLOD flips are now in place (none recreated; before, 40 walk frames updated 200 or
+more HLOD components), and the fly's p95 fell 0.7 ms against the same run's
+`night_plan_all_hlodslow`. But most of the HLOD flood had been in the warm-up flight and
+right after teleports; the walk's slow frames that remained are World Partition's cells
+being added to the world (their actors' components registered, `AddToWorld`, a fixed 5 ms a
+frame on top of a 13 ms frame), their packages loaded and the garbage collector after a cell
+goes. So every import also turns on the engine's **adaptive AddToWorld time slice**
+(`unreal.STREAMING_SETTINGS` in `PROJECT_SETTINGS`: `s.AdaptiveAddToWorld.Enabled=1` in the
+project's `[SystemSettings]`): 1 to 6 ms a frame by how much is in flight, so walking adds a
+little each frame and a teleport still gets its cells in (Delta's loads after a teleport 7.6
+to 7.9 s, 7.9 before). A fixed 2 ms for both registration and loading
+(`night_plan_all_stream2`) was as good on the walk but made the drive hitch (42 frames over
+50 ms) and the teleports twice as slow (15 to 21 s); the bench's exploring passes keep both
+for comparison. Delta's `night_plan_all` p95: 20.6 to 18.8 and 18.7 ms (two runs), the walk
+22.9 to 20.5 and 21.7, the drive 20.7 to 19.6 and 19.0, the fly 19.9 to 16.4
+(`docs/progress/fix_hlod_streaming/`).
+
 ## assetgen's street contribution (AG7)
 
 `assetgen streets BUILD` writes `BUILD/assets/unreal_contribution.streets.json` beside its
@@ -3231,3 +3249,4 @@ LG8 exports and runs as before, at the plan's hour (it still follows atmosgen's 
 | LG6 | Transit ("From LG6: transit" above): `unreal_life.pack_transit` and the stand-ins' model table `TRANSIT_MODELS` (`PACK_VERSION` 7), `import_city.transit_props` and `M_CgTransit` (`LIFE_VERSION` life8), every line's trains by the world's time on their timetables, doors at the stops, people leaving and boarding at the live stops, a served station's street accesses quiet while transit runs, the platforms' keep-out (`WalkClear`); console `CityGenLife.Transit`, `.TransitShow`, the play menu's Transit row, the status's `transit`; bench pass `night_life_notransit`. A plan without `transit` exports and runs as before. | Delta imported into CityAG16, checked with shots of trains at the stations and running (`docs/progress/LG6/`) |
 | LG7 | Air and water ("From LG7: air and water" above): `unreal_life.pack_airwater` and the stand-ins' per kind model table `AIRWATER_MODELS` with AG18's hover cars (`PACK_VERSION` 8), `import_city.airwater_props` (`LIFE_VERSION` life9), every route of what flies and floats by the world's time (flying cars between pads and on circuits, drones, police and media fliers, aircraft, shuttles, boats, water taxis, ferries, ships), banking and bobbing, flashing lights; console `CityGenLife.Air`, `.Water`, `.AirShow`, the play menu's Air traffic and Boats rows, the status's `airwater`; bench pass `night_life_noairwater`. A plan without `airwater` exports and runs as before. | Delta imported into CityAG16, checked with shots of fliers in their layers, a landing, drones, police, boats, a ferry at its pier and a ship (`docs/progress/LG7/`) |
 | LG8 | The hour, the weather and reactions ("From LG8" above): `unreal_life.pack_weather`, the walk rows' `walk_cover`, `walk_night` and `walk_road_side`, the run clip (`PACK_VERSION` 9), `import_city.weather_props` (`LIFE_VERSION` life10); the controller follows atmosgen's hour and weather state (people out, pace, raincoats, umbrellas, shelter, nightlife, the cars' share, speed and headway), people look at the player and flee a danger (`Panic`), then gather; every junction exit tested for room, stuck cars far off leave; lifegen's instanced components (`UCgLifeISM`, `CityGenLife.Bounds`); console `CityGenLife.FollowAtmos`, `.Weather`, `.Panic`, `.WeatherShow`, `.Bounds`, the play menu's Scare the crowd row, the status's `weather`; bench passes `night_life_noweather`, `night_life_ownbounds`, `night_life_enginebounds`. A plan without `weather` exports and runs as before (at the plan's hour). | Delta imported into CityAG16 and Vesper Bay into a throwaway project, checked with shots of rain, umbrellas, shelter, people looking and fleeing (`docs/progress/LG8/`) |
+| HLOD streaming (fix_hlod_streaming) | "HLOD streaming" above: the instanced HLODs' component the play plugin's `UCityGenHLODComponent` (`unreal.set_hlod_class`, DefaultEditor.ini's `[/Script/Engine.HLODBuilder]` when the plugin is built; its module reads the builder's config again once its classes exist): in a game it leaves its HLOD actor's root and a visibility flip keeps its proxy, only the drawn flag changed on the render thread; `build_hlods` builds every HLOD again when the class or `HLOD_VERSION` changes (`hlod_stamp`, `-SetupHLODs -RebuildHLODs`); the adaptive AddToWorld time slice in every project (`STREAMING_SETTINGS`); console `CityGen.HLODFastVisibility`, `CityGen.HLODStatus`; bench passes `night_plan_all_hlodslow`, `night_plan_all_stream2`, `night_plan_all_adaptive` | Delta imported again into CityAG16, its 763 HLOD actors built again, checked with shots (151,671 flips in place, 672 recreated); benchmark and package (`docs/progress/fix_hlod_streaming/`) |

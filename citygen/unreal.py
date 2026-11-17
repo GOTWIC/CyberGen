@@ -1553,7 +1553,15 @@ def set_nanite_pool(uproject: str | Path, man: dict) -> bool:
 # going it made 36 to 48 ms frames at 256 m cells and 1 to 2.8 s ones at 128 m (AG16's hitch
 # dumps on Delta Megacity); a city's textures (AG6's library sets and its sign pages, a few
 # hundred) fit whole: Delta's VRAM stayed at 7 GB.
-PROJECT_SETTINGS = [("r.TextureStreaming", "0")]
+# fix_hlod_streaming: World Partition's cells added to the world (their actors registered, a
+# fixed 5 ms a frame by default, `s.LevelStreamingActorsUpdateTimeLimit`) by the engine's
+# adaptive time slice instead, 1 to 6 ms a frame by how much is in flight
+# (`s.AdaptiveAddToWorld.Enabled`): walking and driving, a step across a row of cells no
+# longer adds 5 ms of registration to each frame after it, and a teleport still gets its
+# cells in about as fast (Delta's night p95 20.6 to 18.8 ms, the walk 22.9 to 20.5; a fixed
+# 2 ms made the drive hitch and the teleports twice as slow).
+STREAMING_SETTINGS = [("s.AdaptiveAddToWorld.Enabled", "1")]
+PROJECT_SETTINGS = [("r.TextureStreaming", "0")] + STREAMING_SETTINGS
 # AT1 (Swagnik: "make sure that the game runs on the monitor's resolution"): a game is
 # DPI-aware, so on a screen scaled 125% a 2560 x 1440 monitor gives the game 2560 x 1440, not
 # a 2048 x 1152 window Windows stretches (the neon strips shimmered); the benchmark's own

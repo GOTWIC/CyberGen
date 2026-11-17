@@ -1,0 +1,19 @@
+{
+ "frames": 8064,
+ "gt_ms": {
+  "p50": 13.36,
+  "p95": 26.32,
+  "p99": 51.77,
+  "max": 848.7
+ },
+ "hlod_updates": 282156,
+ "gum_calls": 1928720,
+ "gum_ms": 9899.7,
+ "deferred_updates_ms": 24513.1,
+ "frames_200_hlod_updates": 278,
+ "their_gt_ms_mean": 72.0,
+ "their_hlod_updates_mean": 834,
+ "their_gum_ms_mean": 24.1,
+ "frames_over_40ms": 112,
+ "deferred_updates_max_ms": 691.023
+}

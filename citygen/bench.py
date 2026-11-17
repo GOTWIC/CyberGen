@@ -175,12 +175,18 @@ ATMOS_PASSES = (
     # visibility flip, the engine's way (each of them still on its own, not attached)
     ("night_plan_all_hlodslow", True, 100.0, _atmos(fog=True, air=True, rain=True, wet=True,
                                                     hlod=False)),
-    # and an exploring pass: the night as delivered with World Partition's cells added to the
+    # and exploring passes: the night as delivered with World Partition's cells added to the
     # world and their packages' game thread loading at most 2 ms a frame each (the engine's 5:
-    # `s.LevelStreamingActorsUpdateTimeLimit`, `s.AsyncLoadingTimeLimit`); it leaves them set,
-    # so it runs after the passes it is compared with
+    # `s.LevelStreamingActorsUpdateTimeLimit`, `s.AsyncLoadingTimeLimit`), and with the
+    # engine's adaptive AddToWorld time slice instead (1 to 6 ms by the work in flight); they
+    # leave them set, so they run after the passes they are compared with
     ("night_plan_all_stream2", True, 100.0,
-     _atmos(**_ALL)[:-1] + ("s.LevelStreamingActorsUpdateTimeLimit 2",
+     _atmos(**_ALL)[:-1] + ("s.AdaptiveAddToWorld.Enabled 0",
+                            "s.LevelStreamingActorsUpdateTimeLimit 2",
+                            "s.AsyncLoadingTimeLimit 2") + _atmos(**_ALL)[-1:]),
+    ("night_plan_all_adaptive", True, 100.0,
+     _atmos(**_ALL)[:-1] + ("s.AdaptiveAddToWorld.Enabled 1",
+                            "s.LevelStreamingActorsUpdateTimeLimit 2",
                             "s.AsyncLoadingTimeLimit 2") + _atmos(**_ALL)[-1:]),
     # AT4's exploring passes: what each engine setting gives back (TUNABLE, by hand)
     ("x_base", True, 100.0, _x()),
