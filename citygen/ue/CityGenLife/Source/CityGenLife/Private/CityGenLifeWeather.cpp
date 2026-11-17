@@ -369,7 +369,7 @@ void ACityGenLife::UpdateUmbrellas(const FVector& View)
 		const bool bShown = WalkState.IsValidIndex(P) && (WalkState[P] == CgShow::Moving || WalkState[P] == CgShow::Still) &&
 			PersonTier.IsValidIndex(P) && PersonTier[P] <= 1 && !WalkPos[P].IsZero() &&
 			!(WalkCovered.IsValidIndex(P) && WalkCovered[P]) &&
-			!(WalkAnimG.IsValidIndex(P) && (WalkAnimG[P] == CgAnim::Sit || WalkAnimG[P] == CgAnim::Run)) &&
+			!(WalkAnimG.IsValidIndex(P) && (CgAnim::IsSit(WalkAnimG[P]) || WalkAnimG[P] == CgAnim::Run)) &&
 			HasUmbrella(P);
 		if (!bShown)
 		{
@@ -511,7 +511,7 @@ bool ACityGenLife::ShowWeather(const FString& What)
 		}
 		else if (What == TEXT("look"))
 		{
-			bWant = WalkState[P] == CgShow::Still && Anim != CgAnim::Sit;
+			bWant = WalkState[P] == CgShow::Still && !CgAnim::IsSit(Anim);
 		}
 		else if (What == TEXT("flee"))
 		{

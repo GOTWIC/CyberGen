@@ -364,18 +364,51 @@ def ensure_library(root: Path, uproject: Path, gas: Path | None = None,
 
 PLACES_SCRIPT = UE_DIR / "people_places.py"
 PLACES_MANIFEST = "places.json"
+# people_idles: the second mid bake and impostor sheet per look (`people_places.py`'s
+# `step_idles`): the bake's rate (the library's), how long a standing idle's and the sitting
+# loop's baked stretch may be (s: from, to), the sheet's rows (the library's walk frames, then
+# sitting and standing idle cells), the library's idle clip baked. The key (`idle_key`) is the
+# library's hash and these: bump `version` when the bake or the sheet changes, so the next run
+# makes them again (a change to the script alone keeps them).
+IDLE_BAKE = {"version": "idles1", "fps": 15.0, "idle_s": [4.0, 8.0], "sit_s": [4.0, 8.0],
+             "walk_frames": 8, "sit_cells": 4, "idle_cells": 4, "idle_clip": "idle_relaxed"}
+PLACES_RUNS_MAX = 8
+PLACES_PER_RUN = 48
 
 
 def places_hash(lib_hash: str) -> str:
     """The places' clips' hash: the library's, the clips (`lifegen.presets.PLACE_CLIPS`), the
-    script that makes them."""
+    script that makes them, the idles' bake (`IDLE_BAKE`)."""
     import hashlib
     from lifegen import presets as LP
     h = hashlib.sha256()
     h.update(lib_hash.encode("utf-8"))
     h.update(json.dumps(LP.PLACE_CLIPS, sort_keys=True).encode("utf-8"))
     h.update(PLACES_SCRIPT.read_bytes())
+    h.update(json.dumps(IDLE_BAKE, sort_keys=True).encode("utf-8"))
     return h.hexdigest()[:16]
+
+
+def idle_key(lib_hash: str) -> str:
+    """people_idles: the key the second mid bakes and sheets keep (`cg.idles`): the library's
+    hash and `IDLE_BAKE`, not the script's bytes."""
+    import hashlib
+    h = hashlib.sha256()
+    h.update(lib_hash.encode("utf-8"))
+    h.update(json.dumps(IDLE_BAKE, sort_keys=True).encode("utf-8"))
+    return h.hexdigest()[:16]
+
+
+def idle_bake(lib: dict) -> dict:
+    """The job's `bake` for a library manifest: `IDLE_BAKE`, its key, the library's impostor
+    layout (views, cell, the card's size in cm) and the sheet's rows."""
+    from lifegen import library as L
+    far = lib.get("far") or {}
+    size = far.get("size") or [1.1, 2.2]
+    rows = IDLE_BAKE["walk_frames"] + IDLE_BAKE["sit_cells"] + IDLE_BAKE["idle_cells"]
+    return {**IDLE_BAKE, "key": idle_key(lib["hash"]), "views": int(far.get("views") or 8),
+            "rows": rows, "cell": list(far.get("cell") or L.IMPOSTOR_CELL),
+            "card_cm": [round(float(size[0]) * 100.0, 3), round(float(size[1]) * 100.0, 3)]}
 
 
 def read_places(uproject: Path) -> dict | None:
@@ -392,10 +425,14 @@ def read_places(uproject: Path) -> dict | None:
 def ensure_place_clips(root: Path, uproject: Path, gas: Path | None = None,
                        log_dir: Path | None = None) -> dict:
     """LG4: the places' clips (a bench's sitting loop, standing idle breaks: `lifegen.presets.
-    PLACE_CLIPS`) in the project, retargeted with the library's own retargeter onto each of its
-    clip groups' body skeleton (`citygen/ue/people_places.py`). Their manifest kept when its hash
-    is the same; else the sample's clips copied in (its closure, `gas_closure`, `migrate`) and the
-    editor's run. The library's assets and hash are untouched. {ok, how, hash, manifest}."""
+    PLACE_CLIPS`; people_idles: the bench's sit-downs and stand-up) in the project, retargeted
+    with the library's own retargeter onto each of its clip groups' body skeleton
+    (`citygen/ue/people_places.py`); people_idles: per look a second mid bake (the walk, a
+    standing idle, the sitting loop) and a still sheet for its card. Their manifest kept when
+    its hash is the same; else the sample's clips copied in (its closure, `gas_closure`,
+    `migrate`) and the editor's runs (a run makes at most `PLACES_PER_RUN` looks' bakes and
+    sheets, the next going on). The library's assets and hash are untouched. {ok, how, hash,
+    manifest}."""
     from lifegen import presets as LP
     t0 = time.time()
     up = Path(uproject).resolve()
@@ -431,16 +468,37 @@ def ensure_place_clips(root: Path, uproject: Path, gas: Path | None = None,
                      if c.get("skeleton") == key), None)
         if body is None:
             continue
-        groups[key] = {"body": body,
+        gclips = lib["clip_groups"][key].get("clips") or {}
+        idle = (gclips.get(IDLE_BAKE["idle_clip"]) or next(
+            (v for k, v in sorted(gclips.items()) if k.startswith("idle")), {})).get("anim", "")
+        groups[key] = {"body": body, "idle": idle,
                        "retargeter": f"{lib['content']}/Anim/{key}/RTG_GasToBody_{lib['hash'][:8]}"}
+    # (people_idles: the looks whose group has a body and an idle and that have the library's
+    # mid data asset)
+    looks = [{"id": c["id"], "skeleton": c.get("skeleton"), "mid": c["mid"]}
+             for c in lib["characters"]
+             if c.get("skeleton") in groups and groups[c["skeleton"]]["idle"]
+             and (c.get("mid") or {}).get("data")]
     job = {"result": str(log_dir / "places_result.json"), "hash": h, "lib_hash": lib["hash"],
            "content": lib["content"], "gas_mesh": L.GAS_MESH, "clips": clips, "groups": groups,
-           "manifest": str(saved / PLACES_MANIFEST)}
+           "manifest": str(saved / PLACES_MANIFEST), "looks": looks,
+           "bake": idle_bake(lib) if looks else {}, "per_run": PLACES_PER_RUN,
+           "sheets_dir": str(log_dir / "sheets_idle"),
+           "export_sheets": [lk["id"] for lk in looks[:2]]}
     from .unreal import run_editor
-    r = run_editor(Path(root), up, PLACES_SCRIPT, job, log_dir / "places_log.txt",
-                   timeout=3600.0, gui=True, extra=["-RenderOffscreen", "-nop4"])
+    runs = []
+    for k in range(PLACES_RUNS_MAX):
+        r = run_editor(Path(root), up, PLACES_SCRIPT, job, log_dir / f"places_log_{k}.txt",
+                       timeout=3 * 3600.0, gui=True, extra=["-RenderOffscreen", "-nop4"])
+        runs.append({"ok": r.get("ok"), "restart": r.get("restart"), "wall_s": r.get("wall_s"),
+                     "looks": len(r.get("looks") or {})})
+        if not r.get("restart"):
+            break
+        # (the next run keeps the clips this one made, with their measures)
+        job["old"] = r.get("groups") or {}
     res["build"] = {k: r.get(k) for k in ("ok", "error", "missing", "wall_in_editor_s",
-                                          "groups") if k in r}
+                                          "groups", "windows") if k in r}
+    res["build"]["runs"] = runs
     if not r.get("ok"):
         return {**res, "ok": False, "how": "build",
                 "error": r.get("error") or "the places' clips failed (see its log)"}

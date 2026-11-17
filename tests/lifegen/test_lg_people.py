@@ -1,11 +1,12 @@
 """LG1: the people library's spec (`lifegen/library.py`), the plan's person draws, and the
 exporter's packing of people (`citygen/unreal_life.py`) and of the library in the project
-(`citygen/unreal_people.py`), without Unreal."""
+(`citygen/unreal_people.py`; people_idles: the places' idles and transitions), without Unreal."""
 
 import json
 from pathlib import Path
 
 from lifegen import library as L
+from lifegen import presets as P
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -113,6 +114,89 @@ def test_exporter_packs_persons_and_library():
     p2 = UL.persons(spike2)
     assert p2["person_char"] == [2, 1] and p2["person_group"] == [0, 3]
     assert UL.people_library(lib3, spike2)["near_mesh_starts"] == [0, 2, 4, 6]
+
+
+def _places(n, looks=True):
+    """A places' manifest (`unreal_people.ensure_place_clips`) for `_lib(n)`'s one group."""
+    g = {"sit": {"anim": "/Game/A/A_place_sit", "length_s": 25.0},
+         "run": {"anim": "/Game/A/A_place_run", "travel_cm": [0.0, 1167.0], "length_s": 2.5}}
+    for k, c in enumerate(P.SIT_IN):
+        g[c] = {"anim": f"/Game/A/A_place_{c}", "other_cm": [10.0 * k, -80.0],
+                "other_yaw": 180.0 - 30.0 * k, "length_s": 2.0 + 0.1 * k}
+    g["sit_out"] = {"anim": "/Game/A/A_place_sit_out", "other_cm": [0.0, 120.0],
+                    "other_yaw": 5.0, "length_s": 2.4}
+    man = {"hash": "pl", "lib_hash": "abc", "clips": list(P.PLACE_CLIPS), "groups": {"s0": g}}
+    if looks:
+        man["idles"] = {"key": "k1", "card": {"views": 8, "rows": 16, "walk": [0, 8],
+                                              "sit": [8, 4], "idle": [12, 4]},
+                        "looks": {f"p{k:02d}": {
+                            "mid": {"materials": [f"/Game/I/MI_{k}_0", f"/Game/I/MI_{k}_1"],
+                                    "walk": [0, 59], "idle": [60, 149], "sit": [150, 269]},
+                            "far": {"material": f"/Game/I/MI_{k}_CardIdle"}} for k in range(n)}}
+    return man
+
+
+def test_exporter_packs_the_idles():
+    """people_idles: the places' second mid bakes, still cards and the bench's transitions
+    reach the life controller's data; a manifest without them (or not for every look) leaves
+    the library's walk and cards as they were."""
+    from citygen import unreal_life as UL
+    spike = {"library": {"characters": 3, "walks": list(L.WALKS)},
+             "persons": {"seed": [1], "character": [0], "scale": [1.0], "gait": [0],
+                         "pace": [1.3], "tint": [0]}}
+    lib = UL.people_library({**_lib(3), "place_clips": _places(3)}, spike)
+    assert lib["mid_still_frames"] == [60.0, 149.0, 150.0, 269.0] * 3
+    assert lib["mid_idle_starts"] == [0, 2, 4, 6] and len(lib["mid_idle_materials"]) == 6
+    assert lib["card_materials"] == [f"/Game/I/MI_{k}_CardIdle" for k in range(3)]
+    assert lib["card_cells"] == [0.0, 8.0, 8.0, 4.0, 12.0, 4.0]
+    assert lib["sit_in_count"] == len(P.SIT_IN) and len(lib["sit_in_clips"]) == len(P.SIT_IN)
+    assert lib["sit_in"][:4] == [0.0, -80.0, 180.0, 2.0] and len(lib["sit_in"]) == 4 * 5
+    assert lib["sit_out"] == [0.0, 120.0, 5.0, 2.4] and lib["sit_in_start"] == [0.0] * 5
+    assert lib["sit_clips"] == ["/Game/A/A_place_sit"]
+    # (a transition played only near its seat: the stretch from `start_s` to `end_s`)
+    pt = _places(3)
+    pt["groups"]["s0"]["sit_in_f"].update(start_s=7.5, end_s=10.0)
+    pt["groups"]["s0"]["sit_out"].update(start_s=0.0, end_s=1.5)
+    trim = UL.people_library({**_lib(3), "place_clips": pt}, spike)
+    assert trim["sit_in"][3] == 2.5 and trim["sit_in_start"][0] == 7.5
+    assert trim["sit_out"][3] == 1.5
+    # (one look without its bake: the library's mid and cards, the transitions kept)
+    pl = _places(3)
+    pl["idles"]["looks"].pop("p01")
+    part = UL.people_library({**_lib(3), "place_clips": pl}, spike)
+    assert "mid_still_frames" not in part and part["card_materials"] == [f"/Game/F/MI_{k}"
+                                                                          for k in range(3)]
+    assert part["sit_in_count"] == len(P.SIT_IN)
+    # (a manifest before people_idles: none of it)
+    old = UL.people_library({**_lib(3), "place_clips": _places(3, looks=False)}, spike)
+    assert "mid_still_frames" not in old and "card_cells" not in old
+    pg = _places(3, looks=False)
+    for c in P.SIT_IN:
+        pg["groups"]["s0"].pop(c)
+    assert "sit_in_clips" not in UL.people_library({**_lib(3), "place_clips": pg}, spike)
+
+
+def test_places_hash_and_idle_key(monkeypatch):
+    """The places' hash follows the clips, the script and the idles' bake; the bakes' own key
+    only the library and the bake's settings, so editing the script keeps the bakes."""
+    from citygen import unreal_people as UP
+    h, k = UP.places_hash("abc"), UP.idle_key("abc")
+    assert h != UP.places_hash("abd") and k != UP.idle_key("abd")
+    monkeypatch.setattr(UP, "IDLE_BAKE", {**UP.IDLE_BAKE, "version": "x"})
+    assert UP.places_hash("abc") != h and UP.idle_key("abc") != k
+    b = UP.idle_bake({"hash": "abc", "far": {"size": [1.1, 2.2], "views": 8}})
+    assert b["rows"] == b["walk_frames"] + b["sit_cells"] + b["idle_cells"] == 16
+    assert b["card_cm"] == [110.0, 220.0] and b["key"] == UP.idle_key("abc")
+    assert list(b["cell"]) == list(L.IMPOSTOR_CELL)
+
+
+def test_places_need_a_library(tmp_path):
+    from citygen import unreal_people as UP
+    up = tmp_path / "proj" / "Proj.uproject"
+    up.parent.mkdir()
+    up.write_text(json.dumps({"FileVersion": 3, "Plugins": []}), encoding="utf-8")
+    r = UP.ensure_place_clips(tmp_path / "engine", up)
+    assert not r["ok"] and r["how"] == "none"
 
 
 def test_library_in_a_project_from_the_cache(tmp_path, monkeypatch):

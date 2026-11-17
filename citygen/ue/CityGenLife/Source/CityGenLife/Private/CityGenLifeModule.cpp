@@ -249,7 +249,7 @@ namespace
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs PlaceShowCmd(TEXT("CityGenLife.PlaceShow"),
-		TEXT("CityGenLife.PlaceShow sit|queue|stall|smoke|gang|gangwalk|police|patrol: the camera moved to the nearest person sitting, queueing or waiting, at a stall or kiosk, smoking at a bar, a gang at its spot or walking, a police pair, a patrol car (the check's shots)"),
+		TEXT("CityGenLife.PlaceShow sit|sitdown|standup|sitmid|sitfar|idlemid|idlefar|queue|stall|smoke|gang|gangwalk|police|patrol: the camera moved to the nearest person sitting (sitting down, standing up; a little further off), standing at a slot a little further off, queueing or waiting, at a stall or kiosk, smoking at a bar, a gang at its spot or walking, a police pair, a patrol car (the check's shots)"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 		{
 			if (ACityGenLife* A = LifeIn(World))

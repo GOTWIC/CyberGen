@@ -360,6 +360,39 @@ namespace CgLife
 		}
 	}
 
+	/** people_idles: whether a person at a bench sits down and stands up (a sit-down chosen,
+	 *  the clips' data there), and a transition's 4 floats (SitIn's or SitOut's). */
+	bool Transits(const FCgLifeFrame& F, const FCgLifeWalker& W)
+	{
+		return W.SitVar != 255 && F.SitIn && F.SitOut && (int32)W.SitVar < F.SitInCount &&
+			F.SitIn->IsValidIndex(4 * (int32)W.SitVar + 3) && F.SitOut->IsValidIndex(3);
+	}
+
+	/** Where a transition's end stands off a seat (UE cm, its facing in deg). */
+	FVector SitSpot(const FCgLifeFrame& F, const FCgLifeWalker& W, const TArray<float>& Data, const int32 K, float& Yaw)
+	{
+		const float SeatYaw = (*F.PointYaw)[W.Point];
+		Yaw = SeatYaw + Data[4 * K + 2];
+		return (*F.PointPos)[W.Point] + FVector(0.f, 0.f, W.ZOff) +
+			FRotator(0.f, SeatYaw, 0.f).RotateVector(FVector(Data[4 * K], Data[4 * K + 1], 0.f));
+	}
+
+	/** What a person at a slot plays: its slot's clip; a sitter sitting down for its sit-down's
+	 *  length after it reached the seat (W.T), standing up once its stay is over (W.Dwell
+	 *  under 0). */
+	uint8 SitAnim(const FCgLifeFrame& F, const FCgLifeWalker& W)
+	{
+		if (W.Anim != CgAnim::Sit || !Transits(F, W))
+		{
+			return W.Anim;
+		}
+		if (W.Dwell <= 0.f)
+		{
+			return CgAnim::StandUp;
+		}
+		return W.T < (*F.SitIn)[4 * (int32)W.SitVar + 3] ? (uint8)(CgAnim::SitDown + W.SitVar) : (uint8)CgAnim::Sit;
+	}
+
 	void Place(FCgLifeFrame& F, const FCgLifeWalker& W, const uint8 Show)
 	{
 		if (F.WalkPos->IsValidIndex(W.Instance))
@@ -371,7 +404,7 @@ namespace CgLife
 			{
 				// (LG8: standing under a cover or looking at a danger, the idle; running from one,
 				// the run)
-				(*F.WalkAnim)[W.Instance] = W.State == CgWalk::AtSlot ? W.Anim :
+				(*F.WalkAnim)[W.Instance] = W.State == CgWalk::AtSlot ? SitAnim(F, W) :
 					((W.State == CgWalk::Shelter || W.State == CgWalk::Look) ? (uint8)CgAnim::Idle :
 					(W.Flee && W.State == CgWalk::Walk ? (uint8)CgAnim::Run : (uint8)CgAnim::Walk));
 			}
@@ -388,6 +421,7 @@ namespace CgLife
 		}
 		W.Slot = INDEX_NONE;
 		W.Point = INDEX_NONE;
+		W.SitVar = 255;
 	}
 
 	/** A person out of the city: its slot back in the pool. */
@@ -503,6 +537,38 @@ namespace CgLife
 		W.State = CgWalk::ToSlot;
 		W.From = W.Pos;
 		W.T = 0.f;
+		W.SitVar = 255;
+	}
+
+	/** people_idles: a sitter's sit-down, the one whose start lies most nearly the way it
+	 *  comes from (its seat's frame): from in front of the bench, its sides or behind it. */
+	uint8 PickSitDown(const FCgLifeFrame& F, const FCgLifeWalker& W)
+	{
+		if (!F.SitIn || F.SitInCount <= 0 || !F.SitOut || !F.PointPos->IsValidIndex(W.Point))
+		{
+			return 255;
+		}
+		const FVector Rel = FRotator(0.f, -(*F.PointYaw)[W.Point], 0.f).RotateVector(W.From - (*F.PointPos)[W.Point]);
+		const FVector2D From(Rel.X, Rel.Y);
+		int32 Best = 0;
+		double BestDot = -2.0;
+		for (int32 K = 0; K < F.SitInCount && F.SitIn->IsValidIndex(4 * K + 3); ++K)
+		{
+			// (not one starting behind the seat: the sample's walk round a bench from behind
+			// starts 3 m back, where a wall or a building may stand)
+			const FVector2D Start((*F.SitIn)[4 * K], (*F.SitIn)[4 * K + 1]);
+			if (Start.X < -50.0)
+			{
+				continue;
+			}
+			const double Dot = From.GetSafeNormal() | Start.GetSafeNormal();
+			if (Dot > BestDot)
+			{
+				BestDot = Dot;
+				Best = K;
+			}
+		}
+		return (uint8)Best;
 	}
 
 	/** LG4: a person to, at and back from a place slot; true while that is what it does this
@@ -522,13 +588,26 @@ namespace CgLife
 		}
 		if (W.State == CgWalk::ToSlot)
 		{
-			const FVector To = (*F.PointPos)[W.Point] + FVector(0.f, 0.f, W.ZOff);
+			// (people_idles: a sitter walks to where the sit-down that suits the way it comes
+			// starts, turning to face as that clip does over its last meter)
+			if (W.SitVar == 255 && (*F.SlotAnim)[S] == CgAnim::Sit)
+			{
+				W.SitVar = PickSitDown(F, W);
+			}
+			float StartYaw = 0.f;
+			const bool bTransit = (*F.SlotAnim)[S] == CgAnim::Sit && Transits(F, W);
+			const FVector To = bTransit ? SitSpot(F, W, *F.SitIn, (int32)W.SitVar, StartYaw)
+				: (*F.PointPos)[W.Point] + FVector(0.f, 0.f, W.ZOff);
 			const float Dur = FMath::Max(0.3f, (float)FVector::Dist(W.From, To) / FMath::Max(50.f, W.Speed));
 			W.T += Dt;
 			const float U = FMath::Clamp(W.T / Dur, 0.f, 1.f);
 			W.Pos = FMath::Lerp(W.From, To, U);
 			const FVector D = To - W.From;
-			if (D.SizeSquared2D() > 1.0)
+			if (bTransit && (1.f - U) * D.Size2D() < 100.f)
+			{
+				TurnTo(F, W, StartYaw, Dt);
+			}
+			else if (D.SizeSquared2D() > 1.0)
 			{
 				TurnTo(F, W, FMath::RadiansToDegrees(FMath::Atan2(D.Y, D.X)), Dt);
 			}
@@ -542,6 +621,18 @@ namespace CgLife
 			const float A = (*F.SlotDwell)[2 * S];
 			const float B = (*F.SlotDwell)[2 * S + 1];
 			W.Dwell = FMath::Lerp(A, FMath::Max(A, B), Unit(W));
+			if (bTransit)
+			{
+				// (on the seat from here, facing as it sits; its clock from the sit-down's start,
+				// its stay at least the sit-down and a moment)
+				W.T = 0.f;
+				W.Yaw = (*F.PointYaw)[W.Point];
+				W.Dwell = FMath::Max(W.Dwell, (*F.SitIn)[4 * (int32)W.SitVar + 3] + 2.f);
+			}
+			else
+			{
+				W.SitVar = 255;
+			}
 			if (F.Occupy)
 			{
 				F.Occupy(S, W.Point);
@@ -551,8 +642,16 @@ namespace CgLife
 		if (W.State == CgWalk::AtSlot)
 		{
 			W.Pos = (*F.PointPos)[W.Point] + FVector(0.f, 0.f, W.ZOff);
-			// (LG8: standing, it looks at the player near it; a sitter keeps to its bench)
-			if (W.Anim == CgAnim::Sit || !LookAtPlayer(F, W, Dt))
+			const bool bTransit = W.Anim == CgAnim::Sit && Transits(F, W);
+			// (LG8: standing, it looks at the player near it; a sitter keeps to its bench;
+			// people_idles: one sitting down or standing up faces its seat's way at once, the
+			// clips turning it)
+			if (bTransit)
+			{
+				W.Yaw = (*F.PointYaw)[W.Point];
+				W.T += Dt;
+			}
+			else if (W.Anim == CgAnim::Sit || !LookAtPlayer(F, W, Dt))
 			{
 				TurnTo(F, W, (*F.PointYaw)[W.Point], Dt);
 			}
@@ -561,6 +660,19 @@ namespace CgLife
 			{
 				Place(F, W, CgShow::Still);
 				return true;
+			}
+			if (bTransit)
+			{
+				// (people_idles: its stay over, it stands up on the seat, then walks off from
+				// where the stand-up ends)
+				if (W.Dwell > -(*F.SitOut)[3])
+				{
+					Place(F, W, CgShow::Still);
+					return true;
+				}
+				float EndYaw = 0.f;
+				W.Pos = SitSpot(F, W, *F.SitOut, 0, EndYaw);
+				W.Yaw = EndYaw;
 			}
 			// (done: a club's queue goes in at its door, everyone else back to its walkway)
 			const int32 Door = (*F.SlotDoor)[S];

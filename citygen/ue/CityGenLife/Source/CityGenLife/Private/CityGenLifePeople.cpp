@@ -42,7 +42,7 @@ namespace
 {
 	// LG2: the person's three dye colors (rgb each) and wear after the walk's floats
 	constexpr int32 MidFloats = 14;    // time offset, play rate, first frame, last frame, 3 x rgb, wear
-	constexpr int32 FarFloats = 12;    // time offset, cycles a second, 3 x rgb, wear
+	constexpr int32 FarFloats = 14;    // time offset, cycles a second, 3 x rgb, wear; people_idles: first cell, cells
 	const FTransform Hidden(FQuat::Identity, FVector(0.0, 0.0, -1.0e6), FVector(0.0));
 
 	uint32 Mix(uint32 X)
@@ -105,7 +105,7 @@ void ACityGenLife::ApplyClothing()
 		}
 		for (const int32 M : MidGarment[K])
 		{
-			C->SetMaterial(M, bOff ? HiddenMaterial.Get() : nullptr);
+			C->SetMaterial(M, bOff ? HiddenMaterial.Get() : MidSlotMaterial(K, M));
 		}
 	}
 }
@@ -284,16 +284,32 @@ void ACityGenLife::TintOf(const int32 P, const int32 Ch, float Out[3]) const
 	}
 }
 
-void ACityGenLife::LookData(const int32 P, const bool bStill, float Mid[14], float Far[12]) const
+UMaterialInterface* ACityGenLife::MidSlotMaterial(const int32 C, const int32 M) const
+{
+	if (!MidIdleStarts.IsValidIndex(C + 1))
+	{
+		return nullptr;
+	}
+	const int32 I = MidIdleStarts[C] + M;
+	return I < MidIdleStarts[C + 1] && MidIdleMaterials.IsValidIndex(I) ? MidIdleMaterials[I].Get() : nullptr;
+}
+
+void ACityGenLife::LookData(const int32 P, const uint8 Look, float Mid[14], float Far[14]) const
 {
 	// (the mid instance: time offset, rate, first and last frame of its loop, the tint; the far
-	// card: time offset, strides a second, the tint. Standing, the mid instance loops its one
-	// passing frame at the walk's rate; the card shows that pose's cell: a
-	// stride rate so slow it does not move, its offset putting the cell's middle at now)
+	// card: time offset, strides a second, the tint, its first cell and cells. Standing, the
+	// mid instance loops its one passing frame at the walk's rate; the card shows that pose's
+	// cell: a stride rate so slow it does not move, its offset putting the cell's middle at
+	// now. people_idles, with the idles' bakes: standing, the mid instance plays the baked
+	// standing idle, sitting the bench's sitting loop, each from its own place in the loop; the
+	// card holds one of the still sheet's sitting or standing cells, the person's own)
 	const int32 NC = FMath::Max(1, MidMeshes.Num());
 	const int32 C = PersonChar.IsValidIndex(P) ? FMath::Clamp(PersonChar[P], 0, NC - 1) : P % NC;
+	const bool bStill = Look == CgLook::Still || Look == CgLook::Sit;
+	const bool bIdles = HasMidIdles() && MidStillFrames.IsValidIndex(4 * C + 3);
+	const bool bCells = CardCells.Num() >= 6;
 	// (LG8: running from a danger, the baked walk played at the flight's pace)
-	const bool bRun = WalkAnimG.IsValidIndex(P) && WalkAnimG[P] == CgAnim::Run;
+	const bool bRun = Look == CgLook::Run;
 	const float Rate = FMath::Max(0.05f, WalkRate(P) * (bRun ? FMath::Clamp(FleePace, 1.f, 3.f) : 1.f));
 	const float T0 = PhaseOffset(P);
 	const float Tint[3] = {
@@ -307,8 +323,30 @@ void ACityGenLife::LookData(const int32 P, const bool bStill, float Mid[14], flo
 	Mid[1] = Rate;
 	Mid[2] = bStill ? Stand : First;
 	Mid[3] = bStill ? Stand : Last;
+	if (bStill && bIdles)
+	{
+		// (a person's own pace through the loop: 0.85 to 1.15 of the clip's)
+		const uint32 S = Mix((uint32)(PersonSeed.IsValidIndex(P) ? PersonSeed[P] : P) + 101u);
+		const int32 K = Look == CgLook::Sit ? 2 : 0;
+		Mid[1] = 0.85f + 0.3f * (float)(S % 1000u) / 1000.f;
+		Mid[2] = MidStillFrames[4 * C + K];
+		Mid[3] = MidStillFrames[4 * C + K + 1];
+	}
 	const float Cycle = MidFrames.IsValidIndex(4 * C + 3) && MidFrames[4 * C + 3] > 0.05f ? MidFrames[4 * C + 3] : 1.f;
-	if (bStill)
+	Far[12] = bCells ? CardCells[0] : 0.f;
+	Far[13] = bCells ? CardCells[1] : 0.f;
+	if (bStill && bCells)
+	{
+		// (a still cell of its own: the still sheet's sitting or standing poses)
+		const uint32 S = Mix((uint32)(PersonSeed.IsValidIndex(P) ? PersonSeed[P] : P) + 7u);
+		const int32 K = Look == CgLook::Sit ? 2 : 4;
+		const int32 N = FMath::Max(1, FMath::RoundToInt(CardCells[K + 1]));
+		Far[0] = 0.f;
+		Far[1] = 0.f;
+		Far[12] = CardCells[K] + (float)(S % (uint32)N);
+		Far[13] = 1.f;
+	}
+	else if (bStill)
 	{
 		constexpr float Slow = 1.0e-5f;
 		const float Now = GetWorld() ? (float)GetWorld()->GetTimeSeconds() : 0.f;
@@ -370,6 +408,17 @@ void ACityGenLife::MakePeople()
 		// (the mid tier casts no shadow: a mid mesh has a section per creator slot, and its
 		// shadow depths doubled the people's draws for a shadow too small to see past NearM)
 		MidComps.Add(MidMeshes[K] ? Make(FString::Printf(TEXT("PeopleMid%d"), K), MidMeshes[K], nullptr, MidFloats, false, MidM + 20.f) : nullptr);
+		// (people_idles: its slots read the idles' bake, the library's walk first in it)
+		if (UInstancedStaticMeshComponent* Mc = MidComps.Last().Get())
+		{
+			for (int32 M = 0; M < Mc->GetNumMaterials(); ++M)
+			{
+				if (UMaterialInterface* Mi = MidSlotMaterial(K, M))
+				{
+					Mc->SetMaterial(M, Mi);
+				}
+			}
+		}
 		UMaterialInterface* Card = CardMaterials.IsValidIndex(K) ? CardMaterials[K].Get() : nullptr;
 		FarComps.Add(CardMesh ? Make(FString::Printf(TEXT("PeopleFar%d"), K), CardMesh, Card, FarFloats, false, FarM + 20.f) : nullptr);
 		// (lifegen_clothing_toggle: which of its slots are garments: by the materials of its
@@ -443,8 +492,8 @@ void ACityGenLife::SpawnPeople(const int32 NP)
 	for (int32 P = 0; P < NP; ++P)
 	{
 		const int32 C = PersonChar.IsValidIndex(P) ? FMath::Clamp(PersonChar[P], 0, NC - 1) : P % NC;
-		float MidData[14], FarData[12];
-		LookData(P, false, MidData, FarData);
+		float MidData[14], FarData[14];
+		LookData(P, CgLook::Walk, MidData, FarData);
 		if (UInstancedStaticMeshComponent* Mid = MidComps.IsValidIndex(C) ? MidComps[C].Get() : nullptr)
 		{
 			Mid->SetCustomData(PersonInst[P], MakeArrayView(MidData, MidFloats), false);
@@ -732,6 +781,23 @@ void ACityGenLife::UpdatePeople()
 	NearCand.Reset();
 	// (LG3: a free slot of the pool, or someone in an elevator, is drawn by no tier)
 	const bool bCity = IsCity() && WalkState.Num() == NP;
+	const bool bMidIdles = HasMidIdles();
+	// (people_idles: per person what it plays and since when, so a near sit-down or stand-up
+	// starts where the walk processor's clock is, wherever its slot is taken)
+	const float TimeNow = (float)GetWorld()->GetTimeSeconds();
+	if (PersonAnimPrev.Num() != NP)
+	{
+		PersonAnimPrev.Init(CgAnim::Walk, NP);
+		PersonAnimT.Init(TimeNow, NP);
+	}
+	for (int32 P = 0; P < NP && P < WalkAnimG.Num(); ++P)
+	{
+		if (PersonAnimPrev[P] != WalkAnimG[P])
+		{
+			PersonAnimPrev[P] = WalkAnimG[P];
+			PersonAnimT[P] = TimeNow;
+		}
+	}
 	auto Shown = [&](const int32 P)
 	{
 		return !bCity || WalkState[P] == CgShow::Moving || WalkState[P] == CgShow::Still;
@@ -743,8 +809,9 @@ void ACityGenLife::UpdatePeople()
 			continue;
 		}
 		const float D2 = FVector::DistSquared(WalkPos[P], View);
-		// (LG4: someone sitting is near out to the mid tier: the baked walk has no sitting pose)
-		const bool bSit = WalkAnimG.IsValidIndex(P) && WalkAnimG[P] == CgAnim::Sit && SitClips.Num();
+		// (LG4: someone sitting is near out to the mid tier: the baked walk has no sitting pose;
+		// people_idles: with the idles' bakes the mid tier has one)
+		const bool bSit = !bMidIdles && WalkAnimG.IsValidIndex(P) && CgAnim::IsSit(WalkAnimG[P]) && SitClips.Num();
 		const float Base = bSit ? FMath::Max(Near2, Mid2) : Near2;
 		const float Lim = PersonSlot[P] != INDEX_NONE ? Base * 1.32f : Base;
 		if (D2 <= Lim && !WalkPos[P].IsZero())
@@ -833,7 +900,20 @@ void ACityGenLife::UpdatePeople()
 					ClipWant = 200;
 					PlaceClip = RunClips.IsValidIndex(Group) ? RunClips[Group].Get() : nullptr;
 				}
-				else if (Anim == CgAnim::Sit && SitClips.IsValidIndex(Group) && SitClips[Group])
+				else if (Anim >= CgAnim::SitDown && SitInCount > 0 && SitInClips.IsValidIndex(Group * SitInCount + (Anim - CgAnim::SitDown)) &&
+					SitInClips[Group * SitInCount + (Anim - CgAnim::SitDown)])
+				{
+					// (people_idles: sitting down, the sit-down from the side it came, once)
+					ClipWant = (uint8)(10 + (Anim - CgAnim::SitDown));
+					PlaceClip = SitInClips[Group * SitInCount + (Anim - CgAnim::SitDown)].Get();
+				}
+				else if (Anim == CgAnim::StandUp && SitOutClips.IsValidIndex(Group) && SitOutClips[Group])
+				{
+					// (people_idles: standing up and walking off, once)
+					ClipWant = 9;
+					PlaceClip = SitOutClips[Group].Get();
+				}
+				else if (CgAnim::IsSit(Anim) && SitClips.IsValidIndex(Group) && SitClips[Group])
 				{
 					ClipWant = 2;
 					PlaceClip = SitClips[Group].Get();
@@ -849,7 +929,9 @@ void ACityGenLife::UpdatePeople()
 					ClipWant = 1;
 				}
 				FVector Root = At;
-				if (ClipWant == 2)
+				// (the sit-downs and the stand-up are in the seat's frame, as the loop)
+				const bool bOnce = ClipWant == 9 || (ClipWant >= 10 && ClipWant < 200);
+				if (ClipWant == 2 || bOnce)
 				{
 					const FVector Fwd(FMath::Cos(FMath::DegreesToRadians(WalkYaw[P])), FMath::Sin(FMath::DegreesToRadians(WalkYaw[P])), 0.0);
 					Root += Fwd * SitOffset.X + FVector(0.0, 0.0, SitOffset.Y);
@@ -881,13 +963,28 @@ void ACityGenLife::UpdatePeople()
 					{
 						Clip = IdleClips[(PersonGait.IsValidIndex(P) ? PersonGait[P] : 0) % IdleClips.Num()].Get();
 					}
-					if (bStand && Clip)
+					if (bStand && Clip && bOnce)
+					{
+						// (people_idles: a sit-down or the stand-up once, from where the walk
+						// processor's clock has it: since it began)
+						// (a sit-down from its stretch's start: the clip's walk up is the person's own)
+						const float Len = FMath::Max(0.1f, Clip->GetPlayLength());
+						const int32 In = Group * SitInCount + (ClipWant - 10);
+						const float From = ClipWant >= 10 && SitInStart.IsValidIndex(In) ? SitInStart[In] : 0.f;
+						Lead->PlayAnimation(Clip, false);
+						Lead->SetPlayRate(1.f);
+						Lead->SetPosition(FMath::Clamp(From + TimeNow - (PersonAnimT.IsValidIndex(P) ? PersonAnimT[P] : TimeNow), 0.f, Len), false);
+						NearSlots[S].Gait = INDEX_NONE;
+					}
+					else if (bStand && Clip)
 					{
 						Lead->PlayAnimation(Clip, true);
 						Lead->SetPlayRate(1.f);
 						// (each its own place in the loop, so a bench's two sitters or a gang's
-						// ring do not move as one)
-						Lead->SetPosition(FMath::Fmod(PhaseOffset(P) * 1.7f, FMath::Max(0.1f, Clip->GetPlayLength())), false);
+						// ring do not move as one; people_idles: one who just sat down from the
+						// loop's start, where its sit-down ends)
+						const bool bSatDown = ClipWant == 2 && NearSlots[S].Clip >= 10 && NearSlots[S].Clip < 200;
+						Lead->SetPosition(bSatDown ? 0.f : FMath::Fmod(PhaseOffset(P) * 1.7f, FMath::Max(0.1f, Clip->GetPlayLength())), false);
 						NearSlots[S].Gait = INDEX_NONE;
 					}
 					else if (!bStand)
@@ -923,11 +1020,13 @@ void ACityGenLife::UpdatePeople()
 		PersonTier[P] = Tier;
 		// (LG3: a mid or far person standing still holds its walk's frame)
 		// (LG8: running from a danger, its walk played faster: 2)
-		const uint8 Look = bStill ? 1 : ((WalkAnimG.IsValidIndex(P) && WalkAnimG[P] == CgAnim::Run) ? 2 : 0);
+		// (people_idles: sitting, the baked sitting loop and a sitting cell)
+		const uint8 AnimP = WalkAnimG.IsValidIndex(P) ? WalkAnimG[P] : (uint8)CgAnim::Walk;
+		const uint8 Look = bStill ? (CgAnim::IsSit(AnimP) ? CgLook::Sit : CgLook::Still) : (AnimP == CgAnim::Run ? CgLook::Run : CgLook::Walk);
 		if (bCity && (Tier == 1 || Tier == 2) && PersonStill.IsValidIndex(P) && PersonStill[P] != Look)
 		{
 			PersonStill[P] = Look;
-			ApplyLook(P, bStill);
+			ApplyLook(P, Look);
 		}
 	}
 	// (LG3: the far cards move half as often, each character's every second frame; a

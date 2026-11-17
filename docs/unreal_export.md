@@ -3170,6 +3170,60 @@ LG8 exports and runs as before, at the plan's hour (it still follows atmosgen's 
   auto` and `CityGenLife.Bounds 1`; `night_life_noweather` the night's rain without its
   effect on life; `night_life_ownbounds` and `night_life_enginebounds` the other two bounds.
 
+### People idling and sitting down (people_idles)
+
+People standing or sitting still look alive at every distance, and a sitter sits down and
+stands up (`citygen/ue/people_places.py`, `citygen/unreal_people.py` `ensure_place_clips`,
+`IDLE_BAKE`; `citygen/unreal_life.py` `idle_data`; `import_city.people_assets` and
+`places_props`, `LIFE_VERSION` life11; `CityGenLifePeople.cpp`, `CityGenLifePlaces.cpp`, the
+walk processor's `StepSlot`). The people library (its hash, cache and assets) is untouched:
+everything is made beside it by the places' clips step, which `--people` runs. A project whose
+places' manifest has none of it imports and plays as before.
+
+- **The bench's transitions** (`lifegen.presets.PLACE_CLIPS`, `SIT_IN`): the Game Animation
+  Sample's bench sit-downs from five sides (`into_F`, `into_L_090`, `into_R_090`,
+  `into_BL`, `into_BR`, the left foot leading) and its stand-up (`out_to_walk`), copied from
+  the user's sample (read only) and retargeted with the library's retargeter as LG4's place
+  clips, then made in the seat's frame (`seat_frame`: the root still where the clip sits, in
+  plan, its height kept; the pelvis carrying the clip's travel and turn), so they chain with
+  the sitting loop. The manifest gives each its root's other end in the seat's frame (cm in
+  the mesh's axes, its turn, its length): a sit-down's start (3.4 to 4.4 m off the seat: the
+  sample's clips walk up to the bench), the stand-up's end (4.8 m in front).
+- **The walk processor:** a person going to a bench point (`ToSlot`) picks the sit-down whose
+  start lies most nearly the way it comes from (not one starting behind the bench: a wall or
+  building may stand there; `PickSitDown`), walks to that start, turning to its facing over the
+  last meter, then stands on the seat (its point, facing the seat's way) while the sit-down
+  plays (`W.T` from its start; its stay at least the clip and 2 s); when its stay is over it
+  stays on the seat for the stand-up's length, then walks off from where the stand-up ends.
+  `WalkAnim` says which: `CgAnim::SitDown` + the sit-down (8 on), `StandUp` (5), `Sit`;
+  `CgAnim::IsSit` is any of them (the umbrellas, shelter, the near ring and the shots read it).
+  `SitIn`, `SitOut` and `SitInCount` (the controller's, per clip group; the processor takes
+  the first group's, `MakeSitFrames`, turned by `MeshYaw` into the seat's frame).
+- **Near:** a sit-down or the stand-up plays once from where the processor's clock has it
+  (`PersonAnimT`: the time the person's `WalkAnim` last changed), rooted at the seat as the
+  sitting loop; the sitting loop after a sit-down from its first frame (where the sit-down
+  ends), else from the person's own place in it.
+- **Mid:** per look a second AnimToTexture bake (`<content>/MidIdle/<look>`: the library's
+  walk as its own bake has it, then the library's `idle_relaxed` and the bench's sitting loop,
+  each over the stretch of 4 to 8 s that loops best, `loop_window`; the library's data
+  asset's settings, its mesh not saved) and a material instance per mid mesh slot (a child of
+  the library's, reading the new bone textures). The controller's `MidStillFrames` (per look
+  the idle's and the sitting loop's first and last frame), `MidIdleMaterials` and
+  `MidIdleStarts` (set on each look's mid component, `MidSlotMaterial`; the clothing switch
+  puts them back). A mid person standing still plays the idle, one sitting (or sitting down
+  or standing up) the sitting loop, each from its own time offset and at 0.85 to 1.15 of the
+  clip's pace; with them a sitter is drawn by its tier (LG4 kept sitters near out to `MidM`).
+- **Far:** per look a still sheet (`<content>/FarIdle`: 8 views of 16 rows, the walk's 8 frames
+  as the library's sheet, 4 poses through the sitting loop, 4 through the idle) on
+  `M_CgPersonCardIdle_<key>`, the library's card with its cell from per-instance custom data
+  12 and 13 (first cell, cells: the walk's 0 and 8; a still person one cell of its own, by its
+  seed); the far instances carry 14 floats. `CardCells` (6: walk, sit, idle, a first cell and
+  cells each); `CardMaterials` the still sheets' cards.
+- **Console and status:** `CityGenLife.PlaceShow sitdown|standup|sitmid|sitfar|idlemid|idlefar`
+  (the camera at someone sitting down or standing up, close; at someone sitting or standing at
+  a slot from 55 m or 150 m, the view's own lens); the status's `places` adds `sit_downs`,
+  `mid_idles` and `still_cards`.
+
 ## Milestones and checks
 
 - **Every milestone** updates the exporter in its own PR for what it adds or changes (a new

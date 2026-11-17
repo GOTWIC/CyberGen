@@ -413,7 +413,19 @@ PLACE_CLIPS = {
     "talk_c": f"{GAS_ANIM}/Idle/M_Neutral_Stand_Idle_Break_v03",
     # (LG8: running from a danger near the view)
     "run": f"{GAS_ANIM}/Run/M_Neutral_Run_Loop_F",
+    # (people_idles: sitting down on a bench, walking in from its front, its left, its right,
+    # behind on its left and on its right, the left foot leading; standing up and walking off.
+    # Made in the seat's frame: the walk processor walks a person to the sit-down that starts
+    # nearest the way it comes from, `SIT_IN`)
+    "sit_in_f": f"{GAS_ANIM}/Interactions/Bench/M_interaction_bench_into_F_Lfoot",
+    "sit_in_l": f"{GAS_ANIM}/Interactions/Bench/M_interaction_bench_into_L_090_Lfoot",
+    "sit_in_r": f"{GAS_ANIM}/Interactions/Bench/M_interaction_bench_into_R_090_Lfoot",
+    "sit_in_bl": f"{GAS_ANIM}/Interactions/Bench/M_interaction_bench_into_BL_LFoot",
+    "sit_in_br": f"{GAS_ANIM}/Interactions/Bench/M_interaction_bench_into_BR_LFoot",
+    "sit_out": f"{GAS_ANIM}/Interactions/Bench/M_interaction_bench_out_to_walk",
 }
+# the sit-downs in the order the runtime numbers them (`CityGenLife`'s SitInClips per group)
+SIT_IN = ("sit_in_f", "sit_in_l", "sit_in_r", "sit_in_bl", "sit_in_br")
 
 # --- LG6: transit (scope 6.6) ------------------------------------------------------------------
 
