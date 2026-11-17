@@ -1,25 +1,25 @@
 {
  "device": "windows",
  "label": "Windows PC",
- "updated": "2026-11-17T01:22:37Z",
+ "updated": "2026-11-17T07:19:26Z",
  "sessions": 27,
  "worktree_sessions": 27,
- "subagents": 34,
+ "subagents": 35,
  "totals": {
-  "total": 13269498671,
-  "input": 55988,
-  "output": 19948667,
-  "cache_write_5m": 262828908,
-  "cache_write_1h": 59765651,
-  "cache_read": 12926899457
+  "total": 13664742821,
+  "input": 57468,
+  "output": 20412865,
+  "cache_write_5m": 269963815,
+  "cache_write_1h": 59955790,
+  "cache_read": 13314352883
  },
  "models": {
   "claude-opus-5-5": {
-   "input": 55988,
-   "output": 19948667,
-   "cache_write_5m": 262828908,
-   "cache_write_1h": 59765651,
-   "cache_read": 12926899457
+   "input": 57468,
+   "output": 20412865,
+   "cache_write_5m": 269963815,
+   "cache_write_1h": 59955790,
+   "cache_read": 13314352883
   }
  },
  "days": {
@@ -119,27 +119,32 @@
    "sessions": 1
   },
   "2026-11-16": {
-   "total": 1011808109,
-   "output": 1227257,
+   "total": 1350957936,
+   "output": 1636460,
+   "sessions": 1
+  },
+  "2026-11-17": {
+   "total": 56094323,
+   "output": 54995,
    "sessions": 1
   }
  },
  "stats": {
   "totals": {
-   "total": 26891551745,
-   "input": 111956,
-   "output": 49421727,
-   "cache_write_5m": 363664454,
-   "cache_write_1h": 130928854,
-   "cache_read": 26347424754
+   "total": 27608281871,
+   "input": 114606,
+   "output": 50416724,
+   "cache_write_5m": 372567825,
+   "cache_write_1h": 131300237,
+   "cache_read": 27053882479
   },
   "models": {
    "claude-opus-5-5": {
-    "input": 111956,
-    "output": 49421727,
-    "cache_write_5m": 363664454,
-    "cache_write_1h": 130928854,
-    "cache_read": 26347424754
+    "input": 114606,
+    "output": 50416724,
+    "cache_write_5m": 372567825,
+    "cache_write_1h": 131300237,
+    "cache_read": 27053882479
    }
   },
   "days": {
@@ -239,8 +244,13 @@
     "sessions": 1
    },
    "2026-11-16": {
-    "total": 1869583587,
-    "output": 2805369,
+    "total": 2490218369,
+    "output": 3689370,
+    "sessions": 1
+   },
+   "2026-11-17": {
+    "total": 96095344,
+    "output": 110996,
     "sessions": 1
    }
   },
