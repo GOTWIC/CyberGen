@@ -1800,6 +1800,7 @@ CLOSE_M = 0.035          # an outer garment within this of a face (nearest) runs
 CLOSE_RAY_M = 0.16       # ... and every ray from it, straight and tilted, meets it within this
 CLOSE_TILT = 0.55        # the tilted rays' slope (about 30 degrees up, down and aside)
 FREE_PARTS = ("skirt", "hood", "collar")   # an outer garment's own parts that hang free
+CLOSE_EDGE_M = 0.06      # ... but a face this near an outer garment's open edge stays
 
 
 def _ray_other(bvh, fpiece, own, o, d, far):
@@ -1822,7 +1823,9 @@ def hide_covered(ob):
     collar) and its rays, straight out and tilted up, down and to each side, meeting them within
     `CLOSE_RAY_M`, so no edge or opening shows the gap. LG2 kept a face only a ray from it
     found covered within 7 cm, and a coat's waist over a heavy body runs farther out at its
-    back: the trousers' waist under it came through as the two moved apart."""
+    back: the trousers' waist under it came through as the two moved apart. A face within
+    `CLOSE_EDGE_M` of an open edge (hem, cuff, opening) of a garment over it stays either way:
+    walking lifts the hem off it, and taken out it left a hole under a jacket's back."""
     me = ob.data
     piece = [0.0] * len(me.vertices)
     me.attributes["piece"].data.foreach_get("value", piece)
@@ -1848,16 +1851,42 @@ def hide_covered(ob):
         sel = [t for t, oo, pp in zip(tris, ford, fparts)
                if o + 0.01 < oo < LAYER_ORDER["acc"] - 0.01 and pp not in FREE_PARTS]
         outer_bvh[o] = BVHTree.FromPolygons(co, sel) if sel else None
+    # (and their open edges: a face near an outer garment's hem, cuff or opening stays, as
+    # walking lifts the hem off it: taken out, it left a hole showing under a jacket's back)
+    from mathutils.kdtree import KDTree
+    ecount = {}
+    for fi, t in enumerate(tris):
+        for a, b in zip(t, t[1:] + t[:1]):
+            k = (a, b) if a < b else (b, a)
+            ecount.setdefault(k, []).append(fi)
+    edge_pts = [(ford[fs[0]], co[a] * 0.5 + co[b] * 0.5, co[a], co[b])
+                for (a, b), fs in ecount.items() if len(fs) == 1]
+    outer_edges = {}
+    for o in outer_bvh:
+        pts_o = [p for oo, m, pa, pb in edge_pts
+                 if o + 0.01 < oo < LAYER_ORDER["acc"] - 0.01 for p in (m, pa, pb)]
+        kd = KDTree(len(pts_o))
+        for i, p in enumerate(pts_o):
+            kd.insert(p, i)
+        kd.balance()
+        outer_edges[o] = kd if pts_o else None
     drop = []
-    close = 0
+    close = kept = 0
     for fi, poly in enumerate(me.polygons):
         n = poly.normal
         pts = [poly.center] + [co[i] * 0.8 + poly.center * 0.2 for i in poly.vertices]
         covered = all(_ray_other(bvh, fpiece, fpiece[fi], p + n * 0.0015, n, COVER_M)
                       is not None for p in pts)
         ob_ = outer_bvh.get(ford[fi])
+        kd = outer_edges.get(ford[fi])
+        if covered and kd is not None and ford[fi] > LAYER_ORDER["skin"] and \
+                kd.find(poly.center)[2] <= CLOSE_EDGE_M:
+            # (near a garment's open edge over it: walking moves the edge, so it stays)
+            covered = False
+            kept += 1
         if not covered and ob_ is not None and fparts[fi] in CLOSE_PARTS and \
-                ford[fi] > LAYER_ORDER["skin"]:
+                ford[fi] > LAYER_ORDER["skin"] and \
+                (kd is None or kd.find(poly.center)[2] > CLOSE_EDGE_M):
             up = Vector((0, 0, 1))
             side = n.cross(up)
             dirs = [n]
@@ -1882,7 +1911,8 @@ def hide_covered(ob):
                 close += 1
         if covered:
             drop.append(fi)
-    log(f"hide_covered: {len(drop)} faces out, {close} by an outer layer close over them")
+    log(f"hide_covered: {len(drop)} faces out, {close} by an outer layer close over them, "
+        f"{kept} kept near an outer edge")
     if drop:
         bm = bmesh.new()
         bm.from_mesh(me)
