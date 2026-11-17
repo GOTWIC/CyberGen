@@ -1,5 +1,9 @@
 # Places on and off at fixed viewpoints (game thread, ms a frame)
 
+Read lifegen's own timers (`CityGenLife_*`): the engine's timers differ by what streamed in
+each 30 s window, and the last window (places off, Midtown) also holds the game's exit
+(`FEngineLoop::Exit`, the purge), which its region ran into.
+
 ## d02_wk_e1715n1224
 
 Frames 2318 (places on) and 2051 (off); the game thread's frame 13.71 ms against 15.54 ms.

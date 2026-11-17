@@ -140,11 +140,31 @@ streaming and the machine's other load, not the places.
 
 ## The package
 
-PACKAGE
+Delta cooked and packaged (Development, Win64) from `CityAG16` as before (`builds/packaged/
+package_curves.cmd`, 15.5 minutes), staged only and moved to `builds/packaged/Delta_curves`
+(5.2 GB). `builds/packaged/Delta_idles` had been deleted for room during the import, and
+`CityAG16`'s `Saved/Cooked` and `Saved/StagedBuilds` were deleted after the smoke launch. The
+smoke launch (`builds/delta_main/smoke_curves.ps1`: its user folder outside the package, every
+`CityAG16` game process closed after it, no `Saved` folder left in the package) loads Delta in
+14.9 s and logs the five sit-downs, the stand-up and the life controller's status (2,400 people,
+1,800 cars). The packaged game was not benchmarked.
 
 ## Tests
 
-TESTS
+Only what changed (logs in `builds/delta_rebuild_tmp/tests/`):
+
+- `tests/lifegen/test_lg_places.py`, `test_lg_plan.py`, `test_lg_weather.py`: 36 passed (new
+  `test_slots_stand_on_their_surface`; the exporter's `slot_seated` in
+  `test_exporter_packs_the_places`; the plan's schemas written again).
+- `tests/atmosgen/test_at_plan.py`, `test_at_streets.py`: 19 passed (new
+  `test_dropped_fixtures_are_filled_again`).
+- `tests/assetgen/test_ag_facades.py`: 14 passed (new
+  `test_arcade_columns_keep_inside_an_acute_corner`).
+- The goldens `GEN_VERSION` moves (`tests/assetgen/goldens.py --sections ag1 ag6 vesper`), then
+  `test_ag_build.py` (13 passed, the small city's and Vesper Bay's building goldens among
+  them), `test_ag_determinism.py`'s small city briefs and Vesper Bay buildings goldens (3
+  passed; the run was stopped at the five samples' briefs goldens, which a building's shell
+  does not touch), `test_ag_materials.py`'s materials and library goldens (2 passed).
 
 ## Choices made
 
@@ -167,6 +187,9 @@ TESTS
   hump runs straight between them (a sidewalk at 2.3 m and 2.6 m at its ends over a 4.5 m
   crest): mid people there walk inside the embankment; near people trace the ground.
 - **People walking in the air** in one shot (Midtown, by a viaduct, `pday_slot_vending`'s top
-  left): walkers on a walkway with nothing drawn under it; not looked into.
+  left): an elevated station's stair walkway (`wk.e651n620`) rises 31 m over 18 m, from the
+  platform at 31 m straight down to the sidewalk, with no stair drawn along it; its people
+  climb through the air. A citygen station stair (M5's stairs, the platform's height); not
+  looked into further.
 - **9 slots with no walkway at their height within 15 m**: their users climb to the slot from
   their walkway.
