@@ -1,4 +1,4 @@
-lifegen plan: Nexus City (ok), plan 1c0c6ee9a2d3c8c3
+lifegen plan: Nexus City (ok), plan 31e554edc59f1b39
 
 spawn points 7952, slots 842, tiles 152; people on the streets at the peak hour 57172, vehicles 3523
 

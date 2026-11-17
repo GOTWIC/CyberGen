@@ -1,6 +1,7 @@
 // lifegen's runtime controller (LG0): see CityGenLifeActor.h.
 
 #include "CityGenLifeActor.h"
+#include "HAL/IConsoleManager.h"
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "CityGenLifeISM.h"
 #include "CityGenLifeProcessors.h"
@@ -389,6 +390,11 @@ void ACityGenLife::BuildLanes()
 }
 
 // --- the stand-ins and the cars ---------------------------------------------------------------
+
+int32 UCgLifeISM::BoundsMode = 1;
+static FAutoConsoleVariableRef CVarCgLifeBounds(TEXT("CityGenLife.Bounds"), UCgLifeISM::BoundsMode,
+	TEXT("CityGenLife.Bounds 0|1|2: lifegen's instanced components' bounds by the engine's measure, "
+		 "the city's fixed box (the default), or lifegen's own measure"));
 
 void ACityGenLife::FixBounds(UInstancedStaticMeshComponent* C) const
 {

@@ -3079,9 +3079,12 @@ LG8 exports and runs as before, at the plan's hour (it still follows atmosgen's 
   a car standing `StuckS` in a queue past `StuckFarM` of the view leaves (its lane refilled as
   any). Cars stopped for the player on foot wait (no horn: lifegen has no sound, scope 11).
 - **Performance** (LG8's pass, `docs/progress/LG8/README.md`): every moving instanced component
-  of the controller is a `UCgLifeISM` with fixed bounds (the lanes' box, 1.5 km round it: no
-  bounds measured over its instances at every update), the near people's garment material
-  instances made once per slot and parent and reused (no garbage as people come and go), the
+  of the controller is a `UCgLifeISM` with fixed bounds (`CityGenLife.Bounds 1`, the default:
+  the lanes' box, 1.5 km round it, never measured; every component drawn in every view, twice
+  LG7's draw calls, which the render thread and GPU carry while the game thread, the bound,
+  saves the measure; 2 lifegen's own measure, each shown instance's place grown by the mesh's
+  radius, hidden instances left out; 0 the engine's, every instance's box), the near people's
+  garment material instances made once per slot and parent and reused (no garbage as people come and go), the
   near skeletal meshes' bounds fixed (the leader's physics asset, the followers' the leader's),
   the ground traced under near people only and cars within 150 m, the far cards sent every
   third frame, cars past 250 m stepped every second frame and past 550 m every fourth, a
@@ -3094,7 +3097,8 @@ LG8 exports and runs as before, at the plan's hour (it still follows atmosgen's 
   state, rain and every value now, umbrellas drawn, people sheltering, looking, fleeing,
   gathering, dangers, people sent in, the stretches) and `traffic.stuck`.
 - **Benchmark:** every life pass sets `CityGenLife.FollowAtmos 1` and `CityGenLife.Weather
-  auto`; `night_life_noweather` the night's rain without its effect on life.
+  auto` and `CityGenLife.Bounds 1`; `night_life_noweather` the night's rain without its
+  effect on life; `night_life_ownbounds` and `night_life_enginebounds` the other two bounds.
 
 ## Milestones and checks
 
@@ -3174,3 +3178,4 @@ LG8 exports and runs as before, at the plan's hour (it still follows atmosgen's 
 | LG4 | Life at places ("From LG4: life at places" above): `unreal_life.pack_places` and the door, drive and pool fields LG4 adds (`PACK_VERSION` 6), `import_city.places_props` (`LIFE_VERSION` life7), the places' clips made in the project after the people library (`unreal_people.ensure_place_clips`, `ue/people_places.py`, `Saved/CityGenPeople/places.json`), the `SmartObjects` plugin a dependency of `CityGenLife`, slots' use points as Smart Objects of the world's subsystem while their walkways are live, gangs, police pairs and patrol cars in a livery; console `CityGenLife.Places`, `.Gangs`, `.Police`, `.PlaceShow`, `.SitOffset`, the play menu's Places row, the status's `places`; bench pass `night_life_noplaces`. A plan without `places` exports and runs as before. |
 | LG6 | Transit ("From LG6: transit" above): `unreal_life.pack_transit` and the stand-ins' model table `TRANSIT_MODELS` (`PACK_VERSION` 7), `import_city.transit_props` and `M_CgTransit` (`LIFE_VERSION` life8), every line's trains by the world's time on their timetables, doors at the stops, people leaving and boarding at the live stops, a served station's street accesses quiet while transit runs, the platforms' keep-out (`WalkClear`); console `CityGenLife.Transit`, `.TransitShow`, the play menu's Transit row, the status's `transit`; bench pass `night_life_notransit`. A plan without `transit` exports and runs as before. | Delta imported into CityAG16, checked with shots of trains at the stations and running (`docs/progress/LG6/`) |
 | LG7 | Air and water ("From LG7: air and water" above): `unreal_life.pack_airwater` and the stand-ins' per kind model table `AIRWATER_MODELS` with AG18's hover cars (`PACK_VERSION` 8), `import_city.airwater_props` (`LIFE_VERSION` life9), every route of what flies and floats by the world's time (flying cars between pads and on circuits, drones, police and media fliers, aircraft, shuttles, boats, water taxis, ferries, ships), banking and bobbing, flashing lights; console `CityGenLife.Air`, `.Water`, `.AirShow`, the play menu's Air traffic and Boats rows, the status's `airwater`; bench pass `night_life_noairwater`. A plan without `airwater` exports and runs as before. | Delta imported into CityAG16, checked with shots of fliers in their layers, a landing, drones, police, boats, a ferry at its pier and a ship (`docs/progress/LG7/`) |
+| LG8 | The hour, the weather and reactions ("From LG8" above): `unreal_life.pack_weather`, the walk rows' `walk_cover`, `walk_night` and `walk_road_side`, the run clip (`PACK_VERSION` 9), `import_city.weather_props` (`LIFE_VERSION` life10); the controller follows atmosgen's hour and weather state (people out, pace, raincoats, umbrellas, shelter, nightlife, the cars' share, speed and headway), people look at the player and flee a danger (`Panic`), then gather; every junction exit tested for room, stuck cars far off leave; lifegen's instanced components (`UCgLifeISM`, `CityGenLife.Bounds`); console `CityGenLife.FollowAtmos`, `.Weather`, `.Panic`, `.WeatherShow`, `.Bounds`, the play menu's Scare the crowd row, the status's `weather`; bench passes `night_life_noweather`, `night_life_ownbounds`, `night_life_enginebounds`. A plan without `weather` exports and runs as before (at the plan's hour). | Delta imported into CityAG16 and Vesper Bay into a throwaway project, checked with shots of rain, umbrellas, shelter, people looking and fleeing (`docs/progress/LG8/`) |

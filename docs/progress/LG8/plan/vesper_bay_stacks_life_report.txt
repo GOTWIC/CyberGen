@@ -1,4 +1,4 @@
-lifegen plan: Vesper Bay Stacks (ok), plan c280dcc90bb104a3
+lifegen plan: Vesper Bay Stacks (ok), plan 90c193dd9bbd7d46
 
 spawn points 8580, slots 927, tiles 152; people on the streets at the peak hour 39820, vehicles 3030
 

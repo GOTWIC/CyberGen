@@ -1,0 +1,42 @@
+window fly_150m 388.8 457.4 frames 3732 events 11914393
+timer                                                                    excl ms/f incl ms/f     n/f
+ProcessLinkerLoadPackageSummary                                              2.302     2.309     1.6
+Game thread idle time                                                        1.524     1.524     0.3
+AddPrimitive (GT)                                                            1.234     2.233    29.0
+UStaticMesh::GetUsedMaterials                                                1.098     1.098   306.5
+CityGenLife_UAID_C87F54669DD3981403                                          0.983     2.741     1.0
+UInstancedStaticMeshComponent::CalcBoundsImpl                                0.980     0.980   117.5
+CityGenLifeGround                                                            0.673     0.714    78.4
+CityGenLifeDriveProcessor_0                                                  0.524     0.524     1.0
+ReflexSleep                                                                  0.368     0.368     1.0
+WaitForTasks                                                                 0.343     0.343     1.0
+CityGenAtmos_UAID_C87F54669DD38D1303                                         0.305     0.900     1.0
+FWorldPartitionLevelHelper::RemapLevelSoftObjectPaths                        0.262     0.268     0.1
+CityGenLifeWalkProcessor_0                                                   0.249     0.249     1.0
+Plane                                                                        0.234     0.396    49.3
+STAT_UInstancedStaticMeshComponent_BuildRenderData                           0.204     0.634   168.8
+UWorld_AddPostProcessingSettings                                             0.183     0.187     1.0
+UInstancedStaticMeshComponent::BatchUpdateInstancesTransforms                0.177     0.177    88.6
+ConditionalFinishDestroy                                                     0.167     0.169     0.1
+UpdateCoreCsvStats_BeginFrame                                                0.138     0.138     1.0
+Post Tick Component Update                                                   0.125     3.652     1.0
+STAT_FCsvProfiler_EndFrame_Stop                                              0.120     0.120     0.0
+UWorldPartitionStreamingPolicy::UpdateStreamingState_ForEachStreamingCel     0.113     0.113     0.8
+DeferredRenderUpdates_GameThread                                             0.112     3.521     1.0
+Event_DeferredPostLoad                                                       0.109     0.133     1.6
+TickAsyncLoading GT                                                          0.104     3.738     1.0
+UpdateKinematicBonesToAnim                                                   0.100     0.100     2.0
+FPhysInterface_Chaos::AddGeometry                                            0.090     0.090     7.2
+ConditionalBeginDestroy                                                      0.089     0.096     0.0
+BeginRenderingViewFamily                                                     0.089     3.763     1.0
+FViewport_Draw                                                               0.080     4.200     1.0
+ConstructObject                                                              0.076     0.201    15.7
+AActor::RerunConstructionScripts                                             0.075     0.183     1.7
+FShaderCommonCompileJob::Destroy                                             0.074     0.083     0.1
+PerformReachabilityAnalysisOnObjectsInternal                                 0.073     0.073     0.0
+CreatePhysicsShapes                                                          0.070     0.163     7.2
+Event_CreateExports                                                          0.066     0.213     1.7
+TickableGameObjects Time                                                     0.066     0.346     2.0
+FrameTime                                                                    0.063    18.362     2.0
+GameEngine Tick                                                              0.063    15.313     1.0
+GT Total                                                                     0.055     0.060     8.0

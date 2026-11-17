@@ -556,3 +556,14 @@ milestone. Report, shots, benchmark, decisions and open items:
 - **Exporter and runtime** (`unreal_life.pack_weather`, `walk_cover`, `walk_night`, `run_clips`,
   `PACK_VERSION` 9; `import_city.weather_props`, `LIFE_VERSION` life10;
   `CityGenLifeWeather.cpp`; the processors; `CityGenPlay`'s Scare the crowd row).
+- **Performance pass** (an Unreal Insights trace of the lean route, the controller's steps in
+  trace scopes): lifegen's instanced components with fixed bounds (`UCgLifeISM`, the lanes'
+  box; `CityGenLife.Bounds` 0 and 2 the engine's and lifegen's own measures), the near
+  garments' material instances kept per slot (the garbage collector had purged them), fixed
+  skeletal bounds near, fewer ground traces, far cards, far cars and idle models' bodies sent
+  less often. The walk's slowest frames are World Partition's instanced HLOD components
+  re-sending their instance data as cells stream (2,362 updates in such a frame), not lifegen's
+  step (1.7 ms median, 2.7 at the 95th percentile).
+- **Delta:** every plan check and the Unreal check pass (Vesper Bay's too, blockout only, in a
+  throwaway project); `night_plan_all` 21.8 ms p95 native on the lean route (walk 24.7), 23.0
+  under 3.4 cores of other load, against LG7's 22.6: over the 20 ms budget.

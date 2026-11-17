@@ -3116,6 +3116,58 @@ LG7 (air and water) is in place:
   and water off 21.7 (both under about 3.3 cores of other load; a component sent every frame
   only while a vehicle within `AwNearM` moved in it). Results: `docs/progress/LG7/README.md`.
 
+LG8 (weather, reactions and release) is in place, which completes stage 4:
+- **The hour and the weather:** the runtime follows atmosgen's controller (found by its class's
+  name; its `Hour`, `GetWeatherLabel`, `RainRate` while `bRain`) every half second: an hour's
+  step moves the doors' and places' rates and the live numbers (people come out and go in over
+  their trips), a jump fills every live walkway and lane again; the weather by the plan's table
+  (`lifegen/weather.py`, `presets.WEATHER_LIFE`: per state people out, pace, rain looks,
+  umbrellas, shelter, the cars' share, speed and headway; a rain state's values reached by
+  atmosgen's rain over its own rate, `WEATHER_RAIN`). Fewer out: past a tenth over, walkers
+  head in at the next door (`ThinOut`). Console `CityGenLife.FollowAtmos`, `.Weather
+  STATE|auto|off`; `CityGenLife.Hour H` stops following.
+- **Shelter, umbrellas, nightlife:** each walkway's stretches out of the rain from atmosgen's
+  rain shadow (`lifegen plan --atmos DIR`, default BUILD/atmos; AT5's masks, a cover 2.1 m or
+  more over it; underground and enclosed walkways whole; walk rows' `cover`), where a passer-by
+  stops by the state's chance and stands at the side facing out; umbrellas (a canopy and a
+  shaft of the engine's basic shapes in `M_CgTransit`, ten canopy colors, a share with a lit
+  shaft) over the right shoulder of near and mid people who hold one, folded under a cover; the
+  pool's mix drawn at 0.6 of the rainiest state's rain looks (`plan.POOL_RAIN`), the runtime
+  blending a district's clear groups (`outfits.district_groups_clear`) toward the rain group;
+  nightlife's people round the open bars, clubs and arcades on their door walkways (walk rows'
+  `night`, `presets.NIGHTLIFE`), on top of M11's density.
+- **Reactions:** people standing still within 6 m of the player turn to look at it; a danger
+  (`ACityGenLife::Panic`, storygen's hook; `CityGenLife.Panic [R] [S] [X Y Z]`; the Tab menu's
+  Scare the crowd row) sends everyone but the police within 35 m running away (the way farthest
+  from it at each walkway's end, signals ignored, near the view on the Game Animation Sample's
+  run, `PLACE_CLIPS["run"]`, `RunClips`, `RunClipSpeed`), then a share comes back and stands on
+  a ring looking at it (`presets.REACTION`). No horn (no sound in lifegen).
+- **Traffic:** every junction exit is tested for room (a short exit only while empty and the
+  lanes after it clear: Old Town's 5.8 m lanes held cars inside a junction behind one waiting
+  at the next); a car waiting for room claims nothing and is never forced in; a car standing
+  75 s past 150 m of the view leaves (`presets.TRAFFIC_STUCK`); rain and fog slow the cars and
+  lengthen their headway.
+- **Performance pass:** the controller's moving instanced components are `UCgLifeISM`
+  (`CityGenLifeISM.h`: fixed bounds, the lanes' box, `CityGenLife.Bounds` 1; the engine's
+  measure over every instance cost the game thread, lifegen's own, 2, too), the near garments'
+  material instances made once per slot and parent and reused (they had kept the garbage
+  collector busy), fixed skeletal bounds near, ground traces under near people and cars within
+  150 m only, far cards every third frame, cars past 250 m every second frame and past 550 m
+  every fourth, a model's bodies with no car within 300 m every third frame;
+  `TRACE_CPUPROFILER_EVENT_SCOPE`s on the controller's steps.
+- **Every sample city** plans with every check passing (Vesper Bay's gang spot past its turf's
+  edge and deep metro concourse, Nexus City's sky tube terminal nearer its end than the turn
+  and media orbit grazing a tower, fixed).
+- **Exporter:** `unreal_life.pack_weather`, `walk_cover`, `walk_night`, `run_clips`
+  (`PACK_VERSION` 9); `import_city.weather_props` (`LIFE_VERSION` life10); checks `weather`,
+  `shelter`, `nightlife`; bench passes `night_life_noweather`, `night_life_ownbounds`,
+  `night_life_enginebounds`; the check's `until` reads
+  `weather.show` (`CityGenLife.WeatherShow`).
+- Delta: every plan check and both Unreal checks (Delta, Vesper Bay) pass; `night_plan_all`
+  21.8 ms p95 native on the lean route (23.0 under 3.4 cores of other load; LG7 22.6), over the
+  20 ms budget: the slowest frames are World Partition's instanced HLOD components re-sent as
+  cells stream, not lifegen's step (1.7 ms median). Results: `docs/progress/LG8/README.md`.
+
 ## Gallery site (GitHub Pages)
 
 `site/` is the public gallery at https://gotwic.github.io/CyberGen/ (served at

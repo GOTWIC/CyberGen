@@ -1,4 +1,4 @@
-lifegen plan: Delta Megacity (ok), plan 5fd1a0ce5ee6fd6c
+lifegen plan: Delta Megacity (ok), plan bc6e6df7b5fd960b
 
 spawn points 21188, slots 1673, tiles 132; people on the streets at the peak hour 58189, vehicles 3394
 

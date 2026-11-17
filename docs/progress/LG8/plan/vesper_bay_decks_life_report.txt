@@ -1,4 +1,4 @@
-lifegen plan: Vesper Bay Decks (ok), plan b672d843aaf1de0b
+lifegen plan: Vesper Bay Decks (ok), plan 568ebdf38e10af2b
 
 spawn points 7487, slots 823, tiles 139; people on the streets at the peak hour 43169, vehicles 3339
 

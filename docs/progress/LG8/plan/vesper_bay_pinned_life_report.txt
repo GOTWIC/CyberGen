@@ -1,4 +1,4 @@
-lifegen plan: Vesper Bay Pinned (ok), plan 94bab1395ac945e0
+lifegen plan: Vesper Bay Pinned (ok), plan 53cfb620bc64e738
 
 spawn points 8628, slots 956, tiles 153; people on the streets at the peak hour 37892, vehicles 3069
 

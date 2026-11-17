@@ -1,4 +1,4 @@
-lifegen plan: Saltreach Free Port (ok), plan 41fa75f9b7aad2f4
+lifegen plan: Saltreach Free Port (ok), plan 4c224aaa50f68135
 
 spawn points 3891, slots 474, tiles 100; people on the streets at the peak hour 36837, vehicles 1978
 

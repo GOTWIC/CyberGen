@@ -727,7 +727,11 @@ look at you; scare the crowd (the Tab menu's Scare the crowd, or `CityGenLife.Pa
 for the story stage) and they run, then come back to look. Every sample city is planned with
 every check passing.
 
-LG8_IMAGES
+| The same corner, clear and in the rain (LG8) | |
+|---|---|
+| <img src="docs/progress/LG8/unreal/delta_day_clear.jpg" width="420"> | <img src="docs/progress/LG8/unreal/delta_day_rain.jpg" width="420"> |
+| Umbrellas by night (LG8) | People turning to look at you (LG8) |
+| <img src="docs/progress/LG8/unreal/delta_night_umbrellas.jpg" width="420"> | <img src="docs/progress/LG8/unreal/delta_night_look.jpg" width="420"> |
 
 | People on an Old Town street | The walk by night |
 |---|---|

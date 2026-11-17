@@ -385,7 +385,7 @@ def test_life_passes():
                                                 "CityGenLife.Gangs", "CityGenLife.Police",
                                                 "CityGenLife.Transit", "CityGenLife.Air",
                                                 "CityGenLife.Water", "CityGenLife.FollowAtmos",
-                                                "CityGenLife.Weather"]
+                                                "CityGenLife.Weather", "CityGenLife.Bounds"]
         assert set(cmds) - set(life) == base and cmds[-1].startswith("CityGenAtmos.Hour")
     assert "CityGenLife.Enable 0" in by["night_life_off"][3]
     assert "CityGenLife.Lumen 1" in by["night_life_lumen"][3]

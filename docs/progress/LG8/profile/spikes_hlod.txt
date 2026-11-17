@@ -1,0 +1,57 @@
+Light Insights trace of the lean route (cpu, frame), game thread: frames with UStaticMesh::GetUsedMaterials over 5 ms against the rest
+big frames 264 GUM calls 7805.598484848485 HLOD upd 2361.9772727272725 ISM 11.587121212121213
+rest frames 12323 GUM calls 179.8090562363061 HLOD upd 13.59539073277611 ISM 8.589547999675403
+us per GUM call 5.341648815083801
+
+Children of DeferredRenderUpdates_GameThread over the whole trace (ms, count)
+    15095 ms  1796321  UStaticMesh::GetUsedMaterials
+     2634 ms   683973  HLODInstancedStaticMeshComponent
+     1148 ms    25313  InstancedStaticMeshComponent
+      498 ms    18140  StaticMeshComponent0
+      373 ms    13105  StaticMesh
+      196 ms     8024  CharacterMesh0
+      192 ms     8024  TransitMesh0
+      165 ms     8024  AirWater3
+      140 ms     3473  Umbrellas
+      139 ms     7722  PeopleNear0
+      133 ms     3473  UmbrellaShafts
+      130 ms     8024  AirWater2
+      122 ms     8024  ShadowBody
+      115 ms     9481  InstancedStaticMesh
+      107 ms     6557  StaticMesh1
+      107 ms     7906  CarPart64
+       98 ms     8024  AirWater1
+       96 ms     8025  AirWater0
+       93 ms     8024  CarPart70
+       87 ms     6327  PeopleNear2
+       87 ms     5385  PeopleNear3
+       81 ms     8024  CarPart76
+       75 ms     6282  PeopleNear1
+       73 ms     7923  CarPart6
+       72 ms     8245  InstancedStaticMesh1
+--
+     1130 ms    25256  InstancedStaticMeshComponent > Plane
+      187 ms     7994  CharacterMesh0 > SKM_Manny_Simple
+      182 ms     8024  TransitMesh0 > Cube
+      158 ms     8024  AirWater3 > Sphere
+      137 ms     3472  Umbrellas > Cone
+      132 ms     3473  UmbrellaShafts > Cylinder
+      128 ms     8023  AirWater2 > Cube
+      117 ms     8024  ShadowBody > SKM_Manny_Simple
+      103 ms     7901  CarPart64 > SM_tanager_cab_body
+       90 ms     8024  AirWater1 > SM_kestrel_meridian_glass
+       89 ms     8019  CarPart70 > SM_tanager_mino_body
+       87 ms     8019  AirWater0 > SM_kestrel_meridian_body
+       74 ms     8021  CarPart76 > SM_tanager_porter_body
+       65 ms     3880  CarPart23 > SM_halcyon_ridge_wheel_fr
+       64 ms     7921  CarPart6 > SM_brakk_hauler_body
+       62 ms     7819  CarPart12 > SM_brakk_mule_body
+       60 ms     7637  CarPart0 > SM_brakk_bastion_body
+       60 ms     8020  CarPart71 > SM_tanager_mino_glass
+       58 ms     7625  CarPart1 > SM_brakk_bastion_glass
+       58 ms     7546  AirWater11 > Cylinder
+       57 ms     7340  CarPart58 > SM_orrin_pebble_body
+       55 ms     7930  CarPart7 > SM_brakk_hauler_glass
+       54 ms     6713  CarPart30 > SM_halcyon_sable_body
+       53 ms     7945  CarPart13 > SM_brakk_mule_glass
+       51 ms     8023  CarPart77 > SM_tanager_porter_glass

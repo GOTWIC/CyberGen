@@ -1,4 +1,4 @@
-lifegen plan: Cragmouth (ok), plan 7f5e2d854551707b
+lifegen plan: Cragmouth (ok), plan 14f0dc06920826f5
 
 spawn points 8909, slots 578, tiles 130; people on the streets at the peak hour 48404, vehicles 3368
 
