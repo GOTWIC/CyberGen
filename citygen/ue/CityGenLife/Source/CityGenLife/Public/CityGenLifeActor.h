@@ -664,6 +664,9 @@ public:
 	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") float StuckFarM = 150.f;
 	/** The places' run clip per clip group (LG8: fleeing near the view; else the walk, faster). */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Reactions") TArray<TObjectPtr<UAnimSequence>> RunClips;
+	/** The run clip's own speed (m/s: its root's travel over its length before it was made in
+	 *  place). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Reactions") float RunClipSpeed = 4.5f;
 	/** Life follows atmosgen's hour and weather (CityGenLife.FollowAtmos [0|1]); off, its own Hour
 	 *  and weather (CityGenLife.Hour, CityGenLife.Weather). */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Weather") bool bFollowAtmos = true;
@@ -873,6 +876,7 @@ private:
 	TArray<TArray<int32>> ModelSlots, FreeByModel, PartsOfModel;
 	TArray<TArray<uint8>> PartShown;          // (per part, per instance: drawn now)
 	int32 InstancesSent = 0;
+	int64 CarFrame = 0;
 	TArray<int32> TrafficLaneHave;
 	TArray<FMassEntityHandle> CarEnts;
 	FRandomStream TrafficRng;
@@ -880,7 +884,7 @@ private:
 	float TrafficClock = 0.f, TrafficLiveScale = 1.f, TrafficWantLive = 0.f, RefillAcc = 0.f;
 	int32 TrafficLiveLanes = 0, CarsActive = 0, CarsSpawned = 0, CarsRefilled = 0, CarsLost = 0, CarsLeftTotal = 0;
 	int32 CarsWhyNow[7] = {0, 0, 0, 0, 0, 0, 0};
-	int32 CarsMovingNow = 0, CarsForcedTotal = 0;
+	int32 CarsMovingNow = 0, CarsForcedTotal = 0, CarsStuckTotal = 0;
 	double TrafficMs = 0.0, TrafficMsMax = 0.0, CarDrawMs = 0.0, LiveMs = 0.0, LiveMsMax = 0.0;
 	FString LastShow;
 

@@ -538,8 +538,9 @@ bool ACityGenLife::ShowWeather(const FString& What)
 	bool bOk;
 	if (What == TEXT("look"))
 	{
-		// (the camera, the player, 4 m in front of someone waiting: those near turn to it)
-		bOk = FrameCar(At + Fwd * 400.0, -Fwd, 0.0, 170.0, 0.0);
+		// (the camera, the player, 4 m in front of someone waiting at eye height: those near
+		// turn to it)
+		bOk = FrameCar(At, -Fwd, 400.0, 170.0, 0.0);
 	}
 	else if (What == TEXT("gather") || What == TEXT("flee"))
 	{

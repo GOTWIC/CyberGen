@@ -502,9 +502,15 @@ def people_library(lib: dict | None, spike: dict) -> dict:
         place = {"sit_clips": [(pg[k].get("sit") or {}).get("anim", "") for k in keys],
                  "talk_clips": [(pg[k].get(c) or {}).get("anim", "") for k in keys for c in talk],
                  "talk_count": len(talk), "places_hash": pc.get("hash"),
-                 # (LG8: the run, where the places' clips have it)
+                 # (LG8: the run, where the places' clips have it, and the speed it runs at:
+                 # its root's travel over its length, made in place)
                  "run_clips": [(pg[k].get("run") or {}).get("anim", "") for k in keys]
-                 if all((pg[k].get("run") or {}).get("anim") for k in keys) else []}
+                 if all((pg[k].get("run") or {}).get("anim") for k in keys) else [],
+                 "run_clip_speed": round(max([math.hypot(*((pg[k].get("run") or {})
+                                                          .get("travel_cm") or [0.0, 0.0]))
+                                              / 100.0 / max(0.1, float((pg[k].get("run") or {})
+                                                                       .get("length_s") or 1.0))
+                                              for k in keys] or [0.0]), 3)}
     return {**place, "near_meshes": near, "near_mesh_starts": starts,
             "near_hair": [c["near"].get("hair") or "" for c in chars],
             "char_clip_group": [keys.index(c["skeleton"]) if c.get("skeleton") in keys else 0

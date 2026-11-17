@@ -1334,6 +1334,7 @@ def places_props(d, missing):
            "talk_clips": [load(p) for p in d.get("talk_clips") or []],
            "talk_count": int(d.get("talk_count") or 0),
            "run_clips": [load(p) for p in d.get("run_clips") or []],
+           "run_clip_speed": float(d.get("run_clip_speed") or 0.0) or 4.5,
            "drive_police": fl("drive_police"), "traffic_police": it("traffic_police"),
            "police_paint": fl("police_paint"), "places": True, "gangs": True, "police": True}
     return out

@@ -386,6 +386,11 @@ def cycle(track: Track, mode: dict, stops: list[dict]) -> dict:
             stop_at = {}
             for k, st in enumerate(stops):
                 x = st["s"] - a if way == 0 else b - st["s"]
+                # (LG8: a terminal station nearer its track's end than the turn point, half a
+                # train in from it, is called at the turn: the train stands along it there;
+                # Nexus City's Spire Line, its Corporate Core stop 10 m from the end)
+                if -tl - 1e-6 <= x < 0.0 or D < x <= D + tl + 1e-6:
+                    x = 0.0 if x < 0.0 else D
                 if -1e-6 <= x <= D + 1e-6:
                     stop_at[min(n, max(0, int(round(x / h))))] = k
             lim = [lim_at(s_of(i * h)) for i in range(n + 1)]

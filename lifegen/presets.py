@@ -639,7 +639,7 @@ NIGHTLIFE = {"kinds": {"bar": 3.0, "club": 7.0, "arcade": 2.0}}
 # hold their ground); then for `gather_s` a `gather_share` of the people within `gather_m`
 # come back and stand `ring_m` off it looking at it for `stay_s`; cars stopped for the player
 # on foot wait (no sound in lifegen: no horn, scope 11)
-REACTION = {"look_m": 6.0, "flee_m": 35.0, "flee_s": 14.0, "flee_pace": 2.4,
+REACTION = {"look_m": 6.0, "flee_m": 35.0, "flee_s": 14.0, "flee_pace": 2.9,
             "gather_m": 60.0, "gather_s": 90.0, "gather_share": 0.35, "ring_m": [9.0, 22.0],
             "stay_s": [15.0, 60.0]}
 # the traffic: a car stuck this long (s) far from the view (past `stuck_far_m`) leaves, so no

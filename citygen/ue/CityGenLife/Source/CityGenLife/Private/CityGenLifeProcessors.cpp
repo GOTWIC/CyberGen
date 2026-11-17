@@ -450,6 +450,22 @@ namespace CgLife
 		return true;
 	}
 
+	/** A person coming back to look at a danger turned toward it along its walkway, once. */
+	void FaceDanger(const FCgLifeFrame& F, FCgLifeWalker& W)
+	{
+		if (!F.Storage->Lanes.IsValidIndex(W.Lane) || W.Lane >= F.WalkLanes ||
+			F.Storage->Lanes[W.Lane].PointsEnd - F.Storage->Lanes[W.Lane].PointsBegin < 2)
+		{
+			return;
+		}
+		FVector At, Head;
+		PathAt(F, W, At, Head);
+		if (FVector::DotProduct(Head * W.Dir, F.PanicAt - W.Pos) < 0.0)
+		{
+			W.Dir = -W.Dir;
+		}
+	}
+
 	/** Whether a danger is on now and this person within its reach (3D). */
 	bool InDanger(const FCgLifeFrame& F, const FCgLifeWalker& W)
 	{
@@ -636,7 +652,8 @@ namespace CgLife
 		// danger; out of it, a share comes back to look while the danger draws them)
 		if (W.Panic != F.PanicId && W.Role != CgRole::Police && W.State != CgWalk::Enter &&
 			W.State != CgWalk::Exit && W.State != CgWalk::Board && W.State != CgWalk::Inside && InDanger(F, W) &&
-			S.Lanes.IsValidIndex(W.Lane) && W.Lane < F.WalkLanes)
+			S.Lanes.IsValidIndex(W.Lane) && W.Lane < F.WalkLanes &&
+			S.Lanes[W.Lane].PointsEnd - S.Lanes[W.Lane].PointsBegin >= 2)
 		{
 			W.Panic = F.PanicId;
 			W.Flee = 1;
@@ -649,10 +666,11 @@ namespace CgLife
 			W.Next = INDEX_NONE;
 			FVector At, Head;
 			PathAt(F, W, At, Head);
+			// (away from it along its walkway; its side offset is the lane's, so it turns on the
+			// spot and drifts to its own right as it runs)
 			if (FVector::DotProduct(Head * W.Dir, W.Pos - F.PanicAt) < 0.0)
 			{
 				W.Dir = -W.Dir;
-				W.Lat = -W.Lat;
 			}
 		}
 		else if (W.Flee && (F.Time >= F.PanicUntil + 4.0 * (double)(W.Instance % 5) / 5.0 || F.PanicCm <= 0.f))
@@ -665,6 +683,7 @@ namespace CgLife
 				W.Gawk = 1;
 				W.Ring = FMath::Lerp((float)F.RingCm.X, (float)F.RingCm.Y, Unit(W));
 				W.Next = INDEX_NONE;
+				FaceDanger(F, W);
 			}
 		}
 		else if (F.bGather && W.Panic != F.PanicId && W.Role == CgRole::Crowd && W.State == CgWalk::Walk &&
@@ -678,6 +697,7 @@ namespace CgLife
 				W.Gawk = 1;
 				W.Ring = FMath::Lerp((float)F.RingCm.X, (float)F.RingCm.Y, Unit(W));
 				W.Next = INDEX_NONE;
+				FaceDanger(F, W);
 			}
 		}
 		if (W.Gawk && (F.Time >= F.GatherUntil || F.PanicCm <= 0.f))
@@ -822,7 +842,7 @@ namespace CgLife
 				FVector At, Head;
 				PathAt(F, W, At, Head);
 				const bool bAway = FVector::DotProduct(Head * W.Dir, F.PanicAt - W.Pos) < 0.0;
-				if (D2 < FMath::Square((double)W.Ring) || (bAway && D2 < FMath::Square(1.6 * (double)W.Ring)))
+				if (D2 < FMath::Square((double)W.Ring) || (bAway && D2 < FMath::Square(2.5 * (double)W.Ring)))
 				{
 					W.State = CgWalk::Look;
 					W.To = F.PanicAt;
@@ -831,11 +851,10 @@ namespace CgLife
 					Place(F, W, CgShow::Still);
 					return;
 				}
-				if (bAway && W.Next == INDEX_NONE)
+				if (bAway)
 				{
-					W.Dir = -W.Dir;
-					W.Lat = -W.Lat;
-					W.Next = INDEX_NONE;
+					// (its walkway leads away and it is not near enough to see: it walks on)
+					W.Gawk = 0;
 				}
 			}
 			// (LG8: faster in the rain; running from a danger)

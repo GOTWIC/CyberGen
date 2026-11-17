@@ -202,3 +202,15 @@ def test_exporter_packs_the_weather(build: Path):
     (build / "life" / "life_plan.json").write_text(json.dumps(plan), encoding="utf-8")
     data, _ = UL.life_data(build / "life", graphs, None, None)
     assert "weather_names" not in data["controller"]
+
+
+def test_terminal_nearer_the_end_than_the_turn_is_called():
+    # (Nexus City's Spire Line: a sky tube whose first stop is 10 m from its track's end, nearer
+    # than the turn point half a train in: the train calls there as it turns)
+    mode = P.TRANSIT_MODES["sky_tube"]
+    track = TR.Track([[0.0, 0.0, 40.0], [700.0, 0.0, 40.0]], False)
+    stops = [{"station_id": "a", "s": 10.35}, {"station_id": "b", "s": 690.0}]
+    cyc = TR.cycle(track, mode, stops)
+    called = {e[2] for e in cyc["events"] if e[2] >= 0}
+    assert called == {0, 1}
+    assert cyc["turn"][0] > 10.35

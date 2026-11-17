@@ -1785,7 +1785,8 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
                       sdata.model_dump(mode="json"), traffic["hash"], places_rec["hash"],
                       gangs_rec["hash"], police_rec["hash"]] +
                      ([transit_rec["hash"]] if tlines else []) +
-                     ([aw_rec["hash"]] if aw_routes else []))
+                     ([aw_rec["hash"]] if aw_routes else []) +
+                     [_sha(weather)])
     plan = PM.LifePlan(plan_hash=plan_hash, **body)
     pdata = json.loads(plan.model_dump_json())
     write(out / "life_plan.json", canon(pdata), wrote)

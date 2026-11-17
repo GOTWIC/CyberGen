@@ -857,8 +857,8 @@ void ACityGenLife::UpdatePeople()
 				// (LG3: standing, at a signal or behind someone: the idle; walking, the walk)
 				if (bCity && NearSlots[S].Clip != ClipWant && ClipWant == 200)
 				{
-					// (LG8: the run: its clip at the runner's speed over the clip's (about 3.6 m/s),
-					// else the walk at the flight's pace)
+					// (LG8: the run: its clip at the runner's speed over the clip's own, else the walk
+					// at the flight's pace)
 					const int32 Gait = PersonGait.IsValidIndex(P) ? FMath::Clamp(PersonGait[P], 0, FMath::Max(0, Gaits - 1)) : 0;
 					const int32 G = FMath::Clamp(Group * FMath::Max(1, Gaits) + Gait, 0, FMath::Max(0, WalkClips.Num() - 1));
 					UAnimSequence* Clip = PlaceClip ? PlaceClip : (WalkClips.IsValidIndex(G) ? WalkClips[G].Get() : nullptr);
@@ -866,7 +866,7 @@ void ACityGenLife::UpdatePeople()
 					{
 						const float V = (PersonPace.IsValidIndex(P) ? PersonPace[P] : 1.35f) * FleePace * PaceNow;
 						Lead->PlayAnimation(Clip, true);
-						Lead->SetPlayRate(PlaceClip ? FMath::Clamp(V / 3.6f, 0.7f, 1.5f) : FMath::Clamp(WalkRate(P) * FleePace, 0.5f, 3.f));
+						Lead->SetPlayRate(PlaceClip ? FMath::Clamp(V / FMath::Max(1.f, RunClipSpeed), 0.6f, 1.5f) : FMath::Clamp(WalkRate(P) * FleePace, 0.5f, 3.f));
 						NearSlots[S].Gait = INDEX_NONE;
 					}
 					NearSlots[S].Clip = ClipWant;
