@@ -14,6 +14,8 @@
 // a run of instances per train), their door leaves and lit doorways drawn near the view only.
 
 #include "CityGenLifeActor.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
+#include "CityGenLifeISM.h"
 #include "CityGenLifeTypes.h"
 #include "Algo/BinarySearch.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -149,7 +151,7 @@ void ACityGenLife::BuildTransit()
 	const int32 NM = TransitMeshes.Num();
 	for (int32 M = 0; M < NM; ++M)
 	{
-		UInstancedStaticMeshComponent* C = NewObject<UInstancedStaticMeshComponent>(this, *FString::Printf(TEXT("TransitMesh%d"), M));
+		UInstancedStaticMeshComponent* C = NewObject<UCgLifeISM>(this, *FString::Printf(TEXT("TransitMesh%d"), M));
 		C->SetMobility(EComponentMobility::Movable);
 		C->SetupAttachment(RootComponent);
 		C->SetStaticMesh(TransitMeshes[M]);
@@ -167,6 +169,7 @@ void ACityGenLife::BuildTransit()
 		C->SetAffectDynamicIndirectLighting(false);
 		C->NumCustomDataFloats = TransitData;
 		C->RegisterComponent();
+		FixBounds(C);
 		TransitComps.Add(C);
 	}
 	TrainInst.SetNum(Trains.Num());
@@ -206,7 +209,7 @@ void ACityGenLife::BuildTransit()
 	const int32 Cube = 0;
 	if (TransitMeshes.IsValidIndex(Cube) && TransitMeshes[Cube])
 	{
-		UInstancedStaticMeshComponent* C = NewObject<UInstancedStaticMeshComponent>(this, TEXT("TransitDoors"));
+		UInstancedStaticMeshComponent* C = NewObject<UCgLifeISM>(this, TEXT("TransitDoors"));
 		C->SetMobility(EComponentMobility::Movable);
 		C->SetupAttachment(RootComponent);
 		C->SetStaticMesh(TransitMeshes[Cube]);
@@ -221,6 +224,7 @@ void ACityGenLife::BuildTransit()
 		C->SetAffectDynamicIndirectLighting(false);
 		C->NumCustomDataFloats = TransitData;
 		C->RegisterComponent();
+		FixBounds(C);
 		DoorComp = C;
 	}
 	DoorInstUsed = 0;
@@ -362,6 +366,7 @@ bool ACityGenLife::DoorPoint(const FCgTrain& T, const int32 Car, const int32 Doo
 
 void ACityGenLife::UpdateTransit(const float Dt)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CityGenLife_UpdateTransit);
 	if (!IsTransit() || Trains.Num() == 0)
 	{
 		return;

@@ -2642,6 +2642,12 @@ look's garments, its hair unless the look covers it, its mid mesh and card.
     `create_new_skeletal_mesh_asset_from_mesh_lods`, the body's bone proportions): weights
     transferred from the plain outfit where it is nearer than the body (the body has no skin
     under it) and from the body elsewhere, accessories and a raised hood held to their bone;
+    since the clothing fixes (`LIB_VERSION` lg2.2) a vertex of an inner layer close under an
+    outer garment (within 4 cm on the body's middle, `garments.follow_pairs`: the JSON's
+    `follow`, `[inner, outer, weight]` in the outer layers' order first) takes that garment's
+    nearest vertex's weights, wholly within 2 cm, and a vertex `manifold` copied takes its
+    source's after (its `copies`), so the layers move as one and cannot pass through
+    each other (a coat's waist over trousers had);
   - *mid* per look: the body and face at a low LOD, the look's mid mesh (one cloth and one
     glow slot on `M_CgPersonMidCloth`, `_Glow`: vertex colors times the person's dye colors
     from per-instance custom data 4 to 12), the hair's helmet unless the look covers the hair;
@@ -2949,6 +2955,158 @@ runs as before.
 - **Benchmark:** every life pass sets `CityGenLife.Transit` (1); the pass `night_life_notransit`
   turns it off (`bench.LIFE_PASSES`).
 
+### From LG7: air and water
+
+A plan with `airwater` (`lifegen/airwater.py`, the plan's `airwater.json`) brings what flies
+and what floats over the whole city: flying cars between M3's pads and round circuits over the
+avenues and highways, drones, police and media fliers, aircraft over the map, a spaceport's
+shuttles, boats on every river, channel and canal, water taxis between piers, ferries across
+the rivers and ships at the port. A plan before LG7 exports and runs as before (none of these
+properties set).
+
+- **The pack** (`unreal_life.pack_airwater`, `PACK_VERSION` 8; `import_city.airwater_props`,
+  `LIFE_VERSION` life9): per route its kind (`AwRouteKind`, of `AwKinds`: car, drone, police,
+  media, aircraft, shuttle, boat, taxi, ferry, ship), model (`AwRouteModel`, of `AwModels`),
+  color (linear), cycle and its samples' step, vehicles per hour band (`AwRouteCount`), points
+  with the heading the vehicle faces there (`AwPoints`, 4 floats: citygen m, absolute z;
+  degrees counterclockwise from east), samples (`AwSamples`: m along the path), dwells
+  (`AwEvents`, 3 floats: arrive, depart, what: 0 pad, 1 roof, 2 pier, 3 berth, 4 launch pad)
+  and its vehicles' paints (`AwPaints`, 9 floats each, a hover car's); per model its parts
+  (`AwParts`, 9 floats: mesh, kind, middle, size, cull distance), the meshes (`AwMeshes`: the
+  engine's basic shapes, AG18's hover cars' parts) and how many custom floats each carries
+  (`AwMeshFloats`: 9 painted, 6 a stand-in's in `AwMaterial`, the trains' `M_CgTransit`).
+- **The models** (decision 6: the Mac designs the missing kinds; lifegen generates no vehicle
+  geometry): flying cars are AG18's hover cars (Kestrel's Dart, Meridian and Atlas, by the
+  districts' fleets, in their districts' paints as LG5's traffic paints a car) where the
+  project has them, with nav lights (red left, green right, a white strobe, a lamp ahead);
+  police fliers the Meridian in LG4's police livery with a flashing red and blue bar; every
+  other kind a stand-in of the per kind model table (`unreal_life.AIRWATER_MODELS`: a drone's
+  body, arms, rotors and parcel, a media flier's four ducted fans and camera, an airliner, a
+  shuttle, a boat, a yellow water taxi with its sign, a double-ended ferry, a container ship),
+  its part kinds colored by the runtime (`AW_PART_KINDS`: body, window, accent, dark, nav red,
+  nav green, strobe, police red and blue, lamp, hull, beacon). A kind's game pack replaces its
+  parts there (meshes, scale 1); the runtime is the same.
+- **The runtime** (`CityGenLifeAir.cpp`, built at BeginPlay after transit):
+  - *By the world's time,* as LG6's trains: a vehicle's place along its route is the sampled
+    cycle at (time + its phase) modulo the cycle, the band's vehicles evenly round it; nothing
+    is simulated, every route runs city-wide, a far vehicle costs a lookup and its instances
+    are placed every fourth frame past `AwFarM` (1.5 km); a component is sent to the engine
+    every frame only while a vehicle within `AwNearM` (600 m) moved in it, else every fourth
+    frame, the components taking turns (the engine's cost is per moving component).
+  - *Heading:* the route's at that point, interpolated (so a double-ended ferry, or a ship
+    backing out of its berth, runs stern first); a flier banks by its turn rate and speed (at
+    most 10 to 25 degrees by kind) and pitches with its climb in plan; a boat rolls and bobs.
+  - *Lights:* the stand-ins' lamps, windows, nav lights and accents glow by night through
+    `M_CgTransit` (MPC_CityGen's `Night`); strobes, beacons and police bars flash (drawn only
+    while lit); the hover cars' own lamps are their packs' emissive. No flier casts light.
+  - *Drawn:* one instanced component per mesh and cull distance (`AirWater0`, ...), each
+    vehicle's parts an instance in theirs; no collision, no shadows, out of Lumen's scene; a
+    drone's small parts culled past 250 to 600 m.
+- **Console:** `CityGenLife.Air [0|1]` and `CityGenLife.Water [0|1]` (toggling without an
+  argument), the play menu's **Air traffic** and **Boats** rows (`air`, `water`, `air=0|1`,
+  `water=0|1`; `ACityGenPlay::HasLifeAirWater`), and for the check's shots
+  `CityGenLife.AirShow car|landing|layers|drone|police|media|aircraft|shuttle|boat|taxi|ferry|
+  ship|pier` (the camera beside the nearest vehicle of a kind within 3 km, a car 4 to 25 s
+  from landing on its pad seen from the pad's roof, the cars' layers from behind and over a car
+  on a circuit, a taxi or ferry at a pier: the status's `airwater.show`, which the check's
+  `until` waits for). `CityGenLife.Status` adds `airwater` (routes, vehicles, fliers and boats
+  running, dwelling, near, components, instances, its time a frame).
+- **Benchmark:** every life pass sets `CityGenLife.Air` and `CityGenLife.Water` (1); the pass
+  `night_life_noairwater` turns both off (`bench.LIFE_PASSES`).
+
+### From LG8: the hour, the weather and reactions
+
+A life plan with `weather` (`lifegen plan` since LG8) makes the city's life follow atmosgen's
+hour and weather, shelter from the rain, crowd round the bars by night and react to the player
+and to danger (`citygen/unreal_life.py` `pack_weather`, the walkways' `walk_cover` and
+`walk_night`, `PACK_VERSION` 9; `import_city.weather_props`, `LIFE_VERSION` life10;
+`CityGenLifeWeather.cpp`, the walk processor's `StepCity`, the drive processor). A plan before
+LG8 exports and runs as before, at the plan's hour (it still follows atmosgen's hour).
+
+- **The pack** (`BUILD/unreal/life.json`, the controller's properties): the weather's table
+  (`WeatherNames`, `WeatherKeys`: out, pace, rain_looks, umbrella, shelter, cars, speed,
+  headway_s; `WeatherLife`, a row per state; `WeatherRain`, each state's rain rate), the plan's
+  own state (`WeatherPlan`, for a level without atmosgen's controller), the rain looks' group
+  (`RainGroup`; `DistrictGroups` are now the clear weather's), each walkway's stretches out of
+  the rain (`WalkCoverStarts`, `WalkCover`: from, to, m along it) and its nightlife per band
+  (`WalkNight`, 5 a walkway, or none), the umbrellas (`UmbrellaColors`, `UmbrellaLit`,
+  `Umbrella`: lit share, canopy width and height, height in the person's heights, right,
+  forward, tilt, shaft; `UmbrellaCanopy` and `UmbrellaShaft`, `/Engine/BasicShapes/Cone` and
+  `Cylinder` in `M_CgTransit`), the shelter's stand (`ShelterS`), the reactions (`bLook`,
+  `bFlee`, `bGather`, `LookM`, `FleeM`, `FleeS`, `FleePace`, `GatherM`, `GatherS`,
+  `GatherShare`, `RingM`, `StayS`), stuck cars (`StuckS`, `StuckFarM`) and the places' run clip
+  (`RunClips` per clip group, `RunClipSpeed`: the Game Animation Sample's
+  `M_Neutral_Run_Loop_F`, retargeted and made in place with LG4's place clips, its speed from
+  its root's travel). The import's `life.weather` says the states, the plan's state, the
+  stretches and whether there is nightlife.
+- **The hour:** every half second the controller reads atmosgen's controller (found by its
+  class's name, `CityGenAtmos`; its `Hour`): a step of one hour (time running,
+  `CityGenAtmos.TimeSpeed`) moves the doors' and places' rates (`ApplyHour`) and the live
+  walkways' and lanes' numbers, people coming out of and going in at doors over their trips; a
+  jump (the play menu's day, dusk or night, `CityGenAtmos.Hour`) fills every live walkway and
+  lane again at the new hour. Transit's trains and what flies and floats take their hour band
+  from it too. `CityGenLife.Hour H` holds life at H (and stops following, the status's
+  `weather.follow`); `CityGenLife.FollowAtmos [0|1]`.
+- **The weather:** the state atmosgen turns to (`GetWeatherLabel`, after its `>`) and its rain
+  (`RainRate` while `bRain`): a rain state's values are the clear weather's moved toward its
+  own by its rain now over its rain rate, so they follow a change as atmosgen's rain does; fog
+  and smog at once. `OutNow` scales every walkway's want (fewer out: past a tenth over, people
+  walking head in at the next door, `ThinOut`), `PaceNow` every walker's pace and walk clip,
+  `RainLooksNow` the share of people coming out in the rain looks (a district's groups blended
+  toward the rain group), `UmbrellaNow` the share of the others holding an umbrella (by each
+  person's hash; none in the rain looks, none for gangs or police), `ShelterNow` a passer-by's
+  chance to stop under a stretch out of the rain its walkway passes (sidewalks, paths, alleys,
+  promenades, pedestrian streets, underpasses, concourses; singles, crowd role, 3 m stretches
+  or longer), standing at the walkway's side for `ShelterS` facing out, walking on soon after
+  the rain stops; `CarsNow` the lanes' cars, `SpeedNow` every lane's speed, `HeadwayNow` the
+  car following's time headway. `CityGenLife.Weather STATE|auto|off` holds a state, follows
+  atmosgen's again, or takes none (clear whatever the sky shows).
+- **Umbrellas:** two instanced components (`Umbrellas`, `UmbrellaShafts`: a flattened cone and
+  a thin cylinder per person of the pool) over the right shoulder of everyone near or mid who
+  holds one and is not under a cover, sitting or running, tilted forward; a canopy color by the
+  person's hash, a share with a lit shaft and a faint glow (the city's LED umbrellas). No
+  shadow, culled past the mid tier. Sent only while one is drawn.
+- **Nightlife:** `WalkNight` adds the bars', clubs' and arcades' people (LG4's places and M11's
+  POIs, by their busy and hours) to their door walkways' want.
+- **Reactions:** people standing still near the player (`LookM`: waiting at a signal, at a
+  slot, under a cover, looking at a danger) turn to face it (sitters keep to their benches);
+  stepping aside is LG3's. A danger (`ACityGenLife::Panic(Where, RadiusM, Seconds)`, a
+  BlueprintCallable for storygen, `CityGenLife.Panic [R] [S] [X Y Z]`, the play menu's **Scare
+  the crowd** row at the player): everyone within its reach but the police leaves where it is
+  and runs away along its walkways (each turn the way farthest from it, ignoring the signals) at
+  `FleePace` times its pace, near the view on the run clip; after `FleeS` they calm down, and
+  for `GatherS` a `GatherShare` of those within `GatherM` (and of the passers-by there) walk
+  back toward it, the way nearest it at each turn, and stand on a ring `RingM` off it looking
+  at it for `StayS`.
+- **Traffic:** every exit of a junction is tested for room past it (LG5 tested only exits
+  twice a car's length and gap): an exit shorter than the car and its gap only while it is
+  empty and the lanes after it start clear by what the car would stick out (Old Town's 5.8 m
+  lanes between the junctions of a cluster held cars inside one junction waiting at the next:
+  gridlock); a car waiting for that room claims no connector and is never forced into the box;
+  a car standing `StuckS` in a queue past `StuckFarM` of the view leaves (its lane refilled as
+  any). Cars stopped for the player on foot wait (no horn: lifegen has no sound, scope 11).
+- **Performance** (LG8's pass, `docs/progress/LG8/README.md`): every moving instanced component
+  of the controller is a `UCgLifeISM` with fixed bounds (`CityGenLife.Bounds 1`, the default:
+  the lanes' box, 1.5 km round it, never measured; every component drawn in every view, twice
+  LG7's draw calls, which the render thread and GPU carry while the game thread, the bound,
+  saves the measure; 2 lifegen's own measure, each shown instance's place grown by the mesh's
+  radius, hidden instances left out; 0 the engine's, every instance's box), the near people's
+  garment material instances made once per slot and parent and reused (no garbage as people come and go), the
+  near skeletal meshes' bounds fixed (the leader's physics asset, the followers' the leader's),
+  the ground traced under near people only and cars within 150 m, the far cards sent every
+  third frame, cars past 250 m stepped every second frame and past 550 m every fourth, a
+  model's bodies with no car within 300 m sent every third frame.
+- **Console:** `CityGenLife.FollowAtmos`, `.Weather`, `.Panic`, and for the check's shots
+  `CityGenLife.WeatherShow umbrella|shelter|look|flee|gather|moving` (the camera at the nearest
+  person holding an umbrella, under a cover, waiting (4 m in front of them, so they look at it),
+  running, looking at the danger: the status's `weather.show`, which the check's `until` waits
+  for). `CityGenLife.Status` adds `weather` (following, atmosgen's hour, steps and jumps, the
+  state, rain and every value now, umbrellas drawn, people sheltering, looking, fleeing,
+  gathering, dangers, people sent in, the stretches) and `traffic.stuck`.
+- **Benchmark:** every life pass sets `CityGenLife.FollowAtmos 1` and `CityGenLife.Weather
+  auto` and `CityGenLife.Bounds 1`; `night_life_noweather` the night's rain without its
+  effect on life; `night_life_ownbounds` and `night_life_enginebounds` the other two bounds.
+
 ## Milestones and checks
 
 - **Every milestone** updates the exporter in its own PR for what it adds or changes (a new
@@ -3026,3 +3184,5 @@ runs as before.
 | Play fixes (2026-11-12, after the packaged Delta) | Play's default is walking (`--play walk`; `fly` and `project` the others): the play plugin's `ACityGenWalker` (`CityGenWalker.h`, a character with a camera in front of the face and a body its player sees, keys bound on its own input component, `-CityGenSelfie=SECONDS` for a packaged game's proof), made into `Core/BP_CityGenWalker` wearing the project's own character's body (`import_city.project_body`) and spawned by `Core/GM_CityGenWalk` (`walk_classes`), the level's game mode override; `--check` walks with it (its spawn and body, a curb climbed: checks `spawn` and `curb`); `M_CgVehicleGlass` darker, coated and covered toward grazing angles (`VEHICLE_VERSION` 10, every car made again; two-sided, the far side's faces left out); the Aurels never imported (`unreal_vehicles.EXCLUDED`, a placement naming one refused) | Delta Megacity imported into CityAG16 and checked, a packaged game (`docs/progress/fix_play_cars/`) |
 | LG4 | Life at places ("From LG4: life at places" above): `unreal_life.pack_places` and the door, drive and pool fields LG4 adds (`PACK_VERSION` 6), `import_city.places_props` (`LIFE_VERSION` life7), the places' clips made in the project after the people library (`unreal_people.ensure_place_clips`, `ue/people_places.py`, `Saved/CityGenPeople/places.json`), the `SmartObjects` plugin a dependency of `CityGenLife`, slots' use points as Smart Objects of the world's subsystem while their walkways are live, gangs, police pairs and patrol cars in a livery; console `CityGenLife.Places`, `.Gangs`, `.Police`, `.PlaceShow`, `.SitOffset`, the play menu's Places row, the status's `places`; bench pass `night_life_noplaces`. A plan without `places` exports and runs as before. |
 | LG6 | Transit ("From LG6: transit" above): `unreal_life.pack_transit` and the stand-ins' model table `TRANSIT_MODELS` (`PACK_VERSION` 7), `import_city.transit_props` and `M_CgTransit` (`LIFE_VERSION` life8), every line's trains by the world's time on their timetables, doors at the stops, people leaving and boarding at the live stops, a served station's street accesses quiet while transit runs, the platforms' keep-out (`WalkClear`); console `CityGenLife.Transit`, `.TransitShow`, the play menu's Transit row, the status's `transit`; bench pass `night_life_notransit`. A plan without `transit` exports and runs as before. | Delta imported into CityAG16, checked with shots of trains at the stations and running (`docs/progress/LG6/`) |
+| LG7 | Air and water ("From LG7: air and water" above): `unreal_life.pack_airwater` and the stand-ins' per kind model table `AIRWATER_MODELS` with AG18's hover cars (`PACK_VERSION` 8), `import_city.airwater_props` (`LIFE_VERSION` life9), every route of what flies and floats by the world's time (flying cars between pads and on circuits, drones, police and media fliers, aircraft, shuttles, boats, water taxis, ferries, ships), banking and bobbing, flashing lights; console `CityGenLife.Air`, `.Water`, `.AirShow`, the play menu's Air traffic and Boats rows, the status's `airwater`; bench pass `night_life_noairwater`. A plan without `airwater` exports and runs as before. | Delta imported into CityAG16, checked with shots of fliers in their layers, a landing, drones, police, boats, a ferry at its pier and a ship (`docs/progress/LG7/`) |
+| LG8 | The hour, the weather and reactions ("From LG8" above): `unreal_life.pack_weather`, the walk rows' `walk_cover`, `walk_night` and `walk_road_side`, the run clip (`PACK_VERSION` 9), `import_city.weather_props` (`LIFE_VERSION` life10); the controller follows atmosgen's hour and weather state (people out, pace, raincoats, umbrellas, shelter, nightlife, the cars' share, speed and headway), people look at the player and flee a danger (`Panic`), then gather; every junction exit tested for room, stuck cars far off leave; lifegen's instanced components (`UCgLifeISM`, `CityGenLife.Bounds`); console `CityGenLife.FollowAtmos`, `.Weather`, `.Panic`, `.WeatherShow`, `.Bounds`, the play menu's Scare the crowd row, the status's `weather`; bench passes `night_life_noweather`, `night_life_ownbounds`, `night_life_enginebounds`. A plan without `weather` exports and runs as before (at the plan's hour). | Delta imported into CityAG16 and Vesper Bay into a throwaway project, checked with shots of rain, umbrellas, shelter, people looking and fleeing (`docs/progress/LG8/`) |

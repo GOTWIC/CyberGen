@@ -1,0 +1,62 @@
+window walk_d04 295.3 325.2 frames 1314 events 6928586
+timer                                                                    excl ms/f incl ms/f     n/f
+ConditionalFinishDestroy                                                     2.432     2.438     0.2
+ProcessLinkerLoadPackageSummary                                              2.038     2.045     1.4
+PerformReachabilityAnalysisOnObjectsInternal                                 1.439     1.439     0.0
+UInstancedStaticMeshComponent::CalcBoundsImpl                                1.165     1.165   233.8
+CityGenLife_UAID_C87F54669DD3981403                                          1.093     4.109     1.0
+CityGenLifeGround                                                            0.931     0.989    95.6
+CityGenLifeDriveProcessor_0                                                  0.865     0.865     1.0
+UStaticMesh::GetUsedMaterials                                                0.790     0.790   269.8
+FObjectPurge::DestroyObjects                                                 0.698     0.698     0.1
+MeshObject Update                                                            0.586     0.588    35.6
+STAT_UInstancedStaticMeshComponent_BuildRenderData                           0.509     1.087   235.9
+ConditionalBeginDestroy                                                      0.487     0.494     0.2
+CityGenLifeWalkProcessor_0                                                   0.402     0.402     1.0
+PyUtil::CollectGarbage                                                       0.381     0.381     0.0
+AddPrimitive (GT)                                                            0.352     0.584    17.1
+Calc SkelMesh Bounds                                                         0.324     0.324   281.9
+Plane                                                                        0.302     0.508    65.2
+CityGenAtmos_UAID_C87F54669DD38D1303                                         0.261     0.850     1.0
+UInstancedStaticMeshComponent::BatchUpdateInstancesTransforms                0.252     0.252   179.2
+WaitForTasks                                                                 0.234     0.234     1.0
+UWorld_AddPostProcessingSettings                                             0.202     0.206     1.0
+DeferredRenderUpdates_GameThread                                             0.162     3.971     1.0
+FPhysInterface_Chaos::AddGeometry                                            0.156     0.156     4.5
+FWorldPartitionLevelHelper::RemapLevelSoftObjectPaths                        0.153     0.156     0.0
+SkinnedMeshComp Tick                                                         0.147     0.345    77.4
+UObject::Rename                                                              0.138     0.138     2.8
+UpdateCoreCsvStats_BeginFrame                                                0.119     0.119     1.0
+STAT_FLinkerManager_DeleteLinkers                                            0.110     0.110     0.2
+TickAsyncLoading GT                                                          0.106     2.917     1.0
+BeginRenderingViewFamily                                                     0.100     4.181     1.0
+ProcessUntilTasksComplete                                                    0.089     6.527     7.0
+UpdateKinematicBonesToAnim                                                   0.088     0.088     2.4
+CreatePhysicsShapes                                                          0.086     0.244     4.5
+FViewport_Draw                                                               0.083     4.657     1.0
+Post Tick Component Update                                                   0.083     4.064     1.0
+UWorldPartitionStreamingPolicy::UpdateStreamingState_ForEachStreamingCel     0.082     0.082     0.6
+UpdatePrimitiveInstance (GT)                                                 0.074     0.074   230.8
+TickableGameObjects Time                                                     0.070     0.325     2.0
+Queue Ticks                                                                  0.068     0.068     1.0
+ULevel::IncrementalRegisterComponents()                                      0.065     0.615     1.6
+Event_DeferredPostLoad                                                       0.064     0.068     1.4
+FrameTime                                                                    0.062    22.763     2.0
+GameEngine Tick                                                              0.058    21.823     1.0
+FLevelStreamingGCHelper::PrepareStreamedOutLevelsForGC                       0.058     0.195     0.0
+GT Total                                                                     0.056     0.062     8.0
+STAT_RecordTickCountsToCSV                                                   0.055     0.055     1.0
+UI Drawing Time                                                              0.052     0.062     1.0
+FTickFunctionTask                                                            0.050     5.843   107.4
+STAT_FTicker_Tick                                                            0.048     0.077     3.0
+Paint: Game UI                                                               0.047     0.056     1.0
+UpdateComponentToWorld                                                       0.045     1.359   173.8
+FWaitingQueue_Unpark_SignalWaitingThread                                     0.044     0.044    11.5
+Event_CreateExports                                                          0.044     0.112     1.5
+SetHitResultFromShapeAndFaceIndex                                            0.044     0.044   100.0
+UpdateChildTransforms                                                        0.043     0.423    79.5
+Post Anim Evaluation                                                         0.043     0.299    13.4
+STAT_SkelMeshComp_InitAnim                                                   0.042     0.077     0.1
+Recreate                                                                     0.042     0.092    11.9
+CityGenSplash                                                                0.041     0.043     5.0
+ConstructObject                                                              0.040     0.106    11.7

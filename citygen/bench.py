@@ -186,7 +186,8 @@ def _life(on: bool = True, shadows: bool = True, rebuild: bool = False,
           lumen: bool = False, near: int | None = None,
           near_m: float | None = None, traffic: bool = True,
           traffic_scale: float = 1.0, clothing: bool = True,
-          places: bool = True, transit: bool = True) -> tuple[str, ...]:
+          places: bool = True, transit: bool = True,
+          airwater: bool = True, weather: bool = True, bounds: int = 1) -> tuple[str, ...]:
     """LG0: lifegen's spike (the level's CityGenLife controller) over the night as delivered:
     on or off, the stand-ins' and cars' shadows, each frame's move recreating the instanced
     components' render state, the people and cars in Lumen's scene (every pass sets all
@@ -199,7 +200,12 @@ def _life(on: bool = True, shadows: bool = True, rebuild: bool = False,
     pass sets it). LG4: `places`, life at places (the slots and shop visits, the gangs, the
     police on foot and in patrol cars) on or off together (every life pass sets the three).
     LG6: `transit`, every line's trains and their boarding on or off (every life pass sets
-    it)."""
+    it). LG7: `airwater`, what flies and floats (fliers and boats) on or off together (every
+    life pass sets both). LG8: `weather`, life by atmosgen's weather (people out, umbrellas,
+    shelter, the cars' speed) or none (`CityGenLife.Weather off`: clear whatever the sky
+    shows); every life pass follows atmosgen's hour and sets it. `bounds`: how the instanced
+    components' bounds are measured (`CityGenLife.Bounds`: 1 the city's box, 2 lifegen's own,
+    0 the engine's; every life pass sets it)."""
     from lifegen.library import TIERS
     t = dict(TIERS)
     if near is not None:
@@ -213,7 +219,10 @@ def _life(on: bool = True, shadows: bool = True, rebuild: bool = False,
             f"CityGenLife.Traffic {int(traffic)} {traffic_scale:g}",
             f"CityGenLife.Clothing {int(clothing)}",
             f"CityGenLife.Places {int(places)}", f"CityGenLife.Gangs {int(places)}",
-            f"CityGenLife.Police {int(places)}", f"CityGenLife.Transit {int(transit)}") + \
+            f"CityGenLife.Police {int(places)}", f"CityGenLife.Transit {int(transit)}",
+            f"CityGenLife.Air {int(airwater)}", f"CityGenLife.Water {int(airwater)}",
+            "CityGenLife.FollowAtmos 1",
+            f"CityGenLife.Weather {'auto' if weather else 'off'}", f"CityGenLife.Bounds {bounds}") + \
         _atmos(fog=True, air=True, rain=True, wet=True)
 
 
@@ -239,6 +248,16 @@ LIFE_PASSES = (
     # LG6: the night without transit (no trains, no boarding: the stations' street accesses
     # send their people out as before LG6)
     ("night_life_notransit", True, 100.0, _life(transit=False)),
+    # LG7: the night without what flies and floats (no flying cars, drones, police or media
+    # fliers, aircraft, boats, water taxis, ferries or ships)
+    ("night_life_noairwater", True, 100.0, _life(airwater=False)),
+    # LG8: the night's rain without its effect on life (no umbrellas, nobody sheltering, as many
+    # out as by a clear night, the cars at their clear speed)
+    ("night_life_noweather", True, 100.0, _life(weather=False)),
+    # LG8's performance pass: the instanced components' bounds by lifegen's own measure (culled
+    # per view, every instance read each frame) and the engine's (every instance's box)
+    ("night_life_ownbounds", True, 100.0, _life(bounds=2)),
+    ("night_life_enginebounds", True, 100.0, _life(bounds=0)),
 )
 ATMOS_PASSES = ATMOS_PASSES + LIFE_PASSES
 # what a game with hardware ray tracing needs at startup (MegaLights traces its shadows; UE

@@ -207,6 +207,10 @@ public:
 	 *  SlotKinds not empty), its state, and SetPlaces, SetGangs and SetPolice on it together (the
 	 *  menu's Places row, places=1 or 0). */
 	bool HasLifePlaces() const;
+	/** LG8: whether the level's life controller takes a danger (its bFlee), and one where the
+	 *  player is (CityGenLife.Panic). */
+	bool HasLifePanic() const;
+	void LifePanic();
 	bool GetLifePlaces() const;
 	void SetLifePlaces(bool bOn);
 	/** LG6: whether the life controller has transit (bTransit, with lines of its own:
@@ -215,6 +219,12 @@ public:
 	bool HasLifeTransit() const;
 	bool GetLifeTransit() const;
 	void SetLifeTransit(bool bOn);
+	/** LG7: whether the life controller has air and water routes (AwRouteKind not empty), the
+	 *  fliers' (bAir) or boats' (bWater) state, and SetAir or SetWater on it (the menu's Air
+	 *  traffic and Boats rows: air, water, air=1 or 0, water=1 or 0). */
+	bool HasLifeAirWater() const;
+	bool GetLifeAirWater(bool bAirRow) const;
+	void SetLifeAirWater(bool bAirRow, bool bOn);
 
 	/** The controller's hour (0 to 24), and SetHour. */
 	float GetAtmosHour() const;

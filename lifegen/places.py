@@ -674,6 +674,10 @@ def gang_spots(model: dict, turfs: list[dict], members: dict, rows: dict, wi: Wa
                 for off in (0.25 * float(w.get("width_m") or 2.0), 0.0):
                     px, py = (cx - to0[0] * off, cy - to0[1] * off) if to0 else (cx, cy)
                     ring = frame_points("gang_spot", px, py, 0.0, 0.0)
+                    # (LG8: the whole ring on its own turf: a corner by the turf's edge whose
+                    # spot runs out of it along the sidewalk is no spot of the turf's)
+                    if not all(shapely.contains_xy(t["shape"], p[0], p[1]) for p in ring):
+                        continue
                     if not any(fp.blocked(p[0], p[1]) for p in ring) and not fp.blocked(px, py):
                         spot = (px, py)
                         break
@@ -697,7 +701,8 @@ def gang_spots(model: dict, turfs: list[dict], members: dict, rows: dict, wi: Wa
             pts = frame_points("gang_spot", c[2], c[3], 0.0, 0.0)
             pts = [[p[0], p[1], p[2], _r(math.degrees(math.atan2(c[3] - p[1], c[2] - p[0])), 2)]
                    for p in pts]
-            if any(fp.blocked(p[0], p[1]) for p in pts):
+            if any(fp.blocked(p[0], p[1]) for p in pts) or \
+                    not all(shapely.contains_xy(t["shape"], p[0], p[1]) for p in pts):
                 continue
             chosen.append((*c, pts))
         n = max(1, len(chosen))

@@ -747,6 +747,15 @@ bool ACityGenPlay::ClickMenuRow(const FString& Row)
 		}
 		SetLifeTraffic(R == TEXT("traffic") ? !GetLifeTraffic() : R.EndsWith(TEXT("1")));
 	}
+	else if (R == TEXT("panic"))
+	{
+		// LG8: a danger where the player is: people run from it, then some come back to look
+		if (!HasLifePanic())
+		{
+			return false;
+		}
+		LifePanic();
+	}
 	else if (R == TEXT("places") || R.StartsWith(TEXT("places=")))
 	{
 		// LG4: lifegen's life at places (slots, shop visits, gangs, police) on or off
@@ -764,6 +773,17 @@ bool ACityGenPlay::ClickMenuRow(const FString& Row)
 			return false;
 		}
 		SetLifeTransit(R == TEXT("transit") ? !GetLifeTransit() : R.EndsWith(TEXT("1")));
+	}
+	else if (R == TEXT("air") || R.StartsWith(TEXT("air=")) || R == TEXT("water") || R.StartsWith(TEXT("water=")))
+	{
+		// LG7: lifegen's fliers or boats on or off
+		const bool bAirRow = R.StartsWith(TEXT("air"));
+		if (!HasLifeAirWater())
+		{
+			return false;
+		}
+		const bool bNow = GetLifeAirWater(bAirRow);
+		SetLifeAirWater(bAirRow, (R == TEXT("air") || R == TEXT("water")) ? !bNow : R.EndsWith(TEXT("1")));
 	}
 	else if (!GetAtmos())
 	{
@@ -984,6 +1004,20 @@ void ACityGenPlay::SetLifeTraffic(bool bOn)
 	CallOne(GetLife(), TEXT("SetTraffic"), bOn, 0.f);
 }
 
+bool ACityGenPlay::HasLifePanic() const
+{
+	const AActor* A = GetLife();
+	return HasLifePlaces() && A && FindFProperty<FBoolProperty>(A->GetClass(), TEXT("bFlee")) != nullptr;
+}
+
+void ACityGenPlay::LifePanic()
+{
+	if (GEngine && GetWorld())
+	{
+		GEngine->Exec(GetWorld(), TEXT("CityGenLife.Panic"));
+	}
+}
+
 bool ACityGenPlay::HasLifePlaces() const
 {
 	const AActor* A = GetLife();
@@ -1033,6 +1067,30 @@ bool ACityGenPlay::GetLifeTransit() const
 void ACityGenPlay::SetLifeTransit(bool bOn)
 {
 	CallOne(GetLife(), TEXT("SetTransit"), bOn, 0.f);
+}
+
+bool ACityGenPlay::HasLifeAirWater() const
+{
+	const AActor* A = GetLife();
+	const FArrayProperty* Routes = A ? FindFProperty<FArrayProperty>(A->GetClass(), TEXT("AwRouteKind")) : nullptr;
+	if (!A || !Routes || FindFProperty<FBoolProperty>(A->GetClass(), TEXT("bAir")) == nullptr)
+	{
+		return false;
+	}
+	FScriptArrayHelper H(Routes, Routes->ContainerPtrToValuePtr<void>(A));
+	return H.Num() > 0;
+}
+
+bool ACityGenPlay::GetLifeAirWater(bool bAirRow) const
+{
+	const AActor* A = GetLife();
+	const FBoolProperty* P = A ? FindFProperty<FBoolProperty>(A->GetClass(), bAirRow ? TEXT("bAir") : TEXT("bWater")) : nullptr;
+	return P && P->GetPropertyValue_InContainer(A);
+}
+
+void ACityGenPlay::SetLifeAirWater(bool bAirRow, bool bOn)
+{
+	CallOne(GetLife(), bAirRow ? TEXT("SetAir") : TEXT("SetWater"), bOn, 0.f);
 }
 
 void ACityGenPlay::SetAtmosHour(float InHour)

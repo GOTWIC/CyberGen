@@ -5,7 +5,7 @@
     lifegen spec schema [OUT]                                   its JSON schema
     lifegen plan schema [--which W] [OUT]                       the plan's schemas
     lifegen plan BUILD [--spec S] [--out DIR] [--no-preview]    the life plan (BUILD/life);
-                                                                exit 1 when a check fails
+                       [--atmos DIR]                            exit 1 when a check fails
 """
 
 from __future__ import annotations
@@ -52,7 +52,8 @@ def cmd_plan(args) -> int:
         _write_json(PM.json_schema(model, title), args.out or args.out_schema)
         return 0
     from .plan import build_plan, report_text
-    rep = build_plan(args.build, args.spec, args.out, preview=not args.no_preview)
+    rep = build_plan(args.build, args.spec, args.out, preview=not args.no_preview,
+                     atmos=args.atmos)
     sys.stdout.write(report_text(rep))
     print(f"{len(rep['wrote'])} files written to {rep['out']} in {rep['seconds']} s")
     if not rep["ok"]:
@@ -82,7 +83,9 @@ def main(argv=None) -> int:
                                   "file)")
     pp.add_argument("--which", default="life_plan", choices=("life_plan", "tile_spawns",
                                                              "contribution", "signals",
-                                                             "timetables"))
+                                                             "timetables", "airwater"))
     pp.add_argument("--no-preview", action="store_true", help="skip preview_crowds.png")
+    pp.add_argument("--atmos", help="LG8: the city's atmos plan (default BUILD/atmos): its rain "
+                                    "shadow gives the walkways' stretches under a cover")
     args = ap.parse_args(argv)
     return {"spec": cmd_spec, "plan": cmd_plan}[args.cmd](args)

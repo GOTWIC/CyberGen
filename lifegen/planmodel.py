@@ -151,6 +151,15 @@ class Walk(_Model):
                                             "the patrol minimum, on the ground).")
     field: float | None = Field(None, description="LG4: M11's police field at its middle.")
     police: PerBand | None = Field(None, description="LG4: police on foot on it per band.")
+    cover: list[Annotated[list[float], Field(min_length=2, max_length=2)]] | None = Field(
+        None, description="LG8: its stretches out of the rain ([from, to] m along it): under "
+                          "a cover of atmosgen's rain shadow, underground or enclosed.")
+    road_side: int | None = Field(None, description="LG8: a covered sidewalk's road side "
+                                                    "looking along its line (1 right, -1 "
+                                                    "left): people shelter on the other.")
+    night: PerBand | None = Field(None, description="LG8: nightlife's people on it per band "
+                                                    "(round an open bar, club or arcade's "
+                                                    "door), on top of `people`.")
     hash: str
 
 
@@ -539,6 +548,83 @@ class Timetables(_Model):
     lines: list[Timetable]
 
 
+class AirWaterPlan(_Model):
+    """LG7: air and water (scope 6.7): the kinds' runs and sizes, the settings, per kind its
+    routes and vehicles by band; the routes themselves in `airwater.json` (`AirWater`)."""
+    hour: int
+    vehicles: dict = Field(description="`presets.AW_VEHICLES`: speeds, rates, dwells, sizes.")
+    settings: dict = Field(description="`presets.AIR` and `presets.WATER`.")
+    kinds: dict
+    file: str = Field(description="`airwater.json`, relative to the plan.")
+    sha256: str = Field(description="sha256 of its bytes.")
+    totals: dict
+    hash: str
+
+
+class AwRoute(_Model):
+    """LG7: a route something flies or sails, a closed path run to a timetable: its points (x,
+    y, z absolute: over the ground datum on a flat city, over sea level on a terrain one; and
+    the heading the vehicle faces there, degrees counterclockwise from east), its length (3D),
+    its cycle sampled every `sample_s` s (`samples`: m along the path), its dwells
+    ([arrive, depart, what (`airwater.EVENT_CODES`), the pad, roof, pier or berth]), its
+    vehicles per hour band, evenly round the cycle."""
+    id: str
+    kind: Literal["car", "drone", "police", "media", "aircraft", "shuttle", "boat", "taxi",
+                  "ferry", "ship"]
+    district_id: str | None = None
+    model: str = Field(description="AG18's hover car (a car's, a police flier's) or the kind's "
+                                   "stand-in (the exporter's `AIRWATER_MODELS`).")
+    color: str
+    serves: list[str]
+    water_id: str | None = None
+    points: list[Annotated[list[float], Field(min_length=4, max_length=4)]]
+    length_m: float
+    cycle_s: float
+    sample_s: float
+    samples: list[float]
+    events: list[list]
+    counts: Annotated[list[int], Field(min_length=5, max_length=5)]
+    top_mps: float
+    vehicle_ids: list[str]
+    moored: bool = False
+    cut: str | None = Field(None, description="A body's route cut short (why).")
+
+
+class AwPad(_Model):
+    """LG7: a pad (M3's av pads and helipads, a spaceport's launch pads): its top."""
+    id: str
+    kind: str
+    building_id: str | None = None
+    district_id: str | None = None
+    megasite_id: str | None = None
+    pos: Vec3
+    size_m: float
+    served: bool
+
+
+class AwPier(_Model):
+    """LG7: a pier (the ask `piers`, derived): where a water taxi or ferry berths, the quay or
+    bank it is at, its walkway, the water and its depth there."""
+    id: str
+    kind: Literal["taxi", "ferry"]
+    quay_id: str | None = None
+    bank_id: str | None = None
+    pos: Vec3
+    yaw_deg: float
+    berth_m: float
+    walkway_id: str | None = None
+    water_id: str | None = None
+    depth_m: float
+    pair: str | None = None
+
+
+class AirWater(_Model):
+    city: str
+    routes: list[AwRoute]
+    pads: list[AwPad]
+    piers: list[AwPier]
+
+
 class Check(_Model):
     ok: bool
     detail: str
@@ -562,6 +648,10 @@ class LifePlan(_Model):
     gangs: GangPlan | None = Field(None, description="LG4: gangs on their turf.")
     police: PolicePlan | None = Field(None, description="LG4: police patrols.")
     transit: TransitPlan | None = Field(None, description="LG6: transit's timetables.")
+    airwater: AirWaterPlan | None = Field(None, description="LG7: air and water routes.")
+    weather: dict | None = Field(None, description="LG8: the crowd and traffic by atmosgen's "
+                                                   "weather state, umbrellas, shelter, "
+                                                   "nightlife and the reactions.")
     checks: dict[str, Check]
     totals: dict
 
@@ -569,7 +659,7 @@ class LifePlan(_Model):
 class Entry(_Model):
     """A layer 4 entry, keyed by what it belongs to."""
     key: str
-    kind: Literal["life_controller", "spawner", "slots", "train"]
+    kind: Literal["life_controller", "spawner", "slots", "train", "air_route", "water_route"]
     hash: str
     tile: str | None = None
     count: int = 0
@@ -588,6 +678,7 @@ SCHEMAS = {"life_plan": (LifePlan, "lifegen life plan"),
            "tile_spawns": (TileSpawns, "lifegen tile spawns"),
            "signals": (Signals, "lifegen signal phases"),
            "timetables": (Timetables, "lifegen transit timetables"),
+           "airwater": (AirWater, "lifegen air and water routes"),
            "contribution": (Contribution, "lifegen layer 4 contribution")}
 
 

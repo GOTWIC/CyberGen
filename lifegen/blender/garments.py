@@ -24,21 +24,29 @@ where its cut and the body disagree, as LG0's tee did in the armpits):
    belongs to (its nearest bone segment, less the part's own radius) and its place along it.
 2. **The panels**: the faces of the parts the pattern covers, offset outward by the pattern's
    ease for each part (at most `ROOM` of the free space to the next part, so legs and arms keep
-   apart), smoothed so the cloth spans the body's hollows and pushed back outside it, cut by
-   the pattern's planes (hem, cuffs, ankles, neckline, the front opening) on the parts each
-   belongs to; skirts and coat skirts flared down from the hip line, hoods and collars added.
+   apart), smoothed so the cloth spans the body's hollows and pushed back outside it, a top
+   or coat hung straight down from the widest point above (`curtain`), cut by the pattern's
+   planes (hem, cuffs, ankles, neckline, the front opening) on the parts each belongs to, the
+   open edges tidied (`tidy_edges`); skirts, coat skirts and the straight hang of a top whose
+   hem is below the hips built down from the hip line (`flare`), hoods and collars added,
+   every face wound away from the body (`orient_out`).
    The panel coordinates (round each part and along it, in meters) are the UVs, so a textile
    lies on the garment as on its pattern piece.
 3. **The drape**: Blender's cloth solver lets it settle on the mannequin (a collision object)
    under gravity, its fitted parts held by goal springs, the loose ones (skirts, coat tails,
-   hoods) free; the last frame is kept (a vertex the solver threw past `MAX_MOVE` goes back).
-4. **The finish**: a rim of the textile's thickness at every open edge (hems, cuffs, the front
-   opening), trims as their own slots, the vertex colors (rgb a multiplier, alpha the dye
-   channel the person's colors go on).
+   hoods) free; the last frame is kept (a vertex the solver threw past `MAX_MOVE` goes back,
+   what hangs off the body stays as built), smoothed over (`DRAPE_RELAX`).
+4. **The finish**: the faces cut along each trim's edges (`crisp_trims`), a rim of the
+   textile's thickness at every open edge (hems, cuffs, the front opening), trims as their own
+   slots, the vertex colors (rgb a multiplier, alpha the dye channel the person's colors go
+   on).
 
-A look joins its garments and accessories, takes out the faces of a layer another covers (no
-hidden faces drawn, no inner layer through an outer one), checks that it covers the plain
-outfit's region (where the body has no skin) and is written out.
+A look joins its garments and accessories, pushes each layer outside the ones under it and
+pulls back under it what still came through (`layered`), takes out the faces of a layer
+another covers or runs close over (`hide_covered`: no hidden faces drawn, no inner layer
+through an outer one), checks that it covers the plain outfit's region (where the body has no
+skin) and is written out, with each inner vertex close under an outer garment naming the
+outer vertex whose skin weights it takes in the editor (`follow_pairs`).
 
 Coordinates: Unreal's component space (cm, x to the body's left, y forward, z up) becomes
 Blender's (m) with y negated (`ue_to_bl`), so the body faces -Y as Blender's front view
@@ -64,6 +72,7 @@ MANNEQUIN_FACES = 15000  # its faces after decimation (about 2 cm edges)
 FRAMES = 28              # the drape's frames
 ROOM = 0.45              # a vertex's ease at most this share of the free space before it
 MAX_MOVE = {"fit": 0.05, "loose": 0.3}
+DRAPE_RELAX = 5          # smoothing steps after the drape
 LOD1_RATIO = 0.45        # the near mesh's LOD 1 (of LOD 0's triangles)
 MID_TRIS = 4500          # the mid mesh's triangles (all the look's garments)
 COVER_M = 0.07           # an outer face within this along a face's normal covers it
@@ -218,6 +227,19 @@ def mannequin(data):
     """The body, its plain outfit and the face's skin as one closed surface."""
     obs = [mesh_from("body", data["body"]), mesh_from("outfit", data["outfit"]),
            mesh_from("face", data["face"], keep_mats={skin_material_id(data["face"])})]
+    # (the clothing fixes: the body's holes, where the creator took the skin out under the plain
+    # outfit, capped, so the remesh sees closed limbs: open at the top of the thighs where the
+    # outfit's legs did not reach over the cut, a body's legs remeshed into a lattice and the
+    # trousers built on it tore through the skin)
+    bm = bmesh.new()
+    bm.from_mesh(obs[0].data)
+    caps = bmesh.ops.holes_fill(bm, edges=list(bm.edges), sides=0)["faces"]
+    if caps:
+        bmesh.ops.triangulate(bm, faces=caps)
+    bm.to_mesh(obs[0].data)
+    obs[0].data.update()
+    bm.free()
+    log(f"mannequin: {len(caps)} holes of the body capped")
     bpy.ops.object.select_all(action="DESELECT")
     for o in obs:
         o.select_set(True)
@@ -388,10 +410,55 @@ def offset(bm, space, draft):
     smooth(bm, space, draft, rounds=draft.get("smooth", 3))
 
 
-def smooth(bm, space, draft, rounds=3, its=6, fac=0.5, only=None):
+CURTAIN_BINS = 72
+CURTAIN_HELD_M = 0.01     # a vertex the curtain moved farther than this is held in the drape
+
+
+def curtain(bm, space, draft):
+    """A top or coat hangs straight down from the widest point of the body above it (the
+    clothing fixes): below `start` (the chest for an outer layer, between waist and chest for
+    a base layer), each vertex of its torso and thighs no nearer the body's middle line than
+    the garment above it at its angle. Fitted to the body, a heavy body's top tucked in
+    under the belly and folded where its hem or its skirt left it."""
+    if draft.get("layer") not in ("base", "outer") or draft.get("kind") == "coveralls" or \
+            "low" in draft.get("ease", {}):
+        return
+    body = space.body
+    z = body.z
+    start = z["chest"] if draft["layer"] == "outer" else (z["waist"] + z["chest"]) / 2.0
+    L = layers(bm)
+    # (a new layer before any vertex is held: adding one frees the bmesh's vertex handles)
+    held = bm.verts.layers.int.get("held") or bm.verts.layers.int.new("held")
+    c = body.center
+    bins = {}
+    for v in bm.verts:
+        if get(v, L)[0] not in ("torso", "thigh") or v.co.z > start:
+            continue
+        a = math.atan2(v.co.x - c.x, -(v.co.y - c.y))
+        b = int((a + math.pi) / (2 * math.pi) * CURTAIN_BINS) % CURTAIN_BINS
+        bins.setdefault(b, []).append(v)
+    for b, vs in bins.items():
+        vs.sort(key=lambda v: -v.co.z)
+        top = 0.0
+        for v in vs:
+            d = Vector((v.co.x - c.x, v.co.y - c.y, 0.0))
+            r = d.length
+            if r < top and r > 1e-6:
+                v.co = Vector((c.x, c.y, v.co.z)) + d * (top / r)
+                if top - r > CURTAIN_HELD_M:
+                    # (off the body: the drape holds it where it hangs, `drape`)
+                    v[held] = 1
+            top = max(top, r)
+    # (the bins' steps smoothed over)
+    smooth(bm, space, draft, rounds=1, its=3, only=("torso", "thigh"))
+
+
+def smooth(bm, space, draft, rounds=3, its=6, fac=0.5, only=None, keep_held=False):
     L = layers(bm)
     clear = draft.get("clear", 0.006)
-    vs = [v for v in bm.verts if only is None or get(v, L)[0] in only]
+    held = bm.verts.layers.int.get("held") if keep_held else None
+    vs = [v for v in bm.verts if (only is None or get(v, L)[0] in only) and
+          not (held is not None and v[held])]
     target = [max(clear, ease_of(draft, get(v, L)) * 0.6) for v in vs]
     for _ in range(rounds):
         for _ in range(its):
@@ -496,7 +563,6 @@ def neck_cut(bm, body, c, ease=0.015):
 
 
 def apply_cuts(bm, body, draft):
-    L = layers(bm)
     for c in draft["cuts"]:
         kind = c["kind"]
         if kind == "z":
@@ -536,20 +602,131 @@ def apply_cuts(bm, body, draft):
                 parts = {f"{x}_{side}" for x, w in LIMB.items() if w == c["limb"]}
                 cut(bm, p, d, parts)
         elif kind == "front":           # the front opening: a slot |x| < width / 2
-            half = c["width"] / 2.0
-            dele = []
-            for f in bm.faces:
-                m = f.calc_center_median()
-                if abs(m.x) < half and m.y < body.center.y and m.z < c.get("z_max", 9.0) and \
-                        get(f.verts[0], L)[0] in ("torso", "neck", "skirt"):
-                    dele.append(f)
-            if dele:
-                bmesh.ops.delete(bm, geom=dele, context="FACES")
-            for v in bm.verts:
-                if v.is_boundary and abs(v.co.x) < half * 2.2 and v.co.y < body.center.y and \
-                        v.co.z < c.get("z_max", 9.0) - 0.02:
-                    v.co.x = half if v.co.x >= 0 else -half
+            front_slot(bm, body, c["width"] / 2.0, c.get("z_max", 9.0))
         drop_small(bm)
+    tidy_edges(bm, body)
+
+
+FRONT_PARTS = ("torso", "neck", "skirt")
+
+
+def front_slot(bm, body, half, z_max):
+    """The front opening: the front faces cut by the planes x = +-half (straight edges, not the
+    faces' steps: the clothing fixes), those between them below `z_max` taken out."""
+    L = layers(bm)
+
+    def front_faces():
+        return [f for f in bm.faces if f.calc_center_median().y < body.center.y and
+                get(f.verts[0], L)[0] in FRONT_PARTS and
+                min(v.co.z for v in f.verts) < z_max]
+    for s in (1.0, -1.0):
+        fs = front_faces()
+        geom = list({v for f in fs for v in f.verts}) + list({e for f in fs for e in f.edges}) + fs
+        if geom:
+            bmesh.ops.bisect_plane(bm, geom=geom, plane_co=Vector((s * half, 0, 0)),
+                                   plane_no=Vector((1, 0, 0)), clear_inner=False,
+                                   clear_outer=False, dist=1e-5)
+    dele = [f for f in front_faces() if abs(f.calc_center_median().x) < half and
+            f.calc_center_median().z < z_max]
+    if dele:
+        bmesh.ops.delete(bm, geom=dele, context="FACES")
+
+
+EDGE_MERGE_M = 0.004     # open-edge vertices closer than this merge
+EDGE_SMOOTH = 10         # rounds of smoothing along each open edge (Taubin's, no shrinking)
+
+
+def boundary_chains(bm):
+    """Each open edge's vertices in order along it (closed loops and runs)."""
+    nb = {}
+    for e in bm.edges:
+        if e.is_boundary:
+            a, b = e.verts
+            nb.setdefault(a, []).append(b)
+            nb.setdefault(b, []).append(a)
+    seen, chains = set(), []
+    for v0 in nb:
+        if v0 in seen:
+            continue
+        # (from an end of a run where there is one; a loop from anywhere)
+        start = v0
+        stack, comp = [v0], set()
+        while stack:
+            v = stack.pop()
+            if v in comp:
+                continue
+            comp.add(v)
+            stack += nb[v]
+        ends = [v for v in comp if len(nb[v]) != 2]
+        if ends:
+            start = ends[0]
+        chain, prev, cur = [start], None, start
+        seen.add(start)
+        while True:
+            nxt = next((w for w in nb[cur] if w is not prev and w not in seen), None)
+            if nxt is None:
+                break
+            chain.append(nxt)
+            seen.add(nxt)
+            prev, cur = cur, nxt
+        closed = not ends and len(chain) > 2 and chain[0] in nb[chain[-1]]
+        seen |= comp
+        chains.append((chain, closed, nb))
+    return chains
+
+
+def smooth_chains(bm, rounds=EDGE_SMOOTH, fixed=()):
+    """Smooths every open edge along itself (lambda and mu steps, so a loop round the body does
+    not shrink): the cuts' steps, where the mannequin's faces met the cut, go. A vertex where
+    edges branch, a run's ends and `fixed` stay."""
+    fixed = set(fixed)
+    for chain, closed, nb in boundary_chains(bm):
+        n = len(chain)
+        if n < 4:
+            continue
+        # (a vertex on a level or an x = const cut, as its neighbor along the edge is, keeps
+        # that coordinate: a hem stays level, a front opening straight, their corner put)
+        lock = []
+        for i, v in enumerate(chain):
+            nbs = [chain[j % n] for j in (i - 1, i + 1) if closed or 0 <= j < n]
+            lock.append((any(abs(w.co.z - v.co.z) < 1e-5 for w in nbs),
+                         any(abs(w.co.x - v.co.x) < 1e-5 for w in nbs)))
+        keep = [(v.co.z, v.co.x) for v in chain]
+        for k in range(2 * rounds):
+            fac = 0.5 if k % 2 == 0 else -0.53
+            new = []
+            for i, v in enumerate(chain):
+                if v in fixed or len(nb[v]) != 2 or (not closed and i in (0, n - 1)):
+                    new.append(v.co.copy())
+                    continue
+                a, b = chain[i - 1], chain[(i + 1) % n]
+                c = v.co + ((a.co + b.co) * 0.5 - v.co) * fac
+                if lock[i][0]:
+                    c.z = keep[i][0]
+                if lock[i][1]:
+                    c.x = keep[i][1]
+                new.append(c)
+            for v, c in zip(chain, new):
+                v.co = c
+
+
+def tidy_edges(bm, body=None):
+    """The open edges the cuts leave made clean (the clothing fixes; LG2's rims and fronts
+    were jagged, the mannequin's 9 mm voxels showing through): open-edge vertices closer than
+    `EDGE_MERGE_M` merged, degenerate faces dissolved, each edge smoothed along itself, the
+    faces next to it relaxed."""
+    bnd = [v for v in bm.verts if v.is_boundary]
+    if bnd:
+        bmesh.ops.remove_doubles(bm, verts=bnd, dist=EDGE_MERGE_M)
+    bmesh.ops.dissolve_degenerate(bm, edges=list(bm.edges), dist=0.0015)
+    smooth_chains(bm)
+    # (the row inside the edge: halfway to its neighbors' middle, so no sliver folds over it)
+    inner = {e.other_vert(v) for v in bm.verts if v.is_boundary for e in v.link_edges
+             if not e.other_vert(v).is_boundary}
+    for v in inner:
+        nb = [e.other_vert(v).co for e in v.link_edges]
+        if nb:
+            v.co = v.co.lerp(sum(nb, Vector()) / len(nb), 0.35)
 
 
 # ------------------------------------------------------------------------------------------
@@ -575,66 +752,142 @@ def boundary_loops(bm):
     return loops
 
 
-def _last_hit(space, o, d, far=1.0):
-    hit = space.bvh.ray_cast(o, d, far)
-    if hit[0] is None:
-        return None
-    last = hit
-    for _ in range(8):
-        h2 = space.bvh.ray_cast(last[0] + d * 0.002, d, far)
-        if h2[0] is None:
+def _last_hit(space, o, d, far=1.0, skip=()):
+    """The distance to the last surface of the mannequin along a ray (its faces of the parts
+    in `skip` passed through: a flare keeps clear of the legs, not of the hands beside it)."""
+    last = None
+    p = o
+    for _ in range(12):
+        h = space.bvh.ray_cast(p, d, far)
+        if h[0] is None:
             break
-        last = h2
-    return (last[0] - o).length
+        if not skip or space.lab[space.tris[h[2]][0]][0] not in skip:
+            last = h
+        p = h[0] + d * 0.002
+    return (last[0] - o).length if last is not None else None
+
+
+FLARE_DZ = 0.03       # a flare's rings' spacing
+FLARE_HOLD_M = 0.15   # its drape held at the hem, less down to this under it
+
+
+def _circ_smooth(r, rounds):
+    n = len(r)
+    for _ in range(rounds):
+        r = [(r[i - 1] + 2.0 * r[i] + r[(i + 1) % n]) / 4.0 for i in range(n)]
+    return r
 
 
 def flare(bm, space, draft):
-    """A skirt hung from the lowest open loop round the hips: rings down to the hem, each the
-    loop's shape scaled about its middle by the flare and kept outside the legs (a front
-    opening, when the pattern has one, carried down)."""
+    """A skirt hung from the hem the pattern's cut left round the hips (its open edge at the
+    flare's `from_z` on the torso and thighs, not the lowest open loop, which on a long-armed
+    body was a sleeve's end: the clothing fixes): rings down to the hem at the angles of the
+    hem's own outer vertices round the body's middle (quads all the way, none left out where
+    the hem's vertices are far apart, as LG2's skirts had holes), each the hem's radius at
+    that angle grown by the flare, held outside the legs (not the hands) by their outer
+    surface dilated and smoothed round the ring (no notches where a ray passes between the
+    legs), never narrower than the ring above; a front opening carried down."""
     f = draft.get("flare")
     if not f:
         return
     L = layers(bm)
-    loops = [lp for lp in boundary_loops(bm) if len(lp) > 12]
-    if not loops:
+    z0 = f["from_z"]
+    top = [v for v in bm.verts if v.is_boundary and abs(v.co.z - z0) < 0.004 and
+           get(v, L)[0] in ("torso", "thigh")]
+    if len(top) < 12:
         return
-    loop = min(loops, key=lambda lp: sum(v.co.z for v in lp) / len(lp))
-    c = sum((v.co for v in loop), Vector()) / len(loop)
+    c = sum((v.co for v in top), Vector()) / len(top)
     c.z = 0.0
-    n = len(loop)
+
+    def ang(p):
+        return math.atan2(p.x - c.x, -(p.y - c.y))    # 0 at the front, +-pi at the back
+
+    def rad(p):
+        return math.hypot(p.x - c.x, p.y - c.y)
+    # (only the hem's outer round: where the cut passes the crotch it also leaves an inner
+    # edge between the legs, which zipped in with the rest folded the skirt's top over)
+    pa = [(ang(v.co), rad(v.co)) for v in top]
+    win = math.radians(14.0)
+    keep = []
+    for v, (a, r) in zip(top, pa):
+        near = [rr for aa, rr in pa if abs((aa - a + math.pi) % (2 * math.pi) - math.pi) < win]
+        if r >= max(near) - 0.03:
+            keep.append(v)
+    top = keep
+    top.sort(key=lambda v: ang(v.co))
+    ta = [ang(v.co) for v in top]
+    tr = [rad(v.co) for v in top]
+    opening = next((cu for cu in draft.get("cuts", []) if cu["kind"] == "front"), None)
+    half = opening["width"] / 2.0 if opening else 0.0
     f = dict(f)
-    if space.body.outfit:
-        # (below the plain outfit's legs: the body has no skin under them)
+    if space.body.outfit and draft.get("layer") == "bottom":
+        # (a skirt reaches below the plain outfit's legs: the body has no skin under them; a
+        # top's or coat's has trousers under it)
         f["to_z"] = min(f["to_z"], space.body.outfit["hem_z"] - 0.05)
-    rings = max(4, int((f["from_z"] - f["to_z"]) / 0.03))
+    rings = max(2, int(round((z0 - f["to_z"]) / FLARE_DZ)))
     clear = draft.get("clear", 0.006) + 0.012
-    prev = loop
+    # (the rings at the hem's own angles: quads down from it, no thin triangles where its
+    # vertices bunch, which the drape tore)
+    N = len(top)
+    angs = ta
+    base = tr
+    prev_r = base
+    grid = []
     for k in range(1, rings + 1):
         s = k / rings
-        z = f["from_z"] + (f["to_z"] - f["from_z"]) * s
-        scale = 1.0 + f["scale"] * s
+        z = z0 + (f["to_z"] - z0) * s
+        hit = []
+        for a in angs:
+            d = Vector((math.sin(a), -math.cos(a), 0.0))
+            far = _last_hit(space, Vector((c.x, c.y, z)), d, skip=("uarm", "farm", "hand"))
+            hit.append(far + clear if far is not None else 0.0)
+        # (the legs' outline dilated by two samples and smoothed: a hem that clears them
+        # without stepping in and out between them)
+        dil = [max(hit[(i + j) % N] for j in range(-2, 3)) for i in range(N)]
+        dil = _circ_smooth(dil, 4)
+        want = _circ_smooth([b * (1.0 + f["scale"] * s) for b in base], 2)
+        r = [max(w, h, p) for w, h, p in zip(want, dil, prev_r)]
         ring = []
-        for v in loop:
-            d = Vector((v.co.x - c.x, v.co.y - c.y, 0.0))
-            o = Vector((c.x, c.y, z))
-            dirn = d.normalized() if d.length > 1e-6 else Vector((1, 0, 0))
-            r = d.length * scale
-            far = _last_hit(space, o, dirn)
-            if far is not None:
-                r = max(r, far + clear)
-            nv = bm.verts.new(o + dirn * r)
+        for a, rr in zip(angs, r):
+            nv = bm.verts.new(Vector((c.x + math.sin(a) * rr, c.y - math.cos(a) * rr, z)))
             put(nv, L, ("skirt", "", z))
             ring.append(nv)
-        for i in range(n):
-            j = (i + 1) % n
-            if (prev[i].co - prev[j].co).length > 0.06:    # (an opening carried down)
-                continue
-            try:
-                bm.faces.new((prev[i], prev[j], ring[j], ring[i]))
-            except ValueError:
-                pass
-        prev = ring
+        grid.append(ring)
+        prev_r = r
+
+    def is_open(*ps):
+        if not opening:
+            return False
+        m = sum((p.co for p in ps), Vector()) / len(ps)
+        return abs(m.x) < half and m.y < c.y
+
+    def face(vs):
+        if is_open(*vs):
+            return
+        try:
+            fc = bm.faces.new(vs)
+        except ValueError:
+            return
+        fc.normal_update()
+        m = fc.calc_center_median()
+        if fc.normal.dot(Vector((m.x - c.x, m.y - c.y, 0.0))) < 0:
+            fc.normal_flip()
+    grid.insert(0, top)
+    if "skirt" not in draft.get("loose", ()):
+        # (a top's hem, from which its held straight hang leaves, held as well: the drape
+        # moved it and folded the band under it)
+        held = bm.verts.layers.int.get("held")
+        if held is not None:
+            for ring in grid:
+                for v in ring:
+                    v[held] = 1
+    for k in range(len(grid) - 1):
+        r0, r1 = grid[k], grid[k + 1]
+        for q in range(N):
+            face((r0[q], r0[(q + 1) % N], r1[(q + 1) % N], r1[q]))
+    loose = [v for v in bm.verts if not v.link_faces]
+    if loose:
+        bmesh.ops.delete(bm, geom=loose, context="VERTS")
 
 
 def hood(bm, space, body, draft):
@@ -711,6 +964,37 @@ def hood(bm, space, body, draft):
                     bm.faces.new((grid[i][j], grid[i + 1][j], grid[i + 1][k], grid[i][k]))
                 except ValueError:
                     pass
+
+
+def orient_out(bm, space):
+    """Every face of the garment wound to face away from the body (the clothing fixes): each
+    connected piece made consistent, then turned over where most of its faces point toward the
+    mannequin. A skirt, hood or collar wound inward had its faces taken out where its rays
+    found the layer under it (`hide_covered`)."""
+    bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
+    seen = set()
+    for f0 in list(bm.faces):
+        if f0 in seen:
+            continue
+        comp, stack = [], [f0]
+        seen.add(f0)
+        while stack:
+            g = stack.pop()
+            comp.append(g)
+            for e in g.edges:
+                for h in e.link_faces:
+                    if h not in seen:
+                        seen.add(h)
+                        stack.append(h)
+        vote = 0.0
+        for f in comp:
+            f.normal_update()
+            c = f.calc_center_median()
+            q = space.bvh.find_nearest(c)
+            if q[0] is not None:
+                vote += f.calc_area() * (1.0 if f.normal.dot(c - q[0]) >= 0.0 else -1.0)
+        if vote < 0.0:
+            bmesh.ops.reverse_faces(bm, faces=comp)
 
 
 def _merge_into(bm, sub):
@@ -805,9 +1089,31 @@ def drape(ob, man, draft):
     lab = labels_of(ob)
     before = [v.co.copy() for v in ob.data.vertices]
     vg = ob.vertex_groups.new(name="pin")
-    loose = set(draft.get("loose", ())) | {"skirt", "hood"}
+    # (a skirt, a coat's skirt, a hood free; a top's short straight hang under its hips held
+    # as its body is: free, it crumpled under its own weight)
+    loose = set(draft.get("loose", ())) | {"hood"}
+    if draft.get("hood") == "down":
+        # (a hood down is a roll of its own behind the neck, joined to nothing: free, the
+        # solver threw it up off the shoulders; it stays as built)
+        loose.discard("hood")
+    fz = (draft.get("flare") or {}).get("from_z")
+    hv = [0] * len(lab)
+    fixed = []
+    if "held" in ob.data.attributes:
+        ob.data.attributes["held"].data.foreach_get("value", hv)
     for i, lb in enumerate(lab):
         w = 0.0 if lb[0] in loose else (0.55 if lb[0] in ("farm", "calf") else 0.8)
+        if (lb[0] == "hood" and draft.get("hood") == "down") or \
+                (lb[0] == "skirt" and "skirt" not in loose) or hv[i]:
+            # (a hood down, a top's straight hang and what the curtain hung off the body
+            # held: unsupported, they sagged and buckled at the hem)
+            w = 1.0
+        if lb[0] == "skirt" and fz is not None and "skirt" in loose:
+            # (a flare held where it leaves the hem, free by `FLARE_HOLD_M` under it: the
+            # clothing fixes; held fitted parts above a free skirt crumpled where they met)
+            w = 0.7 * max(0.0, min(1.0, 1.0 - (fz - lb[2]) / FLARE_HOLD_M))
+        if w >= 1.0:
+            fixed.append(i)
         vg.add([i], w, "REPLACE")
     if not any(m.type == "COLLISION" for m in man.modifiers):
         man.modifiers.new("col", "COLLISION")
@@ -846,9 +1152,11 @@ def drape(ob, man, draft):
     far = [i for i, (v, p, lb) in enumerate(zip(ob.data.vertices, before, lab))
            if (v.co - p).length > (MAX_MOVE["loose"] if lb[0] in loose else MAX_MOVE["fit"])]
     dropped = len(far) > 0.004 * len(before)
-    for i in (range(len(before)) if dropped else far):
+    # (and the held vertices stay where they were built: the goal springs let them buckle)
+    for i in (range(len(before)) if dropped else sorted(set(far) | set(fixed))):
         ob.data.vertices[i].co = before[i]
-    return {"s": round(time.time() - t, 1), "reverted": len(far), "dropped": dropped}
+    return {"s": round(time.time() - t, 1), "reverted": len(far), "dropped": dropped,
+            "held": len(fixed)}
 
 
 # ------------------------------------------------------------------------------------------
@@ -877,9 +1185,79 @@ def pattern_uv(body, lb, p):
     return ang * 0.16, p.z, ang, 0.16
 
 
+def crisp_trims(ob, body, draft):
+    """The garment's faces cut along each trim's edges (the planes `trim_hit` tests: a band's
+    two levels, the front strip's two sides, a cuff's line round the arm, a pocket's sides), so
+    a trim is a clean band and not the faces' steps (the clothing fixes: LG2's front trims read
+    as ragged lines)."""
+    trims = draft.get("trims", [])
+    if not trims:
+        return
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    L = layers(bm)
+
+    def faces_of(test):
+        return [f for f in bm.faces if test(get(f.verts[0], L), f.calc_center_median())]
+
+    def plane(co, no, test):
+        fs = faces_of(test)
+        geom = list({v for f in fs for v in f.verts}) + list({e for f in fs for e in f.edges}) + fs
+        if geom:
+            bmesh.ops.bisect_plane(bm, geom=geom, plane_co=co, plane_no=no, dist=1e-5,
+                                   clear_inner=False, clear_outer=False)
+    up = Vector((0, 0, 1))
+    for t in trims:
+        w = t["where"]
+        if w == "front":
+            for s in (1, -1):
+                plane(Vector((s * t.get("width", 0.02), 0, 0)), Vector((1, 0, 0)),
+                      lambda lb, m: m.y < body.center.y and lb[0] in ("torso", "neck", "skirt",
+                                                                      "collar"))
+        elif w in ("hem", "band_torso", "band_leg"):
+            half = t.get("width", 0.05 if w == "hem" else 0.03)
+            zs = (t["z"] - 0.02, t["z"] + half) if w == "hem" else (t["z"] - half / 2,
+                                                                     t["z"] + half / 2)
+            parts = ("torso", "skirt") if w != "band_leg" else ("thigh", "calf", "foot")
+            for z in zs:
+                plane(Vector((0, 0, z)), up, lambda lb, m, parts=parts: lb[0] in parts)
+        elif w == "sole":
+            plane(Vector((0, 0, t.get("z", 0.025))), up, lambda lb, m: True)
+        elif w == "pocket":
+            for z in (t["z0"], t["z1"]):
+                plane(Vector((0, 0, z)), up, lambda lb, m: lb[0] in t.get("parts", ("torso", "thigh")))
+            for x in (t["x0"], t["x1"]):
+                if abs(x) < 0.9:
+                    for s in (1, -1):
+                        plane(Vector((s * x, 0, 0)), Vector((1, 0, 0)),
+                              lambda lb, m: lb[0] in t.get("parts", ("torso", "thigh")) and
+                              t["z0"] - 0.02 < m.z < t["z1"] + 0.02)
+        elif w == "side_pocket":
+            for z in (t["z0"], t["z1"]):
+                plane(Vector((0, 0, z)), up, lambda lb, m: lb[0] == "thigh")
+        elif w in ("cuff", "band_arm"):
+            ts = ((t["t"] - t.get("width", 0.05) / 0.6,) if w == "cuff" else
+                  (t["t"] - t.get("width", 0.03) / 1.2, t["t"] + t.get("width", 0.03) / 1.2))
+            for side in ("l", "r"):
+                a, b, cc = body.limb("arm", side)
+                L1, L2 = (b - a).length, (cc - b).length
+                for tt in ts:
+                    s = max(0.0, min(1.0, tt)) * (L1 + L2)
+                    if s <= L1:
+                        p, d = a + (b - a) * (s / L1), (b - a).normalized()
+                    else:
+                        p, d = b + (cc - b) * min(1.0, (s - L1) / L2), (cc - b).normalized()
+                    plane(p, d, lambda lb, m, side=side: LIMB.get(lb[0]) == "arm" and
+                          lb[1] == side)
+    bm.to_mesh(ob.data)
+    bm.free()
+    ob.data.update()
+
+
 def finish(ob, body, draft, slots):
     """UVs from the pattern pieces, the material slots (textile, trims) and the vertex colors
     (rgb a multiplier, alpha the dye channel: 0 none, 1/3, 2/3, 1 the person's three)."""
+    crisp_trims(ob, body, draft)
     me = ob.data
     lab = labels_of(ob)
     uvl = me.uv_layers.new(name="UVMap")
@@ -918,6 +1296,9 @@ def trim_hit(t, c, lb, body):
             part in ("torso", "neck", "skirt", "collar")
     if w == "hem":
         return part in ("torso", "skirt") and t["z"] - 0.02 < c.z < t["z"] + t.get("width", 0.05)
+    if w in ("cuff", "band_arm") and LIMB.get(part) == "arm" and lb[1]:
+        # (the place along the arm of the face's middle, as `crisp_trims` cut it)
+        lb = (part, lb[1], limb_t(body, part, lb[1], c))
     if w == "cuff":
         return LIMB.get(part) == "arm" and lb[2] > t["t"] - t.get("width", 0.05) / 0.6
     if w == "ankle":
@@ -1011,13 +1392,25 @@ def build_garment(space, man, draft, slots, bone_ix):
         return ob, {"s": round(time.time() - t0, 1), "tris": tris_of(ob)}
     bm = region(space, draft)
     offset(bm, space, draft)
+    curtain(bm, space, draft)
     apply_cuts(bm, body, draft)
     flare(bm, space, draft)
     collar(bm, body, draft)
     hood(bm, space, body, draft)
+    orient_out(bm, space)
     ob = to_object(draft["id"], bm)
     bm.free()
     info = drape(ob, man, draft)
+    # (the drape's crumples and its small steps along the open edges smoothed out again: the
+    # solver on a 2 cm mesh leaves facets, not folds)
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    if info and not info.get("dropped"):
+        smooth(bm, space, draft, rounds=1, its=DRAPE_RELAX, keep_held=True)
+    smooth_chains(bm, rounds=4)
+    bm.to_mesh(ob.data)
+    bm.free()
+    ob.data.update()
     set_slots(ob, slots)
     finish(ob, body, draft, slots)
     # (a hood up follows the head: held to the head bone, more the higher up)
@@ -1319,9 +1712,10 @@ def compose(look, obs, accs, slots):
     layered(parts, look)
     for k, p in enumerate(parts):
         me = p.data
-        if "piece" not in me.attributes:
-            me.attributes.new("piece", "FLOAT", "POINT")
-        me.attributes["piece"].data.foreach_set("value", [float(k)] * len(me.vertices))
+        for name, val in (("piece", float(k)), ("ord", layer_order(p, look))):
+            if name not in me.attributes:
+                me.attributes.new(name, "FLOAT", "POINT")
+            me.attributes[name].data.foreach_set("value", [val] * len(me.vertices))
     # (one slot list for the look: each part's slots remapped onto it)
     for p in parts:
         names = [m.name for m in p.data.materials]
@@ -1344,6 +1738,16 @@ def compose(look, obs, accs, slots):
 
 
 LAYER_GAP = 0.004
+PULL_M = 0.025           # a vertex this near a garment over it and outside it goes in under it
+
+
+def layer_order(p, look):
+    """A piece's place from the skin out: its layer (`LAYER_ORDER`), a tucked top under its
+    bottoms."""
+    v = p.data.attributes["layer"].data[0].value
+    if look.get("tucked") and abs(v - LAYER_ORDER["base"]) < 0.01:
+        return LAYER_ORDER["bottom"] - 0.5
+    return v
 
 
 def layered(parts, look):
@@ -1351,10 +1755,7 @@ def layered(parts, look):
     the outer layer; a tucked top under its bottoms), every vertex of a layer pushed out to
     `LAYER_GAP` over the layers before it where it comes closer or lies inside them."""
     def order(p):
-        v = p.data.attributes["layer"].data[0].value
-        if look.get("tucked") and abs(v - LAYER_ORDER["base"]) < 0.01:
-            return LAYER_ORDER["bottom"] - 0.5
-        return v
+        return layer_order(p, look)
     garments = sorted([p for p in parts if order(p) < LAYER_ORDER["acc"] - 0.01], key=order)
     done = []
     for p in garments:
@@ -1372,36 +1773,146 @@ def layered(parts, look):
                 if (v.co - q).dot(n) < LAYER_GAP:
                     v.co = q + n * LAYER_GAP
         done.append(p)
+    # (the clothing fixes: and back from the outside in, each garment's vertices that still
+    # lie outside a garment over it, between that one's vertices, pulled in under it: a
+    # waistband or a hem came through a coat's or a top's faces there)
+    for k in range(len(garments) - 2, -1, -1):
+        p = garments[k]
+        over = [q for q in garments[k + 1:] if order(q) > order(p) + 0.01]
+        if not over or order(p) <= LAYER_ORDER["skin"]:
+            continue
+        co, tris = [], []
+        for q in over:
+            base = len(co)
+            co += [v.co.copy() for v in q.data.vertices]
+            tris += [tuple(base + i for i in f.vertices) for f in q.data.polygons]
+        bvh = BVHTree.FromPolygons(co, tris)
+        for v in p.data.vertices:
+            q, n, _, d = bvh.find_nearest(v.co, PULL_M)
+            if q is None:
+                continue
+            if (v.co - q).dot(n) > -LAYER_GAP:
+                v.co = q - n * LAYER_GAP
+
+
+CLOSE_PARTS = ("torso", "neck", "uarm", "farm", "thigh")   # where an outer layer runs close
+CLOSE_M = 0.035          # an outer garment within this of a face (nearest) runs close over it
+CLOSE_RAY_M = 0.16       # ... and every ray from it, straight and tilted, meets it within this
+CLOSE_TILT = 0.55        # the tilted rays' slope (about 30 degrees up, down and aside)
+FREE_PARTS = ("skirt", "hood", "collar")   # an outer garment's own parts that hang free
+CLOSE_EDGE_M = 0.06      # ... but a face this near an outer garment's open edge stays
+
+
+def _ray_other(bvh, fpiece, own, o, d, far):
+    """The first hit of another piece along a ray (past hits of its own piece), or None."""
+    hit = bvh.ray_cast(o, d, far)
+    tries = 0
+    while hit[0] is not None and fpiece[hit[2]] == own and tries < 4:
+        hit = bvh.ray_cast(hit[0] + d * 0.0015, d, far - (hit[0] - o).length)
+        tries += 1
+    if hit[0] is None or fpiece[hit[2]] == own:
+        return None
+    return hit
 
 
 def hide_covered(ob):
     """Takes out each face another piece covers: from its middle and its corners, along its
-    normal, every ray meets another piece within `COVER_M`."""
+    normal, every ray meets another piece within `COVER_M`. And (the clothing fixes) each
+    face of the body's middle (`CLOSE_PARTS`) an outer garment runs close over: each point
+    within `CLOSE_M` of the outer layers' fitted parts (not a coat's free skirt, a hood or a
+    collar) and its rays, straight out and tilted up, down and to each side, meeting them within
+    `CLOSE_RAY_M`, so no edge or opening shows the gap. LG2 kept a face only a ray from it
+    found covered within 7 cm, and a coat's waist over a heavy body runs farther out at its
+    back: the trousers' waist under it came through as the two moved apart. A face within
+    `CLOSE_EDGE_M` of an open edge (hem, cuff, opening) of a garment over it stays either way:
+    walking lifts the hem off it, and taken out it left a hole under a jacket's back."""
     me = ob.data
     piece = [0.0] * len(me.vertices)
     me.attributes["piece"].data.foreach_get("value", piece)
+    order = [0.0] * len(me.vertices)
+    if "ord" in me.attributes:
+        me.attributes["ord"].data.foreach_get("value", order)
+    part = [0] * len(me.vertices)
+    if "part" in me.attributes:
+        me.attributes["part"].data.foreach_get("value", part)
     co = [v.co.copy() for v in me.vertices]
     tris = [tuple(p.vertices) for p in me.polygons]
     bvh = BVHTree.FromPolygons(co, [t for t in tris])
     fpiece = [piece[t[0]] for t in tris]
+
+    def fpart(t):
+        ps = [PARTS[part[i]] if 0 <= part[i] < len(PARTS) else "acc" for i in t]
+        return max(set(ps), key=ps.count)
+    fparts = [fpart(t) for t in tris]
+    ford = [order[t[0]] for t in tris]
+    # (per layer, the fitted parts of the garments outside it)
+    outer_bvh = {}
+    for o in sorted(set(ford)):
+        sel = [t for t, oo, pp in zip(tris, ford, fparts)
+               if o + 0.01 < oo < LAYER_ORDER["acc"] - 0.01 and pp not in FREE_PARTS]
+        outer_bvh[o] = BVHTree.FromPolygons(co, sel) if sel else None
+    # (and their open edges: a face near an outer garment's hem, cuff or opening stays, as
+    # walking lifts the hem off it: taken out, it left a hole showing under a jacket's back)
+    from mathutils.kdtree import KDTree
+    ecount = {}
+    for fi, t in enumerate(tris):
+        for a, b in zip(t, t[1:] + t[:1]):
+            k = (a, b) if a < b else (b, a)
+            ecount.setdefault(k, []).append(fi)
+    edge_pts = [(ford[fs[0]], co[a] * 0.5 + co[b] * 0.5, co[a], co[b])
+                for (a, b), fs in ecount.items() if len(fs) == 1]
+    outer_edges = {}
+    for o in outer_bvh:
+        pts_o = [p for oo, m, pa, pb in edge_pts
+                 if o + 0.01 < oo < LAYER_ORDER["acc"] - 0.01 for p in (m, pa, pb)]
+        kd = KDTree(len(pts_o))
+        for i, p in enumerate(pts_o):
+            kd.insert(p, i)
+        kd.balance()
+        outer_edges[o] = kd if pts_o else None
     drop = []
+    close = kept = 0
     for fi, poly in enumerate(me.polygons):
         n = poly.normal
         pts = [poly.center] + [co[i] * 0.8 + poly.center * 0.2 for i in poly.vertices]
-        covered = True
-        for p in pts:
-            o = p + n * 0.0015
-            hit = bvh.ray_cast(o, n, COVER_M)
-            # (past hits of its own piece: a hood over its own shoulders)
-            tries = 0
-            while hit[0] is not None and fpiece[hit[2]] == fpiece[fi] and tries < 4:
-                hit = bvh.ray_cast(hit[0] + n * 0.0015, n, COVER_M - (hit[0] - o).length)
-                tries += 1
-            if hit[0] is None or fpiece[hit[2]] == fpiece[fi]:
-                covered = False
-                break
+        covered = all(_ray_other(bvh, fpiece, fpiece[fi], p + n * 0.0015, n, COVER_M)
+                      is not None for p in pts)
+        ob_ = outer_bvh.get(ford[fi])
+        kd = outer_edges.get(ford[fi])
+        if covered and kd is not None and ford[fi] > LAYER_ORDER["skin"] and \
+                kd.find(poly.center)[2] <= CLOSE_EDGE_M:
+            # (near a garment's open edge over it: walking moves the edge, so it stays)
+            covered = False
+            kept += 1
+        if not covered and ob_ is not None and fparts[fi] in CLOSE_PARTS and \
+                ford[fi] > LAYER_ORDER["skin"] and \
+                (kd is None or kd.find(poly.center)[2] > CLOSE_EDGE_M):
+            up = Vector((0, 0, 1))
+            side = n.cross(up)
+            dirs = [n]
+            for t in (up, side.normalized() if side.length > 1e-6 else None):
+                for s in ((1.0, -1.0) if t is not None else ()):
+                    d = n + t * (s * CLOSE_TILT)
+                    if d.length > 1e-6:
+                        dirs.append(d.normalized())
+            ok = True
+            for p in pts:
+                q = ob_.find_nearest(p, CLOSE_M)
+                if q[0] is None:
+                    ok = False
+                    break
+                # (from a little inside it: a face that came a few millimeters through the
+                # outer layer is under it all the same)
+                if any(ob_.ray_cast(p - n * 0.008, d, CLOSE_RAY_M)[0] is None for d in dirs):
+                    ok = False
+                    break
+            if ok:
+                covered = True
+                close += 1
         if covered:
             drop.append(fi)
+    log(f"hide_covered: {len(drop)} faces out, {close} by an outer layer close over them, "
+        f"{kept} kept near an outer edge")
     if drop:
         bm = bmesh.new()
         bm.from_mesh(me)
@@ -1449,6 +1960,55 @@ def decimated(ob, ratio, name):
     return c
 
 
+FOLLOW_M = 0.04          # an inner vertex this close to an outer garment follows its skin
+FOLLOW_FULL_M = 0.02     # ... wholly within this
+
+
+def follow_pairs(me, first, each):
+    """Which outer vertex each inner one follows (the clothing fixes): a vertex of the body's
+    middle (`CLOSE_PARTS`) within `FOLLOW_M` of a garment outside it (its fitted parts) takes
+    that garment's nearest vertex's skin weights in the editor (`people_library.skin_garment`),
+    wholly within `FOLLOW_FULL_M`, blended out to `FOLLOW_M`: the two layers move as one and
+    cannot pass through each other, as LG2's, skinned each from the body and plain outfit
+    nearest it, did at a coat's waist. [[i, j, w], ...] in the export's vertex indices, the
+    outer layers' first, so a follower's own outer vertex has its final weights."""
+    if "ord" not in me.attributes or "part" not in me.attributes:
+        return []
+    n = len(me.vertices)
+    order = [0.0] * n
+    me.attributes["ord"].data.foreach_get("value", order)
+    part = [0] * n
+    me.attributes["part"].data.foreach_get("value", part)
+    co = [v.co for v in me.vertices]
+    tris = [tuple(t.vertices) for t in me.loop_triangles]
+
+    def pname(i):
+        return PARTS[part[i]] if 0 <= part[i] < len(PARTS) else "acc"
+    out = []
+    for o in sorted({x for x in order if LAYER_ORDER["skin"] < x < LAYER_ORDER["acc"] - 0.01},
+                    reverse=True):
+        sel = [t for t in tris if o + 0.01 < order[t[0]] < LAYER_ORDER["acc"] - 0.01 and
+               max((pname(i) for i in t), key=[pname(i) for i in t].count) not in FREE_PARTS]
+        if not sel:
+            continue
+        bvh = BVHTree.FromPolygons(co, sel)
+        for vi in range(n):
+            if abs(order[vi] - o) > 1e-3 or pname(vi) not in CLOSE_PARTS or vi not in first:
+                continue
+            q, _, ti, d = bvh.find_nearest(co[vi], FOLLOW_M)
+            if q is None:
+                continue
+            vj = min(sel[ti], key=lambda k: (co[k] - q).length)
+            if vj not in first:
+                continue
+            w = max(0.0, min(1.0, (FOLLOW_M - d) / (FOLLOW_M - FOLLOW_FULL_M)))
+            if w <= 0.0:
+                continue
+            for i in each[vi]:
+                out.append([i, first[vj], round(w, 3)])
+    return out
+
+
 def export(ob, path, slots, bones, mid_colors=None, glow=()):
     """The object as the editor builds it (`people_library.make_looks`): unique corners
     (position, normal, uv, color) as vertices in Unreal's frame (cm, y negated, uv v
@@ -1494,6 +2054,14 @@ def export(ob, path, slots, bones, mid_colors=None, glow=()):
         M.append(ms)
     rec = {"slots": out_slots, "vertices": V, "normals": N, "uv0": U, "colors": C,
            "triangles": T, "mats": M, "rigid_bone": R, "rigid_w": W, "bones": bones}
+    if mid_colors is None:
+        first = {}
+        for k, j in key_of.items():
+            first[k[0]] = min(j, first.get(k[0], j))
+        each = {}
+        for k, j in key_of.items():
+            each.setdefault(k[0], []).append(j)
+        rec["follow"] = follow_pairs(me, first, each)
     Path(path).write_text(json.dumps(rec, separators=(",", ":")), encoding="utf-8")
     return {"verts": len(V) // 3, "tris": len(T) // 3}
 

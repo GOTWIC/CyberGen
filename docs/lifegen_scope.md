@@ -1,4 +1,4 @@
-# lifegen: people, traffic, transit and air (scope, v1: decided 2026-11-13; LG0 to LG6 done)
+# lifegen: people, traffic, transit and air (scope, v1: decided 2026-11-13; LG0 to LG8 done)
 
 Stage 4 (lifegen) of CyberGen's five stages. It takes a built city with its assets (and,
 once stage 3 is there, its hours and weather) and fills it with life: varied, realistic
@@ -103,7 +103,7 @@ Options weighed:
 | Parked car variants per district style | AG8 | the fleet's look, until the fleet replaces them |
 | The graphs in Unreal as data assets (`BP_CityGenGraph`: lanes, walkways, transit, doors, levels) | M15, AG3, M14 | the runtime's input |
 | A C++ runtime plugin pattern (`CityGenPlay`, built with UnrealBuildTool) | play features | how `CityGenLife` is built |
-| Hours and weather | atmosgen (planned) | crowds by hour, umbrellas and shelter in rain |
+| Hours and weather | atmosgen (AT3, AT5) | crowds by hour, umbrellas and shelter in rain (LG8) |
 
 What is missing goes into asks of citygen (section 4.1): signal phases and their timing,
 bus routes and stops, turn restrictions where a junction needs them, lobbies (where a door
@@ -367,8 +367,8 @@ by the player (a later option); seasons.
 | LG4 | Life at places (done, 2026-11-15) | Smart Object slots at benches, stops, stalls, kiosks, vending machines and doors; places by their hours; gangs on their turf, police patrols | LG3 |
 | LG5 | Traffic | AG18's fleet (cars and vans now; buses, trucks, motorbikes and bikes as the Mac designs them) on the lanes; signal phases; parking; bus routes; taxis; densities by hour; lights at night | LG0 |
 | LG6 | Transit (done, 2026-11-16) | trains, metro, monorail, maglev and sky tube pods on their lines to timetables, stations, boarding | LG3, LG5 |
-| LG7 | Air and water | flying cars on air lanes and pads, drones, police fliers, aircraft over the spaceport, boats, water taxis, ships and ferries | LG5 |
-| LG8 | Weather, reactions and release | crowds and traffic by atmosgen's hour and weather (umbrellas, shelter, nightlife), reactions to the player, the crowd and traffic performance pass, every sample city alive, Unreal checks on the PC, README | LG2 to LG7, AT3, AT5 |
+| LG7 | Air and water (done, 2026-11-16) | flying cars on air lanes and pads, drones, police fliers, aircraft over the spaceport, boats, water taxis, ships and ferries | LG5 |
+| LG8 | Weather, reactions and release (done, 2026-11-17) | crowds and traffic by atmosgen's hour and weather (umbrellas, shelter, nightlife), reactions to the player, the crowd and traffic performance pass, every sample city alive, Unreal checks on the PC, README | LG2 to LG7, AT3, AT5 |
 
 Each milestone updates the exporter and the plugin in its own PR and runs AG16's benchmark,
 as stages 1 and 2 update the exporter. LG2 and LG3 can run side by side after LG1 (crowds

@@ -383,7 +383,9 @@ def test_life_passes():
                                                 "CityGenLife.Tiers", "CityGenLife.Traffic",
                                                 "CityGenLife.Clothing", "CityGenLife.Places",
                                                 "CityGenLife.Gangs", "CityGenLife.Police",
-                                                "CityGenLife.Transit"]
+                                                "CityGenLife.Transit", "CityGenLife.Air",
+                                                "CityGenLife.Water", "CityGenLife.FollowAtmos",
+                                                "CityGenLife.Weather", "CityGenLife.Bounds"]
         assert set(cmds) - set(life) == base and cmds[-1].startswith("CityGenAtmos.Hour")
     assert "CityGenLife.Enable 0" in by["night_life_off"][3]
     assert "CityGenLife.Lumen 1" in by["night_life_lumen"][3]
@@ -405,6 +407,16 @@ def test_life_passes():
     assert "CityGenLife.Transit 0" in by["night_life_notransit"][3]
     assert all("CityGenLife.Transit 1" in by[n][3] for n, *_ in B.LIFE_PASSES
                if n != "night_life_notransit")
+    # (LG7: what flies and floats on in every life pass but its own, which turns both off)
+    assert all(f"CityGenLife.{k} 0" in by["night_life_noairwater"][3] for k in ("Air", "Water"))
+    assert all(f"CityGenLife.{k} 1" in by[n][3] for n, *_ in B.LIFE_PASSES
+               if n != "night_life_noairwater" for k in ("Air", "Water"))
+    # (LG8: every life pass follows atmosgen's hour; the weather's effect on in every one but
+    # its own)
+    assert all("CityGenLife.FollowAtmos 1" in by[n][3] for n, *_ in B.LIFE_PASSES)
+    assert "CityGenLife.Weather off" in by["night_life_noweather"][3]
+    assert all("CityGenLife.Weather auto" in by[n][3] for n, *_ in B.LIFE_PASSES
+               if n != "night_life_noweather")
     # (LG1: the people library's tiers, every pass setting them, the near pass none near)
     from lifegen.library import TIERS
     assert f"CityGenLife.Tiers {TIERS['near_m']:g} 0 {TIERS['mid_m']:g} {TIERS['far_m']:g}" \

@@ -178,7 +178,7 @@ def test_fill_resolves_districts_and_the_fleet():
     assert abs(sum(old["mix"].values()) - 1.0) < 1e-3
     # (decision 12.7: the frame budget is 20 ms p95; 12.8: stepping aside and looking)
     assert f["budgets"]["frame_p95_ms"] == 20.0
-    assert f["reactions"] == {"step_aside": True, "look": True, "flee": False, "gather": False}
+    assert f["reactions"] == {"step_aside": True, "look": True, "flee": True, "gather": True}
     # (wear up where poor and dangerous)
     assert old["style"]["wear"] > core["style"]["wear"]
 
@@ -252,7 +252,10 @@ def test_asks_met_when_the_model_has_them():
     m["lanes"][0]["restricted"] = False
     st = {a["id"]: a["status"] for a in A.status(m, {"doors": True})}
     assert st["bus_routes"] == "met" and st["turn_restrictions"] == "met"
-    assert st["doors"] == "met" and st["piers"] == "missing"
+    # (LG7 derives the piers; a model with them meets the ask)
+    assert st["doors"] == "met" and st["piers"] == "derived"
+    m["piers"] = [{"id": "pier.1"}]
+    assert {a["id"]: a["status"] for a in A.status(m)}["piers"] == "met"
 
 
 # --- the exporter's layer 4 -------------------------------------------------------------------

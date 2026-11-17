@@ -154,8 +154,9 @@ BUDGETS = {
     "full_detail": [150, 250],     # people at full detail near the view
 }
 
-# decision 12.8: stepping aside and looking now; fleeing and gathering later (storygen's hook)
-REACTIONS = {"step_aside": True, "look": True, "flee": False, "gather": False}
+# decision 12.8: stepping aside and looking (LG3, LG8); fleeing and gathering (LG8, storygen's
+# hook: a danger at a point, `CityGenLife.Panic`); the settings are LG8's `REACTION`
+REACTIONS = {"step_aside": True, "look": True, "flee": True, "gather": True}
 
 # --- the spike (LG0): plain stand-ins on one district ---------------------------------------
 
@@ -410,6 +411,8 @@ PLACE_CLIPS = {
     "talk_a": f"{GAS_ANIM}/Idle/M_Relaxed_Stand_Idle_Break_v02",
     "talk_b": f"{GAS_ANIM}/Idle/M_Relaxed_Stand_Idle_Break_v05",
     "talk_c": f"{GAS_ANIM}/Idle/M_Neutral_Stand_Idle_Break_v03",
+    # (LG8: running from a danger near the view)
+    "run": f"{GAS_ANIM}/Run/M_Neutral_Run_Loop_F",
 }
 
 # --- LG6: transit (scope 6.6) ------------------------------------------------------------------
@@ -476,3 +479,169 @@ TRANSIT = {
     "budget_cars": 600,            # cars at once
 }
 TRANSIT_MODE_CODES = ("metro", "elevated_rail", "monorail", "maglev", "sky_tube")
+
+# --- LG7: air and water (scope 6.7) ----------------------------------------------------------
+
+# what flies and what floats (the exporter's `unreal_life.AIRWATER_MODELS` draws each kind:
+# AG18's hover cars where the project has them, stand-ins of the engine's basic shapes for the
+# rest until the Mac's designs: decision 6)
+AIR_KINDS = ("car", "drone", "police", "media", "aircraft", "shuttle")
+WATER_KINDS = ("boat", "taxi", "ferry", "ship")
+AW_KINDS = AIR_KINDS + WATER_KINDS
+# how each kind moves: cruise (m/s), acceleration and braking (m/s2), the sideways pull it
+# takes in a turn (m/s2: at most sqrt(lateral R) there), its climb and descent (m/s), its dwell
+# where it lands or berths (s), its size (length, beam, height: m), how far behind the one ahead
+# on its route it keeps at least (m), its draft (boats: m), how far it keeps off what it passes
+# (m: a flier's margin in plan from masses, towers, tubes and signs; a boat's off banks, quays
+# and moored boats), the radius it turns round in at a route's end (m, 0: a double-ended boat
+# that runs back stern first), how far it banks at most (degrees)
+AW_VEHICLES = {
+    "car": {"cruise": 26.0, "accel": 3.0, "brake": 3.5, "lateral": 3.0, "vert": 4.0,
+            "dwell_s": 45.0, "size": [4.8, 2.0, 1.5], "spacing_m": 140.0, "margin_m": 8.0,
+            "turn_m": 40.0, "bank": 22.0},
+    "drone": {"cruise": 14.0, "accel": 3.0, "brake": 3.0, "lateral": 3.0, "vert": 3.0,
+              "dwell_s": 15.0, "size": [0.9, 0.9, 0.35], "spacing_m": 60.0, "margin_m": 3.0,
+              "turn_m": 12.0, "bank": 12.0},
+    "police": {"cruise": 22.0, "accel": 3.0, "brake": 3.5, "lateral": 2.5, "vert": 4.0,
+               "dwell_s": 0.0, "size": [4.8, 2.0, 1.5], "spacing_m": 300.0, "margin_m": 10.0,
+               "turn_m": 120.0, "bank": 18.0},
+    "media": {"cruise": 12.0, "accel": 2.0, "brake": 2.0, "lateral": 1.5, "vert": 3.0,
+              "dwell_s": 0.0, "size": [6.0, 6.0, 2.0], "spacing_m": 300.0, "margin_m": 12.0,
+              "turn_m": 160.0, "bank": 10.0},
+    "aircraft": {"cruise": 80.0, "accel": 2.0, "brake": 2.0, "lateral": 2.5, "vert": 8.0,
+                 "dwell_s": 0.0, "size": [42.0, 36.0, 12.0], "spacing_m": 3000.0,
+                 "margin_m": 0.0, "turn_m": 2600.0, "bank": 25.0},
+    "shuttle": {"cruise": 70.0, "accel": 2.5, "brake": 2.5, "lateral": 2.5, "vert": 6.0,
+                "dwell_s": 240.0, "size": [38.0, 22.0, 9.0], "spacing_m": 3000.0,
+                "margin_m": 0.0, "turn_m": 2000.0, "bank": 20.0},
+    "boat": {"cruise": 4.0, "accel": 0.4, "brake": 0.5, "lateral": 0.4, "vert": 0.0,
+             "dwell_s": 0.0, "size": [7.0, 2.2, 1.6], "spacing_m": 80.0, "draft": 0.5,
+             "margin_m": 0.4, "turn_m": 6.0, "bank": 0.0},
+    "taxi": {"cruise": 6.0, "accel": 0.5, "brake": 0.6, "lateral": 0.5, "vert": 0.0,
+             "dwell_s": 30.0, "size": [9.0, 2.8, 2.4], "spacing_m": 120.0, "draft": 0.7,
+             "margin_m": 0.6, "turn_m": 8.0, "bank": 0.0},
+    "ferry": {"cruise": 4.5, "accel": 0.3, "brake": 0.35, "lateral": 0.3, "vert": 0.0,
+              "dwell_s": 60.0, "size": [26.0, 9.0, 5.5], "spacing_m": 300.0, "draft": 1.6,
+              "margin_m": 3.0, "turn_m": 0.0, "bank": 0.0},
+    "ship": {"cruise": 5.0, "accel": 0.08, "brake": 0.1, "lateral": 0.15, "vert": 0.0,
+             "dwell_s": 1500.0, "size": [120.0, 20.0, 22.0], "spacing_m": 3000.0,
+             "draft": 6.0, "margin_m": 8.0, "turn_m": 0.0, "bank": 0.0},
+}
+# how many: cars and drones airborne per km2 of land per M11 hour band (night, morning, day,
+# evening, late), times the district's `busy`, the spec's `air.busy` and the kind's multiplier,
+# cars also by wealth (0.5 + wealth); police fliers per district by its danger; media fliers
+# and overflying aircraft per city; a shuttle per launch pad
+AIR = {
+    "cell_m": 4.0,                 # the airspace raster (drones on it; cars on 8 m cells)
+    "coarse": 2,
+    "slab_m": 8.0,                 # the airspace's heights in slabs of this (63 of them)
+    "vmargin_m": 3.0,              # every obstacle's top and underside this much more
+    "car_layers": [48.0, 60.0, 72.0, 84.0, 100.0, 116.0, 132.0, 150.0, 170.0, 190.0, 215.0,
+                   240.0, 270.0, 300.0, 335.0, 370.0, 410.0, 450.0],
+    "drone_layers": [26.0, 32.0, 38.0, 44.0, 52.0, 60.0, 70.0, 80.0, 92.0, 104.0],
+    "police_m": [110.0, 130.0, 150.0, 175.0, 200.0, 240.0, 290.0, 330.0],
+    "police_r_m": [260.0, 200.0, 150.0],
+    "media_m": [180.0, 210.0, 240.0, 280.0],
+    "media_r_m": [300.0, 240.0, 180.0],
+    "aircraft_m": [760.0, 820.0],
+    "aircraft_out_m": 2600.0,      # an overflight runs on this far past the map's edge
+    "shuttle_cruise_m": 900.0,
+    "shuttle_hover_m": 140.0,
+    "road_cost": 1.0,              # the A*'s cost a meter over an avenue or highway ...
+    "open_cost": 2.2,              # ... and elsewhere (between the towers, over lower roofs)
+    "pad_over_m": 14.0,            # a flight to or from a pad cruises this far over its roof
+    "ramp_m": 120.0,               # a change of layer along this much of a leg at most
+    "car_density": [12.0, 28.0, 24.0, 32.0, 22.0],
+    "drone_density": [1.5, 6.0, 7.0, 6.0, 3.0],
+    "police": {"base": 0.5, "danger": 2.5, "band": [1.0, 0.6, 0.6, 0.8, 1.0]},
+    "media": 2,
+    "aircraft": 2,
+    "lane_triangle_m": [700.0, 2200.0],   # a circuit's sides
+    "per_circuit": 8,              # cars a circuit at most per band (the rest more circuits)
+    "drone_reach_m": [150.0, 650.0],
+    "drone_drop_h_m": [12.0, 45.0],
+    "drone_hub_h_m": [15.0, 70.0],
+    "drone_hubs_km2": 1.2,
+    "routes_max": {"car": 220, "drone": 160, "police": 30, "media": 4, "aircraft": 4,
+                   "shuttle": 8},
+}
+# boats on a river or channel per km of it per band, a canal's boat, water taxis on a tour per
+# band, ferry crossings, ships at a berth
+WATER = {
+    "cell_m": 4.0,
+    "boat_per_km": [0.6, 1.0, 1.3, 1.3, 0.9],
+    "taxi_band": [1, 2, 2, 2, 1],
+    "ferry_spacing_m": 450.0,      # crossings at least this far apart along a river
+    "ferry_max": 4,
+    "ferry_walk_m": 45.0,          # a ferry pier's shore within this of a walkway
+    "ferry_min_m": 50.0,           # crossings at least this wide
+    "taxi_tour": 4,                # piers a water taxi calls at, at most
+    "out_m": 600.0,                # a ship comes in from this far past the map's edge
+    "canal_min_m": 120.0,          # a canal's route at least this long
+    "bridge_pad_m": 0.4,           # under a bridge, the boat's top this far under its deck
+    "berths": 2,                   # ships at a berth line (one each)
+}
+AW_BUDGET = {"fliers": 500, "drones": 300, "boats": 160}
+AW_SAMPLE_S = 1.0                  # the routes' cycles sampled every this many s
+AW_STEP_M = 4.0                    # the speed profile's grid along a route
+
+# --- LG8: the hour, the weather and reactions (scope 6.8) ---------------------------------------
+
+# the crowd and the traffic by atmosgen's weather state (the runtime reads the state and the rain
+# from atmosgen's controller; the plan's own state is the crowd's `weather`): per state the
+# share of the hour's people out (`out`: the rest stay in, their trips ending at doors), their
+# pace (`pace`), the share in the rain looks (`rain_looks`, LG2's `WEATHER_OUTFITS`), the share
+# of the others holding an umbrella (`umbrella`), a passer-by's chance to stop under a cover
+# its walkway passes (`shelter`), the cars' share (`cars`), speed (`speed`) and the time
+# headway they add (`headway_s`); a rain state's values are reached by its rain (atmosgen's
+# rain rate over the state's, `WEATHER_RAIN`), so they follow a change as the rain does
+WEATHER_LIFE = {
+    "clear": {"out": 1.0, "pace": 1.0, "rain_looks": 0.0, "umbrella": 0.0, "shelter": 0.0,
+              "cars": 1.0, "speed": 1.0, "headway_s": 0.0},
+    "drizzle": {"out": 0.88, "pace": 1.06, "rain_looks": 0.25, "umbrella": 0.3,
+                "shelter": 0.06, "cars": 1.0, "speed": 0.95, "headway_s": 0.2},
+    "rain": {"out": 0.6, "pace": 1.15, "rain_looks": 0.5, "umbrella": 0.6, "shelter": 0.22,
+             "cars": 1.05, "speed": 0.88, "headway_s": 0.45},
+    "fog": {"out": 0.9, "pace": 1.0, "rain_looks": 0.0, "umbrella": 0.0, "shelter": 0.0,
+            "cars": 0.95, "speed": 0.82, "headway_s": 0.6},
+    "smog": {"out": 0.8, "pace": 1.04, "rain_looks": 0.0, "umbrella": 0.0, "shelter": 0.0,
+             "cars": 1.0, "speed": 0.95, "headway_s": 0.2},
+}
+WEATHER_KEYS = ("out", "pace", "rain_looks", "umbrella", "shelter", "cars", "speed",
+                "headway_s")
+WEATHER_RAIN = {"clear": 0.0, "drizzle": 0.3, "rain": 0.8, "fog": 0.0, "smog": 0.0}
+# umbrellas (scope 6.1, 6.2): a canopy and a shaft (the engine's basic shapes, as LG6's
+# stand-ins: a library item until the Mac designs one) over the right shoulder, drawn near and
+# mid; their canopies' colors (sRGB), the share of them with a lit shaft (the city's LED
+# umbrellas) and its colors; folded (not drawn) under a cover
+UMBRELLA = {"colors": ("#0e0f12", "#15171c", "#1b2433", "#2a2c30", "#4a1020", "#10302e",
+                       "#d8dde6", "#c21d8c", "#17b2c9", "#e0681c"),
+            "lit_share": 0.3, "lit": ("#ff2fb4", "#28e6ff", "#b8ff3a", "#ffd23a"),
+            "canopy_m": 1.05, "canopy_h_m": 0.24, "height": 1.13, "side_m": 0.3,
+            "fwd_m": 0.14, "tilt_deg": 6.0, "shaft_m": 0.82}
+# shelter (scope 6.8: under awnings and decks in rain, atmosgen's rain shadow): a walkway's
+# stretches under a cover (AT5's masks: something at least `head_m` over it, on the ground
+# level, of the kinds people walk outdoors), sampled every `step_m`, gaps under `join_m`
+# joined, stretches under `min_m` left out; in rain a passer-by stops under one by the
+# state's `shelter` chance and stands at its side for `dwell_s`, facing out
+SHELTER = {"step_m": 1.0, "join_m": 1.5, "min_m": 3.0, "head_m": 2.1,
+           "kinds": ("sidewalk", "path", "alley", "promenade", "pedestrian_street",
+                     "crossing", "underpass", "concourse"),
+           "dwell_s": [25.0, 140.0]}
+# nightlife (scope 6.8): people round the open bars, clubs and arcades by night, on each one's
+# door walkway, `kinds` people at its busy (LG4's, per band), on top of M11's density (the
+# plan's `night` per walkway; the densities check measures M11's alone)
+NIGHTLIFE = {"kinds": {"bar": 3.0, "club": 7.0, "arcade": 2.0}}
+# reactions to the player and to danger (decision 12.8): people within `look_m` of the player
+# standing still (waiting, queueing, sheltering) turn to look at it; a danger at a point
+# (storygen's hook, `CityGenLife.Panic`) sends everyone within `flee_m` running away along
+# their walkways at `flee_pace` times their pace for `flee_s`, leaving their places (police
+# hold their ground); then for `gather_s` a `gather_share` of the people within `gather_m`
+# come back and stand `ring_m` off it looking at it for `stay_s`; cars stopped for the player
+# on foot wait (no sound in lifegen: no horn, scope 11)
+REACTION = {"look_m": 6.0, "flee_m": 35.0, "flee_s": 14.0, "flee_pace": 2.9,
+            "gather_m": 80.0, "gather_s": 90.0, "gather_share": 0.5, "ring_m": [8.0, 20.0],
+            "stay_s": [15.0, 60.0]}
+# the traffic: a car stuck this long (s) far from the view (past `stuck_far_m`) leaves, so no
+# jam lasts where nobody looks (its lane refilled as any)
+TRAFFIC_STUCK = {"stuck_s": 75.0, "stuck_far_m": 150.0}
