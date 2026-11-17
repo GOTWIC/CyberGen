@@ -1578,9 +1578,22 @@ their first. Road edges 1.8 to 1.9 cm of sag at p95 (15 to 19 on main), junction
 million); the cars' lanes (`unreal_life.fillet`, `smooth`) now run on roads as smooth as
 they are. Regenerations: held footbridges laid again as class `footbridge` (no junction;
 as a pedestrian street one took a held street's dead end), `Frame.ends` every held segment
-(two highways on one centerline each held). Open: issue #241 (a bend junction a hilly
-regeneration lays anew, its curb 3.7 cm over its legs; that test xfail). Outputs and
-measures: `docs/progress/fix_road_curves/`.
+(two highways on one centerline each held). Outputs and measures:
+`docs/progress/fix_road_curves/`. Its follow-ups (`docs/progress/curves_followups/`):
+- **Offset lines whole** (`junctions._offset`, `_joined`): GEOS offsets a line that turns by a
+  hair at a vertex on the offset's inner side as two parts meeting end to end, and the longer
+  part alone was kept, so a lane or a sidewalk's middle line stopped up to 57 m short of its
+  road's end (Vesper Bay's `rs.e669s6`, whose crosswalk `cw.e637n26` was then walked as a
+  49 m diagonal between its corners); parts meeting within `JOIN_GAP_M` join again.
+- **#241** (`pavement.Assembly._foreign`): a junction's, pad's or bulb's vertex that only a
+  road not its own shares (its outline against another road's sidewalk) takes the curb rule's
+  height, not that road's; ports keep theirs.
+- **Station feet** (`transit.Builder.foot`, `_mid_cross`): a stair's or elevator's foot
+  never on a crossing or crosswalk away from the sidewalk it joins.
+- **Check** `walkway_carriageway`: a crossing's length on one road's carriageway faces past
+  that road's carriageway width (`carriageway_w`) counts past its span (a diagonal of one
+  stretch); a station's stair or elevator with its foot in a crosswalk's stripe or on a
+  crossing on the road fails (`station_feet_on_crossings`).
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 

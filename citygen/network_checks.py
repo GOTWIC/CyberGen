@@ -956,7 +956,8 @@ def walk_on_roads(m: CityModel) -> dict:
             # its straight span across that road holds to the road's carriageway width; a
             # crossing of one stretch run along the road has no other stretch to tell it by)
             for n_, (a, b) in enumerate(zip(i, j)):
-                if lens[n_] and owner[b] is not None and                         m.walkways[wid[a]].kind in CROSS_KINDS:
+                if lens[n_] and owner[b] is not None and \
+                        m.walkways[wid[a]].kind in CROSS_KINDS:
                     key = (wid[a], owner[b])
                     along[key] = along.get(key, 0.0) + float(lens[n_])
         wid_a = np.array(wid)
@@ -1000,10 +1001,50 @@ STATION_FEET = ("stairs", "elevator")     # a station's ways down to the ground
 FOOT_IN_M = 0.1     # a foot this far inside a crossing's span is on it
 
 
+def crossing_zones(m: CityModel, walks=None, faces=None) -> tuple[list, list]:
+    """Curves followups: where a crossing stands on the road: each crosswalk record's stripe
+    (its line from curb to curb, FOOT_IN_M in from its ends, its width less FOOT_IN_M), and
+    each crossing or crosswalk walkway's band (its width less FOOT_IN_M about its line) where
+    it lies on a road's carriageway face at the ground (`road_faces`). `walks`: walkway rows
+    or dicts (the model's by default). ([geometry], [crosswalk or walkway id])."""
+    zones, names = [], []
+    for x in m.crosswalks:
+        ln = LineString([p[:2] for p in x.line])
+        if ln.length > 2.0 * FOOT_IN_M:
+            ln = shapely.ops.substring(ln, FOOT_IN_M, ln.length - FOOT_IN_M)
+            zones.append(G.qpoly(ln.buffer(max(x.width_m / 2.0 - FOOT_IN_M, 0.05),
+                                           cap_style="flat")))
+            names.append(x.id)
+    polys, layers, _, _, _ = road_faces(m) if faces is None else faces
+    road = [g for g, lay in zip(polys, layers) if lay == "g0" and not g.is_empty]
+    if not road:
+        return zones, names
+    rtree = shapely.STRtree(road)
+
+    def get(w, k):
+        return w.get(k) if isinstance(w, dict) else getattr(w, k)
+    for w in (m.walkways if walks is None else walks):
+        if get(w, "kind") not in CROSS_KINDS or get(w, "level"):
+            continue
+        pts = [p[:2] for p in get(w, "line")]
+        if len(pts) < 2:
+            continue
+        band = LineString(pts).buffer(max(get(w, "width_m") / 2.0 - FOOT_IN_M, 0.05),
+                                      cap_style="flat")
+        near = sorted(int(i) for i in rtree.query(band, predicate="intersects"))
+        if not near:
+            continue
+        z = G.polygonal(shapely.intersection(band, shapely.union_all([road[i] for i in near]),
+                                             grid_size=G.GRID_M))
+        if not z.is_empty:
+            zones.append(z)
+            names.append(get(w, "id"))
+    return zones, names
+
+
 def station_feet_on_crossings(m: CityModel, faces=None) -> list:
     """Curves followups: a station's stair or elevator whose foot on the ground stands on a
-    crossing: in a crosswalk record's stripe, or on a road's carriageway face within a
-    crossing or crosswalk walkway's width of its line. [(walkway id, station, crossing)]."""
+    crossing (`crossing_zones`). [(walkway id, station, crosswalk or crossing)]."""
     feet = []
     for w in m.walkways:
         st = (w.attrs or {}).get("station")
@@ -1014,33 +1055,15 @@ def station_feet_on_crossings(m: CityModel, faces=None) -> list:
             feet.append((w.id, st, Point(g[0][0], g[0][1])))
     if not feet:
         return []
-    stripes, names = [], []
-    for x in m.crosswalks:
-        ln = LineString([p[:2] for p in x.line])
-        if ln.length > 2.0 * FOOT_IN_M:
-            ln = shapely.ops.substring(ln, FOOT_IN_M, ln.length - FOOT_IN_M)
-            stripes.append(ln.buffer(max(x.width_m / 2.0 - FOOT_IN_M, 0.05), cap_style="flat"))
-            names.append(x.id)
-    polys, layers, _, _, _ = road_faces(m) if faces is None else faces
-    road = [g for g, lay in zip(polys, layers) if lay == "g0"]
-    for w in m.walkways:
-        if w.kind in CROSS_KINDS and not w.level and road:
-            band = LineString([p[:2] for p in w.line]).buffer(
-                max(w.width_m / 2.0 - FOOT_IN_M, 0.05), cap_style="flat")
-            stripes.append(band)
-            names.append(w.id)
-    rtree = shapely.STRtree(road) if road else None
-    tree = shapely.STRtree(stripes) if stripes else None
+    zones, names = crossing_zones(m, faces=faces)
+    if not zones:
+        return []
+    tree = shapely.STRtree(zones)
     out = []
     for wid, st, pt in feet:
-        if tree is None:
-            break
-        for k in sorted(int(i) for i in tree.query(pt, predicate="intersects")):
-            if names[k].startswith("wk") and (rtree is None or not len(
-                    rtree.query(pt, predicate="intersects"))):
-                continue        # (a crossing walkway's line off the road: its sidewalk end)
-            out.append((wid, st, names[k]))
-            break
+        hits = sorted(int(i) for i in tree.query(pt, predicate="intersects"))
+        if hits:
+            out.append((wid, st, names[hits[0]]))
     return out
 
 
