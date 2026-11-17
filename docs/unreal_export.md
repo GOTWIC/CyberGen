@@ -1071,6 +1071,52 @@ play-in-editor and `-game` run). So the fixes cut what the level holds and strea
   s while the city streams (a cooked game marks far fewer objects); at most one moving
   frame over 100 ms in a pass.
 
+### HLOD streaming (fix_hlod_streaming)
+
+**What made the walk's slow frames** (an Unreal Insights trace of the lean route's walk and
+drive on Delta; `docs/progress/fix_hlod_streaming/`): World Partition hides an HLOD actor
+while the main cell it stands for is shown and shows it again when the cell goes (the HLOD
+runtime subsystem's `OnCellShown` and `OnCellHidden`, `AWorldPartitionHLOD::SetVisibility`,
+each of its components' `SetVisibility`). Two things in the engine made each flip expensive:
+
+- **A flip recreates the render state.** `USceneComponent::OnVisibilityChanged` marks it dirty,
+  so at the end of the frame each instanced HLOD component gets a new scene proxy: its
+  instances sent to the GPU again and its materials gathered (`UStaticMesh::GetUsedMaterials`,
+  about 5 microseconds a call) on the game thread.
+- **The root's flip dirties the rest.** The HLOD builder makes one of an HLOD actor's
+  components its root and attaches the others to it, and a component whose visibility
+  changes marks the render state of everything attached to it dirty
+  (`EVisibilityPropagation::DirtyOnly`), so every component of the actor was made anew
+  whatever its own flip did.
+
+An HLOD actor stands for one 128 m main cell and holds a component per distinct mesh (each
+building's, street piece's and part's), up to several hundred; a step across a cell boundary
+shows a row of cells ahead and hides a row behind (about 12 each at 768 m), and those frames
+updated 800 to 2,400 HLOD components at 70 ms or more.
+
+**The fix** (`UCityGenHLODComponent` in the play plugin, `CityGenHLODComponent.h`): the
+instanced HLODs' component class is the play plugin's. It leaves its HLOD actor's root as it
+begins to play (in a game only: each component flips its own visibility anyway), and a flip
+keeps the scene proxy and only changes whether the scene draws it, on the render thread
+(`FSceneInterface::UpdatePrimitivesIsDrawn_RenderThread`, the engine's FastGeo streaming's
+way: Nanite, the shadows and the GPU scene read the drawn flag), a render command per
+component. A component hidden when its render state was made (no proxy) is made anew once when
+first shown, as before. Console: `CityGen.HLODFastVisibility 0|1` (0 the engine's way, for a
+comparison; the bench pass `night_plan_all_hlodslow`), `CityGen.HLODStatus` (the flips in
+place and recreated since the start, and why).
+
+**How every import sets it up** (`unreal.set_hlod_class`, `hlod_class`, `HLOD_VERSION`):
+when the play plugin is built, `[/Script/Engine.HLODBuilder]
+HLODInstancedStaticMeshComponentClass=/Script/CityGenPlay.CityGenHLODComponent` in the
+project's DefaultEditor.ini, else the key is taken out (the engine's class). The HLOD
+builder's defaults read that config when the engine starts, before the plugin's classes
+exist, so the plugin's module reads them again as it starts (editor builds only).
+`build_hlods` records what the level's HLODs were built with in the project
+(`Saved/CityGenHLOD/<level>.txt`: the class and `HLOD_VERSION`) and builds them all again
+(`-SetupHLODs -RebuildHLODs`) when that changes, since the builder's own hash leaves the class
+out; the result's `forced` and `component_class` say so. Delta's 763 HLOD actors built again
+in 6.5 minutes.
+
 ## assetgen's street contribution (AG7)
 
 `assetgen streets BUILD` writes `BUILD/assets/unreal_contribution.streets.json` beside its

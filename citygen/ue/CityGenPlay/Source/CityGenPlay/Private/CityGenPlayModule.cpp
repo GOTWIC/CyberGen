@@ -82,6 +82,15 @@ class FCityGenPlayModule : public FDefaultModuleImpl
 public:
 	virtual void StartupModule() override
 	{
+#if WITH_EDITOR
+		// (fix_hlod_streaming: the HLOD builder's defaults read its config, the instanced HLOD
+		// component class, when the engine starts, before this module's classes exist, so the
+		// project's UCityGenHLODComponent did not resolve; read again now that it does)
+		if (UClass* Builder = FindObject<UClass>(nullptr, TEXT("/Script/Engine.HLODBuilder")))
+		{
+			Builder->GetDefaultObject()->ReloadConfig();
+		}
+#endif
 		if (GIsEditor || IsRunningCommandlet() || !FApp::CanEverRender())
 		{
 			return;

@@ -324,6 +324,18 @@ def test_far_passes():
     assert "CityGenAtmos.Far 0" in B.ATMOS_OFF
 
 
+def test_hlod_passes():
+    """fix_hlod_streaming: every atmos pass sets the instanced HLOD components' flip in place
+    (on, so none leaks into the next), the hlodslow pass off."""
+    by = {p[0]: p for p in B.ATMOS_PASSES}
+    for name, p in by.items():
+        hs = [c for c in p[3] if c.startswith("CityGen.HLODFastVisibility ")]
+        assert hs == ["CityGen.HLODFastVisibility 0" if name.endswith("_hlodslow") else
+                      "CityGen.HLODFastVisibility 1"], name
+    assert set(by["night_plan_all_hlodslow"][3]) - set(by["night_plan_all"][3]) == \
+        {"CityGen.HLODFastVisibility 0"}
+
+
 def test_others_summary_names_who_took_the_foreground():
     """AT3: the samples say which processes took the game's foreground and how often it was
     taken back; the summary adds them up."""
