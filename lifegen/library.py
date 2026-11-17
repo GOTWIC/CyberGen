@@ -30,7 +30,7 @@ import json
 import math
 from pathlib import Path
 
-LIB_VERSION = "lg2.1"
+LIB_VERSION = "lg2.2"      # (lg2.2: the clothing fixes)
 ROOT = Path(__file__).resolve().parent.parent
 
 # The engine's MetaHuman presets (MetaHumanCharacter's optional content, /MetaHumanCharacter/

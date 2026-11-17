@@ -2641,6 +2641,12 @@ look's garments, its hair unless the look covers it, its mid mesh and card.
     `create_new_skeletal_mesh_asset_from_mesh_lods`, the body's bone proportions): weights
     transferred from the plain outfit where it is nearer than the body (the body has no skin
     under it) and from the body elsewhere, accessories and a raised hood held to their bone;
+    since the clothing fixes (`LIB_VERSION` lg2.2) a vertex of an inner layer close under an
+    outer garment (within 4 cm on the body's middle, `garments.follow_pairs`: the JSON's
+    `follow`, `[inner, outer, weight]` in the outer layers' order first) takes that garment's
+    nearest vertex's weights, wholly within 2 cm, and a vertex `manifold` copied takes its
+    source's after (its `copies`), so the layers move as one and cannot pass through
+    each other (a coat's waist over trousers had);
   - *mid* per look: the body and face at a low LOD, the look's mid mesh (one cloth and one
     glow slot on `M_CgPersonMidCloth`, `_Glow`: vertex colors times the person's dye colors
     from per-instance custom data 4 to 12), the hair's helmet unless the look covers the hair;

@@ -2969,6 +2969,25 @@ LG2 (clothing) is in place:
   native (walk 23.8) against LG5's 21.2, clothing off 22.0 (the template bodies): clothing
   costs no frame time. Open items (a long coat's waist showing the layer under it while
   walking, jagged rims, no prints or logos, no cloth simulation): `docs/progress/LG2/README.md`.
+- **Clothing fixes** (a library rebuild, `LIB_VERSION` lg2.2; `lifegen/blender/garments.py`,
+  `lifegen/garments.py`, `people_library.skin_garment`): the mannequin's body holes capped
+  before the remesh (open thighs remeshed into a lattice: one character's trousers tore); a
+  top or coat hangs straight down from the widest point above (`curtain`, held in the drape);
+  a coat's skirt (`flare`) from its own hem's outer vertices over the hips (LG2 hung it off
+  the lowest open loop, a sleeve's end on long arms, and left holes), a top whose hem is below
+  the hips cut there and hung straight (`TOP_FIT_M`, `TOP_FLARE`), a skirt from the hips;
+  every face wound outward (`orient_out`); the cuts' open edges tidied and smoothed along
+  themselves (`tidy_edges`, `smooth_chains`), the front opening cut by planes, trims cut
+  along their edges (`crisp_trims`), a placket dyed (a zip metal); a hood down held; inner
+  layers pulled back under an outer one (`layered`), their faces under an outer garment's
+  fitted parts within 3.5 cm taken out (`hide_covered`; none within `CLOSE_EDGE_M` 6 cm of
+  that garment's open edge, which walking lifts), and each inner vertex within 4 cm of
+  one takes its nearest vertex's skin weights in the editor (`follow_pairs`, the JSON's
+  `follow`; `people_library.skin_garment`). The look check `lifegen/probes/look_export_ue.py`
+  and `look_pose.py` (the looks' FBX posed along the walk in Blender, pokes counted in the
+  waist's band). Delta (library `5279ccbf5d436abe`): every check passes; inner layers coming
+  through per paired vertex 8.3% to 5.9% (waist 10.4% to 6.3%, trench coats 23.3% to 6.5%);
+  `night_plan_all` 20.6 ms p95 native. `docs/progress/clothing_fixes/README.md`.
 
 LG4 (life at places) is in place:
 - **The plan** (`lifegen/places.py`, called by `plan.build_plan`; `presets.SLOT_KINDS`,

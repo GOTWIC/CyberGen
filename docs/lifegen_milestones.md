@@ -183,6 +183,48 @@ shots, benchmark and open items: [`docs/progress/LG2/README.md`](progress/LG2/RE
   (AG6's brand logos not used yet); raincoats (drawn only in rain, LG8) with a weak front
   skirt panel; the dyed garments glossy in the rain; cloth simulation.
 
+### The clothing fixes (after LG8)
+
+Built on the Windows PC (2026-11-17), on main after LG8 (#237): LG2's garment faults, a people
+library rebuild (`LIB_VERSION` lg2.2, `5279ccbf5d436abe`; the characters kept, no cloud
+request). Report, contact sheets, the posed look check and shots:
+[`docs/progress/clothing_fixes/README.md`](progress/clothing_fixes/README.md).
+
+- **The coat's waist:** an inner layer's vertex within 4 cm under an outer garment's fitted
+  parts (not a coat's skirt, a hood or a collar) takes that garment's nearest vertex's skin
+  weights in the editor (`garments.follow_pairs`, the near and LOD 1 JSON's `follow`,
+  `people_library.skin_garment`; wholly within 2 cm, outer layers first, `manifold`'s copies
+  after); inner faces on the body's middle within 3.5 cm under such a garment, every ray from
+  them straight and tilted meeting it, taken out (`hide_covered`; none, by either rule, within
+  6 cm of that garment's open edge, `CLOSE_EDGE_M`: walking lifts a hem, and the first build
+  showed a hole under a jacket's back); what lay outside a garment
+  over it pulled back under it (`layered`).
+- **Coats, raincoats, skirts:** the skirt built from its own hem's outer vertices over the
+  hips (`flare`; LG2's hung off the lowest open loop, a sleeve's end on long arms, skipped
+  faces, stepped between the legs and was wound inward), coats cut at the hips + 4 cm, skirts
+  at the hips + 2 cm; every face wound outward (`orient_out`).
+- **Tops on heavy bodies:** hung straight from the widest point above (`curtain`), cut at the
+  hips and hung straight where the hem is lower (`TOP_FIT_M`, `TOP_FLARE`); what hangs off
+  the body held in the drape, the drape's facets smoothed (`DRAPE_RELAX`).
+- **Rims and fronts:** open edges merged and smoothed along themselves (`tidy_edges`,
+  `smooth_chains`), the front opening cut by planes (`front_slot`), trims cut along their
+  edges (`crisp_trims`), plackets dyed, zips metal; a hood down held.
+- **The mannequin:** the body's holes capped before the remesh (open thighs had remeshed into
+  a lattice: p19's trousers were torn through by the skin in every look).
+- **The look check** (`lifegen/probes/look_export_ue.py`, `look_pose.py`): each look with an
+  outer layer exported from the project as FBX with its skin weights, posed along the walk in
+  Blender, the vertices that came through the piece over them counted (all over and in the
+  waist's band; none within 6 cm of that piece's open edge) and the worst frame rendered.
+- **Delta:** the library rebuilt and imported (the dressing 25 minutes, the looks, mid meshes
+  and cards about 40); every check passes; per paired vertex, inner layers came through
+  8.3% to 5.9% of the time (waist 10.4% to 6.3%; trench coats 23.3% to 6.5%, raincoats 7.2%
+  to 3.4%; the heavy bodies' waist 10.5% to 9.3%); near meshes 28,116 triangles on average
+  (25,089); `night_plan_all` 20.6 ms p95 native on the lean route (walk 22.9). Package
+  `builds/packaged/Delta_clothing` (5.1 GB, its smoke launch loads Delta in 13.6 s).
+- **Open items:** small dents where a pocket's or band's planes cut a heavy belly, a skirt's
+  waistband showing under a short tee's hem, a coat's skirt skinned to the legs (no cloth
+  simulation), a hood down held as built.
+
 ## LG3: crowds on the streets
 
 Built on the Windows PC (2026-11-14), before LG2 at Swagnik's ask (the people keep LG1's plain

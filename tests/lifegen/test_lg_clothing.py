@@ -95,6 +95,29 @@ def test_drafts_are_cut_for_the_body_and_layered():
     assert outer_min > base_max
 
 
+def test_tops_and_coats_hang_from_the_hips_and_their_plackets_are_dyed():
+    """The clothing fixes: a top whose hem is below the hips is cut there and hangs straight
+    (a flare of `TOP_FLARE`), a coat's skirt flares from over the hips, a skirt from the hips;
+    a placket of the garment's own textile is dyed, a zip is metal."""
+    m = G.measure(_body(1.75))
+    for kind in ("tee", "longtee", "shirt", "hoodie", "jacket", "trench", "raincoat", "skirt"):
+        d = G.draft({"kind": kind, "textile": "knit", "channel": 0, "fit": 0.5,
+                     "length": 0.5}, m, "a")
+        f = d["flare"]
+        assert f["from_z"] > m["hip"] > f["to_z"]
+        cut = [c["z"] for c in d["cuts"] if c["kind"] == "z" and c.get("keep") == "above"]
+        assert abs(cut[0] - f["from_z"]) < 1e-6
+        if kind in ("tee", "longtee", "shirt", "hoodie", "jacket"):
+            assert f["scale"] == G.TOP_FLARE and abs(f["to_z"] - d["z"]["hem"]) < 1e-6
+    # (a tucked shirt keeps its hem under the trousers: no flare)
+    d = G.draft({"kind": "shirt", "textile": "canvas", "channel": 0, "tucked": True}, m, "t")
+    assert "flare" not in d and d["ease"]["low"] < d["ease"]["torso"]
+    fronts = {k: [t for t in G.draft({"kind": k, "textile": "nylon", "channel": 1}, m, "f")
+                  ["trims"] if t["where"] == "front"] for k in ("jacket", "raincoat", "shirt")}
+    assert fronts["jacket"][0]["dyed"] and fronts["shirt"][0]["dyed"]
+    assert fronts["raincoat"][0]["textile"] == "metal" and not fronts["raincoat"][0]["dyed"]
+
+
 def test_blender_job_drapes_each_garment_once():
     chars = L.characters()
     looks = G.spec(chars)["looks"][0]
@@ -171,7 +194,7 @@ def test_looks_assigned_by_group_and_variety_check():
 
 def test_library_hash_covers_the_clothing():
     spec = L.spec()
-    assert spec["version"].startswith("lg2")
+    assert spec["version"].startswith("lg2") and spec["version"] == L.LIB_VERSION
     assert len(spec["looks"]) == L.CHARACTERS
     assert all(len(ls) == G.LOOKS for ls in spec["looks"])
     assert "lifegen/garments.py" in L.CODE_FILES and "lifegen/blender/garments.py" in L.CODE_FILES
