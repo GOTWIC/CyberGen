@@ -339,6 +339,12 @@ SLOT_ANIMS = ("idle", "sit", "talk")
 SLOT_REF_PER_M = 0.06          # people a meter on a walkway at which a slot is used fully
 SLOT_USE_MIN = 0.15
 SLOT_REACH_M = 15.0            # a slot's use point at most this far from its walkway
+# delta_rebuild: a slot's points stand on the surface stage 2 draws under them
+# (`places.Surface`): a pavement face's top over its grade line by kind (AG17's
+# `ROAD_DZ_MM` and `CURB_MM`), AG13's ground cover over the ground; the check's tolerance
+SURFACE_LIFT_M = {"curb": 0.2, "sidewalk": 0.2, "corner": 0.2, "median": 0.2, "default": 0.05}
+COVER_LIFT_M = 0.1
+SLOT_SURFACE_TOL_M = 0.03
 # walkway kinds people come to a slot from (and gang corners and patrols walk)
 ACCESS_KINDS = ("sidewalk", "path", "promenade", "pedestrian_street", "alley", "footbridge",
                 "skybridge", "elevated", "concourse")

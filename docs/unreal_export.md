@@ -3231,6 +3231,22 @@ places' manifest has none of it imports and plays as before.
   a slot from 55 m or 150 m, the view's own lens); the status's `places` adds `sit_downs`,
   `mid_idles` and `still_cards`.
 
+### Slots on their surface (delta_rebuild)
+
+A slot's points stood at their walkway lane's height where the slot leaves it (LG4,
+`BuildPlaces`), plus the ground offset its user last traced walking: a point off its walkway
+on another surface (a raised road's sidewalk beside a door path at the ground, the ground by a
+door beside an embankment's sidewalk) stood its people in it or over it. The plan now stands
+every ground level slot's points on the surface stage 2 draws under them (`lifegen.places.
+Surface`: M22's pavement faces on the ground layer at their vertices' heights, lifted as AG17
+lifts them, else AG13's ground cover or the bare ground; over the datum, as the lanes), says
+so per slot (`seated`) and checks it (`slot_heights`). The exporter packs it per slot
+(`slot_seated`, `PACK_VERSION` 10; `import_city.places_props`, `LIFE_VERSION` life12); the
+controller puts a seated slot's points at their own z (`SlotSeated`, `PointSeatedG`) and a
+person there stands on it without its walking ground offset (`CgLife::PointAt`, `FillSlot`).
+A deck's slots keep their walkway's height. A plan before it packs no `slot_seated`: its slots
+stand as before.
+
 ## Milestones and checks
 
 - **Every milestone** updates the exporter in its own PR for what it adds or changes (a new

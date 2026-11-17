@@ -148,7 +148,7 @@ def test_places_on_a_small_city(build: Path):
     rep = PL.build_plan(build, preview=False)
     assert rep["ok"], {k: c for k, c in rep["checks"].items() if not c["ok"]}
     for k in ("slots_placed", "slot_use", "places_hours", "gang_turf", "police_patrols",
-              "places_budget"):
+              "places_budget", "slot_heights"):
         assert rep["checks"][k]["ok"], (k, rep["checks"][k])
     out = build / "life"
     tiles = _tiles(out)
@@ -229,6 +229,42 @@ def test_gang_members_off_their_turf_fail(build: Path):
     assert not out["police_patrols"]["ok"]
 
 
+def test_slots_stand_on_their_surface():
+    """delta_rebuild: a slot's points take the surface stage 2 draws under them: a raised
+    road's sidewalk face (its vertices 1 m over the ground, lifted 0.2 m as AG17's curb), the
+    ground cover (0.1 m) or the bare ground, whatever their walkway's height in the model; the
+    check fails a point moved off it."""
+    net = {"vertices": [{"id": "a", "p": [0.0, 0.0], "z": 1.0}, {"id": "b", "p": [10.0, 0.0], "z": 1.0},
+                        {"id": "c", "p": [10.0, 4.0], "z": 2.0}, {"id": "d", "p": [0.0, 4.0], "z": 2.0}],
+           "edges": [{"id": "ab", "kind": "outer", "v": ["a", "b"]},
+                     {"id": "bc", "kind": "port", "v": ["b", "c"]},
+                     {"id": "cd", "kind": "curb", "v": ["c", "d"]},
+                     {"id": "da", "kind": "port", "v": ["d", "a"]}]}
+    model = {"pavement_net": net,
+             "pavement": [{"id": "rs.x.pv.cl", "owner_id": "rs.x", "kind": "sidewalk", "band": "cl",
+                           "layer": "g0", "rings": [["ab", "bc", "cd", "da"]]},
+                          {"id": "rs.y.pv.cl", "owner_id": "rs.y", "kind": "sidewalk", "band": "cl",
+                           "layer": "g1", "rings": [["ab", "bc", "cd", "da"]]}],
+             "ground_cover": [{"id": "gc", "kind": "lawn", "polygon": {"exterior": _sq(20, 0, 30, 10)["exterior"]}}],
+             "walkways": [{"id": "wk.s", "kind": "sidewalk", "line": [[0.0, 2.0, 0.0], [10.0, 2.0, 0.0]]}]}
+    sf = PL4.Surface(model)
+    z, what = sf.at(5.0, 2.0)
+    assert what == "pavement" and abs(z - 1.7) < 1e-6        # (1.5 m between the curbs, + 0.2)
+    assert sf.at(25.0, 5.0) == (P.COVER_LIFT_M, "cover")
+    assert sf.at(50.0, 50.0) == (0.0, "ground")
+    slots = [{"id": "slot.a", "level": 0, "walkway_id": "wk.s",
+              "points": [[5.0, 2.0, 0.0, 0.0], [25.0, 5.0, 0.0, 90.0]]},
+             {"id": "slot.deck", "level": 1, "walkway_id": "wk.s", "points": [[5.0, 2.0, 9.0, 0.0]]}]
+    st = PL4.seat_slots(slots, sf)
+    assert st["seated"] == 1 and st["pavement"] == 1 and st["cover"] == 1
+    assert slots[0]["seated"] and slots[0]["points"][0][2] == 1.7 and slots[0]["points"][1][2] == 0.1
+    assert "seated" not in slots[1] and slots[1]["points"][0][2] == 9.0
+    ok = PL4.height_check(model, slots, sf, st)
+    assert ok["ok"] and "1 slots more than 0.3 m off" in ok["detail"], ok
+    slots[0]["points"][0][2] = 0.0
+    assert not PL4.height_check(model, slots, sf, st)["ok"]
+
+
 # --- the exporter ---------------------------------------------------------------------------
 
 def test_exporter_packs_the_places(build: Path):
@@ -252,6 +288,8 @@ def test_exporter_packs_the_places(build: Path):
     # (a club's queue goes in at its door: a door index)
     qi = [k for k in range(ns) if names[c["slot_kinds"][k]] == "bar_queue"]
     assert qi and all(0 <= c["slot_doors"][k] < len(c["door_lanes"]) for k in qi)
+    # (delta_rebuild: every ground level slot seated on its surface)
+    assert c["slot_seated"] == [1] * ns
     nw = len(c["walk_kinds"])
     assert len(c["walk_turf"]) == nw and len(c["walk_gang"]) == 5 * nw
     assert len(c["walk_police"]) == 5 * nw and len(c["walk_patrol"]) == nw

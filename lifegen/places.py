@@ -238,6 +238,171 @@ class Carriageway:
         return False
 
 
+class Surface:
+    """The ground level's drawn surface under a point, as stage 2 draws it (delta_rebuild):
+    a face of M22's pavement map on the ground layer (`g0`: an embankment's raised road and
+    its sidewalks too) at its vertices' heights over the ground by mean value coordinates
+    (`citygen.pavement.mvc`), lifted as AG17 lifts it (`SURFACE_LIFT_M`: a curb band,
+    sidewalk, corner pad or median 0.2 m, the rest 0.05 m); off the map AG13's ground cover
+    (`COVER_LIFT_M` over the ground) or the bare ground. Heights over the datum: the ground
+    (M13) plus the height over it, as the lanes' and walkways' heights in Unreal."""
+
+    def __init__(self, model: dict, ground=None):
+        import shapely
+        from .airwater import Ground
+        self.ground = ground if ground is not None else Ground(model)
+        net = model.get("pavement_net") or {}
+        V = {v["id"]: (float(v["p"][0]), float(v["p"][1]), float(v.get("z") or 0.0))
+             for v in net.get("vertices", [])}
+        E = {e["id"]: e["v"] for e in net.get("edges", [])}
+
+        def ring_of(refs):
+            pts = []
+            for ref in refs:
+                vs = E.get(ref.lstrip("-"))
+                if vs is None:
+                    return []
+                vs = list(reversed(vs)) if ref.startswith("-") else vs
+                for vid in vs:
+                    p = V.get(vid)
+                    if p is not None and (not pts or pts[-1] != p):
+                        pts.append(p)
+            if len(pts) > 1 and pts[0] == pts[-1]:
+                pts.pop()
+            return pts
+
+        self.faces, polys = [], []
+        for f in sorted(model.get("pavement", []) or [], key=lambda f: f["id"]):
+            if f.get("layer", "g0") != "g0":
+                continue
+            rings = [ring_of(r) for r in f.get("rings") or []]
+            rings = [r for r in rings if len(r) >= 3]
+            if not rings:
+                continue
+            try:
+                poly = shapely.Polygon([p[:2] for p in rings[0]], [[p[:2] for p in r] for r in rings[1:]])
+            except Exception:                                        # noqa: BLE001
+                continue
+            if poly.is_empty or poly.area <= 1e-6:
+                continue
+            lift = P.SURFACE_LIFT_M.get(f.get("kind"), P.SURFACE_LIFT_M["default"])
+            self.faces.append((rings, lift))
+            polys.append(poly)
+        self.polys = polys
+        self.tree = shapely.STRtree(polys) if polys else None
+        cover = []
+        for g in model.get("ground_cover", []) or []:
+            poly = g.get("polygon") or {}
+            ext = poly.get("exterior") or []
+            if len(ext) >= 3:
+                try:
+                    c = shapely.Polygon(ext, poly.get("holes") or [])
+                    if c.is_valid and c.area > 0.0:
+                        cover.append(c)
+                except Exception:                                    # noqa: BLE001
+                    continue
+        self.cover = cover
+        self.ctree = shapely.STRtree(cover) if cover else None
+
+    def over_ground(self, x: float, y: float) -> tuple[float, str]:
+        """The drawn surface's height over the ground at (x, y) and what it is (`pavement`,
+        `cover`, `ground`): the highest pavement face containing it."""
+        import numpy as np
+        import shapely
+        from citygen.pavement import mvc
+        pt = shapely.Point(x, y)
+        best = None
+        if self.tree is not None:
+            for k in sorted(int(h) for h in self.tree.query(pt)):
+                if not self.polys[k].covers(pt):
+                    continue
+                rings, lift = self.faces[k]
+                # (a point on a vertex takes its height; else mean value coordinates)
+                z = None
+                for r in rings:
+                    for p in r:
+                        if abs(p[0] - x) < 1e-6 and abs(p[1] - y) < 1e-6:
+                            z = p[2]
+                if z is None:
+                    z = float(mvc(rings, np.array([x]), np.array([y]))[0])
+                    if not math.isfinite(z):
+                        z = min(min(p[2] for p in r) for r in rings)
+                z += lift
+                if best is None or z > best:
+                    best = z
+        if best is not None:
+            return best, "pavement"
+        if self.ctree is not None and any(self.cover[int(k)].covers(pt) for k in self.ctree.query(pt)):
+            return P.COVER_LIFT_M, "cover"
+        return 0.0, "ground"
+
+    def at(self, x: float, y: float) -> tuple[float, str]:
+        """The drawn surface's height over the datum at (x, y), and what it is."""
+        z, what = self.over_ground(x, y)
+        return z + self.ground.one(x, y), what
+
+
+def seat_slots(slots: list[dict], surface: Surface) -> dict:
+    """Every ground level slot's points on the surface under them (`Surface.at`, over the
+    datum: `points[k][2]`, `seated` true), so the runtime stands its users there whatever the
+    height of the walkway they came from (a raised road's sidewalk, the ground by a door);
+    a deck's slots keep their walkway's height. Returns the stats."""
+    stats = {"seated": 0, "points": 0, "pavement": 0, "cover": 0, "ground": 0}
+    for s in slots:
+        if int(s.get("level") or 0) != 0:
+            continue
+        for p in s["points"]:
+            z, what = surface.at(p[0], p[1])
+            p[2] = _r(z, 3)
+            stats["points"] += 1
+            stats[what] += 1
+        s["seated"] = True
+        stats["seated"] += 1
+    return stats
+
+
+def height_check(model: dict, slots: list[dict], surface: Surface, stats: dict) -> dict:
+    """`slot_heights`: every ground level slot seated, each point within `SLOT_SURFACE_TOL_M`
+    of the surface under it; noted, the slots whose points stand more than 0.3 m off their
+    walkway's own height in the model where they leave it (a raised road's sidewalk is at the
+    ground there: those the runtime stood at their walkway's height before)."""
+    walks = {w["id"]: w for w in model.get("walkways", [])}
+    bad, off = [], 0
+    for s in slots:
+        if int(s.get("level") or 0) != 0:
+            continue
+        if not s.get("seated"):
+            bad.append(f"{s['id']}: not seated")
+            continue
+        for p in s["points"]:
+            z, _ = surface.at(p[0], p[1])
+            if abs(z - p[2]) > P.SLOT_SURFACE_TOL_M:
+                bad.append(f"{s['id']}: a point {p[2] - z:+.2f} m off its surface")
+                break
+        w = walks.get(s.get("walkway_id"))
+        if w is not None and len(w.get("line") or []) >= 2:
+            p0 = s["points"][0]
+            line = w["line"]
+            best, wz = None, 0.0
+            for a, b in zip(line, line[1:]):
+                dx, dy = b[0] - a[0], b[1] - a[1]
+                L2 = dx * dx + dy * dy
+                t = 0.0 if L2 <= 0.0 else max(0.0, min(1.0, ((p0[0] - a[0]) * dx + (p0[1] - a[1]) * dy) / L2))
+                d = math.hypot(a[0] + dx * t - p0[0], a[1] + dy * t - p0[1])
+                if best is None or d < best:
+                    za = a[2] if len(a) > 2 else 0.0
+                    zb = b[2] if len(b) > 2 else 0.0
+                    best, wz = d, za + (zb - za) * t
+            if abs(p0[2] - (wz + surface.ground.one(p0[0], p0[1]))) > 0.3:
+                off += 1
+    return {"ok": not bad, "detail": (
+        f"{stats['seated']} ground level slots seated, {stats['points']} points on the surface "
+        f"under them (pavement {stats['pavement']}, ground cover {stats['cover']}, bare ground "
+        f"{stats['ground']}) within {P.SLOT_SURFACE_TOL_M * 100:.0f} cm; {off} slots more than "
+        f"0.3 m off their walkway's height in the model where they leave it"
+        if not bad else f"{len(bad)} slots off: " + "; ".join(bad[:5]))}
+
+
 # ---------------------------------------------------------------------------
 # Slots
 # ---------------------------------------------------------------------------

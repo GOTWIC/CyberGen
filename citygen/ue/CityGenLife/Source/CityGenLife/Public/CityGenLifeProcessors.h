@@ -115,6 +115,9 @@ struct FCgLifeFrame
 	const TArray<int32>* SlotPointStart = nullptr;
 	const TArray<FVector>* PointPos = nullptr;
 	const TArray<float>* PointYaw = nullptr;
+	/** delta_rebuild: per point 1 where PointPos is the surface under it (its slot seated): a
+	 *  user stands there, its walking ground offset (ZOff) not added. */
+	const TArray<uint8>* PointSeated = nullptr;
 	/** A slot's point claimed for a person (the actor's: the Smart Objects' claims), INDEX_NONE
 	 *  when none is free; occupied on arrival; freed. */
 	TFunction<int32(int32 Slot, int32 Person)> Claim;

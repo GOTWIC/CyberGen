@@ -412,6 +412,9 @@ public:
 	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<int32> SlotTurfs;
 	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<uint8> SlotAnims;
 	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<int32> SlotDoors;
+	/** delta_rebuild: per slot 1 where its points' z (m) is the surface under them (the plan's
+	 *  `seated`): its users stand there, not at their walkway's height. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<uint8> SlotSeated;
 	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<FString> SlotKindNames;
 	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<FString> SlotKindBehaviors;
 	/** Per walkway lane: its gang turf (-1), gang members and police walking per band (5 each),
@@ -866,7 +869,7 @@ private:
 	TArray<int32> LaneSlotStarts, LaneSlotList, SlotPointStartG;
 	TArray<float> SlotDistCm, SlotWantNow, PointYawG;
 	TArray<int32> SlotUsersNow, PointUser, SlotDoorSorted;
-	TArray<uint8> SlotLiveNow, SlotAnimG, WalkAnimG;
+	TArray<uint8> SlotLiveNow, SlotAnimG, WalkAnimG, PointSeatedG;
 	TArray<FVector> PointPosG;
 	TArray<int32> DoorSortedOf;              // (an exported door's sorted index)
 	TArray<uint8> DoorOpenNow, DoorPoliceSorted;

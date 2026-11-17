@@ -64,6 +64,7 @@ void ACityGenLife::BuildPlaces()
 	SlotPointStartG.Init(0, NS + 1);
 	PointPosG.Reset();
 	PointYawG.Reset();
+	PointSeatedG.Reset();
 	for (int32 K = 0; K < NS; ++K)
 	{
 		const int32 Ln = SlotLanes.IsValidIndex(K) ? SlotLanes[K] : INDEX_NONE;
@@ -80,11 +81,16 @@ void ACityGenLife::BuildPlaces()
 		}
 		const int32 A = SlotPointStarts[K];
 		const int32 B = SlotPointStarts[K + 1];
+		// (delta_rebuild: a seated slot's points at the surface under them, the plan's z over the
+		// datum as the lanes': a raised road's sidewalk, the ground by a door, whatever its
+		// walkway's height where it leaves it)
+		const bool bSeated = SlotSeated.IsValidIndex(K) && SlotSeated[K] != 0;
 		for (int32 P = A; P < B && SlotPoints.IsValidIndex(4 * P + 3); ++P)
 		{
 			FVector At = UeP(SlotPoints[4 * P], SlotPoints[4 * P + 1], 0.f);
-			At.Z = Z;
+			At.Z = bSeated ? 100.f * SlotPoints[4 * P + 2] : Z;
 			PointPosG.Add(At);
+			PointSeatedG.Add(bSeated ? 1 : 0);
 			// (citygen's yaw is counterclockwise from east, y north; Unreal's Y is south)
 			PointYawG.Add(FRotator::NormalizeAxis(-SlotPoints[4 * P + 3]));
 		}
@@ -141,6 +147,7 @@ void ACityGenLife::BuildPlaces()
 	Frame.SlotPointStart = &SlotPointStartG;
 	Frame.PointPos = &PointPosG;
 	Frame.PointYaw = &PointYawG;
+	Frame.PointSeated = &PointSeatedG;
 	Frame.LaneTurf = &WalkTurf;
 	Frame.LanePatrol = &WalkPatrol;
 	Frame.DoorOpenNow = &DoorOpenNow;
@@ -551,7 +558,7 @@ void ACityGenLife::FillSlot(const int32 Sl)
 			{
 				W.ZOff = FMath::Clamp((float)(Hit.ImpactPoint.Z - Loc.Position.Z), -150.f, 250.f);
 			}
-			W.Pos = PointPosG[P] + FVector(0.f, 0.f, W.ZOff);
+			W.Pos = PointPosG[P] + FVector(0.f, 0.f, PointSeatedG.IsValidIndex(P) && PointSeatedG[P] ? 0.f : W.ZOff);
 		}
 		OccupyPoint(Sl, P);
 		WalkPos[Person] = W.Pos;

@@ -368,12 +368,21 @@ namespace CgLife
 			F.SitIn->IsValidIndex(4 * (int32)W.SitVar + 3) && F.SitOut->IsValidIndex(3);
 	}
 
+	/** Where a person at its slot's point stands (UE cm): the point; its walking ground offset
+	 *  added only where the point is on its walkway's height (delta_rebuild: a seated slot's
+	 *  point is the surface under it already). */
+	FVector PointAt(const FCgLifeFrame& F, const FCgLifeWalker& W)
+	{
+		const bool bSeated = F.PointSeated && F.PointSeated->IsValidIndex(W.Point) && (*F.PointSeated)[W.Point] != 0;
+		return (*F.PointPos)[W.Point] + FVector(0.f, 0.f, bSeated ? 0.f : W.ZOff);
+	}
+
 	/** Where a transition's end stands off a seat (UE cm, its facing in deg). */
 	FVector SitSpot(const FCgLifeFrame& F, const FCgLifeWalker& W, const TArray<float>& Data, const int32 K, float& Yaw)
 	{
 		const float SeatYaw = (*F.PointYaw)[W.Point];
 		Yaw = SeatYaw + Data[4 * K + 2];
-		return (*F.PointPos)[W.Point] + FVector(0.f, 0.f, W.ZOff) +
+		return PointAt(F, W) +
 			FRotator(0.f, SeatYaw, 0.f).RotateVector(FVector(Data[4 * K], Data[4 * K + 1], 0.f));
 	}
 
@@ -597,7 +606,7 @@ namespace CgLife
 			float StartYaw = 0.f;
 			const bool bTransit = (*F.SlotAnim)[S] == CgAnim::Sit && Transits(F, W);
 			const FVector To = bTransit ? SitSpot(F, W, *F.SitIn, (int32)W.SitVar, StartYaw)
-				: (*F.PointPos)[W.Point] + FVector(0.f, 0.f, W.ZOff);
+				: PointAt(F, W);
 			const float Dur = FMath::Max(0.3f, (float)FVector::Dist(W.From, To) / FMath::Max(50.f, W.Speed));
 			W.T += Dt;
 			const float U = FMath::Clamp(W.T / Dur, 0.f, 1.f);
@@ -641,7 +650,7 @@ namespace CgLife
 		}
 		if (W.State == CgWalk::AtSlot)
 		{
-			W.Pos = (*F.PointPos)[W.Point] + FVector(0.f, 0.f, W.ZOff);
+			W.Pos = PointAt(F, W);
 			const bool bTransit = W.Anim == CgAnim::Sit && Transits(F, W);
 			// (LG8: standing, it looks at the player near it; a sitter keeps to its bench;
 			// people_idles: one sitting down or standing up faces its seat's way at once, the

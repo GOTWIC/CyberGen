@@ -1646,7 +1646,10 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     turfs = PL4.gang_turfs(model)
     gm = PL4.gang_walks(model, filled, rows, turfs)
     slot_raw += PL4.gang_spots(model, turfs, gm, row_by, wi, fp)
-    pol = PL4.police_plan(model, filled, rows, drows, spawns)
+    # (delta_rebuild: every ground level slot's points on the surface stage 2 draws there)
+    surface = PL4.Surface(model)
+    seat_stats = PL4.seat_slots(slot_raw, surface)
+    pol =PL4.police_plan(model, filled, rows, drows, spawns)
     # LG8: each walkway's stretches out of the rain (atmosgen's rain shadow), nightlife round
     # the bars, clubs and arcades, the weather's table
     adir = WX.atmos_dir(build, atmos)
@@ -1752,6 +1755,7 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     checks.update(traffic_checks(model, drows, hours, filled, sigs, traffic))
     checks.update(places_checks(model, filled, slot_raw, place_rows, rows, drows, turfs, gm,
                                 pol, crowd, traffic, roles, spawns, hours))
+    checks["slot_heights"] = PL4.height_check(model, slot_raw, surface, seat_stats)
     checks.update(TR.checks(model, tlines, tleft, walk_components(model.get("walkways", [])),
                             spawns))
     checks.update(AW.checks(aw_routes, aw_pads, aw_piers, aw_extra))
