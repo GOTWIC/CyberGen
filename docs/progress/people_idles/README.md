@@ -102,8 +102,12 @@ neither was looked into further (the budget holds).
 ## The package
 
 Delta cooked and packaged (Development, Win64) from `CityAG16` as before, staged only and
-moved to `builds/packaged/Delta_idles` (`package_idles.cmd`). `builds/packaged/Delta_hlod` was
-deleted before the cook (the disk had 13 GB free).
+moved to `builds/packaged/Delta_idles` (5.2 GB; `package_idles.cmd`, 14 minutes).
+`builds/packaged/Delta_hlod` was deleted before the cook (the disk had 13 GB free), and
+`CityAG16`'s `Saved/Cooked` and `Saved/StagedBuilds` after it. The smoke launch (its user
+folder outside the package, the game process closed after it, no `Saved` folder left in the
+package) loads Delta in 16.0 s and logs the five sit-downs and the stand-up as the editor
+does. The packaged game was not benchmarked.
 
 ## Tests
 
