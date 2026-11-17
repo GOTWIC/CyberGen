@@ -430,7 +430,17 @@ decisions and open items: [`docs/progress/LG7/README.md`](progress/LG7/README.md
   rest, lit by night, strobes and beacons flashing. Console `CityGenLife.Air`, `.Water`,
   `.AirShow`; the Tab menu's Air traffic and Boats rows; the status's `airwater`; bench pass
   `night_life_noairwater`.
-- **Delta:** DELTA_NUMBERS_LONG
+- **Delta:** 134 routes: 53 for flying cars (27 pad pairs, 26 circuits), 50 drones, 9 police
+  orbits, 2 media fliers, 2 aircraft; 9 boats, 3 water taxi tours, 3 ferries, 3 ships (two
+  lying in the harbor basins, one offshore); 201 fliers and 20 boats at 23:00, 253 fliers at
+  the busiest band. 54 of the 70 pads flown (16 under their own building's crown mast), 17
+  piers derived and called at. Every plan check and the Unreal check pass; shots of a flying
+  car landing on its pad, cars on their layers over Midtown and the Corporate Core, a police
+  flier, a drone, boats on the river, the ferry at its pier, a ship at its berth. Air and
+  water's own step 0.17 to 0.22 ms; `night_plan_all` 22.6 ms p95 native, air and water off
+  21.7 (after one short tuning round: components sent every frame only while a vehicle within
+  600 m moved in them; both under about 3.3 cores of other load). The package
+  (`builds/packaged/Delta_lg7`) runs them.
 - **Tests** (`tests/lifegen/test_lg_airwater.py`: a small city with two roof pads and a tower
   between them, a river, a canal with quays and a moored boat, the sea and a basin, a
   spaceport; the airspace by height, A* round a wall, the pad flight clear of the tower on

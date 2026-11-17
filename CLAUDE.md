@@ -3109,7 +3109,12 @@ LG7 (air and water) is in place:
   `CityGenLife.Air`, `.Water`, `.AirShow`; the Tab menu's Air traffic and Boats rows; the
   status's `airwater`; bench pass `night_life_noairwater`. `docs/unreal_export.md`, "From LG7:
   air and water".
-- Delta: DELTA_NUMBERS. Results: `docs/progress/LG7/README.md`.
+- Delta: 134 routes (53 flying car routes, 50 drones, 9 police, 2 media, 2 aircraft; 9 boats,
+  3 water taxi tours, 3 ferries, 3 ships), 201 fliers and 20 boats at 23:00; 54 of 70 pads
+  flown (16 under their own building's crown mast), 17 piers; every plan check and the Unreal
+  check pass; air and water's step 0.17 to 0.22 ms; `night_plan_all` 22.6 ms p95 native, air
+  and water off 21.7 (both under about 3.3 cores of other load; a component sent every frame
+  only while a vehicle within `AwNearM` moved in it). Results: `docs/progress/LG7/README.md`.
 
 ## Gallery site (GitHub Pages)
 

@@ -588,6 +588,9 @@ public:
 	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") TObjectPtr<UMaterialInterface> AwMaterial;
 	/** Vehicles past AwFarM have their instances sent every fourth frame. */
 	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") float AwFarM = 1500.f;
+	/** A component is sent every frame while a vehicle within AwNearM moved in it, else every
+	 *  fourth frame (the engine's cost is per moving component). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") float AwNearM = 600.f;
 	/** What flies and what floats on or off (CityGenLife.Air, CityGenLife.Water, the play menu's
 	 *  rows). */
 	UPROPERTY(EditAnywhere, Category = "CityGen|AirWater") bool bAir = true;

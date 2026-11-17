@@ -2983,7 +2983,9 @@ properties set).
   - *By the world's time,* as LG6's trains: a vehicle's place along its route is the sampled
     cycle at (time + its phase) modulo the cycle, the band's vehicles evenly round it; nothing
     is simulated, every route runs city-wide, a far vehicle costs a lookup and its instances
-    are sent every fourth frame past `AwFarM` (1.5 km).
+    are placed every fourth frame past `AwFarM` (1.5 km); a component is sent to the engine
+    every frame only while a vehicle within `AwNearM` (600 m) moved in it, else every fourth
+    frame, the components taking turns (the engine's cost is per moving component).
   - *Heading:* the route's at that point, interpolated (so a double-ended ferry, or a ship
     backing out of its berth, runs stern first); a flier banks by its turn rate and speed (at
     most 10 to 25 degrees by kind) and pitches with its climb in plan; a boat rolls and bobs.

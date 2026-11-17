@@ -351,9 +351,13 @@ void ACityGenLife::UpdateAirWater(const float Dt)
 	const double Time = GetWorld()->GetTimeSeconds();
 	const int32 B = BandOfA(Hour);
 	const double Far2 = FMath::Square(100.0 * AwFarM);
+	const double Near2 = FMath::Square(100.0 * AwNearM);
 	AwAirOn = AwWaterOn = AwDwelling = AwNear = 0;
-	TArray<uint8> Dirty;
+	// (a component is sent every frame while a vehicle within AwNearM moved in it, else every
+	// fourth frame, the components taking turns: the engine's cost is per moving component)
+	TArray<uint8> Dirty, NearDirty;
 	Dirty.Init(0, AwComps.Num());
+	NearDirty.Init(0, AwComps.Num());
 	for (int32 I = 0; I < AwVehicles.Num(); ++I)
 	{
 		FCgAwVehicle& V = AwVehicles[I];
@@ -384,6 +388,7 @@ void ACityGenLife::UpdateAirWater(const float Dt)
 		}
 		PlaceAw(V, Time);
 		AwDwelling += V.Event != INDEX_NONE ? 1 : 0;
+		const bool bNear = FVector::DistSquared(V.Xf.GetLocation(), View) < Near2;
 		const double Ph = 0.137 * (double)(V.Route * 7 + V.K * 3);
 		for (int32 Q = Q0; Q < Q1; ++Q)
 		{
@@ -400,12 +405,13 @@ void ACityGenLife::UpdateAirWater(const float Dt)
 				X = Local * V.Xf;
 			}
 			Dirty[AwPartComp[Q]] = 1;
+			NearDirty[AwPartComp[Q]] |= bNear ? 1 : 0;
 		}
 		V.Sent = AwFrame;
 	}
 	for (int32 C = 0; C < AwComps.Num(); ++C)
 	{
-		if (Dirty[C] && AwComps[C] && AwXf[C].Num())
+		if (Dirty[C] && AwComps[C] && AwXf[C].Num() && (NearDirty[C] || ((AwFrame + C) % 4) == 0))
 		{
 			AwComps[C]->BatchUpdateInstancesTransforms(0, AwXf[C], false, bRebuildRenderState, false);
 		}

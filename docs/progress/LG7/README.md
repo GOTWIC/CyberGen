@@ -108,11 +108,42 @@ dwelling on a pad, roof, pier or berth. Air and water's own step takes 0.17 ms a
 
 ## Benchmark
 
-BENCH_SECTION
+The lean benchmark ([`bench`](bench/bench.md): one run each at native 2560 x 1440, no DLSS;
+one walk, the drive, the flight), after the short tuning round:
+
+| pass | p95 all | walk | drive | fly | game p95 (all) | draws p50 (all) |
+|---|---|---|---|---|---|---|
+| **`night_plan_all`** (air and water on) | **22.6** | 24.6 | 22.4 | 22.0 | 20.4 | 1,814 |
+| `night_life_noairwater` | 21.7 | 24.8 | 21.7 | 20.3 | 19.3 | 1,824 |
+
+- **Air and water cost about 0.9 ms p95** over the route, most of it in the flight (1.7 ms: at
+  150 m the camera is among the fliers' layers) and on the game thread; their own step is 0.17 to
+  0.22 ms a frame (`aw_ms`), the rest the engine's handling of the moving instanced components.
+- **The tuning round** (one, short, as LG7 cost more than 0.5 ms): the first run measured 23.1
+  against 21.5 (1.6 ms; walk 28.7 against 24.2). A component is now sent every frame only while
+  a vehicle within `AwNearM` (600 m) moved in it, else every fourth frame, the components taking
+  turns (the engine's cost is per moving component, as LG5 found): the walk's cost went (24.6
+  against 24.8), the drive's and the flight's stay. The rest is left for LG8's performance pass.
+- **Under load:** both runs shared the PC with another session's three test runs (about 3.3
+  cores of Python through each run; `bench.busy` would have waited for hours, so the runs went
+  ahead without waiting, `bench.bench(wait_idle=False)`, as LG6's effectively did). Both passes
+  ran under the same load, so the difference holds; the absolute numbers are high. The budget's
+  overrun (20 ms) stays for the performance pass.
 
 ## Package
 
-PACKAGE_SECTION
+`C:/Users/swagn/CityGen/builds/packaged/Delta_lg7/Windows/CityAG16.exe` (Development, Win64,
+5.1 GB; `builds/packaged/package_lg7.cmd`, cooked in 18 minutes from `CityAG16` itself as
+LG6's). Its smoke launch (60 s, `-userdir` outside the package, the game closed after) loads
+Delta in 19 s, builds the life controller with its 134 air and water routes and 335 vehicles
+(148 ms with the crowd, traffic and transit), and runs them in the cooked game: 201 fliers and
+20 boats at 23:00, air and water's step 0.22 ms; no error of lifegen's, no `Saved` folder left
+in the package. C: had 24 GB free before the cook (another session's builds; the 30 GB margin
+was not there), so a watchdog stopped the cook under 4 GB free: the lowest was 15.1 GB. After
+the smoke launch the superseded `Delta_lg6` package and the cook's `Saved/Cooked` and
+`Saved/StagedBuilds` in `CityAG16` were deleted. The package was cooked before the benchmark's
+tuning round: its plugin sends every moving component every frame (the round changed only that
+rate); the next package takes it.
 
 ## Tests
 
@@ -182,3 +213,9 @@ plugin's build, the Unreal check and the package.
   corner's change of layer; boats of different routes on one river keep to their lanes but are
   not checked against each other.
 - **The hour:** the runtime's 23:00 until LG8; a band's change moves the vehicles at once.
+- **The cost:** about 0.9 ms p95 (1.7 ms in the flight among the layers) after one tuning round,
+  for LG8's performance pass (fewer moving components, instance updates by dirty runs, far
+  fliers as cards); the city's 22.6 ms against the 20 ms budget.
+- **Far fliers by night** are small: a flying car 1 km off is a few pixels of underglow; light
+  trails or far cards for the layers are a later step.
+- **The package** carries the plugin from before the tuning round (see Package).
