@@ -22,7 +22,9 @@
       "life_controller",
       "spawner",
       "slots",
-      "train"
+      "train",
+      "air_route",
+      "water_route"
      ],
      "title": "Kind",
      "type": "string"

@@ -252,7 +252,10 @@ def test_asks_met_when_the_model_has_them():
     m["lanes"][0]["restricted"] = False
     st = {a["id"]: a["status"] for a in A.status(m, {"doors": True})}
     assert st["bus_routes"] == "met" and st["turn_restrictions"] == "met"
-    assert st["doors"] == "met" and st["piers"] == "missing"
+    # (LG7 derives the piers; a model with them meets the ask)
+    assert st["doors"] == "met" and st["piers"] == "derived"
+    m["piers"] = [{"id": "pier.1"}]
+    assert {a["id"]: a["status"] for a in A.status(m)}["piers"] == "met"
 
 
 # --- the exporter's layer 4 -------------------------------------------------------------------

@@ -765,6 +765,17 @@ bool ACityGenPlay::ClickMenuRow(const FString& Row)
 		}
 		SetLifeTransit(R == TEXT("transit") ? !GetLifeTransit() : R.EndsWith(TEXT("1")));
 	}
+	else if (R == TEXT("air") || R.StartsWith(TEXT("air=")) || R == TEXT("water") || R.StartsWith(TEXT("water=")))
+	{
+		// LG7: lifegen's fliers or boats on or off
+		const bool bAirRow = R.StartsWith(TEXT("air"));
+		if (!HasLifeAirWater())
+		{
+			return false;
+		}
+		const bool bNow = GetLifeAirWater(bAirRow);
+		SetLifeAirWater(bAirRow, (R == TEXT("air") || R == TEXT("water")) ? !bNow : R.EndsWith(TEXT("1")));
+	}
 	else if (!GetAtmos())
 	{
 		return false;                           // (the weather rows are hidden)
@@ -1033,6 +1044,30 @@ bool ACityGenPlay::GetLifeTransit() const
 void ACityGenPlay::SetLifeTransit(bool bOn)
 {
 	CallOne(GetLife(), TEXT("SetTransit"), bOn, 0.f);
+}
+
+bool ACityGenPlay::HasLifeAirWater() const
+{
+	const AActor* A = GetLife();
+	const FArrayProperty* Routes = A ? FindFProperty<FArrayProperty>(A->GetClass(), TEXT("AwRouteKind")) : nullptr;
+	if (!A || !Routes || FindFProperty<FBoolProperty>(A->GetClass(), TEXT("bAir")) == nullptr)
+	{
+		return false;
+	}
+	FScriptArrayHelper H(Routes, Routes->ContainerPtrToValuePtr<void>(A));
+	return H.Num() > 0;
+}
+
+bool ACityGenPlay::GetLifeAirWater(bool bAirRow) const
+{
+	const AActor* A = GetLife();
+	const FBoolProperty* P = A ? FindFProperty<FBoolProperty>(A->GetClass(), bAirRow ? TEXT("bAir") : TEXT("bWater")) : nullptr;
+	return P && P->GetPropertyValue_InContainer(A);
+}
+
+void ACityGenPlay::SetLifeAirWater(bool bAirRow, bool bOn)
+{
+	CallOne(GetLife(), bAirRow ? TEXT("SetAir") : TEXT("SetWater"), bOn, 0.f);
 }
 
 void ACityGenPlay::SetAtmosHour(float InHour)

@@ -75,14 +75,15 @@ HASH_TAG = "cg.hash"
 # unchanged build applies the change (stored hashes are "<version>.<content hash>")
 MESH_VERSION = "3"
 ACTOR_VERSION = "1"
-LIFE_VERSION = "life8"   # LG0: lifegen's controller (CityGenLife) and its stand-in material;
+LIFE_VERSION = "life9"   # LG0: lifegen's controller (CityGenLife) and its stand-in material;
                          # LG1: the people library's properties; LG3: the city's crowd;
                          # 4, lifegen_clothing_toggle: the clothing switch's hidden material
                          # and whole body; 5, LG5: the city's traffic; 6, LG2: the looks,
                          # their dye colors, groups and wear; 7, LG4: life at places (slots,
                          # places by their hours, gangs, police, the places' clips); 8, LG6:
                          # transit (lines, timetables, stops, the trains' stand-ins and
-                         # their material M_CgTransit)
+                         # their material M_CgTransit); 9, LG7: air and water (routes, their
+                         # models, AG18's hover cars' meshes, paints)
 ATMOS_VERSION = "atmos7"  # the atmos controller's and cells' actors (2, AT2: the high tier,
                           # blinks and sweeps in the packed lights; 3, AT3: the sky and time;
                           # 4, AT4: the air, a cell's fog volumes and emitters; 5, the visible
@@ -1410,6 +1411,42 @@ def transit_props(d, missing):
     out["transit_material"] = transit_material() if on else None
     out["transit_cross_m"] = float((d.get("transit") or {}).get("cross_m", 90.0))
     out["transit"] = on
+    return out
+
+
+def airwater_props(d, missing):
+    """LG7: the life controller's air and water properties from its packed data (`unreal_life.
+    pack_airwater`): every route's kind, model, color, cycle, vehicles per band, points with
+    headings, samples, dwells and its vehicles' paints; the models' parts, their meshes (the
+    basic shapes, AG18's hover cars' parts), how many custom floats each carries, the stand-ins'
+    material (the trains', M_CgTransit). All empty (nothing flies or floats) for a plan before
+    LG7."""
+    fl = lambda k: [float(v) for v in d.get(k) or []]     # noqa: E731
+    it = lambda k: [int(v) for v in d.get(k) or []]       # noqa: E731
+
+    def load(path):
+        a = unreal.load_asset(path) if path else None
+        if a is None and path:
+            missing.append(path)
+        return a
+
+    on = bool(d.get("aw_route_kind"))
+    out = {k: (it(k) if k in ("aw_route_kind", "aw_route_model", "aw_route_count",
+                              "aw_point_starts", "aw_sample_starts", "aw_event_starts",
+                              "aw_paint_starts", "aw_model_part_starts", "aw_mesh_floats")
+               else fl(k))
+           for k in ("aw_route_kind", "aw_route_model", "aw_route_color", "aw_route_cycle",
+                     "aw_route_dt", "aw_route_count", "aw_point_starts", "aw_points",
+                     "aw_sample_starts", "aw_samples", "aw_event_starts", "aw_events",
+                     "aw_paint_starts", "aw_paints", "aw_model_part_starts", "aw_parts",
+                     "aw_mesh_floats")}
+    out["aw_route_ids"] = [str(v) for v in d.get("aw_route_ids") or []]
+    out["aw_kinds"] = [str(v) for v in d.get("aw_kinds") or []]
+    out["aw_models"] = [str(v) for v in d.get("aw_models") or []]
+    out["aw_meshes"] = [load(p) for p in d.get("aw_meshes") or []] if on else []
+    out["aw_material"] = transit_material() if on else None
+    out["air"] = on
+    out["water"] = on
     return out
 
 
@@ -4670,6 +4707,9 @@ class Importer:
             # (LG6: transit; empty for a plan before it)
             for k, v in transit_props(d, missing).items():
                 a.set_editor_property(k, v)
+            # (LG7: air and water; empty for a plan before it)
+            for k, v in airwater_props(d, missing).items():
+                a.set_editor_property(k, v)
             a.tags = self.tags(info["key"], hv, [], "life", "life", "", d["district"])
 
         self.place(have, info["key"], info["hash"], cls.static_class(), make, update,
@@ -4699,7 +4739,10 @@ class Importer:
                                           "patrol_cars": sum(d.get("traffic_police") or []),
                                           "sit_clips": len(d.get("sit_clips") or []),
                                           "talk_clips": len(d.get("talk_clips") or [])}
-                                         if d.get("slot_kinds") is not None else None)}
+                                         if d.get("slot_kinds") is not None else None),
+                              "airwater": ({"routes": len(d["aw_route_kind"]),
+                                            "models": d.get("aw_models")}
+                                           if d.get("aw_route_kind") else None)}
 
     # -- what Play puts you in, and how far the level streams around you --
 

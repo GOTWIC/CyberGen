@@ -476,3 +476,108 @@ TRANSIT = {
     "budget_cars": 600,            # cars at once
 }
 TRANSIT_MODE_CODES = ("metro", "elevated_rail", "monorail", "maglev", "sky_tube")
+
+# --- LG7: air and water (scope 6.7) ----------------------------------------------------------
+
+# what flies and what floats (the exporter's `unreal_life.AIRWATER_MODELS` draws each kind:
+# AG18's hover cars where the project has them, stand-ins of the engine's basic shapes for the
+# rest until the Mac's designs: decision 6)
+AIR_KINDS = ("car", "drone", "police", "media", "aircraft", "shuttle")
+WATER_KINDS = ("boat", "taxi", "ferry", "ship")
+AW_KINDS = AIR_KINDS + WATER_KINDS
+# how each kind moves: cruise (m/s), acceleration and braking (m/s2), the sideways pull it
+# takes in a turn (m/s2: at most sqrt(lateral R) there), its climb and descent (m/s), its dwell
+# where it lands or berths (s), its size (length, beam, height: m), how far behind the one ahead
+# on its route it keeps at least (m), its draft (boats: m), how far it keeps off what it passes
+# (m: a flier's margin in plan from masses, towers, tubes and signs; a boat's off banks, quays
+# and moored boats), the radius it turns round in at a route's end (m, 0: a double-ended boat
+# that runs back stern first), how far it banks at most (degrees)
+AW_VEHICLES = {
+    "car": {"cruise": 26.0, "accel": 3.0, "brake": 3.5, "lateral": 3.0, "vert": 4.0,
+            "dwell_s": 45.0, "size": [4.8, 2.0, 1.5], "spacing_m": 140.0, "margin_m": 8.0,
+            "turn_m": 40.0, "bank": 22.0},
+    "drone": {"cruise": 14.0, "accel": 3.0, "brake": 3.0, "lateral": 3.0, "vert": 3.0,
+              "dwell_s": 15.0, "size": [0.9, 0.9, 0.35], "spacing_m": 60.0, "margin_m": 3.0,
+              "turn_m": 12.0, "bank": 12.0},
+    "police": {"cruise": 22.0, "accel": 3.0, "brake": 3.5, "lateral": 2.5, "vert": 4.0,
+               "dwell_s": 0.0, "size": [4.8, 2.0, 1.5], "spacing_m": 300.0, "margin_m": 10.0,
+               "turn_m": 120.0, "bank": 18.0},
+    "media": {"cruise": 12.0, "accel": 2.0, "brake": 2.0, "lateral": 1.5, "vert": 3.0,
+              "dwell_s": 0.0, "size": [6.0, 6.0, 2.0], "spacing_m": 300.0, "margin_m": 12.0,
+              "turn_m": 160.0, "bank": 10.0},
+    "aircraft": {"cruise": 80.0, "accel": 2.0, "brake": 2.0, "lateral": 2.5, "vert": 8.0,
+                 "dwell_s": 0.0, "size": [42.0, 36.0, 12.0], "spacing_m": 3000.0,
+                 "margin_m": 0.0, "turn_m": 2600.0, "bank": 25.0},
+    "shuttle": {"cruise": 70.0, "accel": 2.5, "brake": 2.5, "lateral": 2.5, "vert": 6.0,
+                "dwell_s": 240.0, "size": [38.0, 22.0, 9.0], "spacing_m": 3000.0,
+                "margin_m": 0.0, "turn_m": 2000.0, "bank": 20.0},
+    "boat": {"cruise": 4.0, "accel": 0.4, "brake": 0.5, "lateral": 0.4, "vert": 0.0,
+             "dwell_s": 0.0, "size": [7.0, 2.2, 1.6], "spacing_m": 80.0, "draft": 0.5,
+             "margin_m": 0.4, "turn_m": 6.0, "bank": 0.0},
+    "taxi": {"cruise": 6.0, "accel": 0.5, "brake": 0.6, "lateral": 0.5, "vert": 0.0,
+             "dwell_s": 30.0, "size": [9.0, 2.8, 2.4], "spacing_m": 120.0, "draft": 0.7,
+             "margin_m": 0.6, "turn_m": 8.0, "bank": 0.0},
+    "ferry": {"cruise": 4.5, "accel": 0.3, "brake": 0.35, "lateral": 0.3, "vert": 0.0,
+              "dwell_s": 60.0, "size": [26.0, 9.0, 5.5], "spacing_m": 300.0, "draft": 1.6,
+              "margin_m": 3.0, "turn_m": 0.0, "bank": 0.0},
+    "ship": {"cruise": 5.0, "accel": 0.08, "brake": 0.1, "lateral": 0.15, "vert": 0.0,
+             "dwell_s": 1500.0, "size": [120.0, 20.0, 22.0], "spacing_m": 3000.0,
+             "draft": 6.0, "margin_m": 8.0, "turn_m": 0.0, "bank": 0.0},
+}
+# how many: cars and drones airborne per km2 of land per M11 hour band (night, morning, day,
+# evening, late), times the district's `busy`, the spec's `air.busy` and the kind's multiplier,
+# cars also by wealth (0.5 + wealth); police fliers per district by its danger; media fliers
+# and overflying aircraft per city; a shuttle per launch pad
+AIR = {
+    "cell_m": 4.0,                 # the airspace raster (drones on it; cars on 8 m cells)
+    "coarse": 2,
+    "slab_m": 8.0,                 # the airspace's heights in slabs of this (63 of them)
+    "vmargin_m": 3.0,              # every obstacle's top and underside this much more
+    "car_layers": [48.0, 60.0, 72.0, 84.0, 100.0, 116.0, 132.0, 150.0, 170.0, 190.0, 215.0,
+                   240.0, 270.0, 300.0, 335.0, 370.0, 410.0, 450.0],
+    "drone_layers": [26.0, 32.0, 38.0, 44.0, 52.0, 60.0, 70.0, 80.0, 92.0, 104.0],
+    "police_m": [110.0, 130.0, 150.0, 175.0, 200.0, 240.0, 290.0, 330.0],
+    "police_r_m": [260.0, 200.0, 150.0],
+    "media_m": [180.0, 210.0, 240.0, 280.0],
+    "media_r_m": [300.0, 240.0, 180.0],
+    "aircraft_m": [760.0, 820.0],
+    "aircraft_out_m": 2600.0,      # an overflight runs on this far past the map's edge
+    "shuttle_cruise_m": 900.0,
+    "shuttle_hover_m": 140.0,
+    "road_cost": 1.0,              # the A*'s cost a meter over an avenue or highway ...
+    "open_cost": 2.2,              # ... and elsewhere (between the towers, over lower roofs)
+    "pad_over_m": 14.0,            # a flight to or from a pad cruises this far over its roof
+    "ramp_m": 120.0,               # a change of layer along this much of a leg at most
+    "car_density": [12.0, 28.0, 24.0, 32.0, 22.0],
+    "drone_density": [1.5, 6.0, 7.0, 6.0, 3.0],
+    "police": {"base": 0.5, "danger": 2.5, "band": [1.0, 0.6, 0.6, 0.8, 1.0]},
+    "media": 2,
+    "aircraft": 2,
+    "lane_triangle_m": [700.0, 2200.0],   # a circuit's sides
+    "per_circuit": 8,              # cars a circuit at most per band (the rest more circuits)
+    "drone_reach_m": [150.0, 650.0],
+    "drone_drop_h_m": [12.0, 45.0],
+    "drone_hub_h_m": [15.0, 70.0],
+    "drone_hubs_km2": 1.2,
+    "routes_max": {"car": 220, "drone": 160, "police": 30, "media": 4, "aircraft": 4,
+                   "shuttle": 8},
+}
+# boats on a river or channel per km of it per band, a canal's boat, water taxis on a tour per
+# band, ferry crossings, ships at a berth
+WATER = {
+    "cell_m": 4.0,
+    "boat_per_km": [0.6, 1.0, 1.3, 1.3, 0.9],
+    "taxi_band": [1, 2, 2, 2, 1],
+    "ferry_spacing_m": 450.0,      # crossings at least this far apart along a river
+    "ferry_max": 4,
+    "ferry_walk_m": 45.0,          # a ferry pier's shore within this of a walkway
+    "ferry_min_m": 50.0,           # crossings at least this wide
+    "taxi_tour": 4,                # piers a water taxi calls at, at most
+    "out_m": 600.0,                # a ship comes in from this far past the map's edge
+    "canal_min_m": 120.0,          # a canal's route at least this long
+    "bridge_pad_m": 0.4,           # under a bridge, the boat's top this far under its deck
+    "berths": 2,                   # ships at a berth line (one each)
+}
+AW_BUDGET = {"fliers": 500, "drones": 300, "boats": 160}
+AW_SAMPLE_S = 1.0                  # the routes' cycles sampled every this many s
+AW_STEP_M = 4.0                    # the speed profile's grid along a route

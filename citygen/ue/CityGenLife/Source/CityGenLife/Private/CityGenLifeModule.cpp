@@ -2,7 +2,8 @@
 // CityGenLife.Enable [0|1] (toggling without an argument): the people and cars moving and drawn;
 // CityGenLife.Respawn PEOPLE CARS: as many again on the spike's lanes; CityGenLife.Clothing
 // [0|1]: the people's clothes drawn or not (a debug switch); CityGenLife.Transit [0|1] and
-// CityGenLife.TransitShow WHAT (LG6); CityGenLife.Status: the state as one JSON line
+// CityGenLife.TransitShow WHAT (LG6); CityGenLife.Air [0|1], CityGenLife.Water [0|1] and
+// CityGenLife.AirShow WHAT (LG7); CityGenLife.Status: the state as one JSON line
 // (CITYGEN_LIFE_STATUS).
 
 #include "CityGenLifeActor.h"
@@ -236,6 +237,37 @@ namespace
 			if (ACityGenLife* A = LifeIn(World))
 			{
 				A->ShowTransit(Args.Num() ? Args[0] : FString(TEXT("moving")));
+			}
+		}));
+
+	// --- LG7: air and water
+	FAutoConsoleCommandWithWorldAndArgs AirCmd(TEXT("CityGenLife.Air"),
+		TEXT("CityGenLife.Air [0|1]: LG7's fliers (flying cars, drones, police and media fliers, aircraft, shuttles on their routes) on or off (toggling without an argument)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (ACityGenLife* A = LifeIn(World))
+			{
+				A->SetAir(Args.Num() ? FCString::Atoi(*Args[0]) != 0 : !A->bAir);
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs WaterCmd(TEXT("CityGenLife.Water"),
+		TEXT("CityGenLife.Water [0|1]: LG7's boats (boats, water taxis, ferries, ships on their routes) on or off (toggling without an argument)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (ACityGenLife* A = LifeIn(World))
+			{
+				A->SetWater(Args.Num() ? FCString::Atoi(*Args[0]) != 0 : !A->bWater);
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs AirShowCmd(TEXT("CityGenLife.AirShow"),
+		TEXT("CityGenLife.AirShow car|landing|layers|drone|police|media|aircraft|shuttle|boat|taxi|ferry|ship|pier: the camera moved beside the nearest vehicle of a kind, a car coming down onto its pad, the cars' layers, a boat at a pier (the check's shots)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (ACityGenLife* A = LifeIn(World))
+			{
+				A->ShowAirWater(Args.Num() ? Args[0] : FString(TEXT("car")));
 			}
 		}));
 

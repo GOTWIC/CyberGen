@@ -2948,6 +2948,65 @@ runs as before.
 - **Benchmark:** every life pass sets `CityGenLife.Transit` (1); the pass `night_life_notransit`
   turns it off (`bench.LIFE_PASSES`).
 
+### From LG7: air and water
+
+A plan with `airwater` (`lifegen/airwater.py`, the plan's `airwater.json`) brings what flies
+and what floats over the whole city: flying cars between M3's pads and round circuits over the
+avenues and highways, drones, police and media fliers, aircraft over the map, a spaceport's
+shuttles, boats on every river, channel and canal, water taxis between piers, ferries across
+the rivers and ships at the port. A plan before LG7 exports and runs as before (none of these
+properties set).
+
+- **The pack** (`unreal_life.pack_airwater`, `PACK_VERSION` 8; `import_city.airwater_props`,
+  `LIFE_VERSION` life9): per route its kind (`AwRouteKind`, of `AwKinds`: car, drone, police,
+  media, aircraft, shuttle, boat, taxi, ferry, ship), model (`AwRouteModel`, of `AwModels`),
+  color (linear), cycle and its samples' step, vehicles per hour band (`AwRouteCount`), points
+  with the heading the vehicle faces there (`AwPoints`, 4 floats: citygen m, absolute z;
+  degrees counterclockwise from east), samples (`AwSamples`: m along the path), dwells
+  (`AwEvents`, 3 floats: arrive, depart, what: 0 pad, 1 roof, 2 pier, 3 berth, 4 launch pad)
+  and its vehicles' paints (`AwPaints`, 9 floats each, a hover car's); per model its parts
+  (`AwParts`, 9 floats: mesh, kind, middle, size, cull distance), the meshes (`AwMeshes`: the
+  engine's basic shapes, AG18's hover cars' parts) and how many custom floats each carries
+  (`AwMeshFloats`: 9 painted, 6 a stand-in's in `AwMaterial`, the trains' `M_CgTransit`).
+- **The models** (decision 6: the Mac designs the missing kinds; lifegen generates no vehicle
+  geometry): flying cars are AG18's hover cars (Kestrel's Dart, Meridian and Atlas, by the
+  districts' fleets, in their districts' paints as LG5's traffic paints a car) where the
+  project has them, with nav lights (red left, green right, a white strobe, a lamp ahead);
+  police fliers the Meridian in LG4's police livery with a flashing red and blue bar; every
+  other kind a stand-in of the per kind model table (`unreal_life.AIRWATER_MODELS`: a drone's
+  body, arms, rotors and parcel, a media flier's four ducted fans and camera, an airliner, a
+  shuttle, a boat, a yellow water taxi with its sign, a double-ended ferry, a container ship),
+  its part kinds colored by the runtime (`AW_PART_KINDS`: body, window, accent, dark, nav red,
+  nav green, strobe, police red and blue, lamp, hull, beacon). A kind's game pack replaces its
+  parts there (meshes, scale 1); the runtime is the same.
+- **The runtime** (`CityGenLifeAir.cpp`, built at BeginPlay after transit):
+  - *By the world's time,* as LG6's trains: a vehicle's place along its route is the sampled
+    cycle at (time + its phase) modulo the cycle, the band's vehicles evenly round it; nothing
+    is simulated, every route runs city-wide, a far vehicle costs a lookup and its instances
+    are placed every fourth frame past `AwFarM` (1.5 km); a component is sent to the engine
+    every frame only while a vehicle within `AwNearM` (600 m) moved in it, else every fourth
+    frame, the components taking turns (the engine's cost is per moving component).
+  - *Heading:* the route's at that point, interpolated (so a double-ended ferry, or a ship
+    backing out of its berth, runs stern first); a flier banks by its turn rate and speed (at
+    most 10 to 25 degrees by kind) and pitches with its climb in plan; a boat rolls and bobs.
+  - *Lights:* the stand-ins' lamps, windows, nav lights and accents glow by night through
+    `M_CgTransit` (MPC_CityGen's `Night`); strobes, beacons and police bars flash (drawn only
+    while lit); the hover cars' own lamps are their packs' emissive. No flier casts light.
+  - *Drawn:* one instanced component per mesh and cull distance (`AirWater0`, ...), each
+    vehicle's parts an instance in theirs; no collision, no shadows, out of Lumen's scene; a
+    drone's small parts culled past 250 to 600 m.
+- **Console:** `CityGenLife.Air [0|1]` and `CityGenLife.Water [0|1]` (toggling without an
+  argument), the play menu's **Air traffic** and **Boats** rows (`air`, `water`, `air=0|1`,
+  `water=0|1`; `ACityGenPlay::HasLifeAirWater`), and for the check's shots
+  `CityGenLife.AirShow car|landing|layers|drone|police|media|aircraft|shuttle|boat|taxi|ferry|
+  ship|pier` (the camera beside the nearest vehicle of a kind within 3 km, a car 4 to 25 s
+  from landing on its pad seen from the pad's roof, the cars' layers from behind and over a car
+  on a circuit, a taxi or ferry at a pier: the status's `airwater.show`, which the check's
+  `until` waits for). `CityGenLife.Status` adds `airwater` (routes, vehicles, fliers and boats
+  running, dwelling, near, components, instances, its time a frame).
+- **Benchmark:** every life pass sets `CityGenLife.Air` and `CityGenLife.Water` (1); the pass
+  `night_life_noairwater` turns both off (`bench.LIFE_PASSES`).
+
 ## Milestones and checks
 
 - **Every milestone** updates the exporter in its own PR for what it adds or changes (a new
@@ -3025,3 +3084,4 @@ runs as before.
 | Play fixes (2026-11-12, after the packaged Delta) | Play's default is walking (`--play walk`; `fly` and `project` the others): the play plugin's `ACityGenWalker` (`CityGenWalker.h`, a character with a camera in front of the face and a body its player sees, keys bound on its own input component, `-CityGenSelfie=SECONDS` for a packaged game's proof), made into `Core/BP_CityGenWalker` wearing the project's own character's body (`import_city.project_body`) and spawned by `Core/GM_CityGenWalk` (`walk_classes`), the level's game mode override; `--check` walks with it (its spawn and body, a curb climbed: checks `spawn` and `curb`); `M_CgVehicleGlass` darker, coated and covered toward grazing angles (`VEHICLE_VERSION` 10, every car made again; two-sided, the far side's faces left out); the Aurels never imported (`unreal_vehicles.EXCLUDED`, a placement naming one refused) | Delta Megacity imported into CityAG16 and checked, a packaged game (`docs/progress/fix_play_cars/`) |
 | LG4 | Life at places ("From LG4: life at places" above): `unreal_life.pack_places` and the door, drive and pool fields LG4 adds (`PACK_VERSION` 6), `import_city.places_props` (`LIFE_VERSION` life7), the places' clips made in the project after the people library (`unreal_people.ensure_place_clips`, `ue/people_places.py`, `Saved/CityGenPeople/places.json`), the `SmartObjects` plugin a dependency of `CityGenLife`, slots' use points as Smart Objects of the world's subsystem while their walkways are live, gangs, police pairs and patrol cars in a livery; console `CityGenLife.Places`, `.Gangs`, `.Police`, `.PlaceShow`, `.SitOffset`, the play menu's Places row, the status's `places`; bench pass `night_life_noplaces`. A plan without `places` exports and runs as before. |
 | LG6 | Transit ("From LG6: transit" above): `unreal_life.pack_transit` and the stand-ins' model table `TRANSIT_MODELS` (`PACK_VERSION` 7), `import_city.transit_props` and `M_CgTransit` (`LIFE_VERSION` life8), every line's trains by the world's time on their timetables, doors at the stops, people leaving and boarding at the live stops, a served station's street accesses quiet while transit runs, the platforms' keep-out (`WalkClear`); console `CityGenLife.Transit`, `.TransitShow`, the play menu's Transit row, the status's `transit`; bench pass `night_life_notransit`. A plan without `transit` exports and runs as before. | Delta imported into CityAG16, checked with shots of trains at the stations and running (`docs/progress/LG6/`) |
+| LG7 | Air and water ("From LG7: air and water" above): `unreal_life.pack_airwater` and the stand-ins' per kind model table `AIRWATER_MODELS` with AG18's hover cars (`PACK_VERSION` 8), `import_city.airwater_props` (`LIFE_VERSION` life9), every route of what flies and floats by the world's time (flying cars between pads and on circuits, drones, police and media fliers, aircraft, shuttles, boats, water taxis, ferries, ships), banking and bobbing, flashing lights; console `CityGenLife.Air`, `.Water`, `.AirShow`, the play menu's Air traffic and Boats rows, the status's `airwater`; bench pass `night_life_noairwater`. A plan without `airwater` exports and runs as before. | Delta imported into CityAG16, checked with shots of fliers in their layers, a landing, drones, police, boats, a ferry at its pier and a ship (`docs/progress/LG7/`) |

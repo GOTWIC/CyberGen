@@ -3056,6 +3056,66 @@ LG6 (transit) is in place:
   0.06 to 0.09 ms; `night_plan_all` 22.1 ms p95 native, transit off 22.0 (both under about 3
   cores of other load). Results: `docs/progress/LG6/README.md`.
 
+LG7 (air and water) is in place:
+- **Routes** (`lifegen/airwater.py`, called by `plan.build_plan`; `presets.AW_VEHICLES`,
+  `AIR`, `WATER`, `AW_BUDGET`; the spec's `air` and `water`, `busy` and `kinds` multipliers,
+  0 a kind out): everything that flies or floats runs a route, a closed path (points with the
+  heading the vehicle faces) and its speed profile (the kind's cruise, acceleration and
+  braking, sqrt(lateral R) in a turn, its climb rate on a vertical stretch; transit's grid and
+  sampling), dwells where it lands or berths, sampled every 1 s; per band its vehicles evenly
+  round the cycle, fewer where two would come within the kind's spacing (`_fit`).
+- **The airspace** (`AirSpace`): every building mass and roof item, skybridge, structure, transit
+  line, megasite mass and sign off a facade or over a roof, widened by the drones' 3 m margin, on
+  a 4 m raster of 8 m height slabs (a bit each, `uint64`); a kind's blocked cells at a height
+  grown by its own margin (cars 8 m) and, for the cars, made 8 m cells (`Air.blocked`); an
+  A* (`astar`, windowed) costing least over the avenues and highways (`road_cost`, else
+  `open_cost`: between the towers), its path pulled straight on cells no dearer (`pull`), its
+  corners rounded (`fillet`). **Flying cars:** M3's `av_pad` and `helipad` roof items paired
+  500 to 2,200 m apart (`car_pairs`; a pad something stands over left out, Delta's 16 under
+  their own building's crown mast: a citygen conflict), flown between on layers by heading
+  (`car_layers`, east-bound the even, west-bound the odd; `pad_over_m` over both roofs), up and
+  down vertically, a dwell at each, two cars a pair at most; circuits round three avenue or
+  highway nodes of a district (sides from a third of its span), each leg on its heading's
+  layer, the change along `ramp_m`, as many as the district's cars per km2 by band need
+  (`car_density` times busy, the spec and 0.5 plus wealth); models AG18's hover cars by the
+  district's fleet. **Drones:** a hub roof to a drop roof 150 to 650 m off (`drone_roofs`: the
+  top mass's point 2.5 m clear of roof items), on `drone_layers` and the 4 m raster.
+  **Police** orbits over each district (its middle, then its gang turfs) by danger; **media**
+  round the tallest landmarks; **aircraft** across the map high over it, turning off the map;
+  a **shuttle** per spaceport launch pad, in along its flight cone, down onto it, up and away.
+- **The water** (`WaterSpace`): M16's bodies on a 4 m raster, each kind's water exactly as
+  geometry (the water shrunk by its half beam and margin, less every bank's slope, quay band,
+  moored boat, column and AG7 bridge pier grown by as much; deep enough by M16's bed rule made
+  linear; under bridges with room). **Boats** up and down every river, channel and canal
+  keeping right (each way offset, a half turn at each end, `_water_route`; a body cut by a
+  bridge's piers its longest stretch from an end, `_longest_run`); **piers** derived (the ask
+  `piers`: a taxi's beside every quay's middle clear of moored boats, one a canal; a ferry's
+  each end of a river crossing where walkways reach both shores); **water taxis** on tours of
+  up to four piers; **ferries** double-ended across; **ships** in from past the map's edge to
+  the port's berths where deep enough, else lying at them, and one offshore.
+- **Outputs and checks:** `airwater.json` (`planmodel.AirWater`: routes, pads, piers), the
+  plan's `airwater`, a layer 4 entry per route (`air_route`, `water_route`), checks
+  `air_lanes` (every flier's path read back every 4 m against the airspace at its margin),
+  `air_pads`, `water_lanes` (on its water exactly within 1 m, at the surface),
+  `airwater_timing`, `airwater_budget`; `preview_airwater.png`; asks `piers`, `air_corridors`
+  derived, `fleet_kinds` the missing kinds.
+- **Exporter and runtime** (`unreal_life.pack_airwater`, `AIRWATER_MODELS`, `PACK_VERSION` 8;
+  `import_city.airwater_props`, `LIFE_VERSION` life9; `CityGenLifeAir.cpp`): every vehicle by
+  the world's time from its route's samples (instances past 1.5 km sent every fourth frame),
+  heading interpolated (ferries and backing ships stern first), fliers banking and pitching,
+  boats rolling and bobbing; AG18's hover cars in their paint with nav lights, the police
+  flier in LG4's livery with a flashing bar, stand-ins of `/Engine/BasicShapes` for the rest in
+  `M_CgTransit` (lit by night), strobes and beacons flashing; no shadows, no collision. Console
+  `CityGenLife.Air`, `.Water`, `.AirShow`; the Tab menu's Air traffic and Boats rows; the
+  status's `airwater`; bench pass `night_life_noairwater`. `docs/unreal_export.md`, "From LG7:
+  air and water".
+- Delta: 134 routes (53 flying car routes, 50 drones, 9 police, 2 media, 2 aircraft; 9 boats,
+  3 water taxi tours, 3 ferries, 3 ships), 201 fliers and 20 boats at 23:00; 54 of 70 pads
+  flown (16 under their own building's crown mast), 17 piers; every plan check and the Unreal
+  check pass; air and water's step 0.17 to 0.22 ms; `night_plan_all` 22.6 ms p95 native, air
+  and water off 21.7 (both under about 3.3 cores of other load; a component sent every frame
+  only while a vehicle within `AwNearM` moved in it). Results: `docs/progress/LG7/README.md`.
+
 ## Gallery site (GitHub Pages)
 
 `site/` is the public gallery at https://gotwic.github.io/CyberGen/ (served at

@@ -706,6 +706,18 @@ are simple stand-ins in their line's colors until their models are designed.
 |---|---|
 | <img src="docs/progress/LG6/unreal/night_tr_board_maglev.jpg" width="420"> | <img src="docs/progress/LG6/unreal/pday_tr_run_sky.jpg" width="420"> |
 
+LG7 (air and water) is in: flying cars stream in layers over the avenues and between the towers
+and come down onto the rooftop pads, delivery drones hop from roof to roof, police fliers circle
+the rough districts, news fliers the landmarks, and aircraft pass high overhead (a spaceport's
+shuttles land on its pads); boats run up and down every river and canal, water taxis call at
+piers, ferries cross the rivers and ships lie at the port. The flying cars are the hand-designed
+hover cars; the rest are simple stand-ins until their models are designed.
+`CityGenLife.Air 0` and `CityGenLife.Water 0`, or the Tab menu's rows, turn them off.
+
+| A flying car coming down onto a rooftop pad (LG7) | A boat on the river by day (LG7) |
+|---|---|
+| <img src="docs/progress/LG7/unreal/night_aw_landing.jpg" width="420"> | <img src="docs/progress/LG7/unreal/pday_aw_boat.jpg" width="420"> |
+
 | People on an Old Town street | The walk by night |
 |---|---|
 | <img src="docs/progress/LG1/unreal/pday_people_close_0.jpg" width="420"> | <img src="docs/progress/LG1/unreal/night_people_close_0.jpg" width="420"> |
@@ -738,7 +750,7 @@ Plan: [`docs/lifegen_scope.md`](docs/lifegen_scope.md); what each milestone did:
 | LG4 | Life at places | People sitting on benches, waiting at bus stops and taxi stands, buying at kiosks and vending machines, eating at food stalls, queueing at clubs and smoking outside bars; shops, bars and clinics open and closed by their hours, people going in and coming back out; gangs in their colors on their own turf; police walking in pairs and driving patrol cars | Done |
 | LG5 | Traffic | The hand-designed cars on every lane of the city, following each other, stopping at red lights and taking turns through junctions, stopping for people and for you in the road, as many as each street has at each hour; their lights by night | Done |
 | LG6 | Transit | Trains, metro, monorail, maglev and sky tube pods running their lines to timetables over the whole city, stopping at stations with their doors open, people boarding and leaving | Done |
-| LG7 | Air and water | Flying cars on air lanes between towers and landing pads, drones, aircraft and shuttles over the spaceport, helicopters at helipads, boats and ferries on the water | Planned |
+| LG7 | Air and water | Flying cars in layers over the avenues and between the towers, landing on and taking off from the rooftop pads; delivery drones, police and news fliers, aircraft high overhead and shuttles at a spaceport's pads; boats on every river and canal, water taxis between piers, ferries across the rivers and ships at the port | Done |
 | LG8 | Weather, reactions and release | People and traffic that follow the hour and the weather (umbrellas and shelter in rain, nightlife), step aside for the player and react to what happens near them; a performance pass for crowds and traffic; every sample city alive, checked in Unreal | Planned |
 
 ---

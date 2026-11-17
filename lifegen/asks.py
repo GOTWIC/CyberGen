@@ -54,16 +54,23 @@ ASKS = (
      "field": ("", "piers"),
      "record": {"piers[]": "{id, quay_id or bank_id, position, yaw, berth length, walkway "
                            "id, water body id, depth at the berth}"},
-     "derived": "",
-     "missing": "M16's quays and AG7's quay stairs (every 60 m) are there; no berth is named"},
+     "derived": "LG7's `airwater.json` piers: a water taxi's beside the middle of every quay "
+                "(moved along it to where a taxi fits clear of the moored boats; one a canal "
+                "where the quays across it would put two at one spot), a ferry's at each end "
+                "of a crossing of a river or channel where a walkway comes within 45 m of both "
+                "shores (crossings 450 m apart at least, four at most)",
+     "missing": ""},
     {"id": "air_corridors", "of": "citygen", "needed_by": "LG7",
      "what": "air corridors where a city wants them (else lifegen draws its own over the "
              "roads)",
      "field": ("", "air_corridors"),
      "record": {"air_corridors[]": "{id, polyline (x, y), floor_m, ceiling_m, kind "
                                    "(traffic, police, spaceport)}"},
-     "derived": "LG7 draws layers over the avenues and highways, clear of the towers by "
-                "their margins (scope 8)",
+     "derived": "LG7's layers (`presets.AIR`): flying cars over the avenues and highways and "
+                "between the towers on layers by their heading (east-bound the even, "
+                "west-bound the odd), 8 m clear of every mass, sky tube, transit line, "
+                "skybridge and sign; drones lower, 3 m clear; police and media orbits; "
+                "aircraft high over the map; a spaceport's shuttles along its flight cone",
      "missing": ""},
     {"id": "doors", "of": "assetgen", "needed_by": "LG3",
      "what": "every door with its walkway (AG3's door records, the exporter's doors graph)",
@@ -91,12 +98,16 @@ ASKS = (
                 "the police livery by paint (`POLICE[\"livery\"]`)",
      "missing": ""},
     {"id": "fleet_kinds", "of": "assetgen", "needed_by": "LG5, LG7",
-     "what": "AG18's missing kinds: buses, trucks, motorbikes, bikes, flying cars, drones, "
-             "boats (decision 6: designed on the Mac as the cars are)",
+     "what": "AG18's missing kinds: buses, trucks, motorbikes, bikes, drones, police and "
+             "media fliers, aircraft, shuttles, boats, water taxis, ferries, ships (decision "
+             "6: designed on the Mac as the cars are)",
      "field": ("@vehicles", "kinds"),
      "record": {"vehicles/cars/<name>.py": "one script a vehicle, a game pack each "
                                            "(vehicles/GAME.md); its kind in the pack"},
-     "derived": "cars, taxis, vans and pickups from the 15 packs in the cities",
+     "derived": "cars, taxis, vans and pickups from the 15 packs in the cities; LG7's flying "
+                "cars and police fliers are Kestrel's three hover cars; the rest stand-ins of "
+                "the exporter's per kind model table (`citygen.unreal_life.AIRWATER_MODELS`: "
+                "boxes, cylinders and spheres of /Engine/BasicShapes, lit by night)",
      "missing": ""},
     {"id": "train_models", "of": "assetgen", "needed_by": "LG6",
      "what": "trains and pods per transit mode: metro, elevated rail, monorail, maglev and sky "

@@ -215,6 +215,12 @@ public:
 	bool HasLifeTransit() const;
 	bool GetLifeTransit() const;
 	void SetLifeTransit(bool bOn);
+	/** LG7: whether the life controller has air and water routes (AwRouteKind not empty), the
+	 *  fliers' (bAir) or boats' (bWater) state, and SetAir or SetWater on it (the menu's Air
+	 *  traffic and Boats rows: air, water, air=1 or 0, water=1 or 0). */
+	bool HasLifeAirWater() const;
+	bool GetLifeAirWater(bool bAirRow) const;
+	void SetLifeAirWater(bool bAirRow, bool bOn);
 
 	/** The controller's hour (0 to 24), and SetHour. */
 	float GetAtmosHour() const;

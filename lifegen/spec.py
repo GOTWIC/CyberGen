@@ -85,6 +85,20 @@ class Busy(_Model):
     busy: Mul = Field(1.0, description="A multiplier of how busy (LG7).")
 
 
+class Air(Busy):
+    """LG7: what flies (scope 6.7): how busy, and a multiplier per kind (`car`, `drone`,
+    `police`, `media`, `aircraft`, `shuttle`; 0 leaves a kind out)."""
+    kinds: dict[Literal["car", "drone", "police", "media", "aircraft", "shuttle"],
+                Annotated[float, Field(ge=0.0, le=10.0)]] = Field(default_factory=dict)
+
+
+class Water(Busy):
+    """LG7: what floats (scope 6.7): how busy, and a multiplier per kind (`boat`, `taxi`,
+    `ferry`, `ship`; 0 leaves a kind out)."""
+    kinds: dict[Literal["boat", "taxi", "ferry", "ship"],
+                Annotated[float, Field(ge=0.0, le=10.0)]] = Field(default_factory=dict)
+
+
 class Budgets(_Model):
     """Decision 12.7 (2026-11-13): 20 ms p95 at native 2560 x 1440 on the PC."""
     frame_p95_ms: float = P.BUDGETS["frame_p95_ms"]
@@ -144,8 +158,8 @@ class LifeSpec(_Model):
     styles: Styles = Field(default_factory=Styles)
     fleet: Fleet = Field(default_factory=Fleet)
     transit: Transit = Field(default_factory=Transit)
-    air: Busy = Field(default_factory=Busy)
-    water: Busy = Field(default_factory=Busy)
+    air: Air = Field(default_factory=Air)
+    water: Water = Field(default_factory=Water)
     budgets: Budgets = Field(default_factory=Budgets)
     reactions: Reactions = Field(default_factory=Reactions)
     spike: Spike = Field(default_factory=Spike)
@@ -224,6 +238,8 @@ def fill(spec: LifeSpec, districts: list[dict], cars: list[str]) -> dict:
             "budgets": spec.budgets.model_dump(), "reactions": spec.reactions.model_dump(),
             "fleet_busy": _r(spec.fleet.busy), "air_busy": _r(spec.air.busy),
             "water_busy": _r(spec.water.busy),
+            "air": {"kinds": {k: _r(v) for k, v in sorted(spec.air.kinds.items())}},
+            "water": {"kinds": {k: _r(v) for k, v in sorted(spec.water.kinds.items())}},
             "transit": {k: [_r(x) for x in v] for k, v in sorted(spec.transit.headway_min
                                                                    .items())},
             "palette": list(spec.styles.palette), "spike": spec.spike.model_dump(),
