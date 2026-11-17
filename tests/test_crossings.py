@@ -104,13 +104,15 @@ def test_walkways_keep_off_the_carriageway_on_a_sample():
     assert d["on_carriageway_m"] <= 0.02 * d["length_m"], d
     # every crosswalk record of a road with sidewalks has its walkway: square across it, from
     # sidewalk to sidewalk (a highway's runs between its corners)
-    walks = [w for w in m.walkways if w.kind == "crosswalk" and len(w.line) >= 4]
+    walks = _crosswalk_walks(m)
+    fallback = [w for w in walks if len(w.line) == 2]
+    walks = [w for w in walks if len(w.line) >= 4]
     side_ends: dict = {}
     for w in m.walkways:
         if w.kind == "sidewalk":
             for p in (w.line[0], w.line[-1]):
                 side_ends.setdefault((round(p[0], 2), round(p[1], 2)), 0)
-    joined = 0
+    joined = between = 0
     xs = [x for x in m.crosswalks if x.attrs.get("road_class") != "highway"]
     for x in xs:
         a, c = x.line
@@ -121,7 +123,14 @@ def test_walkways_keep_off_the_carriageway_on_a_sample():
             mid, ((best.line[i][0] + best.line[i + 1][0]) / 2,
                   (best.line[i][1] + best.line[i + 1][1]) / 2)))
         p, q = best.line[k], best.line[k + 1]
-        assert ST._dist(mid, ((p[0] + q[0]) / 2, (p[1] + q[1]) / 2)) < 0.5, x.id
+        if ST._dist(mid, ((p[0] + q[0]) / 2, (p[1] + q[1]) / 2)) >= 0.5:
+            # (the crossings fix's fallback where a sidewalk does not reach the station: the
+            # crossing between its leg's corners; the road curves fix's Vesper Bay has one in a
+            # cluster, its right sidewalk ending 45 m short)
+            assert any(LineString([c_[:2] for c_ in w.line]).distance(
+                LineString([a[:2], c[:2]])) < 2.0 for w in fallback), x.id
+            between += 1
+            continue
         if len(best.line) == 4:
             ends = (best.line[0], best.line[-1])
             joined += all((round(e[0], 2), round(e[1], 2)) in side_ends for e in ends)
@@ -131,7 +140,40 @@ def test_walkways_keep_off_the_carriageway_on_a_sample():
             for e, f in ((best.line[0], best.line[1]), (best.line[2], best.line[3])):
                 along = abs((f[0] - e[0]) * dy - (f[1] - e[1]) * dx) / L
                 assert along < 1.0, (x.id, along)
-    assert joined >= 0.9 * len(xs)
+    assert joined >= 0.9 * len(xs) and between <= max(1, 0.01 * len(xs)), (joined, between)
+
+
+def _crosswalk_walks(m) -> list:
+    """The crosswalk walkways, the pieces a later split left (a station stair's foot on one:
+    the road curves fix's Vesper Bay, `stn.the_stacks.2`) joined again end to end."""
+    pieces: dict = {}
+    for w in m.walkways:
+        if w.kind == "crosswalk":
+            pieces.setdefault((w.attrs or {}).get("split_of", w.id), []).append(w)
+    out = []
+    for root in sorted(pieces):
+        ws = sorted(pieces[root], key=lambda w: w.id)
+        line = list(ws[0].line)
+        rest = ws[1:]
+        while rest:
+            for w in rest:
+                if tuple(w.line[0][:2]) == tuple(line[-1][:2]):
+                    line += list(w.line[1:])
+                elif tuple(w.line[-1][:2]) == tuple(line[0][:2]):
+                    line = list(w.line[:-1]) + line
+                else:
+                    continue
+                rest.remove(w)
+                break
+            else:
+                break
+        # (the split point lies on the straight middle stretch: out again)
+        keep = [line[0]] + [b for a, b, c in zip(line, line[1:], line[2:])
+                            if abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) *
+                                   (c[0] - a[0])) > 0.02 * math.dist(a[:2], c[:2])] + \
+            [line[-1]]
+        out.append(ws[0].model_copy(update={"line": keep if len(ws) > 1 else line}))
+    return out
 
 
 def test_check_walk_roads_fails():

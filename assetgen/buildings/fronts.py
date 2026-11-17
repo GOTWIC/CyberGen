@@ -53,6 +53,8 @@ PIER_U = 250                 # a shopfront stops this far inside its unit's ends
 GAP_MIN = 60
 EDGE_CLEAR = 60
 INNER = ("courtyard", "atrium")  # a court's walls: no door moves there
+OUTER = ("front", "street", "alley", "plaza", "park", "canal")  # facades a moved door
+                             # tries first: they face a way, not open ground behind a neighbor
 MAIN_KEEP = 1300             # half the room a main entrance between shopfronts keeps
 SHARE_MM = 1500              # #88: how far off a shopfront a moved main entrance may share it
 SHOP_MIN = 1500              # a unit narrower than this after its piers takes a door only
@@ -388,7 +390,8 @@ class Band:
     def rehome(self, plans: list) -> None:
         """Entrances and units of the mass no facade took (on a wall a neighbor stands
         against, or a facade too short for their door): a door on the band's nearest facade
-        that has room, in place of the ground windows there (`moved`)."""
+        that has room, of the six nearest those facing a way (`OUTER`) first, in place of
+        the ground windows there (`moved`)."""
         sb, br, k_ms = self.sb, self.sb.br, self.ms["k"]
         want = [(k, en, en["position"]) for k, en in enumerate(br["entrances"])
                 if k not in sb.done_ents and (en.get("at") or {}).get("mass") == k_ms]
@@ -404,7 +407,12 @@ class Band:
                 t = int(min(max((x - fa.a[0]) * fa.ux + (y - fa.a[1]) * fa.uy, 0), fa.L))
                 q = fa.P(t, 0)
                 cand.append((round(math.hypot(q[0] - x, q[1] - y)), n, t))
-            for _, n, t in sorted(cand)[:6]:
+            # (of the six nearest facades those facing a way first: a door moved onto open
+            # ground can face a neighbor's back across a gap, its walkway walled off; the
+            # road curves fix's small test city, a shopfront row's cyberware unit)
+            near = sorted(cand)[:6]
+            near.sort(key=lambda c: plans[c[1]][0].cls(c[2], self.z0 + 1200) not in OUTER)
+            for _, n, t in near:
                 fa, r, i, ops = plans[n]
                 if fa.cls(t, self.z0 + 1200) in INNER:
                     continue                   # (not into a court: the street is outside)

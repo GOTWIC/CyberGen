@@ -35,6 +35,7 @@ from .checks import Check
 SHOW = 12
 LEN_TOL = 0.005
 SEAM_M = 60.0
+GRID_SLIVER_M = 0.05    # a part of an overlap thinner than this is a sliver of the grid
 PIER_STEP_M = 40.0      # the blockout's piers under a bridge deck over the water
 DECK_M = 1.2
 
@@ -229,7 +230,12 @@ def check_cover(m) -> Check:
             for i, j in zip(a.tolist(), b.tolist()):
                 seen.setdefault(i, []).append(j)
             for i in sorted(seen):
-                ov = G.area(G.inter(polys[i], G.union_local([geoms[j] for j in seen[i]])))
+                # (the road curves fix: parts thinner than GRID_SLIVER_M are the grid's, a
+                # long edge snap rounding moved a centimeter: Vesper Bay's lot beside a canal
+                # met it along 322 m, 1.5 m2)
+                ov = math.fsum(G.area(q) for q in G.parts(G.inter(
+                    polys[i], G.union_local([geoms[j] for j in seen[i]])))
+                    if CV.width_of(q) >= GRID_SLIVER_M)
                 if ov > 1.0:
                     hits += 1
                     if hits <= 3:

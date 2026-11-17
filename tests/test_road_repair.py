@@ -66,10 +66,13 @@ def test_every_dead_end_says_what_it_is():
     ends = [n for n in m.road_nodes if deg.get(n.id) == 1]
     assert ends and all(n.attrs.get("dead_end") in ST.DEAD_END_KINDS for n in ends)
     bulbs = {j.node_id: j for j in m.junctions if j.shape == "cul_de_sac"}
+    # (M22: a cul-de-sac a cluster took in keeps its bulb in the cluster's region; the road
+    # curves fix's Vesper Bay layout has one, as `check_dead_ends` reads it)
+    held = {n for j in m.junctions for n in j.attrs.get("bulbs") or []}
     culs = [n for n in ends if n.attrs["dead_end"] == "cul_de_sac" and
             n.attrs.get("turning_head_m")]
-    assert culs and all(n.id in bulbs and bulbs[n.id].corner_radius_m ==
-                        n.attrs["turning_head_m"] for n in culs)
+    assert culs and all(n.id in held or (n.id in bulbs and bulbs[n.id].corner_radius_m ==
+                                         n.attrs["turning_head_m"]) for n in culs)
 
 
 def test_check_dead_ends_fails():

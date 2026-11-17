@@ -535,6 +535,7 @@ class Frame:
         self.foot_done: set[int] = set()
         nodes = set()
         held_foot_nodes = set()
+        held_rows = []          # (every held segment: two may share a centerline)
         for s in model.road_segments:
             if self.inside_row(s):
                 continue
@@ -545,6 +546,7 @@ class Frame:
                 self.foot.append(s)
                 held_foot_nodes |= {s.start, s.end}
             self.rows[_ckey(s.centerline)] = s
+            held_rows.append(s)
             if "m1b_segment" in s.attrs:
                 self.m1b.setdefault(s.attrs["m1b_segment"], []).append(
                     tuple((G.q(x), G.q(y)) for x, y in s.centerline))
@@ -556,9 +558,12 @@ class Frame:
             if s.attrs.get("role") == "footbridge" and self.inside_row(s) and \
                     ({s.start, s.end} & held_foot_nodes):
                 self.foot.append(s)
-        self.ends: dict[tuple, list] = {}       # held segments by their end points
-        for k, r in self.rows.items():
-            self.ends.setdefault(_ekey(k), []).append(r)
+        # held segments by their end points (every one: two highways can run on one
+        # centerline, a ring and a spine, and only `match`'s row tells them apart; keyed by
+        # centerline alone the second hid the first, whose grade line then went unheld)
+        self.ends: dict[tuple, list] = {}
+        for r in held_rows:
+            self.ends.setdefault(_ekey(_ckey(r.centerline)), []).append(r)
         # gates: old nodes where the district's streets met a held road
         inner = set()
         for s in model.road_segments:
@@ -719,7 +724,10 @@ class Frame:
         for r in pieces:
             pts = [(G.q(x), G.q(y)) for x, y in r.centerline]
             dist = next((n for n, d in B.did.items() if d == r.attrs.get("district")), None)
-            li = B.add(Line(pts, r.road_class, r.width_m, "footbridge", dist,
+            # (class footbridge, as `footbridges` lays one: it takes no junction; the model's
+            # row says pedestrian, and as one it took a held street's dead end the old city
+            # had run on to the promenade, the small test city's Old Quarter beside Core)
+            li = B.add(Line(pts, "footbridge", r.width_m, "footbridge", dist,
                             section=r.cross_section.model_dump(mode="json"), crosses=wid,
                             water_class="canal"))
             B.lines[li].attached = [ends[p] > 1 for p in (pts[0], pts[-1])]
@@ -1771,13 +1779,18 @@ def pattern_grid(B: Builder, name: str, cell, fam: GridFamily, clearance: float,
 
 
 def _ring_pts(c, r: float, step: float = 14.0):
-    n = max(24, int(2 * math.pi * r / step))
+    # (the road curves fix: chords that keep a street's outer edge, RING_HW_M out, within
+    # G.ROAD_SAG_M of its circle)
+    n = max(24, int(2 * math.pi * r / step), G.arc_steps(r + RING_HW_M, 2.0 * M.PI))
     k = np.arange(n + 1, dtype=np.float64) * (2.0 * M.PI / n)
     xs = c[0] + r * M.cos(k)
     ys = c[1] + r * M.sin(k)
     pts = [_pt(x, y) for x, y in zip(xs, ys)]
     pts[-1] = pts[0]
     return pts
+
+
+RING_HW_M = 10.0    # a radial pattern's ring street's half width, for its circle's chords
 
 
 def pattern_radial(B: Builder, name: str, cell, center, r0: float, lo: float, hi: float,
@@ -4078,9 +4091,153 @@ def _reconnect(B: Builder, edges, find, weight, vehicle: bool = False):
     return n, edges
 
 
+# ---------------------------------------------------------------------------
+# The road curves fix: local roads' corners on arcs
+# ---------------------------------------------------------------------------
+
+ROUND_DEV_M = 0.5           # a corner is rounded off by at most this (the arc's middle from it)
+ROUND_TURN_MAX_DEG = 75.0   # a sharper turn stays a corner
+ROUND_PAD_M = 0.5           # an arc's radius keeps the road's inner edge this far from its center
+ROUND_JOIN_M = 0.5          # two arcs leaving less of a chord than this straight meet
+NO_ROUND = ("pinned_road",)  # traced roads stay as drawn
+
+
+def round_corners(pts, hw: float) -> list:
+    """A polyline with each inner vertex that turns (up to ROUND_TURN_MAX_DEG) replaced by a
+    circular arc tangent to its two chords: its tangent run at most half of each chord, and
+    short enough that the arc's middle is within ROUND_DEV_M of the vertex; two arcs on one
+    chord that would leave less than ROUND_JOIN_M of it straight between them meet at one
+    point (their runs grown in proportion, where their other chords leave room), so no stub
+    is left whose offsets step back; the arc in chords within G.ROAD_SAG_M of its circle at
+    the road's outer edge (hw out). A vertex whose arc would be one chord (its turn already
+    within the sag), or whose radius would leave the inner edge under ROUND_PAD_M from the
+    center, stays. The ends stay (they are nodes). Plain arithmetic and dmath, points on the
+    grid."""
+    n = len(pts)
+    if n < 3:
+        return list(pts)
+    L = [_dist(pts[i], pts[i + 1]) for i in range(n - 1)]
+    lim = M.radians(ROUND_TURN_MAX_DEG)
+    T = [0.0] * n           # each vertex's tangent run (0: it stays)
+    geo: dict = {}
+    for i in range(1, n - 1):
+        a, p, c = pts[i - 1], pts[i], pts[i + 1]
+        ua = _unit(p[0] - a[0], p[1] - a[1])
+        uc = _unit(c[0] - p[0], c[1] - p[1])
+        cross = ua[0] * uc[1] - ua[1] * uc[0]
+        th = float(M.atan2(abs(cross), ua[0] * uc[0] + ua[1] * uc[1]))
+        if th <= 1e-6 or th > lim:
+            continue
+        t = min(0.5 * L[i - 1], 0.5 * L[i], ROUND_DEV_M / float(M.tan(th / 4.0)))
+        if t <= 0.0:
+            continue
+        R = t / float(M.tan(th / 2.0))
+        if R < hw + ROUND_PAD_M or G.arc_steps(R + hw, th) < 2:
+            continue
+        T[i] = t
+        geo[i] = (ua, uc, cross, th)
+    # (two arcs on one chord with a stub between them meet: their runs grown in proportion)
+    shared: dict = {}
+    for i in range(1, n - 2):
+        j = i + 1
+        if not (T[i] and T[j]):
+            continue
+        gap = L[i] - T[i] - T[j]
+        if gap <= 0.0 or gap >= ROUND_JOIN_M:
+            if gap <= 0.0:
+                shared[i] = ((pts[i][0] + pts[j][0]) / 2.0, (pts[i][1] + pts[j][1]) / 2.0)
+            continue
+        # (room on their other chords: half a chord at a node, else what the arc beyond
+        # leaves)
+        ri = (0.5 * L[0] if i == 1 else L[i - 1] - T[i - 1]) - T[i]
+        rj = (0.5 * L[j] if j == n - 2 else L[j] - T[j + 1]) - T[j]
+        if gap > max(ri, 0.0) + max(rj, 0.0):
+            continue
+        gi = min(max(ri, 0.0), gap * T[i] / (T[i] + T[j]))
+        gj = gap - gi
+        if gj > max(rj, 0.0):
+            gj = max(rj, 0.0)
+            gi = gap - gj
+        ti, tj = T[i] + gi, L[i] - (T[i] + gi)
+        T[i], T[j] = ti, tj
+        ua = geo[i][1]
+        shared[i] = (pts[i][0] + ua[0] * ti, pts[i][1] + ua[1] * ti)
+    out = [pts[0]]
+    for i in range(1, n - 1):
+        p = pts[i]
+        if not T[i]:
+            out.append(p)
+            continue
+        ua, uc, cross, th = geo[i]
+        t = T[i]
+        R = t / float(M.tan(th / 2.0))
+        k = G.arc_steps(R + hw, th)
+        side = 1.0 if cross > 0 else -1.0
+        t0 = shared[i - 1] if i - 1 in shared else (p[0] - ua[0] * t, p[1] - ua[1] * t)
+        t1 = shared[i] if i in shared else (p[0] + uc[0] * t, p[1] + uc[1] * t)
+        cx, cy = t0[0] - ua[1] * side * R, t0[1] + ua[0] * side * R
+        a0 = float(M.atan2(t0[1] - cy, t0[0] - cx))
+        out.append(_pt(*t0))
+        for j in range(1, k):
+            ang = a0 + side * th * j / k
+            out.append(_pt(cx + R * float(M.cos(ang)), cy + R * float(M.sin(ang))))
+        out.append(_pt(*t1))
+    out.append(pts[-1])
+    return _dedupe(out)
+
+
+def round_edges(B: Builder, edges) -> tuple[list, int]:
+    """The road curves fix: every local road's corners on arcs (`round_corners`), after the
+    graph is settled and before the segments are written, so its junctions, lanes, sidewalks,
+    blocks and everything after are built on the curve. Primary roads (M1b's own fillets),
+    footbridges, traced roads and, in a regeneration, held roads (as they were) stay."""
+    out, n = [], 0
+    for pts, li in edges:
+        ln = B.lines[li]
+        if li < B.n_primary or ln.cls == "footbridge" or ln.role in NO_ROUND or len(pts) < 3:
+            out.append((pts, li))
+            continue
+        # (a held edge, matched or not: the old city's course, its length as the old row's)
+        old = _held_course(B, pts)
+        if old is not None:
+            out.append((old, li))         # (as the old city rounded it: held, restored)
+            continue
+        new = round_corners(pts, ln.width / 2.0)
+        if new != list(pts):
+            n += 1
+        out.append((new, li))
+    return out, n
+
+
 def _held(B: Builder, pts) -> bool:
     """M10: an edge that is a held segment of the old city (never dropped)."""
     return B.frame is not None and B.frame.match(pts) is not None
+
+
+HELD_ROUND_TOL_M = 0.05    # a held edge's course off its old rounded one beyond ROUND_DEV_M
+
+
+def _held_course(B: Builder, pts) -> list | None:
+    """M10: under a regeneration's frame, the old city's held segment an edge is before its
+    corners are rounded (the same ends, its course within `ROUND_DEV_M` of the old rounded
+    one): its old centerline, in the edge's direction, so it is held and restored as it was.
+    An edge laid again may have lost a vertex where a street of the district met it once,
+    and rounded anew it came out centimeters off the old one (the hilly test city's
+    promenades beside Old Quarter), no longer matched."""
+    if B.frame is None:
+        return None
+    cands = B.frame.ends.get(_ekey(pts))
+    if not cands:
+        return None
+    line = LineString(pts)
+    for r in cands:
+        o = LineString([p[:2] for p in r.centerline])
+        if o.hausdorff_distance(line) <= ROUND_DEV_M + HELD_ROUND_TOL_M:
+            got = [(float(p[0]), float(p[1])) for p in r.centerline]
+            if (got[0][0], got[0][1]) != (float(pts[0][0]), float(pts[0][1])):
+                got = got[::-1]
+            return got
+    return None
 
 
 PIN_CLEAR_M = 15.0              # street centerline to a traced building (a 20 m street keeps 5 m)
@@ -4411,6 +4568,9 @@ def build_streets(spec: CitySpec, h, polygons: dict, district_ids: dict, waterwa
                        "old city ran them on")
     edges, n1 = node_lines(B)
     edges, n2 = clean_graph(B, edges)
+    edges, n_round = round_edges(B, edges)
+    if n_round:
+        n2 = n2 + [f"{n_round} local roads' corners rounded off on arcs"]
     build_output(B, edges)
     net = B.net
     net.lines = B.lines

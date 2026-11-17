@@ -886,11 +886,13 @@ def park_benches(c: Ctx) -> list[Cand]:
         for k, (x, y, ux, uy, _) in enumerate(walk(line, 30.0, 10.0, 8.0)):
             sgn = 1.0 if k % 2 == 0 else -1.0
             bx, by = x - uy * off * sgn, y + ux * off * sgn
-            out.append(Cand("bench", bx, by, yaw=yaw_of(ux, uy), r=0.9, keep=GROUND & ~PATH,
-                            attrs={"path": w.id}))
+            # (the road curves fix: and off the carriageway of a road the path crosses, where
+            # AG14's fit check found one on a highway's median)
+            out.append(Cand("bench", bx, by, yaw=yaw_of(ux, uy), r=0.9,
+                            keep=(GROUND & ~PATH) | CARRIAGE, attrs={"path": w.id}))
             if k % 2 == 0:
                 out.append(Cand("trash_can", bx + ux * 1.6, by + uy * 1.6, r=0.35,
-                                keep=GROUND & ~PATH))
+                                keep=(GROUND & ~PATH) | CARRIAGE))
     return out
 
 

@@ -1526,6 +1526,62 @@ carriageway) is in place, in `citygen/junctions.py` (check in `network_checks.py
   their carriageway, are noted. `walk_road_stats` gives the measure per kind.
 Outputs: `docs/progress/fix_crossings/`.
 
+The road curves fix (cars_steam's open item: roads drawn as coarse as M22's map and AG17
+took them, faceted at street level) is in place: no chord of a road's curve sags more than
+`G.ROAD_SAG_M` 2 cm at its outer edge (`geom.arc_steps(r, sweep, sag)`, M21's rule; plain
+arithmetic, dmath):
+- **Arcs at their source:** M1b's fillets (`roads._arc_line(..., hw=)`: the class's half width;
+  transit keeps M1b's 6 degree or 12 m steps; a fillet under `roads.ARC_OK` 0.98 of its
+  class's minimum radius too, as `curve_radius` passed it on main), M7's turns and loops (`elevated._turn`,
+  `_loop`), M2's ring streets (`streets._ring_pts`, `RING_HW_M`), junction corners
+  (`junctions._arc`, also the map's `_core`), cul-de-sac bulbs and bend faces
+  (`pavement._circle`, `fold_poly`). M7's diamond ramps keep their 10 m stations (finer ones
+  moved a wall light under a ramp in a Delta layout; an open item).
+- **Local roads' corners on arcs** (`streets.round_edges`, after `clean_graph`, before the
+  segments are written, so junctions, lanes, sidewalks, blocks and all after are built on the
+  curve): each inner vertex turning up to `ROUND_TURN_MAX_DEG` 75 degrees becomes an arc
+  tangent to its chords (`round_corners`: run at most half of each chord, the arc's middle
+  within `ROUND_DEV_M` 0.5 m of the vertex, its radius keeping the inner edge
+  `ROUND_PAD_M` from the center, else the vertex stays; a turn already within the sag stays;
+  two arcs leaving under `ROUND_JOIN_M` of a chord between them meet at one point). Not
+  primary roads, footbridges, traced roads or, in a regeneration, held roads (they are not
+  rounded twice).
+- **The map's stations** (`pavement.Path.stations`): a vertex nearer a stretch's end, or
+  another vertex, than its widest band edge's mitre reaches along it (`Path.reach`,
+  `_reach`) is left out, so no edge steps back between a mitre point and a square one (a
+  centimeters-long zigzag that `Road.folds` took for a fold: Vesper Bay's bend faces 81 on
+  main, 137 with the fine arcs alone, 86 with this).
+- **AG17:** draws the map as it is; a barrier run's stations leave out the vertices its mitre
+  overreaches, as the map's faces do (`barriers._clear_of_ends`); its junction corner
+  barriers keep off the crosswalks by main's crossings follow-up (`barriers._keepout`).
+- **Found on the new layouts:** a cluster's inner sidewalk cut and the crossings fix's
+  `_Carriage` buffers on the grid (`test_m2_stages_ignore_ulp_noise`); `ground_cover` leaves out overlap parts thinner than
+  `water_checks.GRID_SLIVER_M` 5 cm (a 1 cm sliver along a 322 m lot edge by a canal);
+  an elevated station's stair whose run passes through a building mass at its height gets an
+  elevator and a path (`transit.Builder._stair_blocked`, the check's own masses);
+  `walkway_building_clash` passes an entrance whose link to any of its walkway's pieces within
+  `network_checks.TIE_M` 5 cm of the nearest is clear (a later split's centimeter piece); park
+  path benches keep off the carriageways their path crosses (`CARRIAGE`); AG3's moved doors
+  try the facades facing a way first (`fronts.OUTER`, of the six nearest; a door moved onto
+  open ground faced a neighbor's back, `asset_access`; `GEN_VERSION` curves.1); in a
+  regeneration a held edge laid again whose course is within `ROUND_DEV_M` of an old
+  segment with its ends takes the old centerline (`streets._held_course`: one that lost a
+  vertex where the district's street once met it was rounded anew off its old course); a failing
+  city tries `build.LAYOUT_SALTS` 7 layouts (3 before) on its roads before another road
+  network, `CITY_RETRIES` 23 (8 before; a city passing within four layouts is unchanged).
+Every city's layout moves and falls on another draw (main's samples sit on lucky ones:
+replayed on main, Delta's layouts 1 and 3 and Vesper Bay's 1 to 3 fail): Delta builds on
+layout salt 4, Vesper Bay 7, Greyhook 2, Cragmouth, the pinned demo 1, the stack demo 2,
+Vesper Bay Decks on its third road network (road variant 3, salt 1), Saltreach and Nexus on
+their first. Road edges 1.8 to 1.9 cm of sag at p95 (15 to 19 on main), junction curbs 2.0
+(6.8); pavement vertices +13 to 15%, street pack triangles +8 to 9% (Delta 1.59 to 1.74
+million); the cars' lanes (`unreal_life.fillet`, `smooth`) now run on roads as smooth as
+they are. Regenerations: held footbridges laid again as class `footbridge` (no junction;
+as a pedestrian street one took a held street's dead end), `Frame.ends` every held segment
+(two highways on one centerline each held). Open: issue #241 (a bend junction a hilly
+regeneration lays anew, its curb 3.7 cm over its legs; that test xfail). Outputs and
+measures: `docs/progress/fix_road_curves/`.
+
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
 - **Validation:** as in "Validation" above; nothing beyond it.
@@ -2815,8 +2871,8 @@ The cars and steam fixes (after LG0, an exporter and runtime update) are in plac
   centripetal Catmull-Rom spline (`smooth`, points 1.5 m apart, neighbor lanes as end
   controls); the runtime's lanes take them, a car's heading the lane's interpolated tangent,
   its speed the lowest point speed a few meters on (`CgLife::SpeedAhead`; `DriveVmax`,
-  `DriveCruise`, `DriveVary`). The roads under them keep M22's and AG17's coarse curves (a
-  later issue).
+  `DriveCruise`, `DriveVary`). The roads under them were as coarse as M22's map drew them
+  until the road curves fix (their curves now within 2 cm).
 - **Steam and smoke off by default** (issue #223): the atmos spec's `steam`
   (`presets.STEAM_ON` False), the plan's `air.steam`, the controller's `bSteam`; the Tab
   menu's Steam and smoke row and `CityGenAtmos.Steam [0|1]`. Results:
