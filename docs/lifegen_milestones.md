@@ -353,6 +353,38 @@ open items: [`docs/progress/LG4/README.md`](progress/LG4/README.md).
   shop doors, the checks catching members off their turf and police off their walkways, the
   exporter's pack; `tests/test_bench.py` the places pass).
 
+### People idling and sitting down (people_idles, after LG8)
+
+Built on the Windows PC (2026-11-17), on main after the HLOD streaming fix (#240): LG4's and
+the people fixes' open items (mid and far people standing or sitting held the walk's passing
+pose; a sitter sat at once). The people library (`5279ccbf5d436abe`) untouched. Report, shots
+and numbers: [`docs/progress/people_idles/README.md`](progress/people_idles/README.md).
+
+- **Sitting down and standing up near:** the Game Animation Sample's bench sit-downs from five
+  sides and its stand-up (`presets.PLACE_CLIPS`, `SIT_IN`) retargeted with LG4's place clips
+  and made in the seat's frame (`people_places.seat_frame`: the root still at the seat in plan,
+  its height kept; the stretch within 1.3 m of the seat, `TRIM_CM`, is what a person plays).
+  The walk processor walks a sitter to the start of the sit-down that suits the way it comes
+  (`PickSitDown`, none from behind the bench), holds it on the seat through the sit-down and,
+  once its stay is over, the stand-up (`StepSlot`, `SitAnim`: `CgAnim::SitDown` + the side,
+  `StandUp`), then walks it off from where the stand-up ends; near plays them once from the
+  processor's clock (`PersonAnimT`).
+- **Mid:** per look a second AnimToTexture bake beside the library's (`people_places.mid_bake`,
+  `loop_window`: the library's walk, `idle_relaxed` and the sitting loop over the stretches of
+  4 to 8 s that loop best) with material instances reading it; standing people play the idle,
+  sitters the sitting loop, each at its own phase and pace (`LookData`, `CgLook`). Sitters are
+  drawn by their tier (LG4 kept them near out to 90 m).
+- **Far:** per look a still sheet (the walk's 8 rows, 4 sitting, 4 standing) on a card holding
+  one cell (custom data 12 and 13); the card reads the cells upright, fixing LG1's card, which
+  drew every far person upside down.
+- **Build:** `unreal_people.ensure_place_clips` (its key for the bakes `idle_key`, `IDLE_BAKE`;
+  runs of 48 looks), 25 minutes for Delta's 144 looks, a minute when only the script changes.
+- **Delta:** imported again, `--check` passes; `night_plan_all` 19.2 ms p95 native on the lean
+  route (walk 21.1), places off 18.0; package `builds/packaged/Delta_idles`.
+- **Open items:** no blending between clips near (a small pop as a sitter rises); mid and far
+  show the sitting loop through a sit-down; a ring of people at a slot in Old Town found sunk
+  into a raised sidewalk (an LG4 fault: a slot's point takes its walkway lane's height).
+
 ## LG6: transit
 
 Built on the Windows PC (2026-11-16), on main after the crossings fix's Unreal run (#234).

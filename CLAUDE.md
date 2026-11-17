@@ -3202,6 +3202,18 @@ LG8 (weather, reactions and release) is in place, which completes stage 4:
   20 ms budget: the slowest frames are World Partition's instanced HLOD components re-sent as
   cells stream, not lifegen's step (1.7 ms median). Results: `docs/progress/LG8/README.md`.
 
+The people idles (people_idles, after LG8) are in place: the places' clips step
+(`unreal_people.ensure_place_clips`, `citygen/ue/people_places.py`) also retargets the Game
+Animation Sample's bench sit-downs (five sides, `presets.SIT_IN`) and stand-up into the seat's
+frame (the stretch within 1.3 m of the seat played) and makes, per look, a second mid bake (the
+walk, `idle_relaxed`, the sitting loop; `IDLE_BAKE`, kept by `idle_key`, not the script) and a
+still sheet on an upright card (the library's card drew far people upside down); the library
+itself is untouched. The walk processor walks a sitter to its sit-down's start and holds it on
+the seat through the sit-down and stand-up (`CgAnim::SitDown`, `StandUp`, `IsSit`); near plays
+them, mid the baked idle and sitting loop, far a still cell (`LookData`, `CgLook`;
+`LIFE_VERSION` life11). Delta: `night_plan_all` 19.2 ms p95. Results:
+`docs/progress/people_idles/README.md`.
+
 ## Gallery site (GitHub Pages)
 
 `site/` is the public gallery at https://gotwic.github.io/CyberGen/ (served at
