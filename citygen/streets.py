@@ -535,6 +535,7 @@ class Frame:
         self.foot_done: set[int] = set()
         nodes = set()
         held_foot_nodes = set()
+        held_rows = []          # (every held segment: two may share a centerline)
         for s in model.road_segments:
             if self.inside_row(s):
                 continue
@@ -545,6 +546,7 @@ class Frame:
                 self.foot.append(s)
                 held_foot_nodes |= {s.start, s.end}
             self.rows[_ckey(s.centerline)] = s
+            held_rows.append(s)
             if "m1b_segment" in s.attrs:
                 self.m1b.setdefault(s.attrs["m1b_segment"], []).append(
                     tuple((G.q(x), G.q(y)) for x, y in s.centerline))
@@ -556,9 +558,12 @@ class Frame:
             if s.attrs.get("role") == "footbridge" and self.inside_row(s) and \
                     ({s.start, s.end} & held_foot_nodes):
                 self.foot.append(s)
-        self.ends: dict[tuple, list] = {}       # held segments by their end points
-        for k, r in self.rows.items():
-            self.ends.setdefault(_ekey(k), []).append(r)
+        # held segments by their end points (every one: two highways can run on one
+        # centerline, a ring and a spine, and only `match`'s row tells them apart; keyed by
+        # centerline alone the second hid the first, whose grade line then went unheld)
+        self.ends: dict[tuple, list] = {}
+        for r in held_rows:
+            self.ends.setdefault(_ekey(_ckey(r.centerline)), []).append(r)
         # gates: old nodes where the district's streets met a held road
         inner = set()
         for s in model.road_segments:
@@ -719,7 +724,10 @@ class Frame:
         for r in pieces:
             pts = [(G.q(x), G.q(y)) for x, y in r.centerline]
             dist = next((n for n, d in B.did.items() if d == r.attrs.get("district")), None)
-            li = B.add(Line(pts, r.road_class, r.width_m, "footbridge", dist,
+            # (class footbridge, as `footbridges` lays one: it takes no junction; the model's
+            # row says pedestrian, and as one it took a held street's dead end the old city
+            # had run on to the promenade, the small test city's Old Quarter beside Core)
+            li = B.add(Line(pts, "footbridge", r.width_m, "footbridge", dist,
                             section=r.cross_section.model_dump(mode="json"), crosses=wid,
                             water_class="canal"))
             B.lines[li].attached = [ends[p] > 1 for p in (pts[0], pts[-1])]
