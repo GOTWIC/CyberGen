@@ -17,6 +17,7 @@
 // was (ApplyClothing says why).
 
 #include "CityGenLifeActor.h"
+#include "CityGenLifeISM.h"
 #include "CityGenLifeTypes.h"
 #include "Algo/Sort.h"
 #include "AnimationRuntime.h"
@@ -153,7 +154,8 @@ float ACityGenLife::WalkRate(const int32 P) const
 	// the clip's own speed against the person's pace: how fast the walk plays
 	const int32 G = PersonGait.IsValidIndex(P) ? PersonGait[P] : 0;
 	const float ClipV = WalkClipSpeeds.IsValidIndex(G) && WalkClipSpeeds[G] > 0.1f ? WalkClipSpeeds[G] : 1.3f;
-	const float Pace = PersonPace.IsValidIndex(P) ? PersonPace[P] : 1.35f;
+	// (LG8: faster in the rain, by the weather's pace)
+	const float Pace = (PersonPace.IsValidIndex(P) ? PersonPace[P] : 1.35f) * PaceNow;
 	return FMath::Clamp(Pace / ClipV, 0.5f, 2.0f);
 }
 
@@ -289,7 +291,9 @@ void ACityGenLife::LookData(const int32 P, const bool bStill, float Mid[14], flo
 	// stride rate so slow it does not move, its offset putting the cell's middle at now)
 	const int32 NC = FMath::Max(1, MidMeshes.Num());
 	const int32 C = PersonChar.IsValidIndex(P) ? FMath::Clamp(PersonChar[P], 0, NC - 1) : P % NC;
-	const float Rate = FMath::Max(0.05f, WalkRate(P));
+	// (LG8: running from a danger, the baked walk played at the flight's pace)
+	const bool bRun = WalkAnimG.IsValidIndex(P) && WalkAnimG[P] == CgAnim::Run;
+	const float Rate = FMath::Max(0.05f, WalkRate(P) * (bRun ? FMath::Clamp(FleePace, 1.f, 3.f) : 1.f));
 	const float T0 = PhaseOffset(P);
 	const float Tint[3] = {
 		PersonTint.IsValidIndex(3 * P) ? PersonTint[3 * P] : 0.5f,
@@ -339,7 +343,7 @@ void ACityGenLife::MakePeople()
 	FarComps.Reset();
 	auto Make = [this](const FString& Name, UStaticMesh* Mesh, UMaterialInterface* Mat, const int32 Floats, const bool bShadow, const float CullM)
 	{
-		UInstancedStaticMeshComponent* C = NewObject<UInstancedStaticMeshComponent>(this, *Name);
+		UInstancedStaticMeshComponent* C = NewObject<UCgLifeISM>(this, *Name);
 		C->SetMobility(EComponentMobility::Movable);
 		C->SetupAttachment(RootComponent);
 		C->SetStaticMesh(Mesh);
@@ -355,6 +359,7 @@ void ACityGenLife::MakePeople()
 		C->NumCustomDataFloats = Floats;
 		C->SetCullDistances(0, (int32)(CullM * 100.f));
 		C->RegisterComponent();
+		FixBounds(C);
 		return C;
 	};
 	MidGarment.Reset();
@@ -524,6 +529,10 @@ void ACityGenLife::Assign(const int32 S, const int32 P)
 		Comp->bEnableUpdateRateOptimizations = true;
 		Comp->SetDisablePostProcessBlueprint(true);
 		Comp->bPropagateCurvesToFollowers = false;
+		// (LG8's performance pass: the leader's bounds from its physics asset, fixed, the
+		// followers' its own: no bounds measured over every mesh's bones every frame)
+		Comp->bComponentUseFixedSkelBounds = Slot.Comps.Num() == 0;
+		Comp->bUseBoundsFromLeaderPoseComponent = Slot.Comps.Num() > 0;
 		Comp->RegisterComponent();
 		NearComps.Add(Comp);
 		Slot.Comps.Add(Comp);
@@ -542,13 +551,28 @@ void ACityGenLife::Assign(const int32 S, const int32 P)
 				Comp->SetLeaderPoseComponent(Mesh ? Lead : nullptr);
 			}
 			// (the garments: a dynamic instance a slot, which takes each person's own colors and
-			// wear; LG2's are instances of M_CgGarment under People/Materials/Garments)
+			// wear; LG2's are instances of M_CgGarment under People/Materials/Garments. LG8: one
+			// per slot and parent material, made once and kept: a slot taking another person
+			// reuses it, so no material instance becomes garbage as people come and go near the
+			// view (they had kept the garbage collector busy, 2 to 5 ms a frame on the walk))
 			for (int32 M = 0; Mesh && M < Comp->GetNumMaterials(); ++M)
 			{
-				const UMaterialInterface* Mat = Comp->GetMaterial(M);
+				UMaterialInterface* Mat = Comp->GetMaterial(M);
 				if (Mat && (Mat->GetName().Contains(TEXT("Garment")) || Mat->GetPathName().Contains(TEXT("/Garments/"))))
 				{
-					Comp->CreateDynamicMaterialInstance(M);
+					const uint64 Key = ((uint64)(uint32)S << 32) | (uint64)Mat->GetUniqueID();
+					UMaterialInstanceDynamic* D = nullptr;
+					if (const TObjectPtr<UMaterialInstanceDynamic>* Have = NearMIDOf.Find(Key))
+					{
+						D = Have->Get();
+					}
+					if (!D)
+					{
+						D = UMaterialInstanceDynamic::Create(Mat, this);
+						NearMIDs.Add(D);
+						NearMIDOf.Add(Key, D);
+					}
+					Comp->SetMaterial(M, D);
 				}
 			}
 		}
@@ -801,7 +825,13 @@ void ACityGenLife::UpdatePeople()
 				const int32 Group = CharClipGroup.IsValidIndex(C) ? CharClipGroup[C] : 0;
 				uint8 ClipWant = bStill ? 1 : 0;
 				UAnimSequence* PlaceClip = nullptr;
-				if (Anim == CgAnim::Sit && SitClips.IsValidIndex(Group) && SitClips[Group])
+				if (Anim == CgAnim::Run && !bStill)
+				{
+					// (LG8: running from a danger: the places' run clip, else its walk faster)
+					ClipWant = 200;
+					PlaceClip = RunClips.IsValidIndex(Group) ? RunClips[Group].Get() : nullptr;
+				}
+				else if (Anim == CgAnim::Sit && SitClips.IsValidIndex(Group) && SitClips[Group])
 				{
 					ClipWant = 2;
 					PlaceClip = SitClips[Group].Get();
@@ -825,7 +855,23 @@ void ACityGenLife::UpdatePeople()
 				Lead->SetWorldLocationAndRotation(Root, FRotator(0.f, WalkYaw[P] + MeshYaw, 0.f), false, nullptr, ETeleportType::TeleportPhysics);
 				Lead->SetWorldScale3D(FVector(Scale));
 				// (LG3: standing, at a signal or behind someone: the idle; walking, the walk)
-				if (bCity && NearSlots[S].Clip != ClipWant)
+				if (bCity && NearSlots[S].Clip != ClipWant && ClipWant == 200)
+				{
+					// (LG8: the run: its clip at the runner's speed over the clip's (about 3.6 m/s),
+					// else the walk at the flight's pace)
+					const int32 Gait = PersonGait.IsValidIndex(P) ? FMath::Clamp(PersonGait[P], 0, FMath::Max(0, Gaits - 1)) : 0;
+					const int32 G = FMath::Clamp(Group * FMath::Max(1, Gaits) + Gait, 0, FMath::Max(0, WalkClips.Num() - 1));
+					UAnimSequence* Clip = PlaceClip ? PlaceClip : (WalkClips.IsValidIndex(G) ? WalkClips[G].Get() : nullptr);
+					if (Clip)
+					{
+						const float V = (PersonPace.IsValidIndex(P) ? PersonPace[P] : 1.35f) * FleePace * PaceNow;
+						Lead->PlayAnimation(Clip, true);
+						Lead->SetPlayRate(PlaceClip ? FMath::Clamp(V / 3.6f, 0.7f, 1.5f) : FMath::Clamp(WalkRate(P) * FleePace, 0.5f, 3.f));
+						NearSlots[S].Gait = INDEX_NONE;
+					}
+					NearSlots[S].Clip = ClipWant;
+				}
+				else if (bCity && NearSlots[S].Clip != ClipWant)
 				{
 					const bool bStand = ClipWant != 0;
 					UAnimSequence* Clip = PlaceClip;
@@ -874,9 +920,11 @@ void ACityGenLife::UpdatePeople()
 		FarXf[C][I] = Tier == 2 ? FTransform(FRotator(0.f, WalkYaw[P], 0.f), At, FVector(Scale)) : Hidden;
 		PersonTier[P] = Tier;
 		// (LG3: a mid or far person standing still holds its walk's frame)
-		if (bCity && (Tier == 1 || Tier == 2) && PersonStill.IsValidIndex(P) && PersonStill[P] != (uint8)bStill)
+		// (LG8: running from a danger, its walk played faster: 2)
+		const uint8 Look = bStill ? 1 : ((WalkAnimG.IsValidIndex(P) && WalkAnimG[P] == CgAnim::Run) ? 2 : 0);
+		if (bCity && (Tier == 1 || Tier == 2) && PersonStill.IsValidIndex(P) && PersonStill[P] != Look)
 		{
-			PersonStill[P] = (uint8)bStill;
+			PersonStill[P] = Look;
 			ApplyLook(P, bStill);
 		}
 	}
@@ -909,7 +957,8 @@ void ACityGenLife::UpdatePeople()
 			}
 			MidSeen[K] = Now;
 		}
-		if (FarComps.IsValidIndex(K) && FarComps[K] && FarXf[K].Num() && (!bCity || ((Ticks + K) & 1) == 0 || !FarSeen[K]))
+		// (LG8: every third frame: a far card 90 to 300 m off moves a few centimeters a frame)
+		if (FarComps.IsValidIndex(K) && FarComps[K] && FarXf[K].Num() && (!bCity || ((Ticks + K) % 3) == 0 || !FarSeen[K]))
 		{
 			const uint8 Now = Any(FarXf[K]) ? 1 : 0;
 			if (Now || FarSeen[K])

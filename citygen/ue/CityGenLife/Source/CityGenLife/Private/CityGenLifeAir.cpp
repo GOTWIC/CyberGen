@@ -13,6 +13,7 @@
 // flashing ones (strobes, beacons, police bars) drawn only while lit.
 
 #include "CityGenLifeActor.h"
+#include "CityGenLifeISM.h"
 #include "Algo/BinarySearch.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
@@ -210,7 +211,7 @@ void ACityGenLife::BuildAirWater()
 			else
 			{
 				const int32 Floats = AwMeshFloats.IsValidIndex(Mesh) ? AwMeshFloats[Mesh] : AwStandIn;
-				UInstancedStaticMeshComponent* Comp = NewObject<UInstancedStaticMeshComponent>(this, *FString::Printf(TEXT("AirWater%d"), AwComps.Num()));
+				UInstancedStaticMeshComponent* Comp = NewObject<UCgLifeISM>(this, *FString::Printf(TEXT("AirWater%d"), AwComps.Num()));
 				Comp->SetMobility(EComponentMobility::Movable);
 				Comp->SetupAttachment(RootComponent);
 				Comp->SetStaticMesh(AwMeshes[Mesh]);
@@ -232,6 +233,7 @@ void ACityGenLife::BuildAirWater()
 					Comp->SetCullDistances(0, (int32)(100.f * Pt[8]));
 				}
 				Comp->RegisterComponent();
+				FixBounds(Comp);
 				C = AwComps.Add(Comp);
 				AwXf.AddDefaulted();
 				Data.AddDefaulted();

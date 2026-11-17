@@ -53,7 +53,10 @@ float ACityGenLife::Want(const int32 Lane) const
 	const int32 D = LaneDistrictArr.IsValidIndex(Lane) ? LaneDistrictArr[Lane] : INDEX_NONE;
 	const int32 H = ((Hour % 24) + 24) % 24;
 	const float Shape = (D >= 0 && DistrictShape.IsValidIndex(24 * D + H)) ? DistrictShape[24 * D + H] : 1.f;
-	return WalkPeople.IsValidIndex(5 * Lane + B) ? WalkPeople[5 * Lane + B] * Shape * CrowdScale : 0.f;
+	// (LG8: nightlife's people round the open bars, clubs and arcades on top; out of doors by the
+	// weather's share)
+	const float Night = WalkNight.IsValidIndex(5 * Lane + B) ? WalkNight[5 * Lane + B] : 0.f;
+	return WalkPeople.IsValidIndex(5 * Lane + B) ? (WalkPeople[5 * Lane + B] * Shape + Night) * CrowdScale * OutNow : 0.f;
 }
 
 int32 ACityGenLife::GroupSize(FRandomStream& Rng) const
@@ -404,13 +407,15 @@ void ACityGenLife::FreeRole(const int32 Slot)
 int32 ACityGenLife::TakeSlot(const int32 D, FRandomStream& Rng)
 {
 	const int32 G = OutfitGroupCount;
-	if (D >= 0 && G > 0 && PersonGroup.Num() && DistrictGroups.IsValidIndex(D * G + G - 1))
+		if (D >= 0 && G > 0 && PersonGroup.Num() && DistrictGroups.IsValidIndex(D * G + G - 1))
 	{
 		float X = Rng.FRand(), Acc = 0.f;
 		int32 Want = G - 1;
+		// (LG8: the district's groups in clear weather, the rain looks' share by the weather now)
+		const float Rs = (RainGroup >= 0 && RainGroup < G && IsWeather()) ? FMath::Clamp(RainLooksNow, 0.f, 1.f) : 0.f;
 		for (int32 K = 0; K < G; ++K)
 		{
-			Acc += DistrictGroups[D * G + K];
+			Acc += DistrictGroups[D * G + K] * (1.f - Rs) + (K == RainGroup ? Rs : 0.f);
 			if (X < Acc)
 			{
 				Want = K;

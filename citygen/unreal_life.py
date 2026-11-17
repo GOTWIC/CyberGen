@@ -50,14 +50,16 @@ import json
 import math
 from pathlib import Path
 
-PACK_VERSION = 8            # 2 (cars_steam): smoothed drive lanes, their speeds; 3 (LG3): the
+PACK_VERSION = 9            # 2 (cars_steam): smoothed drive lanes, their speeds; 3 (LG3): the
                             # city's crowd (every walkway, doors, signals, the pool); 4 (LG5):
                             # the city's traffic (every lane, signals, conflicts, the pool); 5 (LG2):
                             # looks for people, their groups, dye colors and wear; 6 (LG4): slots,
                             # places by their hours, gangs, police patrols and cars, the
                             # places' clips; 7 (LG6): transit's lines, timetables, stops and
                             # trains, the platforms' walkways kept off their trains; 8
-                            # (LG7): air and water routes, their models and paints
+                            # (LG7): air and water routes, their models and paints; 9 (LG8):
+                            # the weather's table, umbrellas, shelter stretches, nightlife,
+                            # the clear weather's groups, the reactions' settings
 DATA = "life.json"
 CONTROLLER_KEY = "life"
 MARGIN_M = 60.0             # lanes this far past the live radius come along (links out of it)
@@ -499,7 +501,10 @@ def people_library(lib: dict | None, spike: dict) -> dict:
     if pg and all(k in pg for k in keys):
         place = {"sit_clips": [(pg[k].get("sit") or {}).get("anim", "") for k in keys],
                  "talk_clips": [(pg[k].get(c) or {}).get("anim", "") for k in keys for c in talk],
-                 "talk_count": len(talk), "places_hash": pc.get("hash")}
+                 "talk_count": len(talk), "places_hash": pc.get("hash"),
+                 # (LG8: the run, where the places' clips have it)
+                 "run_clips": [(pg[k].get("run") or {}).get("anim", "") for k in keys]
+                 if all((pg[k].get("run") or {}).get("anim") for k in keys) else []}
     return {**place, "near_meshes": near, "near_mesh_starts": starts,
             "near_hair": [c["near"].get("hair") or "" for c in chars],
             "char_clip_group": [keys.index(c["skeleton"]) if c.get("skeleton") in keys else 0
@@ -564,12 +569,21 @@ def pack_crowd(plan: dict, pdir: Path, graphs: dict) -> dict:
             windows += [float(s["cycle_s"]), float(s["offset_s"]), float(p["start_s"]),
                         round(float(p["start_s"]) + float(p["walk_s"]), 3)]
     kinds, dist, ppl, sig = [], [], [], []
+    # (LG8: each walkway's stretches out of the rain, [from, to] m, and its nightlife per band)
+    cov_starts, cov, night = [0], [], []
+    any_night = False
     for e in walk:
         r = rows.get(gids[e[0]]) or {}
         kinds.append(codes.get(e[1], path))
         dist.append(didx.get(r.get("district_id"), -1))
         ppl += [round(float(v), 4) for v in (r.get("people") or [0.0] * 5)]
         sig.append(win.get((r.get("signal"), r.get("phase")), -1))
+        for a, b in r.get("cover") or []:
+            cov += [round(float(a), 2), round(float(b), 2)]
+        cov_starts.append(len(cov) // 2)
+        nv = r.get("night")
+        any_night |= bool(nv)
+        night += [round(float(v), 3) for v in (nv or [0.0] * 5)]
     hour = int(crowd["hour"])
     dl, dd, dp, dr = [], [], [], []
     # (LG4: each door's rates every hour, its place's open hours as 24 bits, visit chance by
@@ -620,7 +634,10 @@ def pack_crowd(plan: dict, pdir: Path, graphs: dict) -> dict:
             for cols in rows_:
                 for k in range(ncol):
                     opal += _lin(cols[k % len(cols)])
-            ogrp += [float(v) for v in of["district_groups"].get(d["id"]) or
+            # (LG8: the clear weather's groups where the plan has them: the runtime blends in
+            # the rain looks by atmosgen's rain)
+            src = of.get("district_groups_clear") or of["district_groups"]
+            ogrp += [float(v) for v in src.get(d["id"]) or
                      [1.0 / len(of["groups"])] * len(of["groups"])]
             owear.append(float(of["wear"].get(d["id"], 0.3)))
     av, sp = crowd["avoid"], crowd["speeds"]
@@ -632,6 +649,10 @@ def pack_crowd(plan: dict, pdir: Path, graphs: dict) -> dict:
         out.update(pack_places(plan, walk, gids, lane_of, rows, slots, door_index))
         out.update({"door_rates_h": drh, "door_open": dopen, "door_visit": dvisit,
                     "door_dwell": ddwell, "door_police": dpolice})
+    if plan.get("weather"):
+        out.update(pack_weather(plan["weather"], of))
+        out.update({"walk_cover_starts": cov_starts, "walk_cover": cov,
+                    "walk_night": night if any_night else []})
     out.update({"walk_kinds": kinds, "walk_district": dist, "walk_people": ppl,
                 "walk_signal": sig, "signal_windows": windows,
                 "district_ids": dids, "district_shape": shape, "district_danger": danger,
@@ -653,6 +674,40 @@ def pack_crowd(plan: dict, pdir: Path, graphs: dict) -> dict:
                           "elevator": float(sp["elevator"])},
                 **ps})
     return out
+
+
+UMBRELLA_MESHES = {"canopy": "/Engine/BasicShapes/Cone", "shaft": "/Engine/BasicShapes/Cylinder"}
+
+
+def pack_weather(w: dict, outfits: dict) -> dict:
+    """LG8: the weather's table (per state of `weather.states`, `WEATHER_KEYS` floats, and its
+    rain rate), the plan's own state, the rain looks' group, the umbrellas (canopy colors, lit
+    shaft colors, share lit, their size and hold), shelter (the stand's length) and the
+    reactions' settings, flat."""
+    names = list(w["states"])
+    keys = list(w["keys"])
+    u = w["umbrella"]
+    rx = w["reactions"]
+    return {"weather_names": names, "weather_keys": keys,
+            "weather_life": [float(w["states"][n][k]) for n in names for k in keys],
+            "weather_rain": [float(w["rain"].get(n, 0.0)) for n in names],
+            "weather_plan": w["state"],
+            "rain_group": int(outfits.get("rain_group", -1)) if outfits else -1,
+            "umbrella_colors": [float(v) for c in u["colors"] for v in c],
+            "umbrella_lit": [float(v) for c in u["lit"] for v in c],
+            "umbrella": [float(u[k]) for k in ("lit_share", "canopy_m", "canopy_h_m", "height",
+                                               "side_m", "fwd_m", "tilt_deg", "shaft_m")],
+            "umbrella_meshes": dict(UMBRELLA_MESHES),
+            "shelter_s": [float(v) for v in w["shelter"]["dwell_s"]],
+            "reactions": {"look": bool(rx.get("look", True)), "flee": bool(rx.get("flee", True)),
+                          "gather": bool(rx.get("gather", True)),
+                          "look_m": float(rx["look_m"]), "flee_m": float(rx["flee_m"]),
+                          "flee_s": float(rx["flee_s"]), "flee_pace": float(rx["flee_pace"]),
+                          "gather_m": float(rx["gather_m"]), "gather_s": float(rx["gather_s"]),
+                          "gather_share": float(rx["gather_share"]),
+                          "ring_m": [float(v) for v in rx["ring_m"]],
+                          "stay_s": [float(v) for v in rx["stay_s"]]},
+            "stuck": {k: float(v) for k, v in (w.get("traffic") or {}).items()}}
 
 
 def pack_places(plan: dict, walk: list, gids: list, lane_of: dict, rows: dict, slots: list,

@@ -141,6 +141,38 @@ struct FCgLifeFrame
 	/** Out: people gone into a train this frame. */
 	int32 Boarded = 0;
 
+	// --- LG8: the weather and reactions -------------------------------------------------------
+	/** Per walkway lane its stretches out of the rain [CoverStarts[l], CoverStarts[l + 1]) of
+	 *  Cover (pairs: from, to, cm along it); out: per instance 1 while it is under one. */
+	const TArray<int32>* CoverStarts = nullptr;
+	const TArray<float>* Cover = nullptr;
+	TArray<uint8>* Covered = nullptr;
+	/** The weather now (atmosgen's state and rain): the pace's multiplier, a passer-by's chance
+	 *  to stop under a cover it passes, and for how long (s). */
+	float PaceMul = 1.f;
+	float ShelterP = 0.f;
+	FVector2D ShelterS = FVector2D(25.0, 140.0);
+	/** People standing still within LookCm of the player turn to look at it. */
+	bool bLook = true;
+	float LookCm = 600.f;
+	/** A danger (Panic): where (UE cm), its reach, until when people flee and until when they
+	 *  gather; its number (each person reacts to each danger once); the fleeing pace's
+	 *  multiplier; the share gathering within GatherCm, the ring they stop on (cm), how long
+	 *  they stay (s). */
+	FVector PanicAt = FVector::ZeroVector;
+	float PanicCm = 0.f;
+	double PanicUntil = -1.0;
+	double GatherUntil = -1.0;
+	int32 PanicId = 0;
+	float FleeMul = 2.4f;
+	bool bGather = true;
+	float GatherCm = 6000.f;
+	float GatherShare = 0.35f;
+	FVector2D RingCm = FVector2D(900.0, 2200.0);
+	FVector2D StayS = FVector2D(15.0, 60.0);
+	/** Out: counts this frame. */
+	int32 Fleeing = 0, Gawking = 0, Looking = 0, Sheltering = 0;
+
 	// --- LG5: the city's traffic ----------------------------------------------------------------
 	bool bTraffic = false;
 	/** Per lane (every lane of the storage; walkways 0): on the lane graph's largest strongly
@@ -167,9 +199,12 @@ struct FCgLifeFrame
 	float AmberBrake = 350.f, StarveS = 6.f, ForceS = 25.f;
 	float YieldCm = 18000.f, LookS = 1.6f, LookMinCm = 800.f, LookMaxCm = 4500.f, LatCm = 145.f;
 	float PredictS = 1.f, MarginCm = 200.f;
+	/** LG8: the weather's share of each lane's speed and the time headway it adds (s); a car
+	 *  standing StuckS in a queue past StuckFarCm of the view leaves. */
+	float SpeedMul = 1.f, HeadwayAdd = 0.f, StuckS = 75.f, StuckFarCm = 15000.f;
 	/** Out: counts this frame (cars by why they slow, moving, freed at the live region's edge). */
 	int32 CarsWhy[7] = {0, 0, 0, 0, 0, 0, 0};
-	int32 CarsMoving = 0, CarsActive = 0, CarsLeft = 0, CarsForced = 0;
+	int32 CarsMoving = 0, CarsActive = 0, CarsLeft = 0, CarsForced = 0, CarsStuck = 0;
 	/** The cars' step's own time (ms, this frame). */
 	double TrafficMs = 0.0;
 };

@@ -229,7 +229,8 @@ float ACityGenLife::TrafficWant(const int32 J) const
 	const int32 D = DriveDistrict.IsValidIndex(J) ? DriveDistrict[J] : INDEX_NONE;
 	const int32 H = ((Hour % 24) + 24) % 24;
 	const float Shape = (D >= 0 && DistrictShape.IsValidIndex(24 * D + H)) ? DistrictShape[24 * D + H] : 1.f;
-	return DriveCars.IsValidIndex(5 * J + B) ? DriveCars[5 * J + B] * Shape * TrafficScale : 0.f;
+	// (LG8: the weather's share of the cars)
+	return DriveCars.IsValidIndex(5 * J + B) ? DriveCars[5 * J + B] * Shape * TrafficScale * CarsNow : 0.f;
 }
 
 void ACityGenLife::SpawnCarPool()
@@ -1132,7 +1133,7 @@ void UCityGenLifeDriveProcessor::ExecuteTraffic(FMassExecutionContext& Context)
 	{
 		F.CarsWhy[K] = 0;
 	}
-	F.CarsMoving = F.CarsActive = F.CarsLeft = F.CarsForced = 0;
+	F.CarsMoving = F.CarsActive = F.CarsLeft = F.CarsForced = F.CarsStuck = 0;
 
 	// (1) the live cars sorted by lane and distance; who drives, holds or claims each connector
 	if (LaneFirst.Num() != NL)
@@ -1187,7 +1188,9 @@ void UCityGenLifeDriveProcessor::ExecuteTraffic(FMassExecutionContext& Context)
 			++Occ[C.Reserved];
 			Touch(C.Reserved);
 		}
-		if (C.Wait > F.StarveS && C.Next != INDEX_NONE && Conn[C.Next] && C.Reserved != C.Next)
+		// (LG8: a car waiting for room past the junction claims nothing: its claim would hold the
+		// crossing cars that make the room)
+		if (C.Wait > F.StarveS && C.Why != CgWhy::Box && C.Next != INDEX_NONE && Conn[C.Next] && C.Reserved != C.Next)
 		{
 			if (ClaimBy[C.Next] == INDEX_NONE || ClaimWait[C.Next] < C.Wait)
 			{
@@ -1269,7 +1272,8 @@ void UCityGenLifeDriveProcessor::ExecuteTraffic(FMassExecutionContext& Context)
 		C.Pending = 0.f;
 		const float L = Len[C.Lane];
 		const float V = C.Speed;
-		const float V0 = FMath::Max(150.f, C.Share * SpeedOn(S, F.PointVmax, C.Lane, C.Dist, FMath::Max(400.f, V * 0.6f)));
+		// (LG8: slower in rain and fog, by the weather's share)
+		const float V0 = FMath::Max(150.f, F.SpeedMul * C.Share * SpeedOn(S, F.PointVmax, C.Lane, C.Dist, FMath::Max(400.f, V * 0.6f)));
 		const float Front = C.Dist + 0.5f * C.Len;
 		const float ToEnd = L - Front;
 		float Term = 0.f;           // the strongest interaction (s* / s)^2
@@ -1287,7 +1291,7 @@ void UCityGenLifeDriveProcessor::ExecuteTraffic(FMassExecutionContext& Context)
 				}
 				return;
 			}
-			const float SStar = F.GapCm + FMath::Max(0.f, V * F.Headway + V * (V - VLead) / (2.f * SqrtAB));
+			const float SStar = F.GapCm + FMath::Max(0.f, V * (F.Headway + F.HeadwayAdd) + V * (V - VLead) / (2.f * SqrtAB));
 			const float T = FMath::Square(SStar / Gap);
 			if (T > Term)
 			{
@@ -1362,10 +1366,16 @@ void UCityGenLifeDriveProcessor::ExecuteTraffic(FMassExecutionContext& Context)
 					}
 				}
 				// (room past the junction: the lane it leads to has the car's length and gap
-				// clear at its start, counting the cars already on the connector)
+				// clear at its start, counting the cars already on the connector; LG8: on every
+				// exit, not only the long ones: an exit lane shorter than the car and its gap (Old
+				// Town's 5.8 m lanes between two junctions of a cluster) has room only while it is
+				// empty and the lanes past it start clear by what the car would stick out of it, so
+				// no car waits inside a junction behind one waiting at the next, the gridlock LG5's
+				// cars met there)
 				const int32 Exit = C.Next2;
-				if (bFree && Exit != INDEX_NONE && !Conn[Exit] && Len[Exit] > 2.f * (C.Len + F.GapCm))
+				if (bFree && Exit != INDEX_NONE && !Conn[Exit])
 				{
+					const float Need = C.Len + F.GapCm;
 					float Room = LaneFirst[Exit] != INDEX_NONE ? Sorted[LaneFirst[Exit]]->Dist - 0.5f * Sorted[LaneFirst[Exit]]->Len : Len[Exit];
 					if (LaneFirst[C.Next] != INDEX_NONE)
 					{
@@ -1374,13 +1384,33 @@ void UCityGenLifeDriveProcessor::ExecuteTraffic(FMassExecutionContext& Context)
 							Room -= Sorted[K]->Len + F.GapCm;
 						}
 					}
-					if (Room < C.Len + F.GapCm)
+					bool bRoom = Room >= FMath::Min(Need, Len[Exit] - 30.f);
+					if (bRoom && Len[Exit] < Need)
+					{
+						// (a short exit: empty, and the lanes after it clear at their starts)
+						bRoom = LaneFirst[Exit] == INDEX_NONE;
+						const FZoneLaneData& XL = S.Lanes[Exit];
+						for (int32 Q = XL.LinksBegin; Q < XL.LinksEnd && bRoom; ++Q)
+						{
+							const FZoneLaneLinkData& Lk = S.LaneLinks[Q];
+							const int32 To = Lk.DestLaneIndex;
+							if (Lk.Type != EZoneLaneLinkType::Outgoing || !LaneFirst.IsValidIndex(To) || LaneFirst[To] == INDEX_NONE)
+							{
+								continue;
+							}
+							const FCgLifeCar& O = *Sorted[LaneFirst[To]];
+							bRoom = O.Dist - 0.5f * O.Len >= Need - Len[Exit];
+						}
+					}
+					if (!bRoom)
 					{
 						bFree = false;
 						Reason = CgWhy::Box;
 					}
 				}
-				if (!bFree && C.Wait > F.ForceS)
+				// (forced after ForceS of waiting for a crossing connector; never into a full box:
+				// that only blocks the junction for the others)
+				if (!bFree && C.Wait > F.ForceS && Reason != CgWhy::Box)
 				{
 					bFree = true;
 					++F.CarsForced;
@@ -1556,6 +1586,14 @@ void UCityGenLifeDriveProcessor::ExecuteTraffic(FMassExecutionContext& Context)
 		C.Spin = FMath::Fmod(C.Spin + 0.5f * (V + NewV) * Dt, 1.0e6f);
 		// onto its next lane at its end; off the live region, it leaves
 		bool bGone = false;
+		// (LG8: standing still too long where nobody sees it (a queue held by a jam), it leaves:
+		// its lane is refilled as any)
+		C.Stuck = NewV < 30.f && C.Why != CgWhy::Red ? C.Stuck + Dt : 0.f;
+		if (C.Stuck > F.StuckS && DView2 > FMath::Square((double)F.StuckFarCm))
+		{
+			bGone = true;
+			++F.CarsStuck;
+		}
 		for (int32 Guard = 0; Guard < 4 && C.Dist > Len[C.Lane]; ++Guard)
 		{
 			const float Over = FMath::Min(C.Dist - Len[C.Lane], 300.f);

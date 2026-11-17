@@ -3,8 +3,8 @@
 // CityGenLife.Respawn PEOPLE CARS: as many again on the spike's lanes; CityGenLife.Clothing
 // [0|1]: the people's clothes drawn or not (a debug switch); CityGenLife.Transit [0|1] and
 // CityGenLife.TransitShow WHAT (LG6); CityGenLife.Air [0|1], CityGenLife.Water [0|1] and
-// CityGenLife.AirShow WHAT (LG7); CityGenLife.Status: the state as one JSON line
-// (CITYGEN_LIFE_STATUS).
+// CityGenLife.AirShow WHAT (LG7); CityGenLife.FollowAtmos, .Weather, .Panic, .WeatherShow
+// (LG8); CityGenLife.Status: the state as one JSON line (CITYGEN_LIFE_STATUS).
 
 #include "CityGenLifeActor.h"
 #include "HAL/IConsoleManager.h"
@@ -97,13 +97,63 @@ namespace
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs HourCmd(TEXT("CityGenLife.Hour"),
-		TEXT("CityGenLife.Hour H: LG3's crowd at hour H (0 to 23), the live walkways filled again"),
+		TEXT("CityGenLife.Hour H: LG3's crowd at hour H (0 to 23), the live walkways filled again; LG8: life stops following atmosgen's hour (CityGenLife.FollowAtmos 1 again)"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 		{
 			ACityGenLife* A = LifeIn(World);
 			if (A && Args.Num())
 			{
+				A->bFollowAtmos = false;
 				A->SetHour(FCString::Atoi(*Args[0]));
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs FollowCmd(TEXT("CityGenLife.FollowAtmos"),
+		TEXT("CityGenLife.FollowAtmos [0|1]: LG8: life at atmosgen's hour and weather (1, the default) or its own (CityGenLife.Hour, CityGenLife.Weather)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (ACityGenLife* A = LifeIn(World))
+			{
+				A->SetFollowAtmos(Args.Num() ? FCString::Atoi(*Args[0]) != 0 : !A->bFollowAtmos);
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs WeatherCmd(TEXT("CityGenLife.Weather"),
+		TEXT("CityGenLife.Weather clear|drizzle|rain|fog|smog|auto|off: LG8: life's weather held at a state, atmosgen's again (auto), or none (off: clear whatever the sky shows)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (ACityGenLife* A = LifeIn(World))
+			{
+				A->SetWeather(Args.Num() ? Args[0] : FString(TEXT("auto")));
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs PanicCmd(TEXT("CityGenLife.Panic"),
+		TEXT("CityGenLife.Panic [RADIUS_M] [SECONDS] [X Y Z]: LG8: a danger where the player is (or at citygen X Y Z m): people within it run away, then some come back to look"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (ACityGenLife* A = LifeIn(World))
+			{
+				const float R = Args.Num() > 0 ? FCString::Atof(*Args[0]) : 0.f;
+				const float S = Args.Num() > 1 ? FCString::Atof(*Args[1]) : 0.f;
+				if (Args.Num() > 4)
+				{
+					A->Panic(FVector(100.0 * FCString::Atod(*Args[2]), -100.0 * FCString::Atod(*Args[3]), 100.0 * FCString::Atod(*Args[4])), R, S);
+				}
+				else
+				{
+					A->PanicAtPlayer(R, S);
+				}
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs WeatherShowCmd(TEXT("CityGenLife.WeatherShow"),
+		TEXT("CityGenLife.WeatherShow umbrella|shelter|look|flee|gather|moving: LG8: the camera moved to the nearest person holding an umbrella, under a cover, looking at the player, running from a danger, looking at it (the check's shots)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (ACityGenLife* A = LifeIn(World))
+			{
+				A->ShowWeather(Args.Num() ? Args[0] : FString(TEXT("umbrella")));
 			}
 		}));
 

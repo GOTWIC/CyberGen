@@ -291,12 +291,12 @@
    "description": "Decision 12.8: stepping aside and looking; fleeing and gathering are a later hook.",
    "properties": {
     "flee": {
-     "default": false,
+     "default": true,
      "title": "Flee",
      "type": "boolean"
     },
     "gather": {
-     "default": false,
+     "default": true,
      "title": "Gather",
      "type": "boolean"
     },

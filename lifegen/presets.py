@@ -154,8 +154,9 @@ BUDGETS = {
     "full_detail": [150, 250],     # people at full detail near the view
 }
 
-# decision 12.8: stepping aside and looking now; fleeing and gathering later (storygen's hook)
-REACTIONS = {"step_aside": True, "look": True, "flee": False, "gather": False}
+# decision 12.8: stepping aside and looking (LG3, LG8); fleeing and gathering (LG8, storygen's
+# hook: a danger at a point, `CityGenLife.Panic`); the settings are LG8's `REACTION`
+REACTIONS = {"step_aside": True, "look": True, "flee": True, "gather": True}
 
 # --- the spike (LG0): plain stand-ins on one district ---------------------------------------
 
@@ -410,6 +411,8 @@ PLACE_CLIPS = {
     "talk_a": f"{GAS_ANIM}/Idle/M_Relaxed_Stand_Idle_Break_v02",
     "talk_b": f"{GAS_ANIM}/Idle/M_Relaxed_Stand_Idle_Break_v05",
     "talk_c": f"{GAS_ANIM}/Idle/M_Neutral_Stand_Idle_Break_v03",
+    # (LG8: running from a danger near the view)
+    "run": f"{GAS_ANIM}/Run/M_Neutral_Run_Loop_F",
 }
 
 # --- LG6: transit (scope 6.6) ------------------------------------------------------------------
@@ -581,3 +584,64 @@ WATER = {
 AW_BUDGET = {"fliers": 500, "drones": 300, "boats": 160}
 AW_SAMPLE_S = 1.0                  # the routes' cycles sampled every this many s
 AW_STEP_M = 4.0                    # the speed profile's grid along a route
+
+# --- LG8: the hour, the weather and reactions (scope 6.8) ---------------------------------------
+
+# the crowd and the traffic by atmosgen's weather state (the runtime reads the state and the rain
+# from atmosgen's controller; the plan's own state is the crowd's `weather`): per state the
+# share of the hour's people out (`out`: the rest stay in, their trips ending at doors), their
+# pace (`pace`), the share in the rain looks (`rain_looks`, LG2's `WEATHER_OUTFITS`), the share
+# of the others holding an umbrella (`umbrella`), a passer-by's chance to stop under a cover
+# its walkway passes (`shelter`), the cars' share (`cars`), speed (`speed`) and the time
+# headway they add (`headway_s`); a rain state's values are reached by its rain (atmosgen's
+# rain rate over the state's, `WEATHER_RAIN`), so they follow a change as the rain does
+WEATHER_LIFE = {
+    "clear": {"out": 1.0, "pace": 1.0, "rain_looks": 0.0, "umbrella": 0.0, "shelter": 0.0,
+              "cars": 1.0, "speed": 1.0, "headway_s": 0.0},
+    "drizzle": {"out": 0.88, "pace": 1.06, "rain_looks": 0.25, "umbrella": 0.3,
+                "shelter": 0.06, "cars": 1.0, "speed": 0.95, "headway_s": 0.2},
+    "rain": {"out": 0.6, "pace": 1.15, "rain_looks": 0.5, "umbrella": 0.6, "shelter": 0.22,
+             "cars": 1.05, "speed": 0.88, "headway_s": 0.45},
+    "fog": {"out": 0.9, "pace": 1.0, "rain_looks": 0.0, "umbrella": 0.0, "shelter": 0.0,
+            "cars": 0.95, "speed": 0.82, "headway_s": 0.6},
+    "smog": {"out": 0.8, "pace": 1.04, "rain_looks": 0.0, "umbrella": 0.0, "shelter": 0.0,
+             "cars": 1.0, "speed": 0.95, "headway_s": 0.2},
+}
+WEATHER_KEYS = ("out", "pace", "rain_looks", "umbrella", "shelter", "cars", "speed",
+                "headway_s")
+WEATHER_RAIN = {"clear": 0.0, "drizzle": 0.3, "rain": 0.8, "fog": 0.0, "smog": 0.0}
+# umbrellas (scope 6.1, 6.2): a canopy and a shaft (the engine's basic shapes, as LG6's
+# stand-ins: a library item until the Mac designs one) over the right shoulder, drawn near and
+# mid; their canopies' colors (sRGB), the share of them with a lit shaft (the city's LED
+# umbrellas) and its colors; folded (not drawn) under a cover
+UMBRELLA = {"colors": ("#0e0f12", "#15171c", "#1b2433", "#2a2c30", "#4a1020", "#10302e",
+                       "#d8dde6", "#c21d8c", "#17b2c9", "#e0681c"),
+            "lit_share": 0.3, "lit": ("#ff2fb4", "#28e6ff", "#b8ff3a", "#ffd23a"),
+            "canopy_m": 1.0, "canopy_h_m": 0.3, "height": 1.2, "side_m": 0.16,
+            "fwd_m": 0.08, "tilt_deg": 8.0, "shaft_m": 0.95}
+# shelter (scope 6.8: under awnings and decks in rain, atmosgen's rain shadow): a walkway's
+# stretches under a cover (AT5's masks: something at least `head_m` over it, on the ground
+# level, of the kinds people walk outdoors), sampled every `step_m`, gaps under `join_m`
+# joined, stretches under `min_m` left out; in rain a passer-by stops under one by the
+# state's `shelter` chance and stands at its side for `dwell_s`, facing out
+SHELTER = {"step_m": 1.0, "join_m": 1.5, "min_m": 3.0, "head_m": 2.1,
+           "kinds": ("sidewalk", "path", "alley", "promenade", "pedestrian_street",
+                     "crossing", "underpass", "concourse"),
+           "dwell_s": [25.0, 140.0]}
+# nightlife (scope 6.8): people round the open bars, clubs and arcades by night, on each one's
+# door walkway, `kinds` people at its busy (LG4's, per band), on top of M11's density (the
+# plan's `night` per walkway; the densities check measures M11's alone)
+NIGHTLIFE = {"kinds": {"bar": 3.0, "club": 7.0, "arcade": 2.0}}
+# reactions to the player and to danger (decision 12.8): people within `look_m` of the player
+# standing still (waiting, queueing, sheltering) turn to look at it; a danger at a point
+# (storygen's hook, `CityGenLife.Panic`) sends everyone within `flee_m` running away along
+# their walkways at `flee_pace` times their pace for `flee_s`, leaving their places (police
+# hold their ground); then for `gather_s` a `gather_share` of the people within `gather_m`
+# come back and stand `ring_m` off it looking at it for `stay_s`; cars stopped for the player
+# on foot wait (no sound in lifegen: no horn, scope 11)
+REACTION = {"look_m": 6.0, "flee_m": 35.0, "flee_s": 14.0, "flee_pace": 2.4,
+            "gather_m": 60.0, "gather_s": 90.0, "gather_share": 0.35, "ring_m": [9.0, 22.0],
+            "stay_s": [15.0, 60.0]}
+# the traffic: a car stuck this long (s) far from the view (past `stuck_far_m`) leaves, so no
+# jam lasts where nobody looks (its lane refilled as any)
+TRAFFIC_STUCK = {"stuck_s": 75.0, "stuck_far_m": 150.0}

@@ -1447,6 +1447,20 @@
    "default": 1,
    "title": "Version",
    "type": "integer"
+  },
+  "weather": {
+   "anyOf": [
+    {
+     "additionalProperties": true,
+     "type": "object"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "description": "LG8: the crowd and traffic by atmosgen's weather state, umbrellas, shelter, nightlife and the reactions.",
+   "title": "Weather"
   }
  },
  "required": [

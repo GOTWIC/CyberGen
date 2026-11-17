@@ -264,7 +264,13 @@ def stops_of(model: dict, line: dict, track: Track, mode: dict) -> tuple[list[di
         rec["half_m"] = _r(half, 2)
         rec["clear_m"] = _r(clear, 2) if half > clear + 0.6 else 0.0
         tol = P.TRANSIT
-        if d > tol["stop_tol_m"] or abs(pz - tz) > tol["stop_dz_m"]:
+        # (LG8: a metro's concourse stands over its track as deep as M5 lowered the track
+        # there, under the water bed or foundations: the station's own `track_z_m` is the
+        # track's height it serves, so the stop holds where the track is at that height)
+        tzs = (st.get("attrs") or {}).get("track_z_m")
+        conc = w is not None and bool((w.get("attrs") or {}).get("concourse"))
+        dz = (tz - float(tzs)) if (conc and tzs is not None) else (pz - tz)
+        if d > tol["stop_tol_m"] or abs(dz) > tol["stop_dz_m"]:
             rec["why"] = f"its platform {d:.1f} m off the track in plan, {pz - tz:+.1f} m " \
                          f"in height"
             bad.append(rec)

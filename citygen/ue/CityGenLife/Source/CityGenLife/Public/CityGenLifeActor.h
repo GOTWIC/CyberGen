@@ -27,6 +27,7 @@ class USkeletalMesh;
 class USkeletalMeshComponent;
 class UStaticMeshComponent;
 class UMaterialInterface;
+class UMaterialInstanceDynamic;
 class UStaticMesh;
 class UCityGenLifeWalkProcessor;
 class UCityGenLifeDriveProcessor;
@@ -606,6 +607,124 @@ public:
 	 *  over an avenue from behind one (`layers`); false without one. */
 	UFUNCTION(BlueprintCallable, Category = "CityGen") bool ShowAirWater(const FString& What);
 
+	// --- LG8: the hour, the weather and reactions (set by the importer from the plan's weather) --
+	// The crowd, the traffic, the places, transit and what flies and floats live at the hour of
+	// atmosgen's controller (its Hour, read every half second: a step of an hour as time runs
+	// changes who comes out of the doors and who goes in, a jump fills the live walkways and
+	// lanes again) and by its weather (its state and rain): people out (the rest go in at doors),
+	// their pace, raincoats and umbrellas, people stopping under the covers their walkways pass
+	// (the plan's stretches out of the rain: atmosgen's rain shadow), the cars' speed and
+	// headway. Nightlife's people round the open bars, clubs and arcades by night. Reactions:
+	// people standing near the player look at it; a danger (Panic, storygen's hook) sends them
+	// running and draws a crowd to look after it.
+
+	/** The weather's table: per state (WeatherNames) WeatherKeys floats (out, pace, rain_looks,
+	 *  umbrella, shelter, cars, speed, headway_s) and its rain rate (WeatherRain); the plan's own
+	 *  state (without atmosgen's controller); the rain looks' group. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather") TArray<FString> WeatherNames;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather") TArray<FString> WeatherKeys;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather") TArray<float> WeatherLife;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather") TArray<float> WeatherRain;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather") FString WeatherPlan = TEXT("clear");
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather") int32 RainGroup = -1;
+	/** Per walkway lane its stretches out of the rain [WalkCoverStarts[l], WalkCoverStarts[l + 1])
+	 *  of WalkCover (pairs: from, to, m along it); nightlife's people per band (5 a lane, or none). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather") TArray<int32> WalkCoverStarts;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather") TArray<float> WalkCover;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather") TArray<float> WalkNight;
+	/** Umbrellas: canopy colors and lit shafts' colors (linear RGB), the settings (lit share,
+	 *  canopy width and height, height over the feet in the person's heights, right, forward
+	 *  (m), tilt (deg), shaft length (m)), the meshes and their material (M_CgTransit's six custom
+	 *  floats: base color, emission). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather") TArray<float> UmbrellaColors;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather") TArray<float> UmbrellaLit;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather") TArray<float> Umbrella;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather") TObjectPtr<UStaticMesh> UmbrellaCanopy;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather") TObjectPtr<UStaticMesh> UmbrellaShaft;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather") TObjectPtr<UMaterialInterface> UmbrellaMaterial;
+	/** How long a passer-by stands under a cover in the rain (s). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather") FVector2D ShelterS = FVector2D(25.0, 140.0);
+	/** The reactions: looking at the player (within LookM), fleeing a danger (within FleeM, for
+	 *  FleeS, at FleePace times the pace) and gathering after it (for GatherS, a GatherShare of
+	 *  the people within GatherM, on a ring RingM off it, for StayS). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Reactions") bool bLook = true;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Reactions") bool bFlee = true;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Reactions") bool bGather = true;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Reactions") float LookM = 6.f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Reactions") float FleeM = 35.f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Reactions") float FleeS = 14.f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Reactions") float FleePace = 2.4f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Reactions") float GatherM = 60.f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Reactions") float GatherS = 90.f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Reactions") float GatherShare = 0.35f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Reactions") FVector2D RingM = FVector2D(9.0, 22.0);
+	UPROPERTY(EditAnywhere, Category = "CityGen|Reactions") FVector2D StayS = FVector2D(15.0, 60.0);
+	/** A car standing StuckS in a queue past StuckFarM of the view leaves. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") float StuckS = 75.f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") float StuckFarM = 150.f;
+	/** The places' run clip per clip group (LG8: fleeing near the view; else the walk, faster). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Reactions") TArray<TObjectPtr<UAnimSequence>> RunClips;
+	/** Life follows atmosgen's hour and weather (CityGenLife.FollowAtmos [0|1]); off, its own Hour
+	 *  and weather (CityGenLife.Hour, CityGenLife.Weather). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather") bool bFollowAtmos = true;
+	/** The weather's effects on life (CityGenLife.Weather off: clear whatever atmosgen shows). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Weather") bool bWeatherOn = true;
+
+	bool IsWeather() const { return WeatherNames.Num() > 0 && WeatherKeys.Num() > 0 && WeatherLife.Num() == WeatherNames.Num() * WeatherKeys.Num(); }
+	UFUNCTION(BlueprintCallable, Category = "CityGen") void SetFollowAtmos(bool bOn);
+	/** Life's weather: a state's name (held, not following atmosgen's weather), `auto` (atmosgen's
+	 *  again), `off` (clear, no weather's effect). */
+	UFUNCTION(BlueprintCallable, Category = "CityGen") bool SetWeather(const FString& State);
+	/** A danger at a point (UE cm), its reach (m) and how long people flee (s; 0: FleeM and FleeS):
+	 *  storygen's hook. */
+	UFUNCTION(BlueprintCallable, Category = "CityGen") void Panic(FVector Where, float InRadiusM = 0.f, float InSeconds = 0.f);
+	/** A danger where the player is (CityGenLife.Panic, the play menu's row). */
+	UFUNCTION(BlueprintCallable, Category = "CityGen") bool PanicAtPlayer(float InRadiusM = 0.f, float InSeconds = 0.f);
+	/** For the check's shots: the camera moved to the nearest person with an umbrella (`umbrella`),
+	 *  standing under a cover (`shelter`), looking at the player (`look`), running from a danger
+	 *  (`flee`), looking at it (`gather`), a bar's nightlife (`night`); false without one. */
+	UFUNCTION(BlueprintCallable, Category = "CityGen") bool ShowWeather(const FString& What);
+
+private:
+	// (LG8, CityGenLifeWeather.cpp)
+	void BuildWeather();
+	void FollowAtmos(float Dt, bool bNow);
+	void ApplyWeatherNow();
+	float WeatherKey(int32 State, const TCHAR* Key) const;
+	void ThinOut();
+	void MakeUmbrellas();
+	void UpdateUmbrellas(const FVector& View);
+	bool HasUmbrella(int32 Person) const;
+	FString WeatherStatus() const;
+	TWeakObjectPtr<AActor> AtmosActor;
+	bool bAtmosLooked = false;
+	float AtmosClock = 0.f;
+	float AtmosHour = -1.f;
+	float RainNow = 0.f;
+	FString WeatherState = TEXT("clear");
+	FString WeatherHeld;                       // a state held by CityGenLife.Weather, else empty
+	float OutNow = 1.f, PaceNow = 1.f, RainLooksNow = 0.f, UmbrellaNow = 0.f, ShelterNow = 0.f;
+	float CarsNow = 1.f, SpeedNow = 1.f, HeadwayNow = 0.f;
+	float ThinClock = 0.f;
+	int32 HourSteps = 0, HourJumps = 0, Thinned = 0;
+	TArray<int32> CoverStartsG;
+	TArray<float> CoverCm;
+	TArray<uint8> WalkCovered;
+	UPROPERTY(Transient) TObjectPtr<UInstancedStaticMeshComponent> UmbCanopy;
+	UPROPERTY(Transient) TObjectPtr<UInstancedStaticMeshComponent> UmbShaft;
+	TArray<FTransform> UmbCanXf, UmbShaftXf;
+	TArray<uint8> UmbShown;
+	int32 UmbrellasNow = 0;
+	bool bUmbSeen = false;
+	int32 PanicCount = 0;
+	FVector LastPanicAt = FVector::ZeroVector;
+	FString LastWeatherShow;
+	// (LG8's performance pass: the near people's garments' dynamic material instances kept, one
+	// per slot and parent material, reused as a slot takes another person; each made once, so
+	// near people coming and going make no garbage)
+	UPROPERTY(Transient) TArray<TObjectPtr<UMaterialInstanceDynamic>> NearMIDs;
+	TMap<uint64, TObjectPtr<UMaterialInstanceDynamic>> NearMIDOf;
+
 private:
 	// (LG7, CityGenLifeAir.cpp)
 	struct FCgAwVehicle
@@ -865,6 +984,10 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UCityGenLifeDriveProcessor> DriveProc;
 
 	FCgLifeFrame Frame;
+	/** LG8: the box every instanced component's instances stay within (the lanes' bounds, wide
+	 *  and high enough for what flies), their fixed bounds (UCgLifeISM). */
+	FBox CityBox = FBox(ForceInit);
+	void FixBounds(UInstancedStaticMeshComponent* C) const;
 	TArray<float> Lengths, Widths;
 	TArray<float> PointVmax;       // (cars_steam: per storage point, cm/s; walkways 0)
 	TArray<uint8> InRegion;
