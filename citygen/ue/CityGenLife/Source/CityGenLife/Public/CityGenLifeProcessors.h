@@ -138,6 +138,15 @@ struct FCgLifeFrame
 	// --- LG6: transit -----------------------------------------------------------------------------
 	/** Per walkway lane how far off its middle people keep (cm: a platform's trains), 0 none. */
 	const TArray<float>* WalkClear = nullptr;
+
+	// --- people_idles: the bench's sit-downs and stand-up ----------------------------------------
+	/** Per sit-down (SitInCount of them) where it starts from its seat: 4 floats, the offset
+	 *  in the seat's frame (cm: x along the way its sitter faces, y that frame's y), the
+	 *  facing's turn there (deg) and the clip's length (s); the stand-up's 4 where it ends.
+	 *  None: a sitter sits at once, as LG4's. */
+	const TArray<float>* SitIn = nullptr;
+	int32 SitInCount = 0;
+	const TArray<float>* SitOut = nullptr;
 	/** Out: people gone into a train this frame. */
 	int32 Boarded = 0;
 

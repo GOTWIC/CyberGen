@@ -40,6 +40,24 @@ namespace CgAnim
 		Sit = 2,       // a bench
 		Talk = 3,      // talking, smoking, eating (the sample's idle breaks)
 		Run = 4,       // LG8: running away from a danger
+		// --- people_idles: the bench's transitions (the person at its seat all the while)
+		StandUp = 5,   // standing up from a bench and walking off (the stand-up clip)
+		SitDown = 8,   // sitting down on a bench: 8 + which sit-down (from its front, left, ...)
+	};
+
+	/** Sitting on a bench, sitting down or standing up. */
+	inline bool IsSit(const uint8 A) { return A == Sit || A == StandUp || A >= SitDown; }
+}
+
+/** What a mid or far person shows (ACityGenLife's PersonStill: its instances' custom data). */
+namespace CgLook
+{
+	enum : uint8
+	{
+		Walk = 0,
+		Still = 1,     // standing (people_idles: the baked idle; before, the walk's passing pose)
+		Run = 2,       // LG8: the walk played faster
+		Sit = 3,       // people_idles: the baked sitting loop
 	};
 }
 
@@ -131,6 +149,9 @@ struct FCgLifeWalker : public FMassFragment
 	int32 Panic = 0;               // the last danger it reacted to (each once)
 	int32 CoverK = INDEX_NONE;     // the stretch out of the rain it last chose to pass or stop under
 	float Ring = 0.f;              // cm from the danger it stops to look from
+
+	// --- people_idles: the bench's transitions ---------------------------------------------------
+	uint8 SitVar = 255;            // the sit-down it walks to and plays (255 none)
 };
 
 /** LG5: why a car drives slower than its lane allows now (FCgLifeCar::Why). */
