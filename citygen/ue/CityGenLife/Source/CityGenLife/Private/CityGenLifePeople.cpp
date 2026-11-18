@@ -17,6 +17,7 @@
 // was (ApplyClothing says why).
 
 #include "CityGenLifeActor.h"
+#include "CityGenLifeAnim.h"
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "CityGenLifeISM.h"
 #include "CityGenLifeTypes.h"
@@ -49,6 +50,22 @@ namespace
 	{
 		X ^= X >> 16; X *= 0x7feb352du; X ^= X >> 15; X *= 0x846ca68bu; X ^= X >> 16;
 		return X;
+	}
+
+	// people_surfaces: a near body's animation, the crossfading instance (CityGenLifeAnim.h)
+	// in place of LG1's single node
+	UCgPersonAnim* PersonAnimOf(USkeletalMeshComponent* Lead)
+	{
+		if (!Lead)
+		{
+			return nullptr;
+		}
+		if (Lead->GetAnimationMode() != EAnimationMode::AnimationBlueprint || Lead->GetAnimClass() != UCgPersonAnim::StaticClass())
+		{
+			Lead->SetAnimationMode(EAnimationMode::AnimationBlueprint);
+			Lead->SetAnimInstanceClass(UCgPersonAnim::StaticClass());
+		}
+		return Cast<UCgPersonAnim>(Lead->GetAnimInstance());
 	}
 
 	// lifegen_clothing_toggle: the mid mesh's garment slots: the instances the library set to
@@ -562,6 +579,9 @@ void ACityGenLife::Assign(const int32 S, const int32 P)
 		if (Slot.Comps.Num() == 0)
 		{
 			Comp->SetupAttachment(RootComponent);
+			// (people_surfaces: its pose after this actor's tick, so a clip asked for and the
+			// mesh moved to a seat in the same frame show together)
+			Comp->AddTickPrerequisiteActor(this);
 		}
 		else
 		{
@@ -663,13 +683,16 @@ void ACityGenLife::Assign(const int32 S, const int32 P)
 	const int32 Gait = PersonGait.IsValidIndex(P) ? FMath::Clamp(PersonGait[P], 0, FMath::Max(0, Gaits - 1)) : 0;
 	const int32 G = FMath::Clamp(Group * FMath::Max(1, Gaits) + Gait, 0, FMath::Max(0, WalkClips.Num() - 1));
 	UAnimSequence* Clip = WalkClips.IsValidIndex(G) ? WalkClips[G].Get() : nullptr;
-	if (Clip && Slot.Gait != G)
+	// (people_surfaces: the walk, at once: no blend from the slot's last person; its rate and
+	// phase below)
+	UCgPersonAnim* Anim = PersonAnimOf(Lead);
+	if (Clip && Anim)
 	{
-		Lead->SetAnimationMode(EAnimationMode::AnimationSingleNode);
-		Lead->PlayAnimation(Clip, true);
+		Anim->Play(Clip, true, 1.f, 0.f, 0.f);
 		Slot.Gait = G;
 	}
 	Slot.Clip = 0;
+	Slot.bFresh = true;
 	// (the person's outfit color: the plan's tint, on the garments' dye)
 	const FLinearColor Tint(PersonTint.IsValidIndex(3 * P) ? PersonTint[3 * P] : 0.5f,
 		PersonTint.IsValidIndex(3 * P + 1) ? PersonTint[3 * P + 1] : 0.5f,
@@ -696,13 +719,16 @@ void ACityGenLife::Assign(const int32 S, const int32 P)
 		}
 	}
 	const float Rate = WalkRate(P);
-	Lead->SetPlayRate(Rate);
-	if (Clip)
+	if (Anim)
+	{
+		Anim->SetRate(Rate);
+	}
+	if (Clip && Anim)
 	{
 		// (in phase with its baked walk: the same time offset and rate)
 		const float Len = FMath::Max(0.1f, Clip->GetPlayLength());
 		const float T = (float)GetWorld()->GetTimeSeconds() + PhaseOffset(P);
-		Lead->SetPosition(FMath::Fmod(T * Rate, Len), false);
+		Anim->SetTime(FMath::Fmod(T * Rate, Len));
 	}
 	// (lifegen_clothing_toggle: the whole body, made once a slot, in the character's skin)
 	if (WholeBody && !Slot.Whole)
@@ -936,10 +962,23 @@ void ACityGenLife::UpdatePeople()
 					const FVector Fwd(FMath::Cos(FMath::DegreesToRadians(WalkYaw[P])), FMath::Sin(FMath::DegreesToRadians(WalkYaw[P])), 0.0);
 					Root += Fwd * SitOffset.X + FVector(0.0, 0.0, SitOffset.Y);
 				}
+				// (people_surfaces: where the body stood, so the clip before is drawn there through
+				// a crossfade while the mesh moves to a seat)
+				const FTransform Was = Lead->GetComponentTransform();
 				Lead->SetWorldLocationAndRotation(Root, FRotator(0.f, WalkYaw[P] + MeshYaw, 0.f), false, nullptr, ETeleportType::TeleportPhysics);
 				Lead->SetWorldScale3D(FVector(Scale));
+				UCgPersonAnim* Body = PersonAnimOf(Lead);
+				const uint8 ClipWas = NearSlots[S].Clip;
+				const bool bFresh = NearSlots[S].bFresh;
+				NearSlots[S].bFresh = false;
+				// (people_surfaces: the crossfade into the new clip: none for a person just come
+				// near; SitBlendS into the sitting loop after a sit-down and from the loop into
+				// the stand-up (the pop as a sitter rose), ClipBlendS otherwise)
+				const bool bSitBlend = (ClipWant == 2 && ClipWas >= 10 && ClipWas < 200) || (ClipWant == 9 && ClipWas == 2);
+				const float BlendS = bFresh ? 0.f : (bSitBlend ? SitBlendS : ClipBlendS);
+				const FTransform Fix = Was.GetRelativeTransform(Lead->GetComponentTransform());
 				// (LG3: standing, at a signal or behind someone: the idle; walking, the walk)
-				if (bCity && NearSlots[S].Clip != ClipWant && ClipWant == 200)
+				if (bCity && Body && ClipWas != ClipWant && ClipWant == 200)
 				{
 					// (LG8: the run: its clip at the runner's speed over the clip's own, else the walk
 					// at the flight's pace)
@@ -949,13 +988,13 @@ void ACityGenLife::UpdatePeople()
 					if (Clip)
 					{
 						const float V = (PersonPace.IsValidIndex(P) ? PersonPace[P] : 1.35f) * FleePace * PaceNow;
-						Lead->PlayAnimation(Clip, true);
-						Lead->SetPlayRate(PlaceClip ? FMath::Clamp(V / FMath::Max(1.f, RunClipSpeed), 0.6f, 1.5f) : FMath::Clamp(WalkRate(P) * FleePace, 0.5f, 3.f));
+						Body->Play(Clip, true, PlaceClip ? FMath::Clamp(V / FMath::Max(1.f, RunClipSpeed), 0.6f, 1.5f) : FMath::Clamp(WalkRate(P) * FleePace, 0.5f, 3.f),
+							0.f, BlendS, Fix);
 						NearSlots[S].Gait = INDEX_NONE;
 					}
 					NearSlots[S].Clip = ClipWant;
 				}
-				else if (bCity && NearSlots[S].Clip != ClipWant)
+				else if (bCity && Body && ClipWas != ClipWant)
 				{
 					const bool bStand = ClipWant != 0;
 					UAnimSequence* Clip = PlaceClip;
@@ -971,20 +1010,18 @@ void ACityGenLife::UpdatePeople()
 						const float Len = FMath::Max(0.1f, Clip->GetPlayLength());
 						const int32 In = Group * SitInCount + (ClipWant - 10);
 						const float From = ClipWant >= 10 && SitInStart.IsValidIndex(In) ? SitInStart[In] : 0.f;
-						Lead->PlayAnimation(Clip, false);
-						Lead->SetPlayRate(1.f);
-						Lead->SetPosition(FMath::Clamp(From + TimeNow - (PersonAnimT.IsValidIndex(P) ? PersonAnimT[P] : TimeNow), 0.f, Len), false);
+						Body->Play(Clip, false, 1.f,
+							FMath::Clamp(From + TimeNow - (PersonAnimT.IsValidIndex(P) ? PersonAnimT[P] : TimeNow), 0.f, Len), BlendS, Fix);
 						NearSlots[S].Gait = INDEX_NONE;
 					}
 					else if (bStand && Clip)
 					{
-						Lead->PlayAnimation(Clip, true);
-						Lead->SetPlayRate(1.f);
 						// (each its own place in the loop, so a bench's two sitters or a gang's
 						// ring do not move as one; people_idles: one who just sat down from the
 						// loop's start, where its sit-down ends)
-						const bool bSatDown = ClipWant == 2 && NearSlots[S].Clip >= 10 && NearSlots[S].Clip < 200;
-						Lead->SetPosition(bSatDown ? 0.f : FMath::Fmod(PhaseOffset(P) * 1.7f, FMath::Max(0.1f, Clip->GetPlayLength())), false);
+						const bool bSatDown = ClipWant == 2 && ClipWas >= 10 && ClipWas < 200;
+						Body->Play(Clip, true, 1.f,
+							bSatDown ? 0.f : FMath::Fmod(PhaseOffset(P) * 1.7f, FMath::Max(0.1f, Clip->GetPlayLength())), BlendS, Fix);
 						NearSlots[S].Gait = INDEX_NONE;
 					}
 					else if (!bStand)
@@ -993,8 +1030,7 @@ void ACityGenLife::UpdatePeople()
 						const int32 G = FMath::Clamp(Group * FMath::Max(1, Gaits) + Gait, 0, FMath::Max(0, WalkClips.Num() - 1));
 						if (UAnimSequence* Walk = WalkClips.IsValidIndex(G) ? WalkClips[G].Get() : nullptr)
 						{
-							Lead->PlayAnimation(Walk, true);
-							Lead->SetPlayRate(WalkRate(P));
+							Body->Play(Walk, true, WalkRate(P), 0.f, BlendS, Fix);
 							NearSlots[S].Gait = G;
 						}
 					}
@@ -1013,16 +1049,43 @@ void ACityGenLife::UpdatePeople()
 			Tier = 2;
 			++FarNow;
 		}
-		// (the mid mesh is the skeletal meshes' frame, MeshYaw off the walk; the card's frame
-		// has the person facing +X, as its sheet was drawn)
-		MidXf[C][I] = Tier == 1 ? FTransform(FRotator(0.f, WalkYaw[P] + MeshYaw, 0.f), At, FVector(Scale)) : Hidden;
-		FarXf[C][I] = Tier == 2 ? FTransform(FRotator(0.f, WalkYaw[P], 0.f), At, FVector(Scale)) : Hidden;
-		PersonTier[P] = Tier;
 		// (LG3: a mid or far person standing still holds its walk's frame)
 		// (LG8: running from a danger, its walk played faster: 2)
 		// (people_idles: sitting, the baked sitting loop and a sitting cell)
 		const uint8 AnimP = WalkAnimG.IsValidIndex(P) ? WalkAnimG[P] : (uint8)CgAnim::Walk;
-		const uint8 Look = bStill ? (CgAnim::IsSit(AnimP) ? CgLook::Sit : CgLook::Still) : (AnimP == CgAnim::Run ? CgLook::Run : CgLook::Walk);
+		// (people_surfaces: sitting as the near tier would be: standing through a sit-down until
+		// the near clip has the person seated, sitting through a stand-up until it is up; and
+		// standing where the near clip has the body: at the sit-down's start, at the stand-up's
+		// end)
+		bool bSeated = CgAnim::IsSit(AnimP);
+		FVector AtTier = At;
+		float YawTier = WalkYaw[P];
+		const float Since = PersonAnimT.IsValidIndex(P) ? TimeNow - PersonAnimT[P] : 0.f;
+		if (AnimP >= CgAnim::SitDown && SitSeatedS.IsValidIndex(AnimP - CgAnim::SitDown))
+		{
+			const int32 K = AnimP - CgAnim::SitDown;
+			bSeated = Since >= SitSeatedS[K];
+			if (!bSeated && bStill && SitInSeat.IsValidIndex(4 * K + 2))
+			{
+				AtTier += FRotator(0.f, WalkYaw[P], 0.f).RotateVector(FVector(SitInSeat[4 * K], SitInSeat[4 * K + 1], 0.f));
+				YawTier += SitInSeat[4 * K + 2];
+			}
+		}
+		else if (AnimP == CgAnim::StandUp && SitSeatedS.Num())
+		{
+			bSeated = Since < SitRiseS;
+			if (!bSeated && bStill && SitOutSeat.IsValidIndex(2))
+			{
+				AtTier += FRotator(0.f, WalkYaw[P], 0.f).RotateVector(FVector(SitOutSeat[0], SitOutSeat[1], 0.f));
+				YawTier += SitOutSeat[2];
+			}
+		}
+		// (the mid mesh is the skeletal meshes' frame, MeshYaw off the walk; the card's frame
+		// has the person facing +X, as its sheet was drawn)
+		MidXf[C][I] = Tier == 1 ? FTransform(FRotator(0.f, YawTier + MeshYaw, 0.f), AtTier, FVector(Scale)) : Hidden;
+		FarXf[C][I] = Tier == 2 ? FTransform(FRotator(0.f, YawTier, 0.f), AtTier, FVector(Scale)) : Hidden;
+		PersonTier[P] = Tier;
+		const uint8 Look = bStill ? (bSeated ? CgLook::Sit : CgLook::Still) : (AnimP == CgAnim::Run ? CgLook::Run : CgLook::Walk);
 		if (bCity && (Tier == 1 || Tier == 2) && PersonStill.IsValidIndex(P) && PersonStill[P] != Look)
 		{
 			PersonStill[P] = Look;

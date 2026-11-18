@@ -16,6 +16,10 @@
 #include "CityGenLifePlaces.h"
 #include "CityGenLifeActor.h"
 #include "CityGenLifeTypes.h"
+#include "Animation/AnimSequence.h"
+#include "Animation/AnimationAsset.h"
+#include "Animation/Skeleton.h"
+#include "BoneIndices.h"
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
@@ -200,6 +204,54 @@ void ACityGenLife::MakeSitFrames()
 	}
 	UE_LOG(LogTemp, Display, TEXT("CityGenLife: the stand-up ends %.0f, %.0f cm off its seat, turned %.0f deg, %.2f s"),
 		SitOutSeat[0], SitOutSeat[1], SitOutSeat[2], SitOutSeat[3]);
+	// (people_surfaces: when the near tier is seated and up again, for the mid and far tiers'
+	// looks: the first clip group's pelvis height (the clips' root is at the seat, the pelvis
+	// carries their travel, people_places.seat_frame) half way between its two ends, sampled
+	// every 1/30 s over the stretch a person plays)
+	auto Pelvis = [](UAnimSequence* Seq, const float T) -> float
+	{
+		const USkeleton* Sk = Seq ? Seq->GetSkeleton() : nullptr;
+		const int32 B = Sk ? Sk->GetReferenceSkeleton().FindBoneIndex(TEXT("pelvis")) : INDEX_NONE;
+		if (B == INDEX_NONE)
+		{
+			return 0.f;
+		}
+		FTransform X;
+		Seq->GetBoneTransform(X, FSkeletonPoseBoneIndex(B), FAnimExtractContext(static_cast<double>(T)), false);
+		return (float)X.GetLocation().Z;
+	};
+	auto Cross = [&Pelvis](UAnimSequence* Seq, const float A, const float Len, const bool bDown) -> float
+	{
+		const float Z0 = Pelvis(Seq, A), Z1 = Pelvis(Seq, A + Len);
+		if (FMath::Abs(Z1 - Z0) < 10.f)
+		{
+			return bDown ? 0.f : Len;          // (no clear change: seated all along)
+		}
+		const float Mid = 0.5f * (Z0 + Z1);
+		for (float T = 0.f; T <= Len; T += 1.f / 30.f)
+		{
+			const float Z = Pelvis(Seq, A + T);
+			if (bDown ? Z <= Mid : Z >= Mid)
+			{
+				return T;
+			}
+		}
+		return Len;
+	};
+	SitSeatedS.Reset();
+	for (int32 K = 0; K < NV; ++K)
+	{
+		const float A = SitInStart.IsValidIndex(K) ? SitInStart[K] : 0.f;
+		SitSeatedS.Add(Cross(SitInClips[K].Get(), A, SitInSeat[4 * K + 3], true));
+	}
+	SitRiseS = Cross(SitOutClips[0].Get(), 0.f, SitOutSeat[3], false);
+	FString Seated;
+	for (const float S : SitSeatedS)
+	{
+		Seated += FString::Printf(TEXT(" %.2f"), S);
+	}
+	UE_LOG(LogTemp, Display, TEXT("CityGenLife: seated after the sit-downs' starts by%s s, up %.2f s into the stand-up"),
+		*Seated, SitRiseS);
 }
 
 void ACityGenLife::MakeDefinitions()

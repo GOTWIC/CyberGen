@@ -3285,6 +3285,23 @@ The Delta rebuild (delta_rebuild, after the road curves, #239) is in place: the 
   its square fits (`GEN_VERSION` drebuild.1).
 Results: `docs/progress/delta_rebuild/README.md`.
 
+People on their surfaces (people_surfaces, after delta_rebuild) are in place:
+- **Walkways on the surface** (`citygen/walksurf.py`): `exports.graphs` drapes every walkway
+  drawn on M22's pavement map on the surface AG17 draws (faces by `pavement.mvc`, AG17's
+  lifts; a road's walkway on the face nearest its road's profile, others nearest their own
+  height, within 1.5 m; the rest following the walkways they join, ends meeting at one
+  height), a point wherever its profile bends by 2 cm (`walk_surface` 1); `unreal.flat_graphs`
+  takes these over stage 2's lines. Lanes ran straight between the model's vertices: mid
+  people walked inside a road's hump, a raised road's crossings at the ground. lifegen's check
+  `walk_heights` (`walksurf.check`).
+- **Blended clips near** (`UCgPersonAnim`, `CityGenLifeAnim.h`): a native anim instance in
+  place of the single node, crossfading (`ClipBlendS` 0.3 s, `SitBlendS` 0.5 s into the
+  sitting loop and the stand-up; `CityGenLife.Blend`), the clip before carried from where the
+  body stood (`RootFix`); a sitter no longer pops as it rises.
+- **Mid and far in step** (`MakeSitFrames`' `SitSeatedS`, `SitRiseS` from the clips' pelvis):
+  standing at the sit-down's start until near would be seated, at the stand-up's end once up.
+Results: `docs/progress/people_surfaces/README.md`.
+
 ## Gallery site (GitHub Pages)
 
 `site/` is the public gallery at https://gotwic.github.io/CyberGen/ (served at

@@ -3247,6 +3247,58 @@ person there stands on it without its walking ground offset (`CgLife::PointAt`, 
 A deck's slots keep their walkway's height. A plan before it packs no `slot_seated`: its slots
 stand as before.
 
+### People on their surfaces (people_surfaces)
+
+**Walkways on the surface.** The model keeps a walkway's height at its vertices only, and a
+raised road's sidewalks, crossings and the paths to them at the ground (M7); AG7 put a raised
+road's sidewalk lines on its deck at the same vertices (`graphs.walkways` of the streets'
+contribution). A lane drawn from a line ran straight between its points, so over a road's hump
+(Old Town's avenue rises 4.5 m over 120 m) mid people, which keep the ground offset they last
+traced near, walked inside the embankment, up to 4.5 m under the sidewalk, and a raised road's
+crossings and crosswalks ran under it. `citygen/walksurf.py` drapes every walkway drawn on the
+pavement map (sidewalks, crossings, crosswalks, alleys, promenades, pedestrian streets,
+footbridges, paths; not stairs, elevators, skybridges, platforms or underpasses) on the surface
+stage 2 draws: M22's faces at their vertices' heights by mean value coordinates
+(`pavement.mvc`), lifted as AG17 lifts them (curb, sidewalk, corner pad, median 0.2 m, the
+rest 0.05 m; a crosswalk crosses a median at the road's 0.05 m). Where faces overlap in plan a
+walkway along a road takes the face nearest its road's own surface at its station plus 0.2 m,
+any other the face nearest its own height, both within `REACH_M` (1.5 m); off the faces a
+road's walkway stands on its road's profile, any other at its own height. The rest follow the
+walkways they join (in rounds: their own height moved by the difference at their ends, an end
+on none not moved), and ends that meet take one height. Each line is sampled every meter and
+kept where its profile bends by more than 2 cm (Douglas and Peucker in its profile; every
+vertex kept in place). `exports.graphs` writes the draped lines into `graphs.json` (with the
+ground added on a terrain city, as before) and `walk_surface` 1; `unreal.flat_graphs` then
+takes them over stage 2's lines, which give their heights at the model's vertices only and,
+at a vertex off their own sidewalk's faces (a junction's corner pad), their road's profile
+carried on (121 of 2,418 vertices on Delta 0.3 m or more off the pad drawn there). Every
+consumer of the flat graphs (the data assets, the life packs, the check's walk, the player
+start, the benchmark's route) gets them; a graphs.json from before keeps the old rule. A
+lifegen plan checks them (`walk_heights`: the lines sampled every 0.5 m within 5 cm of the
+surface outside steps such as a curb, which a line rounds off over a meter; failing past
+0.25 m). On Delta: 19,642 walkways, 81,343 points to 92,742; 8 within 15 cm, the rest within
+5 cm.
+
+**Sitters rising without a pop.** Near people play their clips through `UCgPersonAnim`
+(`CityGenLifeAnim.h`, `.cpp`), a native animation instance in place of LG1's single node: one
+clip looping or once at a rate from a position, crossfading from the clip before over a blend
+(eased), the clip before carried on its root bone from where the body stood (`RootFix`: a
+sit-down and the stand-up play in the seat's frame, so the mesh moves to the seat as one
+begins). `ClipBlendS` (0.3 s) between walking, standing, talking, running and into a
+sit-down; `SitBlendS` (0.5 s) from a sit-down into the sitting loop and from the loop into the
+stand-up, where the sitting pose met the stand-up's first frame with no blend; none for a
+person just come near. The leader's anim ticks after the controller (a tick prerequisite), so
+a clip asked for and the move to a seat show in the same frame. Console `CityGenLife.Blend
+CLIP_S [SIT_S]` (`0 0` as before).
+
+**Mid and far in step with near.** A mid or far sitter showed the sitting loop from the moment
+it reached the seat, while near it walks in and sits down over the sit-down's 9 to 10 s, and
+showed it until the stand-up was over. `MakeSitFrames` now finds when each sit-down has the
+person seated and when the stand-up has it up, half way between the clip's two pelvis heights
+over the stretch played (`SitSeatedS`, `SitRiseS`, logged); mid and far stand at the
+sit-down's start until seated, sit, and stand at the stand-up's end once up
+(`UpdatePeople`).
+
 ## Milestones and checks
 
 - **Every milestone** updates the exporter in its own PR for what it adds or changes (a new

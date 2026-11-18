@@ -268,12 +268,21 @@ def test_terrain_city(hilly, tmp_path):
     walks = {w.id: w for w in hilly.walkways}
     side = [w for w in g["walkways"] if walks[w["id"]].attrs.get("segment") in ground.segs]
     assert side
+    # (people_surfaces: the lines draped on the surface, heights over the ground, as `rel`)
+    over = {w["id"]: w["line"] for w in rel["walkways"]}
     for w in side[:50]:
         sid = walks[w["id"]].attrs["segment"]
-        for (x, y, z), p in zip(w["line"], walks[w["id"]].line):
+        assert len(w["line"]) == len(over[w["id"]])
+        for (x, y, z), p in zip(w["line"], over[w["id"]]):
             assert abs(z - (p[2] + ground.road(sid, x, y))) < 0.011
     assert any(abs(p[2] - q[2]) > 1.0 for w in g["walkways"]
-               for p, q in zip(w["line"], walks[w["id"]].line))
+               for p, q in zip(w["line"], over[w["id"]]))
+    # the absolute lines against the surface, the ground taken off as graphs.json adds it
+    from citygen import walksurf as WS
+    gfun = (lambda wid, x, y: ground.road(walks[wid].attrs["segment"], x, y)
+            if walks[wid].attrs.get("segment") in ground.segs else ground.at(x, y))
+    assert WS.check(hilly, {w["id"]: w["line"] for w in g["walkways"]},
+                    ground=gfun)["failed"] == 0
     build = _blockout_files(hilly, tmp_path / "b")
     man = U.build_manifest(build)[0]
     objs = {o["key"]: o for t in man["tiles"] for o in t["objects"]}
@@ -360,6 +369,34 @@ def test_flat_graphs(build, manifest):
     succ = [lanes["ids"][j] for j in lanes["links"][lanes["link_start"][i]:
                                                    lanes["link_start"][i + 1]]]
     assert succ == [s for s in raw["lanes"][i]["successors"] if s in set(lanes["ids"])]
+
+
+def test_graphs_carry_the_draped_walkways(small, build, manifest):
+    """people_surfaces: the small city's graphs.json has every walkway drawn on the pavement
+    map on the surface stage 2 draws (`walksurf.drape`), its ends where the model has them,
+    the others as the model's; the flat graphs (what Unreal and the life packs walk) take
+    them as they are."""
+    from citygen import walksurf as WS
+
+    raw = json.loads((build / "graphs.json").read_text())
+    assert raw["walk_surface"] == WS.VERSION
+    walks = {w.id: w for w in small.walkways}
+    lines = {w["id"]: w["line"] for w in raw["walkways"]}
+    added = 0
+    for wid, line in lines.items():
+        w = walks[wid]
+        assert [line[0][:2], line[-1][:2]] == [list(w.line[0][:2]), list(w.line[-1][:2])]
+        if w.kind not in WS.DRAPED:
+            assert line == [list(p) for p in w.line]
+        added += len(line) - len(w.line)
+    assert added > 0
+    r = WS.check(small, lines)
+    assert r["failed"] == 0, r
+    g = manifest[2]["walkways"]
+    k = g["ids"].index(raw["walkways"][0]["id"])
+    ps = g["point_start"]
+    assert g["points"][3 * ps[k]:3 * ps[k + 1]] == [float(v) for p in raw["walkways"][0]["line"]
+                                                   for v in p]
 
 
 def test_levels():
@@ -730,12 +767,16 @@ def test_stage2_layer(build, manifest, tmp_path, monkeypatch):
     assert mats["streets.asphalt.street"]["color"] == pytest.approx(
         [0.0331, 0.0331, 0.0397], abs=1e-4)
     assert s2["masters"] == ["facade", "road"]
-    # the walkway on the deck, where graphs.json has it at z 0
-    i = g2["walkways"]["ids"].index(walk["id"])
-    ps = g2["walkways"]["point_start"]
-    pts = g2["walkways"]["points"][3 * ps[i]:3 * ps[i + 1]]
+    # people_surfaces: graphs.json's walkways are on the surface, so stage 2's lines are not
+    # taken; from a graphs.json from before, the walkway on the deck, where it has it at z 0
+    assert raw["walk_surface"] and g2["walkways"] == graphs["walkways"]
+    old = U.flat_graphs({k: v for k, v in raw.items() if k != "walk_surface"},
+                        {walk["id"]: lifted})
+    i = old["walkways"]["ids"].index(walk["id"])
+    ps = old["walkways"]["point_start"]
+    pts = old["walkways"]["points"][3 * ps[i]:3 * ps[i + 1]]
     assert pts[2::3] == [9.2] * len(lifted)
-    assert g2["walkways"]["hash"] != graphs["walkways"]["hash"]
+    assert old["walkways"]["hash"] != graphs["walkways"]["hash"]
     assert g2["lanes"] == graphs["lanes"]
     # what an import over the blockout's does
     ch = U.manifest_changes(man, m2)

@@ -269,6 +269,18 @@ namespace
 			}
 		}));
 
+	FAutoConsoleCommandWithWorldAndArgs BlendCmd(TEXT("CityGenLife.Blend"),
+		TEXT("CityGenLife.Blend CLIP_S [SIT_S]: a near person's crossfade from one clip to the next, s (SIT_S into the sitting loop and from it into the stand-up; 0 0: at once, as before people_surfaces)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenLife* A = LifeIn(World);
+			if (A && Args.Num() >= 1)
+			{
+				A->ClipBlendS = FMath::Max(0.f, FCString::Atof(*Args[0]));
+				A->SitBlendS = Args.Num() >= 2 ? FMath::Max(0.f, FCString::Atof(*Args[1])) : A->ClipBlendS;
+			}
+		}));
+
 	// --- LG6: transit
 	FAutoConsoleCommandWithWorldAndArgs TransitCmd(TEXT("CityGenLife.Transit"),
 		TEXT("CityGenLife.Transit [0|1]: LG6's transit (every line's trains on their timetables, boarding and leaving at the stops) on or off (toggling without an argument)"),
