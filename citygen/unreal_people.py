@@ -375,13 +375,14 @@ IDLE_BAKE = {"version": "idles1", "fps": 15.0, "idle_s": [4.0, 8.0], "sit_s": [4
 # umbrella_hold: the right arm holding an umbrella (`people_places.py`'s `hold_pose`): from the
 # group's standing idle at its first frame, the hand put by two-bone IK (the elbow toward
 # `pole`: back, out, down) at the shoulder joint plus `fwd`, `out`, `up` (fractions of the arm's
-# length, upper arm and forearm: about 28 cm ahead, 2 cm out, 22 cm down on a 54 cm arm), the
-# wrist straight; the grip `grip` of the arm's length on from the wrist along the forearm. The
+# length, upper arm and forearm: on Delta's 47 cm arm about 22 cm ahead, 3 cm out, 8 cm down: the
+# forearm raised, the hand by the shoulder), the wrist straight; the grip `grip` of the arm's length
+# on from the wrist along the forearm (umb1 had the hand 19 cm down, the forearm level). The
 # pose is a clip of its own per group (the idle, its arm held: `A_umb_hold`), which the near
 # tier layers over any clip (the arm from the upper arm down) and the second mid bake bakes,
 # with the walk its arm held (`A_umb_walk_*`), as two more loops. Its version is in the mid
 # bakes' key only (`mid_key`): the still sheets keep `idle_key`.
-UMB_HOLD = {"version": "umb1", "fwd": 0.52, "out": 0.04, "up": -0.41,
+UMB_HOLD = {"version": "umb2", "fwd": 0.46, "out": 0.06, "up": -0.18,
             "pole": [-0.3, 0.8, -1.0], "grip": 0.15}
 PLACES_RUNS_MAX = 8
 PLACES_PER_RUN = 48

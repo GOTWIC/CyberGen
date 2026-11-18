@@ -3302,6 +3302,18 @@ People on their surfaces (people_surfaces, after delta_rebuild) are in place:
   standing at the sit-down's start until near would be seated, at the stand-up's end once up.
 Results: `docs/progress/people_surfaces/README.md`.
 
+Umbrellas held (umbrella_hold, after people_surfaces) are in place: the places' step
+(`people_places.py` `hold_pose`, `held_clip`; `unreal_people.UMB_HOLD`, `mid_key`) poses each
+clip group's right arm by two-bone IK on its idle (hand ahead of the chest, elbow back, out and
+down), writes it as a clip (`A_umb_hold`) and bakes the walk and the idle with the arm held as
+two more loops of each look's second mid bake (key `mid_key`; the still sheets keep
+`idle_key`); the exporter packs `umb_hold_clips`, `umb_grip`, `mid_umb_frames` (`PACK_VERSION`
+11, `LIFE_VERSION` life13). Near, `UCgPersonAnim` layers the held arm over any clip, blended over
+`UmbHoldS` as the umbrella opens or folds, the umbrella in the drawn hand; under a cover the arm
+comes down and the umbrella hangs furled from the hand. Mid plays the held loops
+(`CgLook::Umb`) with the umbrella at the bake's grip (not drawn folded); far cards unchanged.
+Results: `docs/progress/umbrella_hold/README.md`.
+
 ## Gallery site (GitHub Pages)
 
 `site/` is the public gallery at https://gotwic.github.io/CyberGen/ (served at

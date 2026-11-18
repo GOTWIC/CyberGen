@@ -634,8 +634,9 @@ bool ACityGenLife::ShowWeather(const FString& What)
 		}
 		else if (What == TEXT("umbrella_folded"))
 		{
-			// (umbrella_hold: someone near holding its umbrella folded, under a cover)
-			bWant = UmbShown.IsValidIndex(P) && UmbShown[P] == 2;
+			// (umbrella_hold: someone with an umbrella under a cover, so folded: near, it hangs
+			// from the hand)
+			bWant = WalkCovered.IsValidIndex(P) && WalkCovered[P] && !CgAnim::IsSit(Anim) && Anim != CgAnim::Run && HasUmbrella(P);
 		}
 		else if (What == TEXT("shelter"))
 		{
@@ -684,6 +685,12 @@ bool ACityGenLife::ShowWeather(const FString& What)
 		// (from over the danger's spot, back and up, the ring or the runners in view)
 		const FVector Dir = (At - LastPanicAt).GetSafeNormal2D();
 		bOk = FrameCar(LastPanicAt, Dir.IsNearlyZero() ? Fwd : Dir, 1400.0, 650.0, 300.0);
+	}
+	else if (What.StartsWith(TEXT("umbrella")))
+	{
+		// (umbrella_hold: closer, from ahead and a little to the right, at shoulder height: the
+		// held arm and the umbrella in its right hand, on the camera's left)
+		bOk = FrameCar(At, -Fwd, 520.0, 150.0, -150.0);
 	}
 	else
 	{
