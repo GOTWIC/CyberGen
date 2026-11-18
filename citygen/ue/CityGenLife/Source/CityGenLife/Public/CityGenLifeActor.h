@@ -459,6 +459,12 @@ public:
 	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<float> SitInStart;
 	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<TObjectPtr<UAnimSequence>> SitOutClips;
 	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<float> SitOut;
+	/** people_surfaces: a near person's crossfade from one clip to the next (s): walking,
+	 *  standing, talking, running and sitting down from a walk (ClipBlendS); into the sitting
+	 *  loop after a sit-down and from it into the stand-up (SitBlendS). 0: at once, as
+	 *  before (`CityGenLife.Blend`). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") float ClipBlendS = 0.3f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") float SitBlendS = 0.5f;
 	/** Patrol cars per drive lane and band (5); per traffic pool slot 1 where it is a patrol
 	 *  car's; the livery (PaintFloats). */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<float> DrivePolice;
@@ -985,6 +991,11 @@ private:
 	UMaterialInterface* MidSlotMaterial(int32 Char, int32 Slot) const;
 	void MakeSitFrames();
 	TArray<float> SitInSeat, SitOutSeat;
+	// (people_surfaces: when a near sitter is seated, s after its sit-down began, per sit-down,
+	// and when it is up again after its stand-up began: half way down and up in the clips'
+	// pelvis height; the mid and far tiers show it sitting only between them)
+	TArray<float> SitSeatedS;
+	float SitRiseS = 0.f;
 	TArray<uint8> PersonAnimPrev;
 	TArray<float> PersonAnimT;
 	int32 TakeSlot(int32 District, FRandomStream& Rng);
@@ -1003,6 +1014,7 @@ private:
 		int32 Char = INDEX_NONE;
 		int32 Gait = INDEX_NONE;
 		uint8 Clip = 0;            // (LG3: 0 its walk, 1 an idle; LG4: 2 sitting, 3 + k a talk clip)
+		bool bFresh = false;       // (people_surfaces: just assigned: its first clip at once)
 	};
 	/** A near slot's components by the clothing switch (lifegen_clothing_toggle). */
 	void SlotClothing(FNearSlot& Slot);
