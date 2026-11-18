@@ -4011,7 +4011,7 @@ class Builder:
         f = tuple(G.qpoint(shapely.ops.nearest_points(a, Point(p[:2]))[0]))
         pts = self.walks[self.gi[h]]["line"]
         for e in (pts[0], pts[-1]):
-            if math.hypot(e[0] - f[0], e[1] - f[1]) <= 0.05:
+            if math.hypot(e[0] - f[0], e[1] - f[1]) <= 0.05 and not self._on_crossing(e):
                 return (e[0], e[1])
         return None if self._on_crossing(f) else f
 
@@ -4285,8 +4285,17 @@ class Builder:
             # the platform's own elevator at its first end (#109: one elevator an end: not
             # where the sidewalk right under that end has one already)
             e = seg[0]
-            acc.append(self.walk("elevator", [(e[0], e[1], 0.0), (e[0], e[1], z)], 2.5,
-                                 {"station": sid}))
+            if self._on_crossing(e):
+                # (curves followups: not down onto a crossing; at the last end where that
+                # has none and stands off them, else none where another end has one)
+                last = seg[-1]
+                if tuple(last[:2]) not in lift_at and not self._on_crossing(last):
+                    e = last
+                elif lift_at:
+                    e = None
+            if e is not None:
+                acc.append(self.walk("elevator", [(e[0], e[1], 0.0), (e[0], e[1], z)], 2.5,
+                                     {"station": sid}))
         self._skywalk(sid, seg, foot, z, bld, gone, acc)
 
     def _stair_blocked(self, line3) -> bool:
