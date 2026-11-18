@@ -181,7 +181,14 @@ Only what changed (logs in `builds/surfaces_tmp/tests/`):
 
 ## The package
 
-(below)
+Delta cooked and packaged (Development, Win64) from `CityAG16` as before (`builds/packaged/
+package_surfaces.cmd`, 16 minutes), staged only and moved to `builds/packaged/Delta_surfaces`
+(5.2 GB). `builds/packaged/Delta_curves` was deleted before the cook (15 GB free), and
+`CityAG16`'s `Saved/Cooked` and `Saved/StagedBuilds` after the smoke launch. The smoke launch
+(`builds/surfaces_tmp/smoke_surfaces.ps1`: its user folder outside the package, every
+`CityAG16` game process closed after it, no `Saved` folder left in the package) loads Delta in
+16.0 s and logs the five sit-downs, the stand-up, the seated and rise times and the life
+controller's status (2,400 people, 1,800 cars). The packaged game was not benchmarked.
 
 ## Open items
 
