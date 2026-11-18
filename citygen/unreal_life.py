@@ -50,7 +50,7 @@ import json
 import math
 from pathlib import Path
 
-PACK_VERSION = 10           # 2 (cars_steam): smoothed drive lanes, their speeds; 3 (LG3): the
+PACK_VERSION = 11           # 2 (cars_steam): smoothed drive lanes, their speeds; 3 (LG3): the
                             # city's crowd (every walkway, doors, signals, the pool); 4 (LG5):
                             # the city's traffic (every lane, signals, conflicts, the pool); 5 (LG2):
                             # looks for people, their groups, dye colors and wear; 6 (LG4): slots,
@@ -60,7 +60,9 @@ PACK_VERSION = 10           # 2 (cars_steam): smoothed drive lanes, their speeds
                             # (LG7): air and water routes, their models and paints; 9 (LG8):
                             # the weather's table, umbrellas, shelter stretches, nightlife,
                             # the clear weather's groups, the reactions' settings; 10
-                            # (delta_rebuild): slots seated on their surface (`slot_seated`)
+                            # (delta_rebuild): slots seated on their surface (`slot_seated`);
+                            # 11 (umbrella_hold): the arm holding an umbrella, its grip, the
+                            # mid bakes' held walk and idle
 DATA = "life.json"
 CONTROLLER_KEY = "life"
 MARGIN_M = 60.0             # lanes this far past the live radius come along (links out of it)
@@ -588,6 +590,21 @@ def idle_data(pc: dict, chars: list, keys: list, cards: list) -> dict:
                     "card_cells": [float(v) for k in ("walk", "sit", "idle")
                                    for v in (cd.get(k) or [0, 0])],
                     "idles_key": idl.get("key")})
+        # (umbrella_hold: per group the clip of its arm holding an umbrella, which the near tier
+        # layers over its clips, and the grip in the mesh's frame (cm), where the mid tier's
+        # umbrella stands; per look in its second bake the walk with the arm held (its first
+        # frame on from the walk's) and the idle with it held, first and last frame, and 1)
+        umb = idl.get("umbrella") or {}
+        if all((umb.get(k) or {}).get("anim") and (umb.get(k) or {}).get("grip_cm")
+               for k in keys) and all("umb_walk" in looks[c["id"]]["mid"] for c in chars):
+            out["umb_hold_clips"] = [umb[k]["anim"] for k in keys]
+            out["umb_grip"] = [float(v) for k in keys for v in umb[k]["grip_cm"]]
+            out["mid_umb_frames"] = [
+                float(v) for c in chars
+                for v in (looks[c["id"]]["mid"]["umb_walk"][0] - looks[c["id"]]["mid"]["walk"][0],
+                          looks[c["id"]]["mid"]["umb_idle"][0],
+                          looks[c["id"]]["mid"]["umb_idle"][1], 1.0)]
+            out["umb_key"] = idl.get("mid_key")
     return out
 
 

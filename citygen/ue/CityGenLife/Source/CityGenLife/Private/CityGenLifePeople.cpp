@@ -311,8 +311,11 @@ UMaterialInterface* ACityGenLife::MidSlotMaterial(const int32 C, const int32 M) 
 	return I < MidIdleStarts[C + 1] && MidIdleMaterials.IsValidIndex(I) ? MidIdleMaterials[I].Get() : nullptr;
 }
 
-void ACityGenLife::LookData(const int32 P, const uint8 Look, float Mid[14], float Far[14]) const
+void ACityGenLife::LookData(const int32 P, const uint8 LookIn, float Mid[14], float Far[14]) const
 {
+	// (umbrella_hold: the flag CgLook::Umb, on a walk or a stand, plays the bake's loop with the
+	// arm held; the far card as without)
+	const uint8 Look = (uint8)(LookIn & ~(uint32)CgLook::Umb);
 	// (the mid instance: time offset, rate, first and last frame of its loop, the tint; the far
 	// card: time offset, strides a second, the tint, its first cell and cells. Standing, the
 	// mid instance loops its one passing frame at the walk's rate; the card shows that pose's
@@ -348,6 +351,20 @@ void ACityGenLife::LookData(const int32 P, const uint8 Look, float Mid[14], floa
 		Mid[1] = 0.85f + 0.3f * (float)(S % 1000u) / 1000.f;
 		Mid[2] = MidStillFrames[4 * C + K];
 		Mid[3] = MidStillFrames[4 * C + K + 1];
+	}
+	if ((LookIn & CgLook::Umb) && HasMidUmb() && MidUmbFrames.IsValidIndex(4 * C + 3) && MidUmbFrames[4 * C + 3] > 0.5f)
+	{
+		if (Look == CgLook::Walk)
+		{
+			// (the walk with the arm held: the same loop, its frames on by the bake's offset)
+			Mid[2] = First + MidUmbFrames[4 * C];
+			Mid[3] = Last + MidUmbFrames[4 * C];
+		}
+		else if (Look == CgLook::Still && bIdles)
+		{
+			Mid[2] = MidUmbFrames[4 * C + 1];
+			Mid[3] = MidUmbFrames[4 * C + 2];
+		}
 	}
 	const float Cycle = MidFrames.IsValidIndex(4 * C + 3) && MidFrames[4 * C + 3] > 0.05f ? MidFrames[4 * C + 3] : 1.f;
 	Far[12] = bCells ? CardCells[0] : 0.f;
@@ -693,6 +710,24 @@ void ACityGenLife::Assign(const int32 S, const int32 P)
 	}
 	Slot.Clip = 0;
 	Slot.bFresh = true;
+	// (umbrella_hold: its group's held arm, held at once if its umbrella is open as it comes near)
+	if (Anim)
+	{
+		if (!bUmbHoldMade)
+		{
+			MakeUmbHold();
+		}
+		if (UmbHoldBones.IsValidIndex(Group) && UmbHoldBones[Group].Num())
+		{
+			Anim->SetHold(UmbHoldBones[Group], UmbHoldRots[Group]);
+		}
+		else
+		{
+			Anim->SetHold(TArray<int32>(), TArray<FQuat>());
+		}
+		Anim->HoldS = UmbHoldS;
+		Anim->HoldTarget = Anim->HoldW = UmbOpen(P) ? 1.f : 0.f;
+	}
 	// (the person's outfit color: the plan's tint, on the garments' dye)
 	const FLinearColor Tint(PersonTint.IsValidIndex(3 * P) ? PersonTint[3 * P] : 0.5f,
 		PersonTint.IsValidIndex(3 * P + 1) ? PersonTint[3 * P + 1] : 0.5f,
@@ -968,6 +1003,11 @@ void ACityGenLife::UpdatePeople()
 				Lead->SetWorldLocationAndRotation(Root, FRotator(0.f, WalkYaw[P] + MeshYaw, 0.f), false, nullptr, ETeleportType::TeleportPhysics);
 				Lead->SetWorldScale3D(FVector(Scale));
 				UCgPersonAnim* Body = PersonAnimOf(Lead);
+				// (umbrella_hold: the arm up while its umbrella is open, down as it folds)
+				if (Body)
+				{
+					Body->HoldTarget = UmbOpen(P) ? 1.f : 0.f;
+				}
 				const uint8 ClipWas = NearSlots[S].Clip;
 				const bool bFresh = NearSlots[S].bFresh;
 				NearSlots[S].bFresh = false;
@@ -1085,7 +1125,12 @@ void ACityGenLife::UpdatePeople()
 		MidXf[C][I] = Tier == 1 ? FTransform(FRotator(0.f, YawTier + MeshYaw, 0.f), AtTier, FVector(Scale)) : Hidden;
 		FarXf[C][I] = Tier == 2 ? FTransform(FRotator(0.f, YawTier, 0.f), AtTier, FVector(Scale)) : Hidden;
 		PersonTier[P] = Tier;
-		const uint8 Look = bStill ? (bSeated ? CgLook::Sit : CgLook::Still) : (AnimP == CgAnim::Run ? CgLook::Run : CgLook::Walk);
+		uint8 Look = bStill ? (bSeated ? CgLook::Sit : CgLook::Still) : (AnimP == CgAnim::Run ? CgLook::Run : CgLook::Walk);
+		// (umbrella_hold: a mid person whose umbrella is open plays its bake's loops with the arm held)
+		if (Tier == 1 && (Look == CgLook::Walk || Look == CgLook::Still) && HasMidUmb() && UmbOpen(P))
+		{
+			Look = (uint8)(Look | CgLook::Umb);
+		}
 		if (bCity && (Tier == 1 || Tier == 2) && PersonStill.IsValidIndex(P) && PersonStill[P] != Look)
 		{
 			PersonStill[P] = Look;

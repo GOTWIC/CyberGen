@@ -68,6 +68,9 @@ void UCgPersonAnim::Play(UAnimSequenceBase* Clip, const bool bLoop, const float 
 void UCgPersonAnim::Advance(const float Dt)
 {
 	Step(Cur, CurT, CurRate, bCurLoop, Dt);
+	// (umbrella_hold: the held arm's weight toward its target)
+	const float Rate = Dt / FMath::Max(0.01f, HoldS);
+	HoldW = HoldTarget > HoldW ? FMath::Min(HoldTarget, HoldW + Rate) : FMath::Max(HoldTarget, HoldW - Rate);
 	if (Prev)
 	{
 		Step(Prev, PrevT, PrevRate, bPrevLoop, Dt);
@@ -90,6 +93,12 @@ float UCgPersonAnim::CurWeight() const
 	return U * U * (3.f - 2.f * U);
 }
 
+float UCgPersonAnim::HoldWeight() const
+{
+	const float U = FMath::Clamp(HoldW, 0.f, 1.f);
+	return U * U * (3.f - 2.f * U);
+}
+
 FAnimInstanceProxy* UCgPersonAnim::CreateAnimInstanceProxy()
 {
 	return new FCgPersonAnimProxy(this);
@@ -109,6 +118,12 @@ void FCgPersonAnimProxy::PreUpdate(UAnimInstance* InAnimInstance, const float De
 		bPrevLoop = A->bPrevLoop;
 		CurWeight = A->CurWeight();
 		Fix = A->Fix;
+		HoldWeight = A->HoldWeight();
+		if (HoldWeight > 0.f)
+		{
+			HoldBones = A->HoldBones;
+			HoldRots = A->HoldRots;
+		}
 	}
 }
 
@@ -134,6 +149,21 @@ bool FCgPersonAnimProxy::Evaluate(FPoseContext& Output)
 		FAnimationPoseData Out(Output);
 		const FAnimationPoseData From(Old);
 		FAnimationRuntime::BlendTwoPosesTogetherInPlace(Out, From, CurWeight);
+	}
+	// (umbrella_hold: the arm holding an umbrella over what plays, from the upper arm down; the
+	// shoulder (clavicle) and every bone past the hand the clip's)
+	if (HoldWeight > 0.f && HoldBones.Num() == HoldRots.Num())
+	{
+		const FBoneContainer& BC = Output.Pose.GetBoneContainer();
+		for (int32 K = 0; K < HoldBones.Num(); ++K)
+		{
+			const FCompactPoseBoneIndex CI = BC.GetCompactPoseIndexFromSkeletonPoseIndex(FSkeletonPoseBoneIndex(HoldBones[K]));
+			if (CI.IsValid() && CI.GetInt() < Output.Pose.GetNumBones())
+			{
+				FTransform& T = Output.Pose[CI];
+				T.SetRotation(FQuat::Slerp(T.GetRotation(), HoldRots[K], HoldWeight).GetNormalized());
+			}
+		}
 	}
 	return true;
 }
