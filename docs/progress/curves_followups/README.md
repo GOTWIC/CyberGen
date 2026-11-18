@@ -68,7 +68,9 @@ walkway, nor on any walkway inside a crossing zone (`network_checks.crossing_zon
 crosswalk record's stripe, curb to curb, and each crossing walkway's band where it lies on a
 road's carriageway face); it takes the nearest walkway point off them (a walkway's end within
 5 cm taken), in every branch of the search (an elevator core in a building, a link round the
-buildings).
+buildings). An elevated platform's own elevator at its first end (#109) that would stand on a
+crossing goes to its last end where that has none and stands off them, else is left out where
+another end has one.
 
 **Check:** `walkway_carriageway` fails a station's stair or elevator whose ground foot stands
 in a crossing zone (`station_feet_on_crossings`). On main it finds Vesper Bay's
@@ -76,7 +78,36 @@ in a crossing zone (`station_feet_on_crossings`). On main it finds Vesper Bay's
 
 ## Results
 
-RESULTS
+Every city the offsets move was built again (all of them), each passing every check (108,
+113 with decks):
+
+| City | Try it builds on (main) | Crossings past their span by 5 m | Station feet on crossings |
+|---|---|---|---|
+| Vesper Bay | 8, layout salt 7 (8, salt 7) | 0 (1 on main, `cw.e637n26`, 23.8 m) | 0 (2 on main) |
+| Vesper Bay Stacks | 3, salt 2 (3, salt 2) | 0 | 0 |
+| Delta Megacity | 3, salt 2 (5, salt 4) | 0 | 0 |
+| Cragmouth | 2, road variant 1 salt 1 (same) | 0 | 0 |
+| Nexus City, Saltreach Free Port | 1 (1) | 0 | 0 |
+| Greyhook | 3, salt 2 (same) | 0 | 0 |
+| Vesper Bay Decks | 18, road variant 3 salt 1 (same) | 0 | 0 |
+| Vesper Bay Pinned | PINNED | 0 | 0 |
+
+Delta Megacity's third layout, which failed `junction_levels` on main, now passes, so it
+builds there. The pinned demo's layout of main (try 2) put a platform's own elevator (#109's,
+at its first end) on a crossing (`stn.neon_strand_2`), which the check found: the elevator now
+goes to the platform's last end where that stands off the crossings, else is left out where
+another end has one (`transit.Builder._elevated`).
+
+Close-ups (walkways over the pavement map): `vesper_bay_cw_e637n26_main.png` and `_after.png`
+(the right sidewalk whole, the crosswalk straight), `vesper_bay_the_stacks_2_main.png` and
+`_after.png` (the stair's foot on the sidewalk).
+
+Goldens: every sample's model and blockout plan, Cragmouth's and Vesper Bay Decks' (all move:
+the lanes and sidewalk lines GEOS had split, and everything placed along them). Tests run
+(touched modules and the regeneration tests): `tests/test_crossings.py`,
+`tests/test_pavement.py`, `tests/test_transit.py`, `tests/test_edit.py`,
+`tests/test_terrain.py` (the hilly regeneration passes every check, no longer xfail):
+TESTS.
 
 ## Open items
 

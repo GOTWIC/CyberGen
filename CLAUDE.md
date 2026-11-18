@@ -1584,7 +1584,8 @@ as a pedestrian street one took a held street's dead end), `Frame.ends` every he
   hair at a vertex on the offset's inner side as two parts meeting end to end, and the longer
   part alone was kept, so a lane or a sidewalk's middle line stopped up to 57 m short of its
   road's end (Vesper Bay's `rs.e669s6`, whose crosswalk `cw.e637n26` was then walked as a
-  49 m diagonal between its corners); parts meeting within `JOIN_GAP_M` join again.
+  49 m diagonal between its corners); parts meeting within `JOIN_GAP_M` join again. Every
+  city moves (goldens rewritten); Delta Megacity builds on layout salt 2, the rest as before.
 - **#241** (`pavement.Assembly._foreign`): a junction's, pad's or bulb's vertex that only a
   road not its own shares (its outline against another road's sidewalk) takes the curb rule's
   height, not that road's; ports keep theirs.
@@ -1592,7 +1593,8 @@ as a pedestrian street one took a held street's dead end), `Frame.ends` every he
   on a crossing or crosswalk walkway, nor on another walkway inside a crossing's zone on the
   road (`network_checks.crossing_zones`: crosswalk records' stripes, crossing walkways' bands
   on a carriageway face; a cluster's inner sidewalk can run along a highway crosswalk): the
-  nearest walkway point off them.
+  nearest walkway point off them; a platform's own elevator (#109) over a crossing goes to
+  its last end, or none where another end has one.
 - **Check** `walkway_carriageway`: a crossing's length on one road's carriageway faces past
   that road's carriageway width (`carriageway_w`) counts past its span (a diagonal of one
   stretch); a station's stair or elevator with its foot in a crossing zone fails
