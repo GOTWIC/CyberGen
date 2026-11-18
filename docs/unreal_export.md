@@ -3299,6 +3299,30 @@ over the stretch played (`SitSeatedS`, `SitRiseS`, logged); mid and far stand at
 sit-down's start until seated, sit, and stand at the stand-up's end once up
 (`UpdatePeople`).
 
+### Umbrellas held (umbrella_hold)
+
+Results: `docs/progress/umbrella_hold/README.md`. LG8's umbrellas stood over the right shoulder,
+no arm held; now they are held in the right hand, the arm up. The places' step
+(`unreal_people.ensure_place_clips`, `people_places.py` `hold_pose`) poses each clip group's arm
+on its standing idle's first frame by two-bone IK (`unreal_people.UMB_HOLD`, fractions of the
+arm's length: on Delta's 47 cm arm the hand 22 cm ahead of the shoulder joint, 3 cm out and 8 cm
+down, the forearm raised, the elbow back, out and down, the wrist straight), writes it as a clip (`Anim/<group>/A_umb_hold`, the idle with the
+upper arm, forearm and hand held) and bakes two more loops into each look's second mid bake (the
+walk and the idle with the arm held: `A_umb_walk_<walk>`); the mid bakes keep a key of their own
+(`unreal_people.mid_key`), the still sheets `idle_key`. The exporter packs per group the held
+clip and the grip in the mesh's frame and per look the held loops' frames (`umb_hold_clips`,
+`umb_grip`, `mid_umb_frames`; `PACK_VERSION` 11, `LIFE_VERSION` life13). Near, `UCgPersonAnim`
+layers the held arm's three rotations over whatever clip plays (walk, idle, talk), weighted in
+and out over `UmbHoldS` (0.35 s) as the umbrella opens or folds; the umbrella stands in the drawn
+hand (`hand_r` on along its forearm), its shaft leaning back by the tilt, its canopy no lower
+than LG8's; under a cover the arm comes down and the umbrella hangs furled from the hand. Mid,
+the instance plays the held walk or idle (`CgLook::Umb`) and the umbrella stands at the bake's
+grip; folded, it is not drawn. Far cards are unchanged. Without the held arm's data the
+umbrellas are LG8's. The weather status adds `umbrellas_folded`, `umbrella_held`,
+`umbrella_mid_held`, `umbrella_hold_groups`; `CityGenLife.WeatherShow umbrella_still` and
+`umbrella_folded` frame someone standing with an umbrella open or someone with one under a
+cover, and every `umbrella*` show frames closer (5.2 m ahead, on the umbrella's side).
+
 ## Milestones and checks
 
 - **Every milestone** updates the exporter in its own PR for what it adds or changes (a new

@@ -41,11 +41,15 @@ JOB = json.load(open(os.environ["CITYGEN_UE_JOB"], encoding="utf-8"))
 HASH = JOB["hash"]
 BAKE = JOB.get("bake") or {}
 BKEY = BAKE.get("key", "")
+# umbrella_hold: the arm holding an umbrella (`unreal_people.UMB_HOLD`); the mid bakes' key
+# (the still sheets keep BKEY)
+UMB = BAKE.get("umbrella") or {}
+MKEY = BAKE.get("mid_key") or BKEY
 EAL = unreal.EditorAssetLibrary
 AT = unreal.AssetToolsHelpers.get_asset_tools()
 MEL = unreal.MaterialEditingLibrary
 ML = unreal.MathLibrary
-R = {"ok": False, "hash": HASH, "groups": {}, "missing": [], "looks": {}}
+R = {"ok": False, "hash": HASH, "groups": {}, "missing": [], "looks": {}, "umbrella": {}}
 T0 = time.time()
 
 
@@ -284,6 +288,199 @@ def loop_window(seq, fps, lo_s, hi_s):
             "clip_fps": round(clip_fps, 3)}
 
 
+# --- umbrella_hold: the right arm holding an umbrella ------------------------------------------
+# (quaternions as (x, y, z, w), Hamilton products as Unreal's FQuat: a child's rotation in the
+# component's frame is its parent's times its own; `hold_pose` checks that on the clip first)
+
+def _qm(a, b):
+    ax, ay, az, aw = a
+    bx, by, bz, bw = b
+    return (aw * bx + ax * bw + ay * bz - az * by, aw * by - ax * bz + ay * bw + az * bx,
+            aw * bz + ax * by - ay * bx + az * bw, aw * bw - ax * bx - ay * by - az * bz)
+
+
+def _qi(q):
+    return (-q[0], -q[1], -q[2], q[3])
+
+
+def _qr(q, v):
+    return _qm(_qm(q, (v[0], v[1], v[2], 0.0)), _qi(q))[:3]
+
+
+def _qd(a, b):
+    """The angle between two rotations (rad)."""
+    return 2.0 * math.acos(min(1.0, abs(sum(x * y for x, y in zip(a, b)))))
+
+
+def _add(a, b):
+    return tuple(x + y for x, y in zip(a, b))
+
+
+def _sub(a, b):
+    return tuple(x - y for x, y in zip(a, b))
+
+
+def _mul(a, s):
+    return tuple(x * s for x in a)
+
+
+def _dot(a, b):
+    return sum(x * y for x, y in zip(a, b))
+
+
+def _cross(a, b):
+    return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
+
+
+def _len(a):
+    return math.sqrt(_dot(a, a))
+
+
+def _unit(a):
+    n = _len(a)
+    return _mul(a, 1.0 / n) if n > 1e-9 else a
+
+
+def _between(a, b):
+    """The shortest turn taking unit direction a onto unit direction b."""
+    ax = _cross(a, b)
+    s, c = _len(ax), _dot(a, b)
+    if s < 1e-9:
+        return (0.0, 0.0, 0.0, 1.0)
+    h = 0.5 * math.atan2(s, c)
+    u = _mul(ax, math.sin(h) / s)
+    return (u[0], u[1], u[2], math.cos(h))
+
+
+def _tq(t):
+    r = t.rotation
+    return (r.x, r.y, r.z, r.w)
+
+
+def _tp(t):
+    v = t.translation
+    return (v.x, v.y, v.z)
+
+
+HOLD_BONES = ("upperarm_r", "lowerarm_r", "hand_r")
+
+
+def hold_pose(seq, cfg):
+    """umbrella_hold: the arm holding an umbrella, on a clip's first frame (the group's standing
+    idle): the hand put by two-bone IK at the shoulder joint (upperarm_r) plus `fwd`, `out` and
+    `up` of the arm's length along the body's forward (the toes' way), right (the right shoulder
+    from the left) and up, the elbow toward `pole` (back, out, down), the wrist straight on its
+    forearm. Its upper arm's, forearm's and hand's rotations in their parents' frames (the
+    near tier layers them over any clip, the held clips carry them), the grip in the mesh's
+    frame (cm: `grip` of the arm's length on from the wrist along the forearm), and its
+    measures. Raises when the clip's bones do not chain as assumed."""
+    AP = unreal.AnimPoseExtensions
+    SP = unreal.AnimPoseSpaces
+    pose = AP.get_anim_pose_at_frame(seq, 0, unreal.AnimPoseEvaluationOptions())
+    have = {str(n) for n in AP.get_bone_names(pose)}
+    need = ("clavicle_r", "upperarm_r", "lowerarm_r", "hand_r", "upperarm_l")
+    if any(b not in have for b in need):
+        raise RuntimeError(f"{seq.get_name()}: no {[b for b in need if b not in have]}")
+    opt = [b for b in ("foot_r", "ball_r", "head") if b in have]
+    w = {b: AP.get_bone_pose(pose, b, SP.WORLD) for b in need + tuple(opt)}
+    loc = {b: AP.get_bone_pose(pose, b, SP.LOCAL) for b in HOLD_BONES}
+    # (the chain and the products as assumed: each child's rotation and place from its
+    # parent's in the component's frame)
+    for child, parent in (("upperarm_r", "clavicle_r"), ("lowerarm_r", "upperarm_r"),
+                          ("hand_r", "lowerarm_r")):
+        got = _qm(_qi(_tq(w[parent])), _tq(w[child]))
+        at = _add(_tp(w[parent]), _qr(_tq(w[parent]), _tp(loc[child])))
+        if _qd(got, _tq(loc[child])) > 2e-3 or _len(_sub(at, _tp(w[child]))) > 0.1:
+            raise RuntimeError(f"{seq.get_name()}: {child} is not {parent}'s child as assumed "
+                               f"(turn {_qd(got, _tq(loc[child])):.4f} rad, "
+                               f"{_len(_sub(at, _tp(w[child]))):.3f} cm)")
+    up = (0.0, 0.0, 1.0)
+    side = _sub(_tp(w["upperarm_r"]), _tp(w["upperarm_l"]))
+    right = _unit((side[0], side[1], 0.0))
+    fwd = _unit(_cross(right, up))
+    toe = None
+    if "ball_r" in w and "foot_r" in w:
+        t = _sub(_tp(w["ball_r"]), _tp(w["foot_r"]))
+        t = (t[0], t[1], 0.0)
+        if _len(t) > 3.0:
+            toe = _unit(_sub(t, _mul(right, _dot(t, right))))
+            fwd = toe
+    S, E0, H0 = (_tp(w[b]) for b in HOLD_BONES)
+    a, b = _len(_sub(E0, S)), _len(_sub(H0, E0))
+    arm = a + b
+    T = _add(S, _add(_mul(fwd, cfg["fwd"] * arm),
+                     _add(_mul(right, cfg["out"] * arm), _mul(up, cfg["up"] * arm))))
+    d = _len(_sub(T, S))
+    u = _unit(_sub(T, S))
+    d = min(max(d, abs(a - b) + 0.5), 0.98 * arm)
+    T = _add(S, _mul(u, d))
+    pl = cfg["pole"]
+    pole = _unit(_add(_mul(fwd, pl[0]), _add(_mul(right, pl[1]), _mul(up, pl[2]))))
+    p = _unit(_sub(pole, _mul(u, _dot(pole, u))))
+    ca = max(-1.0, min(1.0, (a * a + d * d - b * b) / (2.0 * a * d)))
+    E = _add(S, _mul(_add(_mul(u, ca), _mul(p, math.sqrt(1.0 - ca * ca))), a))
+    q1 = _between(_unit(_sub(E0, S)), _unit(_sub(E, S)))
+    wu = _qm(q1, _tq(w["upperarm_r"]))
+    q2 = _between(_qr(q1, _unit(_sub(H0, E0))), _unit(_sub(T, E)))
+    wl = _qm(q2, _qm(q1, _tq(w["lowerarm_r"])))
+    wh = _qm(q2, _qm(q1, _tq(w["hand_r"])))
+    rot = {"upperarm_r": _qm(_qi(_tq(w["clavicle_r"])), wu), "lowerarm_r": _qm(_qi(wu), wl),
+           "hand_r": _qm(_qi(wl), wh)}
+    E1 = _add(S, _qr(wu, _tp(loc["lowerarm_r"])))
+    H1 = _add(E1, _qr(wl, _tp(loc["hand_r"])))
+    grip = _add(H1, _mul(_unit(_sub(T, E)), cfg["grip"] * arm))
+    r3 = lambda v: [round(x, 3) for x in v]       # noqa: E731
+    out = {"rot": {k: [round(x, 7) for x in q] for k, q in rot.items()},
+           "grip_cm": r3(grip), "hand_cm": r3(H1), "elbow_cm": r3(E1), "shoulder_cm": r3(S),
+           "fwd": r3(fwd), "right": r3(right), "toes": toe is not None,
+           "toe_dot": round(_dot(toe, _unit(_cross(right, up))), 3) if toe else None,
+           "arm_cm": round(arm, 2), "error_cm": round(_len(_sub(H1, T)), 3),
+           "head_cm": r3(_tp(w["head"])) if "head" in w else None}
+    log(f"hold pose {seq.get_name()}: {out}")
+    if out["error_cm"] > 1.0:
+        raise RuntimeError(f"{seq.get_name()}: the held hand misses its place by "
+                           f"{out['error_cm']} cm")
+    return out
+
+
+def held_clip(src, dst, rot):
+    """umbrella_hold: a copy of a clip (`src`, a package path) at `dst` with the arm held: the
+    upper arm's, forearm's and hand's rotations `rot` at every key, their places the clip's.
+    Kept while it carries the mid bakes' key."""
+    if EAL.does_asset_exist(dst) and meta(unreal.load_asset(dst), "cg.idles") == MKEY:
+        return unreal.load_asset(dst)
+    if EAL.does_asset_exist(dst):
+        EAL.delete_asset(dst)
+    seq = EAL.duplicate_asset(src, dst)
+    if seq is None:
+        raise RuntimeError(f"could not copy {src} to {dst}")
+    AL = unreal.AnimationLibrary
+    n = _keys(seq)
+    ctrl = seq.get_editor_property("controller")
+    for bone in HOLD_BONES:
+        q = rot[bone]
+        pos = [AL.get_bone_pose_for_frame(seq, bone, k, False).translation for k in range(n)]
+        ctrl.set_bone_track_keys(bone, pos, [unreal.Quat(q[0], q[1], q[2], q[3])] * n,
+                                 [unreal.Vector(1, 1, 1)] * n, False)
+    EAL.set_metadata_tag(seq, "cg.idles", MKEY)
+    EAL.save_loaded_asset(seq, False)
+    log(f"held clip {dst}: {n} keys")
+    return seq
+
+
+UMB_WALKS = {}
+
+
+def umb_walk(anim, key, rot):
+    """umbrella_hold: a walk with the arm held (`A_umb_walk_<walk>` in the group's folder), made
+    once per walk."""
+    src = anim.get_path_name().split(".")[0]
+    if src not in UMB_WALKS:
+        dst = f"{JOB['content']}/Anim/{key}/A_umb_walk_{anim.get_name()}"
+        UMB_WALKS[src] = held_clip(src, dst, rot)
+    return UMB_WALKS[src]
+
+
 def _asset(path, cls, factory):
     a = unreal.load_asset(path) if EAL.does_asset_exist(path) else None
     if a is None:
@@ -318,7 +515,7 @@ def mid_bake(look, windows):
         raise RuntimeError(f"{lid}: no mid mesh {look['mid']['mesh']}")
     nslots = len(mesh.get_editor_property("static_materials"))
     mats = [f"{folder}/MI_{lid}_MidIdle_{i}" for i in range(nslots)]
-    if EAL.does_asset_exist(da_path) and meta(unreal.load_asset(da_path), "cg.idles") == BKEY \
+    if EAL.does_asset_exist(da_path) and meta(unreal.load_asset(da_path), "cg.idles") == MKEY \
             and all(EAL.does_asset_exist(p) for p in mats):
         da = unreal.load_asset(da_path)
         return _mid_record(da, mats, da_path, kept=True)
@@ -339,6 +536,15 @@ def mid_bake(look, windows):
                   w0.get_editor_property("end_frame"))]
     for w, a in ((windows["idle"], idle), (windows["sit"], sit)):
         seqs.append(_info(a, w["clip_frame"], w["clip_frame"] + w["samples"] - 1))
+    if windows.get("umb"):
+        # (umbrella_hold: the walk with the arm held, over the walk's own range, and the idle
+        # with it held, over the idle's loop)
+        hw = windows["umb"]
+        walk = umb_walk(w0.get_editor_property("anim_sequence"), look["skeleton"], hw["rot"])
+        seqs.append(_info(walk, w0.get_editor_property("start_frame"),
+                          w0.get_editor_property("end_frame")))
+        seqs.append(_info(unreal.load_asset(hw["anim"]), hw["clip_frame"],
+                          hw["clip_frame"] + hw["samples"] - 1))
     for k in ("skeletal_mesh", "skeletal_lod_index", "static_mesh", "static_lod_index",
               "uv_channel", "mode", "precision", "num_bone_influences", "sample_rate",
               "num_driver_triangles", "sigma", "max_height", "max_width"):
@@ -361,7 +567,7 @@ def mid_bake(look, windows):
         unreal.AnimToTextureBPLibrary.update_material_instance_from_data_asset(
             da, mi, unreal.MaterialParameterAssociation.GLOBAL_PARAMETER)
         EAL.save_loaded_asset(mi, False)
-    EAL.set_metadata_tag(da, "cg.idles", BKEY)
+    EAL.set_metadata_tag(da, "cg.idles", MKEY)
     EAL.save_loaded_asset(da, False)
     rec = _mid_record(da, mats, da_path, kept=False)
     log(f"mid idle {lid}: {rec}")
@@ -372,11 +578,16 @@ def _mid_record(da, mats, da_path, kept):
     anims = da.get_editor_property("animations")
     rng = [[int(a.get_editor_property("start_frame")), int(a.get_editor_property("end_frame"))]
            for a in anims]
-    if len(rng) < 3:
-        raise RuntimeError(f"{da_path}: {len(rng)} animations baked, 3 wanted")
-    return {"data": da_path, "materials": mats, "walk": rng[0], "idle": rng[1], "sit": rng[2],
-            "frames": int(da.get_editor_property("num_frames")),
-            "fps": float(da.get_editor_property("sample_rate")), "kept": kept}
+    want = 5 if UMB else 3
+    if len(rng) < want:
+        raise RuntimeError(f"{da_path}: {len(rng)} animations baked, {want} wanted")
+    rec = {"data": da_path, "materials": mats, "walk": rng[0], "idle": rng[1], "sit": rng[2],
+           "frames": int(da.get_editor_property("num_frames")),
+           "fps": float(da.get_editor_property("sample_rate")), "kept": kept}
+    if UMB:
+        # (umbrella_hold: the walk and the idle with the arm held)
+        rec.update({"umb_walk": rng[3], "umb_idle": rng[4]})
+    return rec
 
 
 # --- people_idles: the far cards' still poses (a second impostor sheet per look) --------------
@@ -683,6 +894,15 @@ def step_idles(groups):
         windows[key] = {
             "idle": {"anim": g["idle"], **loop_window(idle, fps, *BAKE["idle_s"])},
             "sit": {"anim": groups[key]["sit"]["anim"], **loop_window(sit, fps, *BAKE["sit_s"])}}
+        if UMB:
+            # (umbrella_hold: the group's arm holding an umbrella, the idle with it held over
+            # the idle's own loop)
+            hold = hold_pose(idle, UMB)
+            hp = f"{JOB['content']}/Anim/{key}/A_umb_hold"
+            held_clip(g["idle"], hp, hold["rot"])
+            R["umbrella"][key] = {"anim": hp, **hold}
+            windows[key]["umb"] = {**{k: v for k, v in windows[key]["idle"].items()
+                                      if k != "anim"}, "anim": hp, "rot": hold["rot"]}
         log(f"{key} loops: {windows[key]}")
         yield
     R["windows"] = windows
@@ -734,6 +954,9 @@ def run():
                                      "idle": [int(BAKE["walk_frames"]) + int(BAKE["sit_cells"]),
                                               int(BAKE["idle_cells"])]},
                             "looks": R["looks"]}
+            if UMB:
+                man["idles"]["mid_key"] = MKEY
+                man["idles"]["umbrella"] = R["umbrella"]
         os.makedirs(os.path.dirname(JOB["manifest"]), exist_ok=True)
         with open(JOB["manifest"], "w", encoding="utf-8") as f:
             json.dump(man, f, indent=1)
