@@ -10,10 +10,18 @@
 // raincoats and umbrellas, the chance to shelter, the cars' share, speed and headway; a rain
 // state's values are reached by its rain, so they follow atmosgen's change of state as its rain
 // does. Umbrellas: two instanced components (a canopy and a shaft, the engine's basic shapes in
-// the trains' material) over the right shoulders of the near and mid people who hold one, folded
-// (not drawn) under a cover. A danger (Panic) is the processor's (CgLife::StepCity).
+// the trains' material) of the near and mid people who hold one. umbrella_hold: held in the right
+// hand, the arm up (near, the group's held arm layered over the clip, UCgPersonAnim; mid, the
+// bake's loops with the arm held and the umbrella at the bake's grip); under a cover a near
+// person lowers the arm and the umbrella hangs furled from the hand, a mid one's is not drawn.
+// Without the held arm's data, LG8's over the right shoulder. A danger (Panic) is the
+// processor's (CgLife::StepCity).
 
 #include "CityGenLifeActor.h"
+#include "CityGenLifeAnim.h"
+#include "Animation/AnimSequence.h"
+#include "Animation/Skeleton.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "CityGenLifeISM.h"
 #include "CityGenLifeTypes.h"
@@ -281,6 +289,53 @@ bool ACityGenLife::HasUmbrella(const int32 P) const
 	return U < UmbrellaNow;
 }
 
+bool ACityGenLife::UmbOpen(const int32 P) const
+{
+	return UmbCanopy && WalkState.IsValidIndex(P) && (WalkState[P] == CgShow::Moving || WalkState[P] == CgShow::Still) &&
+		WalkPos.IsValidIndex(P) && !WalkPos[P].IsZero() &&
+		!(WalkCovered.IsValidIndex(P) && WalkCovered[P]) &&
+		!(WalkAnimG.IsValidIndex(P) && (CgAnim::IsSit(WalkAnimG[P]) || WalkAnimG[P] == CgAnim::Run)) &&
+		HasUmbrella(P);
+}
+
+void ACityGenLife::MakeUmbHold()
+{
+	// (umbrella_hold: per clip group its held arm, from its clip's first key: the upper arm's,
+	// forearm's and hand's rotations in their parents' frames, by the skeleton's indices)
+	bUmbHoldMade = true;
+	static const TCHAR* Names[] = {TEXT("upperarm_r"), TEXT("lowerarm_r"), TEXT("hand_r")};
+	UmbHoldBones.SetNum(UmbHoldClips.Num());
+	UmbHoldRots.SetNum(UmbHoldClips.Num());
+	int32 Made = 0;
+	for (int32 G = 0; G < UmbHoldClips.Num(); ++G)
+	{
+		UmbHoldBones[G].Reset();
+		UmbHoldRots[G].Reset();
+		const UAnimSequence* Clip = UmbHoldClips[G].Get();
+		const USkeleton* Sk = Clip ? Clip->GetSkeleton() : nullptr;
+		if (!Sk)
+		{
+			continue;
+		}
+		for (const TCHAR* Name : Names)
+		{
+			const int32 Bone = Sk->GetReferenceSkeleton().FindBoneIndex(FName(Name));
+			if (Bone == INDEX_NONE)
+			{
+				UmbHoldBones[G].Reset();
+				UmbHoldRots[G].Reset();
+				break;
+			}
+			FTransform T;
+			Clip->GetBoneTransform(T, FSkeletonPoseBoneIndex(Bone), FAnimExtractContext(0.0), false);
+			UmbHoldBones[G].Add(Bone);
+			UmbHoldRots[G].Add(T.GetRotation().GetNormalized());
+		}
+		Made += UmbHoldBones[G].Num() ? 1 : 0;
+	}
+	UE_LOG(LogTemp, Display, TEXT("CityGenLife: the umbrella's held arm for %d of %d clip groups"), Made, UmbHoldClips.Num());
+}
+
 void ACityGenLife::MakeUmbrellas()
 {
 	if (!UmbrellaCanopy || !UmbrellaShaft || !IsCity() || Umbrella.Num() < 8)
@@ -362,16 +417,36 @@ void ACityGenLife::UpdateUmbrellas(const FVector& View)
 	const int32 NP = FMath::Min(UmbCanXf.Num(), WalkPos.Num());
 	const float CanW = Umbrella[1], CanH = Umbrella[2], Height = Umbrella[3], SideM = Umbrella[4], FwdM = Umbrella[5];
 	const float Tilt = Umbrella[6], ShaftM = Umbrella[7];
-	int32 On = 0;
+	if (!bUmbHoldMade)
+	{
+		MakeUmbHold();
+	}
+	// (umbrella_hold: held in the hand where the library has the held arm; LG8's over the
+	// shoulder otherwise)
+	const bool bHeld = UmbGrip.Num() >= 3;
+	const int32 NG = UmbGrip.Num() / 3;
+	int32 On = 0, Folded = 0;
 	bool bAny = false;
 	for (int32 P = 0; P < NP; ++P)
 	{
-		const bool bShown = WalkState.IsValidIndex(P) && (WalkState[P] == CgShow::Moving || WalkState[P] == CgShow::Still) &&
-			PersonTier.IsValidIndex(P) && PersonTier[P] <= 1 && !WalkPos[P].IsZero() &&
-			!(WalkCovered.IsValidIndex(P) && WalkCovered[P]) &&
-			!(WalkAnimG.IsValidIndex(P) && (CgAnim::IsSit(WalkAnimG[P]) || WalkAnimG[P] == CgAnim::Run)) &&
-			HasUmbrella(P);
-		if (!bShown)
+		const uint8 TierP = PersonTier.IsValidIndex(P) ? PersonTier[P] : 255;
+		const bool bOpen = TierP <= 1 && UmbOpen(P);
+		// (umbrella_hold: a near person's umbrella in its hand, from the drawn body's bones: open
+		// once the arm is mostly up; folded and hanging from the hand while the arm is down (under
+		// a cover, or rising to open it))
+		USkeletalMeshComponent* Lead = nullptr;
+		const UCgPersonAnim* Body = nullptr;
+		if (bHeld && TierP == 0 && PersonSlot.IsValidIndex(P) && NearSlots.IsValidIndex(PersonSlot[P]) && NearSlots[PersonSlot[P]].Comps.Num())
+		{
+			Lead = NearSlots[PersonSlot[P]].Comps[0];
+			Body = Lead ? Cast<UCgPersonAnim>(Lead->GetAnimInstance()) : nullptr;
+		}
+		const float HoldW = Body ? Body->HoldW : (bOpen ? 1.f : 0.f);
+		const bool bHand = Lead && Body && Body->HoldBones.Num();
+		const bool bShowOpen = bOpen && (!bHand || HoldW >= 0.6f);
+		const bool bShowFurled = !bShowOpen && bHand && WalkState.IsValidIndex(P) && (WalkState[P] == CgShow::Moving || WalkState[P] == CgShow::Still) &&
+			!(WalkAnimG.IsValidIndex(P) && (CgAnim::IsSit(WalkAnimG[P]) || WalkAnimG[P] == CgAnim::Run)) && HasUmbrella(P);
+		if (!bShowOpen && !bShowFurled)
 		{
 			if (UmbShown[P])
 			{
@@ -383,21 +458,68 @@ void ACityGenLife::UpdateUmbrellas(const FVector& View)
 			continue;
 		}
 		const float Scale = PersonScale.IsValidIndex(P) ? PersonScale[P] : 1.f;
-		const FRotator R(-Tilt, WalkYaw[P], 0.f);
 		const FVector Fwd = FRotator(0.f, WalkYaw[P], 0.f).Vector();
 		const FVector Right = FVector::CrossProduct(FVector::UpVector, Fwd);
-		const FVector Up = R.RotateVector(FVector::UpVector);
-		// (the canopy's middle over the right shoulder, a person's height and a bit up; the shaft
-		// down from it toward the hand)
-		const FVector Mid = WalkPos[P] + Fwd * (100.f * FwdM) + Right * (100.f * SideM) +
-			FVector(0.0, 0.0, 100.f * (1.75f * Scale * Height + 0.5f * CanH));
-		UmbCanXf[P] = FTransform(R, Mid, FVector(CanW, CanW, CanH));
-		UmbShaftXf[P] = FTransform(R, Mid - Up * (50.f * ShaftM), FVector(0.022f, 0.022f, ShaftM));
-		UmbShown[P] = 1;
 		bAny = true;
+		if (!bHeld)
+		{
+			// (LG8: the canopy's middle over the right shoulder, a person's height and a bit up;
+			// the shaft down from it toward the hand)
+			const FRotator R(-Tilt, WalkYaw[P], 0.f);
+			const FVector Up = R.RotateVector(FVector::UpVector);
+			const FVector Mid = WalkPos[P] + Fwd * (100.f * FwdM) + Right * (100.f * SideM) +
+				FVector(0.0, 0.0, 100.f * (1.75f * Scale * Height + 0.5f * CanH));
+			UmbCanXf[P] = FTransform(R, Mid, FVector(CanW, CanW, CanH));
+			UmbShaftXf[P] = FTransform(R, Mid - Up * (50.f * ShaftM), FVector(0.022f, 0.022f, ShaftM));
+			UmbShown[P] = 1;
+			++On;
+			continue;
+		}
+		// the grip: near, the drawn hand (its wrist on along its forearm by the grip's share of the
+		// arm, as the bake's); mid, the bake's grip in the body's frame
+		FVector Grip;
+		if (bHand)
+		{
+			const FVector Hand = Lead->GetSocketLocation(TEXT("hand_r"));
+			const FVector Elbow = Lead->GetSocketLocation(TEXT("lowerarm_r"));
+			const FVector Along = (Hand - Elbow).GetSafeNormal();
+			Grip = Hand + Along * (0.3f * FVector::Dist(Hand, Elbow));
+		}
+		else
+		{
+			const int32 NC = FMath::Max(1, MidMeshes.Num());
+			const int32 C = PersonChar.IsValidIndex(P) ? FMath::Clamp(PersonChar[P], 0, NC - 1) : 0;
+			const int32 G = CharClipGroup.IsValidIndex(C) ? FMath::Clamp(CharClipGroup[C], 0, NG - 1) : 0;
+			const FVector Local(UmbGrip[3 * G], UmbGrip[3 * G + 1], UmbGrip[3 * G + 2]);
+			Grip = WalkPos[P] + FRotator(0.f, WalkYaw[P] + MeshYaw, 0.f).RotateVector(Local * Scale);
+		}
+		if (bShowFurled)
+		{
+			// (folded: the canopy furled into a thin cone, tip down, the shaft hanging from the
+			// hand)
+			const FQuat Down(FVector::ForwardVector, PI);
+			UmbCanXf[P] = FTransform(Down, Grip - FVector(0.0, 0.0, 38.0 * Scale), FVector(0.085f, 0.085f, 0.5f * Scale));
+			UmbShaftXf[P] = FTransform(FQuat::Identity, Grip - FVector(0.0, 0.0, 31.0 * Scale), FVector(0.02f, 0.02f, 0.72f * Scale));
+			UmbShown[P] = 2;
+			++Folded;
+			continue;
+		}
+		// (open: the shaft up from the grip, leaning back toward the head by the tilt, the canopy
+		// on its top no lower than LG8's over the head)
+		const float T = FMath::DegreesToRadians(Tilt);
+		const FVector Dir = (FVector::UpVector * FMath::Cos(T) - Fwd * FMath::Sin(T)).GetSafeNormal();
+		const double TopZ = WalkPos[P].Z + 100.0 * (1.75 * Scale * Height + 0.5 * CanH);
+		const double Len = FMath::Max(100.0 * ShaftM * Scale, (TopZ - Grip.Z) / FMath::Max(0.5, (double)Dir.Z));
+		const FVector Mid = Grip + Dir * Len;
+		const FQuat Q = FQuat::FindBetweenNormals(FVector::UpVector, Dir);
+		UmbCanXf[P] = FTransform(Q, Mid, FVector(CanW, CanW, CanH));
+		// (the shaft through the hand and 6 cm past it below: the handle)
+		UmbShaftXf[P] = FTransform(Q, Grip + Dir * (0.5 * (Len - 6.0)), FVector(0.022f, 0.022f, (Len + 6.0) / 100.0));
+		UmbShown[P] = 1;
 		++On;
 	}
 	UmbrellasNow = On;
+	UmbFoldedNow = Folded;
 	if (bAny || bUmbSeen)
 	{
 		UmbCanopy->BatchUpdateInstancesTransforms(0, UmbCanXf, false, bRebuildRenderState, false);
@@ -503,7 +625,17 @@ bool ACityGenLife::ShowWeather(const FString& What)
 		bool bWant = false;
 		if (What == TEXT("umbrella"))
 		{
-			bWant = UmbShown.IsValidIndex(P) && UmbShown[P] && WalkState[P] == CgShow::Moving;
+			bWant = UmbShown.IsValidIndex(P) && UmbShown[P] == 1 && WalkState[P] == CgShow::Moving;
+		}
+		else if (What == TEXT("umbrella_still"))
+		{
+			// (umbrella_hold: someone standing with its umbrella open)
+			bWant = UmbShown.IsValidIndex(P) && UmbShown[P] == 1 && WalkState[P] == CgShow::Still && !CgAnim::IsSit(Anim);
+		}
+		else if (What == TEXT("umbrella_folded"))
+		{
+			// (umbrella_hold: someone near holding its umbrella folded, under a cover)
+			bWant = UmbShown.IsValidIndex(P) && UmbShown[P] == 2;
 		}
 		else if (What == TEXT("shelter"))
 		{
@@ -575,5 +707,8 @@ FString ACityGenLife::WeatherStatus() const
 		bFollowAtmos ? TEXT("true") : TEXT("false"), AtmosActor.IsValid() ? TEXT("true") : TEXT("false"), AtmosHour, Hour, HourSteps, HourJumps,
 		bWeatherOn ? TEXT("true") : TEXT("false"), *WeatherState, *WeatherHeld, RainNow, OutNow, PaceNow, RainLooksNow, UmbrellaNow, ShelterNow,
 		CarsNow, SpeedNow, HeadwayNow, UmbrellasNow, Frame.Sheltering, Frame.Looking, Frame.Fleeing, Frame.Gawking, PanicCount, Thinned,
-		CoverCm.Num() / 2, *LastWeatherShow);
+		CoverCm.Num() / 2, *LastWeatherShow)
+		.LeftChop(1) + FString::Printf(TEXT(",\"umbrellas_folded\":%d,\"umbrella_held\":%s,\"umbrella_mid_held\":%s,\"umbrella_hold_groups\":%d}"),
+			UmbFoldedNow, UmbGrip.Num() >= 3 ? TEXT("true") : TEXT("false"), HasMidUmb() ? TEXT("true") : TEXT("false"),
+			UmbHoldBones.FilterByPredicate([](const TArray<int32>& B) { return B.Num() > 0; }).Num());
 }

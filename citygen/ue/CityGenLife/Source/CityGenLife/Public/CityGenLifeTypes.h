@@ -58,6 +58,7 @@ namespace CgLook
 		Still = 1,     // standing (people_idles: the baked idle; before, the walk's passing pose)
 		Run = 2,       // LG8: the walk played faster
 		Sit = 3,       // people_idles: the baked sitting loop
+		Umb = 0x10,    // umbrella_hold: a flag on Walk or Still: the bake's loop with the arm held
 	};
 }
 

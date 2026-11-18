@@ -190,6 +190,45 @@ def test_places_hash_and_idle_key(monkeypatch):
     assert list(b["cell"]) == list(L.IMPOSTOR_CELL)
 
 
+def test_exporter_packs_the_umbrella_hold():
+    """umbrella_hold: the held arm's clip and grip per group and each look's held walk and idle
+    in its second bake reach the controller; a manifest without them, or without them for every
+    look, leaves the umbrellas as LG8's (none of it)."""
+    from citygen import unreal_life as UL
+    spike = {"library": {"characters": 3, "walks": list(L.WALKS)},
+             "persons": {"seed": [1], "character": [0], "scale": [1.0], "gait": [0],
+                         "pace": [1.3], "tint": [0]}}
+    pl = _places(3)
+    pl["idles"]["mid_key"] = "m1"
+    pl["idles"]["umbrella"] = {"s0": {"anim": "/Game/A/A_umb_hold",
+                                      "grip_cm": [-24.5, 31.0, 122.25]}}
+    for lk in pl["idles"]["looks"].values():
+        lk["mid"].update(umb_walk=[270, 329], umb_idle=[330, 419])
+    lib = UL.people_library({**_lib(3), "place_clips": pl}, spike)
+    assert lib["umb_hold_clips"] == ["/Game/A/A_umb_hold"]
+    assert lib["umb_grip"] == [-24.5, 31.0, 122.25] and lib["umb_key"] == "m1"
+    assert lib["mid_umb_frames"] == [270.0, 330.0, 419.0, 1.0] * 3
+    # (the idles' own data as before)
+    assert lib["mid_still_frames"] == [60.0, 149.0, 150.0, 269.0] * 3
+    pl["idles"]["looks"]["p01"]["mid"].pop("umb_walk")
+    part = UL.people_library({**_lib(3), "place_clips": pl}, spike)
+    assert "umb_grip" not in part and "mid_umb_frames" not in part
+    assert "umb_grip" not in UL.people_library({**_lib(3), "place_clips": _places(3)}, spike)
+
+
+def test_mid_key_follows_the_hold(monkeypatch):
+    """umbrella_hold: the mid bakes' key follows the hold's settings and the idles' key; the
+    still sheets' key (idle_key) does not move with the hold."""
+    from citygen import unreal_people as UP
+    k, m = UP.idle_key("abc"), UP.mid_key("abc")
+    assert m != k and m != UP.mid_key("abd")
+    monkeypatch.setattr(UP, "UMB_HOLD", {**UP.UMB_HOLD, "fwd": 0.5})
+    assert UP.mid_key("abc") != m and UP.idle_key("abc") == k
+    b = UP.idle_bake({"hash": "abc", "far": {"size": [1.1, 2.2], "views": 8}})
+    assert b["key"] == k and b["mid_key"] == UP.mid_key("abc")
+    assert b["umbrella"]["fwd"] == 0.5 and len(b["umbrella"]["pole"]) == 3
+
+
 def test_places_need_a_library(tmp_path):
     from citygen import unreal_people as UP
     up = tmp_path / "proj" / "Proj.uproject"
