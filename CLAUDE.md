@@ -1599,6 +1599,10 @@ as a pedestrian street one took a held street's dead end), `Frame.ends` every he
   that road's carriageway width (`carriageway_w`) counts past its span (a diagonal of one
   stretch); a station's stair or elevator with its foot in a crossing zone fails
   (`station_feet_on_crossings`).
+- **Holes between levels** (`pavement.Assembly._one_level`): `fill_gaps` fills no hole whose
+  faces round it stand at two levels (a street under a bridge approach on one layer): the
+  layer's snap-rounded union left such a sliver open or closed by faces far away, and a
+  regeneration moved a street 535 m from its district.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 

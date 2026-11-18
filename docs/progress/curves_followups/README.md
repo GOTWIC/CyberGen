@@ -76,6 +76,27 @@ another end has one.
 in a crossing zone (`station_feet_on_crossings`). On main it finds Vesper Bay's
 `stn.the_stacks.2` and `stn.vess_docks`, and the 16 Nov Delta's `stn.west_quay`.
 
+## 4. A regeneration moving a street 535 m away (`test_district_regeneration_changes_only_its_neighborhood`)
+
+**Found** (on main, by the coordinator): regenerating the small test city's Old Quarter changed
+the blockout objects `city.road_street.t+00-04` and `city.sidewalk.t+00-04`, far outside the
+district's 250 m neighborhood.
+
+**Cause:** the street `rs.e152s911` passes under a bridge approach of the highway
+`rs.e128s914` (16.6 m over it, both on layer g0). Their faces' edges run 0.5 mm apart there,
+and the shared-edge pass rightly does not join faces of two levels, so a sliver of 0.0017 m2
+lies between them. `pavement.Assembly.fill_gaps` looks for holes in each layer's union of
+faces, a snap-rounded `union_all` whose merge order follows the whole city's faces: on the
+fresh build the sliver came out closed, on the regenerated city (other faces in Old Quarter)
+open, so it was filled into the street's curb band, a vertex added at (114.573, -907.300),
+and the street's curb and carriageway faces, and with them the blockout objects of their
+tile, changed.
+
+**Fix** (`Assembly._one_level`): a hole whose surrounding faces are not all at one level
+(`compatible` at the hole's point) is not filled: it is no sliver between faces built apart
+but the gap between a road and one passing over it. The street's faces now come back as on
+the fresh build. The test passes without changing its rule (the rule is M10's guarantee).
+
 ## Results
 
 Every city the offsets move was built again (all of them), each passing every check (108,
