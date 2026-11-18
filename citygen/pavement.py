@@ -1365,11 +1365,14 @@ class Assembly:
             tree = shapely.STRtree(geoms)
             for hp in sorted(holes, key=lambda h: h.bounds):
                 best = None
+                around = []
                 for k in sorted(tree.query(hp.buffer(0.01)).tolist()):
                     shared = shapely.intersection(geoms[k].boundary, hp.buffer(0.002)).length
+                    if shared > 0:
+                        around.append(k)
                     if shared > 0 and (best is None or shared > best[0] + 1e-9):
                         best = (shared, k)
-                if best is None:
+                if best is None or not self._one_level(idx, around, hp):
                     continue
                 fi = idx[best[1]]
                 F = self.faces[fi]
@@ -1389,6 +1392,21 @@ class Assembly:
             self.tfix(near, near, all_segs=True)
         self.stats["gaps_filled"] = self.stats.get("gaps_filled", 0) + n
         return n
+
+    def _one_level(self, idx: list, around: list, hp) -> bool:
+        """Curves followups: whether the faces round a hole stand at one level there (each
+        pair `compatible` at the hole's point). A hole between levels (a street under a
+        bridge approach on the same layer, their edges a hair apart where the shared-edge
+        pass does not join faces of two levels) is no sliver to fill: whether the layer's
+        union, snap-rounded in an order of the whole city's faces, leaves it open or closed
+        depends on faces far from it, and a regeneration half a kilometer away filled one
+        (the small test city's `rs.e152s911` under `rs.e128s914`)."""
+        if len(around) < 2:
+            return True
+        c = hp.representative_point()
+        v = (mm(c.x), mm(c.y))
+        fs = [self.faces[idx[k]] for k in around]
+        return all(self.compatible(f, g, v) for i, f in enumerate(fs) for g in fs[i + 1:])
 
     def split_invalid(self) -> int:
         """A face the shared-edge pass left self-touching is split at the touch."""
