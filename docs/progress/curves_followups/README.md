@@ -90,7 +90,7 @@ Every city the offsets move was built again (all of them), each passing every ch
 | Nexus City, Saltreach Free Port | 1 (1) | 0 | 0 |
 | Greyhook | 3, salt 2 (same) | 0 | 0 |
 | Vesper Bay Decks | 18, road variant 3 salt 1 (same) | 0 | 0 |
-| Vesper Bay Pinned | PINNED | 0 | 0 |
+| Vesper Bay Pinned | 2, salt 1 (same) | 0 | 0 |
 
 Delta Megacity's third layout, which failed `junction_levels` on main, now passes, so it
 builds there. The pinned demo's layout of main (try 2) put a platform's own elevator (#109's,
