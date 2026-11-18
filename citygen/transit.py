@@ -3947,6 +3947,9 @@ class Keep:
         return True
 
 
+CROSS_WALKS = ("crosswalk", "crossing")   # curves followups: walkways across a road
+
+
 class Builder:
     def __init__(self, c: Ctx, walks: list):
         self.c = c
@@ -3957,6 +3960,16 @@ class Builder:
         lms = [G.from_model_poly(lm.polygon) for lm in c.m.landmasses]
         self.lms = lms
         self.land_of = _landmass_index(lms, [ln.coords[0] for ln in self.glines])
+        # (curves followups: a station's stair or elevator never lands on a crossing: not on
+        # a crossing or crosswalk walkway, nor on any walkway where it runs in a crossing's
+        # span on the road (`network_checks.crossing_zones`); the road curves fix's Vesper
+        # Bay had a metro stair's top in the middle of a crosswalk, split there, and an
+        # elevated station's stair on a cluster's inner sidewalk along a highway crosswalk)
+        from . import network_checks as NC
+
+        self.zones = NC.crossing_zones(c.m, walks)[0]
+        self.ztree = shapely.STRtree(self.zones) if self.zones else None
+        self.allowed: dict = {}      # walkway (gi index) -> its line off the crossings
         self.splits: dict = {}
         self.new: list = []          # (key, kind, line3, width, attrs)
         self.structures: list = []
@@ -3970,23 +3983,70 @@ class Builder:
         self.tracks: list = []       # M19: every line's track (`track_rec`)
         self.nsup: dict = {}         # M19: supports numbered per line
 
+    def _on_crossing(self, f) -> bool:
+        """Curves followups: whether a point stands on a crossing (`crossing_zones`)."""
+        if self.ztree is None:
+            return False
+        from . import network_checks as NC
+
+        return bool(NC.in_zone(self.zones, self.ztree, Point(f[:2])))
+
+    def _foot_ok(self, h: int, p):
+        """Where a path from p meets ground walkway h off the crossings (`_foot` where that is
+        off them; else the nearest point of the walkway's line off them, a walkway end within
+        5 cm taken), or None (a crossing, or all of it on one)."""
+        if self.walks[self.gi[h]]["kind"] in CROSS_WALKS:
+            return None
+        f = _foot(self.glines, self.walks, self.gi, h, p)
+        if not self._on_crossing(f):
+            return f
+        if h not in self.allowed:
+            ln = self.glines[h]
+            near = sorted(int(i) for i in self.ztree.query(ln, predicate="intersects"))
+            self.allowed[h] = shapely.difference(ln, shapely.union_all(
+                [self.zones[i] for i in near]), grid_size=G.GRID_M) if near else ln
+        a = self.allowed[h]
+        if a.is_empty:
+            return None
+        f = tuple(G.qpoint(shapely.ops.nearest_points(a, Point(p[:2]))[0]))
+        pts = self.walks[self.gi[h]]["line"]
+        for e in (pts[0], pts[-1]):
+            if math.hypot(e[0] - f[0], e[1] - f[1]) <= 0.05 and not self._on_crossing(e):
+                return (e[0], e[1])
+        return None if self._on_crossing(f) else f
+
+    def _ways(self, p, lm: int) -> list:
+        """The ground walkways a link from p looks at (RELINK_M past the nearest), on its
+        landmass, nearest first (ties by id)."""
+        ks = [int(i) for i in self.gtree.query(Point(p), predicate="dwithin",
+                                               distance=reach(self.gtree, self.glines,
+                                                              Point(p)))]
+        ks = [h for h in ks if lm < 0 or self.land_of[h] == lm]
+        return sorted(ks, key=lambda h: (G.dist(self.glines[h], Point(p)),
+                                         self.walks[self.gi[h]]["id"]))
+
     def foot(self, p) -> tuple[tuple, float]:
         lm = _landmass_index(self.lms, [p])[0]
         best = _nearest_on(self.gtree, self.glines, self.walks, self.gi, self.land_of,
                            Point(p), lm)
-        f = _foot(self.glines, self.walks, self.gi, best, p)
+        f = self._foot_ok(best, p)
+        if f is None:
+            # (curves followups: on a crossing: the nearest walkway point off them)
+            for h in self._ways(p, lm):
+                f2 = self._foot_ok(h, p)
+                if f2 is not None and (f is None or _d(f2, p) < _d(f, p) - 1e-9):
+                    best, f = h, f2
+            if f is None:
+                f = _foot(self.glines, self.walks, self.gi, best, p)
         host = self.masses.inside(p, 0)
         if host is not None:
             # (an elevator core standing in a building: out through it, round every other
             # one, to the nearest walkway that way reaches; M22's layouts put a core on the
             # wall two buildings share)
-            ks = [int(i) for i in self.gtree.query(Point(p), predicate="dwithin",
-                                                   distance=reach(self.gtree, self.glines,
-                                                                  Point(p)))]
-            ks = [h for h in ks if lm < 0 or self.land_of[h] == lm]
-            for h in sorted(ks, key=lambda h: (G.dist(self.glines[h], Point(p)),
-                                               self.walks[self.gi[h]]["id"])):
-                f2 = _foot(self.glines, self.walks, self.gi, h, p)
+            for h in self._ways(p, lm):
+                f2 = self._foot_ok(h, p)
+                if f2 is None:
+                    continue
                 r = self.masses.inside_round(p, f2, 0, host)
                 if r is not None:
                     best, f = h, f2
@@ -3995,21 +4055,20 @@ class Builder:
                     break
         elif not self.masses.clear(p, f, 0):
             # (park paths fix: the nearest ground walkway it reaches with no building between)
-            ks = [int(i) for i in self.gtree.query(Point(p), predicate="dwithin",
-                                                   distance=reach(self.gtree, self.glines,
-                                                                  Point(p)))]
-            ks = [h for h in ks if lm < 0 or self.land_of[h] == lm]
-            for h in sorted(ks, key=lambda h: (G.dist(self.glines[h], Point(p)),
-                                               self.walks[self.gi[h]]["id"])):
-                f2 = _foot(self.glines, self.walks, self.gi, h, p)
+            ks = self._ways(p, lm)
+            for h in ks:
+                f2 = self._foot_ok(h, p)
+                if f2 is None:
+                    continue
                 if self.masses.clear(p, f2, 0):
                     best, f = h, f2
                     break
             else:
                 # (else led round the buildings: a path from p to f takes that way, `walk`)
-                for h in sorted(ks, key=lambda h: (G.dist(self.glines[h], Point(p)),
-                                                   self.walks[self.gi[h]]["id"])):
-                    f2 = _foot(self.glines, self.walks, self.gi, h, p)
+                for h in ks:
+                    f2 = self._foot_ok(h, p)
+                    if f2 is None:
+                        continue
                     r = self.masses.round(p, f2, 0)
                     if r is not None:
                         best, f = h, f2
@@ -4226,8 +4285,17 @@ class Builder:
             # the platform's own elevator at its first end (#109: one elevator an end: not
             # where the sidewalk right under that end has one already)
             e = seg[0]
-            acc.append(self.walk("elevator", [(e[0], e[1], 0.0), (e[0], e[1], z)], 2.5,
-                                 {"station": sid}))
+            if self._on_crossing(e):
+                # (curves followups: not down onto a crossing; at the last end where that
+                # has none and stands off them, else none where another end has one)
+                last = seg[-1]
+                if tuple(last[:2]) not in lift_at and not self._on_crossing(last):
+                    e = last
+                elif lift_at:
+                    e = None
+            if e is not None:
+                acc.append(self.walk("elevator", [(e[0], e[1], 0.0), (e[0], e[1], z)], 2.5,
+                                     {"station": sid}))
         self._skywalk(sid, seg, foot, z, bld, gone, acc)
 
     def _stair_blocked(self, line3) -> bool:
