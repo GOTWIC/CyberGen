@@ -249,7 +249,7 @@ namespace
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs PlaceShowCmd(TEXT("CityGenLife.PlaceShow"),
-		TEXT("CityGenLife.PlaceShow sit|queue|stall|smoke|gang|gangwalk|police|patrol: the camera moved to the nearest person sitting, queueing or waiting, at a stall or kiosk, smoking at a bar, a gang at its spot or walking, a police pair, a patrol car (the check's shots)"),
+		TEXT("CityGenLife.PlaceShow sit|sitdown|standup|sitmid|sitfar|idlemid|idlefar|queue|stall|smoke|gang|gangwalk|police|patrol: the camera moved to the nearest person sitting (sitting down, standing up; a little further off), standing at a slot a little further off, queueing or waiting, at a stall or kiosk, smoking at a bar, a gang at its spot or walking, a police pair, a patrol car (the check's shots)"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 		{
 			if (ACityGenLife* A = LifeIn(World))
@@ -266,6 +266,18 @@ namespace
 			if (A && Args.Num() >= 2)
 			{
 				A->SitOffset = FVector2D(FCString::Atof(*Args[0]), FCString::Atof(*Args[1]));
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs BlendCmd(TEXT("CityGenLife.Blend"),
+		TEXT("CityGenLife.Blend CLIP_S [SIT_S]: a near person's crossfade from one clip to the next, s (SIT_S into the sitting loop and from it into the stand-up; 0 0: at once, as before people_surfaces)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ACityGenLife* A = LifeIn(World);
+			if (A && Args.Num() >= 1)
+			{
+				A->ClipBlendS = FMath::Max(0.f, FCString::Atof(*Args[0]));
+				A->SitBlendS = Args.Num() >= 2 ? FMath::Max(0.f, FCString::Atof(*Args[1])) : A->ClipBlendS;
 			}
 		}));
 

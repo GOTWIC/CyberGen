@@ -50,7 +50,7 @@ import json
 import math
 from pathlib import Path
 
-PACK_VERSION = 9            # 2 (cars_steam): smoothed drive lanes, their speeds; 3 (LG3): the
+PACK_VERSION = 10           # 2 (cars_steam): smoothed drive lanes, their speeds; 3 (LG3): the
                             # city's crowd (every walkway, doors, signals, the pool); 4 (LG5):
                             # the city's traffic (every lane, signals, conflicts, the pool); 5 (LG2):
                             # looks for people, their groups, dye colors and wear; 6 (LG4): slots,
@@ -59,7 +59,8 @@ PACK_VERSION = 9            # 2 (cars_steam): smoothed drive lanes, their speeds
                             # trains, the platforms' walkways kept off their trains; 8
                             # (LG7): air and water routes, their models and paints; 9 (LG8):
                             # the weather's table, umbrellas, shelter stretches, nightlife,
-                            # the clear weather's groups, the reactions' settings
+                            # the clear weather's groups, the reactions' settings; 10
+                            # (delta_rebuild): slots seated on their surface (`slot_seated`)
 DATA = "life.json"
 CONTROLLER_KEY = "life"
 MARGIN_M = 60.0             # lanes this far past the live radius come along (links out of it)
@@ -511,18 +512,83 @@ def people_library(lib: dict | None, spike: dict) -> dict:
                                               / 100.0 / max(0.1, float((pg[k].get("run") or {})
                                                                        .get("length_s") or 1.0))
                                               for k in keys] or [0.0]), 3)}
-    return {**place, "near_meshes": near, "near_mesh_starts": starts,
-            "near_hair": [c["near"].get("hair") or "" for c in chars],
-            "char_clip_group": [keys.index(c["skeleton"]) if c.get("skeleton") in keys else 0
-                                for c in chars],
-            "gaits": len(names),
-            "walk_clips": [w["anim"] for w in walks],
-            "walk_clip_speeds": [float(w["speed"]) for w in walks],
-            "idle_clips": [groups[keys[0]]["clips"][k]["anim"] for k in lib.get("idles", [])],
-            "mid_meshes": mid, "mid_frames": mid_frames,
-            "card_mesh": lib["far"]["card"], "card_materials": cards,
-            "card_size": [float(v) for v in lib["far"].get("size", [1.0, 2.0])],
-            "tiers": tiers, "library_hash": lib.get("hash")}
+    # (people_idles: the places' second mid bakes and still sheets, where every look has them:
+    # per look the idle's and the sitting loop's frames in its bake, its material instances
+    # (the library mid mesh's slots, flat with starts), its card on the still sheet; the
+    # sheet's cells; the sit-downs and the stand-up, per group, with where they start and end)
+    out = {"near_meshes": near, "near_mesh_starts": starts,
+           "near_hair": [c["near"].get("hair") or "" for c in chars],
+           "char_clip_group": [keys.index(c["skeleton"]) if c.get("skeleton") in keys else 0
+                               for c in chars],
+           "gaits": len(names),
+           "walk_clips": [w["anim"] for w in walks],
+           "walk_clip_speeds": [float(w["speed"]) for w in walks],
+           "idle_clips": [groups[keys[0]]["clips"][k]["anim"] for k in lib.get("idles", [])],
+           "mid_meshes": mid, "mid_frames": mid_frames,
+           "card_mesh": lib["far"]["card"], "card_materials": cards,
+           "card_size": [float(v) for v in lib["far"].get("size", [1.0, 2.0])],
+           "tiers": tiers, "library_hash": lib.get("hash"), **place}
+    out.update(idle_data(pc, chars, keys, cards))
+    return out
+
+
+def idle_data(pc: dict, chars: list, keys: list, cards: list) -> dict:
+    """people_idles: the life controller's idles from the places' manifest (`unreal_people.
+    ensure_place_clips`): `mid_still_frames` per look (the idle's first and last frame, the
+    sitting loop's, in its second bake), `mid_idle_materials` flat with `mid_idle_starts`, the
+    looks' cards on their still sheets in place of `cards` (`card_materials`) and the sheet's
+    cells (`card_cells`: walk, sit, idle, a first cell and cells each); the sit-downs
+    (`sit_in_clips` per group, `sit_in_count` a group, in `lifegen.presets.SIT_IN`'s order) and
+    their start (`sit_in`: per group and sit-down its root's x, y (cm) and turn (deg) in the
+    seat's frame, in the mesh's axes, and the stretch played, s; `sit_in_start` where in the
+    clip that stretch starts) and the stand-up (`sit_out_clips`,
+    `sit_out`: where it ends, and its length). Empty where the manifest has none of them, or
+    not for every look and group."""
+    from lifegen import presets as LP
+    out: dict = {}
+    pg = pc.get("groups") or {}
+    if not pg or not all(k in pg for k in keys):
+        return out
+    ins = list(LP.SIT_IN)
+    def played(r):
+        # (the stretch of a transition a person plays: from `start_s` to `end_s`, the whole clip
+        # where the manifest has no such bounds)
+        t0 = float(r.get("start_s") or 0.0)
+        t1 = float(r.get("end_s") or r.get("length_s") or 1.0)
+        return t0, max(0.1, t1 - t0)
+
+    if all(all((pg[k].get(c) or {}).get("anim") for c in ins + ["sit_out"]) for k in keys):
+        out["sit_in_clips"] = [pg[k][c]["anim"] for k in keys for c in ins]
+        out["sit_in_count"] = len(ins)
+        out["sit_in"] = [float(v) for k in keys for c in ins
+                         for v in (*(pg[k][c].get("other_cm") or [0.0, 0.0]),
+                                   pg[k][c].get("other_yaw") or 0.0, played(pg[k][c])[1])]
+        out["sit_in_start"] = [played(pg[k][c])[0] for k in keys for c in ins]
+        out["sit_out_clips"] = [pg[k]["sit_out"]["anim"] for k in keys]
+        out["sit_out"] = [float(v) for k in keys
+                          for v in (*(pg[k]["sit_out"].get("other_cm") or [0.0, 0.0]),
+                                    pg[k]["sit_out"].get("other_yaw") or 0.0,
+                                    played(pg[k]["sit_out"])[1])]
+    idl = pc.get("idles") or {}
+    looks = idl.get("looks") or {}
+    if chars and all((looks.get(c["id"]) or {}).get("mid", {}).get("materials")
+                     and (looks.get(c["id"]) or {}).get("far", {}).get("material")
+                     for c in chars):
+        frames, mats, starts = [], [], [0]
+        for c in chars:
+            m = looks[c["id"]]["mid"]
+            frames += [float(m["idle"][0]), float(m["idle"][1]), float(m["sit"][0]),
+                       float(m["sit"][1])]
+            mats += list(m["materials"])
+            starts.append(len(mats))
+        cd = idl.get("card") or {}
+        out.update({"mid_still_frames": frames, "mid_idle_materials": mats,
+                    "mid_idle_starts": starts,
+                    "card_materials": [looks[c["id"]]["far"]["material"] for c in chars],
+                    "card_cells": [float(v) for k in ("walk", "sit", "idle")
+                                   for v in (cd.get(k) or [0, 0])],
+                    "idles_key": idl.get("key")})
+    return out
 
 
 def _along(line, x: float, y: float) -> float:
@@ -737,7 +803,7 @@ def pack_places(plan: dict, walk: list, gids: list, lane_of: dict, rows: dict, s
         cols = next(t["colors"] for t in turfs if t["faction_id"] == f)
         for k in range(ncol):
             fcols += _lin(cols[k % len(cols)])
-    sk, sl, sd, sps, sp, su, sw, sr, st, sa, sdoor = ([] for _ in range(11))
+    sk, sl, sd, sps, sp, su, sw, sr, st, sa, sdoor, sseat = ([] for _ in range(12))
     roles = {"crowd": 0, "gang": 1, "police": 2}
     for s in sorted(slots, key=lambda s: s["id"]):
         k = lane_of.get(s.get("walkway_id"))
@@ -759,6 +825,8 @@ def pack_places(plan: dict, walk: list, gids: list, lane_of: dict, rows: dict, s
         pid = s.get("place_id") or ""
         sdoor.append(door_index.get("spawn." + pid[len("place."):], -1)
                      if s["kind"] == "bar_queue" else -1)
+        # (delta_rebuild: its points' z the surface under them, over the datum as the lanes)
+        sseat.append(1 if s.get("seated") else 0)
     sps.append(len(sp) // 4)
     wturf, wgang, wpol, wpat = [], [], [], []
     for e in walk:
@@ -771,7 +839,7 @@ def pack_places(plan: dict, walk: list, gids: list, lane_of: dict, rows: dict, s
     po = plan.get("police") or {}
     return {"slot_kinds": sk, "slot_lanes": sl, "slot_dists": sd, "slot_point_starts": sps,
             "slot_points": sp, "slot_use": su, "slot_dwell": sw, "slot_roles": sr,
-            "slot_turfs": st, "slot_anims": sa, "slot_doors": sdoor,
+            "slot_turfs": st, "slot_anims": sa, "slot_doors": sdoor, "slot_seated": sseat,
             "slot_kind_names": list(kinds),
             "slot_kind_behaviors": [pl["slot_kinds"][k]["behavior"] for k in kinds],
             "walk_turf": wturf, "walk_gang": wgang, "walk_police": wpol, "walk_patrol": wpat,

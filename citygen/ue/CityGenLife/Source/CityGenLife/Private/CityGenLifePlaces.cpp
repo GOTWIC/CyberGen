@@ -16,6 +16,10 @@
 #include "CityGenLifePlaces.h"
 #include "CityGenLifeActor.h"
 #include "CityGenLifeTypes.h"
+#include "Animation/AnimSequence.h"
+#include "Animation/AnimationAsset.h"
+#include "Animation/Skeleton.h"
+#include "BoneIndices.h"
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
@@ -64,6 +68,7 @@ void ACityGenLife::BuildPlaces()
 	SlotPointStartG.Init(0, NS + 1);
 	PointPosG.Reset();
 	PointYawG.Reset();
+	PointSeatedG.Reset();
 	for (int32 K = 0; K < NS; ++K)
 	{
 		const int32 Ln = SlotLanes.IsValidIndex(K) ? SlotLanes[K] : INDEX_NONE;
@@ -80,11 +85,16 @@ void ACityGenLife::BuildPlaces()
 		}
 		const int32 A = SlotPointStarts[K];
 		const int32 B = SlotPointStarts[K + 1];
+		// (delta_rebuild: a seated slot's points at the surface under them, the plan's z over the
+		// datum as the lanes': a raised road's sidewalk, the ground by a door, whatever its
+		// walkway's height where it leaves it)
+		const bool bSeated = SlotSeated.IsValidIndex(K) && SlotSeated[K] != 0;
 		for (int32 P = A; P < B && SlotPoints.IsValidIndex(4 * P + 3); ++P)
 		{
 			FVector At = UeP(SlotPoints[4 * P], SlotPoints[4 * P + 1], 0.f);
-			At.Z = Z;
+			At.Z = bSeated ? 100.f * SlotPoints[4 * P + 2] : Z;
 			PointPosG.Add(At);
+			PointSeatedG.Add(bSeated ? 1 : 0);
 			// (citygen's yaw is counterclockwise from east, y north; Unreal's Y is south)
 			PointYawG.Add(FRotator::NormalizeAxis(-SlotPoints[4 * P + 3]));
 		}
@@ -141,6 +151,7 @@ void ACityGenLife::BuildPlaces()
 	Frame.SlotPointStart = &SlotPointStartG;
 	Frame.PointPos = &PointPosG;
 	Frame.PointYaw = &PointYawG;
+	Frame.PointSeated = &PointSeatedG;
 	Frame.LaneTurf = &WalkTurf;
 	Frame.LanePatrol = &WalkPatrol;
 	Frame.DoorOpenNow = &DoorOpenNow;
@@ -148,11 +159,99 @@ void ACityGenLife::BuildPlaces()
 	Frame.DoorDwell = &DoorDwellSorted;
 	Frame.DoorPolice = &DoorPoliceSorted;
 	Frame.WalkAnim = &WalkAnimG;
-	Frame.Claim = [this](const int32 Slot, const int32 Person) { return ClaimPoint(Slot, Person); };
+	MakeSitFrames();
+	Frame.Claim =[this](const int32 Slot, const int32 Person) { return ClaimPoint(Slot, Person); };
 	Frame.Occupy = [this](const int32 Slot, const int32 Point) { OccupyPoint(Slot, Point); };
 	Frame.Release = [this](const int32 Slot, const int32 Point) { ReleasePoint(Slot, Point); };
 	MakeDefinitions();
 	ApplyHour();
+}
+
+void ACityGenLife::MakeSitFrames()
+{
+	// (people_idles: the bench's sit-downs' starts and the stand-up's end, in the seat's frame
+	// as the walk processor walks to and from them: the clips' root there, in the mesh's frame,
+	// turned by MeshYaw; the first clip group's (the library's groups differ only by their
+	// bodies' proportions, a few centimeters))
+	SitInSeat.Reset();
+	SitOutSeat.Reset();
+	Frame.SitIn = nullptr;
+	Frame.SitOut = nullptr;
+	Frame.SitInCount = 0;
+	const int32 NV = SitInCount;
+	if (NV <= 0 || SitIn.Num() < 4 * NV || SitOut.Num() < 4 || SitInClips.Num() < NV || SitOutClips.Num() < 1 ||
+		!SitClips.Num())
+	{
+		return;
+	}
+	auto Seat = [this](const float* D, TArray<float>& Out)
+	{
+		const FVector V = FRotator(0.f, MeshYaw, 0.f).RotateVector(FVector(D[0], D[1], 0.f));
+		Out.Append({(float)V.X, (float)V.Y, D[2], FMath::Max(0.1f, D[3])});
+	};
+	for (int32 K = 0; K < NV; ++K)
+	{
+		Seat(&SitIn[4 * K], SitInSeat);
+	}
+	Seat(&SitOut[0], SitOutSeat);
+	Frame.SitIn = &SitInSeat;
+	Frame.SitOut = &SitOutSeat;
+	Frame.SitInCount = NV;
+	for (int32 K = 0; K < NV; ++K)
+	{
+		UE_LOG(LogTemp, Display, TEXT("CityGenLife: sit-down %d starts %.0f, %.0f cm off its seat, turned %.0f deg, %.2f s"),
+			K, SitInSeat[4 * K], SitInSeat[4 * K + 1], SitInSeat[4 * K + 2], SitInSeat[4 * K + 3]);
+	}
+	UE_LOG(LogTemp, Display, TEXT("CityGenLife: the stand-up ends %.0f, %.0f cm off its seat, turned %.0f deg, %.2f s"),
+		SitOutSeat[0], SitOutSeat[1], SitOutSeat[2], SitOutSeat[3]);
+	// (people_surfaces: when the near tier is seated and up again, for the mid and far tiers'
+	// looks: the first clip group's pelvis height (the clips' root is at the seat, the pelvis
+	// carries their travel, people_places.seat_frame) half way between its two ends, sampled
+	// every 1/30 s over the stretch a person plays)
+	auto Pelvis = [](UAnimSequence* Seq, const float T) -> float
+	{
+		const USkeleton* Sk = Seq ? Seq->GetSkeleton() : nullptr;
+		const int32 B = Sk ? Sk->GetReferenceSkeleton().FindBoneIndex(TEXT("pelvis")) : INDEX_NONE;
+		if (B == INDEX_NONE)
+		{
+			return 0.f;
+		}
+		FTransform X;
+		Seq->GetBoneTransform(X, FSkeletonPoseBoneIndex(B), FAnimExtractContext(static_cast<double>(T)), false);
+		return (float)X.GetLocation().Z;
+	};
+	auto Cross = [&Pelvis](UAnimSequence* Seq, const float A, const float Len, const bool bDown) -> float
+	{
+		const float Z0 = Pelvis(Seq, A), Z1 = Pelvis(Seq, A + Len);
+		if (FMath::Abs(Z1 - Z0) < 10.f)
+		{
+			return bDown ? 0.f : Len;          // (no clear change: seated all along)
+		}
+		const float Mid = 0.5f * (Z0 + Z1);
+		for (float T = 0.f; T <= Len; T += 1.f / 30.f)
+		{
+			const float Z = Pelvis(Seq, A + T);
+			if (bDown ? Z <= Mid : Z >= Mid)
+			{
+				return T;
+			}
+		}
+		return Len;
+	};
+	SitSeatedS.Reset();
+	for (int32 K = 0; K < NV; ++K)
+	{
+		const float A = SitInStart.IsValidIndex(K) ? SitInStart[K] : 0.f;
+		SitSeatedS.Add(Cross(SitInClips[K].Get(), A, SitInSeat[4 * K + 3], true));
+	}
+	SitRiseS = Cross(SitOutClips[0].Get(), 0.f, SitOutSeat[3], false);
+	FString Seated;
+	for (const float S : SitSeatedS)
+	{
+		Seated += FString::Printf(TEXT(" %.2f"), S);
+	}
+	UE_LOG(LogTemp, Display, TEXT("CityGenLife: seated after the sit-downs' starts by%s s, up %.2f s into the stand-up"),
+		*Seated, SitRiseS);
 }
 
 void ACityGenLife::MakeDefinitions()
@@ -511,7 +610,7 @@ void ACityGenLife::FillSlot(const int32 Sl)
 			{
 				W.ZOff = FMath::Clamp((float)(Hit.ImpactPoint.Z - Loc.Position.Z), -150.f, 250.f);
 			}
-			W.Pos = PointPosG[P] + FVector(0.f, 0.f, W.ZOff);
+			W.Pos = PointPosG[P] + FVector(0.f, 0.f, PointSeatedG.IsValidIndex(P) && PointSeatedG[P] ? 0.f : W.ZOff);
 		}
 		OccupyPoint(Sl, P);
 		WalkPos[Person] = W.Pos;
@@ -674,9 +773,26 @@ bool ACityGenLife::ShowPlace(const FString& What)
 			? SlotKindNames[SlotKinds[W.Slot]] : FString();
 		bool bWant = false;
 		int32 Bonus = 0;
-		if (What == TEXT("sit"))
+		const bool bSitting = W.State == CgWalk::AtSlot && W.Anim == CgAnim::Sit;
+		const bool bMoving = bSitting && W.SitVar != 255 && SitInSeat.IsValidIndex(4 * (int32)W.SitVar + 3);
+		if (What == TEXT("sit") || What == TEXT("sitmid") || What == TEXT("sitfar"))
 		{
-			bWant = W.State == CgWalk::AtSlot && W.Anim == CgAnim::Sit;
+			// (people_idles: sitting, not sitting down or standing up)
+			bWant = bSitting && (!bMoving || (W.Dwell > 0.f && W.T >= SitInSeat[4 * (int32)W.SitVar + 3]));
+		}
+		else if (What == TEXT("sitdown"))
+		{
+			// (people_idles: sitting down, just begun)
+			bWant = bMoving && W.Dwell > 0.f && W.T < 0.4f;
+		}
+		else if (What == TEXT("standup"))
+		{
+			bWant = bMoving && W.Dwell <= 0.f && SitOutSeat.IsValidIndex(3) && W.Dwell > -0.3f;
+		}
+		else if (What == TEXT("idlemid") || What == TEXT("idlefar"))
+		{
+			// (people_idles: standing at a slot, waiting, queueing, talking)
+			bWant = W.State == CgWalk::AtSlot && (W.Anim == CgAnim::Idle || W.Anim == CgAnim::Talk);
 		}
 		else if (What == TEXT("queue"))
 		{
@@ -736,6 +852,17 @@ bool ACityGenLife::ShowPlace(const FString& What)
 		? SlotKindNames[SlotKinds[W.Slot]] : FString();
 	const bool bBehind = Kind == TEXT("bar_queue") || Kind == TEXT("smoke") || Kind == TEXT("kiosk") ||
 		Kind == TEXT("vending") || Kind == TEXT("stall") || Kind == TEXT("taxi_stand") || Kind == TEXT("bus_stop");
+	// (people_idles: someone sitting or standing at a slot a little further off, for the
+	// check's views that draw everyone by the mid or far tier (`CityGenLife.Tiers 0 0 90 300`,
+	// `0 0 0 300`); a sit-down or stand-up close, from in front)
+	if (What.EndsWith(TEXT("mid")) || What.EndsWith(TEXT("far")))
+	{
+		return FrameCar(W.Pos, bBehind ? Face : -Face, 800.0, 220.0, 260.0);
+	}
+	if (What == TEXT("sitdown") || What == TEXT("standup"))
+	{
+		return FrameCar(W.Pos, -Face, 480.0, 120.0, 220.0);
+	}
 	return bBehind ? FrameCar(W.Pos, Face, 600.0, 190.0, 220.0) : FrameCar(W.Pos, -Face, 520.0, 150.0, 160.0);
 }
 
@@ -767,9 +894,10 @@ FString ACityGenLife::PlacesStatus() const
 	{
 		Open += O;
 	}
-	return FString::Printf(TEXT(",\"places\":{\"on\":%s,\"gangs_on\":%s,\"police_on\":%s,\"slots\":%d,\"live\":%d,\"smart_objects\":%d,\"users\":%d,\"by_kind\":{%s},\"taken\":%d,\"left\":%d,\"refused\":%d,\"visits\":%d,\"doors_open\":%d,\"gang\":%d,\"gang_free\":%d,\"gang_want\":%.1f,\"gang_scale\":%.3f,\"police\":%d,\"police_free\":%d,\"police_want\":%.1f,\"police_scale\":%.3f,\"police_out\":%d,\"patrol_cars\":%d,\"patrol_cars_free\":%d,\"patrol_want\":%.1f,\"clips\":%s}"),
+	return FString::Printf(TEXT(",\"places\":{\"on\":%s,\"gangs_on\":%s,\"police_on\":%s,\"slots\":%d,\"live\":%d,\"smart_objects\":%d,\"users\":%d,\"by_kind\":{%s},\"taken\":%d,\"left\":%d,\"refused\":%d,\"visits\":%d,\"doors_open\":%d,\"gang\":%d,\"gang_free\":%d,\"gang_want\":%.1f,\"gang_scale\":%.3f,\"police\":%d,\"police_free\":%d,\"police_want\":%.1f,\"police_scale\":%.3f,\"police_out\":%d,\"patrol_cars\":%d,\"patrol_cars_free\":%d,\"patrol_want\":%.1f,\"clips\":%s,\"sit_downs\":%d,\"mid_idles\":%s,\"still_cards\":%s}"),
 		bPlaces ? TEXT("true") : TEXT("false"), bGangs ? TEXT("true") : TEXT("false"), bPolice ? TEXT("true") : TEXT("false"),
 		SlotKinds.Num(), SlotsLiveNow, PointsSO, Users, *Kinds, SlotsTakenTotal, SlotsLeftTotal, ClaimsRefused, VisitsTotal, Open,
 		GangActive, FreeGang.Num(), WantGang, GangScaleNow, PoliceActive, FreePolice.Num(), WantPolice, PoliceScaleNow, PoliceOut,
-		PoliceCarsActive, FreePoliceCars.Num(), WantPoliceCars, SitClips.Num() ? TEXT("true") : TEXT("false"));
+		PoliceCarsActive, FreePoliceCars.Num(), WantPoliceCars, SitClips.Num() ? TEXT("true") : TEXT("false"),
+		SitInSeat.Num() / 4, HasMidIdles() ? TEXT("true") : TEXT("false"), CardCells.Num() >= 6 ? TEXT("true") : TEXT("false"));
 }

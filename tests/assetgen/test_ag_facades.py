@@ -167,6 +167,20 @@ def test_crowns_and_arcades():
     assert EN.check(br, res["arrays"], EN.part_points(res["parts"]))["ok"]
 
 
+def test_arcade_columns_keep_inside_an_acute_corner():
+    """delta_rebuild: a column 450 mm from an acute corner (a wedge lot on a curved road)
+    would poke its far corner through the other facade; it moves along its edge until its
+    square fits, and one square in a plain corner stays where it was."""
+    ring = [(0, 0), (30000, 0), (0, 6000)]          # (counterclockwise: an 11 degree corner)
+    a, b = ring[1], ring[2]
+    L = ((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2) ** 0.5
+    ux, uy = (b[0] - a[0]) / L, (b[1] - a[1]) / L
+    s = SH.ShellBuilder._column_at(ring, a, ux, uy, L, 450)
+    assert s is not None and s > 450
+    sq = [(0, 0), (10000, 0), (10000, 10000), (0, 10000)]
+    assert SH.ShellBuilder._column_at(sq, sq[0], 1.0, 0.0, 10000.0, 450) == 450
+
+
 def test_balconies_only_where_there_is_room():
     style = {"body.balcony": "solid", "body.balcony_pat": "every", "body.balcony_m": 1.5}
     classes = {(0, 0, 0): "street", (0, 0, 1): "alley", (0, 0, 2): "park", (0, 0, 3): "party"}

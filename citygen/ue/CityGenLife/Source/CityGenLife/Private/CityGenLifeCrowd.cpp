@@ -378,7 +378,7 @@ int32 ACityGenLife::SpawnGroup(const int32 Lane, const float Dist, const float D
 		{
 			WalkAnimG[Slot] = CgAnim::Walk;
 		}
-		ApplyLook(Slot, false);
+		ApplyLook(Slot, CgLook::Walk);
 		++ActiveNow;
 		++Spawned;
 	}
@@ -732,7 +732,7 @@ void ACityGenLife::SetCrowdScale(const float InScale)
 	}
 }
 
-void ACityGenLife::ApplyLook(const int32 P, const bool bStill)
+void ACityGenLife::ApplyLook(const int32 P, const uint8 Look)
 {
 	// (the mid and far instances' custom data: the walk's loop, time offset and rate, its
 	// passing pose held while the person stands; the outfit's tint: LookData)
@@ -742,15 +742,15 @@ void ACityGenLife::ApplyLook(const int32 P, const bool bStill)
 		return;
 	}
 	const int32 C = PersonChar.IsValidIndex(P) ? FMath::Clamp(PersonChar[P], 0, NC - 1) : P % NC;
-	float MidData[14], FarData[12];
-	LookData(P, bStill, MidData, FarData);
+	float MidData[14], FarData[14];
+	LookData(P, Look, MidData, FarData);
 	if (UInstancedStaticMeshComponent* Mid = MidComps.IsValidIndex(C) ? MidComps[C].Get() : nullptr)
 	{
 		Mid->SetCustomData(PersonInst[P], MakeArrayView(MidData, 14), false);
 	}
 	if (UInstancedStaticMeshComponent* Far = FarComps.IsValidIndex(C) ? FarComps[C].Get() : nullptr)
 	{
-		Far->SetCustomData(PersonInst[P], MakeArrayView(FarData, 12), false);
+		Far->SetCustomData(PersonInst[P], MakeArrayView(FarData, 14), false);
 	}
 	// (a near person takes its colors and wear when its slot is assigned: Assign)
 }

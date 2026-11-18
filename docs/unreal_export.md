@@ -3171,6 +3171,134 @@ LG8 exports and runs as before, at the plan's hour (it still follows atmosgen's 
   auto` and `CityGenLife.Bounds 1`; `night_life_noweather` the night's rain without its
   effect on life; `night_life_ownbounds` and `night_life_enginebounds` the other two bounds.
 
+### People idling and sitting down (people_idles)
+
+People standing or sitting still look alive at every distance, and a sitter sits down and
+stands up (`citygen/ue/people_places.py`, `citygen/unreal_people.py` `ensure_place_clips`,
+`IDLE_BAKE`; `citygen/unreal_life.py` `idle_data`; `import_city.people_assets` and
+`places_props`, `LIFE_VERSION` life11; `CityGenLifePeople.cpp`, `CityGenLifePlaces.cpp`, the
+walk processor's `StepSlot`). The people library (its hash, cache and assets) is untouched:
+everything is made beside it by the places' clips step, which `--people` runs. A project whose
+places' manifest has none of it imports and plays as before.
+
+- **The bench's transitions** (`lifegen.presets.PLACE_CLIPS`, `SIT_IN`): the Game Animation
+  Sample's bench sit-downs from five sides (`into_F`, `into_L_090`, `into_R_090`,
+  `into_BL`, `into_BR`, the left foot leading) and its stand-up (`out_to_walk`), copied from
+  the user's sample (read only) and retargeted with the library's retargeter as LG4's place
+  clips, then made in the seat's frame (`seat_frame`: the root still where the clip sits, in
+  plan, its height kept; the pelvis carrying the clip's travel and turn), so they chain with
+  the sitting loop. The manifest gives each its root's other end in the seat's frame (cm in
+  the mesh's axes, its turn) and the stretch a person plays (`start_s`, `end_s`): the sample's
+  sit-downs walk up from 4 to 4.7 m off and its stand-up walks 5.9 m away, so only the part
+  within `TRIM_CM` (1.3 m) of the seat is played (sit-downs 9 to 9.9 s from 1.8 to 2.3 s into
+  the clip, the stand-up its first 2 s), the person walking the rest itself, never from or
+  into a road in front of the bench. The controller's `SitInStart` is where in the clip that
+  stretch starts.
+- **The walk processor:** a person going to a bench point (`ToSlot`) picks the sit-down whose
+  start lies most nearly the way it comes from (not one starting behind the bench: a wall or
+  building may stand there; `PickSitDown`), walks to that start, turning to its facing over the
+  last meter, then stands on the seat (its point, facing the seat's way) while the sit-down
+  plays (`W.T` from its start; its stay at least the clip and 2 s); when its stay is over it
+  stays on the seat for the stand-up's length, then walks off from where the stand-up ends.
+  `WalkAnim` says which: `CgAnim::SitDown` + the sit-down (8 on), `StandUp` (5), `Sit`;
+  `CgAnim::IsSit` is any of them (the umbrellas, shelter, the near ring and the shots read it).
+  `SitIn`, `SitOut` and `SitInCount` (the controller's, per clip group; the processor takes
+  the first group's, `MakeSitFrames`, turned by `MeshYaw` into the seat's frame).
+- **Near:** a sit-down or the stand-up plays once from where the processor's clock has it
+  (`PersonAnimT`: the time the person's `WalkAnim` last changed), rooted at the seat as the
+  sitting loop; the sitting loop after a sit-down from its first frame (where the sit-down
+  ends), else from the person's own place in it.
+- **Mid:** per look a second AnimToTexture bake (`<content>/MidIdle/<look>`: the library's
+  walk as its own bake has it, then the library's `idle_relaxed` and the bench's sitting loop,
+  each over the stretch of 4 to 8 s that loops best, `loop_window`; the library's data
+  asset's settings, its mesh not saved) and a material instance per mid mesh slot (a child of
+  the library's, reading the new bone textures). The controller's `MidStillFrames` (per look
+  the idle's and the sitting loop's first and last frame), `MidIdleMaterials` and
+  `MidIdleStarts` (set on each look's mid component, `MidSlotMaterial`; the clothing switch
+  puts them back). A mid person standing still plays the idle, one sitting (or sitting down
+  or standing up) the sitting loop, each from its own time offset and at 0.85 to 1.15 of the
+  clip's pace; with them a sitter is drawn by its tier (LG4 kept sitters near out to `MidM`).
+- **Far:** per look a still sheet (`<content>/FarIdle`: 8 views of 16 rows, the walk's 8 frames
+  as the library's sheet, 4 poses through the sitting loop, 4 through the idle) on
+  `M_CgPersonCardIdle_<key>_<CARD_V>`, the library's card with its cell from per-instance
+  custom data 12 and 13 (first cell, cells: the walk's 0 and 8; a still person one cell of its
+  own, by its seed); the far instances carry 14 floats. The library's card drew every cell
+  upside down (the plane's v runs against the card's height; unnoticed at 90 to 300 m, plain
+  in LG2's all-far shot): this card reads them upright, and replaces it for every far person. `CardCells` (6: walk, sit, idle, a first cell and
+  cells each); `CardMaterials` the still sheets' cards.
+- **Console and status:** `CityGenLife.PlaceShow sitdown|standup|sitmid|sitfar|idlemid|idlefar`
+  (the camera at someone sitting down or standing up, close; at someone sitting or standing at
+  a slot from 55 m or 150 m, the view's own lens); the status's `places` adds `sit_downs`,
+  `mid_idles` and `still_cards`.
+
+### Slots on their surface (delta_rebuild)
+
+A slot's points stood at their walkway lane's height where the slot leaves it (LG4,
+`BuildPlaces`), plus the ground offset its user last traced walking: a point off its walkway
+on another surface (a raised road's sidewalk beside a door path at the ground, the ground by a
+door beside an embankment's sidewalk) stood its people in it or over it. The plan now stands
+every ground level slot's points on the surface stage 2 draws under them (`lifegen.places.
+Surface`: M22's pavement faces on the ground layer at their vertices' heights, lifted as AG17
+lifts them, else AG13's ground cover or the bare ground; over the datum, as the lanes), says
+so per slot (`seated`) and checks it (`slot_heights`). The exporter packs it per slot
+(`slot_seated`, `PACK_VERSION` 10; `import_city.places_props`, `LIFE_VERSION` life12); the
+controller puts a seated slot's points at their own z (`SlotSeated`, `PointSeatedG`) and a
+person there stands on it without its walking ground offset (`CgLife::PointAt`, `FillSlot`).
+A deck's slots keep their walkway's height. A plan before it packs no `slot_seated`: its slots
+stand as before.
+
+### People on their surfaces (people_surfaces)
+
+**Walkways on the surface.** The model keeps a walkway's height at its vertices only, and a
+raised road's sidewalks, crossings and the paths to them at the ground (M7); AG7 put a raised
+road's sidewalk lines on its deck at the same vertices (`graphs.walkways` of the streets'
+contribution). A lane drawn from a line ran straight between its points, so over a road's hump
+(Old Town's avenue rises 4.5 m to a bridge over a canal) mid people, which keep the ground offset they last
+traced near, walked inside the embankment, up to 4.5 m under the sidewalk, and a raised road's
+crossings and crosswalks ran under it. `citygen/walksurf.py` drapes every walkway drawn on the
+pavement map (sidewalks, crossings, crosswalks, alleys, promenades, pedestrian streets,
+footbridges, paths; not stairs, elevators, skybridges, platforms or underpasses) on the surface
+stage 2 draws: M22's faces at their vertices' heights by mean value coordinates
+(`pavement.mvc`), lifted as AG17 lifts them (curb, sidewalk, corner pad, median 0.2 m, the
+rest 0.05 m; a crosswalk crosses a median at the road's 0.05 m). Where faces overlap in plan a
+walkway along a road takes the face nearest its road's own surface at its station plus 0.2 m,
+any other the face nearest its own height, both within `REACH_M` (1.5 m); off the faces a
+road's walkway stands on its road's profile, any other at its own height. The rest follow the
+walkways they join (in rounds: their own height moved by the difference at their ends, an end
+on none not moved), and ends that meet take one height. Each line is sampled every meter and
+kept where its profile bends by more than 2 cm (Douglas and Peucker in its profile; every
+vertex kept in place). `exports.graphs` writes the draped lines into `graphs.json` (with the
+ground added on a terrain city, as before) and `walk_surface` 1; `unreal.flat_graphs` then
+takes them over stage 2's lines, which give their heights at the model's vertices only and,
+at a vertex off their own sidewalk's faces (a junction's corner pad), their road's profile
+carried on (121 of 2,418 vertices on Delta 0.3 m or more off the pad drawn there). Every
+consumer of the flat graphs (the data assets, the life packs, the check's walk, the player
+start, the benchmark's route) gets them; a graphs.json from before keeps the old rule. A
+lifegen plan checks them (`walk_heights`: the lines sampled every 0.5 m within 5 cm of the
+surface outside steps such as a curb, which a line rounds off over a meter; failing past
+0.25 m). On Delta: 19,642 walkways, 81,343 points to 92,742; 8 within 15 cm, the rest within
+5 cm.
+
+**Sitters rising without a pop.** Near people play their clips through `UCgPersonAnim`
+(`CityGenLifeAnim.h`, `.cpp`), a native animation instance in place of LG1's single node: one
+clip looping or once at a rate from a position, crossfading from the clip before over a blend
+(eased), the clip before carried on its root bone from where the body stood (`RootFix`: a
+sit-down and the stand-up play in the seat's frame, so the mesh moves to the seat as one
+begins). `ClipBlendS` (0.3 s) between walking, standing, talking, running and into a
+sit-down; `SitBlendS` (0.5 s) from a sit-down into the sitting loop and from the loop into the
+stand-up, where the sitting pose met the stand-up's first frame with no blend; none for a
+person just come near. The leader's anim ticks after the controller (a tick prerequisite), so
+a clip asked for and the move to a seat show in the same frame. Console `CityGenLife.Blend
+CLIP_S [SIT_S]` (`0 0` as before).
+
+**Mid and far in step with near.** A mid or far sitter showed the sitting loop from the moment
+it reached the seat, while near it walks in and sits down over the sit-down's 9 to 10 s, and
+showed it until the stand-up was over. `MakeSitFrames` now finds when each sit-down has the
+person seated and when the stand-up has it up, half way between the clip's two pelvis heights
+over the stretch played (`SitSeatedS`, `SitRiseS`, logged); mid and far stand at the
+sit-down's start until seated, sit, and stand at the stand-up's end once up
+(`UpdatePeople`).
+
 ## Milestones and checks
 
 - **Every milestone** updates the exporter in its own PR for what it adds or changes (a new
@@ -3251,3 +3379,6 @@ LG8 exports and runs as before, at the plan's hour (it still follows atmosgen's 
 | LG7 | Air and water ("From LG7: air and water" above): `unreal_life.pack_airwater` and the stand-ins' per kind model table `AIRWATER_MODELS` with AG18's hover cars (`PACK_VERSION` 8), `import_city.airwater_props` (`LIFE_VERSION` life9), every route of what flies and floats by the world's time (flying cars between pads and on circuits, drones, police and media fliers, aircraft, shuttles, boats, water taxis, ferries, ships), banking and bobbing, flashing lights; console `CityGenLife.Air`, `.Water`, `.AirShow`, the play menu's Air traffic and Boats rows, the status's `airwater`; bench pass `night_life_noairwater`. A plan without `airwater` exports and runs as before. | Delta imported into CityAG16, checked with shots of fliers in their layers, a landing, drones, police, boats, a ferry at its pier and a ship (`docs/progress/LG7/`) |
 | LG8 | The hour, the weather and reactions ("From LG8" above): `unreal_life.pack_weather`, the walk rows' `walk_cover`, `walk_night` and `walk_road_side`, the run clip (`PACK_VERSION` 9), `import_city.weather_props` (`LIFE_VERSION` life10); the controller follows atmosgen's hour and weather state (people out, pace, raincoats, umbrellas, shelter, nightlife, the cars' share, speed and headway), people look at the player and flee a danger (`Panic`), then gather; every junction exit tested for room, stuck cars far off leave; lifegen's instanced components (`UCgLifeISM`, `CityGenLife.Bounds`); console `CityGenLife.FollowAtmos`, `.Weather`, `.Panic`, `.WeatherShow`, `.Bounds`, the play menu's Scare the crowd row, the status's `weather`; bench passes `night_life_noweather`, `night_life_ownbounds`, `night_life_enginebounds`. A plan without `weather` exports and runs as before (at the plan's hour). | Delta imported into CityAG16 and Vesper Bay into a throwaway project, checked with shots of rain, umbrellas, shelter, people looking and fleeing (`docs/progress/LG8/`) |
 | HLOD streaming (fix_hlod_streaming) | "HLOD streaming" above: the instanced HLODs' component the play plugin's `UCityGenHLODComponent` (`unreal.set_hlod_class`, DefaultEditor.ini's `[/Script/Engine.HLODBuilder]` when the plugin is built; its module reads the builder's config again once its classes exist): in a game it leaves its HLOD actor's root and a visibility flip keeps its proxy, only the drawn flag changed on the render thread; `build_hlods` builds every HLOD again when the class or `HLOD_VERSION` changes (`hlod_stamp`, `-SetupHLODs -RebuildHLODs`); the adaptive AddToWorld time slice in every project (`STREAMING_SETTINGS`); console `CityGen.HLODFastVisibility`, `CityGen.HLODStatus`; bench passes `night_plan_all_hlodslow`, `night_plan_all_stream2`, `night_plan_all_adaptive` | Delta imported again into CityAG16, its 763 HLOD actors built again, checked with shots (151,671 flips in place, 672 recreated); benchmark and package (`docs/progress/fix_hlod_streaming/`) |
+| People idling and sitting down (people_idles) | "People idling and sitting down" above: the places' clips step makes the bench's five sit-downs and its stand-up (in the seat's frame, the stretch near the seat), per look a second mid bake (the walk, a standing idle, the sitting loop) with its material instances and a still sheet on an upright card (`ensure_place_clips`, `IDLE_BAKE`, `idle_key`); `unreal_life.idle_data`; `import_city.people_assets` and `places_props` (`LIFE_VERSION` life11: `MidStillFrames`, `MidIdleMaterials`, `MidIdleStarts`, `CardCells`, `SitInClips`, `SitInCount`, `SitIn`, `SitInStart`, `SitOutClips`, `SitOut`); the walk processor walks a sitter to its sit-down's start and holds it on the seat through the sit-down and stand-up (`CgAnim::SitDown`, `StandUp`), near plays them, mid the baked idle and sitting loop, far a still cell; console `CityGenLife.PlaceShow` sitdown, standup, sitmid, sitfar, idlemid, idlefar | Delta imported again into CityAG16 with `--people`, checked with shots three times, benchmarked and packaged (`docs/progress/people_idles/`) |
+| Slots on their surface (delta_rebuild) | "Slots on their surface" above: the plan seats every ground level slot's points on the drawn surface and says so (`seated`); `unreal_life.pack_places` packs `slot_seated` (`PACK_VERSION` 10), `import_city.places_props` sets `SlotSeated` (`LIFE_VERSION` life12); the controller stands a seated slot's people at its points' own z. A plan without `seated` runs as before. | Delta (rebuilt on main) imported into CityAG16 and checked, with shots of curved roads by day and night (`docs/progress/delta_rebuild/`) |
+| People on their surfaces (people_surfaces) | "People on their surfaces" above: `exports.graphs` drapes the walkways on the pavement map's surface (`walksurf.drape`, `walk_surface` 1) and `flat_graphs` takes those lines over stage 2's; the life plugin's `UCgPersonAnim` (a near body's clips crossfaded, `ClipBlendS`, `SitBlendS`, `CityGenLife.Blend`), its leader ticking after the controller; `MakeSitFrames`' `SitSeatedS`, `SitRiseS` for the mid and far looks. No pack or importer version moves; a graphs.json from before exports as it did. | Delta's graphs and life plan made again, imported into CityAG16, checked with shots of people over a road's hump and sitters rising, benchmarked and packaged (`docs/progress/people_surfaces/`) |

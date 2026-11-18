@@ -145,6 +145,19 @@ public:
 	/** The cells of a sheet's stride (the library's impostor frames). */
 	UPROPERTY(EditAnywhere, Category = "CityGen|People") int32 CardFrames = 8;
 	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<TObjectPtr<UMaterialInterface>> CardMaterials;
+	/** people_idles (the places' second bakes, `citygen/ue/people_places.py`): per character
+	 *  4 floats, the first and last frame of its standing idle and of its sitting loop in that
+	 *  bake; its mid mesh's slots' materials reading it ([MidIdleStarts[c], MidIdleStarts[c +
+	 *  1]) of MidIdleMaterials); the still cards' cells (6 floats: the walk's first cell and
+	 *  cells, the sitting poses', the standing idle's), CardMaterials then the still sheets'.
+	 *  Empty: a mid or far person standing or sitting holds its walk's passing pose. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<float> MidStillFrames;
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<TObjectPtr<UMaterialInterface>> MidIdleMaterials;
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<int32> MidIdleStarts;
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<float> CardCells;
+	/** Whether the mid tier has the idles' bakes (then a sitter is drawn by its tier, not near
+	 *  out to MidM). */
+	bool HasMidIdles() const { return MidStillFrames.Num() >= 4 * MidMeshes.Num() && MidMeshes.Num() > 0 && MidIdleStarts.Num() == MidMeshes.Num() + 1; }
 	/** The tiers (m from the view) and how many people may be near at once. */
 	UPROPERTY(EditAnywhere, Category = "CityGen|People") float NearM = 30.f;
 	UPROPERTY(EditAnywhere, Category = "CityGen|People") int32 NearMax = 160;
@@ -399,6 +412,9 @@ public:
 	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<int32> SlotTurfs;
 	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<uint8> SlotAnims;
 	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<int32> SlotDoors;
+	/** delta_rebuild: per slot 1 where its points' z (m) is the surface under them (the plan's
+	 *  `seated`): its users stand there, not at their walkway's height. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<uint8> SlotSeated;
 	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<FString> SlotKindNames;
 	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<FString> SlotKindBehaviors;
 	/** Per walkway lane: its gang turf (-1), gang members and police walking per band (5 each),
@@ -430,6 +446,25 @@ public:
 	UPROPERTY(EditAnywhere, Category = "CityGen|Places") int32 TalkCount = 0;
 	/** Where a sitter's root goes from its point (cm: forward along its facing, up). */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Places") FVector2D SitOffset = FVector2D(0.0, 0.0);
+	/** people_idles: the bench's sit-downs per clip group (SitInCount a group: from its front,
+	 *  its left, its right, behind on its left and on its right) and its stand-up, in the
+	 *  seat's frame; per group and sit-down where the stretch a person plays starts (4 floats:
+	 *  x, y in cm in the mesh's frame, the turn in degrees, the stretch's length in s; the clips
+	 *  walk up from 3 to 4 m off, a person plays the last 1.3 m) and that stretch's start in
+	 *  the clip (SitInStart, s), per group where the stand-up's stretch ends. Empty: a sitter
+	 *  sits down and stands up at once, as LG4's. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<TObjectPtr<UAnimSequence>> SitInClips;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") int32 SitInCount = 0;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<float> SitIn;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<float> SitInStart;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<TObjectPtr<UAnimSequence>> SitOutClips;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<float> SitOut;
+	/** people_surfaces: a near person's crossfade from one clip to the next (s): walking,
+	 *  standing, talking, running and sitting down from a walk (ClipBlendS); into the sitting
+	 *  loop after a sit-down and from it into the stand-up (SitBlendS). 0: at once, as
+	 *  before (`CityGenLife.Blend`). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") float ClipBlendS = 0.3f;
+	UPROPERTY(EditAnywhere, Category = "CityGen|Places") float SitBlendS = 0.5f;
 	/** Patrol cars per drive lane and band (5); per traffic pool slot 1 where it is a patrol
 	 *  car's; the livery (PaintFloats). */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Places") TArray<float> DrivePolice;
@@ -840,7 +875,7 @@ private:
 	TArray<int32> LaneSlotStarts, LaneSlotList, SlotPointStartG;
 	TArray<float> SlotDistCm, SlotWantNow, PointYawG;
 	TArray<int32> SlotUsersNow, PointUser, SlotDoorSorted;
-	TArray<uint8> SlotLiveNow, SlotAnimG, WalkAnimG;
+	TArray<uint8> SlotLiveNow, SlotAnimG, WalkAnimG, PointSeatedG;
 	TArray<FVector> PointPosG;
 	TArray<int32> DoorSortedOf;              // (an exported door's sorted index)
 	TArray<uint8> DoorOpenNow, DoorPoliceSorted;
@@ -903,7 +938,8 @@ private:
 	void FreeOnDeadLanes();
 	float Want(int32 Lane) const;
 	int32 GroupSize(FRandomStream& Rng) const;
-	void ApplyLook(int32 Person, bool bStill);
+	/** The mid and far instances' custom data for a person's look (CgLook). */
+	void ApplyLook(int32 Person, uint8 Look);
 	FString CrowdStatus() const;
 
 	TArray<uint8> LaneKindArr;
@@ -945,8 +981,23 @@ private:
 	void MakeMidLoops();
 	// (LG2: the instances' custom data carry the person's three dye colors and wear: mid
 	// 4 anim + 9 + 1 floats, far 2 + 9 + 1; TintOf a person's dye channel's color)
-	void LookData(int32 Person, bool bStill, float Mid[14], float Far[12]) const;
+	// (people_idles: the look, CgLook: walking, standing, running, sitting; the far card's
+	// first cell and cells after them, 14 floats)
+	void LookData(int32 Person, uint8 Look, float Mid[14], float Far[14]) const;
 	void TintOf(int32 Person, int32 Channel, float Out[3]) const;
+	// (people_idles: a mid mesh slot's material, the idles' bake's where there is one; the
+	// sit-downs' and the stand-up's starts and ends in the walk processor's seat frame, from
+	// SitIn and SitOut and MeshYaw; per person what it played last and since when, s)
+	UMaterialInterface* MidSlotMaterial(int32 Char, int32 Slot) const;
+	void MakeSitFrames();
+	TArray<float> SitInSeat, SitOutSeat;
+	// (people_surfaces: when a near sitter is seated, s after its sit-down began, per sit-down,
+	// and when it is up again after its stand-up began: half way down and up in the clips'
+	// pelvis height; the mid and far tiers show it sitting only between them)
+	TArray<float> SitSeatedS;
+	float SitRiseS = 0.f;
+	TArray<uint8> PersonAnimPrev;
+	TArray<float> PersonAnimT;
 	int32 TakeSlot(int32 District, FRandomStream& Rng);
 	void DressSlot(int32 Slot, int32 District, FRandomStream& Rng);
 	TArray<float> MidFirst, MidLast, MidStand, StandShare;
@@ -963,6 +1014,7 @@ private:
 		int32 Char = INDEX_NONE;
 		int32 Gait = INDEX_NONE;
 		uint8 Clip = 0;            // (LG3: 0 its walk, 1 an idle; LG4: 2 sitting, 3 + k a talk clip)
+		bool bFresh = false;       // (people_surfaces: just assigned: its first clip at once)
 	};
 	/** A near slot's components by the clothing switch (lifegen_clothing_toggle). */
 	void SlotClothing(FNearSlot& Slot);

@@ -2324,10 +2324,40 @@ class ShellBuilder:
                 e = 450
                 m = max(1, -(-(int(L) - 2 * e) // spacing))
                 for k in range(m + 1):
-                    s = e + (int(L) - 2 * e) * k // m
+                    s0 = e + (int(L) - 2 * e) * k // m
+                    s = self._column_at(ring, a, ux, uy, L, s0)
+                    if s != s0:
+                        key = "columns_moved" if s is not None else "columns_dropped"
+                        self.stats[key] = self.stats.get(key, 0) + 1
+                    if s is None:
+                        continue
                     self.parts.add("column", {"w": 500, "h": PT.q(ar["z1"])},
                                    int(round(a[0] + ux * s)), int(round(a[1] + uy * s)),
                                    ar["z0"], ux, uy)
+
+    @staticmethod
+    def _column_at(ring, a, ux: float, uy: float, L: float, s: int, w: int = 500):
+        """Where along its edge an arcade column stands: at s where its 500 mm square (along
+        the edge, into the wall) lies within the ring; at an acute corner, where its far
+        corner would poke through the other facade (delta_rebuild: a curved road's wedge lot),
+        moved along the edge toward its middle by 100 mm steps, else none."""
+        nx, ny = -uy, ux                  # (into the wall: the ring's solid is on the left)
+        half = w // 2
+
+        def fits(t: int) -> bool:
+            px, py = a[0] + ux * t, a[1] + uy * t
+            return all(RG.in_poly((px + ux * dx + nx * dy, py + uy * dx + ny * dy), [ring]) >= 0
+                       for dx in (-half, half) for dy in (0, w))
+
+        if fits(s):
+            return s
+        step = 100 if s <= L / 2 else -100
+        t = s + step
+        while 0 <= t <= L and (t - L / 2) * step <= 0:
+            if fits(t):
+                return t
+            t += step
+        return None
 
     def _finish_parts(self) -> None:
         """Parts placed fewer than `parts.INSTANCE_MIN` times merged into the shell; the

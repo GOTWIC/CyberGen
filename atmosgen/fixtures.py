@@ -493,9 +493,13 @@ class Fixtures:
 
     # -- the plan ----------------------------------------------------------------------------
 
-    def place(self) -> dict:
+    def place(self, only: set | None = None) -> dict:
+        """Every light's fixture (`only`: just these lights', the fill lights added after a
+        first placement dropped some, delta_rebuild); the report over all placed so far."""
         lights = self.pl.lights
         for L in lights:
+            if only is not None and L["id"] not in only:
+                continue
             fx = L.get("_fx")
             mount = L["mount"]
             if mount in ("pole", "mast_arm") and fx and fx.get("foot"):

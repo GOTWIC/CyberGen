@@ -3276,6 +3276,50 @@ LG8 (weather, reactions and release) is in place, which completes stage 4:
   20 ms budget: the slowest frames are World Partition's instanced HLOD components re-sent as
   cells stream, not lifegen's step (1.7 ms median). Results: `docs/progress/LG8/README.md`.
 
+The people idles (people_idles, after LG8) are in place: the places' clips step
+(`unreal_people.ensure_place_clips`, `citygen/ue/people_places.py`) also retargets the Game
+Animation Sample's bench sit-downs (five sides, `presets.SIT_IN`) and stand-up into the seat's
+frame (the stretch within 1.3 m of the seat played) and makes, per look, a second mid bake (the
+walk, `idle_relaxed`, the sitting loop; `IDLE_BAKE`, kept by `idle_key`, not the script) and a
+still sheet on an upright card (the library's card drew far people upside down); the library
+itself is untouched. The walk processor walks a sitter to its sit-down's start and holds it on
+the seat through the sit-down and stand-up (`CgAnim::SitDown`, `StandUp`, `IsSit`); near plays
+them, mid the baked idle and sitting loop, far a still cell (`LookData`, `CgLook`;
+`LIFE_VERSION` life11). Delta: `night_plan_all` 19.2 ms p95. Results:
+`docs/progress/people_idles/README.md`.
+
+The Delta rebuild (delta_rebuild, after the road curves, #239) is in place: the live Delta build
+(`builds/delta_main`) made again on main, imported and packaged, with the fixes it needed:
+- **Slots on their surface** (`lifegen.places.Surface`, `seat_slots`, check `slot_heights`):
+  every ground level slot's points stand on the surface stage 2 draws under them (M22's ground
+  layer faces lifted as AG17, else the ground cover), and a prop's slot leaves from a walkway at
+  its height (`WalkIndex.height`, `SLOT_STEP_M`); the exporter packs `slot_seated`
+  (`PACK_VERSION` 10, `LIFE_VERSION` life12), the controller stands a seated slot's people on
+  its points without their walking ground offset (`CgLife::PointAt`). People at a slot stood at
+  their walkway lane's height, sunk into a raised sidewalk or up in the air by a skybridge.
+- **Atmos refill** (`atmosgen/plan.py`): a light whose fixture finds no clear spot was dropped
+  after the fill; the fill now runs again on what is left (`Fixtures.place(only)`).
+- **Arcade columns** (`shell._column_at`): a column at an acute corner moves along its edge until
+  its square fits (`GEN_VERSION` drebuild.1).
+Results: `docs/progress/delta_rebuild/README.md`.
+
+People on their surfaces (people_surfaces, after delta_rebuild) are in place:
+- **Walkways on the surface** (`citygen/walksurf.py`): `exports.graphs` drapes every walkway
+  drawn on M22's pavement map on the surface AG17 draws (faces by `pavement.mvc`, AG17's
+  lifts; a road's walkway on the face nearest its road's profile, others nearest their own
+  height, within 1.5 m; the rest following the walkways they join, ends meeting at one
+  height), a point wherever its profile bends by 2 cm (`walk_surface` 1); `unreal.flat_graphs`
+  takes these over stage 2's lines. Lanes ran straight between the model's vertices: mid
+  people walked inside a road's hump, a raised road's crossings at the ground. lifegen's check
+  `walk_heights` (`walksurf.check`).
+- **Blended clips near** (`UCgPersonAnim`, `CityGenLifeAnim.h`): a native anim instance in
+  place of the single node, crossfading (`ClipBlendS` 0.3 s, `SitBlendS` 0.5 s into the
+  sitting loop and the stand-up; `CityGenLife.Blend`), the clip before carried from where the
+  body stood (`RootFix`); a sitter no longer pops as it rises.
+- **Mid and far in step** (`MakeSitFrames`' `SitSeatedS`, `SitRiseS` from the clips' pelvis):
+  standing at the sit-down's start until near would be seated, at the stand-up's end once up.
+Results: `docs/progress/people_surfaces/README.md`.
+
 ## Gallery site (GitHub Pages)
 
 `site/` is the public gallery at https://gotwic.github.io/CyberGen/ (served at

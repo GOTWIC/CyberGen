@@ -1585,6 +1585,33 @@ def spike_plan(model: dict, filled: dict, hours: dict) -> dict | None:
                    "polygon": [[_r(x, 2), _r(y, 2)] for x, y in ring]})
 
 
+def walk_heights(build: Path, model: dict, ground) -> dict:
+    """people_surfaces: `walk_heights`, the walkway lines the runtime walks (BUILD/graphs.json,
+    which `citygen.walksurf` drapes on the surface stage 2 draws) against that surface,
+    sampled every 0.5 m (`walksurf.check`): none more than `CHECK_FAIL_M` off it outside a
+    step in the surface (a curb, which a line rounds off over a meter); noted, those more than
+    `CHECK_TOL_M` off. A graphs.json from before (heights at the model's vertices only) is
+    not measured."""
+    from citygen import walksurf as WS
+
+    gp = build / "graphs.json"
+    if not gp.is_file():
+        return {"ok": True, "detail": "no graphs.json: not measured"}
+    g = json.loads(gp.read_text(encoding="utf-8"))
+    if not g.get("walk_surface"):
+        return {"ok": True, "detail": "graphs.json's walkways from before people_surfaces "
+                                      "(heights at the model's vertices): not measured"}
+    lines = {w["id"]: w["line"] for w in g.get("walkways") or []}
+    gfun = (lambda wid, x, y: ground.one(x, y)) if g.get("heights") == "absolute" else None
+    r = WS.check(model, lines, ground=gfun)
+    detail = (f"{r['walkways']} walkways on the surface within {WS.CHECK_TOL_M * 100:.0f} cm "
+              f"but {r['off']} (worst {r['worst_m']} m; {r['at_steps']} samples at steps in "
+              f"the surface left out)")
+    if r["first"]:
+        detail += ": " + "; ".join(r["first"][:5])
+    return {"ok": r["failed"] == 0, "detail": detail}
+
+
 def build_plan(build: str | Path, spec_path: str | Path | None = None,
                out: str | Path | None = None, preview: bool = True,
                atmos: str | Path | None = None) -> dict:
@@ -1640,12 +1667,16 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     drows, dleft = traffic_lanes(model, filled, sigs)
     # LG4: the slots, gangs on their turf, police patrols, the pools' roles
     row_by = {r["id"]: r for r in rows}
-    wi = PL4.WalkIndex(model.get("walkways", []))
+    # (delta_rebuild: the surface stage 2 draws: a slot leaves from a walkway at its height,
+    # and every ground level slot's points stand on it)
+    surface = PL4.Surface(model)
+    wi = PL4.WalkIndex(model.get("walkways", []), surface)
     fp = PL4.Footprints(model)
     slot_raw, sleft = PL4.make_slots(model, wi, fp, row_by, places)
     turfs = PL4.gang_turfs(model)
     gm = PL4.gang_walks(model, filled, rows, turfs)
     slot_raw += PL4.gang_spots(model, turfs, gm, row_by, wi, fp)
+    seat_stats = PL4.seat_slots(slot_raw, surface)
     pol = PL4.police_plan(model, filled, rows, drows, spawns)
     # LG8: each walkway's stretches out of the rain (atmosgen's rain shadow), nightlife round
     # the bars, clubs and arcades, the weather's table
@@ -1752,6 +1783,8 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     checks.update(traffic_checks(model, drows, hours, filled, sigs, traffic))
     checks.update(places_checks(model, filled, slot_raw, place_rows, rows, drows, turfs, gm,
                                 pol, crowd, traffic, roles, spawns, hours))
+    checks["slot_heights"] = PL4.height_check(model, slot_raw, surface, seat_stats)
+    checks["walk_heights"] = walk_heights(build, model, surface.ground)
     checks.update(TR.checks(model, tlines, tleft, walk_components(model.get("walkways", [])),
                             spawns))
     checks.update(AW.checks(aw_routes, aw_pads, aw_piers, aw_extra))

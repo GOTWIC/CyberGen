@@ -388,14 +388,17 @@ def flat_graphs(graphs: dict, walk_lines: dict | None = None,
     """graphs.json (M4 exports) as three flat graphs: lanes (lanes and junction connectors,
     linked to their successors), walkways (linked to their neighbors) and transit (lines
     and stations, linked to each other). `walk_lines`: stage 2's walkway lines by id, used
-    over graphs.json's; `doors` (AG3, `doors_of`): a fourth graph, the doors, each with the
-    walkway it opens to as its ref."""
+    over graphs.json's unless graphs.json's walkways are on the surface already
+    (people_surfaces, `walk_surface`: from the pavement map AG7 draws, with a point where it
+    bends; AG7's lines have its heights at the model's vertices only, a vertex off its own
+    sidewalk's faces at its road's profile carried on); `doors` (AG3, `doors_of`): a fourth
+    graph, the doors, each with the walkway it opens to as its ref."""
     lanes = [{"id": x["id"], "kind": x["kind"], "ref": x["segment_id"] or x["node_id"],
               "width": x["width_m"], "points": x["centerline"], "links": x["successors"],
               "attrs": {"forward": x["forward"], "index": x["index"],
                         "adjacent_ids": x["adjacent_ids"]}, "level": x.get("level", 0)}
              for x in graphs["lanes"]]
-    walk_lines = walk_lines or {}
+    walk_lines = {} if graphs.get("walk_surface") else (walk_lines or {})
     absolute = graphs.get("heights") == "absolute"
     walks = [{"id": w["id"], "kind": w["kind"], "width": w["width_m"],
               "points": (_walk_line(w, walk_lines[w["id"]], absolute) if w["id"] in walk_lines

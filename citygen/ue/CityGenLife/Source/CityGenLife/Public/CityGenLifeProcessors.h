@@ -115,6 +115,9 @@ struct FCgLifeFrame
 	const TArray<int32>* SlotPointStart = nullptr;
 	const TArray<FVector>* PointPos = nullptr;
 	const TArray<float>* PointYaw = nullptr;
+	/** delta_rebuild: per point 1 where PointPos is the surface under it (its slot seated): a
+	 *  user stands there, its walking ground offset (ZOff) not added. */
+	const TArray<uint8>* PointSeated = nullptr;
 	/** A slot's point claimed for a person (the actor's: the Smart Objects' claims), INDEX_NONE
 	 *  when none is free; occupied on arrival; freed. */
 	TFunction<int32(int32 Slot, int32 Person)> Claim;
@@ -138,6 +141,15 @@ struct FCgLifeFrame
 	// --- LG6: transit -----------------------------------------------------------------------------
 	/** Per walkway lane how far off its middle people keep (cm: a platform's trains), 0 none. */
 	const TArray<float>* WalkClear = nullptr;
+
+	// --- people_idles: the bench's sit-downs and stand-up ----------------------------------------
+	/** Per sit-down (SitInCount of them) where it starts from its seat: 4 floats, the offset
+	 *  in the seat's frame (cm: x along the way its sitter faces, y that frame's y), the
+	 *  facing's turn there (deg) and the clip's length (s); the stand-up's 4 where it ends.
+	 *  None: a sitter sits at once, as LG4's. */
+	const TArray<float>* SitIn = nullptr;
+	int32 SitInCount = 0;
+	const TArray<float>* SitOut = nullptr;
 	/** Out: people gone into a train this frame. */
 	int32 Boarded = 0;
 
