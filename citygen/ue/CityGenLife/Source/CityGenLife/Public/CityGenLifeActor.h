@@ -158,6 +158,19 @@ public:
 	/** Whether the mid tier has the idles' bakes (then a sitter is drawn by its tier, not near
 	 *  out to MidM). */
 	bool HasMidIdles() const { return MidStillFrames.Num() >= 4 * MidMeshes.Num() && MidMeshes.Num() > 0 && MidIdleStarts.Num() == MidMeshes.Num() + 1; }
+	/** umbrella_hold (`citygen/ue/people_places.py` `hold_pose`): per clip group the clip of its
+	 *  right arm holding an umbrella (its idle, the arm held), whose upper arm, forearm and hand
+	 *  a near person holding one layers over its clip (UCgPersonAnim's hold); per group the
+	 *  grip in the mesh's frame (cm, 3 floats), where a mid person's umbrella stands; per
+	 *  character 4 floats in its second mid bake: the held walk's first frame on from the
+	 *  walk's, the held idle's first and last frame, 1. Empty: umbrellas over the right
+	 *  shoulder, no arm held (LG8's). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<TObjectPtr<UAnimSequence>> UmbHoldClips;
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<float> UmbGrip;
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") TArray<float> MidUmbFrames;
+	/** umbrella_hold: how long the arm takes to rise or fall as an umbrella opens or folds (s). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|People") float UmbHoldS = 0.35f;
+	bool HasMidUmb() const { return HasMidIdles() && MidUmbFrames.Num() >= 4 * MidMeshes.Num() && UmbGrip.Num() >= 3; }
 	/** The tiers (m from the view) and how many people may be near at once. */
 	UPROPERTY(EditAnywhere, Category = "CityGen|People") float NearM = 30.f;
 	UPROPERTY(EditAnywhere, Category = "CityGen|People") int32 NearMax = 160;
@@ -741,6 +754,16 @@ private:
 	void MakeUmbrellas();
 	void UpdateUmbrellas(const FVector& View);
 	bool HasUmbrella(int32 Person) const;
+	/** umbrella_hold: whether a person holds its umbrella open now (one of the weather's share,
+	 *  drawn, out of the rain's cover, not sitting or running). */
+	bool UmbOpen(int32 Person) const;
+	/** umbrella_hold: per clip group the held arm's skeleton bones and their rotations, read
+	 *  from UmbHoldClips once. */
+	void MakeUmbHold();
+	TArray<TArray<int32>> UmbHoldBones;
+	TArray<TArray<FQuat>> UmbHoldRots;
+	bool bUmbHoldMade = false;
+	int32 UmbFoldedNow = 0;
 	FString WeatherStatus() const;
 	TWeakObjectPtr<AActor> AtmosActor;
 	bool bAtmosLooked = false;

@@ -75,7 +75,7 @@ HASH_TAG = "cg.hash"
 # unchanged build applies the change (stored hashes are "<version>.<content hash>")
 MESH_VERSION = "3"
 ACTOR_VERSION = "1"
-LIFE_VERSION = "life13"  # LG0: lifegen's controller (CityGenLife) and its stand-in material;
+LIFE_VERSION = "life14"  # LG0: lifegen's controller (CityGenLife) and its stand-in material;
                          # LG1: the people library's properties; LG3: the city's crowd;
                          # 4, lifegen_clothing_toggle: the clothing switch's hidden material
                          # and whole body; 5, LG5: the city's traffic; 6, LG2: the looks,
@@ -87,8 +87,9 @@ LIFE_VERSION = "life13"  # LG0: lifegen's controller (CityGenLife) and its stand
                          # table, umbrellas, shelter, nightlife, the reactions' settings;
                          # 11, people_idles: the mid idles' bakes, the still cards, the
                          # bench's sit-downs and stand-up; 12, delta_rebuild: slots seated
-                         # on their surface (SlotSeated); 13, car_merge: the cars' merged
-                         # meshes, their wheels' roll (CarPartRoll)
+                         # on their surface (SlotSeated); 13, umbrella_hold: the arm holding an
+                         # umbrella (UmbHoldClips, UmbGrip, MidUmbFrames); 14, car_merge:
+                         # the cars' merged meshes, their wheels' roll (CarPartRoll)
 ATMOS_VERSION = "atmos7"  # the atmos controller's and cells' actors (2, AT2: the high tier,
                           # blinks and sweeps in the packed lights; 3, AT3: the sky and time;
                           # 4, AT4: the air, a cell's fog volumes and emitters; 5, the visible
@@ -1204,7 +1205,8 @@ def people_assets(d, missing):
                 "char_clip_group": [], "walk_clips": [],
                 "walk_clip_speeds": [], "idle_clips": [], "mid_meshes": [], "mid_frames": [],
                 "card_mesh": None, "card_materials": [], "mid_still_frames": [],
-                "mid_idle_materials": [], "mid_idle_starts": [], "card_cells": []}
+                "mid_idle_materials": [], "mid_idle_starts": [], "card_cells": [],
+                "umb_hold_clips": [], "umb_grip": [], "mid_umb_frames": []}
     t = d.get("tiers") or {}
     out = {"near_meshes": [load(p) for p in d["near_meshes"]],
            "near_mesh_starts": [int(v) for v in d["near_mesh_starts"]],
@@ -1223,7 +1225,12 @@ def people_assets(d, missing):
            "mid_still_frames": [float(v) for v in d.get("mid_still_frames") or []],
            "mid_idle_materials": [load(p) for p in d.get("mid_idle_materials") or []],
            "mid_idle_starts": [int(v) for v in d.get("mid_idle_starts") or []],
-           "card_cells": [float(v) for v in d.get("card_cells") or []]}
+           "card_cells": [float(v) for v in d.get("card_cells") or []],
+           # (umbrella_hold: the arm holding an umbrella per group, its grip, the mid bakes'
+           # held walk and idle; empty before it, the umbrellas over the shoulder as LG8's)
+           "umb_hold_clips": [load(p) for p in d.get("umb_hold_clips") or []],
+           "umb_grip": [float(v) for v in d.get("umb_grip") or []],
+           "mid_umb_frames": [float(v) for v in d.get("mid_umb_frames") or []]}
     for k, prop in (("near_m", "near_m"), ("near_max", "near_max"), ("mid_m", "mid_m"),
                     ("far_m", "far_m")):
         if k in t:

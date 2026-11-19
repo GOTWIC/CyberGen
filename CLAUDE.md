@@ -1578,9 +1578,31 @@ their first. Road edges 1.8 to 1.9 cm of sag at p95 (15 to 19 on main), junction
 million); the cars' lanes (`unreal_life.fillet`, `smooth`) now run on roads as smooth as
 they are. Regenerations: held footbridges laid again as class `footbridge` (no junction;
 as a pedestrian street one took a held street's dead end), `Frame.ends` every held segment
-(two highways on one centerline each held). Open: issue #241 (a bend junction a hilly
-regeneration lays anew, its curb 3.7 cm over its legs; that test xfail). Outputs and
-measures: `docs/progress/fix_road_curves/`.
+(two highways on one centerline each held). Outputs and measures:
+`docs/progress/fix_road_curves/`. Its follow-ups (`docs/progress/curves_followups/`):
+- **Offset lines whole** (`junctions._offset`, `_joined`): GEOS offsets a line that turns by a
+  hair at a vertex on the offset's inner side as two parts meeting end to end, and the longer
+  part alone was kept, so a lane or a sidewalk's middle line stopped up to 57 m short of its
+  road's end (Vesper Bay's `rs.e669s6`, whose crosswalk `cw.e637n26` was then walked as a
+  49 m diagonal between its corners); parts meeting within `JOIN_GAP_M` join again. Every
+  city moves (goldens rewritten); Delta Megacity builds on layout salt 2, the rest as before.
+- **#241** (`pavement.Assembly._foreign`): a junction's, pad's or bulb's vertex that only a
+  road not its own shares (its outline against another road's sidewalk) takes the curb rule's
+  height, not that road's; ports keep theirs.
+- **Station feet** (`transit.Builder.foot`, `_foot_ok`): a stair's or elevator's foot never
+  on a crossing or crosswalk walkway, nor on another walkway inside a crossing's zone on the
+  road (`network_checks.crossing_zones`: crosswalk records' stripes, crossing walkways' bands
+  on a carriageway face; a cluster's inner sidewalk can run along a highway crosswalk): the
+  nearest walkway point off them; a platform's own elevator (#109) over a crossing goes to
+  its last end, or none where another end has one.
+- **Check** `walkway_carriageway`: a crossing's length on one road's carriageway faces past
+  that road's carriageway width (`carriageway_w`) counts past its span (a diagonal of one
+  stretch); a station's stair or elevator with its foot in a crossing zone fails
+  (`station_feet_on_crossings`).
+- **Holes between levels** (`pavement.Assembly._one_level`): `fill_gaps` fills no hole whose
+  faces round it stand at two levels (a street under a bridge approach on one layer): the
+  layer's snap-rounded union left such a sliver open or closed by faces far away, and a
+  regeneration moved a street 535 m from its district.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
@@ -3301,6 +3323,18 @@ People on their surfaces (people_surfaces, after delta_rebuild) are in place:
 - **Mid and far in step** (`MakeSitFrames`' `SitSeatedS`, `SitRiseS` from the clips' pelvis):
   standing at the sit-down's start until near would be seated, at the stand-up's end once up.
 Results: `docs/progress/people_surfaces/README.md`.
+
+Umbrellas held (umbrella_hold, after people_surfaces) are in place: the places' step
+(`people_places.py` `hold_pose`, `held_clip`; `unreal_people.UMB_HOLD`, `mid_key`) poses each
+clip group's right arm by two-bone IK on its idle (hand ahead of the chest, elbow back, out and
+down), writes it as a clip (`A_umb_hold`) and bakes the walk and the idle with the arm held as
+two more loops of each look's second mid bake (key `mid_key`; the still sheets keep
+`idle_key`); the exporter packs `umb_hold_clips`, `umb_grip`, `mid_umb_frames` (`PACK_VERSION`
+11, `LIFE_VERSION` life13). Near, `UCgPersonAnim` layers the held arm over any clip, blended over
+`UmbHoldS` as the umbrella opens or folds, the umbrella in the drawn hand; under a cover the arm
+comes down and the umbrella hangs furled from the hand. Mid plays the held loops
+(`CgLook::Umb`) with the umbrella at the bake's grip (not drawn folded); far cards unchanged.
+Results: `docs/progress/umbrella_hold/README.md`.
 
 ## Gallery site (GitHub Pages)
 

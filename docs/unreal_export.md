@@ -3299,6 +3299,30 @@ over the stretch played (`SitSeatedS`, `SitRiseS`, logged); mid and far stand at
 sit-down's start until seated, sit, and stand at the stand-up's end once up
 (`UpdatePeople`).
 
+### Umbrellas held (umbrella_hold)
+
+Results: `docs/progress/umbrella_hold/README.md`. LG8's umbrellas stood over the right shoulder,
+no arm held; now they are held in the right hand, the arm up. The places' step
+(`unreal_people.ensure_place_clips`, `people_places.py` `hold_pose`) poses each clip group's arm
+on its standing idle's first frame by two-bone IK (`unreal_people.UMB_HOLD`, fractions of the
+arm's length: on Delta's 47 cm arm the hand 22 cm ahead of the shoulder joint, 3 cm out and 8 cm
+down, the forearm raised, the elbow back, out and down, the wrist straight), writes it as a clip (`Anim/<group>/A_umb_hold`, the idle with the
+upper arm, forearm and hand held) and bakes two more loops into each look's second mid bake (the
+walk and the idle with the arm held: `A_umb_walk_<walk>`); the mid bakes keep a key of their own
+(`unreal_people.mid_key`), the still sheets `idle_key`. The exporter packs per group the held
+clip and the grip in the mesh's frame and per look the held loops' frames (`umb_hold_clips`,
+`umb_grip`, `mid_umb_frames`; `PACK_VERSION` 11, `LIFE_VERSION` life13). Near, `UCgPersonAnim`
+layers the held arm's three rotations over whatever clip plays (walk, idle, talk), weighted in
+and out over `UmbHoldS` (0.35 s) as the umbrella opens or folds; the umbrella stands in the drawn
+hand (`hand_r` on along its forearm), its shaft leaning back by the tilt, its canopy no lower
+than LG8's; under a cover the arm comes down and the umbrella hangs furled from the hand. Mid,
+the instance plays the held walk or idle (`CgLook::Umb`) and the umbrella stands at the bake's
+grip; folded, it is not drawn. Far cards are unchanged. Without the held arm's data the
+umbrellas are LG8's. The weather status adds `umbrellas_folded`, `umbrella_held`,
+`umbrella_mid_held`, `umbrella_hold_groups`; `CityGenLife.WeatherShow umbrella_still` and
+`umbrella_folded` frame someone standing with an umbrella open or someone with one under a
+cover, and every `umbrella*` show frames closer (5.2 m ahead, on the umbrella's side).
+
 ### Cars as one mesh (car_merge)
 
 LG5 drew the moving traffic with an instanced component per car model and part (a body, its
@@ -3329,11 +3353,11 @@ mesh for the traffic and the fliers; the parked cars keep their parts.
   top going forward as LG5's turned parts did, and the normal (the normal map's, in the mesh's
   space) turned the same way, the material's normal in world space. A vertex whose UV1 height
   is 0 stays put.
-- **Exporter** (`unreal_life.traffic_cars`, `ROLL_M`, `_hover_parts`; `PACK_VERSION` 11): a car
+- **Exporter** (`unreal_life.traffic_cars`, `ROLL_M`, `_hover_parts`; `PACK_VERSION` 12): a car
   with `merged` is one part, its merged mesh, drawn as far as a body (`TRAFFIC_CULL_M`'s 900 m),
   its wheels rolled within `ROLL_M` (150 m, the old wheels' distance) by `spin_radius`; a hover
   flier's painted meshes are its merged one. `import_city.traffic_props` adds `car_part_roll`
-  (`LIFE_VERSION` life13).
+  (`LIFE_VERSION` life14).
 - **Runtime** (`CarPartRoll`; `MakeComponents`, `UpdateCarInstances`): a merged part's component
   carries one more custom float; each frame a car within its roll distance gets its travel
   (wrapped at 64 turns of the model's wheel: no jump) with its transform; past it the wheels

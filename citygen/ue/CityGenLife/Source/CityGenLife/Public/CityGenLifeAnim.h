@@ -8,6 +8,8 @@
 // seat's frame, so the mesh moves to the seat as one begins and the clip before is carried
 // back to where it was (`RootFix`, the old component transform in the new one's frame,
 // applied to its root bone and faded out with it).
+// umbrella_hold: a person holding an umbrella has its right arm held over whatever plays (the
+// group's held pose, `people_places.py` `hold_pose`), weighted in and out as it opens and folds.
 
 #pragma once
 
@@ -36,6 +38,10 @@ struct FCgPersonAnimProxy : public FAnimInstanceProxy
 	bool bPrevLoop = true;
 	float CurWeight = 1.f;
 	FTransform Fix = FTransform::Identity;
+	// (umbrella_hold: the held arm and its weight)
+	TArray<int32> HoldBones;
+	TArray<FQuat> HoldRots;
+	float HoldWeight = 0.f;
 };
 
 UCLASS(transient, NotBlueprintable)
@@ -61,6 +67,16 @@ public:
 	float BlendS = 0.f, BlendT = 0.f;
 	bool bCurLoop = true, bPrevLoop = true;
 	FTransform Fix = FTransform::Identity;
+
+	/** umbrella_hold: the right arm holding an umbrella, layered over whatever clip plays: the
+	 *  rotations `HoldRots` of the bones `HoldBones` (skeleton indices: the upper arm, forearm
+	 *  and hand) in their parents' frames, the clip's own past them; weighted toward
+	 *  `HoldTarget` (0 or 1) over `HoldS` seconds, eased (`HoldWeight`). */
+	void SetHold(const TArray<int32>& Bones, const TArray<FQuat>& Rots) { HoldBones = Bones; HoldRots = Rots; }
+	float HoldWeight() const;
+	TArray<int32> HoldBones;
+	TArray<FQuat> HoldRots;
+	float HoldTarget = 0.f, HoldW = 0.f, HoldS = 0.35f;
 
 protected:
 	virtual FAnimInstanceProxy* CreateAnimInstanceProxy() override;
