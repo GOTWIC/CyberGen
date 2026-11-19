@@ -30,8 +30,8 @@
     "shanty_stack_ubx": "ce18b5f4c3e4d3e55e21fb71976ed1c58caf5bf0bf219ac4a303cdec8d3b4a78"
   },
   "ag1": {
-    "testport_manifest": "45fd1f7ae69c85c23c91256263866c75db5eb11816f1acdbe0b964a201383e19",
-    "testport_files": "86bf914e676003acd464329c1d18982bc5c4e5d133873e2fbc0a7f03db8b657d",
+    "testport_manifest": "a9b4216b50cae2a35c1812a5102a4a5a9395f4c5f45c1da043700067fff09ae5",
+    "testport_files": "f604407852e903e56186aad0004dadc16d4961ed1316b365e34c98c9b4f75196",
     "buildings": {
       "vesper_bay": {
         "d01.lm.e776n278.bld": "5b31a2681804a501cdb6f1941c54ba1d897a5ed8ba50c2c337e6e48d30eff4cc",
