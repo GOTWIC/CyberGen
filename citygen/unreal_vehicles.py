@@ -421,6 +421,163 @@ def check_summary(res: dict) -> str:
     return "\n".join(lines)
 
 
+# --- car_merge: each car's parts as one mesh, for the moving traffic -------------------------
+
+MERGE_VERSION = 1            # of the merged files (their bytes)
+MERGE_DIR = "unreal/vehicles"  # under the build: <car>/lod<k>.glb
+MERGED_PART = "merged"         # the merged mesh's node and mesh name (SM_<car>_merged)
+ROLL_SUFFIX = "_roll"          # a rolling wheel's material: the pack's own, "_roll" added
+_NP = {5126: "<f4", 5125: "<u4", 5123: "<u2", 5121: "u1", 5122: "<i2", 5120: "i1"}
+_NORM = {5121: 255.0, 5123: 65535.0, 5120: 127.0, 5122: 32767.0}
+_ATTRS = ("POSITION", "NORMAL", "TEXCOORD_0")
+
+
+def _array(doc: dict, blob: bytes, k: int):
+    """An accessor as a float64 (or, for indices, int64) numpy array (count, size)."""
+    import numpy as np
+    a = doc["accessors"][k]
+    v = doc["bufferViews"][a["bufferView"]]
+    size = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4}[a["type"]]
+    dt = np.dtype(_NP[a["componentType"]])
+    stride = v.get("byteStride") or dt.itemsize * size
+    base = v.get("byteOffset", 0) + a.get("byteOffset", 0)
+    arr = np.ndarray((a["count"], size), dtype=dt, buffer=blob, offset=base,
+                     strides=(stride, dt.itemsize))
+    if a.get("normalized"):
+        return np.maximum(arr.astype(np.float64) / _NORM[a["componentType"]], -1.0)
+    return arr.astype(np.int64 if a["componentType"] in (5125, 5123, 5121) and size == 1
+                      else np.float64)
+
+
+def rolls(p: dict) -> bool:
+    """Whether a pack part rolls with the car (a wheel that spins: the brakes, which follow a
+    wheel to steer, do not)."""
+    return p.get("kind") == "wheel" and p.get("spins", True) is not False
+
+
+def merge_lod(path: Path, parts: list[dict]) -> bytes:
+    """One LOD file of a pack as one mesh (node and mesh `MERGED_PART`): every part's
+    primitives in the car's frame (in its node's own frame, as the importer takes a part, moved
+    to its pivot, as the runtime places it: glTF's (x, y, z) is the car's (x, z, -y)), grouped
+    by material in
+    the parts' order, a rolling wheel's under its material's name with `ROLL_SUFFIX`;
+    POSITION, NORMAL, TEXCOORD_0 and TEXCOORD_1, the wheel's middle a rolling wheel's
+    vertices turn about (Unreal's x and z in cm: glTF's x and y times 100; 0 on every other
+    vertex). Tangents are left out (the importer has Unreal compute them, MikkTSpace, as it
+    does for the parts). The bytes are a function of the file and the parts alone."""
+    import numpy as np
+    doc, blob = _glb(path)
+    names = {n.get("name"): k for k, n in enumerate(doc.get("nodes", [])) if "mesh" in n}
+    groups: dict[str, dict] = {}
+    for p in parts:
+        k = names.get(p["name"])
+        if k is None:
+            raise ValueError(f"{path}: part {p['name']} has no node")
+        px, py, pz = (float(v) for v in p.get("pivot", [0.0, 0.0, 0.0]))
+        at = np.array([px, pz, -py])
+        roll = rolls(p)
+        mid = at * 100.0
+        for prim in doc["meshes"][doc["nodes"][k]["mesh"]]["primitives"]:
+            if prim.get("mode", 4) != 4:
+                raise ValueError(f"{path}: part {p['name']}: not triangles")
+            va = prim["attributes"]
+            pos = _array(doc, blob, va["POSITION"]) + at
+            n = len(pos)
+            nrm = _array(doc, blob, va["NORMAL"]) if "NORMAL" in va else np.zeros((n, 3))
+            uv0 = _array(doc, blob, va["TEXCOORD_0"]) if "TEXCOORD_0" in va else np.zeros((n, 2))
+            idx = (_array(doc, blob, prim["indices"]).reshape(-1) if "indices" in prim
+                   else np.arange(n, dtype=np.int64))
+            uv1 = np.tile([mid[0], mid[1]] if roll else [0.0, 0.0], (n, 1))
+            mat = doc["materials"][prim["material"]]["name"] if "material" in prim \
+                else p["name"]
+            g = groups.setdefault(mat + (ROLL_SUFFIX if roll else ""),
+                                  {"POSITION": [], "NORMAL": [], "TEXCOORD_0": [],
+                                   "TEXCOORD_1": [], "idx": [], "n": 0})
+            g["idx"].append(idx + g["n"])
+            g["n"] += n
+            for key, arr in (("POSITION", pos), ("NORMAL", nrm), ("TEXCOORD_0", uv0),
+                             ("TEXCOORD_1", uv1)):
+                g[key].append(arr)
+    out = {"asset": {"version": "2.0", "generator": f"citygen car_merge {MERGE_VERSION}"},
+           "scene": 0, "scenes": [{"nodes": [0]}],
+           "nodes": [{"name": MERGED_PART, "mesh": 0}],
+           "meshes": [{"name": MERGED_PART, "primitives": []}],
+           "materials": [], "accessors": [], "bufferViews": [], "buffers": []}
+    data = bytearray()
+
+    def put(arr, ctype, kind, target, minmax=False):
+        raw = np.ascontiguousarray(arr).tobytes()
+        while len(data) % 4:
+            data.append(0)
+        out["bufferViews"].append({"buffer": 0, "byteOffset": len(data),
+                                   "byteLength": len(raw), "target": target})
+        data.extend(raw)
+        acc = {"bufferView": len(out["bufferViews"]) - 1, "componentType": ctype,
+               "count": int(arr.shape[0]), "type": kind}
+        if minmax:
+            acc["min"] = [float(v) for v in arr.min(axis=0)]
+            acc["max"] = [float(v) for v in arr.max(axis=0)]
+        out["accessors"].append(acc)
+        return len(out["accessors"]) - 1
+
+    for mat, g in groups.items():
+        out["materials"].append({"name": mat})
+        attrs = {}
+        for key, kind in (("POSITION", "VEC3"), ("NORMAL", "VEC3"), ("TEXCOORD_0", "VEC2"),
+                          ("TEXCOORD_1", "VEC2")):
+            arr = np.concatenate(g[key]).astype("<f4")
+            attrs[key] = put(arr, 5126, kind, 34962, minmax=key == "POSITION")
+        idx = np.concatenate(g["idx"]).astype("<u4")
+        out["meshes"][0]["primitives"].append(
+            {"attributes": attrs, "indices": put(idx, 5125, "SCALAR", 34963),
+             "material": len(out["materials"]) - 1, "mode": 4})
+    while len(data) % 4:
+        data.append(0)
+    out["buffers"].append({"byteLength": len(data)})
+    js = json.dumps(out, separators=(",", ":")).encode("utf-8")
+    js += b" " * (-len(js) % 4)
+    total = 12 + 8 + len(js) + 8 + len(data)
+    return (struct.pack("<4sII", b"glTF", 2, total) + struct.pack("<I4s", len(js), b"JSON")
+            + js + struct.pack("<I4s", len(data), b"BIN\x00") + bytes(data))
+
+
+def merge_cars(sec: dict | None, build: str | Path) -> dict:
+    """car_merge: each car of the manifest's `vehicles` as one mesh a LOD for the moving
+    traffic and the fliers (`merge_lod`), written to BUILD/`MERGE_DIR`/<car>/lod<k>.glb only
+    when their bytes change, and the car's record given `merged`: the files (relative to the
+    build) with their sha256, the materials (the pack's slot names, a rolling wheel's with
+    `ROLL_SUFFIX`), the radius the runtime rolls its wheels by (the first rolling wheel's,
+    m; 0 for a car with none) and a hash (what the importer compares). The car's own hash is
+    left as it was: the parked cars keep their parts. {car: hash}."""
+    out = {}
+    if not sec:
+        return out
+    build = Path(build)
+    for car, rec in sorted(sec["cars"].items()):
+        folder = Path(rec["dir"])
+        files, shas, mats = [], [], []
+        for lo in rec["lods"]:
+            data = merge_lod(folder / lo["file"], rec["parts"])
+            rel = f"{MERGE_DIR}/{car}/lod{lo['lod']}.glb"
+            dest = build / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if not dest.is_file() or dest.read_bytes() != data:
+                dest.write_bytes(data)
+            files.append(rel)
+            shas.append(hashlib.sha256(data).hexdigest())
+            if not mats:
+                doc, _ = _glb(dest)
+                mats = [m["name"] for m in doc["materials"]]
+        wheels = [p for p in rec["parts"] if rolls(p)]
+        radius = float(wheels[0].get("radius") or wheels[0]["pivot"][2]) if wheels else 0.0
+        m = {"files": files, "sha256": shas, "materials": mats, "roll_radius": round(radius, 4),
+             "part": MERGED_PART}
+        m["hash"] = content_hash([MERGE_VERSION, m])
+        rec["merged"] = m
+        out[car] = m["hash"]
+    return out
+
+
 def actor_hashes(sec: dict | None) -> dict[str, str]:
     """A placement's actor by key (BP_CityGenGroup), with the hash the importer compares."""
     return {r["key"]: r["hash"] for r in (sec or {}).get("placements", [])}

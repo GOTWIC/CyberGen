@@ -336,3 +336,76 @@ def test_cli(lib, tmp_path):
     assert main(["unreal", str(b), "--manifest-only", "--no-play", "--blockout-only",
                  "--vehicles", str(lib)]) == 0
     assert "vehicles" not in json.loads((b / "unreal" / "manifest.json").read_text())
+
+
+def test_merged_cars(lib, tmp_path):
+    """car_merge: each car's parts as one mesh a LOD in BUILD/unreal/vehicles/<car>: the
+    parts at their pivots grouped by material, a rolling wheel's under its material with
+    `_roll` and its middle (Unreal's x and z, cm) in UV1, nothing else in it; the car's own
+    hash, and so the parked cars' actors, as before; the same build writes the same bytes."""
+    import numpy as np
+    b = _build(tmp_path)
+    _place(b, [copy.deepcopy(ENTRY)])
+    man = _man(b, lib)
+    coupe, hover = man["vehicles"]["cars"]["test_coupe"], man["vehicles"]["cars"]["test_hover"]
+    assert coupe["hash"] == UV.read_pack(lib / "test_coupe")["hash"]
+    mg = coupe["merged"]
+    assert mg["files"] == [f"unreal/vehicles/test_coupe/lod{k}.glb" for k in range(4)]
+    assert mg["part"] == "merged" and mg["roll_radius"] == 0.3
+    assert hover["merged"]["roll_radius"] == 0.0
+    assert not any(m.endswith("_roll") for m in hover["merged"]["materials"])
+    doc, blob = UV._glb(b / mg["files"][0])
+    assert [n["name"] for n in doc["nodes"]] == ["merged"]
+    mats = [m["name"] for m in doc["materials"]]
+    assert mats == mg["materials"] and [m for m in mats if m.endswith("_roll")]
+    src, sblob = UV._glb(lib / "test_coupe" / "lod0.glb")
+    wheel = next(n for n in src["nodes"] if n.get("name") == "wheel_fl")
+    wpos = UV._array(src, sblob, src["meshes"][wheel["mesh"]]["primitives"][0]
+                     ["attributes"]["POSITION"])
+    for prim in doc["meshes"][0]["primitives"]:
+        mat = doc["materials"][prim["material"]]["name"]
+        uv1 = UV._array(doc, blob, prim["attributes"]["TEXCOORD_1"])
+        pos = UV._array(doc, blob, prim["attributes"]["POSITION"])
+        if mat.endswith("_roll"):
+            # (both wheels, each at its pivot: the car's (x, y, z) is glTF's (x, -z, y))
+            assert sorted({tuple(r) for r in uv1.tolist()}) == [(140.0, 30.0)]
+            n = len(wpos)
+            assert np.allclose(pos[:n], wpos + [1.4, 0.3, -0.8], atol=1e-5)
+            assert np.allclose(pos[n:2 * n], wpos + [1.4, 0.3, 0.8], atol=1e-5)
+        else:
+            assert not uv1.any()
+    stamp = (b / mg["files"][0]).stat().st_mtime_ns
+    again = _man(b, lib)
+    assert again["vehicles"]["cars"]["test_coupe"]["merged"] == mg
+    assert (b / mg["files"][0]).stat().st_mtime_ns == stamp
+    assert U.actor_hashes(again) == U.actor_hashes(man)
+
+
+def test_traffic_and_fliers_take_the_merged_mesh(lib, tmp_path):
+    """car_merge: the traffic's model is its merged mesh, one part drawn as far as a body, its
+    wheels rolled within ROLL_M by the first wheel's radius; a hover car (no wheels) rolls
+    none; a flier's own meshes are its merged one; a record without `merged` keeps its
+    parts."""
+    from citygen import unreal_life as UL
+    b = _build(tmp_path)
+    _place(b, [copy.deepcopy(ENTRY)])
+    veh = _man(b, lib)["vehicles"]
+    tr = {"models": ["test_coupe", "test_hover"], "slots": [0, 1, 0],
+          "weights": {"d01": [1.0, 1.0]}, "paints": {"d01": [[0.5] * 9, [0.4] * 9]}}
+    out = UL.traffic_cars(tr, veh, ["d01"])
+    assert [p["mesh"] for p in out["parts"]] == [
+        "/Game/CityGen/Vehicles/test_coupe/SM_test_coupe_merged",
+        "/Game/CityGen/Vehicles/test_hover/SM_test_hover_merged"]
+    assert [p["model"] for p in out["parts"]] == [0, 1]
+    assert [p["spin_radius"] for p in out["parts"]] == [0.3, 0.0]
+    assert [p["roll_m"] for p in out["parts"]] == [UL.ROLL_M, 0.0]
+    assert all(p["cull_m"] == UL.TRAFFIC_CULL_M["body"] and p["shadow"] and
+               p["pivot"] == [0.0, 0.0, 0.0] for p in out["parts"])
+    fl = UL._hover_parts(veh["cars"]["test_hover"], False)
+    assert [p["mesh"] for p in fl if p["kind"] == -1] == [
+        "/Game/CityGen/Vehicles/test_hover/SM_test_hover_merged"]
+    plain = copy.deepcopy(veh)
+    for rec in plain["cars"].values():
+        rec.pop("merged")
+    out = UL.traffic_cars(tr, plain, ["d01"])
+    assert len(out["parts"]) == 6 and not any(p.get("roll_m") for p in out["parts"])

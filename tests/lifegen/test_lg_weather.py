@@ -179,7 +179,7 @@ def test_exporter_packs_the_weather(build: Path):
               "links": ln["successors"]} for ln in m["lanes"]]
     graphs = {"walkways": _flat(walks), "lanes": _flat(lanes)}
     data, why = UL.life_data(build / "life", graphs, None, None)
-    assert why == "" and data["version"] == UL.PACK_VERSION == 11
+    assert why == "" and data["version"] == UL.PACK_VERSION == 12
     c = data["controller"]
     names, keys = c["weather_names"], c["weather_keys"]
     assert sorted(names) == sorted(P.WEATHER_LIFE) and keys == list(P.WEATHER_KEYS)

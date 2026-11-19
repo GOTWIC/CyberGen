@@ -451,7 +451,9 @@ void ACityGenLife::MakeComponents()
 	CarParts.Reset();
 	for (int32 P = 0; P < CarPartMeshes.Num(); ++P)
 	{
-		CarParts.Add(CarPartMeshes[P] ? Make(*FString::Printf(TEXT("CarPart%d"), P), CarPartMeshes[P], nullptr, PaintFloats, bShadows && (!CarPartShadows.IsValidIndex(P) || CarPartShadows[P] != 0)) : nullptr);
+		// (car_merge: a merged car's rolling wheels take the car's travel after its paint)
+		const int32 Floats = PaintFloats + ((CarPartRoll.IsValidIndex(P) && CarPartRoll[P] > 0.f) ? 1 : 0);
+		CarParts.Add(CarPartMeshes[P] ? Make(*FString::Printf(TEXT("CarPart%d"), P), CarPartMeshes[P], nullptr, Floats, bShadows && (!CarPartShadows.IsValidIndex(P) || CarPartShadows[P] != 0)) : nullptr);
 		// (LG5: each part drawn out to its own distance: a body far, its glass, wheels and
 		// small parts nearer, as the parked cars')
 		if (CarParts.Last() && CarPartCull.IsValidIndex(P) && CarPartCull[P] > 0.f)

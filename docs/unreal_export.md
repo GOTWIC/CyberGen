@@ -3323,6 +3323,48 @@ umbrellas are LG8's. The weather status adds `umbrellas_folded`, `umbrella_held`
 `umbrella_folded` frame someone standing with an umbrella open or someone with one under a
 cover, and every `umbrella*` show frames closer (5.2 m ahead, on the umbrella's side).
 
+### Cars as one mesh (car_merge)
+
+LG5 drew the moving traffic with an instanced component per car model and part (a body, its
+glass, four to six wheels, brakes: 92 components on Delta), and LG8 found the engine's work on
+them, not lifegen's step, to be most of the traffic's game-thread cost. Each car is now one
+mesh for the traffic and the fliers; the parked cars keep their parts.
+
+- **The merged files** (`unreal_vehicles.merge_cars`, `merge_lod`, in `build_manifest` after
+  the vehicles section): per car and LOD, `BUILD/unreal/vehicles/<car>/lod<k>.glb`, one node
+  and mesh `merged`: every part's primitives in its node's own frame moved to its pivot (as the
+  runtime placed the parts), grouped by the pack's material names, a rolling wheel's (kind
+  `wheel`, `spins` not false) under its material with `_roll`; POSITION, NORMAL, TEXCOORD_0
+  and TEXCOORD_1, the middle a rolling wheel's vertices turn about (Unreal's x and z in cm; 0
+  on every other vertex); tangents left to Unreal (MikkTSpace, as the parts'). Written only
+  when their bytes change. The car's record gains `merged` (files, sha256, materials,
+  `roll_radius` the first rolling wheel's radius, `part`, a hash); the car's own hash does not
+  move, so the parked cars' meshes and actors stay as they were.
+- **The importer** (`Importer.merged_car`, `MERGED_VERSION` 1): `SM_<car>_merged` from the four
+  files (`pipeline(..., merged=True)`: no lightmap UVs, UV1 being the wheels'; the LOD build
+  settings checked too), the pack's LOD screen sizes, its slots on the car's instances (the
+  brakes on `MI_<car>_wheels`), the dark glass from `opaque_from_lod`, only the body's sections
+  casting a shadow (`enable_section_cast_shadow`: the glass and wheels never did as parts), no
+  collision. Made again only when its hash, `VEHICLE_VERSION` or `ROLL_VERSION` changes.
+- **Rolling wheels** (`M_CgVehicleRoll`, `vehicle_master(..., roll=True)`, `ROLL_VERSION` 1;
+  `MI_<car>_wheels_roll` with `RollRadius` the model's wheel radius, cm): the wheels' slot of
+  M_CgVehicle with a world position offset turning each vertex about the car's y axis through
+  its UV1 middle by travel / RollRadius (the instance's custom data 9, after the paint), the
+  top going forward as LG5's turned parts did, and the normal (the normal map's, in the mesh's
+  space) turned the same way, the material's normal in world space. A vertex whose UV1 height
+  is 0 stays put.
+- **Exporter** (`unreal_life.traffic_cars`, `ROLL_M`, `_hover_parts`; `PACK_VERSION` 12): a car
+  with `merged` is one part, its merged mesh, drawn as far as a body (`TRAFFIC_CULL_M`'s 900 m),
+  its wheels rolled within `ROLL_M` (150 m, the old wheels' distance) by `spin_radius`; a hover
+  flier's painted meshes are its merged one. `import_city.traffic_props` adds `car_part_roll`
+  (`LIFE_VERSION` life14).
+- **Runtime** (`CarPartRoll`; `MakeComponents`, `UpdateCarInstances`): a merged part's component
+  carries one more custom float; each frame a car within its roll distance gets its travel
+  (wrapped at 64 turns of the model's wheel: no jump) with its transform; past it the wheels
+  stand still. The status's `traffic.components` counts the components.
+
+Results: `docs/progress/car_merge/README.md`.
+
 ## Milestones and checks
 
 - **Every milestone** updates the exporter in its own PR for what it adds or changes (a new
@@ -3406,3 +3448,4 @@ cover, and every `umbrella*` show frames closer (5.2 m ahead, on the umbrella's 
 | People idling and sitting down (people_idles) | "People idling and sitting down" above: the places' clips step makes the bench's five sit-downs and its stand-up (in the seat's frame, the stretch near the seat), per look a second mid bake (the walk, a standing idle, the sitting loop) with its material instances and a still sheet on an upright card (`ensure_place_clips`, `IDLE_BAKE`, `idle_key`); `unreal_life.idle_data`; `import_city.people_assets` and `places_props` (`LIFE_VERSION` life11: `MidStillFrames`, `MidIdleMaterials`, `MidIdleStarts`, `CardCells`, `SitInClips`, `SitInCount`, `SitIn`, `SitInStart`, `SitOutClips`, `SitOut`); the walk processor walks a sitter to its sit-down's start and holds it on the seat through the sit-down and stand-up (`CgAnim::SitDown`, `StandUp`), near plays them, mid the baked idle and sitting loop, far a still cell; console `CityGenLife.PlaceShow` sitdown, standup, sitmid, sitfar, idlemid, idlefar | Delta imported again into CityAG16 with `--people`, checked with shots three times, benchmarked and packaged (`docs/progress/people_idles/`) |
 | Slots on their surface (delta_rebuild) | "Slots on their surface" above: the plan seats every ground level slot's points on the drawn surface and says so (`seated`); `unreal_life.pack_places` packs `slot_seated` (`PACK_VERSION` 10), `import_city.places_props` sets `SlotSeated` (`LIFE_VERSION` life12); the controller stands a seated slot's people at its points' own z. A plan without `seated` runs as before. | Delta (rebuilt on main) imported into CityAG16 and checked, with shots of curved roads by day and night (`docs/progress/delta_rebuild/`) |
 | People on their surfaces (people_surfaces) | "People on their surfaces" above: `exports.graphs` drapes the walkways on the pavement map's surface (`walksurf.drape`, `walk_surface` 1) and `flat_graphs` takes those lines over stage 2's; the life plugin's `UCgPersonAnim` (a near body's clips crossfaded, `ClipBlendS`, `SitBlendS`, `CityGenLife.Blend`), its leader ticking after the controller; `MakeSitFrames`' `SitSeatedS`, `SitRiseS` for the mid and far looks. No pack or importer version moves; a graphs.json from before exports as it did. | Delta's graphs and life plan made again, imported into CityAG16, checked with shots of people over a road's hump and sitters rising, benchmarked and packaged (`docs/progress/people_surfaces/`) |
+| Cars as one mesh (car_merge) | "Cars as one mesh" above: `unreal_vehicles.merge_cars`, `merge_lod` (`BUILD/unreal/vehicles/<car>/lod<k>.glb`), `Importer.merged_car` and `M_CgVehicleRoll` (`MERGED_VERSION` 1, `ROLL_VERSION` 1), `unreal_life.traffic_cars` and `_hover_parts` taking the merged mesh (`PACK_VERSION` 12), `import_city.traffic_props`' `car_part_roll` (`LIFE_VERSION` life14), the runtime's `CarPartRoll`. A vehicles section without `merged` exports and runs as before. | Delta imported into CityAG16, checked with shots of traffic by day and night, measured at fixed views, benchmarked and packaged (`docs/progress/car_merge/`) |
