@@ -75,7 +75,7 @@ HASH_TAG = "cg.hash"
 # unchanged build applies the change (stored hashes are "<version>.<content hash>")
 MESH_VERSION = "3"
 ACTOR_VERSION = "1"
-LIFE_VERSION = "life12"  # LG0: lifegen's controller (CityGenLife) and its stand-in material;
+LIFE_VERSION = "life13"  # LG0: lifegen's controller (CityGenLife) and its stand-in material;
                          # LG1: the people library's properties; LG3: the city's crowd;
                          # 4, lifegen_clothing_toggle: the clothing switch's hidden material
                          # and whole body; 5, LG5: the city's traffic; 6, LG2: the looks,
@@ -87,7 +87,8 @@ LIFE_VERSION = "life12"  # LG0: lifegen's controller (CityGenLife) and its stand
                          # table, umbrellas, shelter, nightlife, the reactions' settings;
                          # 11, people_idles: the mid idles' bakes, the still cards, the
                          # bench's sit-downs and stand-up; 12, delta_rebuild: slots seated
-                         # on their surface (SlotSeated)
+                         # on their surface (SlotSeated); 13, car_merge: the cars' merged
+                         # meshes, their wheels' roll (CarPartRoll)
 ATMOS_VERSION = "atmos7"  # the atmos controller's and cells' actors (2, AT2: the high tier,
                           # blinks and sweeps in the packed lights; 3, AT3: the sky and time;
                           # 4, AT4: the air, a cell's fog volumes and emitters; 5, the visible
@@ -1284,6 +1285,8 @@ def traffic_props(d):
            "car_lengths": fl("car_lengths"),
            "car_part_spin": [float(p.get("spin_radius") or 0.0) for p in d.get("parts") or []],
            "car_part_cull": [float(p.get("cull_m") or 0.0) for p in d.get("parts") or []],
+           # (car_merge: a merged car's wheels roll within this distance, m; 0 none)
+           "car_part_roll": [float(p.get("roll_m") or 0.0) for p in d.get("parts") or []],
            "traffic_pool": 0}
     t = d.get("traffic")
     if t:
@@ -2184,8 +2187,33 @@ VEHICLE_EMIT_CODE = """
 return E.rgb * (Strength / 15.0) * lerp(GlowDay, GlowNight, Night);
 """
 
+# car_merge: a merged car's rolling wheels (M_CgVehicleRoll): the instance's travel (cm) in its
+# custom data after the paint, UV1 the wheel's middle (x, z in the mesh's cm); the turn is
+# travel / RollRadius (the model's first rolling wheel's radius, cm: every wheel of a car turns
+# by it, so the runtime's travel wraps at a whole number of its turns), the top going forward
+# (as LG5's pitch of -turn); none where the vertex has no middle (UV1's height 0: the body,
+# glass, brakes)
+ROLL_VERSION = "1"           # of M_CgVehicleRoll (with VEHICLE_VERSION)
+ROLL_INDEX = 9               # after the nine paint floats (citygen.unreal_vehicles.PAINT_CPD)
+ROLL_SUFFIX = "_roll"        # a rolling wheel's slot (citygen.unreal_vehicles.ROLL_SUFFIX)
+MERGED_VERSION = "1"         # of what the importer makes of a merged car (with its hash)
+VEHICLE_ROLL_WPO = """
+if (C.y < 0.5) { return float3(0, 0, 0); }
+float a = D / max(R, 1.0);
+float s = sin(a), c = cos(a);
+float2 d = float2(P.x - C.x, P.z - C.y);
+float2 q = float2(d.x * c + d.y * s, d.y * c - d.x * s);
+return float3(q.x - d.x, 0.0, q.y - d.y);
+"""
+VEHICLE_ROLL_NORMAL = """
+if (C.y < 0.5) { return N; }
+float a = D / max(R, 1.0);
+float s = sin(a), c = cos(a);
+return float3(N.x * c + N.z * s, N.y, N.z * c - N.x * s);
+"""
 
-def vehicle_master(defaults):
+
+def vehicle_master(defaults, roll=False):
     """/Game/CityGen/Core/M_CgVehicle: the packs' body and wheels slots (GAME.md): the
     contract's albedo from the base color, the mask and three paint colors (Paint1 to 3:
     Custom Primitive Data 0, 3, 6, read through per-instance custom data, so an instanced
@@ -2194,13 +2222,24 @@ def vehicle_master(defaults):
     ORM's alpha with CoatRoughness, the normal map (OpenGL, flipped at import), the paint's
     flake, specular from the emissive texture's alpha, emission by EmissiveStrength and
     Night. Built through material attributes (the clear coat inputs are not material
-    properties Python can connect)."""
-    path = f"{CORE}/M_CgVehicle"
+    properties Python can connect).
+
+    `roll` (car_merge): M_CgVehicleRoll, the same with a rolling wheel's turn: a merged car's
+    rolling wheels (`unreal_vehicles.merge_lod`) carry in UV1 the middle they turn about (the
+    mesh's x and z, cm), and the instance's custom data `ROLL_INDEX` its travel (cm), so each
+    vertex turns about the car's y axis through its middle by travel / the middle's height
+    (the wheel's radius, to a few percent) by its world position offset, and its normal by the
+    same turn (the normal map's, in the mesh's space, then the world's: the material's normal
+    is in world space), the turn travel / RollRadius (cm). A vertex with no middle (UV1's
+    height 0) stays as it is."""
+    name = "M_CgVehicleRoll" if roll else "M_CgVehicle"
+    tag, ver = ("cg.vehicle_roll", f"{VEHICLE_VERSION}.{ROLL_VERSION}") if roll else         ("cg.vehicle", VEHICLE_VERSION)
+    path = f"{CORE}/{name}"
     m = unreal.load_asset(path) if EAL.does_asset_exist(path) else None
-    if m is not None and meta(m, "cg.vehicle") == VEHICLE_VERSION:
+    if m is not None and meta(m, tag) == ver:
         return instanced(m)
     if m is None:
-        m = AT.create_asset("M_CgVehicle", CORE, unreal.Material, unreal.MaterialFactoryNew())
+        m = AT.create_asset(name, CORE, unreal.Material, unreal.MaterialFactoryNew())
     else:
         clear_material(m)
     uv = expr(m, unreal.MaterialExpressionTextureCoordinate, -1600, 0, coordinate_index=0)
@@ -2252,7 +2291,43 @@ def vehicle_master(defaults):
     link(tex["orm"], "B", att, "Metallic")
     link(tex["orm"], "R", att, "AmbientOcclusion")
     link(tex["emissive"], "A", att, "Specular")
-    link(flake, "", att, "Normal")
+    if roll:
+        S = unreal.MaterialVectorCoordTransformSource
+        T = unreal.MaterialVectorCoordTransform
+        mid = expr(m, unreal.MaterialExpressionTextureCoordinate, -1300, 2900,
+                   coordinate_index=1)
+        travel = expr(m, unreal.MaterialExpressionPerInstanceCustomData, -1300, 3000,
+                      data_index=ROLL_INDEX, const_default_value=0.0)
+        radius = sparam(m, "RollRadius", -1000, 3100, 35.0)
+        off = custom(m, -800, 2900, VEHICLE_ROLL_WPO, ["P", "C", "D", "R"], cmot(F3),
+                     "CgVehicleRollOffset")
+        link(lp, "", off, "P")
+        link(mid, "", off, "C")
+        link(travel, "", off, "D")
+        link(radius, "", off, "R")
+        wpo = expr(m, unreal.MaterialExpressionTransform, -600, 2900,
+                   transform_source_type=S.TRANSFORMSOURCE_LOCAL,
+                   transform_type=T.TRANSFORM_WORLD)
+        link(off, "", wpo, "Input")
+        link(wpo, "", att, "WorldPositionOffset")
+        n_l = expr(m, unreal.MaterialExpressionTransform, -650, 300,
+                   transform_source_type=S.TRANSFORMSOURCE_TANGENT,
+                   transform_type=T.TRANSFORM_LOCAL)
+        link(flake, "", n_l, "Input")
+        turned = custom(m, -500, 300, VEHICLE_ROLL_NORMAL, ["N", "C", "D", "R"], cmot(F3),
+                        "CgVehicleRollNormal")
+        link(n_l, "", turned, "N")
+        link(mid, "", turned, "C")
+        link(travel, "", turned, "D")
+        link(radius, "", turned, "R")
+        n_w = expr(m, unreal.MaterialExpressionTransform, -400, 300,
+                   transform_source_type=S.TRANSFORMSOURCE_LOCAL,
+                   transform_type=T.TRANSFORM_WORLD)
+        link(turned, "", n_w, "Input")
+        link(n_w, "", att, "Normal")
+        m.set_editor_property("tangent_space_normal", False)
+    else:
+        link(flake, "", att, "Normal")
     link(emit, "", att, "EmissiveColor")
     link(tex["orm"], "A", att, "ClearCoat")
     link(sparam(m, "CoatRoughness", -1000, 2770, 0.06), "", att, "ClearCoatRoughness")
@@ -2262,7 +2337,7 @@ def vehicle_master(defaults):
     for f in usage_flags(m):
         m.set_editor_property(f, True)
     MEL.recompile_material(m)
-    EAL.set_metadata_tag(m, "cg.vehicle", VEHICLE_VERSION)
+    EAL.set_metadata_tag(m, tag, ver)
     EAL.save_loaded_asset(m, only_if_is_dirty=False)
     return m
 
@@ -2582,13 +2657,15 @@ class Importer:
 
     # -- meshes --
 
-    def pipeline(self, nanite=True, bake=True, water=False, pack=False, vehicle=False):
+    def pipeline(self, nanite=True, bake=True, water=False, pack=False, vehicle=False,
+                 merged=False):
         """M15's import settings; stage 2's packs keep each mesh in its node's frame (`bake`
         off: the actor stands at the node's pivot) and build Nanite only where asked (`pack`:
         per mesh, by the pack step); AG12's water packs keep their vertex colors and UV1 (the
         current) at full precision, with no lightmap UVs written over it (`water`); AG18's
         vehicle packs their UVs at full precision too (a 4096 atlas: half floats are off by
-        up to two texels near 1) and tangents computed, MikkTSpace (`vehicle`)."""
+        up to two texels near 1) and tangents computed, MikkTSpace (`vehicle`); a merged car
+        (car_merge) no lightmap UVs either, its UV1 the wheels' middles (`merged`)."""
         gp = unreal.InterchangeGenericAssetsPipeline()
         if vehicle:
             cmn = gp.get_editor_property("common_meshes_properties")
@@ -2610,6 +2687,9 @@ class Importer:
         msh.set_editor_property("fallback_collision_type", unreal.InterchangeMeshCollision.NONE)
         msh.set_editor_property("import_skeletal_meshes", False)
         msh.set_editor_property("build_nanite", nanite)
+        if merged:
+            # (the mesh pipeline's own default, said: UV1 is the merged car's wheels' middles)
+            msh.set_editor_property("generate_lightmap_u_vs", False)
         if not bake:
             # (and the packs' own flat normals: recomputed, they would be smoothed across
             # the welded corners of every reveal and band)
@@ -3313,8 +3393,106 @@ class Importer:
                 st["cars"]["kept"] += 1
             for part, sm in got.items():
                 self.veh_meshes[(car, part)] = sm
+            if rec.get("merged"):
+                self.veh_meshes[(car, rec["merged"]["part"])] = self.merged_car(car, rec, sms)
             REPORT.update(n + 1, len(cars), detail=car, force=n + 1 == len(cars))
             log(f"vehicle {n + 1}/{len(cars)} {car}")
+
+    def merged_car(self, car, rec, sms):
+        """car_merge: SM_<car>_merged, the car's parts as one mesh (`unreal_vehicles.
+        merge_lod`, BUILD/unreal/vehicles/<car>/lod<k>.glb) with the pack's four LODs, for
+        the moving traffic and the fliers: an instanced component a model, not one a part.
+        Its sections by the pack's materials (the body, the glass, from opaque_from_lod the
+        dark glass, the brakes on the wheels' instance) and the rolling wheels on
+        `MI_<car>_wheels_roll` (M_CgVehicleRoll, turned by the instance's travel); only the
+        body's sections cast a shadow (the glass and wheels never did as parts); no
+        collision (the life controller's cars have none) and no lightmap UVs (UV1 is the
+        wheels' middles). Made again only when its files, the masters or this version
+        change."""
+        mg = rec["merged"]
+        st = self.stats["vehicles"]
+        mst = st.setdefault("merged", {"made": 0, "kept": 0})
+        path = f"{rec['folder']}/SM_{car}_{mg['part']}"
+        h = f"{MERGED_VERSION}.{VEHICLE_VERSION}.{ROLL_VERSION}.{mg['hash']}"
+        sm = unreal.load_asset(path) if EAL.does_asset_exist(path) else None
+        if sm is not None and meta(sm, HASH_TAG) == h:
+            mst["kept"] += 1
+            return sm
+        tex = self.car_textures(car, rec)
+        # (the parts' instances as they are, the rolling wheels' made or set; all of them
+        # where one is missing)
+        names = ["body", "wheels", "glass", "glass_dark"]
+        paths = {f"pack_{n}": f"{rec['folder']}/Materials/MI_{car}_{n}" for n in names}
+        if all(EAL.does_asset_exist(v) for k, v in paths.items()
+               if k != "pack_wheels" or "wheels" in rec["materials"]):
+            mats = {k: unreal.load_asset(v) for k, v in paths.items() if EAL.does_asset_exist(v)}
+            mats.update(self.car_materials(car, rec, tex, roll_only=True))
+        else:
+            mats = self.car_materials(car, rec, tex, roll=True)
+        src = f"{rec['folder']}/SourceMerged"
+        if EAL.does_directory_exist(src):
+            delete_assets(EAL.list_assets(src, recursive=True))
+        chain = []
+        for k, rel in enumerate(mg["files"]):
+            folder = f"{src}/LOD{k}"
+            pl = self.pipeline(nanite=False, bake=False, vehicle=True, merged=True)
+            self.import_glb(os.path.join(self.build, rel), folder, pl)
+            found = [unreal.load_asset(a) for a in EAL.list_assets(folder, recursive=False)]
+            found = [o for o in found if isinstance(o, unreal.StaticMesh)]
+            if len(found) != 1:
+                raise RuntimeError(f"{car}: merged LOD{k}: {len(found)} meshes imported")
+            chain.append(found[0])
+        if EAL.does_asset_exist(path):
+            EAL.delete_asset(path)
+        sm = EAL.duplicate_asset(chain[0].get_path_name().split(".")[0], path)
+        for k, lo in enumerate(chain[1:], 1):
+            sms.set_lod_from_static_mesh(sm, k, lo, 0, True)
+        sms.set_lod_screen_sizes(sm, [float(lo["screen_size"]) for lo in rec["lods"]])
+        slots, names = [], []
+        for sl in sm.get_editor_property("static_materials"):
+            name = str(sl.material_slot_name).lower()
+            mi = mats.get(name)
+            if mi is None:
+                raise RuntimeError(f"{car}: merged slot {name} has no material")
+            sl.set_editor_property("material_interface", mi)
+            slots.append(sl)
+            names.append(name)
+        sm.set_editor_property("static_materials", slots)
+        opaque_from = int((rec.get("glass") or {}).get("opaque_from_lod", 99))
+        dark = None
+        if "pack_glass" in names and opaque_from < len(rec["lods"]):
+            sm.add_material(mats["pack_glass_dark"])
+            dark = len(sm.get_editor_property("static_materials")) - 1
+            names.append("pack_glass_dark")
+        for k in range(len(rec["lods"])):
+            bset = sms.get_lod_build_settings(sm, k)
+            if bset.get_editor_property("generate_lightmap_u_vs"):
+                bset.set_editor_property("generate_lightmap_u_vs", False)
+                sms.set_lod_build_settings(sm, k, bset)
+            for sec in range(sm.get_num_sections(k)):
+                slot = sms.get_lod_material_slot(sm, k, sec)
+                name = names[slot] if 0 <= slot < len(names) else ""
+                if name == "pack_glass" and dark is not None and k >= opaque_from:
+                    sms.set_lod_material_slot(sm, dark, k, sec)
+                sms.enable_section_cast_shadow(sm, name == "pack_body", k, sec)
+                sms.enable_section_collision(sm, False, k, sec)
+        sms.remove_collisions(sm)
+        bs = sm.get_editor_property("body_setup")
+        if bs is not None:
+            bs.set_editor_property("collision_trace_flag",
+                                   unreal.CollisionTraceFlag.CTF_USE_SIMPLE_AS_COMPLEX, NEVER)
+        uvs = sms.get_num_uv_channels(sm, 0)
+        if uvs < 2:
+            raise RuntimeError(f"{car}: merged mesh has {uvs} UV channels (UV1 is the wheels')")
+        EAL.set_metadata_tag(sm, HASH_TAG, h)
+        for k, v in (("cg.car", car), ("cg.part", mg["part"]), ("cg.kind", "merged")):
+            EAL.set_metadata_tag(sm, k, v)
+        EAL.save_loaded_asset(sm, only_if_is_dirty=False)
+        delete_assets(EAL.list_assets(src, recursive=True))
+        mst["made"] += 1
+        st["meshes"] += 1
+        log(f"vehicle {car}: merged mesh, {len(names)} slots, {uvs} UV channels")
+        return sm
 
     def car_textures(self, car, rec):
         st = self.stats["vehicles"]
@@ -3352,8 +3530,11 @@ class Importer:
             out[(slot, mp)] = tex
         return out
 
-    def car_materials(self, car, rec, tex):
-        """The car's material instances by the pack's glTF material name."""
+    def car_materials(self, car, rec, tex, roll=False, roll_only=False):
+        """The car's material instances by the pack's glTF material name; with `roll`
+        (car_merge) also its wheels' on M_CgVehicleRoll (`pack_wheels_roll`, the merged
+        mesh's rolling wheels); `roll_only` that one alone (the parts' instances left
+        untouched: saved again, every HLOD cell drawing a parked car was built again)."""
         defaults = {mp: t for (slot, mp), t in tex.items() if slot == "body"}
         body_m = vehicle_master(defaults)
         folder = f"{rec['folder']}/Materials"
@@ -3371,10 +3552,13 @@ class Importer:
 
         cols = [rec["colors"].get(c, [0.5, 0.5, 0.5]) for c in ("primary", "secondary",
                                                                   "accent")]
-        for slot in ("body", "wheels"):
+        todo = [] if roll_only else [("body", "", body_m), ("wheels", "", body_m)]
+        if (roll or roll_only) and "wheels" in rec["materials"]:
+            todo.append(("wheels", ROLL_SUFFIX, vehicle_master(defaults, roll=True)))
+        for slot, sfx, parent in todo:
             if slot not in rec["materials"]:
                 continue                 # (a hover car has no wheels)
-            mi = mi_of(f"MI_{car}_{slot}", body_m)
+            mi = mi_of(f"MI_{car}_{slot}{sfx}", parent)
             for pname, mp in (("BaseTex", "base_color"), ("NormalTex", "normal"),
                               ("OrmTex", "orm"), ("MaskTex", "mask"), ("EmisTex", "emissive")):
                 MEL.set_material_instance_texture_parameter_value(mi, pname, tex[(slot, mp)])
@@ -3387,10 +3571,15 @@ class Importer:
             for k, c in enumerate(cols):
                 MEL.set_material_instance_vector_parameter_value(
                     mi, f"Paint{k + 1}", unreal.LinearColor(c[0], c[1], c[2], 1.0))
+            if sfx:
+                MEL.set_material_instance_scalar_parameter_value(
+                    mi, "RollRadius",
+                    100.0 * float((rec.get("merged") or {}).get("roll_radius") or 0.35))
             EAL.save_loaded_asset(mi, only_if_is_dirty=False)
-            out[f"pack_{slot}"] = mi
+            out[f"pack_{slot}{sfx}"] = mi
         g = rec.get("glass") or {}
-        for name, opaque in (("pack_glass", False), ("pack_glass_dark", True)):
+        for name, opaque in () if roll_only else (("pack_glass", False),
+                                                   ("pack_glass_dark", True)):
             mi = mi_of(f"MI_{car}_{name[5:]}", vehicle_glass_master(opaque))
             c = g.get("color", [0.3, 0.33, 0.36])
             MEL.set_material_instance_vector_parameter_value(

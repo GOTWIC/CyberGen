@@ -1287,6 +1287,9 @@ def build_manifest(build_dir: str | Path, name: str | None = None,
         clash = sorted(set(UV.actor_hashes(veh)) & set(actor_hashes(man)))
         if clash:
             raise ValueError(f"vehicles: keys {clash[:5]} are other actors' too")
+        # (car_merge: each car's parts as one mesh a LOD for the moving traffic and the
+        # fliers, BUILD/unreal/vehicles/<car>/lod<k>.glb; the parked cars keep their parts)
+        UV.merge_cars(veh, build)
         man["vehicles"] = veh
         man["counts"]["vehicles"] = veh["counts"]["vehicles"]
         man["counts"]["actors"] = len(actor_hashes(man))

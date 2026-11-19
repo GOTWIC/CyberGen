@@ -811,13 +811,20 @@ void ACityGenLife::UpdateCarInstances()
 		const float Cull = CarPartCull.IsValidIndex(P) ? 100.f * CarPartCull[P] : 0.f;
 		const bool bNear = Cull > 0.f && Cull < 100.f * TrafficLiveM;
 		const double Reach2 = FMath::Square((double)Cull + 3000.0);
+		// (car_merge: a merged car's wheels roll by its travel, sent with its transform within
+		// RollCm of the view; past it they stand still, too small to see turn. The travel wraps
+		// at 64 turns of the model's wheel, which the material turns them by: no jump)
+		const float RollCm = CarPartRoll.IsValidIndex(P) ? 100.f * CarPartRoll[P] : 0.f;
+		const bool bRoll = RollCm > 0.f && R > 1.f && Comp->NumCustomDataFloats > PaintFloats;
+		const double Roll2 = FMath::Square((double)RollCm);
+		const float Wrap = 64.f * 2.f * UE_PI * R;
 		const TArray<int32>& Slots = ModelSlots[M];
 		TArray<uint8>& Shown = PartShown[P];
 		auto Of = [&](const int32 Slot)
 		{
 			const FTransform Car(FRotator(0.f, CarYaw[Slot], 0.f), CarPos[Slot]);
 			// (a wheel rolls: its turn the car's travel over its radius)
-			const FTransform Local = R > 1.f ? FTransform(FRotator(-FMath::RadiansToDegrees(FMath::Fmod(CarSpin[Slot] / R, 2.0 * UE_PI)), 0.f, 0.f), Pivot) : FTransform(Pivot);
+			const FTransform Local = (R > 1.f && RollCm <= 0.f) ? FTransform(FRotator(-FMath::RadiansToDegrees(FMath::Fmod(CarSpin[Slot] / R, 2.0 * UE_PI)), 0.f, 0.f), Pivot) : FTransform(Pivot);
 			return Local * Car;
 		};
 		if (bNear)
@@ -882,6 +889,10 @@ void ACityGenLife::UpdateCarInstances()
 			const bool bOn = bTraffic && CarShow[Slot];
 			Scratch[I] = bOn ? Of(Slot) : Hidden;
 			Shown[I] = bOn ? 1 : 0;
+			if (bRoll && bOn && FVector::DistSquared(CarPos[Slot], View) < Roll2)
+			{
+				Comp->SetCustomDataValue(I, PaintFloats, FMath::Fmod(CarSpin[Slot], Wrap), false);
+			}
 		}
 		Comp->BatchUpdateInstancesTransforms(0, Scratch, false, bRebuildRenderState, false);
 		Sent += Hi;
@@ -942,12 +953,12 @@ FString ACityGenLife::TrafficStatus() const
 	{
 		return TEXT(",\"traffic\":null");
 	}
-	return FString::Printf(TEXT(",\"traffic\":{\"on\":%s,\"hour\":%d,\"pool\":%d,\"live_m\":%.0f,\"live_lanes\":%d,\"want\":%.1f,\"scale\":%.3f,\"traffic_scale\":%.2f,\"active\":%d,\"moving\":%d,\"leader\":%d,\"red\":%d,\"person\":%d,\"player\":%d,\"junction\":%d,\"box\":%d,\"spawned\":%d,\"refilled\":%d,\"left_edge\":%d,\"lost\":%d,\"forced\":%d,\"stuck\":%d,\"conflicts\":%d,\"signal_lanes\":%d,\"traffic_ms\":%.3f,\"traffic_ms_max\":%.3f,\"draw_ms\":%.3f,\"live_ms\":%.3f,\"live_ms_max\":%.3f,\"instances_sent\":%d,\"show\":\"%s\"}"),
+	return FString::Printf(TEXT(",\"traffic\":{\"on\":%s,\"hour\":%d,\"pool\":%d,\"live_m\":%.0f,\"live_lanes\":%d,\"want\":%.1f,\"scale\":%.3f,\"traffic_scale\":%.2f,\"active\":%d,\"moving\":%d,\"leader\":%d,\"red\":%d,\"person\":%d,\"player\":%d,\"junction\":%d,\"box\":%d,\"spawned\":%d,\"refilled\":%d,\"left_edge\":%d,\"lost\":%d,\"forced\":%d,\"stuck\":%d,\"conflicts\":%d,\"signal_lanes\":%d,\"traffic_ms\":%.3f,\"traffic_ms_max\":%.3f,\"draw_ms\":%.3f,\"live_ms\":%.3f,\"live_ms_max\":%.3f,\"instances_sent\":%d,\"components\":%d,\"show\":\"%s\"}"),
 		bTraffic ? TEXT("true") : TEXT("false"), Hour, CarEnts.Num(), TrafficLiveM, TrafficLiveLanes, TrafficWantLive, TrafficLiveScale, TrafficScale,
 		CarsActive, CarsMovingNow, CarsWhyNow[CgWhy::Leader], CarsWhyNow[CgWhy::Red], CarsWhyNow[CgWhy::Person], CarsWhyNow[CgWhy::Player],
 		CarsWhyNow[CgWhy::Junction], CarsWhyNow[CgWhy::Box], CarsSpawned, CarsRefilled, CarsLeftTotal, CarsLost, CarsForcedTotal, CarsStuckTotal,
 		ConflictsG.Num() / 2, DriveSignal.Num() ? DriveSignal.FilterByPredicate([](int32 V) { return V >= 0; }).Num() : 0,
-		TrafficMs, TrafficMsMax, CarDrawMs, LiveMs, LiveMsMax, InstancesSent, *LastShow);
+		TrafficMs, TrafficMsMax, CarDrawMs, LiveMs, LiveMsMax, InstancesSent, CarParts.Num(), *LastShow);
 }
 
 void ACityGenLife::SetJaywalk(const float AtSafe, const float AtDanger)

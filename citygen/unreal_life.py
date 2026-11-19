@@ -50,7 +50,7 @@ import json
 import math
 from pathlib import Path
 
-PACK_VERSION = 10           # 2 (cars_steam): smoothed drive lanes, their speeds; 3 (LG3): the
+PACK_VERSION = 11           # 2 (cars_steam): smoothed drive lanes, their speeds; 3 (LG3): the
                             # city's crowd (every walkway, doors, signals, the pool); 4 (LG5):
                             # the city's traffic (every lane, signals, conflicts, the pool); 5 (LG2):
                             # looks for people, their groups, dye colors and wear; 6 (LG4): slots,
@@ -60,7 +60,8 @@ PACK_VERSION = 10           # 2 (cars_steam): smoothed drive lanes, their speeds
                             # (LG7): air and water routes, their models and paints; 9 (LG8):
                             # the weather's table, umbrellas, shelter stretches, nightlife,
                             # the clear weather's groups, the reactions' settings; 10
-                            # (delta_rebuild): slots seated on their surface (`slot_seated`)
+                            # (delta_rebuild): slots seated on their surface (`slot_seated`);
+                            # 11 (car_merge): a car's merged mesh one part, its wheels' roll
 DATA = "life.json"
 CONTROLLER_KEY = "life"
 MARGIN_M = 60.0             # lanes this far past the live radius come along (links out of it)
@@ -69,6 +70,10 @@ PAINT_FLOATS = 9
 # radius (a flight sees the roads full), its glass, wheels and small parts nearer (the parked
 # cars' import.VEHICLE_CULL_M is shorter: they are many more)
 TRAFFIC_CULL_M = {"body": 900.0, "glass": 300.0, "wheel": 150.0, "brake": 80.0, "other": 200.0}
+# car_merge: a car whose parts the exporter merged (`unreal_vehicles.merge_cars`) is one part,
+# its merged mesh, drawn as far as a body; its wheels roll (the instance's travel sent) only
+# as near as the wheel parts were drawn
+ROLL_M = TRAFFIC_CULL_M["wheel"]
 
 
 def _sha16(data) -> str:
@@ -887,7 +892,9 @@ def traffic_cars(traffic: dict, veh: dict | None, dids: list[str]) -> dict:
     """LG5: the traffic's models (the plan's that the project has: AG18's packs imported with
     the city's parked cars), every part of them (mesh, pivot, shadow, a wheel's radius to spin
     by), each model's length, the pool's slots by model, the districts' fleets and paints in
-    those models' order."""
+    those models' order. car_merge: a model whose parts were merged is one part, its merged
+    mesh (`merged` true; its wheels rolled by the runtime within `roll_m` of the view, by
+    `spin_radius`)."""
     have = (veh or {}).get("cars") or {}
     models = [m for m in traffic["models"] if m in have]
     out = {"models": models, "parts": [], "car_lengths": [], "traffic_slots": [],
@@ -899,6 +906,15 @@ def traffic_cars(traffic: dict, veh: dict | None, dids: list[str]) -> dict:
         rec = have[car]
         dim = rec.get("dimensions") or {}
         out["car_lengths"].append(round(float(dim.get("length") or 4.8), 3))
+        mg = rec.get("merged")
+        if mg:
+            r = float(mg.get("roll_radius") or 0.0)
+            out["parts"].append({"model": mi, "mesh": f"{rec['folder']}/SM_{car}_{mg['part']}",
+                                 "shadow": True, "pivot": [0.0, 0.0, 0.0],
+                                 "spin_radius": round(r, 4),
+                                 "cull_m": TRAFFIC_CULL_M["body"],
+                                 "roll_m": ROLL_M if r > 0 else 0.0, "merged": True})
+            continue
         for p in rec["parts"]:
             spin = p.get("kind") == "wheel" and p.get("spins", True) is not False
             out["parts"].append({"model": mi, "mesh": f"{rec['folder']}/SM_{car}_{p['name']}",
@@ -1305,14 +1321,19 @@ AIRWATER_MODELS = {k: aw_model(k) for k in ("car", "drone", "police", "media", "
 
 
 def _hover_parts(rec: dict, police: bool) -> list[dict]:
-    """An AG18 hover car's own parts (its meshes, kind -1: painted) with nav lights and, a
-    police flier's, a light bar on its roof."""
+    """An AG18 hover car's own parts (its meshes, kind -1: painted; car_merge: its merged
+    mesh, one, where the exporter merged it) with nav lights and, a police flier's, a light
+    bar on its roof."""
     dim = rec.get("dimensions") or {}
     L = float(dim.get("length") or 4.8)
     W = float(dim.get("width") or 2.0)
     H = float(dim.get("height") or 1.4)
     out = []
-    for p in rec["parts"]:
+    mg = rec.get("merged")
+    if mg:
+        out.append({"mesh": f"{rec['folder']}/SM_{rec['car']}_{mg['part']}", "kind": -1,
+                    "at": [0.0, 0.0, 0.0], "size": [1.0, 1.0, 1.0], "cull_m": 0.0})
+    for p in ([] if mg else rec["parts"]):
         out.append({"mesh": f"{rec['folder']}/SM_{rec['car']}_{p['name']}", "kind": -1,
                     "at": [float(v) for v in p.get("pivot", [0.0, 0.0, 0.0])],
                     "size": [1.0, 1.0, 1.0],

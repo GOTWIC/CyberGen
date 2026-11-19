@@ -335,6 +335,11 @@ public:
 	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") TArray<float> CarLengths;
 	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") TArray<float> CarPartSpin;
 	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") TArray<float> CarPartCull;
+	/** car_merge: per part, how near (m) a merged car's wheels roll (0: not a merged mesh with
+	 *  rolling wheels). Such a part's instances carry one more custom float after the paint, the
+	 *  car's travel (cm, wrapped at 64 turns of CarPartSpin), which M_CgVehicleRoll turns its
+	 *  wheels by. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") TArray<float> CarPartRoll;
 	/** The pool, the live radius (m, 3D), its margin, how far off the view cars come in to keep
 	 *  their number (m), a multiplier on the plan's density. */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Traffic") int32 TrafficPool = 0;
