@@ -119,7 +119,7 @@ def assign(briefs: dict, genomes: dict, held: dict | None = None) -> dict[str, d
             if held[b] is not None:
                 genomes[b] = GN.make(briefs[b], avoid_sets(held[b]))
                 out[b] = held[b]
-        done[k] = signature(genomes[us[k][0]])
+        done[k] = [signature(genomes[b]) for b in us[k]]
         for x, y in pos[k]:
             key = (math.floor(x / cell), math.floor(y / cell))
             if k not in grid.setdefault(key, []):
@@ -137,20 +137,22 @@ def assign(briefs: dict, genomes: dict, held: dict | None = None) -> dict[str, d
                         if o not in near and any(math.dist((x, y), q) <= RADIUS_M
                                                  for q in pos[o]):
                             near.add(o)
-        avoid = {kind: {done[o][kind] for o in sorted(near)} for kind in KINDS}
+        # (every member's signature: a family shares its discrete genes, but a member's light
+        # color follows its own schedule (a home's warm, an office's neutral), so its members'
+        # night looks can differ; the first member's alone let a neighbor take another's)
+        avoid = {kind: {s[kind] for o in sorted(near) for s in done[o]} for kind in KINDS}
         # (no two vacant towers side by side: two dark towers light alike)
-        avoid["vacant"] = any(_vacant(done[o]) for o in near)
-        first = us[k][0]
-        sig = signature(genomes[first])
-        if any(sig[kind] in avoid[kind] for kind in KINDS) or \
-                (avoid["vacant"] and _vacant(sig)):
+        avoid["vacant"] = any(_vacant(s) for o in near for s in done[o])
+        sigs = [signature(genomes[b]) for b in us[k]]
+        if any(s[kind] in avoid[kind] for s in sigs for kind in KINDS) or \
+                (avoid["vacant"] and any(_vacant(s) for s in sigs)):
             for b in us[k]:
                 genomes[b] = GN.make(briefs[b], avoid)
                 out[b] = {kind: sorted([list(v) if isinstance(v, tuple) else v
                                         for v in avoid[kind]], key=str) for kind in KINDS}
                 out[b]["vacant"] = avoid["vacant"]
-            sig = signature(genomes[first])
-        done[k] = sig
+            sigs = [signature(genomes[b]) for b in us[k]]
+        done[k] = sigs
         for x, y in pos[k]:
             key = (math.floor(x / cell), math.floor(y / cell))
             if k not in grid.setdefault(key, []):
