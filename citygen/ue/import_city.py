@@ -2240,7 +2240,8 @@ def vehicle_master(defaults, roll=False):
     is in world space), the turn travel / RollRadius (cm). A vertex with no middle (UV1's
     height 0) stays as it is."""
     name = "M_CgVehicleRoll" if roll else "M_CgVehicle"
-    tag, ver = ("cg.vehicle_roll", f"{VEHICLE_VERSION}.{ROLL_VERSION}") if roll else         ("cg.vehicle", VEHICLE_VERSION)
+    tag, ver = (("cg.vehicle_roll", f"{VEHICLE_VERSION}.{ROLL_VERSION}") if roll
+                else ("cg.vehicle", VEHICLE_VERSION))
     path = f"{CORE}/{name}"
     m = unreal.load_asset(path) if EAL.does_asset_exist(path) else None
     if m is not None and meta(m, tag) == ver:

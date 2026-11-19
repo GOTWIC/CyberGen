@@ -3336,6 +3336,16 @@ comes down and the umbrella hangs furled from the hand. Mid plays the held loops
 (`CgLook::Umb`) with the umbrella at the bake's grip (not drawn folded); far cards unchanged.
 Results: `docs/progress/umbrella_hold/README.md`.
 
+Cars as one mesh (car_merge, after umbrella_hold) are in place: the exporter writes each AG18
+car's parts as one mesh a LOD (`unreal_vehicles.merge_cars`, `merge_lod`:
+`BUILD/unreal/vehicles/<car>/lod<k>.glb`, sections by the pack's materials, a rolling wheel's
+middle in UV1), the importer makes `SM_<car>_merged` (`Importer.merged_car`; only the body casts
+a shadow, no Nanite, no collision) with the wheels on `M_CgVehicleRoll` (a world position offset
+turning them by the car's travel, the instance's custom data 9), and the moving traffic and LG7's
+hover cars draw one instanced component a model (`unreal_life.traffic_cars`, `_hover_parts`,
+`ROLL_M`; `PACK_VERSION` 12, `LIFE_VERSION` life14; runtime `CarPartRoll`). Parked cars keep
+their parts. Delta's traffic 92 components to 15. Results: `docs/progress/car_merge/README.md`.
+
 ## Gallery site (GitHub Pages)
 
 `site/` is the public gallery at https://gotwic.github.io/CyberGen/ (served at
