@@ -1619,6 +1619,13 @@ The city open items (four found on Delta, after the car merge) are fixed:
   AV pad stands at its roof's middle, else moved toward a side or corner, the first place its
   square grown by 1 m clears every mass of its building above the roof (M21's mast, spire,
   halo, struts, exo frame), else none; `roof_items` fails a pad with its building over it.
+- **Moorings leave a way through** (`props.boats_in_water`, `open_across`, `NAV_CLEAR_M`
+  8 m): a boat moors only where the open water across its waterway beside it (the polygon less
+  the quays' bands and the moored hulls, on three lines square to its hull) stays 8 m wide, for
+  it and every boat moored near it; `boats_afloat` fails one that leaves less. Delta's Old Town
+  canal (14 m between its 5 m quays) had boats moored all along and no way through for LG7's.
+- **Every pad flown** (lifegen, `airwater.car_pairs`): an odd one out joins the pair nearest
+  it as a third stop of its tour.
 - lifegen's slots and AG7's bridge piers: in their sections.
 Outputs: `docs/progress/city_open_items/`.
 

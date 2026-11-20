@@ -4242,7 +4242,8 @@ class Builder:
                         top = p
                         break
                     s += 1.0
-                if top is None or not self.masses.clear(f, top, 0):
+                if top is None or not self.masses.clear(f, top, 0) or self._stair_blocked(
+                        [(f[0], f[1], 0.0), (top[0], top[1], z), (e0[0], e0[1], z)]):
                     acc.append(self.walk("elevator", [(e0[0], e0[1], 0.0),
                                                       (e0[0], e0[1], z)], 2.5,
                                          {"station": sid}))

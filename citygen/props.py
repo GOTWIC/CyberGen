@@ -965,7 +965,10 @@ class Moorings:
         return None
 
 
-NAV_CLEAR_M = 4.0     # the open water a moored boat leaves across its waterway (a boat passes)
+# the open water a moored boat leaves across its waterway: two boats' lanes (a hull and its
+# margins, 3 m) pass beside it, and lifegen's 4 m water raster keeps a way through (Delta's
+# Old Town canal, 14 m between its 5 m quays, left 6 m beside each boat and no way through)
+NAV_CLEAR_M = 8.0
 NAV_STEPS = (-0.4, 0.0, 0.4)   # ... measured on these lines across its hull (share of its length)
 
 
@@ -985,7 +988,8 @@ def open_across(poly, bands, hulls, x: float, y: float, yaw_deg: float, length: 
         for g in bands + hulls:
             if not free.is_empty and g.intersects(cross):
                 free = free.difference(g)
-        best = max((p.length for p in G.parts(free)), default=0.0) if not free.is_empty else 0.0
+        best = max((float(p.length) for p in shapely.get_parts(free)), default=0.0) \
+            if not free.is_empty else 0.0
         worst = best if worst is None else min(worst, best)
     return worst or 0.0
 
