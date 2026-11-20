@@ -2435,6 +2435,12 @@ def _ground_grid(P: _Plan, gd: _Ground) -> None:
     holes = [G.from_model_poly(st.footprint) for st in m.structures
              if st.kind == "trench" and st.footprint is not None]
     trench = G.union(holes) if holes else None
+    # (station shafts: a metro station's stair wells cut out exactly: every cell they reach
+    # left open, the rest of those cells draped over the ground round the well)
+    wells = [G.from_model_poly(st.footprint) for st in m.structures
+             if st.kind == "stair" and (st.attrs or {}).get("station") and
+             st.footprint is not None and st.z0_m < -0.5]
+    well = G.union(wells) if wells else None
     for o in [o for o in P.objects if o["category"] == "ground"]:
         P.objects.remove(o)
     x0, y0, x1, y1 = m.bounds
@@ -2460,12 +2466,47 @@ def _ground_grid(P: _Plan, gd: _Ground) -> None:
                 cy = fin.y0 + (np.arange(j0, j1) + 0.5) * fin.cell
                 CX, CY = np.meshgrid(cx, cy)
                 skip = np.nonzero(shapely.contains_xy(trench, CX, CY).ravel())[0].tolist()
+            rim = []
+            if well is not None and tb.intersects(well):
+                skip, rim = _well_cells(fin, well, i0, i1, j0, j1, nx, skip)
             t = (ix, iy)
             P.add(f"city.ground.{tile_name(*t)}", [P.city, "Ground"], t, "ground",
                   [{"k": "grid", "m": "ground", "abs": True, "x0": q(fin.x0 + i0 * fin.cell),
                     "y0": q(fin.y0 + j0 * fin.cell), "c": fin.cell, "nx": nx, "ny": ny,
-                    "z": zs, "skip": skip}],
+                    "z": zs, "skip": skip}] + rim,
                   {"citygen_type": "ground"})
+
+
+def _well_cells(fin, well, i0: int, i1: int, j0: int, j1: int, nx: int, skip: list):
+    """Station shafts: the cells of a tile's heightfield a metro stair well reaches, left
+    open (with `skip`, sorted), and the rest of those cells as draped faces over the ground
+    round the well (abs heights), so the ground opens exactly over the well."""
+    out = set(skip)
+    boxes = []
+    c = fin.cell
+    for part in G.parts(well):
+        bx0, by0, bx1, by1 = part.bounds
+        for i in range(max(i0, int(math.floor((bx0 - fin.x0) / c))),
+                       min(i1, int(math.ceil((bx1 - fin.x0) / c)))):
+            for j in range(max(j0, int(math.floor((by0 - fin.y0) / c))),
+                           min(j1, int(math.ceil((by1 - fin.y0) / c)))):
+                cell = box(fin.x0 + i * c, fin.y0 + j * c, fin.x0 + (i + 1) * c,
+                           fin.y0 + (j + 1) * c)
+                if G.area(G.inter(cell, part)) > 1e-4:
+                    k = (j - j0) * (nx - 1) + (i - i0)
+                    if k not in out:
+                        out.add(k)
+                        boxes.append(cell)
+    rim = []
+    if boxes:
+        for pc in G.parts(G.diff(G.union(boxes), well)):
+            ext, holes = _shapely_rings(pc)
+            if len(ext) < 3:
+                continue
+            rings = [_densify_ring(ext, 1.0)] + [_densify_ring(h, 1.0) for h in holes]
+            r3 = [[[x, y, q(fin.at(x, y))] for x, y in r] for r in rings]
+            rim.append({"k": "drape", "m": "ground", "abs": True, "r": r3[0], "h": r3[1:]})
+    return sorted(out), rim
 
 
 def _water_levels(P: _Plan, gd: _Ground):
@@ -2516,6 +2557,8 @@ def _terrain(P: _Plan) -> None:
     road_tun = {t.id: t.segment_ids[0] for t in m.tunnels
                 if t.kind in ("immersed_tube", "cut_and_cover") and t.segment_ids}
     sign_base = {s.id: gd.base.get(s.building_id) for s in m.sign_slots if s.building_id}
+    struct_of = {s.id: s for s in m.structures if s.kind in ("stair", "elevator") and
+                 (s.attrs or {}).get("station")}
     for o in list(P.objects):
         cat = o["category"]
         if cat in ("ground", "sea"):
@@ -2544,6 +2587,17 @@ def _terrain(P: _Plan) -> None:
             parts += _plinth(b, gd)
             o["parts"] = parts
             continue
+        if cat in ("structure_stair", "structure_elevator"):
+            # (station shafts: a station's stair or shaft is one rigid piece, its heights
+            # over the ground at its middle, as transit plans it and AG7 seats it)
+            st = struct_of.get(cid)
+            if st is not None and st.footprint is not None:
+                ext = [tuple(p) for p in st.footprint.exterior]
+                xs, ys = [p[0] for p in ext], [p[1] for p in ext]
+                g0 = gd.at((min(xs) + max(xs)) / 2.0, (min(ys) + max(ys)) / 2.0)
+                o["parts"] = [x for p in o["parts"]
+                              for x in _lift_part(p, lambda x_, y_, g0=g0: g0)]
+                continue
         if cat == "skybridge":
             base = gd.sky.get(cid, 0.0)
             o["parts"] = [x for p in o["parts"] for x in _lift_part(p, lambda x_, y_: base)]

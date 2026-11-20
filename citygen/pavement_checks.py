@@ -105,6 +105,24 @@ class Net:
         return Polygon([self.xy(v) for v in rs[0]], [[self.xy(v) for v in r] for r in rs[1:]])
 
 
+def face_polygons(m) -> list:
+    """(station shafts) Every face of the map as (face, polygon), its rings chained (a face
+    whose boundary does not chain left out): what a station stair or shaft keeps off."""
+    if m.pavement_net is None or not m.pavement:
+        return []
+    N = Net(m)
+    out = []
+    for f in N.faces:
+        if f.id in N.bad or not N.rings.get(f.id):
+            continue
+        p = N.poly(f.id)
+        if not p.is_valid:
+            p = p.buffer(0)
+        if not p.is_empty:
+            out.append((f, p))
+    return out
+
+
 def _grades(spec, m) -> tuple[dict, float]:
     """The steepest grade a face may have, by road class: M13's class grades (highway 6%,
     avenue 8%, street 12%, alley 15%), never less than M18's ramp maximum."""

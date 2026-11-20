@@ -1639,16 +1639,15 @@ blockout and AG7:
   concourse's depth from its foot, under no building, `ACCESS_PASSAGE_M` 60 m), each with a
   path from its ground end to the sidewalk that passes no building (`_ground_ok`); the walkway
   is one `stairs` walkway along the flights and landings (`attrs.structure`). Else an elevator
-  shaft (`SHAFT_M` 3.2 m) there; else, with no clear ground near, an elevator straight down
-  from the end (`attrs.clear` false; none beside another line, where the other end serves).
-  An elevated station with no shaft gets one beside its first or last end. Structures: kind
+  shaft (`SHAFT_M` 3.2 m) there; else (station shafts) farther off (below). An elevated
+  station with no shaft gets one beside its first or last end. Structures: kind
   `stair` (`<station>.st<a|b>`; footprint, the walkway's line, `attrs` frame, length, width,
   flights, rise, run) and `elevator` (`<station>.el<a..d>`; footprint, its stops, `doors`).
   #250's bridges over the sidewalk point (`lift_bridge`) and stepped metro stairs are gone.
 - **Check** `station_stairs` (with the transit checks: 109 on a flat sample, 114 with decks):
   every station stair walkway inside its stair, every flight at most 3.6 m at 0.7 at most, a
   landing between two flights, the footprint on clear ground; every elevated or underground
-  station's elevator in a shaft (a shaft with no clear ground noted).
+  station's elevator in a shaft on clear ground (below).
 - **Blockout** (`blockout._station_stair`): a stair's flights and landings as strips along its
   walkway, posts at its corners and landings, a metro well lined and opened in the ground
   (`_land_and_water`); an elevator's shaft as a prism (`structure_stair`, `structure_elevator`).
@@ -1658,6 +1657,39 @@ blockout and AG7:
   and a door at each stop above the ground. **Exporter:** nothing new (pieces keyed by the
   blockout's objects through stage 2).
 Outputs: `docs/progress/station_stairs/`.
+
+The station shafts (#252's open items) are in place, in `citygen/transit.py`,
+`transit_checks.py` and the blockout:
+- **No shaft in the street:** #252's elevator straight down from an end with no clear ground
+  near (`_lift_here`, `attrs.clear` false, in a road, sidewalk or junction) is gone. An end
+  tries, after #252's tower or well and shaft within reach, a tower or well and a shaft
+  farther off (`ACCESS_FAR_M` 90 m with a bridge up to `ACCESS_BRIDGE_FAR_M` 90 m, a passage
+  up to `ACCESS_PASSAGE_FAR_M` 150 m; a 2 m grid), then, under the ground, a station entrance
+  cut into a building's ground floor (`_niche`, `_niche_ok`: its shaft flush with a facade,
+  the masses on the ground cut round it by `NICHE_PAD_M` and kept over it from
+  `buildout.GATE_CLEAR_M` up, `buildout._cut_gate`; a shop unit in the way gives way, counted
+  `NICHE_UNIT_M` farther; `Building.attrs.station_entrance`, the shaft's `attrs.entrance`);
+  else none, noted (`Out.notes`, `Builder.notes`), the station served by its other end.
+- **Found on the way:** `_stair_blocked` and the paths' masses (`B.masses`) counted the
+  buildings the lines take out (every bridge from Vesper Bay's Halo Line was blocked); a
+  passage may pass under a building whose basement (`tunnels.foundation_m`) stops
+  `PASSAGE_CLEAR_M` over its roof (`_passage_ok`, `PASSAGE_H_M`) and runs freely inside its
+  own station's box; a metro shaft may stand over the concourse (`_dyn(under=False)`); a path
+  to the sidewalk may be led round the buildings (`_ground_ok`).
+- **Clear ground** also keeps off every face of M22's pavement map (`pavement_checks.
+  face_polygons`: corner pads and bulb rings reach past the junction polygons; #252 put three
+  stairs on corner pads), so no well is paved over.
+- **Terrain** (`_gz`, `_rel`, `stair_plan(..., fit=)`): a tower rises from the ground at its
+  own foot to the platform's height over sea level, a well from the ground at its head to the
+  concourse's depth under its foot (a passage at that depth under the ground where it runs,
+  `PASSAGE_GRADE`), the plan kept for the ground where it landed; a walkway's z over the
+  ground at each point, a stair's or shaft's structure over the ground at its middle (the
+  blockout lifts the piece by that, as AG7 does); the check measures flights over sea level.
+  The ground's heightfield leaves every cell a well reaches open and drapes the rest round it
+  (`blockout._well_cells`).
+- **Check** `station_stairs` fails a shaft on a road, junction, crosswalk, pavement face or
+  water or in a building mass within its height (an entrance's floors over it pass).
+Outputs: `docs/progress/station_shafts/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
