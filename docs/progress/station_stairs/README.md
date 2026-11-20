@@ -114,7 +114,7 @@ same try as on main and passes all its checks:
 | Nexus City | 14 | 5 | 103 | 8 | 5 | 0 | 1 |
 | Greyhook | 8 | 8 | 68 | 6 | 5 | 0 | 3 |
 | Vesper Bay | 14 | 7 | 103 | 8 | 12 | 0 | 8 |
-DECKS_ROW
+| Vesper Bay Decks | 14 | 6 | 97 | 9 | 12 | 0 | 18 |
 
 assetgen's goldens (`tests/assetgen/data/`) are written again from the same builds
 (`tests/assetgen/goldens.py --builds`, `streets_goldens.py`, `water_goldens.py`,
