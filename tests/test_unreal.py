@@ -1208,8 +1208,13 @@ def test_stage2_from_assetgen(staged, manifest, monkeypatch):
     assert protos <= set(s2["replaced"])
     assert all(len(a["cpd"]) == 36 for a in s2["actors"] if a["key"] in set(blds))  # (AG15)
     # AG6: every texture a material names is in the build (the library through its link)
-    assert s2["textures"] and all((staged / t["file"]).is_file()
-                                  for t in s2["textures"].values())
+    # (named when it fails: which files, and whether BUILD/assets/library links anywhere)
+    lib = staged / "assets" / "library"
+    missing = sorted(t["file"] for t in s2["textures"].values()
+                     if not (staged / t["file"]).is_file())
+    assert s2["textures"] and not missing, (
+        len(missing), missing[:5], lib.is_symlink() or lib.is_junction(),
+        lib.resolve() if lib.exists() else None)
     assert {"facade", "glass", "metal", "road", "concrete", "sign", "decal"} <= \
         set(s2["masters"])
     era = [a for a in s2["actors"] if a.get("materials")]

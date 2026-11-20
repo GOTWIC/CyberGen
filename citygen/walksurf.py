@@ -7,10 +7,14 @@ the embankment, a meter or two under the sidewalk. `drape` gives each walkway th
 surface it is drawn on at every point where that surface bends:
 
 - **The surface** is M22's pavement map as AG17 draws it: a face's height over the ground at
-  a point by mean value coordinates of its boundary's heights (`pavement.mvc`; on its
-  boundary, along the edge), lifted as AG17 lifts it (`LIFT_M`: a curb band, sidewalk, corner
-  pad or median 0.2 m, the rest 0.05 m; a crosswalk crosses a median at the road's 0.05 m, as
-  AG17 cuts it through).
+  a point by mean value coordinates of its boundary's heights (`pavement.mvc`; within
+  `ON_FACE_M` of its boundary, along the edge), lifted as AG17 lifts it (`LIFT_M`: a curb
+  band, sidewalk, corner pad or median 0.2 m, the rest 0.05 m; a crosswalk crosses a median at
+  the road's 0.05 m, as AG17 cuts it through). A point within `ON_FACE_M` of a face is on it:
+  the model's lines are on the 1 cm grid, the map's on the millimeter one, so a walkway laid
+  along a face's edge (a crossing of a road's end at the map's edge) runs a few millimeters
+  in and out of it, and an exact test would take the face at some samples and not at others,
+  differently for `drape` and `check`, which sample apart.
 - **Which face**, where faces overlap in plan (a sidewalk under a viaduct, a road crossing
   over a street): a walkway that follows a road (`attrs.segment`) takes the face nearest its
   road's own surface there (the road's z profile at its station plus the sidewalk's lift),
@@ -45,7 +49,7 @@ CURB_LIFT_M = 0.2       # AG17: a curb band's, sidewalk's, corner pad's or media
 ROAD_LIFT_M = 0.05      # AG17: a carriageway's, junction's, bulb's, bend's or walk face's (50 mm)
 LIFT_M = {"curb": CURB_LIFT_M, "sidewalk": CURB_LIFT_M, "corner": CURB_LIFT_M,
           "median": CURB_LIFT_M}
-EDGE_M = 1e-3           # a point this near a face's boundary takes the edge's height
+ON_FACE_M = 0.01        # a point this near a face is on it, at its nearest edge's height
 ROUNDS = 3              # rounds of walkways anchored on draped ones at their ends (`drape`)
 CHECK_STEP_M = 0.5      # `check`: the lines sampled this often
 CHECK_TOL_M = 0.05      # ... within this of the surface
@@ -127,14 +131,15 @@ def _boundary(rings, xs, ys):
 
 def face_z(rings, xs: np.ndarray, ys: np.ndarray) -> np.ndarray:
     """A face's height over the ground at points inside it: mean value coordinates of its
-    boundary's heights (`pavement.mvc`), along the nearest edge within `EDGE_M` of it (where
-    the coordinates divide by zero)."""
+    boundary's heights (`pavement.mvc`), along the nearest edge within `ON_FACE_M` of it
+    (where the coordinates divide by zero, and the points just outside it that
+    `Surface.heights` counts as on it)."""
     from .pavement import mvc
 
     with np.errstate(divide="ignore", invalid="ignore"):
         z = mvc(rings, xs, ys)
     d, zb = _boundary(rings, xs, ys)
-    use = (d <= EDGE_M) | ~np.isfinite(z)
+    use = (d <= ON_FACE_M) | ~np.isfinite(z)
     return np.where(use, zb, z)
 
 
@@ -200,7 +205,7 @@ class Surface:
 
     def heights(self, xs, ys, ref, window, crossing, deck):
         """At each point the face height (lifted) nearest `ref` within `window` among the
-        faces of its level (`deck`) holding it, else NaN."""
+        faces of its level (`deck`) holding it (within `ON_FACE_M`), else NaN."""
         import shapely
 
         n = len(xs)
@@ -208,7 +213,7 @@ class Surface:
         if self.tree is None or n == 0:
             return out
         pts = shapely.points(xs, ys)
-        pi, fi = self.tree.query(pts, predicate="intersects")
+        pi, fi = self.tree.query(pts, predicate="dwithin", distance=ON_FACE_M)
         if len(pi) == 0:
             return out
         fdeck = np.array(self.deck)[fi]
