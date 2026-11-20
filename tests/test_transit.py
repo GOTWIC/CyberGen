@@ -1110,8 +1110,11 @@ def test_check_supports_fails_long_span(lines):
         hi = 150.0 + TR.MAIN_SPAN_M[t["mode"]]
         gone = {s["id"] for s in d["structures"] if s["attrs"].get("line_id") == t["id"] and
                 100.0 < s["attrs"].get("s_m", -1.0) < hi}
+        # (a support's `frame` names its portal frame; a station stair's is its placement,
+        # [x, y, ux, uy], since the station stairs)
         d["structures"] = [s for s in d["structures"] if s["id"] not in gone and
-                           s["attrs"].get("frame") not in gone]
+                           not (isinstance(s["attrs"].get("frame"), str) and
+                                s["attrs"]["frame"] in gone)]
     c = _rerun(_mutate(lines.model, fn))["transit_supports"]
     assert not c.passed and any("without a support" in f for f in c.failures)
 

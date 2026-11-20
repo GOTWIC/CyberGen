@@ -1674,15 +1674,16 @@ The station shafts (#252's open items) are in place, in `citygen/transit.py`,
   buildings the lines take out (every bridge from Vesper Bay's Halo Line was blocked); a
   passage may pass under a building whose basement (`tunnels.foundation_m`) stops
   `PASSAGE_CLEAR_M` over its roof (`_passage_ok`, `PASSAGE_H_M`) and runs freely inside its
-  own station's box; a metro shaft may stand over the concourse (`_dyn(under=False)`); a path
-  to the sidewalk may be led round the buildings (`_ground_ok`).
+  own station's box; a metro shaft may stand over the concourse (`_dyn(under=False)`).
 - **Clear ground** also keeps off every face of M22's pavement map (`pavement_checks.
   face_polygons`: corner pads and bulb rings reach past the junction polygons; #252 put three
   stairs on corner pads), so no well is paved over.
 - **Terrain** (`_gz`, `_rel`, `stair_plan(..., fit=)`): a tower rises from the ground at its
   own foot to the platform's height over sea level, a well from the ground at its head to the
   concourse's depth under its foot (a passage at that depth under the ground where it runs,
-  `PASSAGE_GRADE`), the plan kept for the ground where it landed; a walkway's z over the
+  `PASSAGE_GRADE`), the plan kept for the ground where it landed while its flights stay
+  within `STAIR_FIT_GRADE` 0.66; `station_access` measures stair grades over sea level, as
+  `station_stairs`; a walkway's z over the
   ground at each point, a stair's or shaft's structure over the ground at its middle (the
   blockout lifts the piece by that, as AG7 does); the check measures flights over sea level.
   The ground's heightfield leaves every cell a well reaches open and drapes the rest round it
