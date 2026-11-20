@@ -231,14 +231,13 @@ def test_pads_open_to_the_sky(rich):
     pads = [(b, it) for b in m.buildings for it in b.roof_items
             if it.kind in ("helipad", "av_pad")]
     assert pads
+    from citygen import geom as G
+    from citygen.building_checks import _item_rect
+    from citygen.buildings import PAD_CLEAR_M
     for b, it in pads:
-        z = it.position[2]
-        assert not any(ms.z1_m > z + 0.01 and ms.role in ("mast", "spire") for ms in b.masses
-                       if abs(sum(p[0] for p in ms.footprint.exterior) /
-                              len(ms.footprint.exterior) - it.position[0]) < it.size[0] / 2 + 1.0
-                       and abs(sum(p[1] for p in ms.footprint.exterior) /
-                               len(ms.footprint.exterior) - it.position[1]) <
-                       it.size[1] / 2 + 1.0)
+        zone = _item_rect(it, -(PAD_CLEAR_M - 0.05))       # (the pad's own frame)
+        assert not any(ms.z1_m > it.position[2] + 0.01 and
+                       G.from_model_poly(ms.footprint).intersects(zone) for ms in b.masses), b.id
 
     def fn(d):
         b = next(b for b in d["buildings"]

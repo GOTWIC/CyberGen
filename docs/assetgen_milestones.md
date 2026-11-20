@@ -2554,6 +2554,19 @@ city and Vesper Bay), `golden_streets.json`, `golden_props.json` and `golden_gro
 briefs; the Vesper Bay buildings, their shells, the spike and the triangulation are
 unchanged. Notes: `docs/progress/fix_nexus_water/`.
 
+## Fix: bridge piers out of the channel (the city open items)
+
+AG7's `_piers` stood `max(1, run / 40 m)` piers evenly over every stretch of water a bridge
+crosses, so every canal and river crossing under 80 m had a pier in its middle (Delta on main:
+19 piers, 9 in canals), and LG7's boats on two Old Town canals turned short of them.
+`structures.pier_spots`: a stretch of `CLEAR_SPAN_M` (45 m) or less is spanned whole; a longer one
+keeps its piers from each shore out to the navigable channel's edge (`CHANNEL_M`: river 40,
+canal 8 m, at most half the width, citygen's transit rule; the sea none, evenly as before),
+`PIER_HALF_M` off it, the channel one span. Check `street_channels` (`streets/checks.py`, from
+each bridge piece's inputs and its piers' notes): no pier in a channel or a short crossing.
+Delta: 14 piers, none in a channel; every boat route of LG7 runs whole. Results:
+`docs/progress/city_open_items/`.
+
 ## AG16: performance
 
 **Built.** Scope 14.17, issue #96: a whole city's runtime and import cost in Unreal,
