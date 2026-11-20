@@ -652,6 +652,7 @@ def _over_channel(o: dict, g0: float, g1: float, wet: list, shore, closed: bool,
 
 
 def check_station_access(m: CityModel) -> Check:
+    from . import terrain as TE
     from .street_checks import walk_components
 
     from .transit import STAIR_MAX_GRADE
@@ -677,11 +678,15 @@ def check_station_access(m: CityModel) -> Check:
         for w in acc:
             if w.kind not in ("stairs", "escalator"):
                 continue
-            for p0, p1 in zip(w.line, w.line[1:]):
+            # (station shafts: over sea level, as `station_stairs` measures a flight; a
+            # walkway's z is over the ground where each point stands, M13)
+            zs = [p[2] + g for p, g in zip(w.line, TE.on_ground(m, w.line))]
+            for k, (p0, p1) in enumerate(zip(w.line, w.line[1:])):
                 run = math.hypot(p1[0] - p0[0], p1[1] - p0[1])
-                if abs(p1[2] - p0[2]) > STAIR_MAX_GRADE * run + 0.01:
+                dz = abs(zs[k + 1] - zs[k])
+                if dz > STAIR_MAX_GRADE * run + 0.01:
                     _limit(c, f"{s.id} '{s.name}': {w.kind} {w.id} rises "
-                              f"{abs(p1[2] - p0[2]):.1f} m over {run:.1f} m")
+                              f"{dz:.1f} m over {run:.1f} m")
                     break
         joined = any(roots.get((p[0], p[1])) in ground_roots for w in acc for p in
                      (w.line[0], w.line[-1]))

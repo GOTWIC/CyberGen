@@ -137,7 +137,8 @@ PASSAGE_GRADE = 0.25        # (terrain) a passage at the concourse's depth under
 #                             where it runs climbs at most this (in steps)
 PASSAGE_H_M = 3.0           # a passage's clear height; it passes under a building whose
 PASSAGE_CLEAR_M = 1.0       # ... basement (M9's foundation_m) stops this far over its roof
-TERRAIN_TRIES = 3           # (terrain) a stair planned again for the ground where it landed
+TERRAIN_TRIES = 4           # (terrain) a stair planned again for the ground where it landed
+STAIR_FIT_GRADE = 0.66      # ... its flights kept for that ground only up to this grade
 TERRAIN_TOL_M = 0.05        # (terrain) heights within this are one
 STATION_TOWER_M = 200.0     # a sky station uses a portal tower within this of its stop
 CORE_SHIFT = 12             # M19: track vertices a sky station on a pylon may move, its core clear
@@ -3998,12 +3999,12 @@ def stair_plan(z_hi: float, z_lo: float, fit: tuple | None = None) -> tuple | No
     the flights and landings to the foot (on the face the last flight runs to). Station
     shafts: `fit` (n, run) keeps a plan's flights and footprint for another rise (the ground
     where it landed, M13), None where its flights would rise more than FLIGHT_RISE_M or
-    steeper than STAIR_MAX_GRADE."""
+    steeper than STAIR_FIT_GRADE (then planned again, more flights or longer runs)."""
     rise = z_hi - z_lo
     if fit is not None:
         n, run = fit
         h = rise / n
-        if h <= 0.0 or h > FLIGHT_RISE_M + 1e-9 or h > STAIR_MAX_GRADE * run + 1e-9:
+        if h <= 0.0 or h > FLIGHT_RISE_M + 1e-9 or h > STAIR_FIT_GRADE * run + 1e-9:
             return None
     else:
         n = max(1, int(math.ceil(rise / FLIGHT_RISE_M - 1e-9)))
