@@ -274,6 +274,28 @@ def test_slots_stand_on_their_surface():
     assert wi.nearest(5.0, 2.5, 15.0, 0, sf.at(5.0, 2.5)[0])[0]["id"] == "wk.s"
 
 
+def test_slots_leave_from_a_walkway_at_their_height():
+    """City open items: a slot whose walkway is far above or below it (a bar's door on a raised
+    road's sidewalk, a vending machine beside a platform) takes the nearest walkway at its
+    height within reach, else is left out; the check fails one still off its walkway."""
+    model = {"walkways": [{"id": "wk.g", "kind": "sidewalk", "line": [[0.0, 0.0, 0.0], [20.0, 0.0, 0.0]]},
+                          {"id": "wk.p", "kind": "elevated", "line": [[0.0, 38.0, 31.0], [20.0, 38.0, 31.0]]}]}
+    sf = PL4.Surface(model)
+    wi = PL4.WalkIndex(model["walkways"], sf)
+    slots = [{"id": "slot.near", "kind": "vending", "level": 0, "walkway_id": "wk.p",
+              "points": [[5.0, 2.0, 0.0, 0.0]]},
+             {"id": "slot.far", "kind": "bench", "level": 0, "walkway_id": "wk.p",
+              "points": [[5.0, 40.0, 0.0, 0.0]]}]
+    st = PL4.seat_slots(slots, sf)
+    bad = PL4.height_check(model, slots, sf, st)
+    assert not bad["ok"] and "31.00 m off its walkway wk.p" in bad["detail"], bad
+    kept, stats = PL4.level_slots(slots, wi, {})
+    assert stats["moved"] == 1 and stats["dropped_ids"] == ["slot.far"]
+    assert [s["id"] for s in kept] == ["slot.near"] and kept[0]["walkway_id"] == "wk.g"
+    assert kept[0]["reach_m"] == 2.0
+    assert PL4.height_check(model, kept, sf, st)["ok"]
+
+
 # --- the exporter ---------------------------------------------------------------------------
 
 def test_exporter_packs_the_places(build: Path):

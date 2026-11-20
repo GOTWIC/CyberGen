@@ -548,8 +548,12 @@ def _item_rect(it, shrink: float = 0.0) -> Polygon:
 
 
 def check_roof_items(m: CityModel, bx: _B):
+    from .buildings import PAD_CLEAR_M
+
     c = _check("roof_items", "Rooftop items stand on a roof of their building (a mass top at "
-                             "their level that holds their footprint)")
+                             "their level that holds their footprint); a helipad or AV pad "
+                             f"open to the sky (no mass of its building above it within "
+                             f"{PAD_CLEAR_M:g} m: its crown's mast, spire, halo or frame)")
     for b in m.buildings:
         if not b.roof_items:
             continue
@@ -562,6 +566,14 @@ def check_roof_items(m: CityModel, bx: _B):
             if not any(bx.mass_of[(b.id, k)].covers(r) for k in ks):
                 _limit(c, c.failures, f"{b.id}: {it.kind} at z {it.position[2]:g} is not on a "
                                       f"roof")
+            if it.kind in ("helipad", "av_pad"):
+                zone = _item_rect(it, -(PAD_CLEAR_M - 0.05))
+                over = [k for k, mass in enumerate(b.masses)
+                        if mass.z1_m > it.position[2] + 0.01 and
+                        bx.mass_of[(b.id, k)].intersects(zone)]
+                if over:
+                    _limit(c, c.failures, f"{b.id}: its {b.masses[over[0]].role} stands over "
+                                          f"its {it.kind}")
     return c
 
 

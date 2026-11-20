@@ -580,8 +580,10 @@ def build_city(result: Result, max_variants: int = MAX_VARIANTS, roads: bool = T
             if buildings:
                 add_buildings(b, explicit, run)
             fails = sum(len(c.failures) for c in b.checks)
-            P.note(f"city try {attempt + 1}: " + (f"{fails} check failures" if fails else
-                                                  "every check passed"))
+            P.note(f"city try {attempt + 1}: " + (
+                f"{fails} check failures (" + "; ".join(
+                    f"{c.id}: {c.failures[0]}" for c in b.checks if c.failures) + ")"
+                if fails else "every check passed"))
             T.stage(f"city_try{attempt}", [b.variant, b.stats.get("road_variant"), salt, fails])
             tries.append({"variant": b.variant, "road_variant": b.stats.get("road_variant"),
                           "layout_salt": salt, "failures": fails,

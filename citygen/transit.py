@@ -98,6 +98,11 @@ PLATFORM_M = {"metro": 4.0, "elevated_rail": 4.0, "monorail": 3.0, "maglev": 5.0
 COLUMN_M = {"elevated_rail": 1.6, "monorail": 1.2, "maglev": 2.2, "sky_tube": 3.5}
 METRO_CONCOURSE_Z = -8.0
 METRO_RUN_M = 12.0          # a metro stair runs this far along the concourse from its kiosk
+# (city open items) a station stair rises at most this much a meter of run (35 degrees, the
+# steepest a stair is built at); steeper, an elevator takes its place (a metro stair steps
+# farther along its concourse first, to STAIR_GRADE)
+STAIR_MAX_GRADE = 0.7
+STAIR_GRADE = 0.62
 STATION_TOWER_M = 200.0     # a sky station uses a portal tower within this of its stop
 CORE_SHIFT = 12             # M19: track vertices a sky station on a pylon may move, its core clear
 
@@ -4221,6 +4226,37 @@ class Builder:
                         acc.append(self.walk("path", [(e0[0], e0[1], 0.0), (f[0], f[1], 0.0)],
                                              3.0, {"station": sid}))
                     continue
+            moved = False
+            if abs(z) > STAIR_MAX_GRADE * _d(e, f):
+                # (city open items: a stair steeper than one is built: its top steps along the
+                # concourse until its run is at STAIR_GRADE, else an elevator down from the
+                # concourse's end and a path to the sidewalk)
+                e0 = seg[0] if tag == "a" else seg[-1]
+                need = abs(z) / STAIR_GRADE
+                top = None
+                s = 1.0
+                while s <= line.length:
+                    r = line.interpolate(s if tag == "a" else line.length - s)
+                    p = (q(r.x), q(r.y))
+                    if _d(p, f) >= need:
+                        top = p
+                        break
+                    s += 1.0
+                if top is None or not self.masses.clear(f, top, 0):
+                    acc.append(self.walk("elevator", [(e0[0], e0[1], 0.0),
+                                                      (e0[0], e0[1], z)], 2.5,
+                                         {"station": sid}))
+                    if _d(e0, f) > 0.0:
+                        acc.append(self.walk("path", [(e0[0], e0[1], 0.0), (f[0], f[1], 0.0)],
+                                             3.0, {"station": sid}))
+                    continue
+                e, moved = top, True
+            if moved:
+                # (its landing goes on along the concourse to its end, where the walk graph
+                # joins it to the concourse)
+                acc.append(self.walk("stairs", [(f[0], f[1], 0.0), (e[0], e[1], z),
+                                                (e0[0], e0[1], z)], 3.0, {"station": sid}))
+                continue
             acc.append(self.walk("stairs", [(f[0], f[1], 0.0), (e[0], e[1], z)], 3.0,
                                  {"station": sid}))
             kind, l3, w, at = self.new[k]
@@ -4276,6 +4312,33 @@ class Builder:
                     core = G.qpoly(Point(e).buffer(5.0, cap_style="square"))
                     self.struct(f"{sid}.core", "pylon", 0.0, z, footprint=core,
                                 attrs={"station": sid, "role": "elevator_core"})
+            elif z > STAIR_MAX_GRADE * d:
+                # (city open items: a stair from the platform straight down to its sidewalk
+                # would be steeper than any stair is built (Delta's Midtown station's rose
+                # 31 m over 18 m, and its people climbed through the air): a bridge at the
+                # platform's height out over the sidewalk, roofed and glazed as a skywalk, and
+                # an elevator down from its end; a bridge through a building mass at its
+                # height, as `walkway_building_clash` measures it, or near another line, takes
+                # the elevator at the platform end and a path, as round the buildings)
+                br = LineString([e[:2], f[:2]])
+                if self._stair_blocked([(e[0], e[1], z), (f[0], f[1], z)]) or any(
+                        o["id"] != ln.id and o["line"].distance(br) <
+                        o["half"] + SIDE_PAD_M + 2.0 for o in self.tracks):
+                    if self._over_water(e) or self._on_crossing(e):
+                        continue      # (the station's other end serves it)
+                    acc.append(self.walk("elevator", [(e[0], e[1], 0.0), (e[0], e[1], z)],
+                                         2.5, {"station": sid}))
+                    acc.append(self.walk("path", [(e[0], e[1], 0.0), (f[0], f[1], 0.0)], 3.0,
+                                         {"station": sid}))
+                else:
+                    acc.append(self.walk("elevated", [(e[0], e[1], z), (f[0], f[1], z)], 4.0,
+                                         {"station": sid, "lift_bridge": True}))
+                    self.struct(f"{sid}.lb{tag}", "deck", z - 0.8, z,
+                                line=[(e[0], e[1], z), (f[0], f[1], z)],
+                                attrs={"station": sid, "role": "skywalk", "width_m": 4.0})
+                    acc.append(self.walk("elevator", [(f[0], f[1], 0.0), (f[0], f[1], z)],
+                                         2.5, {"station": sid}))
+                lift_at.add(tuple(e[:2]))
             else:
                 acc.append(self.walk("stairs", [(e[0], e[1], z), (f[0], f[1], 0.0)], 3.0,
                                      {"station": sid}))

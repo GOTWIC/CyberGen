@@ -395,12 +395,49 @@ def seat_slots(slots: list[dict], surface: Surface) -> dict:
     return stats
 
 
+def level_slots(slots: list[dict], wi: WalkIndex, rows: dict) -> tuple[list[dict], dict]:
+    """City open items: every seated ground level slot leaves from a walkway at its height
+    (its first point within `SLOT_STEP_M` of the walkway where it leaves it): a slot whose
+    own walkway is not (a bar's door on a raised road's sidewalk, a bench by a quay under a
+    viaduct, a vending machine at a station's foot beside its platform) takes the nearest
+    walkway at its height within `SLOT_REACH_M` (a gang's spot one on its own turf), else it
+    is left out. Returns the slots kept and the stats."""
+    walks = {w["id"]: w for w in wi.walks}
+    out, stats = [], {"moved": 0, "dropped": 0, "dropped_ids": []}
+    for s in slots:
+        w = walks.get(s.get("walkway_id"))
+        if int(s.get("level") or 0) != 0 or not s.get("seated") or w is None:
+            out.append(s)
+            continue
+        p0 = s["points"][0]
+        px, py, _, _, _ = _nearest_on(w["line"], p0[0], p0[1])
+        if abs(p0[2] - wi.height(w, px, py)) <= P.SLOT_STEP_M:
+            out.append(s)
+            continue
+        turf = (rows.get(w["id"]) or {}).get("turf") if s["kind"] == "gang_spot" else None
+        best = None
+        hit = wi.nearest(p0[0], p0[1], P.SLOT_REACH_M, 0, p0[2])
+        if hit is not None and abs(p0[2] - wi.height(hit[0], hit[2], hit[3])) <= \
+                P.SLOT_STEP_M and (turf is None or
+                                   (rows.get(hit[0]["id"]) or {}).get("turf") == turf):
+            best = (hit[0], hit[1])
+        if best is None:
+            stats["dropped"] += 1
+            stats["dropped_ids"].append(s["id"])
+            continue
+        s["walkway_id"] = best[0]["id"]
+        s["reach_m"] = _r(best[1], 2)
+        stats["moved"] += 1
+        out.append(s)
+    return out, stats
+
+
 def height_check(model: dict, slots: list[dict], surface: Surface, stats: dict) -> dict:
     """`slot_heights`: every ground level slot seated, each point within `SLOT_SURFACE_TOL_M`
-    of the surface under it; noted, the slots whose first point stands more than 0.3 m off
-    their walkway where they leave it (`WalkIndex.height`: a raised road's sidewalk, a door's
-    path, a skybridge where no walkway at their height is within reach), and more than
-    `SLOT_STEP_M` off."""
+    of the surface under it, and leaving from a walkway at its height: its first point within
+    `SLOT_STEP_M` of its walkway where it leaves it (city open items: `level_slots`; a slot more
+    than that off fails, its users would climb to it); noted, the slots more than 0.3 m off
+    (`WalkIndex.height`: a raised road's sidewalk, a door's path)."""
     wi = WalkIndex(model.get("walkways", []), surface)
     walks = {w["id"]: w for w in wi.walks}
     bad, off, far = [], 0, 0
@@ -421,13 +458,16 @@ def height_check(model: dict, slots: list[dict], surface: Surface, stats: dict) 
             px, py, _, _, _ = _nearest_on(w["line"], p0[0], p0[1])
             dz = abs(p0[2] - wi.height(w, px, py))
             off += dz > 0.3
-            far += dz > P.SLOT_STEP_M
+            if dz > P.SLOT_STEP_M:
+                far += 1
+                bad.append(f"{s['id']}: {dz:.2f} m off its walkway {w['id']}")
     return {"ok": not bad, "detail": (
         f"{stats['seated']} ground level slots seated, {stats['points']} points on the surface "
         f"under them (pavement {stats['pavement']}, ground cover {stats['cover']}, bare ground "
         f"{stats['ground']}) within {P.SLOT_SURFACE_TOL_M * 100:.0f} cm; {off} slots more than "
-        f"0.3 m off their walkway where they leave it, {far} more than {P.SLOT_STEP_M:g} m"
-        if not bad else f"{len(bad)} slots off: " + "; ".join(bad[:5]))}
+        f"0.3 m off their walkway where they leave it, none more than {P.SLOT_STEP_M:g} m"
+        if not bad else f"{len(bad)} slots off ({far} more than {P.SLOT_STEP_M:g} m off their "
+        f"walkway): " + "; ".join(bad[:5]))}
 
 
 # ---------------------------------------------------------------------------

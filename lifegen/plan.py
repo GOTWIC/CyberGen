@@ -1677,6 +1677,11 @@ def build_plan(build: str | Path, spec_path: str | Path | None = None,
     gm = PL4.gang_walks(model, filled, rows, turfs)
     slot_raw += PL4.gang_spots(model, turfs, gm, row_by, wi, fp)
     seat_stats = PL4.seat_slots(slot_raw, surface)
+    # (city open items: every slot leaves from a walkway at its height, else it is left out)
+    slot_raw, lvl_stats = PL4.level_slots(slot_raw, wi, row_by)
+    sleft["not_at_height"] = lvl_stats["dropped"]
+    sleft["moved_to_height"] = lvl_stats["moved"]
+    seat_stats["seated"] -= lvl_stats["dropped"]
     pol = PL4.police_plan(model, filled, rows, drows, spawns)
     # LG8: each walkway's stretches out of the rain (atmosgen's rain shadow), nightlife round
     # the bars, clubs and arcades, the weather's table

@@ -135,6 +135,34 @@ def report(model, cx, manifest: dict, pieces, out_dir=None) -> dict:
                    "detail": f"{len(replaced)} blockout objects replaced" + (
                        f", {len(partial)} not wholly covered: {', '.join(partial[:6])}"
                        if partial else "")})
+    # (city open items) no bridge pier in the navigable channel of the water it crosses, nor
+    # in a stretch of water short enough to span whole
+    from .path import Path as _Path
+    from .structures import channels
+    in_ch = []
+    n_piers = 0
+    for p in pieces:
+        if p.maker != "bridge":
+            continue
+        fps = (recs.get(p.id, {}).get("notes") or {}).get("piers") or []
+        if not fps:
+            continue
+        try:
+            bl = _Path([(q[0], q[1]) for q in p.inputs["bridge"]["line"]])
+        except ValueError:
+            continue
+        chs = channels(p.inputs)
+        for fp in fps:
+            n_piers += 1
+            ss = [bl.project(x, y)[0] for x, y in fp]
+            lo, hi = min(ss), max(ss)
+            if any(lo < c1 and hi > c0 for c0, c1 in chs):
+                in_ch.append(p.id)
+                break
+    checks.append({"id": "street_channels", "ok": not in_ch,
+                   "detail": f"{n_piers} bridge piers, none in a channel" if not in_ch else
+                   f"{len(in_ch)} bridges with a pier in their water's channel: "
+                   f"{', '.join(in_ch[:6])}"})
     if model.decks:
         from .decks import check as deck_check
         checks.append(deck_check(model, cx, recs))
