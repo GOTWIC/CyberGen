@@ -2567,6 +2567,24 @@ each bridge piece's inputs and its piers' notes): no pier in a channel or a shor
 Delta: 14 piers, none in a channel; every boat route of LG7 runs whole. Results:
 `docs/progress/city_open_items/`.
 
+## Fix: station stairs and elevators (the station stairs)
+
+Citygen's station stairs (`docs/progress/station_stairs/`) are structures of kind `stair` (a
+footprint, the walkway's line along its flights and landings, `attrs` frame, length, width,
+flights, a flight's rise and run) and `elevator` (a footprint, its stops, `doors`), which the
+blockout draws (`blockout._station_stair`) and AG7 replaces by key (`streets/transit.py`,
+`maker_for`): `make_station_stair` draws each flight as AG10's (`decks._flight`: a block a step
+on a sloped soffit, stringers and handrails both sides), a concrete landing the stair's width
+and a flight deep at each end of every flight with guard rails round its open edges (`_rail`;
+the top landing open toward its bridge), an elevated stair tower's steel posts at its corners
+and its landings' inner ends, a metro well's lining (facing in, `concrete.dark`), floor and
+parapet round its opening; `make_station_elevator` a glass shaft between steel corner posts
+with bands every 3 m, a concrete shaft under the ground down to a concourse, its machine room
+and a cab door at each stop above the ground on the face toward its way. Test
+`test_station_stairs_and_elevators_drawn`: every point of a station stair's walkway has a
+tread or landing under it, every elevator a shaft round it. The streets' code hash moves every
+street tile's hash (goldens rewritten).
+
 ## AG16: performance
 
 **Built.** Scope 14.17, issue #96: a whole city's runtime and import cost in Unreal,

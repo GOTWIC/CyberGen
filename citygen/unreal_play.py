@@ -59,6 +59,7 @@ STYLE = {   # category -> (fill, draw order); tunnels run under the ground and a
     "road_avenue": ("#7b87a1", 6), "road_highway": ("#c99441", 6), "junction": ("#566077", 6),
     "crosswalk": ("#6b748a", 7), "bridge": ("#69738a", 7), "site_rail_track": ("#7d6e60", 7),
     "elevated": ("#c99441", 8), "structure_deck": ("#4a5368", 8),
+    "structure_stair": ("#4a5368", 8), "structure_elevator": ("#4a5368", 8),
     "site_container_stack": ("#4a4f63", 9), "site_gantry_crane": ("#8a6b3a", 9),
     "green_roof": ("#24442f", 11), "structure_tube": ("#3ab0c8", 12),
 }

@@ -103,6 +103,23 @@ METRO_RUN_M = 12.0          # a metro stair runs this far along the concourse fr
 # farther along its concourse first, to STAIR_GRADE)
 STAIR_MAX_GRADE = 0.7
 STAIR_GRADE = 0.62
+# (station stairs) every station stair is flights a stair is built of: switchbacks of flights
+# rising at most FLIGHT_RISE_M at STAIR_GRADE, with landings as deep as a flight is wide, in a
+# footprint on clear ground beside its platform end (`stair_plan`, `Builder._tower`, `_well`)
+FLIGHT_W_M = 2.0            # a flight's width (and its landings' depth)
+FLIGHT_GAP_M = 0.3          # between the two flights of a switchback (the well)
+FLIGHT_RISE_M = 3.6         # the most a flight rises between two landings (20 risers)
+STAIR_RAIL_M = 1.1          # guard rails over the top landing (a metro well's parapet)
+STAIR_SLAB_M = 0.3          # under a metro well's bottom landing
+SHAFT_M = 3.2               # an elevator shaft's side (a 2.5 m cab and its walls)
+SHAFT_HEAD_M = 3.0          # its machine room over its top stop
+ACCESS_REACH_M = 36.0       # a station stair's or elevator's middle within this of its end
+ACCESS_STEP_M = 1.0         # the grid of middles tried
+ACCESS_TRIES = 400          # the nearest clear middles tried for a bridge and a path
+ACCESS_PAD_M = 0.5          # clear of what it keeps off by this much
+ACCESS_BRIDGE_M = 40.0      # the longest bridge from a platform end to its stair or elevator
+ACCESS_BRIDGE_W_M = 3.0
+ACCESS_PASSAGE_M = 60.0     # the longest passage from a concourse end to its well or shaft
 STATION_TOWER_M = 200.0     # a sky station uses a portal tower within this of its stop
 CORE_SHIFT = 12             # M19: track vertices a sky station on a pylon may move, its core clear
 
@@ -3952,6 +3969,56 @@ class Keep:
         return True
 
 
+
+def stair_plan(z_hi: float, z_lo: float) -> tuple:
+    """Station stairs: the flights from z_hi down to z_lo in the stair's own frame (s along
+    its long side from -L/2 to L/2, t across it): n flights of equal rise (at most
+    FLIGHT_RISE_M) at STAIR_GRADE, one straight flight or switchbacks side by side with a
+    landing FLIGHT_W_M deep at each end. Returns (n, rise, run, L, W, points): the walkway's
+    points (s, t, z) from the head (the middle of the top landing's face at s = -L/2) along
+    the flights and landings to the foot (on the face the last flight runs to)."""
+    rise = z_hi - z_lo
+    n = max(1, int(math.ceil(rise / FLIGHT_RISE_M - 1e-9)))
+    h = rise / n
+    run = math.ceil(h / STAIR_GRADE * 100.0 - 1e-9) / 100.0
+    fw = FLIGHT_W_M
+    L = q(run + 2.0 * fw)
+    W = q(fw if n == 1 else 2.0 * fw + FLIGHT_GAP_M)
+    ta, tb = -W / 2.0 + fw / 2.0, W / 2.0 - fw / 2.0
+    s0, s1 = -L / 2.0 + fw, L / 2.0 - fw
+    pts = [(-L / 2.0, ta, z_hi), (s0, ta, z_hi)]
+    for k in range(n):
+        lane, other = (ta, tb) if k % 2 == 0 else (tb, ta)
+        b = s1 if k % 2 == 0 else s0
+        z = z_lo if k == n - 1 else z_hi - h * (k + 1)
+        pts.append((b, lane, z))
+        if k < n - 1:
+            mid = L / 2.0 - fw / 2.0 if k % 2 == 0 else -L / 2.0 + fw / 2.0
+            pts += [(mid, lane, z), (mid, other, z), (b, other, z)]
+        else:
+            pts.append((L / 2.0 if k % 2 == 0 else -L / 2.0, lane, z))
+    return n, h, run, L, W, pts
+
+
+def _stair_world(c, u, pts) -> list[tuple]:
+    """A stair's points (s, t, z) placed at c with its long side along u."""
+    v = (-u[1], u[0])
+    return [(q(c[0] + u[0] * s + v[0] * t), q(c[1] + u[1] * s + v[1] * t), q(z))
+            for s, t, z in pts]
+
+
+def _stair_attrs(sid: str, c, u, L: float, W: float, n: int, h: float, run: float) -> dict:
+    return {"station": sid, "role": "station_stair", "width_m": W, "length_m": L,
+            "flight_w_m": FLIGHT_W_M, "flights": n, "flight_rise_m": q(h), "flight_run_m": q(run),
+            "frame": [q(c[0]), q(c[1]), round(u[0], 6), round(u[1], 6)]}
+
+
+def _dir(a, b) -> list[float]:
+    """The unit vector from a to b in plan (an elevator's door), [1, 0] where they meet."""
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    L = math.hypot(dx, dy)
+    return [1.0, 0.0] if L < 0.01 else [round(dx / L, 4), round(dy / L, 4)]
+
 CROSS_WALKS = ("crosswalk", "crossing")   # curves followups: walkways across a road
 
 
@@ -3987,6 +4054,8 @@ class Builder:
         self.platforms: dict = {}    # M19: line id -> [(from, to along it, kind, core at)]
         self.tracks: list = []       # M19: every line's track (`track_rec`)
         self.nsup: dict = {}         # M19: supports numbered per line
+        self.gone: set = set()       # (station stairs) the buildings taken out
+        self.metros: list = []       # (station stairs) the metro lines' tracks in plan
 
     def _on_crossing(self, f) -> bool:
         """Curves followups: whether a point stands on a crossing (`crossing_zones`)."""
@@ -4198,6 +4267,8 @@ class Builder:
                 return b, inside[len(inside) // 2]
         return None, idx
 
+    # -- station stairs and elevators (station stairs: buildable flights on clear ground) ----
+
     def _metro(self, sid, seg, foot, acc) -> None:
         z = METRO_CONCOURSE_Z
         k = self.walk("path", [(x, y, z) for x, y in seg], 6.0, {"station": sid,
@@ -4205,74 +4276,15 @@ class Builder:
         acc.append(k)
         self.struct(f"{sid}.cc", "deck", -14.0, -4.0, footprint=foot,
                     attrs={"station": sid, "role": "concourse", "underground": True})
-        line = LineString(seg)
         for e, tag in ((seg[0], "a"), (seg[-1], "b")):
-            f, d = self.foot(e)
-            stepped = d < 0.5
-            if d < 0.5:  # stairs need a run: step the kiosk 12 m along the concourse (M8c)
-                e0 = e
-                r = line.interpolate(min(METRO_RUN_M, line.length / 2.0) if tag == "a" else
-                                     max(line.length - METRO_RUN_M, line.length / 2.0))
-                e = (q(r.x), q(r.y))
-                if _d(e, f) < 0.5:
-                    continue
-                if not self.masses.clear(f, e, 0):
-                    # (access fix, #87: a stepped stair would pass under a building's ground
-                    # floor: an elevator straight down from the sidewalk instead)
-                    acc.append(self.walk("elevator", [(e0[0], e0[1], 0.0),
-                                                      (e0[0], e0[1], z)], 2.5,
-                                         {"station": sid}))
-                    if _d(e0, f) > 0.0:
-                        acc.append(self.walk("path", [(e0[0], e0[1], 0.0), (f[0], f[1], 0.0)],
-                                             3.0, {"station": sid}))
-                    continue
-            moved = False
-            if abs(z) > STAIR_MAX_GRADE * _d(e, f):
-                # (city open items: a stair steeper than one is built: its top steps along the
-                # concourse until its run is at STAIR_GRADE, else an elevator down from the
-                # concourse's end and a path to the sidewalk)
-                e0 = seg[0] if tag == "a" else seg[-1]
-                need = abs(z) / STAIR_GRADE
-                top = None
-                s = 1.0
-                while s <= line.length:
-                    r = line.interpolate(s if tag == "a" else line.length - s)
-                    p = (q(r.x), q(r.y))
-                    if _d(p, f) >= need:
-                        top = p
-                        break
-                    s += 1.0
-                if top is None or not self.masses.clear(f, top, 0) or self._stair_blocked(
-                        [(f[0], f[1], 0.0), (top[0], top[1], z), (e0[0], e0[1], z)]):
-                    acc.append(self.walk("elevator", [(e0[0], e0[1], 0.0),
-                                                      (e0[0], e0[1], z)], 2.5,
-                                         {"station": sid}))
-                    if _d(e0, f) > 0.0:
-                        acc.append(self.walk("path", [(e0[0], e0[1], 0.0), (f[0], f[1], 0.0)],
-                                             3.0, {"station": sid}))
-                    continue
-                e, moved = top, True
-            if moved:
-                # (its landing goes on along the concourse to its end, where the walk graph
-                # joins it to the concourse)
-                acc.append(self.walk("stairs", [(f[0], f[1], 0.0), (e[0], e[1], z),
-                                                (e0[0], e0[1], z)], 3.0, {"station": sid}))
+            # (station stairs: a stair well of switchback flights on clear ground near the
+            # concourse's end, a passage from its foot to the concourse and a path from its
+            # top to the sidewalk; else an elevator shaft there; else, with no clear ground
+            # near, an elevator straight down from the concourse's end, as before)
+            if self._well(sid, e, z, tag, acc) or self._lift(sid, None, e, z, tag, acc,
+                                                              metro=True):
                 continue
-            acc.append(self.walk("stairs", [(f[0], f[1], 0.0), (e[0], e[1], z)], 3.0,
-                                 {"station": sid}))
-            kind, l3, w, at = self.new[k]
-            if stepped and self.c.m.terrain is not None and (q(e[0]), q(e[1]), q(z)) not in l3:
-                # (M13, terrain cities only so far: the flat cities keep their M8c bytes) a
-                # stepped stair foot between two concourse vertices joins the concourse there
-                s_e = line.project(Point(e))
-                cum = [0.0]
-                for p0, p1 in zip(l3, l3[1:]):
-                    cum.append(cum[-1] + math.hypot(p1[0] - p0[0], p1[1] - p0[1]))
-                at_k = next((i for i in range(1, len(cum)) if cum[i] > s_e), len(l3) - 1)
-                self.new[k] = (kind, l3[:at_k] + [(q(e[0]), q(e[1]), q(z))] + l3[at_k:], w,
-                               at)
-            # (no canopy over the stair foot: a 5 m square on four posts, it stood half in the
-            # road at a junction's corner; Swagnik, 2026-11-12, after the packaged Delta)
+            self._lift_here(sid, None, e, z, tag, acc, metro=True)
 
     def _elevated(self, sid, ln, seg, foot, z, bld, gone, acc, pylon: bool) -> None:
         mode = ln.mode
@@ -4281,86 +4293,405 @@ class Builder:
         acc.append(k)
         self.struct(f"{sid}.pf", "deck", z - 1.0, z, footprint=foot,
                     attrs={"station": sid, "role": "platform", "mode": mode})
-        ends = [seg[0], seg[-1]] if not pylon else [self._core_end(ln, seg)]
-        lift_at = set()       # (#109: the platform ends with an elevator)
-        for e, tag in zip(ends, ("a", "b")):
-            f, d = self.foot(e)
-            # (access fix, #87: a sidewalk reached only round the buildings: an elevator
-            # down and a path led round, not a stair straight through them)
-            rounded = (tuple(map(q, e[:2])), tuple(map(q, f[:2]))) in self.rounds
-            if not (rounded or pylon or d < 1.0) and \
-                    self._stair_blocked([(e[0], e[1], z), (f[0], f[1], 0.0)]):
-                # (the road curves fix: a stair whose straight run down passes through a
-                # building mass at its height, as `walkway_building_clash` measures it, which
-                # the ground test misses where the mass stands on an arcade: an elevator down
-                # and a path, as round the buildings)
-                rounded = True
-            if rounded and not pylon and d >= 1.0 and self._over_water(e):
-                continue          # (an end over the water: the station's other end serves it)
-            if pylon or d < 1.0 or rounded:
-                # an elevator core: on the pylon (sky stations), or where the sidewalk is
-                # right under the platform end
-                if not (rounded and not pylon and d >= 1.0 and tuple(e) == tuple(seg[0])):
-                    # (but at the first end of a platform round the buildings: its own
-                    # elevator, below, is there)
-                    acc.append(self.walk("elevator", [(e[0], e[1], 0.0), (e[0], e[1], z)],
-                                         2.5, {"station": sid}))
-                    lift_at.add(tuple(e[:2]))
-                if f != tuple(e):
-                    acc.append(self.walk("path", [(e[0], e[1], 0.0), (f[0], f[1], 0.0)], 3.0,
-                                         {"station": sid}))
-                if pylon:
-                    core = G.qpoly(Point(e).buffer(5.0, cap_style="square"))
-                    self.struct(f"{sid}.core", "pylon", 0.0, z, footprint=core,
-                                attrs={"station": sid, "role": "elevator_core"})
-            elif z > STAIR_MAX_GRADE * d:
-                # (city open items: a stair from the platform straight down to its sidewalk
-                # would be steeper than any stair is built (Delta's Midtown station's rose
-                # 31 m over 18 m, and its people climbed through the air): a bridge at the
-                # platform's height out over the sidewalk, roofed and glazed as a skywalk, and
-                # an elevator down from its end; a bridge through a building mass at its
-                # height, as `walkway_building_clash` measures it, or near another line, takes
-                # the elevator at the platform end and a path, as round the buildings)
-                br = LineString([e[:2], f[:2]])
-                if self._stair_blocked([(e[0], e[1], z), (f[0], f[1], z)]) or any(
-                        o["id"] != ln.id and o["line"].distance(br) <
-                        o["half"] + SIDE_PAD_M + 2.0 for o in self.tracks):
-                    if self._over_water(e) or self._on_crossing(e):
-                        continue      # (the station's other end serves it)
-                    acc.append(self.walk("elevator", [(e[0], e[1], 0.0), (e[0], e[1], z)],
-                                         2.5, {"station": sid}))
-                    acc.append(self.walk("path", [(e[0], e[1], 0.0), (f[0], f[1], 0.0)], 3.0,
-                                         {"station": sid}))
-                else:
-                    acc.append(self.walk("elevated", [(e[0], e[1], z), (f[0], f[1], z)], 4.0,
-                                         {"station": sid, "lift_bridge": True}))
-                    self.struct(f"{sid}.lb{tag}", "deck", z - 0.8, z,
-                                line=[(e[0], e[1], z), (f[0], f[1], z)],
-                                attrs={"station": sid, "role": "skywalk", "width_m": 4.0})
-                    acc.append(self.walk("elevator", [(f[0], f[1], 0.0), (f[0], f[1], z)],
-                                         2.5, {"station": sid}))
-                lift_at.add(tuple(e[:2]))
-            else:
-                acc.append(self.walk("stairs", [(e[0], e[1], z), (f[0], f[1], 0.0)], 3.0,
+        if pylon:
+            # a sky station on a pylon: an elevator core on the pylon at one platform end
+            e = self._core_end(ln, seg)
+            f, _ = self.foot(e)
+            acc.append(self.walk("elevator", [(e[0], e[1], 0.0), (e[0], e[1], z)], 2.5,
+                                 {"station": sid}))
+            if f != tuple(e):
+                acc.append(self.walk("path", [(e[0], e[1], 0.0), (f[0], f[1], 0.0)], 3.0,
                                      {"station": sid}))
-                # (no canopy over the stair foot, as the metro's: a 6 m square on posts, it
-                # stood in the road where the foot is near one)
-        if not pylon and tuple(seg[0][:2]) not in lift_at:
-            # the platform's own elevator at its first end (#109: one elevator an end: not
-            # where the sidewalk right under that end has one already)
-            e = seg[0]
-            if self._on_crossing(e):
-                # (curves followups: not down onto a crossing; at the last end where that
-                # has none and stands off them, else none where another end has one)
-                last = seg[-1]
-                if tuple(last[:2]) not in lift_at and not self._on_crossing(last):
-                    e = last
-                elif lift_at:
-                    e = None
-            if e is not None:
-                acc.append(self.walk("elevator", [(e[0], e[1], 0.0), (e[0], e[1], z)], 2.5,
-                                     {"station": sid}))
+            core = G.qpoly(Point(e).buffer(5.0, cap_style="square"))
+            self.struct(f"{sid}.core", "pylon", 0.0, z, footprint=core,
+                        attrs={"station": sid, "role": "elevator_core"})
+            self._skywalk(sid, seg, foot, z, bld, gone, acc)
+            return
+        # (station stairs: each platform end a stair tower of switchback flights on clear
+        # ground beside it, a bridge at the platform's height to its top landing and a path
+        # from its foot to the sidewalk; else an elevator shaft there; the city open items'
+        # straight stairs ran 70 to 180 m through the air from a 31 m platform)
+        lifts = 0
+        served = 0
+        for e, tag in ((seg[0], "a"), (seg[-1], "b")):
+            if self._tower(sid, ln, e, z, foot, tag, acc):
+                served += 1
+            elif self._lift(sid, ln, e, z, tag, acc, platform=foot):
+                served += 1
+                lifts += 1
+            elif not (self._over_water(e) or self._on_crossing(e)) and \
+                    self._lift_here(sid, ln, e, z, tag, acc):
+                # (no clear ground near: an elevator straight down from the end and a path;
+                # none over the water or onto a crossing, nor beside another line, where the
+                # other end serves)
+                served += 1
+                lifts += 1
+        if not lifts:
+            # the platform's own elevator (#109: one an end at most): a shaft beside its
+            # first end, else its last, else straight down from its first end
+            if not (self._lift(sid, ln, seg[0], z, "c", acc, platform=foot) or
+                    self._lift(sid, ln, seg[-1], z, "d", acc, platform=foot)):
+                e = seg[0]
+                if self._on_crossing(e) and not self._on_crossing(seg[-1]):
+                    e = seg[-1]
+                if not self._on_crossing(e):
+                    self._lift_here(sid, ln, e, z, "c", acc, force=served == 0)
+                elif served == 0:
+                    self._lift_here(sid, ln, e, z, "c", acc, force=True)
         self._skywalk(sid, seg, foot, z, bld, gone, acc)
+
+    def _clear_index(self) -> None:
+        """Station stairs: what a station stair or elevator keeps off on the ground (built
+        once): every road's right of way (its sidewalks, lanes and crosswalks), junctions,
+        buildings (every mass, but the ones a line takes out), the water, structures, M14's
+        slabs, megasite elements, skybridges and every walkway but the sidewalks' and
+        crossings' (paths, doors' links, raised walkways); and the land."""
+        if getattr(self, "_clr", None) is not None:
+            return
+        m = self.c.m
+        polys = []
+        for s in m.road_segments:
+            if len(s.centerline) >= 2:
+                polys.append(LineString([p[:2] for p in s.centerline]).buffer(
+                    s.width_m / 2.0, cap_style="flat"))
+        polys += [G.from_model_poly(j.polygon) for j in m.junctions]
+        polys += [LineString([p[:2] for p in x.line]).buffer(x.width_m / 2.0,
+                                                             cap_style="flat")
+                  for x in m.crosswalks if len(x.line) >= 2]
+        polys += [b.poly for b in self.c.blds if b.id not in self.gone]
+        for st in m.structures:
+            if st.footprint is not None:
+                polys.append(G.from_model_poly(st.footprint))
+            elif len(st.line) >= 2:
+                polys.append(LineString([p[:2] for p in st.line]).buffer(
+                    (st.attrs or {}).get("width_m", 4.0) / 2.0, cap_style="flat"))
+        polys += [p for p, _ in self.c.slabs]
+        polys += [G.from_model_poly(e.footprint) for e in m.site_elements
+                  if e.footprint is not None]
+        polys += [LineString(sb.line).buffer(sb.width_m / 2.0, cap_style="flat")
+                  for sb in m.skybridges if len(sb.line) >= 2]
+        for w in self.walks:
+            if w["kind"] in ("sidewalk", "crosswalk", "crossing") or len(w["line"]) < 2:
+                continue
+            polys.append(LineString([p[:2] for p in w["line"]]).buffer(
+                w["width_m"] / 2.0 + 0.3))
+        from .tunnels import water_bodies
+
+        wet = [poly for poly, _, _ in water_bodies(m)]
+        polys += wet
+        polys = [p for p in polys if not p.is_empty]
+        self._clr = shapely.STRtree(polys)
+        land = G.union([G.from_model_poly(p) for lnd in m.land for p in lnd.polygons])
+        if wet:
+            land = G.diff(land, G.union(wet))
+        shapely.prepare(land)
+        self._land = land
+
+    def _dyn(self, own) -> tuple:
+        """What this run has laid so far that a station stair or elevator keeps off: its
+        structures, its walkways, every elevated or sky line's track (its own line's by a
+        meter, the others' by SIDE_PAD_M more) and the metro's."""
+        polys = []
+        for r in self.structures:
+            if r.get("footprint") is not None:
+                polys.append(G.from_model_poly(r["footprint"]))
+            elif r.get("line"):
+                polys.append(LineString([p[:2] for p in r["line"]]).buffer(
+                    (r.get("attrs") or {}).get("width_m", 4.0) / 2.0, cap_style="flat"))
+        for kind, line3, width, _ in self.new:
+            if len(line3) >= 2:
+                polys.append(LineString([p[:2] for p in line3]).buffer(width / 2.0 + 0.3))
+        for o in self.tracks:
+            pad = 1.0 if o["id"] == own else SIDE_PAD_M + 1.0
+            polys.append(o["line"].buffer(o["half"] + pad))
+        polys += [g.buffer(WIDTH_M["metro"] / 2.0 + 1.0) for g in self.metros]
+        polys = [p for p in polys if not p.is_empty]
+        return (shapely.STRtree(polys) if polys else None), polys
+
+    def _spot(self, e, t, L: float, W: float, own, key, ok, reach: float = ACCESS_REACH_M):
+        """A rectangle L x W (its long side along u) on clear ground (`_clear_index`, `_dyn`,
+        ACCESS_PAD_M round it) with its middle within `reach` of e: the first by
+        key(c, u) (None: not a candidate) that ok(c, u, polygon) accepts, as (c, u, polygon),
+        else None. The middles on a grid along t and across it, u along or across t."""
+        self._clear_index()
+        dyn, _ = self._dyn(own)
+        nv = (-t[1], t[0])
+        R = reach
+        ks = np.arange(-R, R + 1e-9, ACCESS_STEP_M)
+        A, B = np.meshgrid(ks, ks, indexing="ij")
+        A, B = A.ravel(), B.ravel()
+        sel = A * A + B * B <= R * R
+        A, B = A[sel], B[sel]
+        C = np.round(np.stack([e[0] + A * t[0] + B * nv[0], e[1] + A * t[1] + B * nv[1]],
+                              axis=1), 2)
+        cands = []
+        for u in (t, (-t[0], -t[1]), nv, (-nv[0], -nv[1])):
+            v = (-u[1], u[0])
+            hu = np.array(u) * (L / 2.0)
+            hv = np.array(v) * (W / 2.0)
+            corners = np.stack([C - hu - hv, C + hu - hv, C + hu + hv, C - hu + hv], axis=1)
+            polys = shapely.polygons(corners)
+            good = shapely.covered_by(polys, self._land)
+            buf = shapely.buffer(polys, ACCESS_PAD_M, join_style="mitre")
+            for tree in (self._clr, dyn):
+                if tree is None:
+                    continue
+                ip, _ = tree.query(buf, predicate="intersects")
+                good[ip] = False
+            for i in np.nonzero(good)[0].tolist():
+                c = (float(C[i][0]), float(C[i][1]))
+                kk = key(c, u)
+                if kk is not None:
+                    cands.append((kk, c, u, polys[i]))
+        cands.sort(key=lambda x: (x[0], x[1], x[2]))
+        for _, c, u, poly in cands[:ACCESS_TRIES]:
+            if ok(c, u, poly):
+                return c, u, G.qpoly(poly)
+        return None
+
+    def _bridge_ok(self, ln, e, x, z: float, platform) -> bool:
+        """Whether a bridge at height z from platform end e to x may be built: through no
+        building mass at its height (the check's own test), clear of the other lines, never
+        along its own line's track past its platform."""
+        if _d(e, x) > ACCESS_BRIDGE_M:
+            return False
+        if _d(e, x) < 0.01:
+            return True
+        br = LineString([e[:2], x[:2]])
+        if self._stair_blocked([(e[0], e[1], z), (x[0], x[1], z)]):
+            return False
+        for o in self.tracks:
+            if o["id"] != ln.id and o["line"].distance(br) < o["half"] + SIDE_PAD_M + 2.0:
+                return False
+            if o["id"] == ln.id:
+                out = G.diff(br, platform.buffer(0.01))
+                if not out.is_empty and out.distance(o["line"]) < WIDTH_M[ln.mode] / 2.0 + 0.5:
+                    return False
+        return True
+
+    def _bridge(self, sid, e, x, z: float, platform, target, tag: str, acc) -> None:
+        """The bridge walkway from a platform end e to x at the platform's height, and its
+        deck (a glazed, roofed skywalk) from where it leaves the platform to where it meets
+        the stair's or elevator's footprint."""
+        if _d(e, x) < 0.01:
+            return
+        acc.append(self.walk("elevated", [(e[0], e[1], z), (x[0], x[1], z)], ACCESS_BRIDGE_W_M,
+                             {"station": sid, "access_bridge": True}))
+        br = LineString([e[:2], x[:2]])
+
+        def along(poly):
+            return [br.project(Point(p)) for g in shapely.get_parts(br.intersection(poly))
+                    for p in g.coords]
+        s0 = max(along(platform), default=0.0) if platform is not None else 0.0
+        s1 = min(along(target), default=br.length)
+        if s1 - s0 > 0.3:
+            a, b = br.interpolate(s0), br.interpolate(s1)
+            self.struct(f"{sid}.sb{tag}", "deck", z - 0.8, z,
+                        line=[(q(a.x), q(a.y), z), (q(b.x), q(b.y), z)],
+                        attrs={"station": sid, "role": "skywalk",
+                               "width_m": ACCESS_BRIDGE_W_M})
+
+    def _out(self, seg_end, platform) -> tuple:
+        """The platform's direction out at an end (along its track, away from its middle)."""
+        c = platform.centroid
+        dx, dy = seg_end[0] - c.x, seg_end[1] - c.y
+        L = math.hypot(dx, dy) or 1.0
+        return (dx / L, dy / L)
+
+    def _peek_foot(self, p) -> tuple:
+        """The sidewalk point a path from p would take (`foot`'s first pick), not split."""
+        lm = _landmass_index(self.lms, [p])[0]
+        best = _nearest_on(self.gtree, self.glines, self.walks, self.gi, self.land_of,
+                           Point(p), lm)
+        f = self._foot_ok(best, p)
+        return f if f is not None else _foot(self.glines, self.walks, self.gi, best, p)
+
+    def _tower(self, sid, ln, e, z: float, platform, tag: str, acc) -> bool:
+        """An elevated platform end's stair tower (`stair_plan`) on clear ground beside it,
+        its head landing toward the end, a bridge from the end to it at the platform's height
+        through nothing, a path from its foot to the sidewalk."""
+        n, h, run, L, W, pts = stair_plan(z, 0.0)
+        t = self._out(e, platform)
+
+        def head(c, u):
+            v = (-u[1], u[0])
+            s, tt, _ = pts[0]
+            return (c[0] + u[0] * s + v[0] * tt, c[1] + u[1] * s + v[1] * tt)
+
+        def key(c, u):
+            # (e behind the head landing's face, so the bridge reaches the landing first)
+            if (e[0] - c[0]) * u[0] + (e[1] - c[1]) * u[1] > -L / 2.0 + 1e-6:
+                return None
+            return round(_d(e, head(c, u)), 2)
+
+        def ok(c, u, poly):
+            P3 = _stair_world(c, u, pts)
+            return self._bridge_ok(ln, e, head(c, u), z, platform) and \
+                self._ground_ok(P3[-1], poly)
+
+        r = self._spot(e, t, L, W, ln.id, key, ok)
+        if r is None:
+            return False
+        c, u, poly = r
+        P3 = _stair_world(c, u, pts)
+        H, F = P3[0], P3[-1]
+        self._bridge(sid, e, H, z, platform, poly, tag, acc)
+        sid_st = f"{sid}.st{tag}"
+        acc.append(self.walk("stairs", P3, FLIGHT_W_M, {"station": sid, "structure": sid_st}))
+        self.struct(sid_st, "stair", 0.0, z + STAIR_RAIL_M, footprint=poly, line=P3,
+                    attrs=_stair_attrs(sid, c, u, L, W, n, h, run))
+        f, d = self.foot(F)
+        if d > 0.01:
+            acc.append(self.walk("path", [(F[0], F[1], 0.0), (f[0], f[1], 0.0)], 3.0,
+                                 {"station": sid}))
+        return True
+
+    def _well(self, sid, e, z: float, tag: str, acc) -> bool:
+        """A metro concourse end's stair well (`stair_plan` from the ground down to the
+        concourse) on clear ground near it: a path from the sidewalk to its top, a passage
+        at the concourse's depth from its foot to the concourse's end, under no building."""
+        n, h, run, L, W, pts = stair_plan(0.0, z)
+        f0 = self._peek_foot(e)
+        t = (f0[0] - e[0], f0[1] - e[1])
+        Lt = math.hypot(*t)
+        t = (t[0] / Lt, t[1] / Lt) if Lt > 0.01 else (1.0, 0.0)
+        foot_s = pts[-1][0]
+
+        def ends(c, u):
+            v = (-u[1], u[0])
+            return [(c[0] + u[0] * s + v[0] * tt, c[1] + u[1] * s + v[1] * tt)
+                    for s, tt, _ in (pts[0], pts[-1])]
+
+        def key(c, u):
+            H, F = ends(c, u)
+            out = 1.0 if foot_s > 0 else -1.0
+            # (the passage leaves the well's foot face toward the concourse)
+            if ((e[0] - F[0]) * u[0] + (e[1] - F[1]) * u[1]) * out < 0.0:
+                return None
+            if _d(F, e) > ACCESS_PASSAGE_M:
+                return None
+            return round(_d(F, e) + _d(H, f0), 2)
+
+        def ok(c, u, poly):
+            H, F = ends(c, u)
+            return (_d(F, e) < 0.01 or self.masses.clear(F, e, 0)) and \
+                self._ground_ok((q(H[0]), q(H[1])), poly)
+
+        r = self._spot(e, t, L, W, None, key, ok, reach=ACCESS_PASSAGE_M)
+        if r is None:
+            return False
+        c, u, poly = r
+        P3 = _stair_world(c, u, pts)
+        H, F = P3[0], P3[-1]
+        sid_st = f"{sid}.st{tag}"
+        acc.append(self.walk("stairs", P3, FLIGHT_W_M, {"station": sid, "structure": sid_st}))
+        self.struct(sid_st, "stair", z - STAIR_SLAB_M, STAIR_RAIL_M, footprint=poly, line=P3,
+                    attrs=_stair_attrs(sid, c, u, L, W, n, h, run))
+        if _d(F, e) > 0.01:
+            acc.append(self.walk("path", [(F[0], F[1], z), (e[0], e[1], z)], 3.0,
+                                 {"station": sid, "passage": True}))
+        f, d = self.foot(H)
+        if d > 0.01:
+            acc.append(self.walk("path", [(H[0], H[1], 0.0), (f[0], f[1], 0.0)], 3.0,
+                                 {"station": sid}))
+        return True
+
+    def _lift(self, sid, ln, e, z: float, tag: str, acc, platform=None,
+              metro: bool = False) -> bool:
+        """An elevator shaft on clear ground near a platform end (a bridge to it at the
+        platform's height) or a concourse end (a passage to it at the concourse's depth),
+        a path from its foot to the sidewalk."""
+        S = SHAFT_M
+        if metro:
+            f0 = self._peek_foot(e)
+            t = (f0[0] - e[0], f0[1] - e[1])
+            Lt = math.hypot(*t)
+            t = (t[0] / Lt, t[1] / Lt) if Lt > 0.01 else (1.0, 0.0)
+
+            def key(c, u):
+                if u != t or _d(c, e) > ACCESS_PASSAGE_M:
+                    return None
+                return round(_d(c, e) + _d(c, f0), 2)
+
+            def ok(c, u, poly):
+                return self.masses.clear(c, e, 0) and \
+                    self._ground_ok((q(c[0]), q(c[1])), None)
+        else:
+            t = self._out(e, platform)
+
+            def key(c, u):
+                return round(_d(c, e), 2) if u == t else None
+
+            def ok(c, u, poly):
+                return self._bridge_ok(ln, e, c, z, platform) and \
+                    self._ground_ok((q(c[0]), q(c[1])), None)
+        r = self._spot(e, t, S, S, ln.id if ln is not None else None, key, ok,
+                       reach=ACCESS_PASSAGE_M if metro else ACCESS_REACH_M)
+        if r is None:
+            return False
+        c, _, poly = r
+        c = (q(c[0]), q(c[1]))
+        lo, hi = (z, 0.0) if metro else (0.0, z)
+        sid_el = f"{sid}.el{tag}"
+        if metro:
+            if _d(c, e) > 0.01:
+                acc.append(self.walk("path", [(c[0], c[1], z), (e[0], e[1], z)], 3.0,
+                                     {"station": sid, "passage": True}))
+        else:
+            self._bridge(sid, e, c, z, platform, poly, tag, acc)
+        acc.append(self.walk("elevator", [(c[0], c[1], 0.0), (c[0], c[1], z)], 2.5,
+                             {"station": sid, "structure": sid_el}))
+        f, d = self.foot(c)
+        if d > 0.01:
+            acc.append(self.walk("path", [(c[0], c[1], 0.0), (f[0], f[1], 0.0)], 3.0,
+                                 {"station": sid}))
+        self.struct(sid_el, "elevator", lo - (1.0 if metro else 0.0), hi + SHAFT_HEAD_M,
+                    footprint=poly, line=[(c[0], c[1], 0.0), (c[0], c[1], z)],
+                    attrs={"station": sid, "role": "station_elevator", "width_m": S,
+                           "doors": [_dir(c, e), _dir(c, f)] if metro else
+                           [_dir(c, f), _dir(c, e)], "clear": True})
+        return True
+
+    def _ground_ok(self, p, poly) -> bool:
+        """Whether the path at the ground from a stair's or shaft's foot p to the sidewalk
+        point `foot` takes passes no building (the buildings' ground test and the check's
+        own, `walkway_building_clash`) nor through the stair's footprint."""
+        f = self._peek_foot(p)
+        if _d(p, f) < 0.01:
+            return True
+        if not self.masses.clear(p, f, 0) or self._stair_blocked([(p[0], p[1], 0.0),
+                                                                  (f[0], f[1], 0.0)]):
+            return False
+        if poly is not None:
+            seg = LineString([p[:2], f[:2]])
+            if G.length(G.inter(seg, poly.buffer(-0.05))) > 0.01:
+                return False
+        return True
+
+    def _lift_here(self, sid, ln, e, z: float, tag: str, acc, metro: bool = False,
+                   force: bool = False) -> bool:
+        """No clear ground near: an elevator straight down from the end (its shaft where it
+        stands, `attrs.clear` false) and a path to the sidewalk; none (but `force`) where
+        another line passes the shaft closer than its clearance."""
+        if not force and ln is not None:
+            sq0 = Point(e[:2]).buffer(SHAFT_M / 2.0, cap_style="square")
+            if any(o["id"] != ln.id and o["line"].distance(sq0) < o["half"] + SIDE_PAD_M + 0.5
+                   for o in self.tracks):
+                return False
+        f, d = self.foot(e)
+        sid_el = f"{sid}.el{tag}"
+        acc.append(self.walk("elevator", [(e[0], e[1], 0.0), (e[0], e[1], z)], 2.5,
+                             {"station": sid, "structure": sid_el}))
+        if d > 0.01:
+            acc.append(self.walk("path", [(e[0], e[1], 0.0), (f[0], f[1], 0.0)], 3.0,
+                                 {"station": sid}))
+        lo, hi = (z, 0.0) if metro else (0.0, z)
+        sq = G.qpoly(Point(e[:2]).buffer(SHAFT_M / 2.0, cap_style="square"))
+        self.struct(sid_el, "elevator", lo - (1.0 if metro else 0.0), hi + SHAFT_HEAD_M,
+                    footprint=sq, line=[(e[0], e[1], 0.0), (e[0], e[1], z)],
+                    attrs={"station": sid, "role": "station_elevator", "width_m": SHAFT_M,
+                           "doors": [_dir(e, f), _dir(e, f)], "clear": False})
+        return True
 
     def _stair_blocked(self, line3) -> bool:
         """Whether a stair's straight run (x, y, z over the ground) passes through a building
@@ -5142,6 +5473,11 @@ def _build(spec, m, fixed: dict) -> Out:
         if e is not None:
             ent[b.id] = (e.position[0], e.position[1])
     B.tracks = [track_rec(ln) for ln in lines if ln.mode != "metro"]
+    # (station stairs: what a station stair or elevator keeps off: the buildings the lines
+    # take out stand no more; the metro lines' plan, which a stair well keeps off)
+    B.gone = gone
+    B.metros = [LineString(ln.pts) for ln in lines if ln.mode == "metro" and
+                len(ln.pts) >= 2]
     tl_rows, supports, spans = [], {}, {}
     st_ids_of = {ln.id: B.stations_of(ln, bld, ent, gone) for ln in lines}
     for ln in lines:

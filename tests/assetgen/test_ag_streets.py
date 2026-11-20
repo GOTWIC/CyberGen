@@ -285,6 +285,94 @@ def test_quay_stairs_are_closed():
             assert dirs == {(2, 1), (0, 1), (0, -1), (1, side)}, (side, s0, dirs)
 
 
+def _surface_misses(out, origin, line, step: float = 0.5) -> list:
+    """The points of a walkway line (every `step`) with no surface of the mesh under them:
+    a triangle whose plan holds the point, at most 0.5 m under it and 0.2 m over it (a
+    stair's treads round its sloped line)."""
+    import math
+
+    import numpy as np
+    tris = []
+    for sl in out.mesh.slots.values():
+        if not sl.idx:
+            continue
+        P = np.array(sl.pos, dtype=np.float64) / 1000.0
+        P[:, 0] += origin[0]
+        P[:, 1] += origin[1]
+        tris.append(P[np.array(sl.idx).reshape(-1, 3)])
+    T = np.concatenate(tris)
+    a0, v0, v1 = T[:, 0], T[:, 1] - T[:, 0], T[:, 2] - T[:, 0]
+    den = v0[:, 0] * v1[:, 1] - v1[:, 0] * v0[:, 1]
+    flat = np.abs(den) > 1e-9
+    miss = []
+    segs = list(zip(line, line[1:]))
+    for j, (p, q) in enumerate(segs):
+        Lp = math.hypot(q[0] - p[0], q[1] - p[1])
+        n = max(1, int(math.ceil(Lp / step)))
+        # (the walkway's two ends 5 cm in: on the 1 cm grid they may lie a few millimeters
+        # past the landing's edge)
+        f0 = 0.05 / Lp if j == 0 and Lp > 0.1 else 0.0
+        f1 = 1.0 - 0.05 / Lp if j == len(segs) - 1 and Lp > 0.1 else 1.0
+        for k in range(n + 1):
+            f = f0 + (f1 - f0) * k / n
+            x, y, z = (p[i] + (q[i] - p[i]) * f for i in range(3))
+            dx, dy = x - a0[:, 0], y - a0[:, 1]
+            with np.errstate(divide="ignore", invalid="ignore"):
+                u = (dx * v1[:, 1] - v1[:, 0] * dy) / den
+                v = (v0[:, 0] * dy - dx * v0[:, 1]) / den
+            inside = flat & (u >= -1e-4) & (v >= -1e-4) & (u + v <= 1.0001)
+            zs = a0[:, 2] + u * v0[:, 2] + v * v1[:, 2]
+            if not np.any(inside & (zs >= z - 0.5) & (zs <= z + 0.2)):
+                miss.append((round(x, 2), round(y, 2), round(z, 2)))
+    return miss
+
+
+def test_station_stairs_and_elevators_drawn():
+    """Station stairs: AG7 draws every station stair from its structure (citygen's
+    `stair_plan`: a stair tower's flights, landings, rails and posts from a 31 m platform; a
+    metro's well down 8 m, lined and railed), so every point of its walkway has a tread or
+    landing under it; and every elevator's shaft round its walkway from stop to stop."""
+    from citygen import transit as CT
+    from shapely.geometry import Polygon
+
+    from assetgen.streets import transit as ST
+    for z_hi, z_lo in ((31.0, 0.0), (15.8, 0.0), (0.0, -8.0), (3.0, 0.0)):
+        n, h, run, L, W, pts = CT.stair_plan(z_hi, z_lo)
+        assert h <= CT.FLIGHT_RISE_M + 1e-9 and h / run <= CT.STAIR_GRADE + 1e-9
+        c, u = (100.0, 50.0), (0.6, 0.8)
+        line = CT._stair_world(c, u, pts)
+        v = (-u[1], u[0])
+        ring = [[c[0] + u[0] * s * L / 2 + v[0] * t * W / 2,
+                 c[1] + u[1] * s * L / 2 + v[1] * t * W / 2]
+                for s, t in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+        st = {"id": "stn.x.sta", "kind": "stair", "z0_m": min(z_lo, 0.0) - 0.3 * (z_lo < 0),
+              "z1_m": max(z_hi, 0.0) + 1.1, "footprint": {"exterior": ring, "holes": []},
+              "line": [list(p) for p in line],
+              "attrs": CT._stair_attrs("stn.x", c, u, L, W, n, h, run)}
+        assert ST.maker_for(SimpleNamespace(kind="stair", attrs=st["attrs"])) == \
+            "station_stair"
+        out = ST.make_station_stair({"st": st, "origin": list(c), "ground_c": None})
+        assert out.mesh.triangles > 0 and not any(K.check(out.mesh.slots).values())
+        assert _surface_misses(out, c, line) == [], (z_hi, z_lo)
+        lo, hi = out.mesh.bounds_mm()
+        assert hi[2] / 1000.0 >= z_hi - 0.01 and lo[2] / 1000.0 <= min(z_lo, 0.0) + 0.01
+    for z_hi, z_lo in ((20.0, 0.0), (0.0, -8.0)):
+        sq = Polygon([(10, 10), (13.2, 10), (13.2, 13.2), (10, 13.2)])
+        st = {"id": "stn.x.ela", "kind": "elevator", "z0_m": z_lo - (1.0 if z_lo < 0 else 0),
+              "z1_m": z_hi + 3.0, "footprint": {"exterior": [list(p) for p in
+                                                            sq.exterior.coords[:-1]],
+                                                "holes": []},
+              "line": [[11.6, 11.6, 0.0], [11.6, 11.6, z_hi if z_hi else z_lo]],
+              "attrs": {"station": "stn.x", "role": "station_elevator", "width_m": 3.2,
+                        "doors": [[1.0, 0.0], [0.0, 1.0]], "clear": True}}
+        assert ST.maker_for(SimpleNamespace(kind="elevator", attrs=st["attrs"])) == \
+            "station_elevator"
+        out = ST.make_station_elevator({"st": st, "origin": [11.6, 11.6], "ground_c": None})
+        assert not any(K.check(out.mesh.slots).values())
+        lo, hi = out.mesh.bounds_mm()
+        assert lo[2] / 1000.0 <= z_lo + 0.01 and hi[2] / 1000.0 >= z_hi + 2.5
+        assert lo[0] / 1000.0 <= -1.5 and hi[0] / 1000.0 >= 1.5
+
 def _golden() -> dict:
     return json.loads(GOLDEN.read_text(encoding="utf-8"))
 

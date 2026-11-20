@@ -24,7 +24,7 @@ from conftest import SMALL
 
 TRANSIT_CHECKS = {"transit_routes", "transit_stops", "transit_curves", "transit_self_crossing",
                   "transit_grades", "transit_profile_smooth", "transit_altitude", "transit_clearance", "transit_supports",
-                  "station_access", "transit_skybridges", "transit_hubs"}
+                  "station_access", "station_stairs", "transit_skybridges", "transit_hubs"}
 
 # The small city with one line of each kind: underground, along the avenues, through towers,
 # and an elevated loop whose stops (west, east, north, middle) cross over if taken from the
@@ -233,10 +233,8 @@ def test_check_station_access_fails(lines):
 
 
 def test_station_stairs_at_a_stair_grade(lines):
-    """City open items: every station stair rises at most STAIR_MAX_GRADE a meter of run (an
-    elevated platform's end too high over its sidewalk gets a bridge at its height and an
-    elevator down, as Delta's Midtown station whose stair rose 31 m over 18 m); the check
-    fails a stair made steeper."""
+    """City open items: every station stair rises at most STAIR_MAX_GRADE a meter of run; the
+    check fails a stair made steeper."""
     import math
 
     from citygen.transit import STAIR_MAX_GRADE
@@ -249,13 +247,6 @@ def test_station_stairs_at_a_stair_grade(lines):
         for a, b in zip(w.line, w.line[1:]):
             assert abs(b[2] - a[2]) <= STAIR_MAX_GRADE * math.hypot(b[0] - a[0], b[1] - a[1]) \
                 + 0.01, w.id
-    bridges = [walks[i] for s in m.stations for i in s.access_ids
-               if i in walks and (walks[i].attrs or {}).get("lift_bridge")]
-    for w in bridges:
-        # (level at the platform's height, an elevator at its end)
-        assert w.line[0][2] == w.line[-1][2] > 0.0
-        end = tuple(w.line[-1][:2])
-        assert any(o.kind == "elevator" and tuple(o.line[0][:2]) == end for o in m.walkways)
 
     def fn(d):
         s = next(s for s in d["stations"] if s["kind"] == "elevated")
@@ -266,6 +257,100 @@ def test_station_stairs_at_a_stair_grade(lines):
         w["line"] = [[x, y, 19.0], [x + 5.0, y, 0.0]]
     rec = _rerun(_mutate(m, fn))["station_access"]
     assert not rec.passed and any("rises 19.0 m over 5.0 m" in f for f in rec.failures)
+
+
+def _station_vertical(m):
+    """Every stair and elevator walkway of an elevated or underground station."""
+    kinds = {s.id: s.kind for s in m.stations}
+    return [w for w in m.walkways if w.kind in ("stairs", "elevator") and
+            kinds.get((w.attrs or {}).get("station")) in ("elevated", "underground")]
+
+
+def test_station_stairs_are_flights_on_clear_ground(lines):
+    """Station stairs: every station stair is a stair structure of flights (each at most
+    FLIGHT_RISE_M at a stair's grade, a landing between two) in a footprint on clear ground,
+    its walkway along the flights; every elevator of an elevated or underground station in a
+    shaft; `station_stairs` passes, and fails a stair walkway made one straight run (no
+    buildable flight) and one whose stair stands in a road."""
+    from citygen.transit import FLIGHT_RISE_M, STAIR_MAX_GRADE
+
+    m = lines.model
+    structs = {s.id: s for s in m.structures}
+    ws = _station_vertical(m)
+    stairs = [w for w in ws if w.kind == "stairs"]
+    assert stairs and any(w.kind == "elevator" for w in ws)
+    kinds = {s.id: s.kind for s in m.stations}
+    assert {kinds[w.attrs["station"]] for w in stairs} == {"elevated", "underground"}
+    for w in ws:
+        r = structs[w.attrs["structure"]]
+        assert r.kind == ("stair" if w.kind == "stairs" else "elevator")
+        poly = G.from_model_poly(r.footprint).buffer(0.05)
+        assert all(poly.covers(shapely.Point(p[:2])) for p in w.line), w.id
+        if w.kind == "stairs":
+            rises = [abs(b[2] - a[2]) for a, b in zip(w.line, w.line[1:])]
+            assert max(rises) <= FLIGHT_RISE_M + 0.01
+            assert sum(1 for x in rises if x > 0.005) == r.attrs["flights"]
+            assert abs(w.line[0][2] - w.line[-1][2]) > 7.9      # (platform or concourse)
+            for a, b in zip(w.line, w.line[1:]):
+                assert abs(b[2] - a[2]) <= STAIR_MAX_GRADE * math.hypot(b[0] - a[0],
+                                                                         b[1] - a[1]) + 0.01
+    rec = {c.id: c for c in lines.checks}["station_stairs"]
+    assert rec.passed, rec.failures
+
+    def straight(d):
+        w = next(w for w in d["walkways"] if w["kind"] == "stairs" and
+                 (w.get("attrs") or {}).get("structure"))
+        a, b = w["line"][0], w["line"][-1]
+        w["line"] = [a, [a[0] + 60.0, a[1], b[2]]]
+    rec = _rerun(_mutate(m, straight))["station_stairs"]
+    assert not rec.passed and any("leaves its stair" in f for f in rec.failures)
+
+    def in_road(d):
+        w = next(w for w in d["walkways"] if w["kind"] == "stairs" and
+                 (w.get("attrs") or {}).get("structure"))
+        r = next(s for s in d["structures"] if s["id"] == w["attrs"]["structure"])
+        x0, y0 = w["line"][0][:2]
+        seg = min(d["road_segments"], key=lambda s: min(
+            math.hypot(p[0] - x0, p[1] - y0) for p in s["centerline"]))
+        pts = [p[:2] for p in w["line"]] + [p[:2] for p in seg["centerline"]]
+        xs, ys = [p[0] for p in pts], [p[1] for p in pts]
+        r["footprint"] = {"exterior": [[min(xs) - 1, min(ys) - 1], [max(xs) + 1, min(ys) - 1],
+                                       [max(xs) + 1, max(ys) + 1], [min(xs) - 1, max(ys) + 1]],
+                           "holes": []}
+    rec = _rerun(_mutate(m, in_road))["station_stairs"]
+    assert not rec.passed and any("stands on" in f for f in rec.failures)
+
+
+def test_station_stairs_and_elevators_in_the_blockout(lines):
+    """Station stairs: the blockout draws every station stair (a strip a flight wide along
+    each leg of its walkway, at its heights) and every station elevator's shaft, so each such
+    walkway has a drawn object under it, keyed by its structure."""
+    from citygen import blockout as BO
+
+    m = lines.model
+    plan = BO.make_plan(m)
+    objs = {o["name"]: o for o in plan["objects"]}
+    structs = {s.id: s for s in m.structures}
+    for w in _station_vertical(m):
+        o = objs[w.attrs["structure"]]
+        assert o["category"] == ("structure_stair" if w.kind == "stairs" else
+                                 "structure_elevator")
+        if w.kind == "elevator":
+            pr = o["parts"][0]
+            assert pr["k"] == "prism" and pr["z0"] <= min(p[2] for p in w.line) + 0.01
+            assert pr["z1"] >= max(p[2] for p in w.line)
+            continue
+        ribbons = [(tuple(pr["l"][0][2:]), tuple(pr["l"][-1][2:])) for pr in o["parts"]
+                   if pr["k"] == "ribbon"]
+        legs = [(a[2], b[2]) for a, b in zip(w.line, w.line[1:])
+                if math.hypot(b[0] - a[0], b[1] - a[1]) > 0.01]
+        assert len(ribbons) == len(legs), w.id
+        assert [(round(a[0], 2), round(b[0], 2)) for a, b in ribbons] == \
+            [(round(a, 2), round(b, 2)) for a, b in legs]
+        r = structs[w.attrs["structure"]]
+        if r.z0_m < -0.5:
+            # (a metro well: open in the ground)
+            assert any(pr["k"] == "prism" and pr["h"] for pr in o["parts"])
 
 
 def test_check_stops_fails(lines):
