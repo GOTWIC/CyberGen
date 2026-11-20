@@ -2205,8 +2205,14 @@ ROLL_VERSION = "1"           # of M_CgVehicleRoll (with VEHICLE_VERSION)
 ROLL_INDEX = 9               # after the nine paint floats (citygen.unreal_vehicles.PAINT_CPD)
 ROLL_SUFFIX = "_roll"        # a rolling wheel's slot (citygen.unreal_vehicles.ROLL_SUFFIX)
 MERGED_VERSION = "2"         # of what the importer makes of a merged car (with its hash; 2,
-                             # car_merge_followups: the far LODs' screen sizes, the body's
-                             # hulls for the parked cars)
+                             # car_merge_followups: the body's hulls for the parked cars)
+# car_merge_followups: M_CgVehicle draws a vertex whose UV1 height is under -0.5 flat (the
+# merged mesh's last LOD folds its glass and wheels into the body's section:
+# `unreal_vehicles.flat_of`): UV1 (gray, -1 - roughness), no paint, texture, flake, emission or
+# clear coat, a flat normal; every other vertex's UV1 height is 0 or more (none, a lightmap's,
+# a rolling wheel's middle), drawn as before
+FLAT_VERSION = "1"
+VEHICLE_FLAT_CODE = "float f = saturate(-C.y); return lerp(A, B, f);"
 VEHICLE_ROLL_WPO = """
 if (C.y < 0.5) { return float3(0, 0, 0); }
 float a = D / max(R, 1.0);
@@ -2244,7 +2250,7 @@ def vehicle_master(defaults, roll=False):
     height 0) stays as it is."""
     name = "M_CgVehicleRoll" if roll else "M_CgVehicle"
     tag, ver = (("cg.vehicle_roll", f"{VEHICLE_VERSION}.{ROLL_VERSION}") if roll
-                else ("cg.vehicle", VEHICLE_VERSION))
+                else ("cg.vehicle", f"{VEHICLE_VERSION}.f{FLAT_VERSION}"))
     path = f"{CORE}/{name}"
     m = unreal.load_asset(path) if EAL.does_asset_exist(path) else None
     if m is not None and meta(m, tag) == ver:
@@ -2297,11 +2303,30 @@ def vehicle_master(defaults, roll=False):
     link(sparam(m, "GlowNight", -1000, 2610, 2.0), "", emit, "GlowNight")
     link(night(m, -1000, 2690), "", emit, "Night")
     att = expr(m, unreal.MaterialExpressionMakeMaterialAttributes, -300, 300)
-    link(alb, "", att, "BaseColor")
-    link(tex["orm"], "G", att, "Roughness")
-    link(tex["orm"], "B", att, "Metallic")
-    link(tex["orm"], "R", att, "AmbientOcclusion")
-    link(tex["emissive"], "A", att, "Specular")
+    flat_uv = None if roll else expr(m, unreal.MaterialExpressionTextureCoordinate, -1300,
+                                     3300, coordinate_index=1)
+
+    def flat(src, out, code, ot, y):
+        """car_merge_followups: `src` as it is, or (UV1 height under -0.5) flat by `code`
+        (A the input, C UV1: see FLAT_VERSION); the roll master's UV1 is a wheel's middle."""
+        if roll:
+            return src, out
+        node = custom(m, -550, 3300 + 90 * y, code, ["A", "C"], cmot(ot), "CgVehicleFlat")
+        link(src, out, node, "A")
+        link(flat_uv, "", node, "C")
+        return node, ""
+
+    for (src, out), code, ot, inp, y in (
+            ((alb, ""), "return lerp(A, C.xxx, saturate(-C.y));", F3, "BaseColor", 0),
+            ((tex["orm"], "G"), "return lerp(A, saturate(-C.y - 1.0), saturate(-C.y));", F1,
+             "Roughness", 1),
+            ((tex["orm"], "B"), "return A * (1.0 - saturate(-C.y));", F1, "Metallic", 2),
+            ((tex["orm"], "R"), "return lerp(A, 1.0, saturate(-C.y));", F1, "AmbientOcclusion",
+             3),
+            ((tex["emissive"], "A"), "return lerp(A, 0.5, saturate(-C.y));", F1, "Specular",
+             4)):
+        n, o = flat(src, out, code, ot, y)
+        link(n, o, att, inp)
     if roll:
         S = unreal.MaterialVectorCoordTransformSource
         T = unreal.MaterialVectorCoordTransform
@@ -2338,9 +2363,12 @@ def vehicle_master(defaults, roll=False):
         link(n_w, "", att, "Normal")
         m.set_editor_property("tangent_space_normal", False)
     else:
-        link(flake, "", att, "Normal")
-    link(emit, "", att, "EmissiveColor")
-    link(tex["orm"], "A", att, "ClearCoat")
+        n, o = flat(flake, "", "return lerp(A, float3(0.0, 0.0, 1.0), saturate(-C.y));", F3, 5)
+        link(n, o, att, "Normal")
+    n, o = flat(emit, "", "return A * (1.0 - saturate(-C.y));", F3, 6)
+    link(n, o, att, "EmissiveColor")
+    n, o = flat(tex["orm"], "A", "return A * (1.0 - saturate(-C.y));", F1, 7)
+    link(n, o, att, "ClearCoat")
     link(sparam(m, "CoatRoughness", -1000, 2770, 0.06), "", att, "ClearCoatRoughness")
     m.set_editor_property("use_material_attributes", True)
     m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_CLEAR_COAT)
@@ -3417,11 +3445,11 @@ class Importer:
         dark glass, the brakes on the wheels' instance) and the rolling wheels on
         `MI_<car>_wheels_roll` (M_CgVehicleRoll, turned by the instance's travel); only the
         body's sections cast a shadow (the glass and wheels never did as parts); no lightmap
-        UVs (UV1 is the wheels' middles). car_merge_followups: the far LODs past the pack's
-        (without wheels, then without glass) at their own screen sizes, and the body's hulls
-        as its simple collision, for the parked cars, which place it too (the life
-        controller's components never collide). Made again only when its files, the masters
-        or this version change."""
+        UVs (UV1 is the wheels' middles). car_merge_followups: its last LOD one section, the
+        body's (the glass and wheels in it drawn flat by M_CgVehicle's `FLAT`, their UV1),
+        and the body's hulls as its simple collision, for the parked cars, which place it too
+        (the life controller's components never collide). Made again only when its files, the
+        masters or this version change."""
         mg = rec["merged"]
         st = self.stats["vehicles"]
         mst = st.setdefault("merged", {"made": 0, "kept": 0})
@@ -3460,9 +3488,7 @@ class Importer:
         sm = EAL.duplicate_asset(chain[0].get_path_name().split(".")[0], path)
         for k, lo in enumerate(chain[1:], 1):
             sms.set_lod_from_static_mesh(sm, k, lo, 0, True)
-        # (car_merge_followups: the far LODs' own, from `unreal_vehicles.merge_cars`)
-        sms.set_lod_screen_sizes(sm, [float(v) for v in mg.get("screen_sizes") or
-                                      [lo["screen_size"] for lo in rec["lods"]]])
+        sms.set_lod_screen_sizes(sm, [float(lo["screen_size"]) for lo in rec["lods"]])
         slots, names = [], []
         for sl in sm.get_editor_property("static_materials"):
             name = str(sl.material_slot_name).lower()

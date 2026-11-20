@@ -425,41 +425,25 @@ def check_summary(res: dict) -> str:
 # --- car_merge: each car's parts as one mesh, for the moving traffic -------------------------
 
 MERGE_VERSION = 2            # of the merged files (their bytes; 2, car_merge_followups: the
-                             # far LODs)
+                             # dark glass and the last LOD in the body's section)
 MERGE_DIR = "unreal/vehicles"  # under the build: <car>/lod<k>.glb
 MERGED_PART = "merged"         # the merged mesh's node and mesh name (SM_<car>_merged)
 ROLL_SUFFIX = "_roll"          # a rolling wheel's material: the pack's own, "_roll" added
 _NP = {5126: "<f4", 5125: "<u4", 5123: "<u2", 5121: "u1", 5122: "<i2", 5120: "i1"}
 _NORM = {5121: 255.0, 5123: 65535.0, 5120: 127.0, 5122: 32767.0}
 _ATTRS = ("POSITION", "NORMAL", "TEXCOORD_0")
-# car_merge_followups: past the pack's last LOD the merged mesh has two more, made of that LOD's
-# file without its small parts, so a merged car costs no more far off than its parts did (each
-# part its own component, culled at its own distance: LG5's TRAFFIC_CULL_M): from 150 m without
-# its wheels and brakes, from 300 m without its glass too (the body alone). A car with no
-# wheels (a hover car) has the second only.
-FAR_LODS = (("wheels", 150.0, ("wheel", "brake")), ("glass", 300.0, ("wheel", "brake", "glass")))
-# the engine's LOD screen size of a mesh at a distance: 2 K R / d, R its box's half diagonal
-# (what the GPU's per-instance LOD selection of an instanced mesh takes: FInstancedStaticMesh
-# SceneProxy::GetGpuLodInstanceRadius), K = max(P00, P11) / 2 of the view's projection: 16/9
-# / 2 for a 90 degree horizontal view at 16:9 (the walker's and the benchmark's 2560 x 1440)
-SCREEN_K = 0.5 * 16.0 / 9.0
-FAR_STEP = 0.8               # a far LOD's screen size at most this share of the LOD before it
-
-
-def screen_size(radius_m: float, dist_m: float) -> float:
-    """The engine's LOD screen size of a mesh whose box has `radius_m` as its half diagonal,
-    `dist_m` from a 90 degree view at 16:9."""
-    return 2.0 * SCREEN_K * radius_m / max(dist_m, 1e-3)
-
-
-def _radius(doc: dict) -> float:
-    """A merged file's box's half diagonal (m), from its positions' accessor bounds."""
-    lo, hi = [1e30] * 3, [-1e30] * 3
-    for prim in doc["meshes"][0]["primitives"]:
-        a = doc["accessors"][prim["attributes"]["POSITION"]]
-        lo = [min(x, y) for x, y in zip(lo, a["min"])]
-        hi = [max(x, y) for x, y in zip(hi, a["max"])]
-    return 0.5 * sum((b - a) ** 2 for a, b in zip(lo, hi)) ** 0.5
+# car_merge_followups: the merged mesh's last LOD (the pack's LOD3, from about 90 m) is one
+# section, the body's: every other part's primitives (the glass, dark and opaque there already,
+# folded from the pack's opaque_from_lod on; the wheels and brakes) join the body's group in a
+# flat color, their UV1 (gray, -1 - roughness)
+# (no rolling wheel's middle has a y under 0), which M_CgVehicle draws flat (`FLAT` in the
+# importer). Each section of every LOD is a draw in every pass of every view the component is
+# in (the traffic's components are the whole city's box, LG8): the glass and wheels sections
+# out to the body's 900 m were car_merge's added draws; two more LODs dropping them (this
+# milestone's first try) added more draws than they saved triangles.
+FLAT_TIRE = (0.03, 0.7)        # the wheels and brakes: gray, roughness
+FLAT_GLASS = 0.06              # the glass: its color's mean times this (M_CgVehicleGlassDark's)
+FLAT_GLASS_ROUGH = 0.05
 
 
 def _array(doc: dict, blob: bytes, k: int):
@@ -485,7 +469,7 @@ def rolls(p: dict) -> bool:
     return p.get("kind") == "wheel" and p.get("spins", True) is not False
 
 
-def merge_lod(path: Path, parts: list[dict]) -> bytes:
+def merge_lod(path: Path, parts: list[dict], flat: dict | None = None) -> bytes:
     """One LOD file of a pack as one mesh (node and mesh `MERGED_PART`): every part's
     primitives in the car's frame (in its node's own frame, as the importer takes a part, moved
     to its pivot, as the runtime places it: glTF's (x, y, z) is the car's (x, z, -y)), grouped
@@ -494,11 +478,21 @@ def merge_lod(path: Path, parts: list[dict]) -> bytes:
     POSITION, NORMAL, TEXCOORD_0 and TEXCOORD_1, the wheel's middle a rolling wheel's
     vertices turn about (Unreal's x and z in cm: glTF's x and y times 100; 0 on every other
     vertex). Tangents are left out (the importer has Unreal compute them, MikkTSpace, as it
-    does for the parts). The bytes are a function of the file and the parts alone."""
+    does for the parts). `flat` (car_merge_followups): {"into": the body's material, material:
+    [gray, roughness]}: a primitive of such a material (the glass, the wheels), a rolling
+    wheel's too, joins the body's group with UV1 (gray, -1 - roughness), drawn flat. The bytes
+    are a function of the file, the parts and `flat` alone."""
     import numpy as np
     doc, blob = _glb(path)
     names = {n.get("name"): k for k, n in enumerate(doc.get("nodes", [])) if "mesh" in n}
     groups: dict[str, dict] = {}
+    flat = flat or {}
+    own = {}                      # a node's first material
+    for k in names.values():
+        for q in doc["meshes"][doc["nodes"][k]["mesh"]]["primitives"]:
+            if "material" in q:
+                own[k] = doc["materials"][q["material"]]["name"]
+                break
     for p in parts:
         k = names.get(p["name"])
         if k is None:
@@ -517,10 +511,18 @@ def merge_lod(path: Path, parts: list[dict]) -> bytes:
             uv0 = _array(doc, blob, va["TEXCOORD_0"]) if "TEXCOORD_0" in va else np.zeros((n, 2))
             idx = (_array(doc, blob, prim["indices"]).reshape(-1) if "indices" in prim
                    else np.arange(n, dtype=np.int64))
-            uv1 = np.tile([mid[0], mid[1]] if roll else [0.0, 0.0], (n, 1))
+            # (a primitive with no material takes its part's: some packs' LOD3 bodies have a
+            # few such triangles, which made a section of their own)
             mat = doc["materials"][prim["material"]]["name"] if "material" in prim \
-                else p["name"]
-            g = groups.setdefault(mat + (ROLL_SUFFIX if roll else ""),
+                else own.get(k, p["name"])
+            if mat in flat and mat != flat.get("into"):
+                gray, rough = flat[mat]
+                uv1 = np.tile([float(gray), -1.0 - float(rough)], (n, 1))
+                key = flat["into"]
+            else:
+                uv1 = np.tile([mid[0], mid[1]] if roll else [0.0, 0.0], (n, 1))
+                key = mat + (ROLL_SUFFIX if roll else "")
+            g = groups.setdefault(key,
                                   {"POSITION": [], "NORMAL": [], "TEXCOORD_0": [],
                                    "TEXCOORD_1": [], "idx": [], "n": 0})
             g["idx"].append(idx + g["n"])
@@ -571,6 +573,34 @@ def merge_lod(path: Path, parts: list[dict]) -> bytes:
             + js + struct.pack("<I4s", len(data), b"BIN\x00") + bytes(data))
 
 
+def flat_of(path: Path, rec: dict) -> tuple[dict, set]:
+    """car_merge_followups: how the last LOD file `path` of car `rec` folds into one section:
+    {"into": the body part's material, <material>: [gray, roughness]} for every other material
+    of its parts (a glass part's at `FLAT_GLASS` of the pack's glass color, the rest at
+    `FLAT_TIRE`), and the glass parts' materials."""
+    doc, _ = _glb(path)
+    nodes = {n.get("name"): n for n in doc.get("nodes", []) if "mesh" in n}
+
+    def mats(p):
+        n = nodes.get(p["name"])
+        return [] if n is None else [doc["materials"][q["material"]]["name"]
+                                     for q in doc["meshes"][n["mesh"]]["primitives"]
+                                     if "material" in q]
+    body = next((m for p in rec["parts"] if p["kind"] == "body" for m in mats(p)), None)
+    if body is None:
+        return {}, set()
+    col = (rec.get("glass") or {}).get("color") or [0.3, 0.33, 0.36]
+    flat_glass = [round(FLAT_GLASS * sum(col) / len(col), 4), FLAT_GLASS_ROUGH]
+    out, glass = {"into": body}, set()
+    for p in rec["parts"]:
+        for m in mats(p):
+            if m != body and m not in out:
+                out[m] = flat_glass if p["kind"] == "glass" else list(FLAT_TIRE)
+                if p["kind"] == "glass":
+                    glass.add(m)
+    return dict(sorted(out.items())), glass
+
+
 def merge_cars(sec: dict | None, build: str | Path) -> dict:
     """car_merge: each car of the manifest's `vehicles` as one mesh a LOD for the moving
     traffic and the fliers (`merge_lod`), written to BUILD/`MERGE_DIR`/<car>/lod<k>.glb only
@@ -578,11 +608,10 @@ def merge_cars(sec: dict | None, build: str | Path) -> dict:
     build) with their sha256, the materials (the pack's slot names, a rolling wheel's with
     `ROLL_SUFFIX`), the radius the runtime rolls its wheels by (the first rolling wheel's,
     m; 0 for a car with none) and a hash (what the importer compares). The car's own hash is
-    left as it was. car_merge_followups: the files go on past the pack's LODs with `FAR_LODS`
-    (the last LOD's file less the parts each drops), `far` says which (lod, what it drops,
-    from how far), `screen_sizes` every LOD's (the pack's, then the far ones' from
-    `screen_size` at their distance, each at most `FAR_STEP` of the one before), `radius_m`
-    the box's half diagonal; the parked cars take the merged mesh too. {car: hash}."""
+    left as it was. car_merge_followups: the last LOD is one section and the glass joins the
+    body's from the pack's `opaque_from_lod` (`flat_of`, the record's `flat`: the body's
+    material and each folded material's gray and roughness); the parked cars take the merged
+    mesh too. {car: hash}."""
     out = {}
     if not sec:
         return out
@@ -590,22 +619,15 @@ def merge_cars(sec: dict | None, build: str | Path) -> dict:
     for car, rec in sorted(sec["cars"].items()):
         folder = Path(rec["dir"])
         files, shas, mats = [], [], []
-        jobs = [(lo["file"], rec["parts"]) for lo in rec["lods"]]
-        kinds = {p["kind"] for p in rec["parts"]}
-        far, cut = [], set()
-        for what, dist, drops in FAR_LODS:
-            if not kinds & (set(drops) - cut):
-                continue                  # (nothing more to drop: a hover car's wheels)
-            cut |= set(drops)
-            keep = [p for p in rec["parts"] if p["kind"] not in cut]
-            if not keep:
-                continue
-            far.append({"lod": len(jobs), "drops": what, "from_m": dist})
-            jobs.append((rec["lods"][-1]["file"], keep))
-        radius_m = 0.0
-        for k, (f, parts) in enumerate(jobs):
-            data = merge_lod(folder / f, parts)
-            rel = f"{MERGE_DIR}/{car}/lod{k}.glb"
+        flat, glass = flat_of(folder / rec["lods"][-1]["file"], rec)
+        opaque_from = int((rec.get("glass") or {}).get("opaque_from_lod", 99))
+        for k, lo in enumerate(rec["lods"]):
+            # (the glass from the LOD it is dark and opaque in, the rest in the last LOD)
+            last = k == len(rec["lods"]) - 1
+            sub = {m: v for m, v in flat.items()
+                   if m == "into" or last or (k >= opaque_from and m in glass)}
+            data = merge_lod(folder / lo["file"], rec["parts"], sub if len(sub) > 1 else None)
+            rel = f"{MERGE_DIR}/{car}/lod{lo['lod']}.glb"
             dest = build / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
             if not dest.is_file() or dest.read_bytes() != data:
@@ -615,16 +637,10 @@ def merge_cars(sec: dict | None, build: str | Path) -> dict:
             if not mats:
                 doc, _ = _glb(dest)
                 mats = [m["name"] for m in doc["materials"]]
-                radius_m = _radius(doc)
-        sizes = [float(lo["screen_size"]) for lo in rec["lods"]]
-        for fr in far:
-            sizes.append(round(min(screen_size(radius_m, fr["from_m"]), FAR_STEP * sizes[-1]),
-                               6))
         wheels = [p for p in rec["parts"] if rolls(p)]
         radius = float(wheels[0].get("radius") or wheels[0]["pivot"][2]) if wheels else 0.0
         m = {"files": files, "sha256": shas, "materials": mats, "roll_radius": round(radius, 4),
-             "part": MERGED_PART, "far": far, "screen_sizes": sizes,
-             "radius_m": round(radius_m, 4)}
+             "part": MERGED_PART, "flat": flat}
         m["hash"] = content_hash([MERGE_VERSION, m])
         rec["merged"] = m
         out[car] = m["hash"]
