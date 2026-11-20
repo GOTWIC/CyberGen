@@ -388,7 +388,9 @@ def _drive(g: dict, start: tuple[float, float], length_m: float) -> list:
     if best is None:
         return []
     _, cur, k = best
-    path = _line(g, cur)[k:]
+    # (from the point before the nearest where that is the lane's last: its last point alone
+    # has no heading, and the drive ended there; car_merge_followups, Delta's middle)
+    path = _line(g, cur)[min(k, max(0, len(_line(g, cur)) - 2)):]
     seen = {cur}
     while _length(path) < length_m and len(path) >= 2:
         hx, hy = path[-1][0] - path[-2][0], path[-1][1] - path[-2][1]

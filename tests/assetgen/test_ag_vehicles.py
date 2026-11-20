@@ -259,7 +259,17 @@ def test_exporter_and_scene(tmp_path):
     sc = SC.count(man)
     v = sc["city"]["vehicles"]
     assert v["vehicles"] == 3 and v["models"] == 2
-    # (the coupe: body, glass, two wheels; the hover car: body and glass)
+    # (car_merge_followups: the hover car one component of its merged mesh; the coupes, one of
+    # which steers, their parts: body, glass, two wheels)
+    assert v["components"] == 4 + 1 and v["instances"] == 2 * 4 + 1 and v["meshes"] == 5
+    for r in man["vehicles"]["placements"]:
+        for m in r["models"].values():
+            m["steer"] = [0.0] * len(m["steer"])
+    v = SC.count(man)["city"]["vehicles"]
+    assert v["components"] == 2 and v["instances"] == 3 and v["meshes"] == 2
+    for rec in man["vehicles"]["cars"].values():
+        rec.pop("merged")
+    v = SC.count(man)["city"]["vehicles"]
     assert v["components"] == 4 + 2 and v["instances"] == 2 * 4 + 2
     assert sc["city"]["actors"] == len(hashes)
     assert "vehicles" not in SC.count(before)["city"]

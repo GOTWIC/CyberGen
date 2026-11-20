@@ -19,7 +19,8 @@ Vehicles come into a city by **placement entries** in any stage 2 contribution
 primary, secondary and accent colors, linear, the pack's show colors where left out;
 `steer_deg` turns the wheels that steer). The importer makes one actor per entry
 (`BP_CityGenGroup`) with an instanced component per car model and part, its instances' paint
-in per-instance custom data, so a tile's parked cars of one model are one component per part.
+in per-instance custom data, so a tile's parked cars of one model are one component per part
+(car_merge_followups: one component, the car's merged mesh, `merge_cars`).
 
 `section` gives the manifest's `vehicles`: the cars the entries name (or, with `all_cars`, the
 library's every car) with each file's sha256, the parts and pivots, the materials' parameters,
@@ -423,13 +424,42 @@ def check_summary(res: dict) -> str:
 
 # --- car_merge: each car's parts as one mesh, for the moving traffic -------------------------
 
-MERGE_VERSION = 1            # of the merged files (their bytes)
+MERGE_VERSION = 2            # of the merged files (their bytes; 2, car_merge_followups: the
+                             # far LODs)
 MERGE_DIR = "unreal/vehicles"  # under the build: <car>/lod<k>.glb
 MERGED_PART = "merged"         # the merged mesh's node and mesh name (SM_<car>_merged)
 ROLL_SUFFIX = "_roll"          # a rolling wheel's material: the pack's own, "_roll" added
 _NP = {5126: "<f4", 5125: "<u4", 5123: "<u2", 5121: "u1", 5122: "<i2", 5120: "i1"}
 _NORM = {5121: 255.0, 5123: 65535.0, 5120: 127.0, 5122: 32767.0}
 _ATTRS = ("POSITION", "NORMAL", "TEXCOORD_0")
+# car_merge_followups: past the pack's last LOD the merged mesh has two more, made of that LOD's
+# file without its small parts, so a merged car costs no more far off than its parts did (each
+# part its own component, culled at its own distance: LG5's TRAFFIC_CULL_M): from 150 m without
+# its wheels and brakes, from 300 m without its glass too (the body alone). A car with no
+# wheels (a hover car) has the second only.
+FAR_LODS = (("wheels", 150.0, ("wheel", "brake")), ("glass", 300.0, ("wheel", "brake", "glass")))
+# the engine's LOD screen size of a mesh at a distance: 2 K R / d, R its box's half diagonal
+# (what the GPU's per-instance LOD selection of an instanced mesh takes: FInstancedStaticMesh
+# SceneProxy::GetGpuLodInstanceRadius), K = max(P00, P11) / 2 of the view's projection: 16/9
+# / 2 for a 90 degree horizontal view at 16:9 (the walker's and the benchmark's 2560 x 1440)
+SCREEN_K = 0.5 * 16.0 / 9.0
+FAR_STEP = 0.8               # a far LOD's screen size at most this share of the LOD before it
+
+
+def screen_size(radius_m: float, dist_m: float) -> float:
+    """The engine's LOD screen size of a mesh whose box has `radius_m` as its half diagonal,
+    `dist_m` from a 90 degree view at 16:9."""
+    return 2.0 * SCREEN_K * radius_m / max(dist_m, 1e-3)
+
+
+def _radius(doc: dict) -> float:
+    """A merged file's box's half diagonal (m), from its positions' accessor bounds."""
+    lo, hi = [1e30] * 3, [-1e30] * 3
+    for prim in doc["meshes"][0]["primitives"]:
+        a = doc["accessors"][prim["attributes"]["POSITION"]]
+        lo = [min(x, y) for x, y in zip(lo, a["min"])]
+        hi = [max(x, y) for x, y in zip(hi, a["max"])]
+    return 0.5 * sum((b - a) ** 2 for a, b in zip(lo, hi)) ** 0.5
 
 
 def _array(doc: dict, blob: bytes, k: int):
@@ -548,7 +578,11 @@ def merge_cars(sec: dict | None, build: str | Path) -> dict:
     build) with their sha256, the materials (the pack's slot names, a rolling wheel's with
     `ROLL_SUFFIX`), the radius the runtime rolls its wheels by (the first rolling wheel's,
     m; 0 for a car with none) and a hash (what the importer compares). The car's own hash is
-    left as it was: the parked cars keep their parts. {car: hash}."""
+    left as it was. car_merge_followups: the files go on past the pack's LODs with `FAR_LODS`
+    (the last LOD's file less the parts each drops), `far` says which (lod, what it drops,
+    from how far), `screen_sizes` every LOD's (the pack's, then the far ones' from
+    `screen_size` at their distance, each at most `FAR_STEP` of the one before), `radius_m`
+    the box's half diagonal; the parked cars take the merged mesh too. {car: hash}."""
     out = {}
     if not sec:
         return out
@@ -556,9 +590,22 @@ def merge_cars(sec: dict | None, build: str | Path) -> dict:
     for car, rec in sorted(sec["cars"].items()):
         folder = Path(rec["dir"])
         files, shas, mats = [], [], []
-        for lo in rec["lods"]:
-            data = merge_lod(folder / lo["file"], rec["parts"])
-            rel = f"{MERGE_DIR}/{car}/lod{lo['lod']}.glb"
+        jobs = [(lo["file"], rec["parts"]) for lo in rec["lods"]]
+        kinds = {p["kind"] for p in rec["parts"]}
+        far, cut = [], set()
+        for what, dist, drops in FAR_LODS:
+            if not kinds & (set(drops) - cut):
+                continue                  # (nothing more to drop: a hover car's wheels)
+            cut |= set(drops)
+            keep = [p for p in rec["parts"] if p["kind"] not in cut]
+            if not keep:
+                continue
+            far.append({"lod": len(jobs), "drops": what, "from_m": dist})
+            jobs.append((rec["lods"][-1]["file"], keep))
+        radius_m = 0.0
+        for k, (f, parts) in enumerate(jobs):
+            data = merge_lod(folder / f, parts)
+            rel = f"{MERGE_DIR}/{car}/lod{k}.glb"
             dest = build / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
             if not dest.is_file() or dest.read_bytes() != data:
@@ -568,10 +615,16 @@ def merge_cars(sec: dict | None, build: str | Path) -> dict:
             if not mats:
                 doc, _ = _glb(dest)
                 mats = [m["name"] for m in doc["materials"]]
+                radius_m = _radius(doc)
+        sizes = [float(lo["screen_size"]) for lo in rec["lods"]]
+        for fr in far:
+            sizes.append(round(min(screen_size(radius_m, fr["from_m"]), FAR_STEP * sizes[-1]),
+                               6))
         wheels = [p for p in rec["parts"] if rolls(p)]
         radius = float(wheels[0].get("radius") or wheels[0]["pivot"][2]) if wheels else 0.0
         m = {"files": files, "sha256": shas, "materials": mats, "roll_radius": round(radius, 4),
-             "part": MERGED_PART}
+             "part": MERGED_PART, "far": far, "screen_sizes": sizes,
+             "radius_m": round(radius_m, 4)}
         m["hash"] = content_hash([MERGE_VERSION, m])
         rec["merged"] = m
         out[car] = m["hash"]

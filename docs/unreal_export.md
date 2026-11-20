@@ -3365,6 +3365,30 @@ mesh for the traffic and the fliers; the parked cars keep their parts.
 
 Results: `docs/progress/car_merge/README.md`.
 
+### The car merge's follow-ups (car_merge_followups)
+
+- **Far LODs** (`unreal_vehicles.FAR_LODS`, `MERGE_VERSION` 2): the merged mesh goes on past
+  the pack's four LODs with the last LOD's file less its wheels and brakes (from 150 m) and
+  less its glass too (from 300 m; a hover car this one alone), the distances the parts were
+  culled at before the merge. Their screen sizes (`screen_size`: 2 K R / d, R the merged
+  box's half diagonal, which the GPU's per-instance LOD selection of an instanced mesh takes,
+  K 16/9 / 2 for a 90 degree view at 16:9; each at most `FAR_STEP` 0.8 of the LOD before) in
+  the record's `screen_sizes`, `far` and `radius_m`. The importer (`MERGED_VERSION` 2) sets
+  them, the dark glass on the far LODs' glass too.
+- **Parked cars from the merged mesh** (`Importer.parked_parts`, `still_wheels`,
+  `VEHICLE_ACTOR_VERSION` 4): a placement's cars of one model are one instanced component of
+  `SM_<car>_merged` (kind body: it collides by the body's hulls, which the merged mesh now
+  carries, culled at the body's 450 m), its rolling wheels' slot overridden with the plain
+  `MI_<car>_wheels` (no world position offset: they stand still); a model one of whose cars
+  steers keeps its parts (a steered wheel needs its own; Delta's parked cars steer none). The
+  component is tagged `cg.part=merged`; `check_vehicles` and AG16's scene count
+  (`assetgen/scene.py`) take it. Delta: 4,288 parked car components to 661.
+- **The lean route's drive** (`bench._drive`): a drive whose nearest lane point is its
+  lane's last starts from the point before it (Delta's middle: the drive had one point and
+  the route none).
+
+Results: `docs/progress/car_merge_followups/README.md`.
+
 ## Milestones and checks
 
 - **Every milestone** updates the exporter in its own PR for what it adds or changes (a new
@@ -3449,3 +3473,4 @@ Results: `docs/progress/car_merge/README.md`.
 | Slots on their surface (delta_rebuild) | "Slots on their surface" above: the plan seats every ground level slot's points on the drawn surface and says so (`seated`); `unreal_life.pack_places` packs `slot_seated` (`PACK_VERSION` 10), `import_city.places_props` sets `SlotSeated` (`LIFE_VERSION` life12); the controller stands a seated slot's people at its points' own z. A plan without `seated` runs as before. | Delta (rebuilt on main) imported into CityAG16 and checked, with shots of curved roads by day and night (`docs/progress/delta_rebuild/`) |
 | People on their surfaces (people_surfaces) | "People on their surfaces" above: `exports.graphs` drapes the walkways on the pavement map's surface (`walksurf.drape`, `walk_surface` 1) and `flat_graphs` takes those lines over stage 2's; the life plugin's `UCgPersonAnim` (a near body's clips crossfaded, `ClipBlendS`, `SitBlendS`, `CityGenLife.Blend`), its leader ticking after the controller; `MakeSitFrames`' `SitSeatedS`, `SitRiseS` for the mid and far looks. No pack or importer version moves; a graphs.json from before exports as it did. | Delta's graphs and life plan made again, imported into CityAG16, checked with shots of people over a road's hump and sitters rising, benchmarked and packaged (`docs/progress/people_surfaces/`) |
 | Cars as one mesh (car_merge) | "Cars as one mesh" above: `unreal_vehicles.merge_cars`, `merge_lod` (`BUILD/unreal/vehicles/<car>/lod<k>.glb`), `Importer.merged_car` and `M_CgVehicleRoll` (`MERGED_VERSION` 1, `ROLL_VERSION` 1), `unreal_life.traffic_cars` and `_hover_parts` taking the merged mesh (`PACK_VERSION` 12), `import_city.traffic_props`' `car_part_roll` (`LIFE_VERSION` life14), the runtime's `CarPartRoll`. A vehicles section without `merged` exports and runs as before. | Delta imported into CityAG16, checked with shots of traffic by day and night, measured at fixed views, benchmarked and packaged (`docs/progress/car_merge/`) |
+| The car merge's follow-ups (car_merge_followups) | "The car merge's follow-ups" above: the merged mesh's far LODs (`FAR_LODS`, `MERGE_VERSION` 2, `MERGED_VERSION` 2), its body's hulls, the parked cars on it (`parked_parts`, `still_wheels`, `VEHICLE_ACTOR_VERSION` 4), the lean route's drive. | Delta imported into CityAG16, checked, measured at fixed views, benchmarked and packaged (`docs/progress/car_merge_followups/`) |

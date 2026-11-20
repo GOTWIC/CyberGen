@@ -2151,8 +2151,9 @@ def stage2_master(master, defaults=None):
 
 VEHICLE_VERSION = "10"       # of the vehicle masters (`cg.vehicle` metadata; 8 to 10: the glass)
 VEHICLE_MESH_VERSION = "3"   # of what the importer makes of a car (with its manifest hash)
-VEHICLE_ACTOR_VERSION = "3"  # of the placement actors (2: the glass casts no shadow;
-                             # 3, AT4: cull distances by part, the wheels cast no shadow)
+VEHICLE_ACTOR_VERSION = "4"  # of the placement actors (2: the glass casts no shadow;
+                             # 3, AT4: cull distances by part, the wheels cast no shadow; 4,
+                             # car_merge_followups: a car's merged mesh, one component a model)
 VEHICLE_CULL_M = {"body": 450.0, "glass": 250.0, "wheel": 120.0, "brake": 80.0,
                   "other": 150.0}
 # the paint per placement: Custom Primitive Data, or per-instance custom data on an
@@ -2203,7 +2204,9 @@ return E.rgb * (Strength / 15.0) * lerp(GlowDay, GlowNight, Night);
 ROLL_VERSION = "1"           # of M_CgVehicleRoll (with VEHICLE_VERSION)
 ROLL_INDEX = 9               # after the nine paint floats (citygen.unreal_vehicles.PAINT_CPD)
 ROLL_SUFFIX = "_roll"        # a rolling wheel's slot (citygen.unreal_vehicles.ROLL_SUFFIX)
-MERGED_VERSION = "1"         # of what the importer makes of a merged car (with its hash)
+MERGED_VERSION = "2"         # of what the importer makes of a merged car (with its hash; 2,
+                             # car_merge_followups: the far LODs' screen sizes, the body's
+                             # hulls for the parked cars)
 VEHICLE_ROLL_WPO = """
 if (C.y < 0.5) { return float3(0, 0, 0); }
 float a = D / max(R, 1.0);
@@ -3413,10 +3416,12 @@ class Importer:
         Its sections by the pack's materials (the body, the glass, from opaque_from_lod the
         dark glass, the brakes on the wheels' instance) and the rolling wheels on
         `MI_<car>_wheels_roll` (M_CgVehicleRoll, turned by the instance's travel); only the
-        body's sections cast a shadow (the glass and wheels never did as parts); no
-        collision (the life controller's cars have none) and no lightmap UVs (UV1 is the
-        wheels' middles). Made again only when its files, the masters or this version
-        change."""
+        body's sections cast a shadow (the glass and wheels never did as parts); no lightmap
+        UVs (UV1 is the wheels' middles). car_merge_followups: the far LODs past the pack's
+        (without wheels, then without glass) at their own screen sizes, and the body's hulls
+        as its simple collision, for the parked cars, which place it too (the life
+        controller's components never collide). Made again only when its files, the masters
+        or this version change."""
         mg = rec["merged"]
         st = self.stats["vehicles"]
         mst = st.setdefault("merged", {"made": 0, "kept": 0})
@@ -3455,7 +3460,9 @@ class Importer:
         sm = EAL.duplicate_asset(chain[0].get_path_name().split(".")[0], path)
         for k, lo in enumerate(chain[1:], 1):
             sms.set_lod_from_static_mesh(sm, k, lo, 0, True)
-        sms.set_lod_screen_sizes(sm, [float(lo["screen_size"]) for lo in rec["lods"]])
+        # (car_merge_followups: the far LODs' own, from `unreal_vehicles.merge_cars`)
+        sms.set_lod_screen_sizes(sm, [float(v) for v in mg.get("screen_sizes") or
+                                      [lo["screen_size"] for lo in rec["lods"]]])
         slots, names = [], []
         for sl in sm.get_editor_property("static_materials"):
             name = str(sl.material_slot_name).lower()
@@ -3472,7 +3479,10 @@ class Importer:
             sm.add_material(mats["pack_glass_dark"])
             dark = len(sm.get_editor_property("static_materials")) - 1
             names.append("pack_glass_dark")
-        for k in range(len(rec["lods"])):
+        nlod = sms.get_lod_count(sm)
+        if nlod != len(mg["files"]):
+            raise RuntimeError(f"{car}: merged mesh has {nlod} LODs, {len(mg['files'])} files")
+        for k in range(nlod):
             bset = sms.get_lod_build_settings(sm, k)
             if bset.get_editor_property("generate_lightmap_u_vs"):
                 bset.set_editor_property("generate_lightmap_u_vs", False)
@@ -3485,6 +3495,9 @@ class Importer:
                 sms.enable_section_cast_shadow(sm, name == "pack_body", k, sec)
                 sms.enable_section_collision(sm, False, k, sec)
         sms.remove_collisions(sm)
+        # (car_merge_followups: the body's hulls, as its part's, for the parked cars; the
+        # life controller's components never collide)
+        st["hulls"] += self.car_hulls(sm, rec.get("hulls") or [])
         bs = sm.get_editor_property("body_setup")
         if bs is not None:
             bs.set_editor_property("collision_trace_flag",
@@ -3492,6 +3505,8 @@ class Importer:
         uvs = sms.get_num_uv_channels(sm, 0)
         if uvs < 2:
             raise RuntimeError(f"{car}: merged mesh has {uvs} UV channels (UV1 is the wheels')")
+        # (made again: the parked cars' actors placing it point at the new object)
+        getattr(self, "veh_made", set()).add(car)
         EAL.set_metadata_tag(sm, HASH_TAG, h)
         for k, v in (("cg.car", car), ("cg.part", mg["part"]), ("cg.kind", "merged")):
             EAL.set_metadata_tag(sm, k, v)
@@ -3737,6 +3752,30 @@ class Importer:
         delete_assets(EAL.list_assets(src, recursive=True))
         return got
 
+    def still_wheels(self, comp, sm, rec):
+        """A parked merged car's component: its rolling wheels' slot drawn with the car's
+        plain wheels instance (M_CgVehicle), so they stand still with no offset evaluated."""
+        path = f"{rec['folder']}/Materials/MI_{rec['car']}_wheels"
+        if not EAL.does_asset_exist(path):
+            return
+        mi = unreal.load_asset(path)
+        for k, sl in enumerate(sm.get_editor_property("static_materials")):
+            if str(sl.material_slot_name).lower().endswith(ROLL_SUFFIX):
+                comp.set_material(k, mi)
+
+    def parked_parts(self, rec, m):
+        """car_merge_followups: the parts a placement's cars of one model are drawn with: its
+        merged mesh alone (`merged` true, at the car's own frame, kind `body`: it collides by
+        the body's hulls and is drawn as far as a body, its far LODs dropping the wheels and
+        the glass) where the importer made one and no car of them steers (a steered wheel
+        needs its own part: Delta's parked cars steer none), else the pack's parts."""
+        mg = rec.get("merged")
+        if mg and (rec["car"], mg["part"]) in self.veh_meshes and \
+                not any(abs(s) > 1e-6 for s in m["steer"]):
+            return [{"name": mg["part"], "kind": "body", "pivot": [0.0, 0.0, 0.0],
+                     "merged": True}]
+        return rec["parts"]
+
     def vehicle_actors(self, have):
         """A BP_CityGenGroup actor per placement entry at its pivot: per car model and part
         an instanced component (hierarchical: the meshes are not Nanite) of the car's mesh,
@@ -3744,7 +3783,8 @@ class Importer:
         wheel turned by the vehicle's steer angle), each instance's paint in its per-instance
         custom data (nine floats: Paint1 to 3), tagged `cg.member`, `cg.key=<entry>.<car>.
         <part>`, `cg.vehicle=`, `cg.part=` and `cg.id=` per vehicle in instance order; the
-        body collides (its hulls), the rest not."""
+        body collides (its hulls), the rest not. car_merge_followups: a car with a merged
+        mesh is one part, that mesh (`parked_parts`), its wheels standing still."""
         veh = self.man.get("vehicles")
         if not veh:
             return
@@ -3768,7 +3808,7 @@ class Importer:
                 ids = []
                 for car, m in sorted(r["models"].items()):
                     ids += m["ids"]
-                    for p in cars[car]["parts"]:
+                    for p in self.parked_parts(cars[car], m):
                         sm = self.veh_meshes[(car, p["name"])]
                         hd, why = sds.add_new_subobject(unreal.AddNewSubobjectParams(
                             parent_handle=root,
@@ -3789,6 +3829,10 @@ class Importer:
                                 comp.set_custom_data_value(i, j, float(v), False)
                         comp.set_collision_profile_name("BlockAll" if p["kind"] == "body"
                                                         else "NoCollision")
+                        if p.get("merged"):
+                            # (a parked car's wheels stand still: the plain wheels' instance
+                            # on the rolling wheels' slot, no world position offset to run)
+                            self.still_wheels(comp, sm, cars[car])
                         if p["kind"] == "glass":
                             # (the packs' glass is thick, an outer and an inner sheet a few
                             # mm apart: cast into the shadow maps, each sheet shadowed the

@@ -124,6 +124,25 @@ def check_meshes(man):
                 if p["kind"] == "wheel" and (abs(mid[0]) > 0.02 or abs(mid[2]) > 0.02):
                     bad.append(f"{car}.{p['name']}: mesh middle {r['mid_m']} off its pivot")
             row[p["name"]] = r
+        mg = rec.get("merged")
+        if mg:
+            # (car_merge_followups: the merged mesh, its far LODs and the body's hulls)
+            sm = unreal.load_asset(f"{rec['folder']}/SM_{car}_{mg['part']}")
+            if sm is None:
+                bad.append(f"{car}.{mg['part']}: no mesh")
+            else:
+                n = sms.get_lod_count(sm)
+                r = {"lods": n, "triangles": [sm.get_num_triangles(k) for k in range(n)],
+                     "sections": [sm.get_num_sections(k) for k in range(n)],
+                     "hulls": sms.get_convex_collision_count(sm)}
+                if n != len(mg["files"]):
+                    bad.append(f"{car}.{mg['part']}: {n} LODs, {len(mg['files'])} files")
+                if r["hulls"] != len(rec.get("hulls") or []):
+                    bad.append(f"{car}.{mg['part']}: {r['hulls']} hulls")
+                if any(r["triangles"][k] > r["triangles"][k - 1] for k in range(1, n)):
+                    bad.append(f"{car}.{mg['part']}: a LOD with more triangles than the one "
+                               f"before ({r['triangles']})")
+                row[mg["part"]] = r
         out[car] = row
     RES["checks"]["meshes"] = {"ok": not bad, "bad": bad[:40], "cars": out}
     log(f"meshes: {len(bad)} faults")
@@ -145,6 +164,19 @@ def components(a):
     return out
 
 
+BODY_PARTS = ("body", "merged")     # the parts a trace onto a parked car may hit
+
+
+def placed_parts(rec, m):
+    """The parts a placement's cars of one model are drawn with, as the importer places them
+    (`Importer.parked_parts`, car_merge_followups): the merged mesh alone where the car has
+    one and none of them steers, else the pack's parts."""
+    mg = rec.get("merged")
+    if mg and not any(abs(s) > 1e-6 for s in m["steer"]):
+        return [{"name": mg["part"], "kind": "body", "pivot": [0.0, 0.0, 0.0]}]
+    return rec["parts"]
+
+
 def check_placements(man, actors):
     bad, n = [], 0
     cars = man["vehicles"]["cars"]
@@ -155,7 +187,7 @@ def check_placements(man, actors):
             continue
         comps = components(a)
         for car, m in r["models"].items():
-            for p in cars[car]["parts"]:
+            for p in placed_parts(cars[car], m):
                 c = comps.get((car, p["name"]))
                 if c is None:
                     bad.append(f"{r['key']}: no component {car}.{p['name']}")
@@ -202,7 +234,7 @@ def check_collision(world, man, actors):
                         down += 1
                         if h and h["actor"] == a:
                             part = tag(h["comp"], "cg.part", True) if h["comp"] else ""
-                            if part == "body":
+                            if part in BODY_PARTS:
                                 hit_down += 1
                             else:
                                 wrong += 1
@@ -215,7 +247,7 @@ def check_collision(world, man, actors):
                         h = trace(world, ue(*a0), ue(*a1))
                         side += 1
                         if h and h["actor"] == a and \
-                                tag(h["comp"], "cg.part", True) == "body":
+                                tag(h["comp"], "cg.part", True) in BODY_PARTS:
                             hit_side += 1
                 row = rows.setdefault(car, {"down": 0, "hit_down": 0, "side": 0,
                                             "hit_side": 0, "other_part": 0})

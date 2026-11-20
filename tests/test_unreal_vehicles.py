@@ -350,7 +350,7 @@ def test_merged_cars(lib, tmp_path):
     coupe, hover = man["vehicles"]["cars"]["test_coupe"], man["vehicles"]["cars"]["test_hover"]
     assert coupe["hash"] == UV.read_pack(lib / "test_coupe")["hash"]
     mg = coupe["merged"]
-    assert mg["files"] == [f"unreal/vehicles/test_coupe/lod{k}.glb" for k in range(4)]
+    assert mg["files"] == [f"unreal/vehicles/test_coupe/lod{k}.glb" for k in range(6)]
     assert mg["part"] == "merged" and mg["roll_radius"] == 0.3
     assert hover["merged"]["roll_radius"] == 0.0
     assert not any(m.endswith("_roll") for m in hover["merged"]["materials"])
@@ -379,6 +379,40 @@ def test_merged_cars(lib, tmp_path):
     assert again["vehicles"]["cars"]["test_coupe"]["merged"] == mg
     assert (b / mg["files"][0]).stat().st_mtime_ns == stamp
     assert U.actor_hashes(again) == U.actor_hashes(man)
+
+
+def test_merged_far_lods(lib, tmp_path):
+    """car_merge_followups: past the pack's four LODs the merged mesh has the last LOD
+    without its wheels (from 150 m), then without its glass too (from 300 m; a hover car this
+    one alone), at the screen sizes of those distances for the mesh's box, each smaller than
+    the one before."""
+    b = _build(tmp_path)
+    _place(b, [copy.deepcopy(ENTRY)])
+    man = _man(b, lib)
+    coupe, hover = man["vehicles"]["cars"]["test_coupe"], man["vehicles"]["cars"]["test_hover"]
+    mg = coupe["merged"]
+    assert mg["far"] == [{"lod": 4, "drops": "wheels", "from_m": 150.0},
+                         {"lod": 5, "drops": "glass", "from_m": 300.0}]
+    assert hover["merged"]["far"] == [{"lod": 4, "drops": "glass", "from_m": 300.0}]
+    assert len(hover["merged"]["files"]) == 5
+    mats, verts = [], []
+    for rel in mg["files"]:
+        doc, _ = UV._glb(b / rel)
+        mats.append([m["name"] for m in doc["materials"]])
+        verts.append(sum(doc["accessors"][p["attributes"]["POSITION"]]["count"]
+                         for p in doc["meshes"][0]["primitives"]))
+    # (the test packs' parts are boxes alike on one material: body, glass, two wheels, then
+    # body and glass, then the body)
+    assert mats[3] == mg["materials"] and any(m.endswith("_roll") for m in mats[3])
+    assert not any(m.endswith("_roll") for m in mats[4])
+    assert verts[4] == verts[3] // 2 and verts[5] == verts[3] // 4
+    s = mg["screen_sizes"]
+    assert s[:4] == list(UV.SCREEN_SIZES)
+    # (the coupe's box, about 4 x 1.8 x 1.7 m)
+    r = mg["radius_m"]
+    assert r == round(UV._radius(UV._glb(b / mg["files"][0])[0]), 4) and 2.2 < r < 2.45
+    assert abs(s[4] - UV.screen_size(r, 150.0)) < 1e-5 and abs(s[5] - UV.screen_size(r, 300.0)) < 1e-5
+    assert all(a > b for a, b in zip(s, s[1:]))
 
 
 def test_traffic_and_fliers_take_the_merged_mesh(lib, tmp_path):
