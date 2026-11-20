@@ -321,6 +321,91 @@ def test_station_stairs_are_flights_on_clear_ground(lines):
     assert not rec.passed and any("stands on" in f for f in rec.failures)
 
 
+def test_station_shafts_stand_on_clear_ground(lines):
+    """Station shafts: no station's stair or elevator shaft stands in a road, crosswalk,
+    junction or on a face of the pavement map (#252 left shafts straight down from an end
+    with no clear ground near, `attrs.clear` false; now a stair or shaft farther off, or an
+    entrance cut into a building's ground floor); the check fails a shaft moved into the
+    street."""
+    from citygen import pavement_checks as PVC
+
+    m = lines.model
+    kinds = {s.id: s.kind for s in m.stations}
+    parts = [s for s in m.structures if s.kind in ("stair", "elevator") and
+             kinds.get((s.attrs or {}).get("station")) in ("elevated", "underground")]
+    assert any(s.kind == "elevator" for s in parts)
+    faces = [p for _, p in PVC.face_polygons(m)]
+    assert faces
+    tree = shapely.STRtree(faces)
+    for s in parts:
+        assert (s.attrs or {}).get("clear") is not False, s.id
+        fp = G.from_model_poly(s.footprint)
+        assert all(G.area(G.inter(fp, faces[i])) <= 0.01
+                   for i in tree.query(fp, predicate="intersects").tolist()), s.id
+
+    def in_road(d):
+        st = {x["id"]: x["kind"] for x in d["stations"]}
+        r = next(s for s in d["structures"] if s["kind"] == "elevator" and
+                 st.get((s.get("attrs") or {}).get("station")) in ("elevated", "underground"))
+        seg = max(d["road_segments"], key=lambda s: (s["width_m"], s["id"]))
+        a, b = seg["centerline"][0], seg["centerline"][1]
+        x, y = (a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0
+        h = 1.6
+        r["footprint"] = {"exterior": [[x - h, y - h], [x + h, y - h], [x + h, y + h],
+                                       [x - h, y + h]], "holes": []}
+        r["line"] = [[x, y, p[2]] for p in r["line"]]
+        for w in d["walkways"]:
+            if (w.get("attrs") or {}).get("structure") == r["id"]:
+                w["line"] = [[x, y, p[2]] for p in w["line"]]
+    rec = _rerun(_mutate(m, in_road))["station_stairs"]
+    assert not rec.passed and any("shaft" in f and "stands on" in f for f in rec.failures)
+
+
+def test_stair_plan_fits_the_ground_it_lands_on():
+    """Station shafts: a stair planned for one rise keeps its flights and footprint for the
+    rise the ground where it landed gives (M13), and refuses one its flights cannot take."""
+    from citygen.transit import FLIGHT_RISE_M, STAIR_MAX_GRADE, stair_plan
+
+    n, h, run, L, W, pts = stair_plan(19.0, 0.0)
+    got = stair_plan(19.0, -0.6, fit=(n, run))
+    assert got is not None
+    n2, h2, run2, L2, W2, pts2 = got
+    assert (n2, run2, L2, W2) == (n, run, L, W)
+    assert [p[:2] for p in pts2] == [p[:2] for p in pts]
+    assert pts2[0][2] == 19.0 and pts2[-1][2] == -0.6
+    assert h2 <= FLIGHT_RISE_M and h2 <= STAIR_MAX_GRADE * run
+    assert stair_plan(19.0, -6.0, fit=(n, run)) is None
+
+
+def test_metro_wells_open_the_terrain_grid():
+    """Station shafts: on a terrain city the ground's heightfield leaves every cell a metro
+    well reaches open and drapes the rest of those cells round the well, so the ground opens
+    exactly over it (`blockout._well_cells`)."""
+    import numpy as np
+    from shapely.geometry import box
+
+    from citygen import blockout as BO
+    from citygen.terrain import Field
+
+    fin = Field(0.0, 0.0, 4.0, np.fromfunction(lambda j, i: 0.1 * i + 0.05 * j, (11, 11)))
+    well = box(9.3, 10.1, 17.6, 14.4)
+    nx = ny = 11
+    skip, rim = BO._well_cells(fin, well, 0, nx - 1, 0, ny - 1, nx, [3])
+    assert 3 in skip and skip == sorted(skip)
+    cells = [k for k in skip if k != 3]
+    covered = G.union([box((k % (nx - 1)) * 4.0, (k // (nx - 1)) * 4.0,
+                           (k % (nx - 1)) * 4.0 + 4.0, (k // (nx - 1)) * 4.0 + 4.0)
+                       for k in cells])
+    assert covered.covers(well)
+    drape = G.union([shapely.Polygon([p[:2] for p in r["r"]], [[q[:2] for q in h]
+                                                               for h in r["h"]])
+                     for r in rim])
+    assert abs(G.area(drape) + G.area(well) - G.area(covered)) < 0.05
+    assert G.area(G.inter(drape, well)) < 0.01
+    for r in rim:
+        assert all(abs(p[2] - fin.at(p[0], p[1])) < 0.006 for p in r["r"])
+
+
 def test_station_stairs_and_elevators_in_the_blockout(lines):
     """Station stairs: the blockout draws every station stair (a strip a flight wide along
     each leg of its walkway, at its heights) and every station elevator's shaft, so each such
@@ -1025,8 +1110,11 @@ def test_check_supports_fails_long_span(lines):
         hi = 150.0 + TR.MAIN_SPAN_M[t["mode"]]
         gone = {s["id"] for s in d["structures"] if s["attrs"].get("line_id") == t["id"] and
                 100.0 < s["attrs"].get("s_m", -1.0) < hi}
+        # (a support's `frame` names its portal frame; a station stair's is its placement,
+        # [x, y, ux, uy], since the station stairs)
         d["structures"] = [s for s in d["structures"] if s["id"] not in gone and
-                           s["attrs"].get("frame") not in gone]
+                           not (isinstance(s["attrs"].get("frame"), str) and
+                                s["attrs"]["frame"] in gone)]
     c = _rerun(_mutate(lines.model, fn))["transit_supports"]
     assert not c.passed and any("without a support" in f for f in c.failures)
 

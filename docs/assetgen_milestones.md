@@ -2585,6 +2585,19 @@ and a cab door at each stop above the ground on the face toward its way. Test
 tread or landing under it, every elevator a shaft round it. The streets' code hash moves every
 street tile's hash (goldens rewritten).
 
+## Fix: station shafts (after the station stairs)
+
+Citygen's station shafts (`docs/progress/station_shafts/`) leave AG7's code as it is: no
+station stair or shaft stands on a face of M22's pavement map any more (corner pads included),
+so AG17 paves over none, and M16's ground cover (AG13's ground) already left every stair and
+elevator out. A shaft in a station entrance cut into a building's ground floor
+(`attrs.entrance`) is drawn by `make_station_elevator` as any other, its machine room
+(`SHAFT_HEAD_M` 3 m) under the floors kept over the opening from 4.5 m; the building's cut
+masses are drawn by AG1 to AG5 as the access fixes' gateways. On a terrain city a station
+stair's and shaft's heights are over the ground at its middle, the `ground_c` AG7 seats it on.
+Assetgen's goldens move with the models (the briefs of the buildings cut and of the cities'
+moved stations, Vesper Bay's street tiles).
+
 ## AG16: performance
 
 **Built.** Scope 14.17, issue #96: a whole city's runtime and import cost in Unreal,
