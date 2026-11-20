@@ -1605,16 +1605,10 @@ as a pedestrian street one took a held street's dead end), `Frame.ends` every he
   regeneration moved a street 535 m from its district.
 
 The city open items (four found on Delta, after the car merge) are fixed:
-- **Station stairs at a stair's grade** (`transit.Builder._elevated`, `_metro`;
-  `STAIR_MAX_GRADE` 0.7, `STAIR_GRADE` 0.62): an elevated platform end whose straight stair
-  down to its sidewalk would rise more than 0.7 m a meter (Delta's Midtown stair rose 31 m over
-  18 m, its people climbed through the air) gets a bridge at the platform's height out over the
-  sidewalk (walkway `elevated`, `attrs.lift_bridge`; a `skywalk` deck structure
-  `<station>.lb<a|b>`, drawn glazed by AG7) and an elevator down from its end; a bridge through
-  a building mass at its height or near another line takes the elevator at the platform end and
-  a path. A metro stair too steep steps its top along the concourse to `STAIR_GRADE` (its
-  landing on to the concourse's end, where the walk graph joins it), else an elevator.
-  `station_access` fails a station stair or escalator steeper than `STAIR_MAX_GRADE`.
+- **Station stairs at a stair's grade** (`STAIR_MAX_GRADE` 0.7, `STAIR_GRADE` 0.62):
+  `station_access` fails a station stair or escalator steeper than `STAIR_MAX_GRADE` (Delta's
+  Midtown stair rose 31 m over 18 m). Its bridges and stepped metro stairs gave way to the
+  station stairs below.
 - **Pads open to the sky** (`buildings._pad`, `pad_blocked`, `PAD_CLEAR_M` 1 m): a helipad or
   AV pad stands at its roof's middle, else moved toward a side or corner, the first place its
   square grown by 1 m clears every mass of its building above the roof (M21's mast, spire,
@@ -1628,6 +1622,42 @@ The city open items (four found on Delta, after the car merge) are fixed:
   it as a third stop of its tour.
 - lifegen's slots and AG7's bridge piers: in their sections.
 Outputs: `docs/progress/city_open_items/`.
+
+The station stairs (#250's open items: long station stairs through the air, no stair or
+elevator drawn) are in place, in `citygen/transit.py` (check in `transit_checks.py`), the
+blockout and AG7:
+- **Flights on clear ground** (`stair_plan`, `Builder._tower`, `_well`, `_lift`, `_spot`):
+  every station stair is flights of at most `FLIGHT_RISE_M` 3.6 m at `STAIR_GRADE`, switchbacks
+  side by side (`FLIGHT_W_M` 2 m, a 0.3 m well) with a landing as deep as a flight is wide at
+  each end, in a footprint on clear ground (no road's right of way, junction, crosswalk,
+  building mass, water, structure, M14 slab, skybridge, track or walkway but a sidewalk within
+  `ACCESS_PAD_M`; `_clear_index`, `_dyn`) whose middle is within `ACCESS_REACH_M` 36 m of its
+  platform or concourse end, chosen on a 1 m grid along and across the track: an elevated
+  platform end's stair tower (its top landing toward the end, a bridge at the platform's
+  height through no building and off the other lines, `ACCESS_BRIDGE_M` 40 m at most, a
+  `skywalk` deck `<station>.sb<a|b>`), a metro concourse end's stair well (a passage at the
+  concourse's depth from its foot, under no building, `ACCESS_PASSAGE_M` 60 m), each with a
+  path from its ground end to the sidewalk that passes no building (`_ground_ok`); the walkway
+  is one `stairs` walkway along the flights and landings (`attrs.structure`). Else an elevator
+  shaft (`SHAFT_M` 3.2 m) there; else, with no clear ground near, an elevator straight down
+  from the end (`attrs.clear` false; none beside another line, where the other end serves).
+  An elevated station with no shaft gets one beside its first or last end. Structures: kind
+  `stair` (`<station>.st<a|b>`; footprint, the walkway's line, `attrs` frame, length, width,
+  flights, rise, run) and `elevator` (`<station>.el<a..d>`; footprint, its stops, `doors`).
+  #250's bridges over the sidewalk point (`lift_bridge`) and stepped metro stairs are gone.
+- **Check** `station_stairs` (with the transit checks: 109 on a flat sample, 114 with decks):
+  every station stair walkway inside its stair, every flight at most 3.6 m at 0.7 at most, a
+  landing between two flights, the footprint on clear ground; every elevated or underground
+  station's elevator in a shaft (a shaft with no clear ground noted).
+- **Blockout** (`blockout._station_stair`): a stair's flights and landings as strips along its
+  walkway, posts at its corners and landings, a metro well lined and opened in the ground
+  (`_land_and_water`); an elevator's shaft as a prism (`structure_stair`, `structure_elevator`).
+- **AG7** (`assetgen/streets/transit.py` `make_station_stair`, `make_station_elevator`):
+  AG10's flights (`decks._flight`), landings with guard rails, a tower's steel posts, a metro
+  well's lining, floor and parapet; glass shafts between steel posts with their machine room
+  and a door at each stop above the ground. **Exporter:** nothing new (pieces keyed by the
+  blockout's objects through stage 2).
+Outputs: `docs/progress/station_stairs/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 

@@ -690,6 +690,107 @@ def check_station_access(m: CityModel) -> Check:
     return c
 
 
+def check_station_stairs(m: CityModel) -> Check:
+    """Station stairs: every station stair walkway runs on a stair structure of its station
+    whose flights can be built (each rises at most FLIGHT_RISE_M at STAIR_MAX_GRADE at most,
+    a landing between two flights, every point of the walkway inside its footprint) on clear
+    ground (no road's right of way, junction, crosswalk, building mass or water under it);
+    every elevator of an elevated or underground station rides in a shaft (an elevator
+    structure round it from its lowest stop to its highest). A shaft standing where no clear
+    ground was near (`attrs.clear` false) is noted."""
+    from .transit import FLIGHT_RISE_M, STAIR_MAX_GRADE
+    from .tunnels import water_bodies
+
+    c = _check("station_stairs", "Every station stair is flights that can be built: at most "
+                                 f"{FLIGHT_RISE_M:g} m a flight at {STAIR_MAX_GRADE:g} m a "
+                                 "meter at most, landings between, in a stair structure on "
+                                 "clear ground (no road, junction, crosswalk, building or "
+                                 "water under it); every elevated or underground station's "
+                                 "elevator in a shaft")
+    stations = {s.id: s for s in m.stations}
+    structs = {s.id: s for s in m.structures}
+    hard = []
+    for s in m.road_segments:
+        if len(s.centerline) >= 2:
+            hard.append(("road " + s.id, LineString([p[:2] for p in s.centerline]).buffer(
+                s.width_m / 2.0, cap_style="flat")))
+    hard += [("junction " + j.id, G.from_model_poly(j.polygon)) for j in m.junctions]
+    hard += [("crosswalk " + x.id, LineString([p[:2] for p in x.line]).buffer(
+        x.width_m / 2.0, cap_style="flat")) for x in m.crosswalks if len(x.line) >= 2]
+    for b in m.buildings:
+        for ms in b.masses:
+            if ms.z1_m > ms.z0_m and ms.role != "void":
+                hard.append(("building " + b.id, G.from_model_poly(ms.footprint)))
+    hard += [("water", poly) for poly, _, _ in water_bodies(m)]
+    hard = [(n, g) for n, g in hard if not g.is_empty]
+    tree = shapely.STRtree([g for _, g in hard]) if hard else None
+    n_st = n_fl = n_el = 0
+    unclear = []
+    for w in sorted(m.walkways, key=lambda w: w.id):
+        a = w.attrs or {}
+        stn = stations.get(a.get("station"))
+        if stn is None or w.kind not in ("stairs", "escalator", "elevator"):
+            continue
+        if w.kind == "elevator":
+            if stn.kind == "sky":
+                continue        # (M19's elevator cores and the portal towers' lifts)
+            n_el += 1
+            r = structs.get(a.get("structure"))
+            zs = [p[2] for p in w.line]
+            if r is None or r.kind != "elevator" or r.footprint is None:
+                _limit(c, f"{stn.id}: elevator {w.id} has no shaft")
+                continue
+            poly = G.from_model_poly(r.footprint).buffer(0.05)
+            if not all(poly.covers(Point(p[:2])) for p in w.line) or                     r.z0_m > min(zs) + 0.01 or r.z1_m < max(zs) - 0.01:
+                _limit(c, f"{stn.id}: elevator {w.id} runs outside its shaft {r.id}")
+            elif (r.attrs or {}).get("clear") is False:
+                unclear.append(r.id)
+            continue
+        n_st += 1
+        r = structs.get(a.get("structure"))
+        if r is None or r.kind != "stair" or r.footprint is None:
+            _limit(c, f"{stn.id}: {w.kind} {w.id} has no stair under it (no buildable "
+                      f"flight)")
+            continue
+        poly = G.from_model_poly(r.footprint)
+        out = [p for p in w.line if not poly.buffer(0.05).covers(Point(p[:2]))]
+        if out:
+            _limit(c, f"{stn.id}: {w.kind} {w.id} leaves its stair {r.id} at "
+                      f"({out[0][0]:.1f}, {out[0][1]:.1f})")
+            continue
+        bad = None
+        flight_before = False
+        for p0, p1 in zip(w.line, w.line[1:]):
+            dz = abs(p1[2] - p0[2])
+            run = math.hypot(p1[0] - p0[0], p1[1] - p0[1])
+            if dz < 0.005:
+                flight_before = False
+                continue
+            n_fl += 1
+            if dz > FLIGHT_RISE_M + 0.01:
+                bad = f"a flight rises {dz:.1f} m (at most {FLIGHT_RISE_M:g})"
+            elif dz > STAIR_MAX_GRADE * run + 0.01:
+                bad = f"a flight rises {dz:.1f} m over {run:.1f} m"
+            elif flight_before:
+                bad = "two flights with no landing between"
+            if bad:
+                break
+            flight_before = True
+        if bad:
+            _limit(c, f"{stn.id}: {w.kind} {w.id}: {bad}")
+            continue
+        if tree is not None:
+            for i in sorted(tree.query(poly, predicate="intersects").tolist()):
+                if G.area(G.inter(poly, hard[i][1])) > 0.01:
+                    _limit(c, f"{stn.id}: stair {r.id} stands on {hard[i][0]}")
+                    break
+    c.notes.append(f"{n_st} station stairs ({n_fl} flights), {n_el} elevators in shafts")
+    if unclear:
+        c.notes.append(f"{len(unclear)} shafts with no clear ground near, straight down from "
+                       f"the platform: {', '.join(unclear[:6])}")
+    return c
+
+
 def check_skybridges(m: CityModel) -> Check:
     c = _check("transit_skybridges", "No skybridge in the way of an elevated or sky line "
                                      "(within its corridor and 3 m of its height)")
@@ -752,7 +853,8 @@ def run(spec: CitySpec, m: CityModel) -> list:
                 check_self_crossing(m), check_grades(m), check_profile_smooth(m),
                 check_altitude(spec, m),
                 check_clearance(m),
-                check_supports(m), check_station_access(m), check_skybridges(m),
+                check_supports(m), check_station_access(m), check_station_stairs(m),
+                check_skybridges(m),
                 check_hubs(spec, m)]
 
 

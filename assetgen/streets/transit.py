@@ -14,7 +14,9 @@
   (crosshead, legs, tie, stays).
 - **Stations' structures** (stations themselves are buildings, the building line's):
   platforms, skywalks (glazed, roofed), canopies on posts, covered walkways, elevator cores,
-  underground concourses.
+  underground concourses; (station stairs) every station stair's flights and landings
+  (`make_station_stair`: an elevated platform's stair tower on its posts, a metro's lined
+  and railed well) and every elevator's shaft (`make_station_elevator`).
 - Anything else in `structures` falls back to its footprint as a prism or its line as a
   slab.
 """
@@ -533,6 +535,10 @@ def _posts(ring) -> list[tuple[float, float]]:
 def maker_for(st) -> str | None:
     """Which generator a model structure takes."""
     a = st.attrs or {}
+    if st.kind == "stair" and a.get("station"):
+        return "station_stair"
+    if st.kind == "elevator" and a.get("station"):
+        return "station_elevator"
     if st.kind == "column" and a.get("road_id") and not a.get("line_id"):
         return "column"
     if st.kind in ("column", "pylon") and a.get("line_id"):
@@ -553,6 +559,168 @@ def maker_for(st) -> str | None:
         return "retaining_wall"
     return "station_part"
 
+
+# -- station stairs and elevators (station stairs) -------------------------------------------
+
+STAIR_POST = 0.25       # a stair tower's steel posts, square
+PARAPET_H = 1.1         # a metro well's parapet over the ground
+PARAPET_T = 0.25
+STAIR_SLAB = 0.3        # a metro well's floor (citygen's STAIR_SLAB_M)
+
+
+def _stair_frame(a: dict):
+    cx, cy, ux, uy = a["frame"]
+    vx, vy = -uy, ux
+
+    def P(s, t):
+        return (cx + ux * s + vx * t, cy + uy * s + vy * t)
+    return P, (cx, cy, ux, uy)
+
+
+def _rail(mesh: Mesh, pts, z: float) -> None:
+    """A guard rail along a landing's open edges: a rail through the points at hand height
+    and a post at each point (once)."""
+    from .decks import HAND_H
+    for a, b in zip(pts, pts[1:]):
+        mesh.beam("steel.painted", (a[0], a[1], z + HAND_H), (b[0], b[1], z + HAND_H), 0.05, 0.05)
+    for p in pts:
+        mesh.box("steel.painted", p[0], p[1], z, 0.05, 0.05, HAND_H, 0.0)
+
+
+@maker("station_stair", 1)
+def make_station_stair(inp: dict) -> Out:
+    """A station's stair (citygen's `stair_plan`): every flight of its walkway line as AG10's
+    flights (a block a step on a sloped soffit, stringers and handrails both sides), a
+    landing the stair's width and a flight deep at each end of every flight, guard rails
+    round the landings' open edges. An elevated platform's stair tower stands on steel posts
+    at its corners and the inner ends of its landings up to its top landing; a metro well is
+    lined from its floor to the ground, with a parapet round its opening, the top landing at
+    the ground left open where the walkway comes in."""
+    from .decks import LANDING_T, _flight
+    st = inp["st"]
+    a = st.get("attrs", {})
+    line = st.get("line") or []
+    if len(line) < 2 or not a.get("frame"):
+        return Out(empty="no flights")
+    g = _g(inp)
+    mesh = Mesh(inp["origin"])
+    fw = a.get("flight_w_m", 2.0)
+    L, W = a["length_m"], a["width_m"]
+    P, (cx, cy, ux, uy) = _stair_frame(a)
+    metro = st["z0_m"] < -0.5
+    top = max(p[2] for p in line)
+    landings = set()
+    for p0, p1 in zip(line, line[1:]):
+        if abs(p1[2] - p0[2]) > 0.005:
+            _flight(mesh, (p0[0], p0[1]), (p1[0], p1[1]), p0[2] + g, p1[2] + g, fw, inp)
+        else:
+            sm = ((p0[0] + p1[0]) / 2.0 - cx) * ux + ((p0[1] + p1[1]) / 2.0 - cy) * uy
+            landings.add((1 if sm > 0 else -1, round(p0[2], 3)))
+    floor_top = st["z0_m"] + STAIR_SLAB if metro else None
+    for end, z in sorted(landings):
+        if floor_top is not None and abs(z - floor_top) < 0.05:
+            continue            # (a metro well's bottom landing: its floor)
+        so, si = end * L / 2.0, end * (L / 2.0 - fw)
+        ring = [P(si, -W / 2.0), P(so, -W / 2.0), P(so, W / 2.0), P(si, W / 2.0)]
+        zz = z + g
+        mesh.prism("concrete", ccw(ring), zz - LANDING_T, zz, bottom=True)
+        if abs(z) < 0.05:
+            continue            # (a landing at the ground: no rails)
+        if end == -1 and abs(z - top) < 0.005:
+            # (the top landing: open on its outer edge, where the bridge comes in)
+            _rail(mesh, [P(si, -W / 2.0), P(so, -W / 2.0)], zz)
+            _rail(mesh, [P(so, W / 2.0), P(si, W / 2.0)], zz)
+        else:
+            _rail(mesh, [P(si, -W / 2.0), P(so, -W / 2.0), P(so, W / 2.0), P(si, W / 2.0)],
+                  zz)
+    if metro:
+        floor = st["z0_m"] + g
+        ring = ccw([tuple(p) for p in st["footprint"]["exterior"]])
+        mesh.poly("concrete.dark", ring, [], z=floor + STAIR_SLAB)
+        n = len(ring)
+        for i in range(n):
+            # (the lining, facing in: the ring's edges walked the other way)
+            mesh.wall("concrete.dark", ring[(i + 1) % n], ring[i], floor + STAIR_SLAB, g,
+                      floor + STAIR_SLAB, g)
+        s0 = -L / 2.0 + fw
+        ta = -W / 2.0 + fw / 2.0
+        edge = [P(s0, ta + fw / 2.0), P(s0, W / 2.0), P(L / 2.0, W / 2.0),
+                P(L / 2.0, -W / 2.0), P(s0, -W / 2.0)]
+        if W <= fw + 0.1:
+            edge = [P(s0, W / 2.0), P(L / 2.0, W / 2.0), P(L / 2.0, -W / 2.0),
+                    P(s0, -W / 2.0)]
+        from shapely.geometry import LineString
+        band = LineString(edge).buffer(PARAPET_T / 2.0, cap_style="flat", join_style="mitre")
+        if not band.is_empty and band.geom_type == "Polygon":
+            mesh.prism("concrete", ccw(list(band.exterior.coords)[:-1]), g, g + PARAPET_H,
+                       bottom=True)
+        return Out(mesh=mesh, notes={"stair": {"low": C.m(floor), "high": C.m(top + g)}})
+    s1 = L / 2.0 - fw
+    posts = [P(-L / 2.0 + STAIR_POST, -W / 2.0 + STAIR_POST),
+             P(-L / 2.0 + STAIR_POST, W / 2.0 - STAIR_POST),
+             P(L / 2.0 - STAIR_POST, -W / 2.0 + STAIR_POST),
+             P(L / 2.0 - STAIR_POST, W / 2.0 - STAIR_POST)]
+    if W > fw + 0.1:
+        posts += [P(s1, 0.0), P(-s1, 0.0)]
+    ang = M.degrees(M.atan2(uy, ux))
+    for x, y in posts:
+        mesh.box("steel.painted", x, y, g, STAIR_POST, STAIR_POST, top - LANDING_T, ang)
+    return Out(mesh=mesh, notes={"stair": {"low": C.m(g), "high": C.m(top + g)}})
+
+
+@maker("station_elevator", 1)
+def make_station_elevator(inp: dict) -> Out:
+    """A station's elevator shaft: glass between steel corner posts and bands every 3 m
+    above the ground (a concrete shaft under it down to a metro concourse), its machine room
+    over its top stop, a cab door at each stop above the ground on the face toward where it
+    leads (its `doors`: the bottom stop's way, the top stop's)."""
+    from .decks import DOOR_H, DOOR_W, ELEV_FRAME, _band
+    st = inp["st"]
+    a = st.get("attrs", {})
+    fp = st.get("footprint")
+    if fp is None:
+        return Out(empty="no footprint")
+    g = _g(inp)
+    ring = ccw(fp["exterior"])
+    mesh = Mesh(inp["origin"])
+    z0, z1 = st["z0_m"] + g, st["z1_m"] + g
+    stops = sorted(p[2] + g for p in (st.get("line") or [[0.0, 0.0, 0.0]]))
+    lo, hi = stops[0], stops[-1]
+    base = max(z0, g)
+    if z0 < g - 0.5:
+        mesh.prism("concrete", ring, z0, g, top=False, bottom=True)
+    head = max(hi + DOOR_H + 0.4, z1 - 0.8)
+    cxy = inp["origin"]
+    n = len(ring)
+    for i in range(n):
+        mesh.wall("glass.panel", ring[i], ring[(i + 1) % n], base, head, base, head)
+    for p in ring:
+        px, py = p[0] + (cxy[0] - p[0]) * 0.05, p[1] + (cxy[1] - p[1]) * 0.05
+        mesh.box("steel.painted", px, py, base, ELEV_FRAME, ELEV_FRAME, head - base, 0.0)
+    z = base + 3.0
+    while z < head - 1.0:
+        _band(mesh, ring, z, 0.12)
+        z += 3.0
+    _band(mesh, ring, head, max(z1 - head, 0.3))
+    for zl, d in zip((lo, hi), a.get("doors") or [[1.0, 0.0], [1.0, 0.0]]):
+        if zl < g - 0.5:
+            continue            # (a metro shaft's bottom door: underground, in its lining)
+        best = None
+        for i in range(n):
+            p, q_ = ring[i], ring[(i + 1) % n]
+            ex, ey = q_[0] - p[0], q_[1] - p[1]
+            Le = math.hypot(ex, ey) or 1.0
+            nx, ny = ey / Le, -ex / Le       # (outward of a counterclockwise ring)
+            k = (round(nx * d[0] + ny * d[1], 6), -i)
+            if best is None or k > best[0]:
+                best = (k, p, q_, ex / Le, ey / Le, nx, ny, Le)
+        _, p, q_, ux, uy, nx, ny, Le = best
+        m_ = ((p[0] + q_[0]) / 2.0 + nx * 0.02, (p[1] + q_[1]) / 2.0 + ny * 0.02)
+        w = min(DOOR_W, Le - 0.4)
+        p0 = (m_[0] - ux * w / 2.0, m_[1] - uy * w / 2.0)
+        p1 = (m_[0] + ux * w / 2.0, m_[1] + uy * w / 2.0)
+        mesh.wall("steel", p0, p1, zl, zl + DOOR_H, zl, zl + DOOR_H)
+    return Out(mesh=mesh, notes={"elevator": {"low": C.m(z0), "high": C.m(z1)}})
 
 @maker("retaining_wall", 1)
 def make_retaining_wall(inp: dict) -> Out:

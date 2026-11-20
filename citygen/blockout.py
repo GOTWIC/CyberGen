@@ -326,6 +326,10 @@ def _land_and_water(P: _Plan) -> None:
     # M9: the open approaches of the road tunnels and the underpass stair wells are holes
     holes = [G.from_model_poly(st.footprint) for st in m.structures
              if st.kind == "trench" and st.footprint is not None]
+    # (station stairs: a metro station's stair wells open in the ground)
+    holes += [G.from_model_poly(st.footprint) for st in m.structures
+              if st.kind == "stair" and (st.attrs or {}).get("station") and
+              st.footprint is not None and st.z0_m < -0.5]
     if holes:
         ground = G.diff(ground, G.union(holes))
     x0, y0, x1, y1 = m.bounds
@@ -1184,6 +1188,18 @@ def _sites(P: _Plan) -> None:
             continue    # M18: drawn with its road (`_streets`)
         if a.get("deck"):
             continue    # M14: drawn with their deck (`_decks`)
+        if transit and s.kind in ("stair", "elevator") and s.footprint is not None:
+            # (station stairs: a station's stair of flights and landings on its posts, a
+            # metro well lined and railed; an elevator's shaft)
+            ext, holes = _poly_rings(s.footprint)
+            cx, cy = _center(ext)
+            parts = _station_stair(s, ext) if s.kind == "stair" else                 [{"k": "prism", "m": "deck_elevator", "z0": q(s.z0_m), "z1": q(s.z1_m),
+                  "r": ext, "h": holes, "s": "prism"}]
+            P.add(s.id, P.collection(P.district_at(cx, cy), "Transit"), tile_key(cx, cy),
+                  f"structure_{s.kind}", parts,
+                  {"citygen_id": s.id, "citygen_type": s.type, "line_id": "",
+                   "station_id": a.get("station", "")})
+            continue
         if s.kind == "vent":
             ext, holes = _poly_rings(s.footprint)
             cx, cy = _center(ext)
@@ -1223,6 +1239,51 @@ def _sites(P: _Plan) -> None:
               tile_key(cx, cy), f"structure_{s.kind}", parts,
               {"citygen_id": s.id, "citygen_type": s.type, "line_id": a.get("line_id", ""),
                "station_id": a.get("station", "")})
+
+
+STAIR_POST_M = 0.3              # (station stairs) a stair's posts, square
+
+
+def _station_stair(s, ext: list) -> list[dict]:
+    """Station stairs: a stair's flights and landings (a strip as wide as a flight along each
+    leg of its walkway line, from flight to landing to flight), posts at its corners and at
+    the inner ends of its landings up to its top, and a metro well's lining and parapet round
+    its footprint from its bottom to over the ground."""
+    a = s.attrs or {}
+    fw = a.get("flight_w_m", 2.0)
+    parts = []
+    for p0, p1 in zip(s.line, s.line[1:]):
+        r = ribbon([p0[:2], p1[:2]], fw, [p0[2], p1[2]])
+        if r is not None:
+            parts.append({"k": "ribbon", "m": "deck_stair", "l": r[0], "rr": r[1], "t": 0.3})
+    top = max(p[2] for p in s.line)
+    if s.z0_m < -0.5:
+        poly = G.from_model_poly(s.footprint)
+        ring = G.qpoly(G.diff(poly.buffer(0.3, join_style="mitre"), poly))
+        for g in G.parts(ring):
+            r_, h_ = _shapely_rings(g)
+            parts.append({"k": "prism", "m": "transit_support", "z0": q(s.z0_m),
+                          "z1": q(s.z1_m), "r": r_, "h": h_, "s": "prism"})
+        return parts
+    fr = a.get("frame")
+    pts = [tuple(p) for p in ext]
+    if fr:
+        # (the inner ends of the landings: the flights' ends on the long axis)
+        cx, cy, ux, uy = fr
+        s1 = a.get("length_m", 0.0) / 2.0 - fw
+        pts += [(cx + ux * s1, cy + uy * s1), (cx - ux * s1, cy - uy * s1)]
+    c0 = _center(ext)
+    h = STAIR_POST_M / 2.0
+    for x, y in pts:
+        # (each post pulled inside the footprint by half its size)
+        dx, dy = c0[0] - x, c0[1] - y
+        L = math.hypot(dx, dy) or 1.0
+        px, py = x + dx / L * h * 1.5, y + dy / L * h * 1.5
+        parts.append({"k": "prism", "m": "transit_support", "z0": q(s.z0_m), "z1": q(top),
+                      "r": [[q(px - h), q(py - h)], [q(px + h), q(py - h)],
+                            [q(px + h), q(py + h)], [q(px - h), q(py + h)]], "h": [],
+                      "s": "prism"})
+    return parts
 
 
 PIER_CAP = (1.8, -2.0, 1.2)     # M19: a pier's footing: times its width, from, to (m)
