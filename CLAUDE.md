@@ -3380,8 +3380,16 @@ middle in UV1), the importer makes `SM_<car>_merged` (`Importer.merged_car`; onl
 a shadow, no Nanite, no collision) with the wheels on `M_CgVehicleRoll` (a world position offset
 turning them by the car's travel, the instance's custom data 9), and the moving traffic and LG7's
 hover cars draw one instanced component a model (`unreal_life.traffic_cars`, `_hover_parts`,
-`ROLL_M`; `PACK_VERSION` 12, `LIFE_VERSION` life14; runtime `CarPartRoll`). Parked cars keep
-their parts. Delta's traffic 92 components to 15. Results: `docs/progress/car_merge/README.md`.
+`ROLL_M`; `PACK_VERSION` 12, `LIFE_VERSION` life14; runtime `CarPartRoll`). Delta's traffic 92
+components to 15. Results: `docs/progress/car_merge/README.md`. Its follow-ups
+(car_merge_followups): the merged mesh's last LOD is one section, its glass (from the pack's
+`opaque_from_lod`) and wheels folded into the body's in a flat color by UV1, which M_CgVehicle
+draws flat (`unreal_vehicles.flat_of`, `FLAT_VERSION`; `MERGE_VERSION` 2), and it carries the
+body's hulls (`MERGED_VERSION` 2); parked cars draw it too, one
+component a model a tile, wheels on the plain material (`Importer.parked_parts`,
+`still_wheels`, `VEHICLE_ACTOR_VERSION` 4; a model with a steered car keeps its parts): Delta's
+4,288 parked car components to 661; the lean route's drive starts a lane's point before when
+the nearest is its last (`bench._drive`). Results: `docs/progress/car_merge_followups/`.
 
 ## Gallery site (GitHub Pages)
 

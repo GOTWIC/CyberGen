@@ -3365,6 +3365,38 @@ mesh for the traffic and the fliers; the parked cars keep their parts.
 
 Results: `docs/progress/car_merge/README.md`.
 
+### The car merge's follow-ups (car_merge_followups)
+
+- **Fewer sections far off** (`unreal_vehicles.flat_of`, `merge_lod(..., flat)`,
+  `MERGE_VERSION` 2): every section of every LOD of an instanced component is a draw in each
+  pass of each view it is in, and the traffic's components are the whole city's box (LG8), so
+  car_merge's glass and wheels sections drawn to 900 m were its added draws. The merged mesh's
+  last LOD (the pack's LOD3, from about 90 m) is now one section, the body's: the glass, the
+  wheels and the brakes join it in a flat color, and the glass does so already from the pack's
+  `opaque_from_lod` (2), where it is dark and opaque anyway. Their UV1 is (gray, -1 -
+  roughness) (glass `FLAT_GLASS` 0.06 of its color, as M_CgVehicleGlassDark draws it, rough
+  0.05; wheels and brakes `FLAT_TIRE` 0.03, 0.7), which M_CgVehicle draws flat
+  (`import_city.FLAT_VERSION` 1: no paint, textures, flake, emission or clear coat, a flat
+  normal, specular 0.5; every other UV1 height is 0 or more). A primitive with no material
+  takes its part's (three packs' LOD3 bodies had one, a section of its own). Sections per
+  model: 3 to 4 a LOD (12 to 16) before, 9 to 12 now. The record's `flat`. Tried first and
+  dropped: two more LODs past the pack's without wheels (from 150 m) and without glass (from
+  300 m) added more draws (three sections a model, in every shadow pass) than they saved
+  triangles.
+- **Parked cars from the merged mesh** (`Importer.parked_parts`, `still_wheels`,
+  `VEHICLE_ACTOR_VERSION` 4): a placement's cars of one model are one instanced component of
+  `SM_<car>_merged` (kind body: it collides by the body's hulls, which the merged mesh now
+  carries, culled at the body's 450 m), its rolling wheels' slot overridden with the plain
+  `MI_<car>_wheels` (no world position offset: they stand still); a model one of whose cars
+  steers keeps its parts (a steered wheel needs its own; Delta's parked cars steer none). The
+  component is tagged `cg.part=merged`; `check_vehicles` and AG16's scene count
+  (`assetgen/scene.py`) take it. Delta: 4,288 parked car components to 661.
+- **The lean route's drive** (`bench._drive`): a drive whose nearest lane point is its
+  lane's last starts from the point before it (Delta's middle: the drive had one point and
+  the route none).
+
+Results: `docs/progress/car_merge_followups/README.md`.
+
 ## Milestones and checks
 
 - **Every milestone** updates the exporter in its own PR for what it adds or changes (a new
@@ -3449,3 +3481,4 @@ Results: `docs/progress/car_merge/README.md`.
 | Slots on their surface (delta_rebuild) | "Slots on their surface" above: the plan seats every ground level slot's points on the drawn surface and says so (`seated`); `unreal_life.pack_places` packs `slot_seated` (`PACK_VERSION` 10), `import_city.places_props` sets `SlotSeated` (`LIFE_VERSION` life12); the controller stands a seated slot's people at its points' own z. A plan without `seated` runs as before. | Delta (rebuilt on main) imported into CityAG16 and checked, with shots of curved roads by day and night (`docs/progress/delta_rebuild/`) |
 | People on their surfaces (people_surfaces) | "People on their surfaces" above: `exports.graphs` drapes the walkways on the pavement map's surface (`walksurf.drape`, `walk_surface` 1) and `flat_graphs` takes those lines over stage 2's; the life plugin's `UCgPersonAnim` (a near body's clips crossfaded, `ClipBlendS`, `SitBlendS`, `CityGenLife.Blend`), its leader ticking after the controller; `MakeSitFrames`' `SitSeatedS`, `SitRiseS` for the mid and far looks. No pack or importer version moves; a graphs.json from before exports as it did. | Delta's graphs and life plan made again, imported into CityAG16, checked with shots of people over a road's hump and sitters rising, benchmarked and packaged (`docs/progress/people_surfaces/`) |
 | Cars as one mesh (car_merge) | "Cars as one mesh" above: `unreal_vehicles.merge_cars`, `merge_lod` (`BUILD/unreal/vehicles/<car>/lod<k>.glb`), `Importer.merged_car` and `M_CgVehicleRoll` (`MERGED_VERSION` 1, `ROLL_VERSION` 1), `unreal_life.traffic_cars` and `_hover_parts` taking the merged mesh (`PACK_VERSION` 12), `import_city.traffic_props`' `car_part_roll` (`LIFE_VERSION` life14), the runtime's `CarPartRoll`. A vehicles section without `merged` exports and runs as before. | Delta imported into CityAG16, checked with shots of traffic by day and night, measured at fixed views, benchmarked and packaged (`docs/progress/car_merge/`) |
+| The car merge's follow-ups (car_merge_followups) | "The car merge's follow-ups" above: the merged mesh's dark glass and last LOD in the body's section, drawn flat (`flat_of`, `MERGE_VERSION` 2, M_CgVehicle's `FLAT_VERSION` 1), its body's hulls (`MERGED_VERSION` 2), the parked cars on it (`parked_parts`, `still_wheels`, `VEHICLE_ACTOR_VERSION` 4), the lean route's drive. | Delta imported into CityAG16, checked, measured at fixed views, benchmarked and packaged (`docs/progress/car_merge_followups/`) |

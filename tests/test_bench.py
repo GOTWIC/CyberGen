@@ -88,6 +88,19 @@ def test_lean_route(tmp_path):
     assert w["warm"] and w["segments"] == [3] and m["segments"] == [0, 1, 2]
 
 
+def test_drive_from_a_lane_end():
+    """car_merge_followups: a drive whose nearest lane point is that lane's last (Delta's
+    middle) starts from the point before it and goes on into the next lane; it had one point,
+    no heading, and the lean route lost its drive."""
+    lanes = _graph(
+        [[(-300.0, 0.0, 0.0), (0.0, 0.0, 0.0)], [(0.0, 0.0, 0.0), (0.0, 900.0, 0.0)]],
+        ["lane", "lane"], [[1], []])
+    d = B._drive(lanes, (5.0, -2.0), 500.0)
+    assert len(d) >= 3 and d[0] == (-300.0, 0.0, 0.0)
+    assert math.isclose(B._length(d), 500.0, abs_tol=1e-6)
+    assert d[-1][0] == 0.0 and d[-1][1] > 0
+
+
 def test_atmos_job_picks_lights_by_sight_on_the_ground(tmp_path):
     """Visible lights: with atmosgen's passes each segment sets the live set's mode, by sight
     on the walks and the drive, the circle in the flights; the route itself is unchanged."""
