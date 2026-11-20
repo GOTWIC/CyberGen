@@ -132,6 +132,26 @@ def test_check_measures_lines_against_the_surface():
     assert r["failed"] >= 1 and r["worst_m"] > 1.0
 
 
+def test_a_walkway_along_a_faces_edge_is_on_it():
+    """A crossing laid along a road's end (the crossings fix's crossing of a dead end at the
+    map's edge), its line on the 1 cm grid a few millimeters in and out of the faces' end
+    edge: on the road's surface all the way, not on it only where it falls inside (the hilly
+    test city's `wk.e460n1200` stood 0.7 m off the median past the middle)."""
+    net = _Net()
+    net.face("rs.e.pv.cw", "rs.e", "carriageway",
+             [(250.0, -5.0, 0.6), (300.0, -5.0, 0.6), (300.0, 5.0, 0.6), (250.0, 5.0, 0.6)])
+    walk = {"id": "wk.end", "kind": "crossing", "line": [[300.006, 5.0, 0.0],
+                                                         [299.994, -5.0, 0.0]],
+            "attrs": {"segment": "rs.e"}, "level": 0}
+    m = {"pavement": net.faces,
+         "pavement_net": {"vertices": list(net.vertices.values()), "edges": net.edges},
+         "road_segments": [], "walkways": [walk]}
+    pts = WS.drape(m)["wk.end"][0]
+    assert all(abs(p[2] - (0.6 + WS.ROAD_LIFT_M)) < 1e-6 for p in pts), pts
+    r = WS.check(m, {"wk.end": pts})
+    assert r["failed"] == 0 and r["worst_m"] < 1e-6, r
+
+
 def test_lifegen_checks_the_lines_it_will_walk(tmp_path):
     """lifegen's `walk_heights` reads BUILD/graphs.json: draped lines pass, a raised road's
     walkways at the ground (the model's) fail, a graphs.json from before is not measured."""
