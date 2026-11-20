@@ -965,12 +965,45 @@ class Moorings:
         return None
 
 
+# the open water a moored boat leaves across its waterway: two boats' lanes (a hull and its
+# margins, 3 m) pass beside it, and lifegen's 4 m water raster keeps a way through (Delta's
+# Old Town canal, 14 m between its 5 m quays, left 6 m beside each boat and no way through)
+NAV_CLEAR_M = 8.0
+NAV_STEPS = (-0.4, 0.0, 0.4)   # ... measured on these lines across its hull (share of its length)
+
+
+def open_across(poly, bands, hulls, x: float, y: float, yaw_deg: float, length: float) -> float:
+    """City open items: the widest stretch of open water across a waterway (its polygon less
+    the quays' bands and the moored hulls) on lines square to a hull at (x, y) along `yaw_deg`,
+    at `NAV_STEPS` of its `length`, the narrowest of them (a boat moored opposite another, or
+    opposite a quay in a narrow canal, left Delta's Old Town canal no way through)."""
+    a = math.radians(yaw_deg)
+    ux, uy = math.cos(a), math.sin(a)
+    reach = 200.0
+    worst = None
+    for t in NAV_STEPS:
+        cx, cy = x + ux * t * length, y + uy * t * length
+        cross = LineString([(cx + uy * reach, cy - ux * reach), (cx - uy * reach, cy + ux * reach)])
+        free = cross.intersection(poly)
+        for g in bands + hulls:
+            if not free.is_empty and g.intersects(cross):
+                free = free.difference(g)
+        best = max((float(p.length) for p in shapely.get_parts(free)), default=0.0) \
+            if not free.is_empty else 0.0
+        worst = best if worst is None else min(worst, best)
+    return worst or 0.0
+
+
 def boats_in_water(c: Ctx, cands: list[Cand]) -> list[Cand]:
     """Boats whose hull lies in its waterway, clear of the quays' bands, the shore's walls,
-    bridges and each other."""
+    bridges and each other, leaving `NAV_CLEAR_M` of open water across the waterway beside it
+    (city open items: a boat passes every mooring)."""
     ww = {w.id: G.from_model_poly(w.polygon) for w in c.m.waterways}
     shore = {k: p.boundary for k, p in ww.items()}
     moor = Moorings(c.m)
+    bands = [line.buffer(half, cap_style="flat") for _, line, half in moor.quays]
+    bandtree = shapely.STRtree(bands) if bands else None
+    hulls: dict = {}
     bridges = [LineString(s.centerline).buffer(s.width_m / 2.0 + 3.0)
                for s in c.m.road_segments if s.bridge]
     btree = shapely.STRtree(bridges) if bridges else None
@@ -987,10 +1020,25 @@ def boats_in_water(c: Ctx, cands: list[Cand]) -> list[Cand]:
             continue
         if btree is not None and len(btree.query(hull, predicate="intersects")):
             continue
+        L = KINDS["boat"][1][0] * b.scale[0]
+        nb = [bands[int(k)] for k in sorted(bandtree.query(poly))] if bandtree is not None \
+            else []
+        mine = hulls.setdefault(b.attrs["waterway"], [])
+        if open_across(poly, nb, [h for _, h in mine] + [hull], b.x, b.y, b.yaw, L) < \
+                NAV_CLEAR_M:
+            continue
+        # (and every boat moored before it near it still leaves as much, as the check
+        # measures each boat with all the others)
+        allh = [h for _, h in mine] + [hull]
+        if any(open_across(poly, nb, allh, o.x, o.y, o.yaw,
+                           KINDS["boat"][1][0] * o.scale[0]) < NAV_CLEAR_M
+               for o, h in mine if G.dist(h, hull) < 2.0 * L):
+            continue
         b.r = KINDS["boat"][1][0] / 2.0 * b.scale[0]
         b.z = c.water_z(b.attrs["waterway"], b.x, b.y)
         if c.fits(b):
             c.occupy(b)
+            mine.append((b, hull))
             out.append(b)
     return out
 

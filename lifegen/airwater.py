@@ -956,10 +956,12 @@ def _abs(air: Air, pts2, z: float):
     return [(x, y, z + air.space.gz(x, y)) for x, y in pts2]
 
 
-def car_pairs(pads: list[dict], lo: float, hi: float) -> list[tuple[dict, dict]]:
+def car_pairs(pads: list[dict], lo: float, hi: float) -> list[tuple[dict, ...]]:
     """M3's pads paired for flights between them (each pad in one pair): in the order of a
     draw from their ids, each with the unpaired pad between `lo` and `hi` away its draw likes
-    best, else the nearest beyond `lo` / 2."""
+    best, else the nearest beyond `lo` / 2; a pad left over (an odd one out) joins the pair
+    with the pad nearest it beyond `lo` / 2 as a third stop of its tour (city open items: every
+    pad flown)."""
     roof = sorted([p for p in pads if p["kind"] != "launch_pad"], key=lambda p: _u("pad", p["id"]))
     used, out = set(), []
     for a in roof:
@@ -983,18 +985,33 @@ def car_pairs(pads: list[dict], lo: float, hi: float) -> list[tuple[dict, dict]]
         b = best[1]
         used |= {a["id"], b["id"]}
         out.append((a, b))
+    for c in roof:
+        if c["id"] in used:
+            continue
+        near = None
+        for k, pr in enumerate(out):
+            if len(pr) > 2:
+                continue
+            d = min(math.dist(c["pos"][:2], x["pos"][:2]) for x in pr)
+            if d >= lo / 2.0 and (near is None or (d, k) < near):
+                near = (d, k)
+        if near is not None:
+            out[near[1]] = out[near[1]] + (c,)
+            used.add(c["id"])
     return out
 
 
-def pad_route(air: Air, a: dict, b: dict, hint: int) -> tuple[dict | None, str]:
+def pad_route(air: Air, a: dict, b: dict, hint: int, *more: dict) -> tuple[dict | None, str]:
     """A pair of pads flown between: up from a, over to b on a layer by its heading, down onto
-    b, a dwell, up, back on a layer of the other heading, down onto a, a dwell."""
+    b, a dwell, up, back on a layer of the other heading, down onto a, a dwell; with a third
+    pad (`car_pairs`' odd one out) a tour a, b, c and back to a."""
     A = P.AIR
-    za, zb = a["pos"][2], b["pos"][2]
+    seq = (a, b) + tuple(more)
+    hops = list(zip(seq, seq[1:] + seq[:1]))
     rt = Route(f"air.car.{a['id']}", "car", a.get("district_id"))
-    rt.serves = [a["id"], b["id"]]
+    rt.serves = [x["id"] for x in seq]
     legs = []
-    for p, q in ((a, b), (b, a)):
+    for p, q in hops:
         h = _heading(p["pos"], q["pos"])
         ga = air.space.gz(*p["pos"][:2])
         gb = air.space.gz(*q["pos"][:2])
@@ -1011,7 +1028,7 @@ def pad_route(air: Air, a: dict, b: dict, hint: int) -> tuple[dict | None, str]:
         if got is None:
             return None, f"no flight from {p['id']} to {q['id']} clear on a layer"
         legs.append(got)
-    for (pts, z), p, q in zip(legs, (a, b), (b, a)):
+    for (pts, z), (p, q) in zip(legs, hops):
         rt.add([tuple(p["pos"])])
         rt.stop(V["car"]["dwell_s"], "pad", p["id"])
         rt.add(_abs(air, pts, z))
@@ -2082,11 +2099,11 @@ def airwater_plan(model: dict, filled: dict, build: Path | None = None,
                                  (" (its own building's crown: a citygen conflict)"
                                   if what == p.get("building_id") else "")})
         pairs = car_pairs(usable, 500.0, 2200.0)
-        for q, (a, b) in enumerate(pairs[:A["routes_max"]["car"]]):
-            rec, why = pad_route(air, a, b, int(2 * _u("hint", a["id"])) % 2)
+        for q, (a, b, *more) in enumerate(pairs[:A["routes_max"]["car"]]):
+            rec, why = pad_route(air, a, b, int(2 * _u("hint", a["id"])) % 2, *more)
             if rec is None:
-                left["pads"].append({"id": a["id"], "why": why})
-                left["pads"].append({"id": b["id"], "why": why})
+                for x in (a, b, *more):
+                    left["pads"].append({"id": x["id"], "why": why})
                 continue
             bad = _route_clear(air, rec, "car")
             if bad:
@@ -2097,7 +2114,7 @@ def airwater_plan(model: dict, filled: dict, build: Path | None = None,
             rec["model"] = hover_model(did, a["id"])
             rec["color"] = CAR_GLOW[int(_u("glow", rec["id"]) * len(CAR_GLOW)) % len(CAR_GLOW)]
             rec["counts"] = [1, 2, 2, 2, 1]
-            served |= {a["id"], b["id"]}
+            served |= {x["id"] for x in (a, b, *more)}
             for bb in range(5):
                 have[did][bb] += rec["counts"][bb]
             routes.append(rec)

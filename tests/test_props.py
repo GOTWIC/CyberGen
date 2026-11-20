@@ -176,6 +176,21 @@ def test_boats_moor_off_the_quay(city):
     assert not ch.passed and "quay" in ch.failures[0], ch.failures
 
 
+def test_moorings_leave_a_way_through():
+    """City open items: a moored boat leaves `NAV_CLEAR_M` of open water across its waterway
+    (a 14 m canal between 5 m quays has room for a boat to pass only with none moored)."""
+    canal = shapely.box(0.0, 0.0, 200.0, 14.0)
+    bands = [shapely.LineString([(0, 0), (200, 0)]).buffer(2.5, cap_style="flat"),
+             shapely.LineString([(0, 14), (200, 14)]).buffer(2.5, cap_style="flat")]
+    assert PR.open_across(canal, bands, [], 100.0, 7.0, 0.0, 8.0) == pytest.approx(9.0)
+    hull = PR.boat_hull(100.0, 4.4, 0.0, (1.0, 1.0, 1.0))      # moored past the south band
+    w = PR.open_across(canal, bands, [hull], 100.0, 4.4, 0.0, 8.0)
+    assert w == pytest.approx(11.5 - 5.9, abs=0.01) and w < PR.NAV_CLEAR_M
+    wide = shapely.box(0.0, 0.0, 200.0, 24.0)
+    bands2 = [bands[0], shapely.LineString([(0, 24), (200, 24)]).buffer(2.5, cap_style="flat")]
+    assert PR.open_across(wide, bands2, [hull], 100.0, 4.4, 0.0, 8.0) >= PR.NAV_CLEAR_M
+
+
 # --- M20: on their surfaces, under what is over them -----------------------------------
 
 M20_CHECKS = {"prop_support", "plant_headroom"}

@@ -178,6 +178,18 @@ def test_pads_flown_between_clear_of_the_tower(planned):
     assert ck["air_pads"]["ok"], ck["air_pads"]["detail"]
 
 
+def test_odd_pad_joins_a_tour():
+    """City open items: with an odd number of pads the one left over joins the pair with the
+    pad nearest it (beyond half the least distance) as a third stop of its tour, so every pad is
+    flown."""
+    pads = [{"id": f"p{k}", "kind": "av_pad", "pos": [x, 0.0, 60.0]}
+            for k, x in enumerate((0.0, 900.0, 1800.0))]
+    tours = AW.car_pairs(pads, 500.0, 2200.0)
+    assert len(tours) == 1 and sorted(p["id"] for p in tours[0]) == ["p0", "p1", "p2"]
+    four = pads + [{"id": "p3", "kind": "av_pad", "pos": [2700.0, 0.0, 60.0]}]
+    assert all(len(t) == 2 for t in AW.car_pairs(four, 500.0, 2200.0))
+
+
 def test_layers_by_heading():
     import types
     air = types.SimpleNamespace()

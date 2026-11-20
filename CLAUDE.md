@@ -1604,6 +1604,31 @@ as a pedestrian street one took a held street's dead end), `Frame.ends` every he
   layer's snap-rounded union left such a sliver open or closed by faces far away, and a
   regeneration moved a street 535 m from its district.
 
+The city open items (four found on Delta, after the car merge) are fixed:
+- **Station stairs at a stair's grade** (`transit.Builder._elevated`, `_metro`;
+  `STAIR_MAX_GRADE` 0.7, `STAIR_GRADE` 0.62): an elevated platform end whose straight stair
+  down to its sidewalk would rise more than 0.7 m a meter (Delta's Midtown stair rose 31 m over
+  18 m, its people climbed through the air) gets a bridge at the platform's height out over the
+  sidewalk (walkway `elevated`, `attrs.lift_bridge`; a `skywalk` deck structure
+  `<station>.lb<a|b>`, drawn glazed by AG7) and an elevator down from its end; a bridge through
+  a building mass at its height or near another line takes the elevator at the platform end and
+  a path. A metro stair too steep steps its top along the concourse to `STAIR_GRADE` (its
+  landing on to the concourse's end, where the walk graph joins it), else an elevator.
+  `station_access` fails a station stair or escalator steeper than `STAIR_MAX_GRADE`.
+- **Pads open to the sky** (`buildings._pad`, `pad_blocked`, `PAD_CLEAR_M` 1 m): a helipad or
+  AV pad stands at its roof's middle, else moved toward a side or corner, the first place its
+  square grown by 1 m clears every mass of its building above the roof (M21's mast, spire,
+  halo, struts, exo frame), else none; `roof_items` fails a pad with its building over it.
+- **Moorings leave a way through** (`props.boats_in_water`, `open_across`, `NAV_CLEAR_M`
+  8 m): a boat moors only where the open water across its waterway beside it (the polygon less
+  the quays' bands and the moored hulls, on three lines square to its hull) stays 8 m wide, for
+  it and every boat moored near it; `boats_afloat` fails one that leaves less. Delta's Old Town
+  canal (14 m between its 5 m quays) had boats moored all along and no way through for LG7's.
+- **Every pad flown** (lifegen, `airwater.car_pairs`): an odd one out joins the pair nearest
+  it as a third stop of its tour.
+- lifegen's slots and AG7's bridge piers: in their sections.
+Outputs: `docs/progress/city_open_items/`.
+
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
 - **Validation:** as in "Validation" above; nothing beyond it.
@@ -2294,6 +2319,13 @@ AG17 (road surfaces by construction, after M22; scope 14.18) is in place, in
 - **AG8:** props keep off the map's carriageway faces (`_Fit`) and stand on a raised junction's
   pads as AG7 draws them (`_RaisedCorners`), both from the map. No exporter change.
 Results: `docs/progress/AG17/`.
+
+Bridge piers out of the channel (the city open items, `streets/structures.py` `pier_spots`,
+`channels`): a bridge spans a stretch of water of `CLEAR_SPAN_M` 45 m or less whole; over a
+longer one its piers stand from each shore out to the navigable channel's edge (citygen's
+transit rule: `CHANNEL_M` river 40, canal 8 m, at most half the width; the sea none), the
+channel one span (AG7 stood a pier in the middle of every canal and river crossing, and
+LG7's boats turned short of it); check `street_channels`.
 
 AG16 (performance) is in place (scope 14.17, issue #96; `docs/unreal_export.md`, "From AG16"):
 - **Benchmark** (`citygen unreal BUILD UPROJECT --bench` or `--bench-only`, `--bench-runs`,
@@ -3125,6 +3157,11 @@ LG4 (life at places) is in place:
   `docs/unreal_export.md`, "From LG4: life at places".
 - Delta: every check passes; `night_plan_all` 21.2 ms p95 native on the lean route (walk
   26.2), places off 20.9 (walk 23.5). Results: `docs/progress/LG4/README.md`.
+- **Slots at their walkway's height** (the city open items, `places.level_slots`): a seated
+  ground level slot whose walkway is more than `SLOT_STEP_M` above or below its first point (a
+  bar's door on a raised road's sidewalk, a vending machine beside a platform) takes the
+  nearest walkway at its height within `SLOT_REACH_M` (a gang's spot one on its turf), else is
+  left out (`left_out` `not_at_height`); `slot_heights` fails one still off its walkway.
 
 LG6 (transit) is in place:
 - **The plan** (`lifegen/transit.py`, called by `plan.build_plan`; `presets.TRANSIT_MODES`,

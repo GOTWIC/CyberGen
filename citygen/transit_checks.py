@@ -654,9 +654,13 @@ def _over_channel(o: dict, g0: float, g1: float, wet: list, shore, closed: bool,
 def check_station_access(m: CityModel) -> Check:
     from .street_checks import walk_components
 
+    from .transit import STAIR_MAX_GRADE
+
     c = _check("station_access", "Every station has stairs, escalators or an elevator to the "
                                  "street and joins the walkway graph (elevated and sky "
-                                 "stations next to a sidewalk or plaza)")
+                                 "stations next to a sidewalk or plaza); no station stair or "
+                                 f"escalator rises more than {STAIR_MAX_GRADE:g} m a meter "
+                                 "of run (steeper, an elevator)")
     roots = walk_components(m)
     walks = {w.id: w for w in m.walkways}
     ground_roots = set()
@@ -670,6 +674,15 @@ def check_station_access(m: CityModel) -> Check:
         if not vertical:
             _limit(c, f"{s.id} '{s.name}': no stairs or elevator")
             continue
+        for w in acc:
+            if w.kind not in ("stairs", "escalator"):
+                continue
+            for p0, p1 in zip(w.line, w.line[1:]):
+                run = math.hypot(p1[0] - p0[0], p1[1] - p0[1])
+                if abs(p1[2] - p0[2]) > STAIR_MAX_GRADE * run + 0.01:
+                    _limit(c, f"{s.id} '{s.name}': {w.kind} {w.id} rises "
+                              f"{abs(p1[2] - p0[2]):.1f} m over {run:.1f} m")
+                    break
         joined = any(roots.get((p[0], p[1])) in ground_roots for w in acc for p in
                      (w.line[0], w.line[-1]))
         if not joined:

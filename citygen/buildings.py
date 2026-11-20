@@ -1490,6 +1490,38 @@ def _item(b: Bld, roof, z: float, kind: str, cu: float, cv: float, su: float, sv
             "yaw_deg": fr.yaw_deg()}
 
 
+PAD_CLEAR_M = 1.0   # a pad's square grown by this keeps clear of its building above its roof
+
+
+def pad_blocked(b: Bld, u: float, v: float, s: float, z: float) -> bool:
+    """Whether a mass of the building standing above a roof at z (its crown: a mast, a spire,
+    a halo's ring and struts, an exo frame) comes within `PAD_CLEAR_M` of a pad's square of
+    side s at (u, v) in plan: a flier could not land on it (city open items: LG7's pads under
+    crown masts). An exact predicate on the grid's square."""
+    h = s / 2.0 + PAD_CLEAR_M
+    zone = b.fr.rect(u - h, v - h, u + h, v + h)
+    return any(m[2] > z + 0.01 and m[0].intersects(zone) for m in b.masses)
+
+
+def _pad(b: Bld, roof, z: float, kind: str, bounds, s: float, sz: float) -> dict | None:
+    """A helipad or AV pad on the roof: at its middle, else moved toward a side or a corner
+    as far as the roof holds it, the first place clear of the building's crown
+    (`pad_blocked`); None where none is."""
+    u0, v0, u1, v1 = bounds
+    cu, cv = (u0 + u1) / 2.0, (v0 + v1) / 2.0
+    us = (cu, q(u0 + s / 2.0 + 0.5), q(u1 - s / 2.0 - 0.5))
+    vs = (cv, q(v0 + s / 2.0 + 0.5), q(v1 - s / 2.0 - 0.5))
+    spots = sorted({(u, v) for u in us for v in vs},
+                   key=lambda p: (abs(p[0] - cu) + abs(p[1] - cv), p))
+    for u, v in spots:
+        it = _item(b, roof, z, kind, u, v, s, s, sz)
+        if it is None:
+            continue
+        if not pad_blocked(b, u, v, s, z):
+            return it
+    return None
+
+
 def rooftop(b: Bld, cx: Ctx, rng) -> list[dict]:
     prog = cx.prog
     items = []
@@ -1506,10 +1538,10 @@ def rooftop(b: Bld, cx: Ctx, rng) -> list[dict]:
     pad = None
     if "helipad" in kinds and z >= 150.0 and W >= 24.0 and D >= 24.0 and \
             float(rng.random()) < 0.7:
-        pad = _item(b, roof, z, "helipad", cu, cv, 20.0, 20.0, 0.6)
+        pad = _pad(b, roof, z, "helipad", (u0, v0, u1, v1), 20.0, 0.6)
     elif "av_pad" in kinds and z >= 50.0 and W >= 18.0 and D >= 18.0 and \
             float(rng.random()) < 0.45:
-        pad = _item(b, roof, z, "av_pad", cu, cv, 14.0, 14.0, 0.5)
+        pad = _pad(b, roof, z, "av_pad", (u0, v0, u1, v1), 14.0, 0.5)
     if pad is not None:
         items.append(pad)
     elif "mechanical" in kinds and z >= 25.0 and W >= 10.0 and D >= 10.0:

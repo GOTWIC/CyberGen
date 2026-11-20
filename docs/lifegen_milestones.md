@@ -385,6 +385,20 @@ and numbers: [`docs/progress/people_idles/README.md`](progress/people_idles/READ
   show the sitting loop through a sit-down; a ring of people at a slot in Old Town found sunk
   into a raised sidewalk (an LG4 fault: a slot's point takes its walkway lane's height).
 
+### The city open items (after car_merge)
+
+Two of lifegen's open items on Delta, with citygen's and AG7's (`docs/progress/
+city_open_items/`):
+- **Slots at their walkway's height** (`places.level_slots`, after `seat_slots`): a ground level
+  slot more than `SLOT_STEP_M` from its walkway's height where it leaves it (bars' doors on a
+  raised road's sidewalk, a bench under a viaduct, a vending machine beside a 31 m platform: 12
+  on Delta) takes the nearest walkway at its height within `SLOT_REACH_M` (a gang's spot one on
+  its turf), else is left out (`left_out.not_at_height`, `moved_to_height`); `slot_heights` fails
+  a slot still off.
+- **Every pad flown** (`airwater.car_pairs`, `pad_route`): an odd pad out joins the pair with
+  the pad nearest it as a third stop of its tour; with citygen's pads now off their crowns,
+  Delta flies all 57.
+
 ## LG6: transit
 
 Built on the Windows PC (2026-11-16), on main after the crossings fix's Unreal run (#234).

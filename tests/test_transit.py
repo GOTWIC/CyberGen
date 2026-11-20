@@ -232,6 +232,42 @@ def test_check_station_access_fails(lines):
     assert not _rerun(_mutate(lines.model, fn))["station_access"].passed
 
 
+def test_station_stairs_at_a_stair_grade(lines):
+    """City open items: every station stair rises at most STAIR_MAX_GRADE a meter of run (an
+    elevated platform's end too high over its sidewalk gets a bridge at its height and an
+    elevator down, as Delta's Midtown station whose stair rose 31 m over 18 m); the check
+    fails a stair made steeper."""
+    import math
+
+    from citygen.transit import STAIR_MAX_GRADE
+
+    m = lines.model
+    walks = {w.id: w for w in m.walkways}
+    stairs = [walks[i] for s in m.stations for i in s.access_ids
+              if i in walks and walks[i].kind == "stairs"]
+    for w in stairs:
+        for a, b in zip(w.line, w.line[1:]):
+            assert abs(b[2] - a[2]) <= STAIR_MAX_GRADE * math.hypot(b[0] - a[0], b[1] - a[1]) \
+                + 0.01, w.id
+    bridges = [walks[i] for s in m.stations for i in s.access_ids
+               if i in walks and (walks[i].attrs or {}).get("lift_bridge")]
+    for w in bridges:
+        # (level at the platform's height, an elevator at its end)
+        assert w.line[0][2] == w.line[-1][2] > 0.0
+        end = tuple(w.line[-1][:2])
+        assert any(o.kind == "elevator" and tuple(o.line[0][:2]) == end for o in m.walkways)
+
+    def fn(d):
+        s = next(s for s in d["stations"] if s["kind"] == "elevated")
+        w = next(w for w in d["walkways"] if w["id"] in s["access_ids"] and
+                 w["kind"] in ("stairs", "elevator"))
+        x, y, _ = w["line"][0]
+        w["kind"] = "stairs"
+        w["line"] = [[x, y, 19.0], [x + 5.0, y, 0.0]]
+    rec = _rerun(_mutate(m, fn))["station_access"]
+    assert not rec.passed and any("rises 19.0 m over 5.0 m" in f for f in rec.failures)
+
+
 def test_check_stops_fails(lines):
     def fn(d):
         t = _line(d, "elevated_rail")

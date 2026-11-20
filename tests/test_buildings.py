@@ -224,6 +224,34 @@ def test_check_roof_items_fails(rich):
     assert not _rerun(RICH, _mutate(rich.model, fn))["roof_items"].passed
 
 
+def test_pads_open_to_the_sky(rich):
+    """City open items: a helipad or AV pad keeps clear of its building's crown (LG7: Delta's
+    pads under their own building's mast); the check fails a mast stood over one."""
+    m = rich.model
+    pads = [(b, it) for b in m.buildings for it in b.roof_items
+            if it.kind in ("helipad", "av_pad")]
+    assert pads
+    from citygen import geom as G
+    from citygen.building_checks import _item_rect
+    from citygen.buildings import PAD_CLEAR_M
+    for b, it in pads:
+        zone = _item_rect(it, -(PAD_CLEAR_M - 0.05))       # (the pad's own frame)
+        assert not any(ms.z1_m > it.position[2] + 0.01 and
+                       G.from_model_poly(ms.footprint).intersects(zone) for ms in b.masses), b.id
+
+    def fn(d):
+        b = next(b for b in d["buildings"]
+                 if any(it["kind"] in ("helipad", "av_pad") for it in b["roof_items"]))
+        it = next(it for it in b["roof_items"] if it["kind"] in ("helipad", "av_pad"))
+        x, y, z = it["position"]
+        b["masses"].append({"footprint": {"exterior": [[x - 1.3, y - 1.3], [x + 1.3, y - 1.3],
+                                                       [x + 1.3, y + 1.3], [x - 1.3, y + 1.3]],
+                                          "holes": []},
+                            "z0_m": z, "z1_m": z + 16.0, "role": "mast", "shape": "prism"})
+    rec = _rerun(RICH, _mutate(m, fn))["roof_items"]
+    assert not rec.passed and any("mast stands over its" in f for f in rec.failures)
+
+
 def test_check_complexes_fails(rich):
     def fn(d):
         p = next(p for p in d["properties"] if p["complex"] == "twin_towers")

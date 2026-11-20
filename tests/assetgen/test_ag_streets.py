@@ -226,6 +226,27 @@ def test_kit_drops_folds_and_checks_clean():
     assert not any(K.check(b.slots).values())
 
 
+def test_bridge_piers_keep_out_of_the_channel():
+    """City open items: a bridge spans a short stretch of water whole and keeps its piers out
+    of a canal's or river's navigable channel (AG7 stood one in the middle of every crossing:
+    Delta's Old Town canal and two canals' boats turned short of them); the open sea has
+    none."""
+    from assetgen.streets import structures as ST
+    assert ST.pier_spots(0.0, 30.0, 40.0, 8.0) == []           # a canal: spanned whole
+    assert ST.pier_spots(0.0, 44.0, 40.0, None) == []          # short, even on the sea
+    river = ST.pier_spots(10.0, 130.0, 40.0, 40.0)             # a 120 m river
+    assert river and all(s <= 10.0 + 40.0 or s >= 130.0 - 40.0 for s in river)
+    assert min(abs(s - 70.0) for s in river) >= 20.0 + ST.PIER_HALF_M - 0.01
+    assert len(ST.pier_spots(0.0, 200.0, 40.0, None)) == 5     # the sea: evenly
+    inp = {"bridge": {"water_class": "river", "line": [[0.0, 0.0, 9.0], [140.0, 0.0, 9.0]]},
+           "wet": [0, 0] + [1] * 25 + [0] * 2}
+    (c0, c1), = ST.channels(inp)
+    (r0, r1), = ST._wet_runs(inp["wet"], 140.0)
+    assert c0 < (r0 + r1) / 2.0 < c1 and c1 - c0 >= 40.0
+    spots = ST.pier_spots(r0, r1, 40.0, 40.0)
+    assert spots and all(s + 1.2 < c0 or s - 1.2 > c1 for s in spots)
+
+
 def test_quay_stairs_are_closed():
     """#131: each flight down a quay wall is a closed solid: its only open edges lie on the
     quay wall's face (where it stands against the wall) or at the wall's foot, and its faces

@@ -273,6 +273,7 @@ def make_bridge(inp: dict) -> Out:
     out.notes["bridge_kind"] = kind
     piers: list = []
     runs = _wet_runs(inp["wet"], ln.L)
+    ch = channel_of(b)
     if kind.startswith("footbridge") or cls == "footbridge":
         _footbridge(mesh, ln, dict(inp, segs=segs), "footbridge.steel"
                     if kind == "cable_stayed" else kind, W, wz)
@@ -289,7 +290,7 @@ def make_bridge(inp: dict) -> Out:
             a0, a1 = sm - 160.0, sm + 160.0
         _arch(mesh, ln, a0, a1, W, D, wz, foot, piers)
         _piers(mesh, ln, runs, W, D, wz, skip=(a0 - 5.0, a1 + 5.0), step=40.0, foot=foot,
-               piers=piers)
+               piers=piers, channel=ch)
     elif kind == "cable_stayed" and main is not None:
         w0, w1 = main
         sm = (w0 + w1) / 2.0
@@ -297,9 +298,10 @@ def make_bridge(inp: dict) -> Out:
         p0, p1 = sm - half, sm + half
         _cable_stayed(mesh, ln, p0, p1, W, D, wz, foot, piers)
         _piers(mesh, ln, runs, W, D, wz, skip=(p0 - 30.0, p1 + 30.0), step=50.0, foot=foot,
-               piers=piers)
+               piers=piers, channel=ch)
     else:
-        _piers(mesh, ln, runs, W, D, wz, skip=None, step=40.0, foot=foot, piers=piers)
+        _piers(mesh, ln, runs, W, D, wz, skip=None, step=40.0, foot=foot, piers=piers,
+               channel=ch)
     if piers:
         out.notes["piers"] = piers          # (AG12: the water foams round them)
     # abutments where the bridge meets the banks
@@ -322,17 +324,72 @@ def _footprint(x, y, dx, dy, along: float, across: float) -> list[list[float]]:
             [C.m2(x + ax + bx), C.m2(y + ay + by)], [C.m2(x - ax + bx), C.m2(y - ay + by)]]
 
 
+CLEAR_SPAN_M = 45.0       # a stretch of water this short is spanned whole: no pier in it
+# the navigable channel down the middle of the water a bridge crosses, at most half its
+# width and this wide, kept clear of piers (citygen's transit piers' rule, `CHANNEL_M`: the
+# open sea has none); a pier stands this far (its half length and a margin) off its edge
+CHANNEL_M = {"river": 40.0, "canal": 8.0}
+PIER_HALF_M = 1.8
+
+
+def channel_of(bridge: dict) -> float | None:
+    """The navigable channel's width under a bridge by the water it crosses (None: the sea,
+    where a pier may stand anywhere)."""
+    return CHANNEL_M.get(bridge.get("water_class") or "canal")
+
+
+def pier_spots(r0: float, r1: float, step: float, channel: float | None) -> list[float]:
+    """Where piers stand along a bridge over a stretch of water [r0, r1] (distances along its
+    line): none on a stretch of `CLEAR_SPAN_M` or less (city open items: AG7 stood one in the
+    middle of every canal and river crossing, across its channel, and the boats turned short
+    of it); else, with a channel, from each shore out to the channel's edge at most `step`
+    apart, the channel one span; on the open sea evenly at most `step` apart."""
+    L = r1 - r0
+    if L < 12.0 or L <= CLEAR_SPAN_M:
+        return []
+    if channel is None:
+        n = max(1, int(L / step))
+        return [r0 + L * k / (n + 1) for k in range(1, n + 1)]
+    reach = L / 2.0 - min(L / 4.0, channel / 2.0) - PIER_HALF_M
+    if reach < 4.0:
+        return []
+    n = max(1, int(math.ceil(reach / step - 1e-9)))
+    out = []
+    for k in range(1, n + 1):
+        d = reach * k / n
+        out += [r0 + d, r1 - d]
+    return sorted(out)
+
+
+def channels(inp: dict) -> list[tuple[float, float]]:
+    """The stretches along a bridge's line no pier may stand in (`pier_spots`' rule): each
+    stretch of water's channel, the whole of a short one; the check's (`street_channels`)."""
+    try:
+        L = Path([(p[0], p[1]) for p in inp["bridge"]["line"]]).L
+    except ValueError:
+        return []
+    ch = channel_of(inp["bridge"])
+    out = []
+    for r0, r1 in _wet_runs(inp.get("wet") or [], L):
+        w = r1 - r0
+        if w < 12.0 or w <= CLEAR_SPAN_M:
+            out.append((r0, r1))
+        elif ch is not None:
+            reach = w / 2.0 - min(w / 4.0, ch / 2.0) - PIER_HALF_M
+            if reach < 4.0:
+                out.append((r0, r1))
+            else:
+                out.append((r0 + reach + PIER_HALF_M - 0.01, r1 - reach - PIER_HALF_M + 0.01))
+    return out
+
+
 def _piers(mesh: Mesh, ln: Line3, runs, W: float, D: float, wz: float, skip, step: float,
-           foot=None, piers=None):
+           foot=None, piers=None, channel: float | None = None):
     if foot is None:
         def foot(s):
             return wz - PIER_FOOT_M
     for r0, r1 in runs:
-        if r1 - r0 < 12.0:
-            continue
-        n = max(1, int((r1 - r0) / step))
-        for k in range(1, n + 1):
-            s = r0 + (r1 - r0) * k / (n + 1)
+        for s in pier_spots(r0, r1, step, channel):
             if skip is not None and skip[0] <= s <= skip[1]:
                 continue
             x, y, _, _, _ = ln.path.frame(s)

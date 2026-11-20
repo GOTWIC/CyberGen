@@ -11,6 +11,7 @@ import shapely
 from shapely.geometry import LineString, Point
 
 from . import geom as G
+from . import props as P
 from . import vegetation as V
 from .checks import Check
 from .model import CityModel
@@ -189,9 +190,16 @@ def check_boats(c: Ctx, m: CityModel) -> Check:
     ch = _check("boats_afloat", "Boats lie in their waterway, their hull clear of every "
                                 "quay's band (width_m across its line, half of it over the "
                                 "water) and of their water's banks (a wall's thickness, a "
-                                "slope's run to the waterline)")
+                                "slope's run to the waterline), each leaving "
+                                f"{P.NAV_CLEAR_M:g} m of open water across its waterway")
     ww = {w.id: G.from_model_poly(w.polygon) for w in m.waterways}
     moor = Moorings(m)
+    bands = [line.buffer(half, cap_style="flat") for _, line, half in moor.quays]
+    hulls: dict = {}
+    for p in m.props:
+        if _kind(p) == "boat":
+            hulls.setdefault((p.attrs or {}).get("waterway"), []).append(
+                boat_hull(p.position[0], p.position[1], p.yaw_deg, p.scale))
     banks: dict = {}
     for k in m.banks:
         if len(k.line) >= 2:
@@ -211,6 +219,12 @@ def check_boats(c: Ctx, m: CityModel) -> Check:
         if qid is not None:
             _limit(ch, f"{p.id}: its hull on quay {qid}'s band")
             continue
+        # (city open items: a boat passes every mooring)
+        nb = [g for g in bands if g.intersects(poly)]
+        w_open = P.open_across(poly, nb, hulls.get(wid, []), p.position[0], p.position[1],
+                               p.yaw_deg, KINDS["boat"][1][0] * p.scale[0])
+        if w_open < P.NAV_CLEAR_M - 0.01:
+            _limit(ch, f"{p.id}: {w_open:.1f} m of open water across its waterway beside it")
         # (M16's banks, from the land's edge out to the waterline; a city built before M16
         # has none: then its waterway's shore by the walls M16 would stand there)
         if wid in banks:
