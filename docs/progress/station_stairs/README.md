@@ -100,7 +100,27 @@ it) for the import and package.
 
 ## Cities whose models moved
 
-HASHES_TABLE
+Every city moves on purpose (`tests/data/golden_hashes.json`: the five samples', Cragmouth's and
+Vesper Bay Decks' models and blockout plans, from builds of the branch in
+`C:/Users/swagn/CityGen/builds/goldens_station_stairs`, Delta's in `delta_stairs`): its stations'
+stairs and elevators, the props, plants and gameplay rows near them. Every one builds on the
+same try as on main and passes all its checks:
+
+| City | Stair towers | Metro wells | Flights | Shafts on clear ground | Shafts straight down | Walkways with nothing under them | Built on try |
+|---|---|---|---|---|---|---|---|
+| Archipelago Free Port | 13 | 0 | 91 | 8 | 2 | 0 | 1 |
+| Cragmouth | 0 | 10 | 30 | 0 | 6 | 0 | 2 |
+| Delta Megacity | 20 | 2 | 146 | 11 | 4 | 0 | 3 |
+| Nexus City | 14 | 5 | 103 | 8 | 5 | 0 | 1 |
+| Greyhook | 8 | 8 | 68 | 6 | 5 | 0 | 3 |
+| Vesper Bay | 14 | 7 | 103 | 8 | 12 | 0 | 8 |
+DECKS_ROW
+
+assetgen's goldens (`tests/assetgen/data/`) are written again from the same builds
+(`tests/assetgen/goldens.py --builds`, `streets_goldens.py`, `water_goldens.py`,
+`props_goldens.py`, `ground_goldens.py`): the five samples' briefs move with their models, and
+Vesper Bay's street tiles with the stairs and shafts AG7 draws (the small test city, which has no
+transit, keeps its streets, water, props and ground).
 
 ## Open items
 
