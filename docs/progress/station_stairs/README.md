@@ -17,7 +17,7 @@ plan --atmos`).
 | Map | `citygen/unreal_play.py` | stairs and shafts on the play features' map |
 | Tests | `tests/test_transit.py`, `tests/assetgen/test_ag_streets.py` | flights on clear ground and the check failing two broken copies; every station stair or elevator walkway has a blockout object and an AG7 surface under it |
 
-![Delta's East Quay monorail station (19 m): two stair towers of six flights and an elevator shaft on the quay beside the platform, bridges from the platform's ends to their tops](render_east_quay_stairs.jpg)
+![Delta's East Quay monorail station (19 m) as AG7 draws it: two stair towers of six flights and a glass elevator shaft on the quay beside the platform, glazed bridges from the platform's ends to their tops](delta_east_quay_ag7.jpg)
 
 ## 1. Stairs that can be built
 
@@ -77,6 +77,8 @@ the ground facing its way). The tests check that every point of every station st
 a tread or landing under it, and every elevator a shaft round it. **Exporter:** nothing new; the
 pieces replace the blockout's objects by key through stage 2.
 
+![The same station in the blockout: the flights and landings as strips on their posts, the shaft as a prism](render_east_quay_stairs.jpg)
+
 ## Delta on the branch
 
 | | main (#250) | branch |
@@ -86,7 +88,15 @@ pieces replace the blockout's objects by key through stage 2.
 | Bridges and passages | 10 bridges over the sidewalk point | 30 bridges, 6 to 33 m; 3 passages, 8 to 30 m |
 | Station stair or elevator walkways with nothing under them | every one | none |
 
-STAGES_TABLE
+| Stage | Time | Checks |
+|---|---|---|
+| `citygen build` | 16m03s (the third layout, salt 2, as on main: tries 1 and 2 fail as they do on main) | 109 of 109 pass (`station_stairs` new) |
+| `assetgen build` | 12m26s | every stage's checks pass; 37 station stair and elevator pieces drawn (22 stairs, 15 shafts) |
+| `atmosgen plan` | 1m48s | pass |
+| `lifegen plan --atmos` | 65 s | 37 of 37 pass (`transit_boarding`: every stop's platform reaches its street accesses along the new stairs) |
+
+The build is left at `C:/Users/swagn/CityGen/builds/delta_stairs` (its `build.sh` and logs beside
+it) for the import and package.
 
 ## Cities whose models moved
 
