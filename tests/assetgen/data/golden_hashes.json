@@ -13,11 +13,11 @@
     }
   },
   "samples": {
-    "archipelago_free_port": "cead9ecc843664d73483eb86b7e4c5b046ace5ce6a9fbeafb4ee706776656206",
-    "delta_megacity": "3e0361459ef2b1bbf6f8114668607a9f459f4a15542fb07527b446445777d2bb",
-    "nexus_city": "af7ff20195dfdab28965403d3a178b19c2368e6537f38483c861dd1f2d8d3b51",
-    "peninsula_city": "c52e6c6f069fe5421b3525e9a1c8827d07ee13311a08eaab806904ba5664f1d2",
-    "vesper_bay": "f5f16fd5994fe65d565d584c7543c0dd8d850670ad4e87265197e9569de23200"
+    "archipelago_free_port": "ca68b20fa9d91c13905fd8ad8e1f5ec3a5dd1f07b8eb7dc940b0381dcb6095ee",
+    "delta_megacity": "0b4e6c01081f4662fa8aad20fc54ba461efb4bc3f03fe35df097383de2a7ec40",
+    "nexus_city": "eb394cf71e7a83c87f9529ab2f55d057cfb06d6350da50cc91644a6ed971457e",
+    "peninsula_city": "0bf9ac48fc9b032dd1607db429eabbde935756a14a81dd4002d5576538910176",
+    "vesper_bay": "dcac75347b1580a49fafba83a3d37dff3ddc9d00609f382ae783a248fee380f0"
   },
   "spike": {
     "shopfront_row": "f23a2f816caf8edb6e5ebd46b70d96a7fc9e205c5c979b9eda1c88f6abe5276e",
