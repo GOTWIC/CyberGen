@@ -381,6 +381,48 @@ def test_merged_cars(lib, tmp_path):
     assert U.actor_hashes(again) == U.actor_hashes(man)
 
 
+def test_merged_last_lod_is_one_section(lib, tmp_path):
+    """car_merge_followups: the merged mesh's last LOD is one section, the body's: the glass
+    and the wheels (a rolling wheel's too) join it with UV1 (gray, -1 - roughness), which
+    M_CgVehicle draws flat, the glass already from the LOD it is dark in; a pack whose parts
+    share the body's material folds nothing."""
+    import numpy as np
+
+    def box(c, d, m):
+        return U.prototype_mesh([{"k": "box", "c": c, "d": d, "yaw": 0.0, "m": m}])
+    d = lib / "test_coupe"
+    parts = {"body": box([0, 0, 0.2], [4, 1.8, 1.0], "pack_body"),
+             "glass": box([0, 0, 1.2], [2, 1.6, 0.4], "pack_glass"),
+             "wheel_fl": box([0, 0, -0.3], [0.6, 0.2, 0.6], "pack_wheels"),
+             "wheel_fr": box([0, 0, -0.3], [0.6, 0.2, 0.6], "pack_wheels")}
+    for k in range(4):
+        U.write_glb(parts, {}, d / f"lod{k}.glb")
+    b = _build(tmp_path)
+    _place(b, [copy.deepcopy(ENTRY)])
+    man = _man(b, lib)
+    mg = man["vehicles"]["cars"]["test_coupe"]["merged"]
+    glass = round(UV.FLAT_GLASS * sum([0.3, 0.33, 0.36]) / 3, 4)
+    assert mg["flat"] == {"into": "pack_body", "pack_glass": [glass, UV.FLAT_GLASS_ROUGH],
+                          "pack_wheels": list(UV.FLAT_TIRE)}
+    mats = []
+    for rel in mg["files"]:
+        doc, blob = UV._glb(b / rel)
+        mats.append([m["name"] for m in doc["materials"]])
+    assert mats[0] == mats[1] == ["pack_body", "pack_glass", "pack_wheels_roll"] == \
+        mg["materials"]
+    # (the glass in the body's section from the pack's opaque_from_lod, 2; the wheels in the
+    # last LOD)
+    assert mats[2] == ["pack_body", "pack_wheels_roll"] and mats[3] == ["pack_body"]
+    prim = doc["meshes"][0]["primitives"][0]
+    uv1 = UV._array(doc, blob, prim["attributes"]["TEXCOORD_1"])
+    rows = {tuple(round(v, 4) for v in r) for r in uv1.tolist()}
+    assert rows == {(0.0, 0.0), (glass, round(-1.0 - UV.FLAT_GLASS_ROUGH, 4)),
+                    (UV.FLAT_TIRE[0], round(-1.0 - UV.FLAT_TIRE[1], 4))}
+    assert np.all(uv1[:, 1] <= 0.0)
+    # (the hover car's test pack: one material for every part, nothing folded)
+    assert man["vehicles"]["cars"]["test_hover"]["merged"]["flat"] == {"into": "m"}
+
+
 def test_traffic_and_fliers_take_the_merged_mesh(lib, tmp_path):
     """car_merge: the traffic's model is its merged mesh, one part drawn as far as a body, its
     wheels rolled within ROLL_M by the first wheel's radius; a hover car (no wheels) rolls

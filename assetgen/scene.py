@@ -100,12 +100,17 @@ def count(man: dict) -> dict:
         # instance per vehicle; its meshes are not Nanite (no root pages)
         vstat = {"vehicles": 0, "components": 0, "instances": 0, "models": 0,
                  "triangles_lod0": 0}
-        models = set()
+        models, meshes = set(), set()
         for r in veh["placements"]:
             e = t(r["tile"])
             for car, m in r["models"].items():
                 rec = veh["cars"][car]
-                n = len(rec["parts"])
+                # (car_merge_followups: a car with a merged mesh is one component, unless one
+                # of its cars steers: the importer's `parked_parts`)
+                parts = [rec["merged"]["part"]] if rec.get("merged") and \
+                    not any(m.get("steer") or []) else [p["name"] for p in rec["parts"]]
+                meshes |= {(car, p) for p in parts}
+                n = len(parts)
                 e["components"] += n
                 e["instances"] += n * len(m["ids"])
                 vstat["components"] += n
@@ -114,7 +119,7 @@ def count(man: dict) -> dict:
                 vstat["triangles_lod0"] += rec["lods"][0]["triangles"] * len(m["ids"])
                 models.add(car)
         vstat["models"] = len(models)
-        vstat["meshes"] = sum(len(veh["cars"][c]["parts"]) for c in models)
+        vstat["meshes"] = len(meshes)
     city_meshes = set()
     for e in tiles.values():
         city_meshes |= e["meshes"]
