@@ -114,7 +114,7 @@ vehicles/blender.sh vehicles/lineup.py --test     # 1920 px, 24 samples, into th
 - **Studio.** Its own floor and cove, as wide as the camera's distance asks (the camera
   stands about 100 m off with a 105 mm lens), a pool of soft light over the cars; each car
   keeps its own lights, and the image gets the sheets' bloom.
-- **Time.** About 1.5 minutes for 19 cars (4.5 million triangles): 25 s to build the cars
+- **Time.** About 1.5 minutes for 19 cars (4.5 million triangles; 25 cars: about 6 minutes on the PC, all built anew): 25 s to build the cars
   the first time, 3 s to append them, a minute to render 3840 x 1422 at 128 samples. A
   `--test` takes 12 s once the cars are cached.
 - **Arguments.** `--out FILE`, `--cache DIR`, `--width N`, `--samples N`, `--only a,b` (some
