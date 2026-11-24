@@ -41,6 +41,23 @@ The whole roster at one scale (`vehicles/blender.sh vehicles/lineup.py`).
 | Tanager | Porter | parcel-locker delivery van | 2 | 5.30 m | [tanager_porter](tanager_porter/sheet.jpg) | [proof](tanager_porter/game.jpg) |
 | Tanager | Linnet | compact five-door | 5 | 4.18 m | [tanager_linnet](tanager_linnet/sheet.jpg) | none yet |
 
+## Trains
+
+Two transit vehicles on the same kit, in `vehicles/trains/` (apart from the cars, so the
+line-up, the survey and the parked cars' table never list them), each with a complete
+interior to walk in: floor, lining, seats, poles, doors with their inner faces, displays,
+lights. Sizes, floor heights and door places are the ones the transit runtime already runs
+(`lifegen/presets.py`, `TRANSIT_MODES`). The line's color is one material (`paint2`); door
+leaves, interior parts and running gear are objects of their own (`door.*`, `interior.*`,
+`cab.*`, `bogie.*`, `mag.*`, `track.*`); `CYBERGEN_VARIANT=mid` builds the middle car of a
+train and `CYBERGEN_SHUT=1` shuts the doors. No game packs yet and nothing in Unreal: the
+trains there are still the stand-ins.
+
+| Maker | Model | For | Size | Seats | Sheet | Interior |
+|---|---|---|---|---|---|---|
+| Caldera Transit Works | Strand | elevated rail and metro | 20.0 x 3.0 m, floor 1.15 m over the rail, three 1.4 m doors a side | 41 (49 in the middle car) | [caldera_strand](caldera_strand/sheet.jpg) | [inside](caldera_strand/interior.jpg) |
+| Caldera Transit Works | Quill | sky tube pod | 9.0 x 2.4 x 2.7 m, one 1.4 m door a side, 209 mm clear of the 7 m tube | 16 (17 in the middle pod) | [caldera_quill](caldera_quill/sheet.jpg) | [inside](caldera_quill/interior.jpg) |
+
 **In the cities** (step H): `assetgen vehicles BUILD` (also part of `assetgen build`) parks
 the packs in a generated city in place of AG8's parked car variants: a model by its
 district's archetype, wealth and danger, painted per placement, wherever its footprint fits

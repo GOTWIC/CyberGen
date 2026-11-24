@@ -2522,6 +2522,19 @@ waits for Swagnik's review.
   rebuilt), then the Dart, Lumen, Hauler and Mino as brand pilots. The Aurels are set aside
   (Swagnik, 2026-11-12; the Prelate's attempt on branch `claude/ag18-prelate-step-b-wip`).
   The Sable, Ridge, Meridian, Atlas, Pebble, Aria, Bastion and Mule followed (2026-11-13; the Orrins keep 2.4 mm shut lines, which tore their far LODs at 3.5 mm). Next: the Tanager Cab and Porter, each switching to its `vehicles/brands/` module.
+- **More cars and the first trains** (2026-11-24, designed on the PC through `blender.sh`
+  with `BLENDER` set): the Halcyon Kite (hot hatch), Orrin Tide (crossover estate), Brakk
+  Burro (compact 4x4) and Tanager Linnet (compact five-door), each with step B's features, a
+  fourth model of its brand in `BRANDS.md` (25 cars in the line-up); no game packs yet, so
+  none is placed in a city. Transit vehicles are in `vehicles/trains/` (never in `cars/`:
+  the line-up, the survey and the parked table list `cars/` only), each with a complete
+  walk-in interior at the transit runtime's sizes (`lifegen/presets.TRANSIT_MODES`): the
+  Caldera Strand (elevated rail and metro car, 20.0 x 3.0 m, three doors a side) and the
+  Caldera Quill (sky tube pod, 9.0 x 2.4 x 2.7 m, one door a side). Their line color is the
+  one material `paint2`; `door.<side>...`, `interior.*`, `cab.*`, `bogie.*`, `mag.*` and
+  `track.*` are objects of their own, `CYBERGEN_VARIANT=mid` builds a train's middle car.
+  No packs and nothing in Unreal yet (LG6's stand-ins still run). Sheets and interior views:
+  `docs/progress/AG18/<name>/`.
 - The other phases (improvements, AG8's parked vehicles and
   stage 4's fleet drawing on them) are listed in the scope with their plan.
 

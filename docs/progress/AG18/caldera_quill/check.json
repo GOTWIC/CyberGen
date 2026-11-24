@@ -1,0 +1,434 @@
+{
+ "car": "caldera_quill",
+ "size": [
+  9.25,
+  2.402,
+  2.701
+ ],
+ "top_z": 2.701,
+ "objects": 131,
+ "palette": {
+  "paint": [
+   0.6,
+   0.61,
+   0.6
+  ],
+  "paint_finish": "pearl",
+  "paint2": [
+   0.62,
+   0.17,
+   0.004
+  ],
+  "paint2_finish": "gloss"
+ },
+ "tires": {
+  "verdict": "ok",
+  "note": "no wheels on the ground (a hover car)",
+  "wheels": []
+ },
+ "ground": {
+  "verdict": "ok",
+  "clearance_mm": 0.0,
+  "lowest": "body.skirt.r",
+  "under_floor": [],
+  "note": "stands on the ground on body.skirt.r"
+ },
+ "symmetry": {
+  "verdict": "ok",
+  "center_off_mm": 0.0,
+  "objects": 0,
+  "asymmetric": [
+   {
+    "object": "interior.seat.10",
+    "off_mm": 472.0,
+    "at": [
+     1.665,
+     0.296,
+     0.773
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat.01",
+    "off_mm": 443.0,
+    "at": [
+     -1.588,
+     0.23,
+     0.759
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat.04",
+    "off_mm": 443.0,
+    "at": [
+     -2.488,
+     0.23,
+     0.759
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat.07",
+    "off_mm": 443.0,
+    "at": [
+     -3.388,
+     0.23,
+     0.759
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat.09",
+    "off_mm": 439.6,
+    "at": [
+     1.605,
+     0.634,
+     0.96
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat.10.frame",
+    "off_mm": 438.2,
+    "at": [
+     1.063,
+     0.285,
+     0.898
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.screens.glass",
+    "off_mm": 428.4,
+    "at": [
+     0.93,
+     0.27,
+     1.18
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat.01.frame",
+    "off_mm": 422.0,
+    "at": [
+     -2.039,
+     0.213,
+     1.118
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat.04.frame",
+    "off_mm": 422.0,
+    "at": [
+     -2.939,
+     0.213,
+     1.118
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat.07.frame",
+    "off_mm": 401.5,
+    "at": [
+     -3.84,
+     0.21,
+     1.118
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat.09.frame",
+    "off_mm": 387.5,
+    "at": [
+     1.653,
+     0.729,
+     0.69
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.screens",
+    "off_mm": 337.4,
+    "at": [
+     -0.946,
+     0.179,
+     1.176
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.screens.trim",
+    "off_mm": 335.2,
+    "at": [
+     -0.941,
+     0.177,
+     1.978
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.screen.route.case",
+    "off_mm": 278.7,
+    "at": [
+     -0.91,
+     0.34,
+     1.435
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.screen.route",
+    "off_mm": 269.4,
+    "at": [
+     -0.903,
+     0.35,
+     1.442
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.screen.route.amber",
+    "off_mm": 238.3,
+    "at": [
+     -0.9,
+     0.382,
+     1.621
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.poles",
+    "off_mm": 156.8,
+    "at": [
+     -0.93,
+     -0.642,
+     2.151
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.notices",
+    "off_mm": 123.5,
+    "at": [
+     -4.296,
+     -0.812,
+     1.535
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.extinguisher",
+    "off_mm": 122.0,
+    "at": [
+     -4.298,
+     -0.82,
+     1.33
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.steel",
+    "off_mm": 117.0,
+    "at": [
+     -4.303,
+     -0.829,
+     1.752
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.screen.route.white",
+    "off_mm": 116.3,
+    "at": [
+     -0.9,
+     0.505,
+     1.539
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.bay.rail",
+    "off_mm": 115.0,
+    "at": [
+     2.029,
+     -1.04,
+     1.13
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.bay.pad",
+    "off_mm": 52.2,
+    "at": [
+     0.999,
+     -1.064,
+     1.05
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.bay.call.button",
+    "off_mm": 30.2,
+    "at": [
+     1.89,
+     -1.075,
+     0.8
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.bay.call",
+    "off_mm": 27.8,
+    "at": [
+     1.873,
+     -1.079,
+     0.759
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.bay.sign",
+    "off_mm": 6.8,
+    "at": [
+     1.471,
+     -1.125,
+     0.654
+    ],
+    "meant": true
+   },
+   {
+    "object": "marking.end",
+    "off_mm": 5.5,
+    "at": [
+     -4.502,
+     -0.937,
+     1.747
+    ],
+    "meant": true
+   }
+  ]
+ },
+ "panels": {
+  "verdict": "ok",
+  "open_edges": [],
+  "open_mm": 0,
+  "cutter_holes": [],
+  "cut_loops": 0,
+  "pieces": {}
+ },
+ "through": {
+  "verdict": "ok",
+  "parts": [
+   {
+    "object": "interior.gangway.liner.r",
+    "out_mm": 107.9,
+    "share": 0.41,
+    "at": [
+     -4.644,
+     0.474,
+     2.334
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.gangway.plate.r",
+    "out_mm": 76.0,
+    "share": 0.5,
+    "at": [
+     -4.723,
+     -0.407,
+     0.306
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.threshold",
+    "out_mm": 31.3,
+    "share": 0.06,
+    "at": [
+     0.697,
+     -1.182,
+     0.215
+    ],
+    "meant": true
+   }
+  ],
+  "count": 0
+ },
+ "triangles": {
+  "verdict": "ok",
+  "total": 263395,
+  "budget": 400000,
+  "top": [
+   [
+    "body.skirt.f",
+    14856
+   ],
+   [
+    "interior.screen.route.white",
+    9200
+   ],
+   [
+    "marking",
+    9192
+   ],
+   [
+    "interior.display.amber",
+    8222
+   ],
+   [
+    "door.l.a",
+    5923
+   ],
+   [
+    "door.r.a",
+    5923
+   ],
+   [
+    "door.l.b",
+    5923
+   ],
+   [
+    "door.r.b",
+    5923
+   ]
+  ],
+  "groups": [
+   [
+    "interior",
+    128696
+   ],
+   [
+    "body",
+    69440
+   ],
+   [
+    "door",
+    23692
+   ],
+   [
+    "glass",
+    16646
+   ],
+   [
+    "marking",
+    12015
+   ],
+   [
+    "mag",
+    7380
+   ],
+   [
+    "display",
+    3744
+   ],
+   [
+    "light",
+    1782
+   ]
+  ]
+ },
+ "verdict": "ok"
+}
