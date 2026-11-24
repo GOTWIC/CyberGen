@@ -27,11 +27,12 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import bmesh                                                        # noqa: E402
 import carkit as K                                                  # noqa: E402
-from functools import partial                                       # noqa: E402
+import cabin as C                                                   # noqa: E402
+from functools import partial                                      # noqa: E402
 from brands import tanager                                          # noqa: E402
 from brands.tanager import (GD, GLYPH, badge, banner, bar_on, dots, grain, pad,   # noqa: E402
                             rect, rrect, sheet, text_proj)
-from carkit import Geo, Matrix, V3, cos, hypot, pi, rad, sin, stud    # noqa: E402
+from carkit import Geo, Matrix, V3, cos, hypot, pi, rad, stud         # noqa: E402
 
 # ---------------------------------------------------------------------------------------
 # dimensions
@@ -647,55 +648,32 @@ def build_roof():
 # interior
 # ---------------------------------------------------------------------------------------
 def build_interior():
-    """The cabin tub, kept inside the hull and out of the wheel wells (the wells' walls
-    at WELL_Y, their arches up to 0.625 m): over the wells only its middle reaches down."""
-    g = Geo()
-    yi = WELL_Y - 0.01
-    g.box((-0.20, 0, 0.255), (2.62, 2 * yi, 0.03))                  # floor, its middle
-    dash = [(1.10, 0.27), (1.10, 0.985), (0.84, 0.995), (0.70, 0.93), (0.74, 0.27)]
-    g.prism([(x, -yi, z) for x, z in dash], (0, 2 * yi, 0))        # dash
-    dash_out = [(1.10, 0.66), (1.10, 0.985), (0.84, 0.995), (0.70, 0.93), (0.74, 0.27),
-                (0.86, 0.27), (0.86, 0.66)]
-    for sg in (1, -1):
-        y0 = sg * yi
-        g.box((0.0, sg * (yi + 0.70) / 2, 0.255), (1.72, 0.70 - yi, 0.03))      # floor
-        g.prism([(x, y0, z) for x, z in dash_out], (0, sg * (0.70 - yi), 0))  # dash
-        g.box((-1.085, sg * (yi + 0.68) / 2, 0.795), (0.03, 0.68 - yi, 0.27))  # boot wall
-        g.box((0.0, sg * 0.715, 0.615), (1.72, 0.02, 0.65))         # door cards
-        g.box((-1.15, sg * 0.715, 0.80), (0.58, 0.02, 0.28))        # quarter cards
-        g.box((0.93, sg * 0.715, 0.80), (0.14, 0.02, 0.28))
-    g.box((-1.30, 0, 0.93), (0.44, 1.36, 0.02))                     # parcel shelf
-    g.box((-1.085, 0, 0.60), (0.03, 2 * yi, 0.66))                  # the boot's wall
-    g.box((0.30, 0, 0.36), (0.55, 0.16, 0.18))                      # a low console
-    g.obj("interior.tub", "interior", bevel=0.006)
-    g = Geo()
-    tf, tr = Matrix.Rotation(rad(-14), 3, 'Y'), Matrix.Rotation(rad(-12), 3, 'Y')
-    for y in (0.36, -0.36):
-        g.box((0.30, y, 0.50), (0.48, 0.50, 0.13))
-        g.box((0.03, y, 0.86), (0.11, 0.48, 0.62), rot=tf)
-        g.box((-0.065, y, 1.245), (0.075, 0.25, 0.16), rot=tf)
-        g.box((-0.905, y, 1.225), (0.075, 0.25, 0.15), rot=tr)
-    g.box((-0.62, 0, 0.50), (0.46, 1.30, 0.13))
-    g.box((-0.855, 0, 0.84), (0.11, 1.30, 0.58), rot=tr)
-    g.obj("interior.seats", "seat", bevel=0.022, segs=3)
-    g = Geo()
-    wheel = (Matrix.Translation((0.66, 0.36, 1.00)) @ Matrix.Rotation(rad(-64), 4, 'Y')
-             @ Matrix.Rotation(pi / 2, 4, 'X'))
-    g.lathe([(-0.012, 0.165), (0.0, 0.178), (0.012, 0.165), (0.0, 0.152)], 24, xf=wheel)
-    for a in (0, 180, 270):
-        g.tube(wheel @ V3((0, -0.02, 0)), wheel @ V3((0.16 * cos(rad(a)), 0, 0.16 * sin(rad(a)))),
-               0.011, 6)
-    g.box((0.75, 0.36, 0.955), (0.20, 0.05, 0.05), rot=Matrix.Rotation(rad(-26), 3, 'Y'))
-    g.obj("interior.wheel", "interior", sharp=40)
-    g = Geo()
-    scr = Matrix.Rotation(rad(-18), 3, 'Y')
-    g.box((0.735, 0.0, 1.04), (0.008, 0.26, 0.085), rot=scr)
-    g.box((0.765, 0.36, 1.03), (0.008, 0.20, 0.06), rot=scr)
-    g.obj("interior.screens", "screen")
-    g = Geo()                                   # ceiling lights, so the cabin reads
-    for x in (0.25, -0.70):
-        g.box((x, 0, 1.49), (0.34, 0.16, 0.008))
-    g.obj("interior.dome", "dome")
+    """The cabin (vehicles/cabin.py): a lined box from the firewall to the tailgate (the
+    wheel wells come up inside it, lined), two front seats, a rear bench for two, a parcel
+    shelf over the boot, a plain dash in light grey with a red inlay, a two-spoke wheel,
+    door cards front and rear, the roof's kit; the interior views cab_*."""
+    C.materials(head=(0.36, 0.36, 0.34), soft=(0.16, 0.16, 0.155),
+                    trim=(0.50, 0.035, 0.02), carpet=(0.025, 0.025, 0.028),
+                    ambient=(1.0, 0.50, 0.16))
+    cab = C.Cabin(-1.66, 1.12, 0.27, rear="body", style="tanager")
+    cab.lining()
+    cab.seat((0.21, 0.36, 0.64), driver=True)
+    cab.seat((0.21, -0.36, 0.64))
+    cab.seat((-0.70, 0.0, 0.64), places=2, width=1.22)
+    cab.dash(depth=0.34)
+    cab.cluster()
+    cab.screen()
+    cab.wheel(tilt=36)
+    cab.pedals()
+    cab.console(h=0.14)
+    cab.door(0.04, 0.90, tag="door_f", sill_text="TANAGER")
+    cab.door(-0.84, -0.03, tag="door_r", sill=False)
+    cab.shelf(-1.60, -1.12, 0.93)
+    cab.roof_kit()
+    cab.mats()
+    cab.views(exposure=-0.3, outside=2.0, daylight=8.0)
+    cab.report()
+    K.meant("symmetry", *cab.one_sided)
     # the parking permit behind the windshield, on the right
     w = W_FRONT
     c = w.at(-0.40, 1.125, -GD - 0.012)

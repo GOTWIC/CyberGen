@@ -6,7 +6,7 @@
   1.19
  ],
  "top_z": 1.19,
- "objects": 105,
+ "objects": 162,
  "palette": {
   "paint": [
    0.15,
@@ -87,25 +87,207 @@
  "symmetry": {
   "verdict": "look",
   "center_off_mm": 0.0,
-  "objects": 5,
+  "objects": 1,
   "asymmetric": [
    {
-    "object": "interior.wheel",
-    "off_mm": 149.6,
+    "object": "interior.wheel.soft",
+    "off_mm": 194.3,
     "at": [
-     0.266,
-     0.37,
-     0.608
-    ]
+     0.354,
+     0.281,
+     0.515
+    ],
+    "meant": true
    },
    {
-    "object": "interior.screens",
-    "off_mm": 68.8,
+    "object": "interior.wheel.interior",
+    "off_mm": 178.6,
     "at": [
-     0.456,
-     0.5,
-     0.816
-    ]
+     0.36,
+     0.355,
+     0.527
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.gloss",
+    "off_mm": 116.5,
+    "at": [
+     0.413,
+     0.249,
+     0.632
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.pedals.metal",
+    "off_mm": 113.9,
+    "at": [
+     0.686,
+     0.328,
+     0.302
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.metal",
+    "off_mm": 113.4,
+    "at": [
+     0.407,
+     0.37,
+     0.631
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.lit",
+    "off_mm": 111.8,
+    "at": [
+     0.417,
+     0.261,
+     0.639
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.pedals.mat",
+    "off_mm": 110.8,
+    "at": [
+     0.689,
+     0.333,
+     0.311
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.pedals.interior",
+    "off_mm": 93.4,
+    "at": [
+     0.707,
+     0.374,
+     0.325
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.lit",
+    "off_mm": 77.2,
+    "at": [
+     0.485,
+     0.303,
+     0.859
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.warn",
+    "off_mm": 77.1,
+    "at": [
+     0.485,
+     0.236,
+     0.858
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.soft",
+    "off_mm": 72.9,
+    "at": [
+     0.419,
+     0.19,
+     0.892
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.white",
+    "off_mm": 72.4,
+    "at": [
+     0.485,
+     0.429,
+     0.856
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.gloss",
+    "off_mm": 67.1,
+    "at": [
+     0.487,
+     0.214,
+     0.872
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.dark",
+    "off_mm": 63.2,
+    "at": [
+     0.487,
+     0.22,
+     0.876
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.screen.gloss",
+    "off_mm": 52.5,
+    "at": [
+     0.483,
+     0.116,
+     0.621
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.screen.dark",
+    "off_mm": 51.6,
+    "at": [
+     0.484,
+     0.113,
+     0.624
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.screen.white",
+    "off_mm": 47.4,
+    "at": [
+     0.489,
+     0.099,
+     0.634
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.screen.warn",
+    "off_mm": 31.6,
+    "at": [
+     0.506,
+     0.067,
+     0.677
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.screen.lit",
+    "off_mm": 30.5,
+    "at": [
+     0.498,
+     0.063,
+     0.634
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.screen.interior",
+    "off_mm": 28.9,
+    "at": [
+     0.592,
+     0.066,
+     0.707
+    ],
+    "meant": true
    },
    {
     "object": "wiper",
@@ -114,7 +296,8 @@
      0.988,
      0.138,
      0.778
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "wiper.blade",
@@ -123,16 +306,37 @@
      0.948,
      -0.039,
      0.792
-    ]
+    ],
+    "meant": true
    },
    {
     "object": "body.lightband",
-    "off_mm": 4.5,
+    "off_mm": 8.0,
     "at": [
-     -2.144,
-     0.911,
-     0.675
+     -2.166,
+     -0.875,
+     0.805
     ]
+   },
+   {
+    "object": "interior.dash.metal",
+    "off_mm": 5.0,
+    "at": [
+     0.574,
+     -0.415,
+     0.559
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.dash.gloss",
+    "off_mm": 3.5,
+    "at": [
+     0.594,
+     -0.571,
+     0.479
+    ],
+    "meant": true
    }
   ]
  },
@@ -156,7 +360,7 @@
  },
  "triangles": {
   "verdict": "ok",
-  "total": 304992,
+  "total": 337480,
   "budget": 400000,
   "top": [
    [
@@ -165,7 +369,7 @@
    ],
    [
     "body.lightband",
-    19152
+    19258
    ],
    [
     "mouth.mesh",
@@ -188,18 +392,22 @@
     14384
    ],
    [
-    "body.fender_f",
-    9468
+    "interior.seat0.cover",
+    9792
    ]
   ],
   "groups": [
    [
     "body",
-    106754
+    106780
    ],
    [
     "tire",
     57536
+   ],
+   [
+    "interior",
+    36247
    ],
    [
     "tail",
@@ -220,10 +428,6 @@
    [
     "hub",
     14976
-   ],
-   [
-    "arch",
-    4464
    ]
   ]
  },

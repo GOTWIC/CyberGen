@@ -71,6 +71,27 @@ are of this build.
   bar and displays bake lit, and LOD3 keeps the visors' lamp rings and bars lit and the
   glass dark gray.
 
+## Cabin (2026-11-24)
+
+The second pilot of the shared cabin module (`vehicles/cabin.py`, style `tanager`; guide in
+`vehicles/README.md`, "Cabins"), in place of the schematic tub, box seats, ring wheel, slab
+screens and ceiling slabs. What it has: a lining cast on the car as built from the firewall
+to the tailgate (`rear="body"`: the boot and the tailgate's window are part of the cabin), a
+flat carpeted floor and firewall, a light headliner, the four wheel wells as carpeted covers
+over humps in the footwells and the boot with the wall running on behind them; two comfort
+seats with post headrests and a rear bench for two, beige with darker inserts and seams,
+belts and buckles; a parcel shelf; a plain dash in light grey with a red inlay, round vents,
+defrost slots, an orange light strip and a glovebox line; a free-standing cluster and a
+landscape screen; a two-spoke wheel with a dot emblem; pedals; a low console with a dial
+selector and cupholders; front and rear door cards with cup pulls, switch packs, speakers
+and map pockets, orange light strips and lit "TANAGER" sill plates; visors, an inside
+mirror, a dome light, grab handles; mats front and rear. The parking permit behind the
+windshield is as it was. `cabin.jpg`: the four interior views. Triangles: the cabin 4,176
+before, 59,980 now (the car 276,698 before, 332,502 now). The exterior's fingerprint
+(`signature.py`) is unchanged but for the `interior.*` objects, the cabin's materials (and
+the kit's `mirror`) and the interior views' lamps (0 W in every other view). `check.json`:
+`ok` on every check (the front wheels steer 30 degrees before touching, 35 before).
+
 ## Tanager's signature cues (for the Cab and the Porter to repeat)
 
 1. **The visor.** A gloss black rounded band across each end (since step B a pocket under one flush clear lens, the lamps inside it). In it one unbroken light bar between two rounded-rectangle lamp rings with a small lit core (the eyes), and under the bar on the car's left a dot-matrix display (5 x 7 glyphs: charge in front, hire state behind). White in front, red behind, same layout.

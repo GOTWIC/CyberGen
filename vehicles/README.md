@@ -416,6 +416,116 @@ bevelled edges.
   another corner or size, and a list lays several (`extra=["top", dict(view="open",
   corner="tr")]`). Check on the sheet that the corners are free of the car.
 
+## Cabins
+
+`cabin.py` gives a car a full interior: a player sits in it and looks round, or looks in
+through an open door. It makes a lining that hides the body's back faces (floor, firewall,
+walls, headliner, pillar trims, reveals to the glass, wheel well covers), seats, a dash,
+displays, a wheel, pedals, a console, door cards, the roof's kit and mats, all named
+`interior.*` (the checks and the game packs find the cabin by that). It reads the car as
+built, so it fits any body with a few numbers; the pilots are `cars/vanta_r.py` (a low
+two-seater with a bulkhead behind the seats) and `cars/tanager_mino.py` (a tall box with a
+rear bench, its wheel wells inside the cabin, a hatchback's open tail).
+
+### A car's cabin
+
+```python
+import carkit as K
+import cabin as C              # "C": several scripts already have a function named cabin
+
+def build_interior():          # after the body and its glass (wheels may come later)
+    C.materials(head=(0.03, 0.03, 0.035))          # optional colors, after K.materials()
+    cab = C.Cabin(-0.66, 0.80, 0.165, style="halcyon", rear_window=(0.30, 0.72, 0.98))
+    cab.lining()
+    cab.seat((-0.02, 0.37, 0.315), driver=True)    # the hip point: the driver first
+    cab.seat((-0.02, -0.37, 0.315))
+    cab.dash(); cab.cluster(); cab.screen(); cab.wheel(); cab.pedals(); cab.console()
+    cab.door(-0.62, 0.78, sill_text="VANTA-R")     # rear and front end of the door cards
+    cab.roof_kit(); cab.mats(); cab.views(); cab.report()
+    K.meant("symmetry", *cab.one_sided)            # the wheel, the pedals, ...
+```
+
+Order matters: `lining()` first (everything stands on it), the driver's `seat()` before the
+wheel, pedals, cluster and views, `dash()` before the cluster, screen and console. Every
+part is a method a car may call, skip or replace with its own geometry (named `interior.*`).
+
+### The numbers a car gives
+
+| Call | Parameters |
+|---|---|
+| `materials(**colors)` | `carpet`, `head` (headliner, pillars), `soft` (dash pad, door uppers), `trim` (inlays, the rear window's frame), `trim_metal`, `trim_rough`, `metal`, `gloss`, `accent` (seat inserts), `piping`, `belt`, `mat`, `red`, `light`, `ambient` (light strips), `graphics`, `warn`, `pane`; with `*_strength` for the lit ones. The kit's `interior`, `seat` and `screen` colors come from `K.materials()` |
+| `Cabin(x0, x1, floor, ...)` | `x0`, `x1` the rear and front ends; `floor` the floor's top; `front`/`rear` `"wall"` (a cut plane there, filled flat: firewall, bulkhead) or `"body"` (the body's own end closes it: a hatchback or van's tail); `gap` 0.03 (lining under the skin); `detail` 0, 1, 2 (grid 55, 40, 30 mm; seats' fineness); `style` a name of `STYLES` (`plain`, `halcyon`, `orrin`, `brakk`, `tanager`, `kestrel`, `aurel`) or a dict; `lhd`; `shell`/`ignore` object names to add to or take from what bounds the cabin; `open_mats` (`("glass",)`); `zs`, `cap` the spine; `rear_window` `(half width, z0, z1)` |
+| `lining(...)` | `lap` (8 mm past a window's edge); `zone(label, point, normal)` a car's own material choice; `trim`, `carpet`, `head`, `wall`, `reveal` materials; `belt` (the side windows' sills); `crisp`; `wells` `"cover"` or `"line"`; `smooth` (3 rounds) |
+| `seat(hip, ...)` | `hip` the hip point (75 mm over the cushion; 0.13 to 0.16 m over the floor in a low car, 0.30 to 0.40 in a tall one); `kind` `bucket`, `comfort`, `bench`, `lounge`, `jump`; `places` (a bench's sitters: `hip` is its middle); `driver`; `width`, `cushion`, `thick`, `back`, `rake`, `bolster`, `headrest` (`post`, `integrated`, `pillow`, `None`), `quilt`; `belt` `pillar`, `seat` or `None`; `rails`; `face` -1 looks backward; `drop`, `tilt`. Returns `hip`, `eye`, `front`, `back`, `top` |
+| `dash(...)` | `depth` (0.40, glass base to brow); `top`; `fascia`, `knee` heights; `brow`, `crown`, `wrap` (toward the driver at the sides); `vents` `slat`, `round`, `hex`, `slot`; `vent_y`; `inlay`, `glovebox`, `defrost`, `strip`; `mat`, `low_mat`; `tuck` |
+| `cluster(...)` | `kind` `hood`, `free` or `None`; `w`, `h`; `y`; `set_back`, `lift`, `lean`; `graphics` `gauges` or `bars`. Moves back and down under a raked windshield until it clears the glass |
+| `screen(...)` | `kind` `landscape`, `float`, `driver`, `wide`, `small`, `portrait`; `w`, `h`, `y`, `t` (on the fascia), `turn`, `lean`, `out`; `graphics` `media`, `map`, `gauges`, `bars` |
+| `wheel(...)` | `at` (0.44 ahead and 0.33 over the hip); `kind` `round`, `flat`, `yoke`; `r`; `tilt` (20 a sports car, 35 to 45 a van); `spokes` 2, 3, 4; `emblem` `hex`, `ring`, `dot`, `bar`, `tri` or `fn(g, center, right, up, normal)`; `column`, `stalks`, `grip` |
+| `pedals(...)` | `x`, `n` (3: a clutch), `y`, `dead` |
+| `console(...)` | `x0`, `x1`, `w`, `h`, `rise`, `armrest`, `cups`, `selector` (`lever`, `dial`, `toggle`, `None`), `switches`, `mat`, `top`, `y` |
+| `door(xa, xb, ...)` | `tag` (one per door: `door_f`, `door_r`); `z0`, `arm`; `pull` `bar`, `strap`, `cup`; `speaker`, `pocket`, `switches`, `release`, `strip`; `sill`, `sill_text` (lit, read the right way on each side); `upper`, `card`, `lift` |
+| `sills(xa, xb, ...)`, `shelf(xa, xb, z, ...)`, `mats(...)`, `roof_kit(...)` | a tub's raised sills; a parcel shelf or load floor (`thick`, `lip`); mats ahead of each place (`rear`); dome light, visors, grab handles (`grabs` `loop`, `bar`, `None`), inside mirror |
+| `views(...)` | `eye`, `lens` (17); `exposure` (+0.8 stops in these views only); `power` (the dome's watts); `daylight` (watts per square meter of each window, a soft panel inside it); `outside` (the world's light times this, so the glass shows the day more than the cabin mirrored in it); `lamps` your own; `cut` (how far inside the near side `cab_in` cuts) |
+| Surface helpers | `wall(x, z, side)`, `roof(x, y)`, `on(proj, a, b)`, `half(x, z)`, `at(o, d)`; `pad(g, proj, c, w, h, ...)` a raised panel lying on the lining; `room(p)` how far inside the shell a point is; `keep(p)` the point pressed inside it; `loft`, `pill`, `rr`, `rrd` small solids |
+
+### Interior views and how to check a cabin
+
+`views()` adds five views to `K.VIEWS`, rendered with `--views cab_fwd,cab_side,cab_back,cab_in`:
+
+| View | From |
+|---|---|
+| `cab_fwd` | the driver's eye, ahead, a little down and inboard |
+| `cab_side` | the driver's eye at the far door |
+| `cab_back` | the eye moved forward and inboard (a head turned), looking back across the cabin |
+| `cab_dash` | the driver's eye down at the wheel, cluster and console |
+| `cab_in` | square to the driver's side from outside, the near side cut away by the camera's near clip: the whole cabin at once |
+
+In these views only, the cabin's lamps are lit, the studio's soft boxes are hidden from the
+camera and through the glass, the world is brighter and the exposure raised; every other
+view renders as it did (the lamps are at 0 W). A pale cabin (beige seats, a light
+headliner) wants less: `views(exposure=-0.3, outside=2.0, daylight=8)`.
+
+```
+vehicles/blender.sh vehicles/cars/NAME.py --out DIR                 # the log's "cabin:" lines
+vehicles/blender.sh vehicles/cars/NAME.py --out DIR --views cab_fwd,cab_side,cab_back,cab_in --res 1920 1080 --samples 64
+vehicles/blender.sh vehicles/cars/NAME.py --out DIR --check         # tires, through, symmetry
+```
+
+- **The log.** `cabin: N x M rays`, the lining's faces and reveals and the belt height
+  found; `report()` gives the triangles by part and `through the shell:` every part that
+  still cuts through the skin, the wells or the glass, with how far and where. It should
+  say `nothing`.
+- **The exterior.** The cabin must not move anything else: sign the car before and after
+  (`blender.sh vehicles/signature.py vehicles/cars/NAME.py OUT.json`) and compare; only
+  `interior.*` objects, the cabin's materials (and the kit's `mirror`) and the studio's
+  `cab*` lamps may differ.
+- **The checks.** `tires` fails when the lining or a cover reaches a wheel; `through` looks
+  at cabin parts in the open; mark the cabin's one-sided parts meant (`cab.one_sided`).
+
+### Pitfalls met on the pilots
+
+- **Floor and walls on planes.** The floor, firewall and rear wall are cut planes filled
+  flat; pick `x1` at the dash's front (behind the windshield's base) and `x0` at the
+  bulkhead. A firewall plane right at the windshield's base leaves a sliver of lining with
+  spikes between them: under the dash, unseen.
+- **Frit is skin.** A frit band counts as skin, so the lining covers it; a car whose
+  windows are clear to their edge gets narrow pillars.
+- **Wheel wells inside the cabin** (vans, city cars, rear seats over the axle) get covers;
+  the wall behind them is cut away so it never reaches the tire. A tire check that fails on
+  `interior.lining` means a well the module did not take as a well: name its object in
+  `shell` or give its panel the `well` material. A few cover faces at the arch's lip may be
+  reported through the shell (the Mino: 7 faces, behind the fender and the tire, unseen);
+  deleting them opened holes in the humps, so they stay.
+- **Raked windshields.** The cluster moves back and down under the glass; the dash pad's
+  color shows mirrored in the windshield from the driver's eye (keep it dark).
+- **The poles.** The rays fan out from the spine's ends; where a window lies right round an
+  end (a hatchback's tailgate) the lining there shows small fans of faces. Look at
+  `cab_back` and at `cab_in`.
+- **Lights.** The studio's light reaches a cabin only through glass, as noise: the cabin
+  views light it themselves. A lamp left glossy shows as a white square in the windshield.
+- **Triangles.** A cabin is 35,000 to 60,000 triangles at `detail=1` (seats are subdivided
+  once: 7,500 to 15,000 each); `detail=0` for a car near its budget.
+
 ## Brand modules
 
 `vehicles/brands/<brand>.py` holds the helpers a brand's three scripts each carried a copy

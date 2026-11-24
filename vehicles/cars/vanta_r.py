@@ -14,6 +14,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import carkit as K                                                  # noqa: E402
+import cabin as C                                                   # noqa: E402
 from carkit import (Geo, Matrix, V3, hypot, my, on_body, pi, rad, ribbon, shr,    # noqa: E402
                     stud, text_flat, text_on_body)
 
@@ -487,35 +488,25 @@ def build_surface_details():
 # interior
 # ---------------------------------------------------------------------------------------
 def build_interior():
-    g = Geo()
-    g.box((0.0, 0, 0.15), (1.45, 1.6, 0.03))
-    g.prism([(-0.66, -0.80, 0.14), (-0.66, 0.80, 0.14), (-0.66, 0.84, 0.80),
-             (-0.66, 0.60, 1.06), (-0.66, -0.60, 1.06), (-0.66, -0.84, 0.80)], (0.04, 0, 0))
-    g.prism([(0.80, -0.78, 0.50), (0.80, -0.78, 0.775), (0.52, -0.78, 0.775),
-             (0.40, -0.78, 0.70), (0.44, -0.78, 0.50)], (0, 1.56, 0))
-    g.box((0.05, 0, 0.27), (0.95, 0.2, 0.24))
-    g.obj("interior.tub", "interior", bevel=0.006)
-    g = Geo()
-    tilt = Matrix.Rotation(rad(-20), 3, 'Y')
-    for y in (0.37, -0.37):
-        g.box((-0.02, y, 0.30), (0.50, 0.46, 0.12))
-        g.box((-0.40, y, 0.62), (0.11, 0.44, 0.62), rot=tilt)
-        g.box((-0.535, y, 0.965), (0.07, 0.22, 0.15), rot=tilt)
-        for s in (-1, 1):
-            g.box((-0.02, y + s * 0.235, 0.33), (0.46, 0.05, 0.16))
-            g.box((-0.385, y + s * 0.225, 0.58), (0.14, 0.05, 0.50), rot=tilt)
-    g.obj("interior.seats", "seat", bevel=0.012, segs=3)
-    g = Geo()
-    wheel = (Matrix.Translation((0.33, 0.37, 0.75)) @ Matrix.Rotation(rad(-70), 4, 'Y')
-             @ Matrix.Rotation(pi / 2, 4, 'X'))
-    g.lathe([(-0.012, 0.155), (0.0, 0.167), (0.012, 0.155), (0.0, 0.143)], 24, xf=wheel)
-    g.box((0.40, 0.37, 0.72), (0.16, 0.05, 0.05))
-    g.obj("interior.wheel", "interior", sharp=40)
-    g = Geo()
-    scr = Matrix.Rotation(rad(-25), 3, 'Y')
-    g.box((0.41, 0.0, 0.745), (0.008, 0.30, 0.08), rot=scr)
-    g.box((0.47, 0.37, 0.795), (0.008, 0.26, 0.05), rot=scr)
-    g.obj("interior.screens", "screen")
+    """The cabin (vehicles/cabin.py): a lined tub between the firewall and the bulkhead
+    behind the seats, two buckets, a cockpit dash wrapped toward the driver, a flat-bottomed
+    wheel, the console, door cards, the roof's kit; the interior views cab_*."""
+    cab = C.Cabin(-0.66, 0.80, 0.165, style="halcyon", rear_window=(0.30, 0.72, 0.98))
+    cab.lining()
+    cab.seat((-0.02, 0.37, 0.315), driver=True)
+    cab.seat((-0.02, -0.37, 0.315))
+    cab.dash()
+    cab.cluster()
+    cab.screen()
+    cab.wheel()
+    cab.pedals()
+    cab.console()
+    cab.door(-0.62, 0.78, sill_text="VANTA-R")
+    cab.roof_kit()
+    cab.mats()
+    cab.views(outside=5.0)
+    cab.report()
+    K.meant("symmetry", *cab.one_sided, "wiper", "wiper.blade")    # one wiper, on the left
     # power unit under the rear glass
     g = Geo()
     ge = Geo()

@@ -53,6 +53,28 @@ clay, zebra and check above are of this build.
   the channels sit in their middle.
 - About 305,000 triangles (240,000 before; the lamps 24,500 of them).
 
+## Cabin (2026-11-24)
+
+The first car on the shared cabin module (`vehicles/cabin.py`, style `halcyon`; guide in
+`vehicles/README.md`, "Cabins"), in place of the schematic tub, box seats, ring wheel and
+slab screens. What it has: a lining cast on the car as built (a flat carpeted floor and
+firewall, a bulkhead behind the seats with a smoked window into the engine bay behind a
+frame, a dark headliner, the A-pillars lined over the glass's frit, reveals to the glass);
+two buckets with integrated headrests, carbon backs, inserts and seams, belts with reels and
+buckles, on rails; a dash wrapped toward the driver with hex vents, defrost slots, a light
+strip and a glovebox line; a hooded cluster kept under the raked windshield and a screen
+turned to the driver; a flat-bottomed three-spoke wheel with a hex emblem on a column with
+stalks; pedals and a dead pedal; a console with a toggle selector, switches, cupholders and
+an armrest; door cards with strap pulls, switch packs, speakers and map pockets; lit
+"VANTA-R" sill plates; visors, an inside mirror, a dome light; mats. `cabin.jpg`: the four
+interior views (`cab_fwd`, `cab_side`, `cab_back`, `cab_in`). Triangles: the cabin 3,376
+before, 36,247 now (the car 304,609 before, 337,480 now). The exterior's fingerprint
+(`signature.py`) is unchanged but for the `interior.*` objects, the cabin's materials (and
+the kit's `mirror`) and the interior views' lamps (0 W in every other view). `check.json`:
+`look` for the same exterior findings as before (front tires 12.8 mm from the wells and
+steering 0 degrees, `body.lightband` 8 mm off its mirror image); the cabin's one-sided
+parts and the single wiper are marked meant; nothing of the cabin is in the open.
+
 ## Files
 
 | File | What |
