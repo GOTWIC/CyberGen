@@ -1,0 +1,681 @@
+{
+ "car": "caldera_strand",
+ "size": [
+  20.504,
+  3.016,
+  4.449
+ ],
+ "top_z": 4.42,
+ "objects": 303,
+ "palette": {
+  "paint": [
+   0.56,
+   0.57,
+   0.58
+  ],
+  "paint_finish": [
+   0.9,
+   0.36,
+   0.15
+  ],
+  "paint2": [
+   0.86,
+   0.2,
+   0.02
+  ],
+  "paint2_finish": "gloss"
+ },
+ "tires": {
+  "verdict": "ok",
+  "note": "no wheels on the ground (a hover car)",
+  "wheels": []
+ },
+ "ground": {
+  "verdict": "ok",
+  "clearance_mm": -29.0,
+  "lowest": "bogie.f.axle1",
+  "under_floor": [
+   [
+    -0.029,
+    "bogie.f.axle1"
+   ],
+   [
+    -0.029,
+    "bogie.f.axle2"
+   ],
+   [
+    -0.029,
+    "bogie.r.axle1"
+   ],
+   [
+    -0.029,
+    "bogie.r.axle2"
+   ]
+  ],
+  "note": "floats -29 mm over the ground"
+ },
+ "symmetry": {
+  "verdict": "ok",
+  "center_off_mm": 0.0,
+  "objects": 0,
+  "asymmetric": [
+   {
+    "object": "interior.rails",
+    "off_mm": 500.0,
+    "at": [
+     -4.188,
+     0.437,
+     2.268
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat.21",
+    "off_mm": 482.2,
+    "at": [
+     -4.104,
+     0.473,
+     1.72
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat.23",
+    "off_mm": 482.2,
+    "at": [
+     -2.568,
+     0.473,
+     1.72
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat.bases",
+    "off_mm": 469.4,
+    "at": [
+     -4.197,
+     0.47,
+     2.166
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat.01",
+    "off_mm": 442.8,
+    "at": [
+     1.436,
+     0.949,
+     1.595
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat.02",
+    "off_mm": 441.6,
+    "at": [
+     1.905,
+     0.949,
+     1.595
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat.03",
+    "off_mm": 441.6,
+    "at": [
+     1.943,
+     0.949,
+     1.595
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat.28",
+    "off_mm": 375.4,
+    "at": [
+     -3.348,
+     -0.98,
+     1.591
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat.29",
+    "off_mm": 375.4,
+    "at": [
+     -3.324,
+     -0.98,
+     1.591
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat.05",
+    "off_mm": 344.0,
+    "at": [
+     2.881,
+     0.934,
+     1.575
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat.06",
+    "off_mm": 344.0,
+    "at": [
+     3.35,
+     0.934,
+     1.575
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat.07",
+    "off_mm": 344.0,
+    "at": [
+     3.819,
+     0.934,
+     1.575
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat.04",
+    "off_mm": 341.2,
+    "at": [
+     2.847,
+     0.935,
+     1.575
+    ],
+    "meant": true
+   },
+   {
+    "object": "cab.light",
+    "off_mm": 302.0,
+    "at": [
+     7.962,
+     0.874,
+     2.6
+    ],
+    "meant": true
+   },
+   {
+    "object": "cab.fittings",
+    "off_mm": 300.0,
+    "at": [
+     7.96,
+     0.805,
+     3.045
+    ],
+    "meant": true
+   },
+   {
+    "object": "underfloor.brackets",
+    "off_mm": 250.0,
+    "at": [
+     3.419,
+     -0.773,
+     0.6
+    ],
+    "meant": true
+   },
+   {
+    "object": "underfloor.cases",
+    "off_mm": 237.5,
+    "at": [
+     -3.155,
+     -0.225,
+     0.365
+    ],
+    "meant": true
+   },
+   {
+    "object": "underfloor.print.sign_yellow",
+    "off_mm": 197.0,
+    "at": [
+     4.08,
+     1.242,
+     0.38
+    ],
+    "meant": true
+   },
+   {
+    "object": "underfloor.vents",
+    "off_mm": 190.6,
+    "at": [
+     3.95,
+     1.241,
+     0.39
+    ],
+    "meant": true
+   },
+   {
+    "object": "underfloor.print.sign_dark",
+    "off_mm": 181.6,
+    "at": [
+     4.269,
+     1.243,
+     0.407
+    ],
+    "meant": true
+   },
+   {
+    "object": "bogie.f.motors",
+    "off_mm": 180.0,
+    "at": [
+     6.1,
+     0.21,
+     0.45
+    ],
+    "meant": true
+   },
+   {
+    "object": "bogie.r.motors",
+    "off_mm": 180.0,
+    "at": [
+     -7.3,
+     0.21,
+     0.45
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat.20",
+    "off_mm": 169.7,
+    "at": [
+     -4.09,
+     0.98,
+     1.904
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat.22",
+    "off_mm": 169.7,
+    "at": [
+     -2.582,
+     0.98,
+     1.904
+    ],
+    "meant": true
+   },
+   {
+    "object": "bogie.f.cables",
+    "off_mm": 168.2,
+    "at": [
+     7.316,
+     0.504,
+     0.665
+    ],
+    "meant": true
+   },
+   {
+    "object": "bogie.r.cables",
+    "off_mm": 168.2,
+    "at": [
+     -6.084,
+     0.504,
+     0.665
+    ],
+    "meant": true
+   },
+   {
+    "object": "bogie.f.frame",
+    "off_mm": 167.1,
+    "at": [
+     7.645,
+     -0.297,
+     0.665
+    ],
+    "meant": true
+   },
+   {
+    "object": "bogie.r.frame",
+    "off_mm": 167.1,
+    "at": [
+     -5.755,
+     -0.297,
+     0.665
+    ],
+    "meant": true
+   },
+   {
+    "object": "cab.controller",
+    "off_mm": 164.1,
+    "at": [
+     8.896,
+     0.885,
+     2.095
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.extinguisher.bracket.rear",
+    "off_mm": 153.0,
+    "at": [
+     -9.697,
+     0.797,
+     1.606
+    ],
+    "meant": true
+   },
+   {
+    "object": "underfloor.latches",
+    "off_mm": 146.0,
+    "at": [
+     3.78,
+     1.252,
+     0.704
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.extinguisher.rear",
+    "off_mm": 138.0,
+    "at": [
+     -9.76,
+     0.812,
+     1.62
+    ],
+    "meant": true
+   },
+   {
+    "object": "roof.guards",
+    "off_mm": 132.3,
+    "at": [
+     5.047,
+     0.302,
+     4.42
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat.27",
+    "off_mm": 108.1,
+    "at": [
+     -3.85,
+     -1.292,
+     1.719
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat.30",
+    "off_mm": 108.1,
+    "at": [
+     -2.822,
+     -1.292,
+     1.719
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.extinguisher.head.rear",
+    "off_mm": 104.8,
+    "at": [
+     -9.677,
+     0.845,
+     2.085
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheelchair.post",
+    "off_mm": 96.1,
+    "at": [
+     2.506,
+     -0.946,
+     2.524
+    ],
+    "meant": true
+   },
+   {
+    "object": "bogie.f.dampers",
+    "off_mm": 84.2,
+    "at": [
+     6.514,
+     0.16,
+     0.684
+    ],
+    "meant": true
+   },
+   {
+    "object": "bogie.r.dampers",
+    "off_mm": 84.2,
+    "at": [
+     -6.886,
+     0.16,
+     0.684
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheelchair.belt",
+    "off_mm": 75.0,
+    "at": [
+     2.376,
+     -1.325,
+     1.35
+    ],
+    "meant": true
+   }
+  ]
+ },
+ "panels": {
+  "verdict": "ok",
+  "open_edges": [
+   {
+    "panel": "body.roof",
+    "length_mm": 2942,
+    "at": [
+     -9.999,
+     -0.0,
+     3.865
+    ],
+    "meant": true
+   },
+   {
+    "panel": "body.floor",
+    "length_mm": 2887,
+    "at": [
+     -9.999,
+     -0.0,
+     0.85
+    ],
+    "meant": true
+   },
+   {
+    "panel": "body.cant",
+    "length_mm": 1597,
+    "at": [
+     -9.999,
+     -1.425,
+     3.02
+    ],
+    "meant": true
+   },
+   {
+    "panel": "body.cant",
+    "length_mm": 1597,
+    "at": [
+     -9.999,
+     1.425,
+     3.02
+    ],
+    "meant": true
+   },
+   {
+    "panel": "body.lower",
+    "length_mm": 658,
+    "at": [
+     -9.999,
+     -1.481,
+     1.45
+    ],
+    "meant": true
+   },
+   {
+    "panel": "body.lower",
+    "length_mm": 658,
+    "at": [
+     -9.999,
+     1.481,
+     1.45
+    ],
+    "meant": true
+   },
+   {
+    "panel": "body.skirt",
+    "length_mm": 235,
+    "at": [
+     -9.999,
+     1.455,
+     1.002
+    ],
+    "meant": true
+   },
+   {
+    "panel": "body.skirt",
+    "length_mm": 235,
+    "at": [
+     -9.999,
+     -1.455,
+     1.002
+    ],
+    "meant": true
+   },
+   {
+    "panel": "body.subsill",
+    "length_mm": 117,
+    "at": [
+     -9.999,
+     -1.496,
+     1.96
+    ],
+    "meant": true
+   },
+   {
+    "panel": "body.subsill",
+    "length_mm": 117,
+    "at": [
+     -9.999,
+     1.496,
+     1.96
+    ],
+    "meant": true
+   },
+   {
+    "panel": "body.stripe",
+    "length_mm": 117,
+    "at": [
+     -9.999,
+     -1.5,
+     1.84
+    ],
+    "meant": true
+   },
+   {
+    "panel": "body.stripe",
+    "length_mm": 117,
+    "at": [
+     -9.999,
+     1.5,
+     1.84
+    ],
+    "meant": true
+   }
+  ],
+  "open_mm": 0,
+  "cutter_holes": [],
+  "cut_loops": 0,
+  "pieces": {
+   "body": {
+    "closed": false,
+    "panels": 13
+   },
+   "face": {
+    "closed": false,
+    "panels": 6
+   }
+  }
+ },
+ "through": {
+  "verdict": "ok",
+  "parts": [],
+  "count": 0
+ },
+ "triangles": {
+  "verdict": "ok",
+  "total": 397453,
+  "budget": 400000,
+  "top": [
+   [
+    "interior.print.sign_white",
+    37225
+   ],
+   [
+    "interior.print.ink_grey",
+    13134
+   ],
+   [
+    "body.floor",
+    11952
+   ],
+   [
+    "body.roof",
+    10120
+   ],
+   [
+    "interior.print.lit_white",
+    8196
+   ],
+   [
+    "interior.print.sign_dark",
+    8102
+   ],
+   [
+    "underfloor.print.sign_dark",
+    6920
+   ],
+   [
+    "roof.ducts",
+    6696
+   ]
+  ],
+  "groups": [
+   [
+    "interior",
+    174679
+   ],
+   [
+    "body",
+    58728
+   ],
+   [
+    "bogie",
+    41152
+   ],
+   [
+    "door",
+    33312
+   ],
+   [
+    "cab",
+    20596
+   ],
+   [
+    "roof",
+    20196
+   ],
+   [
+    "underfloor",
+    15128
+   ],
+   [
+    "light",
+    12796
+   ]
+  ]
+ },
+ "verdict": "ok"
+}
