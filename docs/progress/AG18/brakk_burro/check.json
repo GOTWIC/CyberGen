@@ -1,0 +1,418 @@
+{
+ "car": "brakk_burro",
+ "size": [
+  4.018,
+  1.95,
+  1.96
+ ],
+ "top_z": 1.96,
+ "objects": 190,
+ "palette": {
+  "paint": [
+   0.18,
+   0.025,
+   0.015
+  ],
+  "paint_finish": [
+   0.0,
+   0.42,
+   0.4
+  ],
+  "paint2": [
+   0.035,
+   0.038,
+   0.042
+  ],
+  "paint2_finish": [
+   0.35,
+   0.52,
+   0.0
+  ]
+ },
+ "tires": {
+  "verdict": "ok",
+  "wheels": [
+   {
+    "tag": "fl",
+    "clearance_mm": 64.4,
+    "nearest": "chassis",
+    "at": [
+     1.357,
+     0.624,
+     0.586
+    ],
+    "foot_mm": 0.0,
+    "steer_hits": "chassis",
+    "steer_deg": 20,
+    "verdict": "ok"
+   },
+   {
+    "tag": "rl",
+    "clearance_mm": 30.0,
+    "nearest": "fender.gussets",
+    "at": [
+     -1.031,
+     0.65,
+     0.827
+    ],
+    "foot_mm": 0.0,
+    "verdict": "ok"
+   },
+   {
+    "tag": "fr",
+    "clearance_mm": 64.4,
+    "nearest": "chassis",
+    "at": [
+     1.183,
+     -0.624,
+     0.586
+    ],
+    "foot_mm": 0.0,
+    "steer_hits": "chassis",
+    "steer_deg": 20,
+    "verdict": "ok"
+   },
+   {
+    "tag": "rr",
+    "clearance_mm": 30.0,
+    "nearest": "fender.gussets",
+    "at": [
+     -1.031,
+     -0.65,
+     0.827
+    ],
+    "foot_mm": 0.0,
+    "verdict": "ok"
+   }
+  ]
+ },
+ "ground": {
+  "verdict": "ok",
+  "clearance_mm": 300.0,
+  "lowest": "chassis",
+  "under_floor": []
+ },
+ "symmetry": {
+  "verdict": "ok",
+  "center_off_mm": 0.0,
+  "objects": 0,
+  "asymmetric": [
+   {
+    "object": "interior.wheel",
+    "off_mm": 190.6,
+    "at": [
+     0.316,
+     0.282,
+     1.073
+    ],
+    "meant": true
+   },
+   {
+    "object": "stack.flap",
+    "off_mm": 165.8,
+    "at": [
+     -0.709,
+     -0.658,
+     1.884
+    ],
+    "meant": true
+   },
+   {
+    "object": "stack",
+    "off_mm": 160.3,
+    "at": [
+     -0.73,
+     -0.655,
+     1.874
+    ],
+    "meant": true
+   },
+   {
+    "object": "antenna",
+    "off_mm": 157.1,
+    "at": [
+     -0.548,
+     -0.421,
+     1.96
+    ],
+    "meant": true
+   },
+   {
+    "object": "snorkel.head",
+    "off_mm": 109.7,
+    "at": [
+     0.834,
+     0.661,
+     1.919
+    ],
+    "meant": true
+   },
+   {
+    "object": "snorkel.clamps",
+    "off_mm": 106.1,
+    "at": [
+     0.888,
+     0.646,
+     1.573
+    ],
+    "meant": true
+   },
+   {
+    "object": "stack.shield",
+    "off_mm": 97.9,
+    "at": [
+     -0.753,
+     -0.668,
+     1.669
+    ],
+    "meant": true
+   },
+   {
+    "object": "snorkel",
+    "off_mm": 92.2,
+    "at": [
+     0.901,
+     0.591,
+     1.207
+    ],
+    "meant": true
+   },
+   {
+    "object": "snorkel.mesh",
+    "off_mm": 88.8,
+    "at": [
+     0.988,
+     0.647,
+     1.896
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.screens",
+    "off_mm": 68.0,
+    "at": [
+     0.55,
+     0.26,
+     1.271
+    ],
+    "meant": true
+   },
+   {
+    "object": "hooks",
+    "off_mm": 37.6,
+    "at": [
+     2.028,
+     0.055,
+     0.537
+    ],
+    "meant": true
+   },
+   {
+    "object": "cans.caps",
+    "off_mm": 28.4,
+    "at": [
+     -0.785,
+     -0.17,
+     1.208
+    ],
+    "meant": true
+   },
+   {
+    "object": "wipers",
+    "off_mm": 22.0,
+    "at": [
+     0.854,
+     0.267,
+     1.485
+    ],
+    "meant": true
+   },
+   {
+    "object": "hub.spare",
+    "off_mm": 17.4,
+    "at": [
+     -1.338,
+     -0.063,
+     1.651
+    ],
+    "meant": true
+   },
+   {
+    "object": "winch.rollers",
+    "off_mm": 12.2,
+    "at": [
+     2.02,
+     0.018,
+     0.59
+    ],
+    "meant": true
+   },
+   {
+    "object": "spare.ratchet",
+    "off_mm": 11.8,
+    "at": [
+     -1.248,
+     0.45,
+     1.615
+    ],
+    "meant": true
+   },
+   {
+    "object": "snorkel.bolts",
+    "off_mm": 11.5,
+    "at": [
+     1.081,
+     0.44,
+     1.146
+    ],
+    "meant": true
+   },
+   {
+    "object": "spare.clamp",
+    "off_mm": 9.7,
+    "at": [
+     -1.367,
+     -0.018,
+     1.667
+    ],
+    "meant": true
+   },
+   {
+    "object": "wiper.blades",
+    "off_mm": 9.6,
+    "at": [
+     0.834,
+     0.177,
+     1.423
+    ],
+    "meant": true
+   },
+   {
+    "object": "snorkel.flange",
+    "off_mm": 8.0,
+    "at": [
+     1.238,
+     0.43,
+     1.151
+    ],
+    "meant": true
+   },
+   {
+    "object": "rimholes.spare",
+    "off_mm": 5.5,
+    "at": [
+     -1.238,
+     0.151,
+     1.654
+    ],
+    "meant": true
+   },
+   {
+    "object": "tub.tread",
+    "off_mm": 4.0,
+    "at": [
+     -1.366,
+     -0.027,
+     0.764
+    ],
+    "meant": true
+   }
+  ]
+ },
+ "panels": {
+  "verdict": "ok",
+  "open_edges": [],
+  "open_mm": 0,
+  "cutter_holes": [],
+  "cut_loops": 11,
+  "pieces": {
+   "hull": {
+    "closed": true,
+    "panels": 23
+   },
+   "tub": {
+    "closed": true,
+    "panels": 9
+   }
+  }
+ },
+ "through": {
+  "verdict": "ok",
+  "parts": [],
+  "count": 0
+ },
+ "triangles": {
+  "verdict": "ok",
+  "total": 267928,
+  "budget": 400000,
+  "top": [
+   [
+    "hub.fl",
+    9904
+   ],
+   [
+    "hub.rl",
+    9904
+   ],
+   [
+    "hub.fr",
+    9904
+   ],
+   [
+    "hub.rr",
+    9904
+   ],
+   [
+    "hub.spare",
+    9904
+   ],
+   [
+    "springs",
+    7648
+   ],
+   [
+    "chassis",
+    6756
+   ],
+   [
+    "bolts",
+    6144
+   ]
+  ],
+  "groups": [
+   [
+    "hub",
+    49520
+   ],
+   [
+    "tire",
+    21520
+   ],
+   [
+    "hull",
+    21146
+   ],
+   [
+    "tub",
+    17624
+   ],
+   [
+    "rim",
+    15840
+   ],
+   [
+    "tiretext",
+    15760
+   ],
+   [
+    "lamp",
+    13008
+   ],
+   [
+    "pylon",
+    11968
+   ]
+  ]
+ },
+ "verdict": "ok"
+}
