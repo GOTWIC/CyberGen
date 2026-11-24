@@ -60,3 +60,37 @@ step B). The sheet, clay, zebra and check above are of this build.
   lens on a curved band), and the band beside it is 4.2 mm off its mirror at a rounded
   corner (symmetry `look`, as before for other parts); both small at the sheet's size. The
   front projectors read as small dark eyes by day.
+
+## Cabin (2026-11-24)
+
+![cabin](cabin.jpg)
+
+The schematic cabin (box seats, a slab dash, a strip of light on the console) is replaced by
+the shared module's (`vehicles/cabin.py`, `style="halcyon"`), so a player can sit in it and
+look round, or look in through an open coach door. The exterior is unchanged (its
+fingerprint differs only in `interior.*`, the cabin's materials and the studio's `cab*`
+lamps; the old `led.cabin` strip went with the old cabin).
+
+- **What it has:** a lined tub from the firewall (x 0.90) to a wall just inside the tail
+  panel's recess (x -2.26), floor 0.19 m up, under the glass roof and the carbon rib down
+  its middle (no headliner there, so no dome light, visors or inside mirror); the rear wells
+  inside it under carpeted covers. Two cognac buckets with dark quilted inserts and brass
+  piping in front (hip 0.19 m over the floor, a grand tourer's low seat), a lower pair behind
+  with post headrests and a padded armrest with cupholders between them; the cockpit dash
+  wrapped toward the driver with hex vents and a brass inlay (the calipers' metal), the
+  hooded cluster, the driver's screen, the flat-bottomed wheel, pedals, the console with its
+  toggle selector; door cards on the front and rear coach doors with strap pulls and amber
+  light strips (the tail's accent), a lit "SABLE" sill plate; mats at all four places; a
+  parcel shelf under the fastback's glass over the boot.
+- **Seats** in a deeper cognac than the exterior palette's (it read pale peach in the cabin's
+  daylight), rougher, the cabin views at +0.3 stops and 10 W daylight panels.
+- **Fit:** the rib splits the windshield, so the module finds no glass at y = 0; the car
+  hands `dash()` the glass's base beside the rib there. The lining is held 50 mm inside the
+  skin where the scoop's recess dips into it and 30 mm in the corner under the A pillars,
+  the well covers' rims 8 mm under the skin at the arch's lip, and the front door cards end
+  at x 0.80, short of the cowl: nothing of the cabin comes through the shell.
+- **Triangles:** the cabin about 6,400 to 66,397; the car 280,292 to 340,253 (of 400,000).
+- **Check:** `look` only for the band round the tail, 8.5 mm off its mirror, as before;
+  tires (the rear tires now 38.6 mm from the lining behind the wells, 31.8 mm from the old
+  seats), ground, panels, `through` and triangles `ok`; the cabin's one-sided parts are
+  marked meant.

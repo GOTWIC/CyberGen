@@ -24,7 +24,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import carkit as K                                                  # noqa: E402
-from brands import halcyon                                          # noqa: E402
+import cabin as C                                                   # noqa: E402
+from brands import halcyon                                        # noqa: E402
 from carkit import (Geo, Matrix, V3, cos, my, on_body, pi, rad,    # noqa: E402
                     ribbon, shr, sin, stud, text_flat, text_on_body)
 
@@ -691,49 +692,73 @@ def build_lamps():
 # ---------------------------------------------------------------------------------------
 # interior: four seats, a load floor under the hatch
 # ---------------------------------------------------------------------------------------
+FLOOR = 0.30                        # the cabin floor's top
+LOAD_Z = 0.64                       # the load floor's top under the hatch
+WELL_IN = WELL_R - 0.03             # the load floor's half width between the rear well covers
+
+
 def build_interior():
-    g = Geo()
-    g.prism([(0.76, -.82, 1.0), (0.76, -.78, 1.0), (0.76, -.72, .30), (0.76, .72, .30),
-             (0.76, .78, 1.0), (0.76, .82, 1.0), (0.76, .82, .26), (0.76, -.82, .26)],
-            (-1.66, 0, 0))                                      # floor and door cards
-    g.box((-1.37, 0, 0.315), (0.94, 1.20, 0.04))                # floor between the wells
-    g.box((-1.66, 0, 0.62), (0.86, 1.24, 0.04))                 # the load floor
-    g.prism([(-1.20, -0.62, 0.27), (-1.20, 0.62, 0.27), (-1.26, 0.64, 1.02),
-             (-1.26, -0.64, 1.02)], (-0.04, 0, 0))              # behind the rear seats
-    g.box((-1.64, 0, 1.03), (0.74, 1.30, 0.016))                # the cover over the load
-    g.prism([(0.76, -0.78, 0.72), (0.76, -0.78, 1.045), (0.50, -0.78, 1.045),
-             (0.36, -0.78, 0.96), (0.40, -0.78, 0.72)], (0, 1.56, 0))       # dash
-    g.box((-0.30, 0, 0.50), (1.90, 0.20, 0.26))                 # the console
-    g.box((-0.66, 0, 0.69), (0.36, 0.17, 0.10))                 # armrest between the rear seats
-    g.obj("interior.tub", "interior", bevel=0.006)
-    g = Geo()
-    tilt = Matrix.Rotation(rad(-18), 3, 'Y')
-    for x0, tall in ((0.10, 0.0), (-0.74, -0.01)):
-        for y in (0.385, -0.385):
-            g.box((x0, y, 0.57), (0.50, 0.46, 0.12))
-            g.box((x0 - 0.37, y, 0.89 + tall), (0.11, 0.44, 0.62), rot=tilt)
-            g.box((x0 - 0.49, y, 1.245 + tall), (0.07, 0.22, 0.15), rot=tilt)
-            for s in (-1, 1):
-                g.box((x0, y + s * 0.235, 0.60), (0.46, 0.05, 0.16))
-                g.box((x0 - 0.355, y + s * 0.225, 0.85 + tall), (0.14, 0.05, 0.50), rot=tilt)
-    g.obj("interior.seats", "seat", bevel=0.014, segs=3)
-    g = Geo()
-    wheel = (Matrix.Translation((0.29, 0.385, 1.0)) @ Matrix.Rotation(rad(-70), 4, 'Y')
-             @ Matrix.Rotation(pi / 2, 4, 'X'))
-    g.lathe([(-0.012, 0.155), (0.0, 0.167), (0.012, 0.155), (0.0, 0.143)], 24, xf=wheel)
-    g.box((0.36, 0.385, 0.97), (0.16, 0.05, 0.05))
-    g.obj("interior.wheel", "interior", sharp=40)
-    g = Geo()
-    scr = Matrix.Rotation(rad(-25), 3, 'Y')
-    g.box((0.365, 0.0, 1.0), (0.008, 0.34, 0.085), rot=scr)
-    g.box((0.43, 0.385, 1.055), (0.008, 0.28, 0.05), rot=scr)
-    g.box((0.43, -0.385, 1.055), (0.008, 0.28, 0.05), rot=scr)
-    g.box((-0.46, 0.0, 0.72), (0.008, 0.15, 0.09), rot=scr)        # the rear seats' screen
-    g.obj("interior.screens", "screen")
-    g = Geo()
-    for y in (0.103, -0.103):
-        g.box((-0.30, y, 0.632), (1.80, 0.004, 0.004))
-    g.obj("led.cabin", "led_accent")
+    """The cabin (vehicles/cabin.py): a lined tub from the firewall to a wall just inside
+    the tail panel's recess (cast on the body's own tail, the lining came through it).
+    Halcyon's cockpit: graphite buckets with burnt orange inserts in
+    front and two lower buckets behind with an armrest between them, a dash wrapped toward
+    the driver, the flat-bottomed wheel, the console, door cards front and rear with the
+    tow eyes' teal anodized trim, a load floor between the rear wells with a cover over
+    it; the interior views cab_*."""
+    C.materials(carpet=(0.018, 0.018, 0.020), head=(0.045, 0.045, 0.048),
+                trim=(0.035, 0.26, 0.31), trim_metal=0.9, trim_rough=0.38,
+                accent=(0.30, 0.048, 0.005), piping=(0.42, 0.07, 0.006),
+                belt=(0.40, 0.065, 0.006), ambient=(0.45, 0.92, 1.0))
+    sb = next(n for n in K.MAT["seat"].node_tree.nodes if n.type == 'BSDF_PRINCIPLED')
+    sb.inputs["Roughness"].default_value = 0.70             # graphite nappa: a soft sheen,
+    sb.inputs["Specular IOR Level"].default_value = 0.28    # not the daylight's mirror
+    cab = C.Cabin(-2.16, 0.72, FLOOR, style="halcyon")
+    lin = cab.lining()
+    for v in lin.data.vertices:         # held inside the scoop's recess, which dips in
+        if -0.82 < v.co.x < -0.52 and abs(v.co.y) > 0.70:
+            v.co = cab.keep(v.co, margin=0.040, wells=False)
+    cab.seat((0.0, 0.37, 0.64), driver=True, quilt=5)
+    cab.seat((0.0, -0.37, 0.64), quilt=5)
+    for y in (0.35, -0.35):                         # the rear pair: lower, softer bolsters
+        cab.seat((-0.86, y, 0.62), width=0.46, bolster=0.6, back=0.58, rake=27, quilt=5,
+                 headrest="post")
+    cab.dash()
+    cab.cluster()
+    cab.screen()
+    cab.wheel()
+    cab.pedals()
+    cab.console()
+    cab.door(-0.10, 0.74, tag="door_f", sill_text="RIDGE")
+    cab.door(-0.62, -0.18, tag="door_r", sill=False)
+    cab.roof_kit()
+    cab.mats()
+    # the rear armrest between the rear seats, cupholders in it
+    p = C._Parts()
+    C.pill(p["interior"], (-0.80, 0, FLOOR + 0.17), (1, 0, 0), (0, 1, 0), 0.44, 0.17, 0.34,
+           r=0.04, soft=0.5)
+    C.pill(p["seat"], (-0.80, 0, FLOOR + 0.355), (1, 0, 0), (0, 1, 0), 0.40, 0.16, 0.04,
+           r=0.04, soft=0.7)
+    for y in (0.04, -0.04):
+        p["interior.metal"].ring((-0.62, y, FLOOR + 0.343), 'z', 0.033, sec=(0.005, 0.005), n=20)
+    cab._emit("armrest_r", p)
+    # the load floor: between the well covers over the wells, out to the lining behind them
+    p = C._Parts()
+    xs = [-2.14 + 0.05 * k for k in range(20)]
+    secs = []
+    for x in xs:
+        yw = cab.half(x, LOAD_Z - 0.01) - 0.004
+        if -2.0 < x < -0.92:
+            yw = min(yw, WELL_IN)
+        secs.append([V3((x, -yw, LOAD_Z - 0.025)), V3((x, yw, LOAD_Z - 0.025)),
+                     V3((x, yw, LOAD_Z)), V3((x, -yw, LOAD_Z))])
+    C.loft(p["interior.carpet"], secs)
+    for y in (0.22, -0.22):                         # tie-down rails along it
+        p["interior.metal"].box((-1.60, y, LOAD_Z + 0.004), (0.90, 0.02, 0.008))
+    cab._emit("load", p)
+    cab.shelf(-2.14, -1.30, 1.00, thick=0.016, tag="cover")
+    cab.views(exposure=0.3, outside=4.0, daylight=10.0)
+    cab.report()
+    K.meant("symmetry", *cab.one_sided)
 
 
 # ---------------------------------------------------------------------------------------
@@ -823,7 +848,7 @@ def main():
                 paint2=(0.42, 0.072, 0.006), paint2_finish=(0.55, 0.55, 0.0),
                 dust_z=(0.18, 0.70), glass=(0.50, 0.54, 0.58), led_front=(0.80, 0.94, 1.0),
                 led_accent=(0.45, 0.92, 1.0), caliper=(0.74, 0.75, 0.73),
-                seat=(0.40, 0.38, 0.34), interior=(0.022, 0.022, 0.025),
+                seat=(0.040, 0.040, 0.044), interior=(0.022, 0.022, 0.025),
                 screen=(0.30, 0.75, 1.0), decal=(0.70, 0.71, 0.72))
     m, b = K.carbon("carbon_dry")                           # bare weave: no coat to mirror
     b.inputs["Coat Weight"].default_value = 0.0             # the top light on the spine

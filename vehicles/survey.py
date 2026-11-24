@@ -44,7 +44,8 @@ def cars(only, every=False):
 
 def run(car, out, render):
     out.mkdir(parents=True, exist_ok=True)
-    cmd = ["bash", str(HERE / "blender.sh"), str(HERE / "cars" / (car + ".py")), "--out", str(out),
+    cmd = ["bash", (HERE / "blender.sh").as_posix(), (HERE / "cars" / (car + ".py")).as_posix(),
+           "--out", out.as_posix(),
            "--check"] + (["--clay", "--zebra"] if render else [])
     t0 = time.time()
     with open(out / "log.txt", "w") as log:
@@ -60,8 +61,8 @@ def sign(only, out):
     out.mkdir(parents=True, exist_ok=True)
     ok = True
     for car in cars(only, every=True):
-        cmd = ["bash", str(HERE / "blender.sh"), str(HERE / "signature.py"),
-               str(HERE / "cars" / (car + ".py")), str(out / (car + ".json"))]
+        cmd = ["bash", (HERE / "blender.sh").as_posix(), (HERE / "signature.py").as_posix(),
+               (HERE / "cars" / (car + ".py")).as_posix(), (out / (car + ".json")).as_posix()]
         with open(out / (car + ".log"), "w") as log:
             rc = subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT).returncode
         print("%-18s %s" % (car, "signed" if rc == 0 else "FAILED (%s)" % (out / (car + ".log"))),

@@ -56,3 +56,34 @@ AG18, step B). The sheet, clay, zebra and check above are of this build.
   channel passes close to the tail's inner frame (symmetry `look`, as before for the old
   glass frames); the charge flap's outline shows a small sliver at one corner and the ring's
   lens a faint step at the upper corners, both small at the sheet's size.
+
+## Cabin (2026-11-24)
+
+![cabin](cabin.jpg)
+
+The schematic cabin (box seats, a slab dash, a strip of light on the console) is replaced by
+the shared module's (`vehicles/cabin.py`, `style="halcyon"`), so a player can sit in it and
+look round, or look in through an open door. The exterior is unchanged (its fingerprint
+differs only in `interior.*`, the cabin's materials and the studio's `cab*` lamps; the old
+`led.cabin` strip went with the old cabin).
+
+- **What it has:** a lined tub from the firewall (x 0.72) to a wall just inside the tail
+  panel's recess (x -2.16), floor 0.30 m up; the rear wells inside it under carpeted covers.
+  Two graphite buckets with burnt orange quilted inserts and piping in front (hip 0.34 m over
+  the floor), two lower buckets behind with post headrests and a padded armrest with
+  cupholders between them; the cockpit dash wrapped toward the driver with hex vents and an
+  inlay in the tow eyes' teal anodized metal, the hooded cluster, the driver's screen, the
+  flat-bottomed wheel, pedals, the console with its toggle selector; door cards front and rear
+  with strap pulls and cyan light strips, a lit "RIDGE" sill plate; dome light, visors and
+  inside mirror; mats at all four places; a carpeted load floor between the rear wells with
+  tie-down rails and a cover over it.
+- **Seats** in a rougher graphite than the kit's seat (it read light grey in the cabin's
+  daylight), the cabin views at +0.3 stops and 10 W daylight panels.
+- **Fit:** the lining is held 40 mm inside the skin where the scoop's recess dips into it,
+  so nothing of the cabin comes through the shell (`cabin: through the shell: nothing`).
+- **Triangles:** the cabin about 6,500 to 61,007; the car 250,511 to 304,974 (of 400,000).
+- **Check:** `look` only for the band round the tail, 3.5 mm off its mirror, as before;
+  tires, ground, panels, `through` and triangles `ok`; the cabin's one-sided parts (wheel,
+  pedals, cluster, the driver's seat, the sill lettering) are marked meant.
+- **Left:** the windshield still mirrors the studio's top box whole in the hero (a white
+  slab over the dash; exterior, as before).

@@ -24,3 +24,38 @@
   - A dry weave that stays dark as a library material (`need("carbon_dry")`): `carbon(coat=0)` still has the metal's sheen and reads as silver under the top box, so the Ridge and this car both reach into the node tree (here: no metal, little specular, rougher).
   - `well_cutter` with the steering room as an argument (a second, lower arch further in), and a note in the README that an arch corner on a station makes slivers in the sill.
   - `wiper()` and one-sided parts told as meant by default, or a `K.meant` pattern list in the brand module.
+
+## Cabin (2026-11-24)
+
+![cabin](cabin.jpg)
+
+The blocked-in cabin (box seats, a slab dash, a strip of light on the console) is replaced by
+the shared module's (`vehicles/cabin.py`, `style="halcyon"`), so a player can sit in it and
+look round, or look in through the open door. The exterior is unchanged (its fingerprint
+differs only in `interior.*`, the cabin's materials, the studio's `cab*` lamps and the top
+box's light-linking list, which names every object it lights and so now the cabin's new
+objects instead of the old ones; the old `led.cabin` strip went with the old cabin).
+
+- **What it has:** a lined tub from the firewall (x 0.66) to a wall just inside the tail
+  panel's recess (x -1.88), floor 0.21 m up; the rear wells inside it under carpeted covers.
+  Two black buckets with quilted inserts in the body's yellow and violet piping in front, two
+  smaller, more upright buckets behind (the 2 of 2 + 2) with post headrests; the cockpit
+  dash wrapped toward the driver with hex vents and an inlay in the body's yellow, the
+  hooded cluster, the driver's screen, the flat-bottomed wheel, pedals, the console with its
+  toggle selector; a long door card each side with a strap pull, violet light strip (the
+  car's accent) and a lit "KITE" sill plate, a trim panel with a speaker and light strip by
+  each rear seat (three doors: no rear door); dome light, visors, inside mirror; mats at all
+  four places; a carpeted load floor between the rear wells with tie-down rails, and a cover
+  over it.
+- **Seats** black in the cabin (the exterior palette's seat color is violet, which read
+  lilac), rougher; the cabin views at +0.3 stops and 10 W daylight panels. The studio's own
+  cabin lamp (`K.cabin_light`) stays as it was.
+- **Fit:** the front and rear hips 0.87 m apart, which leaves the rear knees about 0.15 m
+  to the front seat backs (a 2 + 2's room). The lining is
+  held 45 mm inside the skin in the fold under the quarter glass, the well covers' rims
+  8 mm under the skin at the arch's lip: nothing of the cabin comes through the shell.
+- **Triangles:** the cabin about 6,400 to 57,276; the car 277,665 to 328,529 (of 400,000).
+- **Check:** `look` only for the band round the tail, 6.7 mm off its mirror, as before; tires
+  (the rear tires 25.3 mm from the lining behind the wells, just over the 25 mm mark),
+  ground, panels, `through` and triangles `ok`; the cabin's one-sided parts are marked
+  meant.

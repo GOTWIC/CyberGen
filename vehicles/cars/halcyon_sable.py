@@ -19,8 +19,11 @@ and the tail halo are light channels cut into the bands under lenses, with lamps
 import os
 import sys
 
+import bpy
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import carkit as K                                                  # noqa: E402
+import cabin as C                                                   # noqa: E402
 from brands import halcyon                                          # noqa: E402
 from carkit import (Geo, Matrix, V3, my, on_body, pi, rad, ribbon, shr,    # noqa: E402
                     stud, text_flat, text_on_body)
@@ -553,48 +556,78 @@ def build_lamps():
 # ---------------------------------------------------------------------------------------
 # interior: four seats under the glass
 # ---------------------------------------------------------------------------------------
+FLOOR = 0.19                        # the cabin floor's top
+SHELF_Z = 0.92                      # the parcel shelf under the rear glass
+
+
 def build_interior():
-    g = Geo()
-    g.prism([(0.96, -.80, .86), (0.96, -.76, .86), (0.96, -.70, .20), (0.96, .70, .20),
-             (0.96, .76, .86), (0.96, .80, .86), (0.96, .80, .15), (0.96, -.80, .15)],
-            (-1.94, 0, 0))                                      # floor and door cards
-    g.box((-1.22, 0, 0.17), (0.50, 1.14, 0.04))                 # floor between the wells
-    g.prism([(-1.44, -0.57, 0.15), (-1.44, 0.57, 0.15), (-1.44, 0.63, 0.93),
-             (-1.44, -0.63, 0.93)], (-0.04, 0, 0))              # bulkhead behind the seats
-    g.box((-1.72, 0, 0.925), (0.56, 1.22, 0.02))                # shelf under the rear glass
-    g.prism([(0.94, -0.76, 0.52), (0.94, -0.76, 0.845), (0.66, -0.76, 0.845),
-             (0.53, -0.76, 0.76), (0.57, -0.76, 0.52)], (0, 1.52, 0))       # dash
-    g.box((-0.22, 0, 0.30), (2.30, 0.20, 0.26))                 # the console, cowl to shelf
-    g.box((-0.72, 0, 0.47), (0.36, 0.17, 0.10))                 # armrest between the rear seats
-    g.obj("interior.tub", "interior", bevel=0.006)
-    g = Geo()
-    tilt = Matrix.Rotation(rad(-20), 3, 'Y')
-    for x0, tall, yc in ((0.12, 0.0, 0.385), (-0.80, -0.02, 0.365)):   # rear pair in from
-        for y in (yc, -yc):                                             # the rear tires
-            g.box((x0, y, 0.33), (0.50, 0.46, 0.12))
-            g.box((x0 - 0.38, y, 0.65 + tall), (0.11, 0.44, 0.62), rot=tilt)
-            g.box((x0 - 0.515, y, 0.995 + tall), (0.07, 0.22, 0.15), rot=tilt)
-            for s in (-1, 1):
-                g.box((x0, y + s * 0.235, 0.36), (0.46, 0.05, 0.16))
-                g.box((x0 - 0.365, y + s * 0.225, 0.61 + tall), (0.14, 0.05, 0.50), rot=tilt)
-    g.obj("interior.seats", "seat", bevel=0.014, segs=3)
-    g = Geo()
-    wheel = (Matrix.Translation((0.47, 0.385, 0.80)) @ Matrix.Rotation(rad(-70), 4, 'Y')
-             @ Matrix.Rotation(pi / 2, 4, 'X'))
-    g.lathe([(-0.012, 0.155), (0.0, 0.167), (0.012, 0.155), (0.0, 0.143)], 24, xf=wheel)
-    g.box((0.54, 0.385, 0.77), (0.16, 0.05, 0.05))
-    g.obj("interior.wheel", "interior", sharp=40)
-    g = Geo()
-    scr = Matrix.Rotation(rad(-25), 3, 'Y')
-    g.box((0.545, 0.0, 0.80), (0.008, 0.34, 0.085), rot=scr)
-    g.box((0.61, 0.385, 0.855), (0.008, 0.28, 0.05), rot=scr)
-    g.box((0.61, -0.385, 0.855), (0.008, 0.28, 0.05), rot=scr)
-    g.box((-0.47, 0.0, 0.50), (0.008, 0.15, 0.09), rot=scr)        # the rear seats' screen
-    g.obj("interior.screens", "screen")
-    g = Geo()
-    for y in (0.103, -0.103):
-        g.box((-0.22, y, 0.432), (2.20, 0.004, 0.004))
-    g.obj("led.cabin", "led_accent")
+    """The cabin (vehicles/cabin.py): a lined tub from the firewall to a wall before the
+    tail, under the glass roof and the carbon rib down its middle. A grand tourer in
+    Halcyon's cockpit: cognac buckets with quilted inserts in front and a lower pair behind
+    with an armrest between them, a dash wrapped toward the driver, the flat-bottomed wheel,
+    the console, door cards on the coach doors front and rear with brass trim like the
+    calipers and amber light like the tail's accents, a parcel shelf under the fastback's
+    glass over the boot; the interior views cab_*."""
+    C.materials(carpet=(0.016, 0.017, 0.022), head=(0.030, 0.034, 0.050),
+                trim=(0.62, 0.42, 0.12), trim_metal=1.0, trim_rough=0.30,
+                accent=(0.070, 0.028, 0.011), piping=(0.70, 0.46, 0.14),
+                ambient=(1.0, 0.62, 0.22))
+    sb = next(n for n in K.MAT["seat"].node_tree.nodes if n.type == 'BSDF_PRINCIPLED')
+    sb.inputs["Base Color"].default_value = (0.15, 0.058, 0.020, 1.0)   # deeper in the cabin
+    sb.inputs["Roughness"].default_value = 0.62             # cognac aniline: a soft sheen,
+    sb.inputs["Specular IOR Level"].default_value = 0.32    # not the daylight's mirror
+    cab = C.Cabin(-2.26, 0.90, FLOOR, style="halcyon")
+    # the spine's rib splits the windshield down the middle, so the module finds no glass
+    # at y = 0 (dash() measures its base there): there, the glass's base beside the rib
+    cowl = cab.cowl
+
+    def cowl_beside_rib(y, x=None):
+        b = cowl(y, x)
+        if b is None and abs(y) < 0.16:
+            b = cowl(0.16 if y >= 0 else -0.16, x)
+            if b is not None:
+                b = V3((b.x, y, b.z))
+        return b
+    cab.cowl = cowl_beside_rib
+    lin = cab.lining()
+    for v in lin.data.vertices:         # held inside the scoop's recess, which dips in,
+        if -1.16 < v.co.x < -0.74 and abs(v.co.y) > 0.66:
+            v.co = cab.keep(v.co, margin=0.050, wells=False)
+        elif v.co.x > 0.70 and abs(v.co.y) > 0.55:   # and the corner under the A pillar
+            v.co = cab.keep(v.co, margin=0.030, wells=False)
+    wells = bpy.data.objects.get("interior.wells")
+    if wells is not None:               # the covers' rim at the arch's lip, under the skin
+        for v in wells.data.vertices:
+            if abs(v.co.y) > 0.88:
+                v.co = cab.keep(v.co, margin=0.008, wells=False)
+    cab.seat((0.02, 0.37, 0.38), driver=True, quilt=6, bolster=0.85)
+    cab.seat((0.02, -0.37, 0.38), quilt=6, bolster=0.85)
+    for y in (0.335, -0.335):                       # the rear pair, in from the rear wells
+        cab.seat((-0.92, y, 0.37), width=0.44, bolster=0.55, back=0.56, rake=28, quilt=6,
+                 headrest="post")
+    cab.dash()
+    cab.cluster()
+    cab.screen()
+    cab.wheel()
+    cab.pedals()
+    cab.console()
+    cab.door(-0.20, 0.80, tag="door_f", sill_text="SABLE")
+    cab.door(-0.85, -0.25, tag="door_r", sill=False)
+    cab.roof_kit()
+    cab.mats()
+    # the rear armrest between the rear seats, cupholders in it
+    p = C._Parts()
+    C.pill(p["interior"], (-0.86, 0, FLOOR + 0.13), (1, 0, 0), (0, 1, 0), 0.44, 0.15, 0.26,
+           r=0.04, soft=0.5)
+    C.pill(p["seat"], (-0.86, 0, FLOOR + 0.275), (1, 0, 0), (0, 1, 0), 0.40, 0.14, 0.04,
+           r=0.04, soft=0.7)
+    for y in (0.035, -0.035):
+        p["interior.metal"].ring((-0.68, y, FLOOR + 0.263), 'z', 0.030, sec=(0.005, 0.005), n=20)
+    cab._emit("armrest_r", p)
+    cab.shelf(-2.24, -1.40, SHELF_Z, thick=0.018, tag="shelf")
+    cab.views(exposure=0.3, outside=4.0, daylight=10.0)
+    cab.report()
+    K.meant("symmetry", *cab.one_sided)
 
 
 # ---------------------------------------------------------------------------------------
