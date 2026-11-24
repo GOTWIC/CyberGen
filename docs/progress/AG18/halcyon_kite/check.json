@@ -1,0 +1,269 @@
+{
+ "car": "halcyon_kite",
+ "size": [
+  4.107,
+  1.958,
+  1.346
+ ],
+ "top_z": 1.346,
+ "objects": 115,
+ "palette": {
+  "paint": [
+   0.74,
+   0.44,
+   0.002
+  ],
+  "paint_finish": [
+   0.7,
+   0.28,
+   1.0
+  ],
+  "paint2": [
+   0.45,
+   0.05,
+   0.03
+  ],
+  "paint2_finish": "gloss"
+ },
+ "tires": {
+  "verdict": "ok",
+  "wheels": [
+   {
+    "tag": "fl",
+    "clearance_mm": 29.6,
+    "nearest": "arch.trims",
+    "at": [
+     0.937,
+     0.865,
+     0.345
+    ],
+    "foot_mm": 0.0,
+    "steer_hits": "body.well",
+    "steer_deg": 25,
+    "verdict": "ok"
+   },
+   {
+    "tag": "rl",
+    "clearance_mm": 29.6,
+    "nearest": "arch.trims",
+    "at": [
+     -1.703,
+     0.865,
+     0.345
+    ],
+    "foot_mm": 0.0,
+    "verdict": "ok"
+   },
+   {
+    "tag": "fr",
+    "clearance_mm": 29.6,
+    "nearest": "arch.trims",
+    "at": [
+     0.937,
+     -0.865,
+     0.345
+    ],
+    "foot_mm": 0.0,
+    "steer_hits": "body.well",
+    "steer_deg": 25,
+    "verdict": "ok"
+   },
+   {
+    "tag": "rr",
+    "clearance_mm": 29.6,
+    "nearest": "arch.trims",
+    "at": [
+     -1.703,
+     -0.865,
+     0.345
+    ],
+    "foot_mm": 0.0,
+    "verdict": "ok"
+   }
+  ]
+ },
+ "ground": {
+  "verdict": "ok",
+  "clearance_mm": 124.9,
+  "lowest": "body.floor",
+  "under_floor": []
+ },
+ "symmetry": {
+  "verdict": "look",
+  "center_off_mm": 0.0,
+  "objects": 1,
+  "asymmetric": [
+   {
+    "object": "interior.wheel",
+    "off_mm": 160.5,
+    "at": [
+     0.335,
+     0.448,
+     0.92
+    ],
+    "meant": true
+   },
+   {
+    "object": "tow.strap",
+    "off_mm": 74.2,
+    "at": [
+     2.043,
+     -0.213,
+     0.233
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.screens",
+    "off_mm": 71.1,
+    "at": [
+     0.426,
+     0.24,
+     0.871
+    ],
+    "meant": true
+   },
+   {
+    "object": "wiper.rear",
+    "off_mm": 26.0,
+    "at": [
+     -1.888,
+     0.16,
+     1.047
+    ],
+    "meant": true
+   },
+   {
+    "object": "wiper",
+    "off_mm": 21.6,
+    "at": [
+     0.728,
+     0.252,
+     0.89
+    ],
+    "meant": true
+   },
+   {
+    "object": "wiper.blade",
+    "off_mm": 9.6,
+    "at": [
+     0.728,
+     0.461,
+     0.928
+    ],
+    "meant": true
+   },
+   {
+    "object": "wiper.rear.blade",
+    "off_mm": 9.6,
+    "at": [
+     -1.877,
+     0.28,
+     1.034
+    ],
+    "meant": true
+   },
+   {
+    "object": "body.lightband",
+    "off_mm": 6.7,
+    "at": [
+     -1.99,
+     -0.796,
+     0.487
+    ]
+   }
+  ]
+ },
+ "panels": {
+  "verdict": "ok",
+  "open_edges": [],
+  "open_mm": 0,
+  "cutter_holes": [],
+  "cut_loops": 23,
+  "pieces": {
+   "body": {
+    "closed": true,
+    "panels": 30
+   }
+  }
+ },
+ "through": {
+  "verdict": "ok",
+  "parts": [],
+  "count": 0
+ },
+ "triangles": {
+  "verdict": "ok",
+  "total": 277665,
+  "budget": 400000,
+  "top": [
+   [
+    "mouth.mesh",
+    18864
+   ],
+   [
+    "tail.mesh",
+    18048
+   ],
+   [
+    "body.lightband",
+    17600
+   ],
+   [
+    "tire.fl",
+    14384
+   ],
+   [
+    "tire.rl",
+    14384
+   ],
+   [
+    "tire.fr",
+    14384
+   ],
+   [
+    "tire.rr",
+    14384
+   ],
+   [
+    "body.side",
+    11304
+   ]
+  ],
+  "groups": [
+   [
+    "body",
+    97738
+   ],
+   [
+    "tire",
+    57536
+   ],
+   [
+    "mouth",
+    20338
+   ],
+   [
+    "tail",
+    18772
+   ],
+   [
+    "rim",
+    16368
+   ],
+   [
+    "hub",
+    14976
+   ],
+   [
+    "beam",
+    9552
+   ],
+   [
+    "scoop",
+    8928
+   ]
+  ]
+ },
+ "verdict": "look"
+}

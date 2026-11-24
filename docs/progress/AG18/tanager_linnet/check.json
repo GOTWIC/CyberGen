@@ -1,0 +1,326 @@
+{
+ "car": "tanager_linnet",
+ "size": [
+  4.184,
+  2.004,
+  1.586
+ ],
+ "top_z": 1.586,
+ "objects": 147,
+ "palette": {
+  "paint": [
+   0.88,
+   0.43,
+   0.0
+  ],
+  "paint_finish": "gloss",
+  "paint2": [
+   0.8,
+   0.78,
+   0.72
+  ],
+  "paint2_finish": "gloss"
+ },
+ "tires": {
+  "verdict": "ok",
+  "wheels": [
+   {
+    "tag": "fl",
+    "clearance_mm": 60.0,
+    "nearest": "body.well",
+    "at": [
+     1.401,
+     0.698,
+     0.73
+    ],
+    "foot_mm": 0.0,
+    "steer_hits": "body.well",
+    "steer_deg": 30,
+    "verdict": "ok"
+   },
+   {
+    "tag": "rl",
+    "clearance_mm": 60.0,
+    "nearest": "body.well",
+    "at": [
+     -1.339,
+     0.698,
+     0.73
+    ],
+    "foot_mm": 0.0,
+    "verdict": "ok"
+   },
+   {
+    "tag": "fr",
+    "clearance_mm": 60.0,
+    "nearest": "body.well",
+    "at": [
+     1.401,
+     -0.698,
+     0.73
+    ],
+    "foot_mm": 0.0,
+    "steer_hits": "body.well",
+    "steer_deg": 30,
+    "verdict": "ok"
+   },
+   {
+    "tag": "rr",
+    "clearance_mm": 60.0,
+    "nearest": "body.well",
+    "at": [
+     -1.341,
+     -0.698,
+     0.73
+    ],
+    "foot_mm": 0.0,
+    "verdict": "ok"
+   }
+  ]
+ },
+ "ground": {
+  "verdict": "ok",
+  "clearance_mm": 110.0,
+  "lowest": "mudflaps",
+  "under_floor": []
+ },
+ "symmetry": {
+  "verdict": "ok",
+  "center_off_mm": 0.0,
+  "objects": 0,
+  "asymmetric": [
+   {
+    "object": "interior.wheel",
+    "off_mm": 210.4,
+    "at": [
+     0.57,
+     0.39,
+     0.841
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.bezels",
+    "off_mm": 139.5,
+    "at": [
+     0.754,
+     0.284,
+     1.097
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.screens",
+    "off_mm": 128.8,
+    "at": [
+     0.756,
+     0.27,
+     1.087
+    ],
+    "meant": true
+   },
+   {
+    "object": "wipers",
+    "off_mm": 26.0,
+    "at": [
+     -1.86,
+     0.203,
+     1.153
+    ],
+    "meant": true
+   },
+   {
+    "object": "body.fender",
+    "off_mm": 14.1,
+    "at": [
+     1.193,
+     0.82,
+     0.897
+    ],
+    "meant": true
+   },
+   {
+    "object": "display.front",
+    "off_mm": 10.0,
+    "at": [
+     2.047,
+     0.385,
+     0.693
+    ],
+    "meant": true
+   },
+   {
+    "object": "display.rear",
+    "off_mm": 10.0,
+    "at": [
+     -2.039,
+     -0.163,
+     0.809
+    ],
+    "meant": true
+   },
+   {
+    "object": "permit",
+    "off_mm": 10.0,
+    "at": [
+     1.06,
+     -0.385,
+     1.153
+    ],
+    "meant": true
+   },
+   {
+    "object": "wipers.blades",
+    "off_mm": 9.6,
+    "at": [
+     1.124,
+     -0.17,
+     1.125
+    ],
+    "meant": true
+   },
+   {
+    "object": "hatch.camera",
+    "off_mm": 8.0,
+    "at": [
+     -2.064,
+     0.161,
+     0.567
+    ],
+    "meant": true
+   },
+   {
+    "object": "permit.text",
+    "off_mm": 7.2,
+    "at": [
+     1.097,
+     -0.415,
+     1.122
+    ],
+    "meant": true
+   },
+   {
+    "object": "permit.mark",
+    "off_mm": 7.2,
+    "at": [
+     1.068,
+     -0.392,
+     1.149
+    ],
+    "meant": true
+   },
+   {
+    "object": "pixels.front",
+    "off_mm": 4.0,
+    "at": [
+     2.054,
+     0.273,
+     0.672
+    ],
+    "meant": true
+   },
+   {
+    "object": "pixels.rear",
+    "off_mm": 4.0,
+    "at": [
+     -2.044,
+     -0.34,
+     0.824
+    ],
+    "meant": true
+   }
+  ]
+ },
+ "panels": {
+  "verdict": "ok",
+  "open_edges": [],
+  "open_mm": 0,
+  "cutter_holes": [],
+  "cut_loops": 8,
+  "pieces": {
+   "body": {
+    "closed": true,
+    "panels": 16
+   }
+  }
+ },
+ "through": {
+  "verdict": "ok",
+  "parts": [],
+  "count": 0
+ },
+ "triangles": {
+  "verdict": "ok",
+  "total": 319531,
+  "budget": 400000,
+  "top": [
+   [
+    "tire.fl",
+    14384
+   ],
+   [
+    "tire.rl",
+    14384
+   ],
+   [
+    "tire.fr",
+    14384
+   ],
+   [
+    "tire.rr",
+    14384
+   ],
+   [
+    "body.gate",
+    11567
+   ],
+   [
+    "body.quarter",
+    10982
+   ],
+   [
+    "lettering.side",
+    10572
+   ],
+   [
+    "seal.side",
+    10224
+   ]
+  ],
+  "groups": [
+   [
+    "body",
+    93901
+   ],
+   [
+    "tire",
+    57536
+   ],
+   [
+    "visor",
+    27904
+   ],
+   [
+    "lamp",
+    27244
+   ],
+   [
+    "seal",
+    14016
+   ],
+   [
+    "lettering",
+    13099
+   ],
+   [
+    "roof",
+    10522
+   ],
+   [
+    "cover",
+    10272
+   ]
+  ]
+ },
+ "verdict": "ok"
+}
