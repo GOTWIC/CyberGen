@@ -1,6 +1,6 @@
 # AG18 brand book
 
-Seven made-up makers. A brand is a design language in geometry and texture: how a body is
+Seven made-up makers, three models each at first, a fourth for four of them since. A brand is a design language in geometry and texture: how a body is
 cut, what its lights, wheels, grilles and trims are shaped like, how its panels are finished
 and lettered. Color is never part of it: every car will be deployed in many colors, so each
 car picks a show color of its own for its sheet and nothing about a brand depends on it.
@@ -27,6 +27,7 @@ Creased wedges, low and wide, mid-engined proportions even on its larger cars.
 | Vanta-R | mid-engined supercar | 2 | done first, the reference for the kit |
 | Sable | fastback grand tourer | 4 | long wheelbase, four doors, the spine carried through a glass roof |
 | Ridge | performance crossover | 4 | raised, the octagonal arches at their boldest, short overhangs |
+| Kite | hot hatch | 2 + 2 | the smallest: a short wedge with a chopped tail, the spine a kite in plan, fins on the tail corners |
 
 ## Kestrel Aerodyne (hover, sharp)
 
@@ -66,6 +67,7 @@ Pebbles and drops. One continuous surface with almost no creases, as if poured.
 | Lumen | sedan | 4 | a long drop with a full canopy, wheels faired in |
 | Pebble | city pod | 2 | under 3 m, nearly symmetrical front to back |
 | Aria | hypercar | 2 | the canopy as a teardrop, buttresses, the widest hips |
+| Tide | crossover estate | 5 | a long-roofed drop on big wheels, a hoop over the glass behind the rear doors, a dark keel line |
 
 ## Brakk Industrial (heavy, utility)
 
@@ -84,6 +86,7 @@ Monoliths. Flat plates with big chamfers, built to be repaired with a wrench.
 | Hauler | pickup truck | 4 | crew cab, open bed with rails, exposed wheels |
 | Bastion | armored utility vehicle | 4 | slab sides, small glass, roof rack and light bar |
 | Mule | cargo van | 2 + cargo | six wheels, a ribbed box body, side and rear doors |
+| Burro | compact 4x4 | 2 | the smallest: as tall as wide, a roll hoop and a sloping rack with the spare over a short tub |
 
 ## Aurel (luxury, formal)
 
@@ -144,3 +147,4 @@ The cars most people in the city actually drive. Friendly boxes with big glass.
 | Mino | city car | 4 | about 3.4 m, a tall box on small wheels |
 | Cab | taxi | 4 | a one-box people carrier, a roof sign, a sliding door each side |
 | Porter | delivery van | 2 + cargo | a long box, roller door at the back, a roof rack |
+| Linnet | compact five-door | 5 | the common car: a cab-forward two-box with a raked glass hatch, a cap roof |
