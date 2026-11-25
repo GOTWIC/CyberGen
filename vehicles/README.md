@@ -159,6 +159,19 @@ vehicles/blender.sh vehicles/game.py --car vanta_r --test           # 1024 / 512
   wheel anew: a round tire and a disc wearing the rim face baked for it from the side. Each
   LOD is measured against LOD0 (normals, textures) and fails when crumpled. `--keep-work`
   then `--lods-only` remakes only the LODs in seconds.
+- **Cabins** (`cabin.py`'s `interior.*` objects). Faces seen only through the glass are the
+  cabin class (texels at 0.4 of the exterior's); the cabin is in LOD0 and LOD1 and left out
+  from LOD2, where the glass turns dark and opaque. A cabin face no ray from outside
+  reaches is still kept when it is open to the cabin (seen from a seat). A cabin face keeps
+  its side when its back is also seen from outside (a door lining through the slot under a side window), and
+  its lit displays and sill letters stay geometry (baked, they were specks); a closed solid
+  wound inward (the seat covers) is turned outward for the low parts and the bakes alike
+  (a collapsed seat baked dark and mottled from its inward originals), and its baked-down
+  detail comes from the cabin's own objects only (the body's paint, a few centimeters behind
+  the lining, came through on the headliner and door cards). Over budget
+  the cabin is shed alike with the exterior (relief, then a collapse of every part of 600
+  triangles or more). `--views cab_fwd,cab_in,cab_back` compares the pack from inside, in
+  the cabin views' own light; `proof/lod1_<view>.jpg` shows LOD1 from there.
 - **Size class.** Large vehicles (55 m2 of body exterior or more: trucks, vans) get an
   8,000 triangle LOD3 (5,000 otherwise) and a lower texel floor.
 - **Shared wheels.** A wheel that is another one moved or mirrored shares its texels

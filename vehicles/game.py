@@ -71,6 +71,8 @@ CAGE_M, REACH_M = 0.015, 0.035  # baking the detail: cage out, ray reach under t
 TEXEL_FLOOR = {"body": 300.0, "wheels": 300.0}  # px/m on exterior faces at 4096 / 2048
 TEXEL_FLOOR_LARGE = {"body": 240.0, "wheels": 240.0}  # ... for the large class (never under 220)
 CORE_WHEEL = ("tire", "rim", "hub", "ring", "disc", "drum", "caliper")
+CABIN_PREFIX = "interior"       # cabin.py names every part of a cabin interior.<part>...
+CABIN_OPEN_M = 0.25             # a cabin face a ray leaves this far clear is seen from a seat
 DETAIL_BOOST = 2.0              # texel density under baked lettering and decals, at most
 DETAIL_MARGIN = 1.03            # ... while the exterior's 5th percentile stays this over the floor
 DETAIL_COST = 0.2               # ... and the atlas grows by this share at most (the rest shrinks)
@@ -177,7 +179,35 @@ def build_car(car, out):
 def cam_record(cam):
     d = cam.data
     return dict(matrix=[list(r) for r in cam.matrix_world], lens=d.lens, sensor=d.sensor_width,
-                dof=bool(d.dof.use_dof), focus=d.dof.focus_distance, fstop=d.dof.aperture_fstop)
+                dof=bool(d.dof.use_dof), focus=d.dof.focus_distance, fstop=d.dof.aperture_fstop,
+                clip=d.clip_start)
+
+
+def view_rig(K):
+    """The light a cabin view renders in (cabin.py's views(): the cabin's own lamps lit, the
+    exposure raised, the world brighter, the studio's soft boxes hidden from the camera and
+    through the glass), as the scene stands while the view renders: the proof sets the same
+    up for the pack, so a cabin view compares like with like."""
+    vs = K.SCN.view_settings
+    w = K.SCN.world
+    bg = None
+    if w is not None and w.node_tree is not None:
+        n = next((n for n in w.node_tree.nodes if n.type == 'BACKGROUND'), None)
+        if n is not None:
+            bg = float(n.inputs["Strength"].default_value)
+    lights = {}
+    for ob in K.STUDIO.objects:
+        if ob.type != 'LIGHT':
+            continue
+        L = ob.data
+        row = dict(type=L.type, energy=float(L.energy), color=[float(c) for c in L.color],
+                   matrix=[list(r) for r in ob.matrix_world], camera=bool(ob.visible_camera),
+                   transmission=bool(ob.visible_transmission),
+                   glossy=bool(ob.visible_glossy))
+        if L.type == 'AREA':
+            row.update(shape=L.shape, size=float(L.size), size_y=float(L.size_y))
+        lights[ob.name] = row
+    return dict(exposure=float(vs.exposure), background=bg, lights=lights)
 
 
 STUDIO_UNLIT_SHARE = 0.3        # a part a light skips when it skips this share of its area
@@ -227,9 +257,23 @@ def render_views(K, names, res, samples, folder, prefix):
             log("no view %s on this car" % name)
             continue
         path = os.path.join(folder, "%s_%s.jpg" % (prefix, name))
-        K.render_view(name, path, res, samples)
+        rig = {}
+        cabin = bool(K.VIEWS[name].get("cabin"))
+
+        def grab(n, before, name=name, rig=rig):
+            if before and n == name:
+                rig.update(view_rig(K))
+        if cabin:                   # after the car's own hooks: the scene as it renders
+            K.VIEW_HOOKS.append(grab)
+        try:
+            K.render_view(name, path, res, samples)
+        finally:
+            if cabin:
+                K.VIEW_HOOKS.remove(grab)
         cams[name] = cam_record(K.SCN.camera)
         cams[name]["no_floor"] = bool(K.VIEWS[name].get("no_floor"))
+        if rig:
+            cams[name]["rig"] = rig
     return cams
 
 
@@ -554,6 +598,99 @@ def piece_meshes(ob, dg):
     return out
 
 
+def turn_cabin_out(pieces):
+    """A cabin's closed solids wound inward (cabin.py's seat covers: Blender draws both
+    sides, so the design never shows it) turned outward in their pieces, before anything
+    reads them. Seen through the glass from inside, the visibility rule turned the low faces
+    round, but the bakes read the originals: an inward surface's occlusion is taken inside
+    the solid and its normals point in, so a collapsed seat baked dark and mottled. A solid
+    is judged whole, an object's pieces (one per material) welded where they meet. Returns
+    {object name: faces turned}; the bakes read those objects from stand-ins
+    (cabin_stands)."""
+    by = {}
+    for p in pieces:
+        if p.part != "glass" and p.ob.name.split(".", 1)[0] == CABIN_PREFIX:
+            by.setdefault(p.ob.name, []).append(p)
+    out = {}
+    for name, ps in by.items():
+        bm = bmesh.new()
+        lp, lf = bm.faces.layers.int.new("cg_p"), bm.faces.layers.int.new("cg_f")
+        for k, p in enumerate(ps):
+            vs = [bm.verts.new(v.co) for v in p.me.vertices]
+            for poly in p.me.polygons:
+                try:
+                    f = bm.faces.new([vs[i] for i in poly.vertices])
+                except ValueError:
+                    continue
+                f[lp], f[lf] = k, poly.index
+        bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
+        bm.faces.ensure_lookup_table()
+        turn = {}
+        for part in loose_parts(bm):
+            if not all(e.is_manifold for f in part for e in f.edges):
+                continue
+            vol = 0.0
+            for f in part:
+                vs = [v.co for v in f.verts]
+                for i in range(1, len(vs) - 1):
+                    vol += vs[0].dot(vs[i].cross(vs[i + 1]))
+            if vol < 0:
+                for f in part:
+                    turn.setdefault(f[lp], set()).add(f[lf])
+        bm.free()
+        for k, idx in turn.items():
+            pb = bmesh.new()
+            pb.from_mesh(ps[k].me)
+            pb.faces.ensure_lookup_table()
+            fl = [pb.faces[i] for i in idx]
+            bmesh.ops.reverse_faces(pb, faces=fl)
+            ln = pb.loops.layers.float_vector.get("cg_n")
+            if ln is not None:
+                for f in fl:
+                    for l in f.loops:
+                        l[ln] = -l[ln]
+            pb.to_mesh(ps[k].me)
+            pb.free()
+            out[name] = out.get(name, 0) + len(idx)
+    if out:
+        log("cabin solids wound inward, turned out: %s" % out)
+    return out
+
+
+def cabin_stands(K, pieces, turned, sources):
+    """The bake sources of the objects turn_cabin_out turned: a stand-in per object made of
+    its pieces as turned, in its own space and place (its materials read object
+    coordinates), the original hidden from the renders."""
+    if not turned:
+        return
+    by = {}
+    for p in pieces:
+        if p.ob.name in turned and p.part != "glass":
+            by.setdefault(p.ob.name, (p.ob, []))[1].append(p.me)
+    for name, (ob, mes) in by.items():
+        if not any(ob in lst for lst in sources.values()):
+            continue
+        M = ob.matrix_world.copy()
+        inv = M.inverted_safe()
+        R = M.to_3x3().transposed()
+        cps = []
+        for me in mes:
+            c = me.copy()
+            c.transform(inv)
+            a = c.attributes.get("cg_n")
+            if a is not None:
+                a.data.foreach_set("vector", [x for v in a.data for x in
+                                              (R @ V3(v.vector)).normalized()])
+            cps.append(c)
+        st = join_meshes(name + ".cg_stand", cps, K.CAR)
+        st.matrix_world = M
+        set_normals(st.data)
+        ob.hide_render = True
+        for lst in sources.values():
+            if ob in lst:
+                lst[lst.index(ob)] = st
+
+
 def void_material():
     m = bpy.data.materials.get("void")
     if m is None:
@@ -775,6 +912,12 @@ def find_relief(pieces, lit=()):
             continue
         kind = p.ob.name.split(".", 1)[0]
         if p.part != "body" and kind in CORE_WHEEL:
+            continue
+        if kind == CABIN_PREFIX and p.mat in lit:
+            # a display's graphics, a lit sill's letters (cabin.py's interior.* objects):
+            # digits and gauge rings a few millimeters across, which the cabin's texels
+            # (its islands at a fraction of the exterior's density) bake to specks; they
+            # stay as drawn, a few hundred triangles each
             continue
         # its vertices and the middles of its faces and edges: a long bar whose vertices
         # all sit in its end plates is no relief
@@ -1133,7 +1276,7 @@ VIS_AGAIN_M2 = 0.002    # a face this large that no ray left is looked at again
 VIS_AGAIN_DIRS = 600    # ... along this many directions (96 at first)
 
 
-def visibility(bm, glass_tree, floats=False):
+def visibility(bm, glass_tree, floats=False, keep_side=None):
     """Face classes by rays: 0 seen from outside (exterior), 1 seen only from below
     (underside), 2 seen only through glass (cabin), 3 seen only in gaps (a large face found
     on the second, finer look), -1 never seen (removed). On a vehicle
@@ -1144,7 +1287,11 @@ def visibility(bm, glass_tree, floats=False):
     (Blender draws both sides; an engine culls back faces): its class from the back, and
     its index in the second list, to be turned round. So is a face seen better from its
     back than from its front (exterior over cabin over underside: a deck under the glass
-    turned down, seen through the glass from above and through a gap from below)."""
+    turned down, seen through the glass from above and through a gap from below). A face
+    in keep_side (indices: a cabin's) seen from its front through the glass keeps its side
+    however well its back is seen: a door lining's back seen from outside through the slot
+    under a side window, turned round, was a hole in the door from the seat (an engine
+    culls the face's back), seen only as a sliver from outside."""
     global DIRS
     if DIRS is None:
         DIRS = fib_dirs(96)
@@ -1171,6 +1318,16 @@ def visibility(bm, glass_tree, floats=False):
                 if best == 0:
                     return 0
         return best
+
+    def open_to(samples, n):
+        dirs = [n] + [d for d in DIRS if d.dot(n) > 0.3]
+        for p in samples:
+            o = p + n * eps
+            for d in dirs:
+                if tree.ray_cast(o, d, CABIN_OPEN_M)[0] is None:
+                    return True
+        return False
+    rescued = [0]
     again = 0
     for f in bm.faces:
         n = f.normal
@@ -1184,8 +1341,21 @@ def visibility(bm, glass_tree, floats=False):
         best = seen(samples, n)
         if best != 0:
             back = seen(samples, -n)
-            if RANK[back] > RANK[best]:
+            if RANK[back] > RANK[best] and not (
+                    best == 2 and keep_side is not None and f.index in keep_side):
                 best = back
+                flip.append(f.index)
+        if best == -1 and keep_side is not None and f.index in keep_side:
+            # a cabin's face is seen from the seats, not only from outside: one open to the
+            # cabin's air (a ray from it runs CABIN_OPEN_M clear) stays, as cabin. Judged
+            # from outside alone, a headrest's front, the headliner over the windshield and
+            # the trim round the tailgate went, holes onto the skin's painted inside
+            if open_to(samples, n):
+                best = 2
+                rescued[0] += 1
+            elif open_to(samples, -n):
+                best = 2
+                rescued[0] += 1
                 flip.append(f.index)
         if best == -1 and f.calc_area() > VIS_AGAIN_M2:
             # a large face no ray left: looked at again from more points along many more
@@ -1201,10 +1371,12 @@ def visibility(bm, glass_tree, floats=False):
         cls.append(best)
     if again:
         log("  %d large faces seen only on a second, finer look (kept)" % again)
+    if rescued[0]:
+        log("  %d cabin faces unseen from outside but open to the cabin (kept)" % rescued[0])
     return cls, flip
 
 
-def cull(ob, glass_tree, lit=(), floats=False):
+def cull(ob, glass_tree, lit=(), floats=False, cabin=()):
     """Removes coincident and never seen faces of a part, stores each face's class (FACE
     int cg_class). A lamp's faces (materials in lit) are never removed as unseen: a light
     band seen only through the gaps of a row of flutes catches too few of the rays.
@@ -1215,7 +1387,9 @@ def cull(ob, glass_tree, lit=(), floats=False):
     dup = dedupe_faces(bm) + [f for f in bm.faces if f.calc_area() < 1e-9]
     bmesh.ops.delete(bm, geom=list(set(dup)), context='FACES')
     bm.faces.ensure_lookup_table()
-    cls, flip = visibility(bm, glass_tree, floats)
+    pl = bm.faces.layers.int.get("cg_piece")
+    keep = {f.index for f in bm.faces if f[pl] in cabin} if cabin and pl is not None else None
+    cls, flip = visibility(bm, glass_tree, floats, keep)
     if flip:
         fl = [bm.faces[i] for i in flip]
         bmesh.ops.reverse_faces(bm, faces=fl)
@@ -1934,13 +2108,14 @@ def ray_vis(objs, on):
 
 
 def bake_slot(slot, targets, receiver, sources, chans_low, chans_src, size, work, samples,
-              K, low_coll, hide, extra=None):
+              K, low_coll, hide, extra=None, cabin=None):
     """Pass A: each target's own surface, its materials as they are, against the low parts.
     Pass B: the baked-down detail, from the original objects (sources) onto the receiver
     (the faces under it), against the original car; with extra (an object, its sources,
     their channels, a ray reach: the rim discs), that too, into the same images, its rays
-    from just outside it along its normals up to the reach. hide: objects out of both
-    (glass, the other copies of the targets). Every pass a PNG in work/:
+    from just outside it along its normals up to the reach; with cabin (a receiver and
+    its sources: the cabin's faces and objects), that as a job of its own. hide: objects
+    out of both (glass, the other copies of the targets). Every pass a PNG in work/:
     <slot>_<A|B>_<pass>.png."""
     scn = bpy.context.scene
     car_lc, st_lc = layer_coll(K.CAR.name), layer_coll(K.STUDIO.name)
@@ -1957,6 +2132,8 @@ def bake_slot(slot, targets, receiver, sources, chans_low, chans_src, size, work
         if side == "B":
             jobs = [([receiver], [receiver] + sources)] if receiver is not None and sources \
                 else []
+            if cabin is not None and cabin[1]:
+                jobs.append(([cabin[0]], [cabin[0]] + cabin[1]))
             if extra is not None:
                 jobs.append(([extra[0]], [extra[0]] + extra[1]))
             if not jobs:
@@ -1964,6 +2141,8 @@ def bake_slot(slot, targets, receiver, sources, chans_low, chans_src, size, work
         car_lc.exclude = side == "A"
         if receiver is not None:
             receiver.hide_render = side == "A"
+        if cabin is not None:
+            cabin[0].hide_render = side == "A"
         if extra is not None:
             extra[0].hide_render = side == "A"
         ray_vis(low_coll.objects, side == "A")
@@ -2128,6 +2307,8 @@ def lights_of(pieces, infos):
             role = ROLE.get(p.mat, "emitter")
             if p.part.startswith("wheel:"):
                 role = "wheel"
+            elif p.ob.name.split(".", 1)[0] == CABIN_PREFIX:
+                role = "cabin"          # cabin.py's displays, strips and dome light
             out.append(dict(
                 name=p.ob.name, part=p.part.split(":")[0], material=p.mat, role=role,
                 position=[round(x, 4) for x in c], size=[round(g["hi"][i] - g["lo"][i], 4)
@@ -3701,6 +3882,7 @@ def main_build(A):
     log("%d pieces from %d objects, %d triangles; %d wheels" % (
         len(pieces), n_objects, sum(p.tris for p in pieces), len(wheels)))
     studio = studio_record(K, pieces)
+    turned = turn_cabin_out(pieces)
 
     # 3. bake down: flat relief and cards always
     find_relief(pieces, {mi.name for mi in infos.values() if mi.emissive})
@@ -3729,6 +3911,7 @@ def main_build(A):
     # glass never (a collapsed canopy shows its facets in every reflection)
     steps = ["tall", "collapse", "collapse", "collapse", "collapse"]
     over_tried = False
+    cabin_idx = {p.idx for p in pieces if p.ob.name.split(".", 1)[0] == CABIN_PREFIX}
     while True:
         parts = part_meshes(pieces, cards)
         objs = {part: join_meshes("tmp_" + part, [m for m, _ in lst], low_coll)
@@ -3747,7 +3930,7 @@ def main_build(A):
             if part != "glass" and part not in twins:
                 culled[part] = cull(ob, glass_tree if part == "body" else None,
                                     {mi.name for mi in infos.values() if mi.emissive},
-                                    floats=not wheels)
+                                    floats=not wheels, cabin=cabin_idx)
         total = sum(mesh_tris(objs[twins.get(k, k)].data) for k in objs)
         log("low: %d triangles (%s); removed (coincident, hidden) %s; twins %s" % (
             total, ", ".join("%s %d" % (k, mesh_tris(o.data)) for k, o in sorted(objs.items())),
@@ -3985,6 +4168,7 @@ def main_build(A):
     tags = {k.split(":")[1] for k in nodes if k not in twins and k.startswith("wheel:")}
     disc_src = [o for tag, piv, mem in wheels if tag in tags for o in mem
                 if o.type in ('MESH', 'CURVE', 'FONT', 'SURFACE')] if disc_ob is not None else []
+    cabin_stands(K, pieces, turned, sources)
     src_chans = {}
     for slot in ("body", "wheels"):
         for ob in sources[slot] + (disc_src if slot == "wheels" else []):
@@ -4012,12 +4196,26 @@ def main_build(A):
             dc = [src_chans[m.name] for o in disc_src for m in o.data.materials
                   if m is not None]
             extra = (disc_ob, disc_src, list({id(c): c for c in dc}.values()), disc_reach)
+        cab = None
+        if rec is not None and slot == "body":
+            # the cabin's faces baked from the cabin's sources alone: the lining lies a few
+            # centimeters inside the skin, within the bake's reach of it, and a collapsed
+            # headliner or door card took the body's paint and frit from behind it
+            ids = {p.idx for p in pieces if p.ob.name.split(".", 1)[0] == CABIN_PREFIX}
+            csrc = [o for o in srcs if o.name.split(".", 1)[0] == CABIN_PREFIX]
+            rec, crec = split_receiver(rec, ids, low_coll)
+            if crec is not None:
+                cab = (crec, csrc)
+                srcs = [o for o in srcs if o not in csrc]
+                log("  of them %d faces of the cabin, from its %d source objects alone" % (
+                    len(crec.data.polygons), len(csrc)))
         files[slot] = bake_slot(slot, [target], rec, srcs, chans[slot], sc, size, work,
-                                A.samples, K, low_coll, hide, extra)
-        if rec is not None:
-            me = rec.data
-            bpy.data.objects.remove(rec)
-            bpy.data.meshes.remove(me)
+                                A.samples, K, low_coll, hide, extra, cab)
+        for r in (rec, cab[0] if cab else None):
+            if r is not None:
+                me = r.data
+                bpy.data.objects.remove(r)
+                bpy.data.meshes.remove(me)
     times["bake"] = time.time() - t
 
     # 7. LODs, collision, export
@@ -4186,6 +4384,37 @@ def emissive_scale(infos, obs):
     out = [mi.strength for mi in em if mi.name not in cabin]
     emax = max(out or [mi.strength for mi in em] or [0.0])
     return emax, sorted(mi.name for mi in em if mi.name in cabin and mi.strength > emax)
+
+
+def split_receiver(rec, ids, coll):
+    """A receiver's faces of the pieces in ids as an object of their own: (the rest, those),
+    either None when it has no faces; rec itself when none are in ids."""
+    lay = rec.data.attributes.get("cg_piece")
+    if lay is None or not any(x.value in ids for x in lay.data):
+        return rec, None
+
+    def part(mine, name):
+        me = rec.data.copy()
+        bm = bmesh.new()
+        bm.from_mesh(me)
+        pl = bm.faces.layers.int.get("cg_piece")
+        bmesh.ops.delete(bm, geom=[f for f in bm.faces if (f[pl] in ids) != mine],
+                         context='FACES')
+        if not bm.faces:
+            bm.free()
+            bpy.data.meshes.remove(me)
+            return None
+        bm.to_mesh(me)
+        bm.free()
+        ob = new_obj(name, me, coll)
+        ob.matrix_world = rec.matrix_world
+        set_normals(me)
+        return ob
+    rest, mine = part(False, rec.name + "_rest"), part(True, rec.name + "_cabin")
+    me = rec.data
+    bpy.data.objects.remove(rec)
+    bpy.data.meshes.remove(me)
+    return rest, mine
 
 
 def receiver_of(target, replaced, sources, relief, coll):
@@ -4410,7 +4639,7 @@ def proof_main(pack_dir, lods_only=False):
         cd = bpy.data.cameras.new("pc")
         cd.lens = rec["lens"]
         cd.sensor_width = rec["sensor"]
-        cd.clip_start, cd.clip_end = 0.1, 200
+        cd.clip_start, cd.clip_end = rec.get("clip", 0.1), 200    # a cut-away view's own
         if rec["dof"]:
             cd.dof.use_dof = True
             cd.dof.focus_distance = rec["focus"]
@@ -4420,15 +4649,72 @@ def proof_main(pack_dir, lods_only=False):
         ob.matrix_world = Matrix(rec["matrix"])
         return ob
 
-    def shot(cam, path, r, no_floor=False):
+    def background():
+        w = K.SCN.world
+        if w is None or w.node_tree is None:
+            return None
+        n = next((n for n in w.node_tree.nodes if n.type == 'BACKGROUND'), None)
+        return n.inputs["Strength"] if n is not None else None
+
+    def apply_rig(rig):
+        """A cabin view's light (view_rig) set up, its lights made where the proof's studio
+        has none (the cabin's lamps); returns the undo."""
+        vs = K.SCN.view_settings
+        keep = dict(e=vs.exposure)
+        vs.exposure = rig["exposure"]
+        bgs = background()
+        if bgs is not None and rig.get("background") is not None:
+            keep["bg"] = bgs.default_value
+            bgs.default_value = rig["background"]
+        made, saved = [], {}
+        for name, row in rig["lights"].items():
+            ob = K.STUDIO.objects.get(name)
+            if ob is None:
+                L = bpy.data.lights.new(name, row["type"])
+                ob = bpy.data.objects.new(name, L)
+                K.STUDIO.objects.link(ob)
+                ob.matrix_world = Matrix(row["matrix"])
+                if row["type"] == 'AREA':
+                    L.shape = row["shape"]
+                    L.size, L.size_y = row["size"], row["size_y"]
+                made.append(ob)
+            elif ob.type != 'LIGHT':
+                continue
+            else:
+                saved[name] = (ob.data.energy, tuple(ob.data.color), ob.visible_camera,
+                               ob.visible_transmission, ob.visible_glossy)
+            ob.data.energy = row["energy"]
+            ob.data.color = row["color"]
+            ob.visible_camera = row["camera"]
+            ob.visible_transmission = row["transmission"]
+            ob.visible_glossy = row["glossy"]
+
+        def undo():
+            vs.exposure = keep["e"]
+            if "bg" in keep:
+                bgs.default_value = keep["bg"]
+            for name, (e, c, cam_, tr, gl) in saved.items():
+                ob = K.STUDIO.objects[name]
+                ob.data.energy, ob.data.color = e, c
+                ob.visible_camera, ob.visible_transmission, ob.visible_glossy = cam_, tr, gl
+            for ob in made:
+                L = ob.data
+                bpy.data.objects.remove(ob)
+                bpy.data.lights.remove(L)
+        return undo
+
+    def shot(cam, path, r, no_floor=False, rig=None):
         cyc = K.STUDIO.objects.get("cyc")      # a view from under the floor hides it
         if cyc is not None:
             cyc.hide_render = bool(no_floor)
+        undo = apply_rig(rig) if rig else None
         K.SCN.camera = cam
         K.SCN.render.resolution_x, K.SCN.render.resolution_y = r
         K.SCN.cycles.samples = sm
         K.SCN.render.filepath = path
         bpy.ops.render.render(write_still=True)
+        if undo is not None:
+            undo()
         log("proof %s" % os.path.basename(path))
 
     paint = {k: v["color"] for k, v in pack["colors"].items()}
@@ -4470,7 +4756,7 @@ def proof_main(pack_dir, lods_only=False):
         show(0)
         for name, cam in cams.items():
             shot(cam, os.path.join(out, "baked_%s.jpg" % name), res,
-                 pack["cameras"][name].get("no_floor"))
+                 pack["cameras"][name].get("no_floor"), pack["cameras"][name].get("rig"))
         # recolored: the primary and secondary paints swapped for others
         mats2 = {s: material(s, {k: alt[k] for k in paint}) for s in mats}
         assign(lod_objs[0], mats2)
@@ -4480,6 +4766,13 @@ def proof_main(pack_dir, lods_only=False):
     for k in sorted(lod_objs):
         show(k)
         shot(cams["hero"], os.path.join(out, "lod%d_hero.jpg" % k), small)
+        if k < opaque_from:
+            # the LODs that still carry the cabin, from the cabin's own views
+            for name, cam in cams.items():
+                rig = pack["cameras"][name].get("rig")
+                if k > 0 and rig:
+                    shot(cam, os.path.join(out, "lod%d_%s.jpg" % (k, name)), small,
+                         pack["cameras"][name].get("no_floor"), rig)
     with open(os.path.join(out, "alt_colors.json"), "w") as f:
         json.dump(alt, f)
 

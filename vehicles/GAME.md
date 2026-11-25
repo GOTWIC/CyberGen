@@ -155,7 +155,30 @@ So that LOD0 is near 150,000 triangles without decimating the silhouette:
   underside class. A face never seen from its front but seen from its back (a design
   face turned the wrong way, which Blender draws and an engine culls) is turned round, and
   so is a face seen better from its back than its front (exterior over cabin over
-  underside).
+  underside), but never a cabin's face (an `interior.*` object of `cabin.py`) whose front is
+  seen through the glass: a door lining's back seen from outside through the slot under a
+  side window, turned round, was a hole in the door from the seat. A cabin's face is also
+  seen from the seats, not only from outside: one no ray from outside reaches but which is
+  open to the cabin's air (a ray from it, front or back, runs 25 cm clear) is kept as cabin,
+  turned round when it is its back that is open. Judged from outside alone, a quarter of
+  the Mino's cabin went (a headrest's front, the headliner over the windshield, the trim
+  round the tailgate: holes onto the skin's painted inside).
+- **Cabin solids wound inward** (an `interior.*` object's closed solid, its pieces welded
+  where they meet, whose signed volume is negative: `cabin.py`'s seat covers) are turned
+  outward before anything reads them, and the bakes read that object from a stand-in made
+  of the turned pieces in its own space (its materials read object coordinates), the
+  original hidden. The visibility rule had turned the low faces round, but the bakes read
+  the originals: occlusion taken inside the solid and normals pointing in, a collapsed seat
+  baked dark and mottled.
+- **The cabin baked from the cabin.** The faces of a cabin's pieces that take baked-down
+  detail (its collapsed or relief-bearing parts) are baked from the cabin's own objects
+  alone, as a bake job of their own: the lining lies a few centimeters inside the skin,
+  within the bake's reach of it, and a collapsed headliner or door card took the body's
+  paint and frit from behind it.
+- **Never baked down**: a cabin's lit relief (`interior.*` objects in an emissive material:
+  a display's digits and gauge rings, a lit sill's letters). The cabin's islands are at a
+  fraction of the exterior's texel density, and baked there the graphics came out as
+  specks; drawn as they are they cost a few hundred triangles each.
 
 `baked_down` in `pack.json` lists every piece and what became of it.
 
@@ -348,7 +371,7 @@ corners (the farthest points along 128 directions). `collision.glb`, nodes
 | `colors`, `tinted_materials` | show colors per channel; the materials that follow them |
 | `emissive_strength`, `emissive_clipped` | the emissive texture's 1.0 in Blender's strength (day values): the strongest emitter seen from outside; the cabin-only emitters stronger than that, clipped to it (their true strength is in `lights`) |
 | `micro_detail` | detail left to the engine's detail maps |
-| `lights` | every emissive surface grouped into lamps: role (`head`, `tail`, `marker`, `wheel`, `cabin`, `glow`, `lamp`, `emitter`), part, position, size, facing, area, color, strength |
+| `lights` | every emissive surface grouped into lamps: role (`head`, `tail`, `marker`, `wheel`, `cabin` (the kit's `screen`, and every emitter of a `cabin.py` cabin: displays, light strips, the dome light), `glow`, `lamp`, `emitter`), part, position, size, facing, area, color, strength |
 | `collision` | file and hulls |
 | `views`, `cameras` | the hero view, the studio as the car's script set it up (`views.studio`: per light its energy and color, and `unlit`, the parts a light was linked off), and the cameras of the proof renders |
 | `baked_down` | what was removed or replaced, and how |
@@ -414,3 +437,12 @@ up, at 30% of a part's area or more, from `views.studio`; a view from under the 
 its floor, as the car's own) next to the procedural original from the same camera,
 a recolored copy, the textures, and the four LODs (from `opaque_from_lod` the glass dark
 and opaque, as an engine draws it).
+
+A cabin's views (`cab_fwd`, `cab_in`, ...: `--views`) render in a light of their own
+(`cabin.py`'s `views()`: the cabin's lamps lit, the exposure raised, the world brighter, the
+soft boxes hidden from the camera) and a cut-away one (`cab_in`) with its own near clip. The
+build records both per camera (`cameras.<view>.clip`, `cameras.<view>.rig`: the exposure,
+the world's strength and every studio light as it stood while the view rendered) and the
+proof sets them up for the pack's renders, so a cabin view compares like with like; every
+LOD that still carries the cabin (below `opaque_from_lod`) is also rendered from each such
+view (`proof/lod1_<view>.jpg`).

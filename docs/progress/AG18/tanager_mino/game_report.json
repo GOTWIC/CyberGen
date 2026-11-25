@@ -3,29 +3,29 @@
  "title": "Tanager Mino",
  "ok": true,
  "triangles": {
-  "original": 276187,
+  "original": 332502,
   "lods": [
-   143087,
-   59994,
-   20076,
-   5361
+   147379,
+   59990,
+   19940,
+   5465
   ],
   "lod0_parts": {
-   "body": 114087,
+   "body": 118851,
    "glass": 2024,
-   "wheel_fl": 6744,
-   "wheel_fr": 6744,
+   "wheel_fl": 6508,
+   "wheel_fr": 6508,
    "wheel_rl": 6744,
    "wheel_rr": 6744
   }
  },
  "objects": {
-  "original": 141,
+  "original": 211,
   "parts": 6
  },
  "size_class": {
   "name": "standard",
-  "exterior_m2": 26.3,
+  "exterior_m2": 23.01,
   "rule": "large when the body's exterior is 55 m2 or more",
   "lod_budgets": [
    150000,
@@ -42,60 +42,128 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 34400594,
- "seconds": 777.6,
+ "pack_bytes": 40851210,
+ "seconds": 4172.5,
  "stage_seconds": {
-  "build": 1.2,
-  "render_original": 78.7,
-  "parts": 21.7,
+  "build": 2.6,
+  "render_original": 326.3,
+  "parts": 128.9,
   "nodes": 0.0,
-  "uv": 85.1,
-  "bake": 406.4,
-  "lods_export": 53.3,
-  "textures": 8.459035873413086,
-  "proof": 122.07246899604797
+  "uv": 541.7,
+  "bake": 2354.9,
+  "lods_export": 115.4,
+  "textures": 23.105061054229736,
+  "proof": 678.4805240631104
  },
  "baked_down": {
+  "collapse": {
+   "pieces": 34,
+   "triangles": 129826,
+   "names": [
+    "arch.trims",
+    "body.clad",
+    "body.door_f",
+    "body.door_r",
+    "body.fender",
+    "body.floor",
+    "body.gate",
+    "body.hood",
+    "body.nose",
+    "body.quarter",
+    "body.roof",
+    "body.screen",
+    "body.well",
+    "frit.ends",
+    "frit.side",
+    "handle.pulls",
+    "interior.door_f.interior",
+    "interior.door_f.soft",
+    "interior.door_r.interior",
+    "interior.door_r.soft",
+    "interior.lining",
+    "interior.seat0.cover",
+    "interior.seat1.cover",
+    "interior.seat2.cover",
+    "interior.seat2.seat",
+    "interior.wheel.soft",
+    "roof.rails",
+    "sensor.mast",
+    "visor.back.rear",
+    "wipers"
+   ]
+  },
   "relief": {
-   "pieces": 24,
-   "triangles": 23534,
+   "pieces": 68,
+   "triangles": 89704,
    "names": [
     "badge.disc.X",
     "badge.disc.z",
+    "badge.ring.X",
+    "badge.ring.z",
+    "badge.t.X",
+    "badge.t.z",
+    "body.slot",
+    "bump.lines",
+    "bump.strip",
+    "bumper.front",
+    "bumper.guards.front",
+    "bumper.guards.rear",
+    "bumper.rear",
     "charge.bolt",
+    "charge.label",
     "cover.cap.fl",
     "cover.cap.fr",
     "cover.cap.rl",
     "cover.cap.rr",
+    "cover.slots.fl",
+    "cover.slots.fr",
+    "intake",
+    "intake.slats",
+    "interior.cluster.dark",
+    "interior.dash.gloss",
+    "interior.dash.interior",
+    "interior.dash.trim",
+    "interior.door_f.grille",
+    "interior.door_r.grille",
+    "interior.pedals.mat",
+    "interior.roof.mirror",
+    "interior.screen.dark",
+    "interior.wells",
+    "lamp.fog.chrome",
     "lamp.fog.housing",
+    "lamp.front.chrome",
     "lamp.front.housing",
+    "lamp.front_bar.chrome",
+    "lamp.rear.chrome",
     "lamp.rear.housing",
+    "lamp.rear_bar.chrome",
+    "lamp.repeater.chrome",
+    "lamp.reverse.chrome",
     "lamp.reverse.housing",
     "lamp.stop.chrome",
     "lamp.stop.housing",
     "lettering.rear",
     "lettering.side",
+    "mirror.glass",
     "permit.mark",
+    "permit.text",
     "pixels.front",
     "pixels.rear",
+    "plate.X",
+    "plate.glyphs.X",
+    "plate.glyphs.x",
+    "plate.x",
+    "reflectors",
     "roof.number",
     "roundel",
     "roundel.number",
+    "seal.ends",
+    "seal.side",
     "sensors.front",
     "sensors.rear",
-    "tow.cover"
-   ]
-  },
-  "lod0_only": {
-   "pieces": 6,
-   "triangles": 2319,
-   "names": [
-    "badge.t.X",
-    "badge.t.z",
-    "charge.label",
-    "permit.text",
-    "plate.glyphs.X",
-    "plate.glyphs.x"
+    "tow.cover",
+    "visor.rim.front",
+    "visor.rim.rear"
    ]
   },
   "lathe": {
@@ -112,53 +180,53 @@
  "texel_px_per_m": {
   "body": {
    "exterior": {
-    "area_m2": 26.297,
-    "p5": 489.4,
-    "median": 505.0
+    "area_m2": 23.013,
+    "p5": 495.5,
+    "median": 522.9
    },
    "underside": {
-    "area_m2": 0.14,
-    "p5": 176.0,
-    "median": 485.0
+    "area_m2": 0.171,
+    "p5": 182.3,
+    "median": 517.2
    },
    "cabin": {
-    "area_m2": 16.17,
-    "p5": 199.2,
-    "median": 201.4
+    "area_m2": 30.364,
+    "p5": 196.2,
+    "median": 208.5
    },
    "lamp_in_gaps": {
-    "area_m2": 3.183,
-    "p5": 176.0,
-    "median": 176.0
+    "area_m2": 0.307,
+    "p5": 182.3,
+    "median": 523.5
    }
   },
   "wheels": {
    "lamp_in_gaps": {
-    "area_m2": 0.283,
-    "p5": 543.0,
-    "median": 600.5
+    "area_m2": 0.565,
+    "p5": 386.4,
+    "median": 427.3
    },
    "exterior": {
-    "area_m2": 2.297,
-    "p5": 527.0,
-    "median": 585.4
+    "area_m2": 4.563,
+    "p5": 375.2,
+    "median": 416.5
    },
    "underside": {
-    "area_m2": 0.001,
-    "p5": 531.5,
-    "median": 542.0
+    "area_m2": 0.002,
+    "p5": 429.3,
+    "median": 429.3
    }
   }
  },
- "lights": 25,
+ "lights": 50,
  "collision_hulls": 7,
  "source": {
   "script": "vehicles/cars/tanager_mino.py",
-  "script_sha256": "20ac4bbcaf2d63672338601e84fabad0c14c33f448a9a25c815a6d5df53b22b4",
-  "carkit_sha256": "80020b974b190e7b6db524668c8c6d0164b3484f712ec8a6420c6e9961b53ea5",
-  "game_sha256": "32271c5b2195e75c93509022799b7dd770add377d59cc906b924e040e27ff1db",
-  "original_triangles": 276187,
-  "original_objects": 141
+  "script_sha256": "4123bf23fb77dd483bf64cc7f9fe2d351296be298c4e13fefdafe7ae153d1c67",
+  "carkit_sha256": "4a1b9a9a1c4472c37227e0b9171ff94263a6d3d320dd4d13ad55783936af1832",
+  "game_sha256": "6bc787455f83d358b79adcaa41d315ad23d127658fae3995d87da043ee22c951",
+  "original_triangles": 332502,
+  "original_objects": 211
  },
  "test": false,
  "checks": [
@@ -177,25 +245,25 @@
    "detail": [
     {
      "lod": 0,
-     "triangles": 143087,
+     "triangles": 147379,
      "budget": 150000,
      "ok": true
     },
     {
      "lod": 1,
-     "triangles": 59994,
+     "triangles": 59990,
      "budget": 60000,
      "ok": true
     },
     {
      "lod": 2,
-     "triangles": 20076,
+     "triangles": 19940,
      "budget": 20000,
      "ok": true
     },
     {
      "lod": 3,
-     "triangles": 5361,
+     "triangles": 5465,
      "budget": 5000,
      "ok": true
     }
@@ -208,13 +276,13 @@
     "limit": 0.005,
     "slots": {
      "body": {
-      "overlap": 6e-05,
-      "coverage": 0.5522,
+      "overlap": 0.00022,
+      "coverage": 0.5745,
       "outside_unit": 0.0
      },
      "wheels": {
       "overlap": 0.0,
-      "coverage": 0.2109,
+      "coverage": 0.2118,
       "outside_unit": 0.0
      }
     }
@@ -225,14 +293,14 @@
    "ok": true,
    "detail": {
     "body": {
-     "p5": 489.4,
-     "median": 505.0,
+     "p5": 495.5,
+     "median": 522.9,
      "floor": 300.0,
      "ok": true
     },
     "wheels": {
-     "p5": 527.0,
-     "median": 585.4,
+     "p5": 375.2,
+     "median": 416.5,
      "floor": 300.0,
      "ok": true
     }
@@ -349,7 +417,7 @@
     {
      "lod": 2,
      "deviation_m": [
-      0.0005,
+      0.0,
       0.001,
       0.0011
      ],
@@ -363,9 +431,9 @@
     {
      "lod": 3,
      "deviation_m": [
-      0.0002,
+      0.0,
       0.0027,
-      0.0005
+      0.0043
      ],
      "tolerance_m": [
       0.0515,
@@ -381,10 +449,10 @@
    "ok": true,
    "detail": [
     {
-     "normal_p95_deg": 0.45,
-     "bent_share": 0.0001,
-     "texture_share": 0.0002,
-     "miss_share": 0.0001,
+     "normal_p95_deg": 0.53,
+     "bent_share": 0.0006,
+     "texture_share": 0.0008,
+     "miss_share": 0.0074,
      "lod": 1,
      "limits": {
       "p95": 12.0,
@@ -394,10 +462,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 12.54,
-     "bent_share": 0.0101,
-     "texture_share": 0.0007,
-     "miss_share": 0.0017,
+     "normal_p95_deg": 5.16,
+     "bent_share": 0.0027,
+     "texture_share": 0.0009,
+     "miss_share": 0.0013,
      "lod": 2,
      "limits": {
       "p95": 25.0,
@@ -407,10 +475,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 15.37,
-     "bent_share": 0.0243,
-     "texture_share": 0.0333,
-     "miss_share": 0.1084,
+     "normal_p95_deg": 12.69,
+     "bent_share": 0.0183,
+     "texture_share": 0.0158,
+     "miss_share": 0.0083,
      "lod": 3,
      "limits": {
       "p95": 40.0,
@@ -427,13 +495,13 @@
    "detail": {
     "hulls": 7,
     "vertices": [
-     438,
-     226,
-     364,
-     360,
-     132,
-     456,
-     258
+     416,
+     234,
+     294,
+     322,
+     150,
+     466,
+     254
     ]
    }
   }
