@@ -6,7 +6,7 @@
   2.08
  ],
  "top_z": 2.08,
- "objects": 156,
+ "objects": 242,
  "palette": {
   "paint": [
    0.78,
@@ -98,6 +98,16 @@
   "objects": 0,
   "asymmetric": [
    {
+    "object": "interior.wheel.soft",
+    "off_mm": 232.8,
+    "at": [
+     0.439,
+     0.513,
+     1.174
+    ],
+    "meant": true
+   },
+   {
     "object": "antenna",
     "off_mm": 200.5,
     "at": [
@@ -108,22 +118,172 @@
     "meant": true
    },
    {
-    "object": "interior.wheel",
-    "off_mm": 170.5,
+    "object": "interior.wheel.interior",
+    "off_mm": 181.0,
     "at": [
-     0.517,
-     0.339,
-     1.06
+     0.476,
+     0.56,
+     1.228
     ],
     "meant": true
    },
    {
-    "object": "interior.screens",
-    "off_mm": 96.3,
+    "object": "interior.cluster.soft",
+    "off_mm": 160.3,
+    "at": [
+     0.672,
+     0.58,
+     1.476
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.gloss",
+    "off_mm": 153.5,
+    "at": [
+     0.499,
+     0.504,
+     1.251
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.lit",
+    "off_mm": 144.2,
+    "at": [
+     0.506,
+     0.497,
+     1.261
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.gloss",
+    "off_mm": 125.0,
+    "at": [
+     0.737,
+     0.546,
+     1.441
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.metal",
+    "off_mm": 120.2,
+    "at": [
+     0.528,
+     0.382,
+     1.302
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.dark",
+    "off_mm": 117.4,
+    "at": [
+     0.732,
+     0.55,
+     1.434
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.pedals.metal",
+    "off_mm": 113.9,
+    "at": [
+     0.936,
+     0.358,
+     0.737
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.pedals.mat",
+    "off_mm": 110.8,
+    "at": [
+     0.939,
+     0.363,
+     0.746
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.warn",
+    "off_mm": 106.6,
     "at": [
      0.728,
-     0.31,
-     1.331
+     0.271,
+     1.424
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.lit",
+    "off_mm": 102.8,
+    "at": [
+     0.727,
+     0.482,
+     1.42
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.extinguisher.metal",
+    "off_mm": 102.1,
+    "at": [
+     0.74,
+     -0.713,
+     0.893
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.extinguisher.red",
+    "off_mm": 101.5,
+    "at": [
+     0.696,
+     -0.741,
+     0.932
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.white",
+    "off_mm": 96.7,
+    "at": [
+     0.726,
+     0.459,
+     1.414
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.pedals.interior",
+    "off_mm": 93.4,
+    "at": [
+     0.957,
+     0.404,
+     0.76
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.extinguisher.gloss",
+    "off_mm": 69.2,
+    "at": [
+     0.694,
+     -0.769,
+     0.98
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.extinguisher.white",
+    "off_mm": 41.1,
+    "at": [
+     0.684,
+     -0.789,
+     0.829
     ],
     "meant": true
    },
@@ -148,6 +308,36 @@
     "meant": true
    },
    {
+    "object": "interior.console_roof.red",
+    "off_mm": 19.5,
+    "at": [
+     0.333,
+     0.123,
+     1.776
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.console_roof.metal",
+    "off_mm": 17.1,
+    "at": [
+     0.505,
+     -0.113,
+     1.734
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.dash.metal",
+    "off_mm": 12.5,
+    "at": [
+     0.721,
+     -0.445,
+     1.06
+    ],
+    "meant": true
+   },
+   {
     "object": "winch.rollers",
     "off_mm": 12.2,
     "at": [
@@ -168,12 +358,42 @@
     "meant": true
    },
    {
+    "object": "interior.plate.gloss",
+    "off_mm": 5.0,
+    "at": [
+     0.681,
+     -0.282,
+     1.223
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.dash.gloss",
+    "off_mm": 4.5,
+    "at": [
+     0.776,
+     -0.199,
+     1.009
+    ],
+    "meant": true
+   },
+   {
     "object": "bed.tread",
     "off_mm": 4.0,
     "at": [
      -1.154,
      -0.532,
      0.744
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.plate.metal",
+    "off_mm": 3.6,
+    "at": [
+     0.685,
+     -0.275,
+     1.245
     ],
     "meant": true
    }
@@ -203,9 +423,17 @@
  },
  "triangles": {
   "verdict": "ok",
-  "total": 259196,
+  "total": 322026,
   "budget": 400000,
   "top": [
+   [
+    "interior.lining",
+    17580
+   ],
+   [
+    "interior.seat2.cover",
+    15232
+   ],
    [
     "bed.tread",
     10368
@@ -229,17 +457,13 @@
    [
     "hub.spare",
     9904
-   ],
-   [
-    "lettering",
-    8210
-   ],
-   [
-    "bolts",
-    8064
    ]
   ],
   "groups": [
+   [
+    "interior",
+    69899
+   ],
    [
     "hub",
     49520
@@ -249,16 +473,16 @@
     26684
    ],
    [
-    "tiretext",
-    25170
-   ],
-   [
     "tire",
     22000
    ],
    [
+    "tiretext",
+    21480
+   ],
+   [
     "hull",
-    17582
+    17610
    ],
    [
     "rim",
@@ -267,10 +491,6 @@
    [
     "pylon",
     11968
-   ],
-   [
-    "lamp",
-    11676
    ]
   ]
  },

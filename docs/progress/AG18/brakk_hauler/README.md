@@ -57,6 +57,19 @@ small dish, no hub motor). The sheet, clay, zebra and check above are of this bu
   are told to the checks as meant.
 - About 259,000 triangles (230,000 before).
 
+## Cabin
+
+![cabin](cabin.jpg)
+
+The full crew cab from `vehicles/cabin.py` (`style="brakk"`), in place of the box seats and slab dash: `cab_fwd`, `cab_side`, `cab_back` and `cab_in` above, 96 samples.
+
+- **What it has.** A work truck's cab lined from the windshield's base to a wall just inside the cab's back, on a tall floor (0.60 m) in black rubber with ribbed mats; two upright buckets and a rear bench for two in tan vinyl with orange stitching and post headrests, belts on the pillars; a hard grey dash with an orange band, slat vents, the gauge hood, a small route screen and HAULER on a bolted steel plate over the glovebox; a four-spoke wheel on a 34 degree column, pedals with a dead pedal; the console with the lever, cupholders and a row of switches; door cards front and rear with bar pulls and bolted steel kick plates, HAULER lit on the front sills; grab bars up both A pillars and on both B pillars, grab bars over the doors; an overhead console of toggles (the last under a red guard) and a radio with its lit dial; a fire extinguisher strapped in the mate's footwell; a black moulding round the windshield's sides and header; the smoked rear window in its frame (the body's is opaque, so it reads as a dark pane).
+- **The lining.** The firewall plane just behind the windshield's base (ahead of it the lining came through the cowl), the spine on to 20 cm of each end (`cap=0.20`: with the pole near the upright windshield's base its sides were met by grazing rays and tore), a 30 mm grid (`cab.step`), the vertices under the cowl pressed 30 mm inside the shell (`keep`), and the car's `zone()`: rubber up the footwells, the cowl and pillars' feet in the dash's dark trim, headliner over the window sills. The moulding (`glass_trim()`) hides what was still ragged at the windshield's sides; its header is laid on the lining at four stations only and straight between them.
+- **Triangles.** Interior 7,069 before, 69,899 now (lining 17,580, the bench 17,004, each bucket 7,588); the whole truck 259,196 before, 322,026 now (of 400,000).
+- **Check.** `--check` says `ok`: tires, ground, symmetry (the cab's one-sided parts told as meant), panels, through (0 cabin parts in the open), triangles. The log's "through the shell" says nothing.
+- **Exterior.** Signed before and after: only `interior.*` objects, cabin materials (the kit's `seat` set to a rougher vinyl, the module's own) and the studio's `cab*` lamps differ.
+- **Weakest from the seat.** The windshield's lower corners at the A pillars' feet still show a little crumpled lining beside the moulding; the rear window is a black pane (the body's window is opaque); the overhead console is a plain steel box.
+
 ## Brakk family cues (for the Bastion and the Mule)
 
 Geometry and texture only, none of it depends on the color:
@@ -74,7 +87,7 @@ The script's helpers for these (`plate`, `pylon`, `bolt`, `stencil`, `chevrons`,
 
 ## What I would improve
 
-- A see-through rear window in the cab's back wall (it is a dark pane in a frame now) and a fuller cabin: door cards, pedals, belts.
+- A see-through rear window in the cab's back wall (it is a dark pane in a frame now, inside and out).
 - The front suspension is hidden from most angles by the bumper ends and the fender slopes; a higher, shorter bumper would show the wishbones.
 - Tread as real carved blocks with sipes rather than blocks set on a carcass; mud on the tires and plates.
 - Fender plates on stays that move with the wheel, a tailgate with hinges and chains, a cable on the winch drum.
