@@ -72,12 +72,47 @@ silhouette. At a grazing angle a few millimeters of the panel's rim show in the 
 lines at their front and rear ends. The small teeth where the paint meets the glass tongue
 beside each pole pebble are as before.
 
+## Cabin (2026-11-24)
+
+![cabin](cabin.jpg)
+
+The schematic cabin (two seats of three stones each on a foot, a dash of one stone, a yoke
+ring) is replaced by `vehicles/cabin.py`'s full interior, style `orrin`. The old liner, one
+sheet from nose to tail, is split into its two decks under the dome, `deck.front` (the nose
+deck over the front wheels, ending in a drop at the firewall) and `deck.rear` (the luggage
+shelf, rising behind the cabin's rear wall), built as before on the same rim rows; the case,
+the bag, their straps and the rail stay on the shelf as they were. The dome, which lifts as
+the door, is built shut for the lining and the checks; the sheet's "open" tile lifts it as
+before.
+
+- **Tub:** a lining from a firewall at x 0.55 (behind the front wheels) to a rear wall at
+  x -0.53, carpet in plum-black, at the module's `detail=1`; the dome is the roof, so there is
+  no headliner or roof kit.
+- **Seats:** two upright lounges in oat with plum inserts, two quilt bars, pillow headrests on
+  posts.
+- **Dash:** low and soft on the nose deck's rear edge with round vents (the Pebble's own:
+  round as its name), a floating screen and a free cluster, an amber line under the brow; the
+  two-spoke round wheel, a console, pedals, mats.
+- **Doors:** cards on the petals, a lit sill plate reading PEBBLE.
+- **Triangles:** cabin about 11,500 (old stones and dash) and the liner's 16,596 to 30,660 and
+  the two decks; the car 323,742 to 340,186 (budget 400,000).
+- **Check:** verdict `look`, as before: the tires (16 mm under the eyelids, unchanged) and
+  symmetry (the cabin's one-sided parts marked meant; the luggage and `led.cabin` as before);
+  ground, panels, through and triangles ok; the log's "through the shell" says nothing.
+- **Exterior:** unchanged but for the liner, now its two decks (signature: the `liner` piece
+  gone, `deck.front` and `deck.rear` new, `interior.*` objects, the cabin's materials and the
+  studio's `cab*` lamps).
+- **Cabin views:** the studio's boxes kept out of the dome's reflections there
+  (`quiet_glass()`).
+- **Weakest:** the dome mirrors the dash's lights and the nose deck's lettering over the
+  view ahead; the footwells under the dash stay dark and plain; the small cabin's door
+  cards and lining are near black against the oat seats.
+
 ## What I would improve
 
 - The front wheels have no room to steer inside their cavities (faired in under the eyelids), and the tires stand a little ahead of the chin when seen from low in front.
 - The leaf has no seal, struts or latch; the sill at the dip could carry a bright step plate.
 - A few small teeth remain where the paint's rim meets the glass tongue beside each pole pebble.
-- The dash is one stone with a strip screen; it deserves controls, and the cabin belts.
 
 ## Kit wishes
 

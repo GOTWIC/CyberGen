@@ -27,11 +27,46 @@
 - `tidy()`: takes the folded slivers off the panels' edges. A ribbon running toward its pole runs along the mesh's rows; the boolean leaves triangles thinner than the kit's gap, the gap turns them over and the panel's rim stands on them: flakes a millimeter proud all along the channel (360 faces here).
 - `ribbon_lamp()`: the lit face as wide as its lens. `orrin.channel_lamp`'s wider face showed through the gap between paint and channel as bright dashes beside the ribbon.
 
+## Cabin (2026-11-24)
+
+![cabin](cabin.jpg)
+
+The schematic cabin (seats of three stones each, a dash of one stone, a yoke ring) is replaced
+by `vehicles/cabin.py`'s full interior, style `orrin`. The old liner, one sheet from nose to
+tail, is split into its two decks under the glass, `deck.front` (the nose deck, ending in a
+drop over the footwells) and `deck.rear` (the load deck, rising behind the rear wall), built
+as before on the same rim rows; the tub between them is the module's. The load deck's case,
+bag and rail stay as they were.
+
+- **Tub:** a lining from a firewall at x 1.00 (behind the front wells, so the footwells need
+  no well covers) to a rear wall at x -1.06, carpet in warm black; the glass is the roof, so
+  there is no headliner or roof kit.
+- **Seats:** two lounges in front and a bench for three behind, oat with copper inserts, pillow
+  headrests on posts. Their covers are left unsmoothed (the module subdivides them once) and
+  shaded round: the triangles go to the body.
+- **Dash:** low and soft under the glass's foot, its top meeting the nose deck's rear edge;
+  the Tide's own is one long ribbon of screen across it, the driver's display and the media
+  in one, in place of a cluster and a center screen; the two-spoke round wheel, a console,
+  pedals, mats, an amber line under the brow.
+- **Doors:** cards on the petal doors front and rear, sampled every 7 cm (no speakers or map
+  pockets), a lit sill plate reading TIDE.
+- **Triangles:** cabin 18,748 (old seats, dash and yoke) and the liner's 6,968 to 23,526 and
+  the two decks; the car 394,620 to 397,330 (budget 400,000).
+- **Check:** verdict `ok`, as before: the symmetry of the cabin's one-sided parts is
+  marked meant (the wheel, pedals and screen on the left, the bench's middle buckles);
+  tires, ground, panels, through and triangles ok; the log's "through the shell" says nothing.
+- **Exterior:** unchanged but for the liner, now its two decks (signature: the `liner` piece
+  gone, `deck.front` and `deck.rear` new, `interior.*` objects, the cabin's materials, the
+  studio's `cab*` lamps and the rim light's linking list, which names the new objects).
+- **Cabin views:** the studio's boxes kept out of the glass's reflections there
+  (`quiet_glass()`): the canopy mirrored the top box as a white panel in `cab_in`.
+- **Weakest:** the unsmoothed seat covers show their facets on the bolsters' tops up close;
+  the cabin is dark round the oat seats, the door cards and dash brown-black.
+
 ## What I would improve
 
 - The hoop is a separate piece laid on the hull: its feet end in a rounded tip on the haunch instead of truly melting into it. A cage with the hoop as part of the body would do it properly.
 - The form is still a soft drop. The fender valleys and the wave carry it, but the flank between the wheels is plain, and from straight behind the tail reads narrow between the tires.
-- The seats are three stones each and the dash is one stone with a strip of screen; no belts, no controls, no door cards.
 - The front ribbon stops 12 mm short of the centerline on each side under the pebble (see Kit wishes); the rear ribbon stops 5 cm short of the tailgate's cut on each side instead of running under it.
 - The side glass shows the studio's wall through both sides as a grey panel in the side view; a darker glass hides the cabin in the hero.
 - The wheel wells are plain tunnels and the wake crescents plain voids.

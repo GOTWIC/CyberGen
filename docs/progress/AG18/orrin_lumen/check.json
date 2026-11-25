@@ -6,7 +6,7 @@
   1.373
  ],
  "top_z": 1.373,
- "objects": 54,
+ "objects": 123,
  "palette": {
   "paint": [
    0.011,
@@ -91,25 +91,176 @@
  "symmetry": {
   "verdict": "look",
   "center_off_mm": 0.0,
-  "objects": 2,
+  "objects": 1,
   "asymmetric": [
    {
-    "object": "interior.wheel",
-    "off_mm": 161.6,
+    "object": "interior.wheel.soft",
+    "off_mm": 211.2,
     "at": [
-     0.634,
+     0.442,
+     0.438,
+     0.635
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.pedals.interior",
+    "off_mm": 194.2,
+    "at": [
+     1.057,
+     0.381,
+     0.558
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.interior",
+    "off_mm": 163.8,
+    "at": [
+     0.503,
+     0.34,
+     0.747
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.metal",
+    "off_mm": 157.4,
+    "at": [
+     0.508,
      0.385,
-     0.645
-    ]
+     0.772
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.gloss",
+    "off_mm": 154.5,
+    "at": [
+     0.513,
+     0.506,
+     0.767
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.lit",
+    "off_mm": 148.6,
+    "at": [
+     0.517,
+     0.494,
+     0.774
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.warn",
+    "off_mm": 98.0,
+    "at": [
+     0.709,
+     0.256,
+     0.949
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.lit",
+    "off_mm": 97.1,
+    "at": [
+     0.709,
+     0.467,
+     0.945
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.white",
+    "off_mm": 91.1,
+    "at": [
+     0.708,
+     0.444,
+     0.939
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.gloss",
+    "off_mm": 81.0,
+    "at": [
+     0.712,
+     0.239,
+     0.965
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.pedals.metal",
+    "off_mm": 78.6,
+    "at": [
+     1.033,
+     0.305,
+     0.375
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.dark",
+    "off_mm": 77.0,
+    "at": [
+     0.711,
+     0.235,
+     0.959
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.pedals.mat",
+    "off_mm": 52.5,
+    "at": [
+     0.991,
+     0.348,
+     0.381
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.interior",
+    "off_mm": 23.2,
+    "at": [
+     0.724,
+     0.435,
+     0.825
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.dash.metal",
+    "off_mm": 12.5,
+    "at": [
+     0.7,
+     -0.43,
+     0.605
+    ],
+    "meant": true
    },
    {
     "object": "led.cabin",
-    "off_mm": 8.3,
+    "off_mm": 8.5,
     "at": [
-     2.107,
-     0.026,
-     0.71
+     2.113,
+     0.011,
+     0.708
     ]
+   },
+   {
+    "object": "interior.dash.gloss",
+    "off_mm": 3.5,
+    "at": [
+     0.755,
+     -0.586,
+     0.538
+    ],
+    "meant": true
    }
   ]
  },
@@ -117,32 +268,52 @@
   "verdict": "ok",
   "open_edges": [
    {
+    "panel": "deck.rear.deck",
+    "length_mm": 5048,
+    "at": [
+     -1.865,
+     -0.0,
+     0.72
+    ],
+    "meant": true
+   },
+   {
     "panel": "deck.front.deck",
-    "length_mm": 5484,
+    "length_mm": 3631,
     "at": [
-     1.685,
+     2.024,
      0.0,
-     0.641
+     0.625
     ],
     "meant": true
    },
    {
-    "panel": "deck.rear.deck",
-    "length_mm": 3741,
+    "panel": "deck.front.deck",
+    "length_mm": 136,
     "at": [
-     -2.037,
-     -0.0,
-     0.745
+     0.79,
+     0.161,
+     0.601
     ],
     "meant": true
    },
    {
-    "panel": "deck.rear.deck",
-    "length_mm": 1254,
+    "panel": "deck.front.deck",
+    "length_mm": 136,
     "at": [
-     -1.091,
-     -0.0,
-     0.605
+     0.79,
+     -0.161,
+     0.601
+    ],
+    "meant": true
+   },
+   {
+    "panel": "deck.front.deck",
+    "length_mm": 92,
+    "at": [
+     0.79,
+     0.0,
+     0.601
     ],
     "meant": true
    }
@@ -172,7 +343,7 @@
  },
  "triangles": {
   "verdict": "ok",
-  "total": 356940,
+  "total": 398043,
   "budget": 400000,
   "top": [
    [
@@ -181,7 +352,7 @@
    ],
    [
     "body.front",
-    53878
+    53751
    ],
    [
     "body.rear",
@@ -211,11 +382,15 @@
   "groups": [
    [
     "body",
-    225314
+    225193
    ],
    [
     "tire",
     57536
+   ],
+   [
+    "interior",
+    45778
    ],
    [
     "lamp",
@@ -236,10 +411,6 @@
    [
     "ring",
     5120
-   ],
-   [
-    "interior",
-    4448
    ]
   ]
  },

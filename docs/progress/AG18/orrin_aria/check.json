@@ -6,7 +6,7 @@
   1.121
  ],
  "top_z": 1.121,
- "objects": 83,
+ "objects": 130,
  "palette": {
   "paint": [
    0.01,
@@ -91,25 +91,186 @@
  "symmetry": {
   "verdict": "look",
   "center_off_mm": 0.0,
-  "objects": 2,
+  "objects": 1,
   "asymmetric": [
    {
-    "object": "interior.fittings",
-    "off_mm": 224.1,
+    "object": "interior.wheel.interior",
+    "off_mm": 315.8,
     "at": [
-     0.594,
-     0.325,
-     0.541
-    ]
+     0.362,
+     0.252,
+     0.642
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.gloss",
+    "off_mm": 300.4,
+    "at": [
+     0.368,
+     0.228,
+     0.64
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.soft",
+    "off_mm": 294.0,
+    "at": [
+     0.386,
+     0.163,
+     0.7
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.lit",
+    "off_mm": 290.1,
+    "at": [
+     0.362,
+     0.217,
+     0.633
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.metal",
+    "off_mm": 274.7,
+    "at": [
+     0.357,
+     0.309,
+     0.631
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.gloss",
+    "off_mm": 111.3,
+    "at": [
+     0.722,
+     0.179,
+     0.775
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.dark",
+    "off_mm": 104.3,
+    "at": [
+     0.718,
+     0.175,
+     0.767
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.warn",
+    "off_mm": 94.3,
+    "at": [
+     0.716,
+     0.196,
+     0.757
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.lit",
+    "off_mm": 89.5,
+    "at": [
+     0.715,
+     0.252,
+     0.752
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.white",
+    "off_mm": 84.3,
+    "at": [
+     0.714,
+     0.384,
+     0.747
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.pedals.mat",
+    "off_mm": 82.1,
+    "at": [
+     0.767,
+     0.241,
+     0.255
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.pedals.metal",
+    "off_mm": 47.7,
+    "at": [
+     0.747,
+     0.195,
+     0.225
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.interior",
+    "off_mm": 28.7,
+    "at": [
+     0.724,
+     0.275,
+     0.632
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.pedals.interior",
+    "off_mm": 24.0,
+    "at": [
+     0.795,
+     0.2,
+     0.194
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.dash.metal",
+    "off_mm": 12.5,
+    "at": [
+     0.728,
+     -0.37,
+     0.422
+    ],
+    "meant": true
    },
    {
     "object": "led.cabin",
-    "off_mm": 6.0,
+    "off_mm": 6.2,
     "at": [
-     1.198,
-     0.019,
-     0.626
+     1.203,
+     0.008,
+     0.625
     ]
+   },
+   {
+    "object": "interior.sill_text.ambient",
+    "off_mm": 4.5,
+    "at": [
+     0.204,
+     0.621,
+     0.377
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.dash.gloss",
+    "off_mm": 3.5,
+    "at": [
+     0.783,
+     -0.132,
+     0.356
+    ],
+    "meant": true
    }
   ]
  },
@@ -117,37 +278,67 @@
   "verdict": "ok",
   "open_edges": [
    {
-    "panel": "liner.liner",
-    "length_mm": 2920,
+    "panel": "deck.rear.liner",
+    "length_mm": 4012,
     "at": [
-     -0.019,
-     0.484,
-     0.751
+     -0.713,
+     0.0,
+     0.651
     ],
     "meant": true
    },
    {
-    "panel": "liner.liner",
-    "length_mm": 2920,
+    "panel": "deck.front.liner",
+    "length_mm": 316,
     "at": [
-     -0.019,
-     -0.484,
-     0.751
+     0.938,
+     0.537,
+     0.706
     ],
     "meant": true
    },
    {
-    "panel": "liner.liner",
-    "length_mm": 61,
+    "panel": "deck.front.liner",
+    "length_mm": 316,
     "at": [
-     2.235,
-     0.095,
-     0.434
+     0.938,
+     -0.537,
+     0.706
     ],
     "meant": true
    },
    {
-    "panel": "liner.liner",
+    "panel": "deck.front.liner",
+    "length_mm": 249,
+    "at": [
+     0.861,
+     0.493,
+     0.552
+    ],
+    "meant": true
+   },
+   {
+    "panel": "deck.front.liner",
+    "length_mm": 147,
+    "at": [
+     0.861,
+     -0.518,
+     0.582
+    ],
+    "meant": true
+   },
+   {
+    "panel": "deck.front.liner",
+    "length_mm": 95,
+    "at": [
+     0.86,
+     -0.268,
+     0.457
+    ],
+    "meant": true
+   },
+   {
+    "panel": "deck.front.liner",
     "length_mm": 61,
     "at": [
      2.235,
@@ -157,21 +348,41 @@
     "meant": true
    },
    {
-    "panel": "liner.liner",
+    "panel": "deck.front.liner",
+    "length_mm": 61,
+    "at": [
+     2.235,
+     0.095,
+     0.434
+    ],
+    "meant": true
+   },
+   {
+    "panel": "deck.front.liner",
+    "length_mm": 58,
+    "at": [
+     0.86,
+     -0.42,
+     0.482
+    ],
+    "meant": true
+   },
+   {
+    "panel": "deck.rear.liner",
     "length_mm": 42,
     "at": [
      -2.18,
-     -0.04,
+     0.04,
      0.56
     ],
     "meant": true
    },
    {
-    "panel": "liner.liner",
+    "panel": "deck.rear.liner",
     "length_mm": 42,
     "at": [
      -2.18,
-     0.04,
+     -0.04,
      0.56
     ],
     "meant": true
@@ -197,7 +408,11 @@
     "closed": false,
     "panels": 2
    },
-   "liner": {
+   "deck.front": {
+    "closed": false,
+    "panels": 1
+   },
+   "deck.rear": {
     "closed": false,
     "panels": 1
    }
@@ -210,7 +425,7 @@
  },
  "triangles": {
   "verdict": "ok",
-  "total": 393388,
+  "total": 399141,
   "budget": 400000,
   "top": [
    [
@@ -219,27 +434,27 @@
    ],
    [
     "hip.hip",
-    44795
+    44582
    ],
    [
     "body.front",
-    43581
+    43571
    ],
    [
     "pod.pod",
-    40810
+    40784
    ],
    [
     "body.rear",
-    28312
+    28302
    ],
    [
     "yoke.yoke",
-    14798
+    14686
    ],
    [
     "pod.lamp_p",
-    13296
+    13368
    ],
    [
     "body.floor",
@@ -249,15 +464,15 @@
   "groups": [
    [
     "body",
-    156031
+    155987
    ],
    [
     "pod",
-    55808
+    55852
    ],
    [
     "hip",
-    54187
+    53898
    ],
    [
     "tire",
@@ -265,7 +480,11 @@
    ],
    [
     "yoke",
-    22790
+    22562
+   ],
+   [
+    "interior",
+    16830
    ],
    [
     "lamp",
@@ -274,10 +493,6 @@
    [
     "vanes",
     11840
-   ],
-   [
-    "rim",
-    9984
    ]
   ]
  },

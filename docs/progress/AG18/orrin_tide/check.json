@@ -6,7 +6,7 @@
   1.596
  ],
  "top_z": 1.596,
- "objects": 88,
+ "objects": 145,
  "palette": {
   "paint": [
    0.3,
@@ -94,12 +94,52 @@
   "objects": 0,
   "asymmetric": [
    {
-    "object": "interior.fittings",
-    "off_mm": 280.8,
+    "object": "interior.wheel.metal",
+    "off_mm": 356.4,
     "at": [
-     0.636,
-     0.411,
-     0.762
+     0.49,
+     0.385,
+     0.868
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.interior",
+    "off_mm": 344.8,
+    "at": [
+     0.488,
+     0.438,
+     0.854
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.soft",
+    "off_mm": 341.0,
+    "at": [
+     0.489,
+     0.192,
+     0.876
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.gloss",
+    "off_mm": 336.8,
+    "at": [
+     0.491,
+     0.254,
+     0.858
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.lit",
+    "off_mm": 332.5,
+    "at": [
+     0.496,
+     0.266,
+     0.864
     ],
     "meant": true
    },
@@ -124,12 +164,42 @@
     "meant": true
    },
    {
+    "object": "interior.pedals.metal",
+    "off_mm": 113.9,
+    "at": [
+     0.886,
+     0.333,
+     0.377
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.pedals.mat",
+    "off_mm": 110.8,
+    "at": [
+     0.889,
+     0.338,
+     0.386
+    ],
+    "meant": true
+   },
+   {
     "object": "load.bag",
     "off_mm": 100.4,
     "at": [
      -1.341,
      -0.5,
      0.964
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.pedals.interior",
+    "off_mm": 93.4,
+    "at": [
+     0.907,
+     0.379,
+     0.4
     ],
     "meant": true
    },
@@ -144,12 +214,102 @@
     "meant": true
    },
    {
+    "object": "interior.screen.interior",
+    "off_mm": 57.0,
+    "at": [
+     0.916,
+     0.097,
+     0.884
+    ],
+    "meant": true
+   },
+   {
     "object": "wiper",
     "off_mm": 27.7,
     "at": [
      1.022,
      0.28,
      1.171
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.screen.gloss",
+    "off_mm": 26.5,
+    "at": [
+     0.825,
+     0.584,
+     0.816
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.screen.dark",
+    "off_mm": 26.5,
+    "at": [
+     0.826,
+     0.587,
+     0.822
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.screen.lit",
+    "off_mm": 26.2,
+    "at": [
+     0.827,
+     0.403,
+     0.829
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.screen.white",
+    "off_mm": 26.2,
+    "at": [
+     0.827,
+     0.536,
+     0.829
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.screen.warn",
+    "off_mm": 22.6,
+    "at": [
+     0.833,
+     0.396,
+     0.859
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat2.interior",
+    "off_mm": 21.4,
+    "at": [
+     -0.839,
+     0.186,
+     0.533
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.dash.metal",
+    "off_mm": 12.5,
+    "at": [
+     0.888,
+     -0.42,
+     0.71
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat2.red",
+    "off_mm": 11.9,
+    "at": [
+     -0.831,
+     0.204,
+     0.544
     ],
     "meant": true
    },
@@ -172,6 +332,16 @@
      0.956
     ],
     "meant": true
+   },
+   {
+    "object": "interior.dash.gloss",
+    "off_mm": 3.5,
+    "at": [
+     0.943,
+     -0.174,
+     0.643
+    ],
+    "meant": true
    }
   ]
  },
@@ -179,27 +349,47 @@
   "verdict": "ok",
   "open_edges": [
    {
-    "panel": "liner.liner",
-    "length_mm": 3244,
+    "panel": "deck.rear.liner",
+    "length_mm": 3728,
     "at": [
-     -0.194,
-     0.79,
-     1.07
+     -1.241,
+     0.0,
+     0.954
     ],
     "meant": true
    },
    {
-    "panel": "liner.liner",
-    "length_mm": 3244,
+    "panel": "deck.front.liner",
+    "length_mm": 1513,
     "at": [
-     -0.194,
-     -0.79,
-     1.07
+     1.029,
+     0.0,
+     0.696
     ],
     "meant": true
    },
    {
-    "panel": "liner.liner",
+    "panel": "deck.front.liner",
+    "length_mm": 461,
+    "at": [
+     1.15,
+     -0.752,
+     1.011
+    ],
+    "meant": true
+   },
+   {
+    "panel": "deck.front.liner",
+    "length_mm": 461,
+    "at": [
+     1.15,
+     0.752,
+     1.011
+    ],
+    "meant": true
+   },
+   {
+    "panel": "deck.front.liner",
     "length_mm": 103,
     "at": [
      2.202,
@@ -209,7 +399,27 @@
     "meant": true
    },
    {
-    "panel": "liner.liner",
+    "panel": "deck.front.liner",
+    "length_mm": 92,
+    "at": [
+     1.03,
+     0.749,
+     0.874
+    ],
+    "meant": true
+   },
+   {
+    "panel": "deck.front.liner",
+    "length_mm": 92,
+    "at": [
+     1.03,
+     -0.749,
+     0.874
+    ],
+    "meant": true
+   },
+   {
+    "panel": "deck.front.liner",
     "length_mm": 84,
     "at": [
      2.276,
@@ -219,7 +429,7 @@
     "meant": true
    },
    {
-    "panel": "liner.liner",
+    "panel": "deck.front.liner",
     "length_mm": 84,
     "at": [
      2.276,
@@ -229,7 +439,7 @@
     "meant": true
    },
    {
-    "panel": "liner.liner",
+    "panel": "deck.rear.liner",
     "length_mm": 83,
     "at": [
      -2.281,
@@ -239,7 +449,7 @@
     "meant": true
    },
    {
-    "panel": "liner.liner",
+    "panel": "deck.rear.liner",
     "length_mm": 83,
     "at": [
      -2.281,
@@ -249,7 +459,7 @@
     "meant": true
    },
    {
-    "panel": "liner.liner",
+    "panel": "deck.front.liner",
     "length_mm": 47,
     "at": [
      2.219,
@@ -271,7 +481,11 @@
     "closed": false,
     "panels": 1
    },
-   "liner": {
+   "deck.front": {
+    "closed": false,
+    "panels": 1
+   },
+   "deck.rear": {
     "closed": false,
     "panels": 1
    }
@@ -284,7 +498,7 @@
  },
  "triangles": {
   "verdict": "ok",
-  "total": 394620,
+  "total": 397330,
   "budget": 400000,
   "top": [
    [
@@ -308,16 +522,16 @@
     17370
    ],
    [
-    "interior.seats",
-    14400
-   ],
-   [
     "body.floor",
     12288
    ],
    [
     "body.door_r",
     11520
+   ],
+   [
+    "body.door_f",
+    11508
    ]
   ],
   "groups": [
@@ -339,7 +553,7 @@
    ],
    [
     "interior",
-    18748
+    23526
    ],
    [
     "vanes",
@@ -350,8 +564,8 @@
     9984
    ],
    [
-    "liner",
-    6968
+    "glass",
+    5416
    ]
   ]
  },

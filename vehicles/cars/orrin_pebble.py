@@ -27,6 +27,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import bpy                                                          # noqa: E402
 import carkit as K                                                  # noqa: E402
+import cabin as C                                                   # noqa: E402
 from brands import orrin                                            # noqa: E402
 from brands.orrin import (both, dot_field, lune_cut, ring, snap, spline, stone,   # noqa: E402
                           strip, text_proj)
@@ -439,17 +440,24 @@ def build_interior():
             (0.56, .80, 0), (0.53, .225, 0), (0.30, .225, 0), (0.0, .225, 0), (-0.30, .225, 0),
             (-0.52, .225, 0), (-0.555, .735, 0), (-0.70, .74, 0), (RA_X, None, .12),
             (-1.16, None, .045), (-1.31, None, .012), (-1.385, None, .006)]
-    S, rims = [], []
-    for x, zf, drop in rows:
-        rm = orrin.rim_at(x, pt=PT, order=ORDER, line="U", at=0.4, push=None, depth=0.018)
-        rims.append(rm)
-        zf = rm.z - drop if zf is None else zf
-        deep = rm.z - zf > 0.2
-        S.append([tuple(rm), (rm.x, rm.y * 0.95, zf + (rm.z - zf) * 0.45),
-                  (rm.x, rm.y * (0.80 if deep else 0.86), zf), (rm.x, 0.0, zf)])
-    hold = {4: 0.5, 5: 0.75, 6: 0.75, 10: 0.75, 11: 0.75, 12: 0.4}
-    K.build_body(S, lambda i, j: "liner", dict(liner="interior"), 0.0,
-                 lambda i, j: hold.get(i, 0.0), name="liner", project=False, subdiv=3)
+    def rim(x):
+        return orrin.rim_at(x, pt=PT, order=ORDER, line="U", at=0.4, push=None, depth=0.018)
+    rims = [rim(x) for x, _, _ in rows]
+    # the liner's two decks under the dome (the cabin's tub between them is cabin.py's):
+    # the nose deck over the front wheels, ending in a drop at the firewall, and the luggage
+    # shelf behind the seats, rising from a drop behind the cabin's rear wall
+    for name, part, hold in (("deck.front", rows[:6] + [DECK_F], {4: 0.5, 5: 0.75, 6: 0.5}),
+                             ("deck.rear", [DECK_R] + rows[11:], {1: 0.75, 2: 0.75, 3: 0.4})):
+        S = []
+        for x, zf, drop in part:
+            rm = rim(x)
+            zf = rm.z - drop if zf is None else zf
+            deep = rm.z - zf > 0.2
+            S.append([tuple(rm), (rm.x, rm.y * 0.95, zf + (rm.z - zf) * 0.45),
+                      (rm.x, rm.y * (0.80 if deep else 0.86), zf), (rm.x, 0.0, zf)])
+        K.build_body(S, lambda i, j: "liner", dict(liner="interior"), 0.0,
+                     lambda i, j, h=hold: h.get(i, 0.0), name=name, project=False, subdiv=3)
+    DECK_EDGE[:] = [rows[5][0] - 0.008, rims[5].y * 0.86, rows[5][1]]
     # ---- a hair of light under the glass, round both tongues of the dome
     g = Geo()
     sec = [(-0.0025, -0.002), (0.0025, -0.002), (0.0025, 0.002), (-0.0025, 0.002)]
@@ -463,27 +471,7 @@ def build_interior():
     text_flat(g, "orrin", 0.036, a.lerp(b, 0.42) + V3((0, 0, 0.022)), (0, 1, 0), up,
               spacing=1.5)
     g.obj("led.cabin", "led_accent")
-    # ---- two seats, each three stones on a foot
-    g, gi = Geo(), Geo()
-    back = Matrix.Rotation(rad(-15), 3, 'Y')
-    for y in (0.345, -0.345):
-        stone(g, (-0.07, y, 0.415), (0.255, 0.265, 0.085), Matrix.Rotation(rad(-6), 3, 'Y'),
-              n=3.0)
-        stone(g, (-0.375, y, 0.76), (0.075, 0.245, 0.30), back, n=3.0)
-        stone(g, (-0.455, y, 1.105), (0.050, 0.115, 0.078), back, n=2.6)
-        stone(gi, (-0.10, y, 0.285), (0.19, 0.20, 0.07), n=3.0)
-    g.obj("interior.seats", "seat", sharp=60)
-    # ---- dash: one long stone, a screen let into it, a yoke
-    stone(gi, (0.615, 0, 0.815), (0.085, 0.60, 0.042), Matrix.Rotation(rad(12), 3, 'Y'), n=3.2)
-    stone(gi, (-0.02, 0, 0.30), (0.26, 0.055, 0.085), n=3.0)             # the tunnel between
-    yoke = (Matrix.Translation((0.47, 0.345, 0.80)) @ Matrix.Rotation(rad(-66), 4, 'Y')
-            @ Matrix.Rotation(pi / 2, 4, 'X'))
-    gi.lathe([(-0.010, 0.140), (0.0, 0.150), (0.010, 0.140), (0.0, 0.130)], 28, xf=yoke)
-    gi.tube((0.50, 0.345, 0.79), (0.60, 0.345, 0.81), 0.018)
-    gi.obj("interior.fittings", "interior", sharp=60)
-    g = Geo()
-    stone(g, (0.535, 0, 0.822), (0.012, 0.50, 0.024), Matrix.Rotation(rad(12), 3, 'Y'), n=4)
-    g.obj("interior.screen", "screen", sharp=60)
+    build_cabin()
     # ---- the luggage shelf behind the seats: a case and a soft bag, strapped, and a rail
     g, gs = Geo(), Geo()
     stone(g, (-0.86, 0.17, 0.865), (0.20, 0.235, 0.115), Matrix.Rotation(rad(4), 3, 'Z'), n=5)
@@ -503,6 +491,78 @@ def build_interior():
     g.sweep(spline(rail, 6), [(0.007 * cos(rad(a)), 0.007 * sin(rad(a)))
                               for a in range(0, 360, 45)], up=(0, 0, 1))
     g.obj("luggage.rail", "wheel_vane", sharp=60)
+
+
+FLOOR = 0.225                       # the cabin floor's top
+X0, X1 = -0.53, 0.55                # the rear wall (ahead of the luggage shelf), the firewall
+DECK_F, DECK_R = (0.545, 0.55, 0), (-0.54, 0.45, 0)     # the decks' drops: x, how low
+DECK_EDGE = []                      # the nose deck's rear edge: x, half width, top
+SEAT_HIP = (-0.12, 0.33, 0.47)           # the driver's hip point
+
+
+def quiet_glass():
+    """In the cabin views the studio's boxes stay out of the glass's reflections too (the
+    module hides them from the camera and through the glass, not in it): seen from the
+    side the dome mirrored the top box as an opaque white panel over the seats."""
+    keep = {}
+
+    def hook(name, before):
+        if not K.VIEWS.get(name, {}).get("cabin"):
+            return
+        for o in K.STUDIO.objects:
+            if o.type != 'LIGHT' or o.name.startswith("cab"):
+                continue
+            if before:
+                keep[o.name] = o.visible_glossy
+                o.visible_glossy = False
+            elif o.name in keep:
+                o.visible_glossy = keep.pop(o.name)
+    K.on_view(hook)
+
+
+def build_cabin():
+    """The cabin (vehicles/cabin.py) between the nose deck and the luggage shelf under the
+    dome, which is built shut (the "open" view lifts it): a lined tub, two upright lounge
+    seats in oat with plum inserts, a low soft dash on the nose deck's edge with round vents,
+    a floating screen and a free cluster, the two-spoke wheel, a console, door cards on the
+    petals, amber light lines; the dome is the roof, so nothing hangs overhead. The interior
+    views cab_*."""
+    C.materials(carpet=(0.018, 0.012, 0.022), head=(0.034, 0.028, 0.040),
+                soft=(0.028, 0.022, 0.034), trim=(0.40, 0.24, 0.10), trim_metal=1.0,
+                trim_rough=0.30, accent=(0.075, 0.022, 0.10), piping=(0.60, 0.50, 0.38),
+                metal=(0.60, 0.58, 0.56), mat=(0.014, 0.010, 0.016),
+                ambient=(1.0, 0.56, 0.16), ambient_strength=10.0)
+    sb = next(n for n in K.MAT["seat"].node_tree.nodes if n.type == 'BSDF_PRINCIPLED')
+    sb.inputs["Base Color"].default_value = (0.34, 0.285, 0.21, 1.0)    # oat, deeper inside
+    sb.inputs["Roughness"].default_value = 0.68
+    sb.inputs["Specular IOR Level"].default_value = 0.3
+    cab = C.Cabin(X0, X1, FLOOR, style="orrin", detail=1)
+    cab.lining()
+    # the nose deck's drop hides what stands under it from the spine: the parts are held
+    # and measured against the shell without it (as on the Lumen)
+    free = C.Cabin(X0, X1, FLOOR, style="orrin", detail=1, ignore=("deck.front*",))
+    for k in ("tree", "tree_nw", "flab", "flab_nw", "well_vs", "well_ps"):
+        setattr(cab, k, getattr(free, k))
+    ex, ew, ez = DECK_EDGE
+
+    def cowl(y, x=None):            # the glass's foot as the dash sees it: the deck's edge
+        return None if abs(y) > ew else V3((ex, y, ez))
+    cab.cowl = cowl
+    hx, hy, hz = SEAT_HIP
+    for y, drv in ((hy, True), (-hy, False)):
+        cab.seat((hx, y, hz), driver=drv, width=0.50, back=0.56, rake=22, quilt=2)
+    cab.dash(depth=0.20, vents="round")
+    cab.cluster()
+    cab.screen()
+    cab.wheel(at=(hx + 0.40, hy, hz + 0.32), tilt=32)
+    cab.pedals()
+    cab.console()
+    cab.door(-0.42, 0.42, tag="door", sill_text="PEBBLE")
+    cab.mats()
+    cab.views(exposure=0.0, outside=2.0, daylight=8.0)
+    quiet_glass()
+    cab.report()
+    K.meant("symmetry", *cab.one_sided)
 
 
 # ---------------------------------------------------------------------------------------

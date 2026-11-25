@@ -13,6 +13,7 @@ redesigned (EXCLUDED) are left out of the checks. --sign and --compare are for c
 the kit (signature.py): sign every car before and after, and the same fingerprints mean the
 same cars. Stdlib only.
 """
+import os
 import argparse
 import json
 import shutil
@@ -30,6 +31,13 @@ CHECKS = ("tires", "ground", "symmetry", "panels", "through", "triangles")
 MARK = {"ok": "ok", "look": "look", "fail": "FAIL"}
 
 
+# blender.sh is a bash script; on Windows a bare "bash" from Python finds System32's WSL bash,
+# which cannot see C:/ paths, so Git's bash is taken there ($CYBERGEN_BASH overrides)
+BASH = os.environ.get("CYBERGEN_BASH") or (
+    "C:/Program Files/Git/bin/bash.exe"
+    if os.name == "nt" and os.path.exists("C:/Program Files/Git/bin/bash.exe") else "bash")
+
+
 def cars(only, every=False):
     names = sorted(p.stem for p in (HERE / "cars").glob("*.py"))
     names = [n for n in names if every or not n.startswith(EXCLUDED)]
@@ -44,7 +52,7 @@ def cars(only, every=False):
 
 def run(car, out, render):
     out.mkdir(parents=True, exist_ok=True)
-    cmd = ["bash", (HERE / "blender.sh").as_posix(), (HERE / "cars" / (car + ".py")).as_posix(),
+    cmd = [BASH, (HERE / "blender.sh").as_posix(), (HERE / "cars" / (car + ".py")).as_posix(),
            "--out", out.as_posix(),
            "--check"] + (["--clay", "--zebra"] if render else [])
     t0 = time.time()
@@ -61,7 +69,7 @@ def sign(only, out):
     out.mkdir(parents=True, exist_ok=True)
     ok = True
     for car in cars(only, every=True):
-        cmd = ["bash", (HERE / "blender.sh").as_posix(), (HERE / "signature.py").as_posix(),
+        cmd = [BASH, (HERE / "blender.sh").as_posix(), (HERE / "signature.py").as_posix(),
                (HERE / "cars" / (car + ".py")).as_posix(), (out / (car + ".json")).as_posix()]
         with open(out / (car + ".log"), "w") as log:
             rc = subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT).returncode

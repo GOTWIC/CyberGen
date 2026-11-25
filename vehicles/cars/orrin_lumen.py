@@ -21,7 +21,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import carkit as K                                                  # noqa: E402
-from brands import orrin                                            # noqa: E402
+import cabin as C                                                   # noqa: E402
+from brands import orrin                                          # noqa: E402
 from brands.orrin import (both, dot_field, lune, ring, snap, spline, strip,   # noqa: E402
                           text_proj)
 from carkit import Geo, Matrix, V3, cos, on_body, pi, rad, sin, stud, text_flat   # noqa: E402
@@ -463,37 +464,7 @@ def build_interior():
                         (-2.22, .80, .19, .795, .31, .775), (-2.41, .71, .06, .708, .12, .70),
                         (-2.445, .675, .035, .674, .07, .671),
                         (-2.478, .625, .012, .625, .024, .624)], 1)
-    g = Geo()
-    g.prism([(1.0, -.74, .90), (1.0, -.70, .90), (1.0, -.655, .215), (1.0, .655, .215),
-             (1.0, .70, .90), (1.0, .74, .90), (1.0, .74, .24), (1.0, .69, .16),
-             (1.0, -.69, .16), (1.0, -.74, .24)], (-2.07, 0, 0))
-    g.box((-1.10, 0, .55), (0.05, 1.26, .78))
-    g.box((0.93, 0, .50), (0.06, 1.30, .68))
-    g.box((-0.05, 0, .31), (1.9, 0.20, .20))
-    g.obj("interior.tub", "interior", bevel=0.01)
-    g = Geo()
-    tilt = Matrix.Rotation(rad(-24), 3, 'Y')
-    for x in (0.38, -0.55):
-        for y in (0.385, -0.385):
-            g.hexa([(x - 0.27, y - 0.25, .26), (x + 0.26, y - 0.25, .26),
-                    (x + 0.26, y + 0.25, .26), (x - 0.27, y + 0.25, .26),
-                    (x - 0.27, y - 0.24, .43), (x + 0.25, y - 0.23, .40),
-                    (x + 0.25, y + 0.23, .40), (x - 0.27, y + 0.24, .43)])
-            g.hexa([(x - 0.31, y - 0.24, .38), (x - 0.17, y - 0.24, .38),
-                    (x - 0.17, y + 0.24, .38), (x - 0.31, y + 0.24, .38),
-                    (x - 0.50, y - 0.185, .97), (x - 0.42, y - 0.185, .97),
-                    (x - 0.42, y + 0.185, .97), (x - 0.50, y + 0.185, .97)])
-            g.box((x - 0.475, y, 1.04), (0.07, 0.22, 0.13), rot=tilt)
-    g.obj("interior.seats", "seat", bevel=0.035, segs=4)
-    g = Geo()
-    yoke = (Matrix.Translation((0.70, 0.385, 0.78)) @ Matrix.Rotation(rad(-68), 4, 'Y')
-            @ Matrix.Rotation(pi / 2, 4, 'X'))
-    g.lathe([(-0.011, 0.150), (0.0, 0.161), (0.011, 0.150), (0.0, 0.139)], 28, xf=yoke)
-    g.box((0.75, 0.385, 0.755), (0.14, 0.05, 0.05))
-    g.obj("interior.wheel", "interior", sharp=40)
-    g = Geo()
-    g.box((0.785, 0, 0.775), (0.006, 1.24, 0.06))
-    g.obj("interior.screen", "screen")
+    build_cabin()
     g = Geo()
     text_flat(g, "orrin", 0.055, (2.12, 0, 0.705), (0, 1, 0), (-0.94, 0, 0.34), spacing=1.5)
     # a hair of light under the glass, round the canopy's front tongue
@@ -505,6 +476,97 @@ def build_interior():
             (-2.37, .09, .712), (-2.39, 0, .706)]
     g.sweep(spline(both(half), 8), sec, up=(0, 0, 1))
     g.obj("led.cabin", "led_accent")
+
+
+FLOOR = 0.20                        # the cabin floor's top
+X0 = -1.07                          # the rear wall, just ahead of the rear deck
+DECK_EDGE = (0.84, 0.68, 0.856)     # the front deck's rear edge: x, half width, top
+HIP_F, HIP_R = (0.12, 0.385, 0.45), (-0.70, 0.37, 0.47)     # the hip points, left side
+
+
+def quiet_glass():
+    """In the cabin views the studio's boxes stay out of the glass's reflections too (the
+    module hides them from the camera and through the glass, not in it): seen from the
+    side the canopy mirrored the top box as an opaque white panel over the seats."""
+    keep = {}
+
+    def hook(name, before):
+        if not K.VIEWS.get(name, {}).get("cabin"):
+            return
+        for o in K.STUDIO.objects:
+            if o.type != 'LIGHT' or o.name.startswith("cab"):
+                continue
+            if before:
+                keep[o.name] = o.visible_glossy
+                o.visible_glossy = False
+            elif o.name in keep:
+                o.visible_glossy = keep.pop(o.name)
+    K.on_view(hook)
+
+
+def build_cabin():
+    """The cabin (vehicles/cabin.py) between the two decks under the long glass: a lined tub
+    from the footwells under the front deck to a wall under the rear deck, four lounge seats
+    in pale stone with teal inserts, a low soft dash with a floating screen and a free
+    cluster, the two-spoke wheel, a console, door cards front and rear on the petal doors;
+    the glass is the roof, so nothing hangs overhead. The interior views cab_*."""
+    C.materials(carpet=(0.012, 0.024, 0.026), head=(0.030, 0.036, 0.038),
+                soft=(0.022, 0.030, 0.032), trim=(0.045, 0.062, 0.064), trim_metal=0.0,
+                trim_rough=0.28, accent=(0.012, 0.075, 0.080), piping=(0.62, 0.58, 0.50),
+                metal=(0.62, 0.64, 0.64), mat=(0.010, 0.018, 0.020),
+                ambient=(0.30, 1.0, 0.78), ambient_strength=10.0)
+    sb = next(n for n in K.MAT["seat"].node_tree.nodes if n.type == 'BSDF_PRINCIPLED')
+    sb.inputs["Base Color"].default_value = (0.34, 0.30, 0.245, 1.0)    # stone, deeper inside
+    sb.inputs["Roughness"].default_value = 0.68                          # satin, not a mirror
+    sb.inputs["Specular IOR Level"].default_value = 0.3
+    cab = C.Cabin(X0, 1.08, FLOOR, style="orrin", detail=0)
+    cab.lining()
+    # The front deck under the glass ends in a drop at x 0.79 over the footwells: the lining
+    # stops on it, but seen from the spine it hides everything under it, so the parts that
+    # stand there (the dash's nose, the pedals, the door cards' fronts) are held and measured
+    # against the shell without it.
+    free = C.Cabin(X0, 1.08, FLOOR, style="orrin", detail=0, ignore=("deck.front*",))
+    for k in ("tree", "tree_nw", "flab", "flab_nw", "well_vs", "well_ps"):
+        setattr(cab, k, getattr(free, k))
+
+    def cowl(y, x=None):
+        # the glass runs on to the nose over the deck: the windshield's base, as the dash
+        # sees it, is the deck's rear edge (its top row, deck_front())
+        if abs(y) > DECK_EDGE[1]:
+            return None
+        return V3((DECK_EDGE[0], y, DECK_EDGE[2] - 0.017 * (abs(y) / DECK_EDGE[1]) ** 2))
+    cab.cowl = cowl
+    fx, fy, fz = HIP_F
+    rx, ry, rz = HIP_R
+    cab.seat((fx, fy, fz), driver=True, quilt=1)
+    cab.seat((fx, -fy, fz), quilt=1)
+    for y in (ry, -ry):
+        cab.seat((rx, y, rz), width=0.54, back=0.56, rake=20, quilt=1)
+    cab.dash(depth=0.18)
+    cab.cluster()
+    cab.screen()
+    cab.wheel(at=(fx + 0.40, fy, fz + 0.33))
+    cab.pedals()
+    cab.console()
+    cab.door(0.06, 0.95, tag="door_f", sill_text="LUMEN")
+    cab.door(-1.02, 0.0, tag="door_r", sill=False, speaker=False)
+    cab.mats()
+    # the Lumen's own: one hair of light round the cabin at the glass's foot, along both
+    # sides from the dash to the rear wall and across it
+    p = C._Parts()
+    zb = cab.belt - 0.016
+    xs = [0.70 - (0.70 - X0 - 0.03) * k / 40 for k in range(41)]
+    side = [cab.wall(x, zb, 1) for x in xs]
+    path = [q + n * 0.004 for q, n in side]
+    yb = path[-1].y
+    path += [V3((X0 + 0.014, yb * (1 - 2 * k / 12), zb)) for k in range(1, 12)]
+    path += [V3((q.x, -q.y, q.z)) for q in reversed(path[:len(side)])]
+    p["interior.ambient"].pipe(path, 0.0028, n=3, up=(0, 0, 1))
+    cab._emit("ribbon", p)
+    cab.views(exposure=0.2, outside=2.0, daylight=8.0)
+    quiet_glass()
+    cab.report()
+    K.meant("symmetry", *cab.one_sided)
 
 
 # ---------------------------------------------------------------------------------------

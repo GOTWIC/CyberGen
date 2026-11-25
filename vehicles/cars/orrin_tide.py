@@ -25,8 +25,11 @@ what skin() is off by.
 import os
 import sys
 
+import bpy
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import carkit as K                                                  # noqa: E402
+import cabin as C                                                   # noqa: E402
 from brands import orrin                                            # noqa: E402
 from brands.orrin import (both, dot_field, lune_cut, ring, snap, spline, stone,   # noqa: E402
                           strip, text_proj)
@@ -653,16 +656,23 @@ def build_interior():
             (-1.07, .24, 0, .70), (-1.12, .83, 0, .86), (-1.30, .83, 0, .86),
             (RA_X, .83, 0, .86), (-1.80, .845, 0, .86), (-2.05, None, .16, .86),
             (-2.20, None, .07, .86), (-2.31, None, .012, .86)]
-    S, rims = [], []
-    for x, zf, drop, fe in rows:
-        rm = orrin.rim_at(x, tree, pt=PT, order=ORDER)
-        rims.append(rm)
-        zf = rm.z - drop if zf is None else zf
-        S.append([tuple(rm), (rm.x, rm.y * 0.96, zf + (rm.z - zf) * 0.45),
-                  (rm.x, rm.y * fe, zf), (rm.x, 0.0, zf)])
-    hold = {5: 0.6, 6: 0.75, 7: 0.5, 11: 0.4, 12: 0.75, 13: 0.75, 14: 0.4}
-    K.build_body(S, lambda i, j: "liner", dict(liner="liner"), 0.0,
-                 lambda i, j: hold.get(i, 0.0), name="liner", project=False, subdiv=2)
+    rims = [orrin.rim_at(x, tree, pt=PT, order=ORDER) for x, _, _, _ in rows]
+    # the liner's two decks under the glass (the cabin's tub between them is cabin.py's):
+    # the nose deck, ending in a drop over the footwells, and the load deck behind the
+    # rear seats, rising from a drop behind the cabin's rear wall
+    for name, part, hold in (("deck.front", rows[:6] + [(DECK_F[0], DECK_F[1], 0, .86)],
+                              {5: 0.75}),
+                             ("deck.rear", [(DECK_R[0], DECK_R[1], 0, .86)] + rows[13:],
+                              {1: 0.75, 2: 0.4})):
+        S = []
+        for x, zf, drop, fe in part:
+            rm = orrin.rim_at(x, tree, pt=PT, order=ORDER)
+            zf = rm.z - drop if zf is None else zf
+            S.append([tuple(rm), (rm.x, rm.y * 0.96, zf + (rm.z - zf) * 0.45),
+                      (rm.x, rm.y * fe, zf), (rm.x, 0.0, zf)])
+        K.build_body(S, lambda i, j: "liner", dict(liner="liner"), 0.0,
+                     lambda i, j, h=hold: h.get(i, 0.0), name=name, project=False, subdiv=2)
+    DECK_EDGE[:] = [rows[5][0] - 0.012, rims[5].y * 0.86, rims[5].z - rows[5][2]]
     # ---- a hair of light under the glass round both tongues, the word under the nose glass
     g = Geo()
     sec = [(-0.0025, -0.002), (0.0025, -0.002), (0.0025, 0.002), (-0.0025, 0.002)]
@@ -675,32 +685,7 @@ def build_interior():
     text_flat(g, "orrin", 0.050, a.lerp(b, 0.45) + V3((0, 0, 0.012)), (0, 1, 0),
               (b - a).normalized(), spacing=1.5)
     g.obj("led.cabin", "led_accent")
-    # ---- seats, each three stones: two in front, three across behind
-    g, gi = Geo(), Geo()
-    back = Matrix.Rotation(rad(-20), 3, 'Y')
-    for x0, places in ((0.20, ((0.375, 0.235), (-0.375, 0.235))),
-                       (-0.69, ((0.44, 0.215), (-0.44, 0.215), (0.0, 0.185)))):
-        for y, hw in places:
-            mid = y == 0.0
-            stone(g, (x0, y, 0.455 + (0.012 if mid else 0)), (0.25, hw, 0.07),
-                  Matrix.Rotation(rad(-8), 3, 'Y'), n=3.0)
-            stone(g, (x0 - 0.325, y, 0.80), (0.065, hw - 0.015, 0.31 if not mid else 0.28),
-                  back, n=3.0)
-            stone(g, (x0 - 0.455, y, 1.165 if not mid else 1.11), (0.045, 0.105, 0.068), back,
-                  n=2.6)
-            stone(gi, (x0 - 0.02, y, 0.33), (0.20, hw - 0.04, 0.07), n=3.0, seg=20, rows=10)
-    g.obj("interior.seats", "seat", sharp=60)
-    # ---- the dash (one stone and a strip of screen), the yoke, a spine between the seats
-    stone(gi, (0.955, 0, 0.955), (0.095, 0.66, 0.045), Matrix.Rotation(rad(12), 3, 'Y'), n=3.2)
-    stone(gi, (0.25, 0, 0.36), (0.52, 0.065, 0.11), n=3.0, seg=20, rows=10)
-    yoke = (Matrix.Translation((0.70, 0.375, 0.905)) @ Matrix.Rotation(rad(-66), 4, 'Y')
-            @ Matrix.Rotation(pi / 2, 4, 'X'))
-    gi.lathe([(-0.010, 0.150), (0.0, 0.161), (0.010, 0.150), (0.0, 0.139)], 28, xf=yoke)
-    gi.tube((0.73, 0.375, 0.895), (0.89, 0.375, 0.945), 0.02)
-    gi.obj("interior.fittings", "interior", sharp=60)
-    g = Geo()
-    stone(g, (0.862, 0, 0.962), (0.012, 0.50, 0.026), Matrix.Rotation(rad(12), 3, 'Y'), n=4)
-    g.obj("interior.screen", "screen", sharp=60)
+    build_cabin()
     # ---- on the load deck: a case, a soft bag and a roll, a rail across behind the seats
     g = Geo()
     g.box((-1.60, 0.20, 0.962), (0.56, 0.40, 0.25))
@@ -721,6 +706,110 @@ def build_interior():
     g = Geo()
     g.tube((-1.235, -0.72, 0.90), (-1.235, 0.72, 0.90), 0.012)
     g.obj("load.rail", "rim_bright", sharp=60)
+
+
+FLOOR = 0.24                        # the cabin floor's top
+X0, X1 = -1.06, 1.00                # the rear wall (ahead of the load deck), the firewall
+                                    # (behind the front wells: no cover in the footwells)
+DECK_F, DECK_R = (1.02, 0.66), (-1.085, 0.56)   # the decks' drops: x, how low
+DECK_EDGE = []                      # the nose deck's rear edge: x, half width, top
+HIP_F, HIP_R = (0.10, 0.375, 0.54), (-0.72, 0.0, 0.56)     # the hip points
+
+
+def quiet_glass():
+    """In the cabin views the studio's boxes stay out of the glass's reflections too (the
+    module hides them from the camera and through the glass, not in it): seen from the
+    side the canopy mirrored the top box as an opaque white panel over the seats."""
+    keep = {}
+
+    def hook(name, before):
+        if not K.VIEWS.get(name, {}).get("cabin"):
+            return
+        for o in K.STUDIO.objects:
+            if o.type != 'LIGHT' or o.name.startswith("cab"):
+                continue
+            if before:
+                keep[o.name] = o.visible_glossy
+                o.visible_glossy = False
+            elif o.name in keep:
+                o.visible_glossy = keep.pop(o.name)
+    K.on_view(hook)
+
+
+def bare(cab, tag):
+    """A seat's upholstery cover without its smoothing modifier (the Tide's triangles are
+    nearly all spent on its body): seat() made it at detail 1, sampled finely enough to
+    stand smooth-shaded on its own. The headrests keep theirs."""
+    for ob in K.CAR.objects:
+        if ob.name == "interior.%s.cover" % tag:
+            for md in [m for m in ob.modifiers if m.type == 'SUBSURF']:
+                ob.modifiers.remove(md)
+            ob.data.set_sharp_from_angle(angle=rad(179))    # its facets shaded round
+
+
+def build_cabin():
+    """The cabin (vehicles/cabin.py) between the nose deck and the load deck under the long
+    glass: a lined tub, two lounge seats in front and a bench for three behind in oat with
+    copper inserts, a low soft dash under the glass's foot with a floating screen and a free
+    cluster, the two-spoke wheel, a console, door cards on the petal doors front and rear,
+    amber light ribbons; the glass is the roof, so nothing hangs overhead. The interior
+    views cab_*."""
+    C.materials(carpet=(0.020, 0.016, 0.014), head=(0.040, 0.034, 0.030),
+                soft=(0.030, 0.026, 0.024), trim=(0.30, 0.13, 0.065), trim_metal=1.0,
+                trim_rough=0.32, accent=(0.16, 0.058, 0.026), piping=(0.60, 0.52, 0.40),
+                metal=(0.62, 0.58, 0.54), mat=(0.016, 0.014, 0.013),
+                ambient=(1.0, 0.72, 0.40), ambient_strength=10.0)
+    sb = next(n for n in K.MAT["seat"].node_tree.nodes if n.type == 'BSDF_PRINCIPLED')
+    sb.inputs["Base Color"].default_value = (0.36, 0.31, 0.24, 1.0)     # oat, deeper inside
+    sb.inputs["Roughness"].default_value = 0.68
+    sb.inputs["Specular IOR Level"].default_value = 0.3
+    cab = C.Cabin(X0, X1, FLOOR, style="orrin", detail=0)
+    cab.lining()
+    wells = bpy.data.objects.get("interior.wells")
+    if wells is not None:               # the covers' rim at the arch's lip, under the skin
+        for v in wells.data.vertices:
+            if abs(v.co.y) > 0.62:
+                v.co = cab.keep(v.co, margin=0.008, wells=False)
+    # the nose deck's drop hides what stands under it from the spine: the parts are held
+    # and measured against the shell without it (as on the Lumen)
+    free = C.Cabin(X0, X1, FLOOR, style="orrin", detail=0, ignore=("deck.front*",))
+    for k in ("tree", "tree_nw", "flab", "flab_nw", "well_vs", "well_ps"):
+        setattr(cab, k, getattr(free, k))
+    ex, ew, ez = DECK_EDGE
+
+    def cowl(y, x=None):            # the glass's foot as the dash sees it: the deck's edge
+        return None if abs(y) > ew else V3((ex, y, ez))
+    cab.cowl = cowl
+    cab.detail = 1                  # the seats sampled finely, then left unsmoothed
+    fx, fy, fz = HIP_F
+    for y, drv in ((fy, True), (-fy, False)):
+        s = cab.seat((fx, y, fz), driver=drv, quilt=1)
+        bare(cab, s["tag"])
+    rx, _, rz = HIP_R
+    cab.detail = 0                  # the bench, seen from further off, sampled coarser
+    s = cab.seat((rx, 0.0, rz), places=3, width=1.30, back=0.56, rake=20, headrest="pillow")
+    bare(cab, s["tag"])
+    cab.detail = 0
+    cab.dash(depth=0.20)
+    # the Tide's own: one long ribbon of screen across the dash, the driver's gauges at its
+    # left end, in place of a cluster and a center screen
+    cab.screen(kind="wide", w=0.86, h=0.10, y=fy * 0.42, t=0.25, graphics="media")
+    cab.wheel(at=(fx + 0.40, fy, fz + 0.33), tilt=30)
+    cab.pedals()
+    cab.console()
+    pad = cab.pad                   # the door cards sampled every 7 cm, not 4 (triangles)
+    cab.pad = lambda *a, **kw: pad(*a, **dict(kw, step=0.07))
+    cab.door(0.02, 0.96, tag="door_f", sill_text="TIDE", pocket=False,
+             speaker=False)
+    cab.door(-1.0, -0.06, tag="door_r", sill=False, speaker=False, pocket=False,
+             switches=False)
+    cab.pad = pad
+    cab.mats()
+    cab.views(exposure=-0.3, outside=2.0, daylight=8.0)
+    quiet_glass()
+    cab.report()
+    # (the bench's middle place has its buckles to one side, as a bench for three does)
+    K.meant("symmetry", *cab.one_sided, "interior.seat2.interior", "interior.seat2.red")
 
 
 # ---------------------------------------------------------------------------------------

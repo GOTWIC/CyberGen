@@ -26,8 +26,11 @@ import os
 import subprocess
 import sys
 
+import bpy
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import carkit as K                                                  # noqa: E402
+import cabin as C                                                   # noqa: E402
 from brands import orrin                                            # noqa: E402
 from brands.orrin import (both, dot_field, lid_cutter, lune_cut, ring, snap,  # noqa: E402
                           spline, stone, strip, text_proj)
@@ -556,17 +559,22 @@ def build_interior():
             (0.40, .17, 0), (0.0, .17, 0), (-0.38, .17, 0), (-0.46, .17, 0),
             (-0.50, None, .05), (-0.82, None, .04), (RA_X, None, .028), (-1.86, None, .014),
             (-2.20, None, .005)]
-    S, rims = [], []
-    for x, zf, drop in rows:
-        rm = orrin.rim_at(x, tree, pt=PT, order=ORDER)
-        rims.append(rm)
-        zf = rm.z - drop if zf is None else zf
-        deep = rm.z - zf > 0.2
-        S.append([tuple(rm), (rm.x, rm.y * 0.95, zf + (rm.z - zf) * 0.45),
-                  (rm.x, rm.y * (0.82 if deep else 0.86), zf), (rm.x, 0.0, zf)])
-    hold = {5: 0.6, 6: 0.75, 7: 0.5, 10: 0.5, 11: 0.75, 12: 0.6}
-    K.build_body(S, lambda i, j: "liner", dict(liner="liner"), 0.0,
-                 lambda i, j: hold.get(i, 0.0), name="liner", project=False, subdiv=2)
+    rims = [orrin.rim_at(x, tree, pt=PT, order=ORDER) for x, _, _ in rows]
+    # the liner's two decks under the glass (the cabin's tub between them is cabin.py's):
+    # the nose deck, ending in a drop over the footwells, and the tail deck behind the
+    # seats, rising from a drop behind the cabin's rear wall
+    for name, part, hold in (("deck.front", rows[:6] + [DECK_F], {5: 0.75, 6: 0.5}),
+                             ("deck.rear", [DECK_R] + rows[12:], {0: 0.5, 1: 0.75})):
+        S = []
+        for x, zf, drop in part:
+            rm = orrin.rim_at(x, tree, pt=PT, order=ORDER)
+            zf = rm.z - drop if zf is None else zf
+            deep = rm.z - zf > 0.2
+            S.append([tuple(rm), (rm.x, rm.y * 0.95, zf + (rm.z - zf) * 0.45),
+                      (rm.x, rm.y * (0.82 if deep else 0.86), zf), (rm.x, 0.0, zf)])
+        K.build_body(S, lambda i, j: "liner", dict(liner="liner"), 0.0,
+                     lambda i, j, h=hold: h.get(i, 0.0), name=name, project=False, subdiv=2)
+    DECK_EDGE[:] = [rows[5][0] - 0.012, rims[5].y * 0.86, rims[5].z - rows[5][2]]
     # ---- a hair of light under the glass round both tongues, the word under the nose glass
     g = Geo()
     sec = [(-0.0025, -0.002), (0.0025, -0.002), (0.0025, 0.002), (-0.0025, 0.002)]
@@ -579,25 +587,141 @@ def build_interior():
     text_flat(g, "orrin", 0.040, a.lerp(b, 0.5) + V3((0, 0, 0.012)), (0, 1, 0),
               (b - a).normalized(), spacing=1.5)
     g.obj("led.cabin", "led_accent")
-    # ---- two seats, each three stones; a spine between them
-    g, gi = Geo(), Geo()
-    back = Matrix.Rotation(rad(-24), 3, 'Y')
-    for y in (0.325, -0.325):
-        stone(g, (0.14, y, 0.305), (0.26, 0.225, 0.07), Matrix.Rotation(rad(-9), 3, 'Y'), n=3.0)
-        stone(g, (-0.215, y, 0.60), (0.070, 0.215, 0.30), back, n=3.0)
-        stone(g, (-0.375, y, 0.935), (0.045, 0.105, 0.070), back, n=2.6)
-        stone(gi, (0.10, y, 0.215), (0.20, 0.18, 0.05), n=3.0, seg=20, rows=10)
-    g.obj("interior.seats", "seat", sharp=60)
-    stone(gi, (0.86, 0, 0.705), (0.085, 0.56, 0.040), Matrix.Rotation(rad(14), 3, 'Y'), n=3.2)
-    stone(gi, (0.25, 0, 0.27), (0.50, 0.060, 0.095), n=3.0, seg=20, rows=10)
-    yoke = (Matrix.Translation((0.66, 0.325, 0.665)) @ Matrix.Rotation(rad(-66), 4, 'Y')
-            @ Matrix.Rotation(pi / 2, 4, 'X'))
-    gi.lathe([(-0.010, 0.140), (0.0, 0.150), (0.010, 0.140), (0.0, 0.130)], 28, xf=yoke)
-    gi.tube((0.69, 0.325, 0.66), (0.80, 0.325, 0.69), 0.018)
-    gi.obj("interior.fittings", "interior", sharp=60)
-    g = Geo()
-    stone(g, (0.775, 0, 0.705), (0.012, 0.46, 0.022), Matrix.Rotation(rad(14), 3, 'Y'), n=4)
-    g.obj("interior.screen", "screen", sharp=60)
+    build_cabin()
+
+
+FLOOR = 0.17                        # the cabin floor's top
+X0, X1 = -0.46, 0.97                # the rear wall (ahead of the tail deck), the firewall
+                                    # (behind the front wells: no covers in the footwells)
+DECK_F, DECK_R = (0.86, 0.45, 0), (-0.48, 0.40, 0)     # the decks' drops: x, how low
+DECK_EDGE = []                      # the nose deck's rear edge: x, half width, top
+SEAT_HIP = (-0.06, 0.325, 0.33)      # the driver's hip point
+
+
+def quiet_glass():
+    """In the cabin views the studio's boxes stay out of the glass's reflections too (the
+    module hides them from the camera and through the glass, not in it): seen from the
+    side the canopy mirrored the top box as an opaque white panel over the seats."""
+    keep = {}
+
+    def hook(name, before):
+        if not K.VIEWS.get(name, {}).get("cabin"):
+            return
+        for o in K.STUDIO.objects:
+            if o.type != 'LIGHT' or o.name.startswith("cab"):
+                continue
+            if before:
+                keep[o.name] = o.visible_glossy
+                o.visible_glossy = False
+            elif o.name in keep:
+                o.visible_glossy = keep.pop(o.name)
+    K.on_view(hook)
+
+    def fill_higher():
+        # the module's low fill lamp hangs 8 cm over the hip's height at the dash, right
+        # over the console, which it bleached: lifted to the brow's height and forward
+        o = K.STUDIO.objects.get("cab1")
+        if o is not None:
+            o.location = (o.location.x + 0.12, o.location.y, o.location.z + 0.25)
+    K.after_studio(fill_higher)
+
+
+def smooth_doors(cab, lin, rounds=6):
+    """The lining's walls behind the door cards smoothed again: the flank tucks in under
+    the waist and the rays leave it in folds, which the cards (laid on it) took on. The
+    cabin's lining tree is made again from the smoothed mesh (the cards are laid on it)."""
+    import bmesh
+    from mathutils.bvhtree import BVHTree
+    bm = bmesh.new()
+    bm.from_mesh(lin.data)
+    zb = cab.belt - 0.05
+    soft = [v for v in bm.verts if not v.is_boundary and abs(v.co.y) > 0.45
+            and -0.45 < v.co.x < 0.85 and FLOOR + 0.04 < v.co.z < zb]
+    for _ in range(rounds):
+        bmesh.ops.smooth_vert(bm, verts=soft, factor=0.5, use_axis_x=True, use_axis_y=True,
+                              use_axis_z=True)
+    for v in soft:
+        v.co = cab.keep(v.co, cab.gap * 0.5, wells=False)
+    bm.to_mesh(lin.data)
+    bm.free()
+    lin.data.update()
+    vs = [lin.matrix_world @ v.co for v in lin.data.vertices]
+    cab.lin = BVHTree.FromPolygons(vs, [tuple(q.vertices) for q in lin.data.polygons])
+
+
+def bare(tag):
+    """A seat's upholstery cover without its smoothing modifier (the Aria's triangles are
+    nearly all spent on its five bodies): seat() made it at detail 1, sampled finely enough
+    to stand on its own, shaded round. The headrests keep theirs."""
+    ob = bpy.data.objects.get("interior.%s.cover" % tag)
+    if ob is not None:
+        for md in [m for m in ob.modifiers if m.type == 'SUBSURF']:
+            ob.modifiers.remove(md)
+        ob.data.set_sharp_from_angle(angle=rad(179))
+
+
+def build_cabin():
+    """The cabin (vehicles/cabin.py) between the nose deck and the tail deck under the
+    teardrop: a low lined tub, two lounge seats laid back in cognac with black inserts, a
+    low soft dash under the glass's foot with a free cluster (no center screen), a yoke,
+    a console, door cards, cyan light lines; the glass is the roof, so nothing hangs
+    overhead. The interior views cab_*."""
+    C.materials(carpet=(0.012, 0.012, 0.014), head=(0.024, 0.024, 0.027),
+                soft=(0.020, 0.020, 0.023), trim=(0.20, 0.20, 0.21), trim_metal=1.0,
+                trim_rough=0.30, accent=(0.016, 0.014, 0.014), piping=(0.55, 0.26, 0.10),
+                metal=(0.50, 0.50, 0.52), mat=(0.010, 0.010, 0.011),
+                ambient=(0.30, 0.82, 1.0), ambient_strength=10.0)
+    sb = next(n for n in K.MAT["seat"].node_tree.nodes if n.type == 'BSDF_PRINCIPLED')
+    sb.inputs["Base Color"].default_value = (0.16, 0.058, 0.020, 1.0)   # cognac, deeper inside
+    sb.inputs["Roughness"].default_value = 0.6
+    sb.inputs["Specular IOR Level"].default_value = 0.32
+    cab = C.Cabin(X0, X1, FLOOR, style="orrin", detail=0)
+    lin = cab.lining()
+    for v in lin.data.vertices:         # held inside the door pulls' pockets, which dip in
+        if -0.35 < v.co.x < 0.55 and abs(v.co.y) > 0.6:
+            v.co = cab.keep(v.co, margin=0.045, wells=False)
+    smooth_doors(cab, lin)
+    # the nose deck's drop hides what stands under it from the spine: the parts are held
+    # and measured against the shell without it (as on the Lumen)
+    free = C.Cabin(X0, X1, FLOOR, style="orrin", detail=0, ignore=("deck.front*",))
+    for k in ("tree", "tree_nw", "flab", "flab_nw", "well_vs", "well_ps"):
+        setattr(cab, k, getattr(free, k))
+    ex, ew, ez = DECK_EDGE
+
+    def cowl(y, x=None):            # the glass's foot as the dash sees it: the deck's edge
+        return None if abs(y) > ew else V3((ex, y, ez))
+    cab.cowl = cowl
+    hx, hy, hz = SEAT_HIP
+    cab.detail = 1                  # the seats sampled finely, then left unsmoothed
+    for y, drv in ((hy, True), (-hy, False)):
+        st = cab.seat((hx, y, hz), driver=drv, thick=0.075, back=0.52, rake=26, quilt=1,
+                      width=0.52)
+        bare(st["tag"])
+    cab.detail = 0
+    cab.dash(depth=0.20)
+    cab.cluster()                   # a driver's car: the cluster, no center screen
+    cab.wheel(at=(hx + 0.42, hy, hz + 0.30), kind="yoke", tilt=20)
+    cab.pedals()
+    cab.console()
+    pad = cab.pad                   # the door cards sampled every 7 cm, not 4 (triangles)
+    cab.pad = lambda *a, **kw: pad(*a, **dict(kw, step=0.07))
+    # a hypercar's wide sills over the flank's tuck under the doors (the lining there follows
+    # the skin into the sill in folds), the door cards above them
+    cab.sills(-0.40, 0.80, h=0.20, w=0.15)
+    tx = C._Parts()                 # the name lit on the sills' tops, read stepping in
+    yc = cab.half(0.20, FLOOR + 0.12) + 0.012 - 0.07
+    for sg in (1, -1):
+        K.text_flat(tx["interior.ambient"], "ARIA", 0.03, V3((0.20, sg * yc, FLOOR + 0.2065)),
+                    (-sg, 0, 0), (0, -sg, 0), spacing=1.3)
+    cab._emit("sill_text", tx, one_sided=True)
+    cab.door(-0.36, 0.78, tag="door", speaker=False, pocket=False, z0=FLOOR + 0.215,
+             sill=False)
+    cab.pad = pad
+    cab.mats()
+    cab.views(exposure=0.3, outside=2.0, daylight=8.0)
+    quiet_glass()
+    cab.report()
+    K.meant("symmetry", *cab.one_sided)
 
 
 # ---------------------------------------------------------------------------------------

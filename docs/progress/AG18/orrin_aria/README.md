@@ -72,6 +72,41 @@ faired in under the eyelids. Small chips inside the crescent slots under the nos
 (the slot's walls where its cutter meets the skin nearly tangent), seen from close up; the
 chopped walls' top edges catch light at the channels' mouths from a few tens of centimeters.
 
+## Cabin (2026-11-24)
+
+![cabin](cabin.jpg)
+
+The schematic cabin (two seats of three stones each, a dash of one stone, a yoke ring) is
+replaced by `vehicles/cabin.py`'s full interior, style `orrin`. The old liner, one sheet from
+nose to tail, is split into its two decks under the glass, `deck.front` (the nose deck, ending
+in a drop over the footwells) and `deck.rear` (the tail deck behind the seats, rising from a
+drop behind the cabin's rear wall), built as before on the same rim rows.
+
+- **Tub:** a low lining from a firewall at x 0.97 (behind the front pods' wells) to a rear
+  wall at x -0.46, carpet in black; the walls behind the doors smoothed again
+  (`smooth_doors()`: the flank tucks in under the waist and the rays left the lining there in
+  folds the door cards took on), the lining held inside the door pulls' pockets; the glass
+  is the roof, so there is no headliner or roof kit.
+- **Seats:** two low lounges laid back (26 degrees), cognac with black inserts and cognac
+  piping, pillow headrests on posts; covers unsmoothed and shaded round (triangles).
+- **Dash:** low and soft on the nose deck's rear edge, a free cluster and no center screen
+  (a driver's car), slot vents, a cyan line under the brow; a yoke, a console, pedals, mats.
+- **Its own:** wide sills each side under the doors with ARIA lit on their tops, the door
+  cards above them (no speakers or pockets, sampled every 7 cm).
+- **Triangles:** cabin about 9,600 (old stones and dash) and the liner's about 5,500 to
+  16,830 and the two decks; the car 392,963 to 399,141 (budget 400,000: little room left).
+- **Check:** verdict `look`, as before: the tires (5 mm in the pods, unchanged) and symmetry
+  (the cabin's one-sided parts marked meant; `led.cabin` 6 mm, as before); ground, panels,
+  through and triangles ok; the log's "through the shell" says nothing.
+- **Exterior:** unchanged but for the liner, now its two decks (signature: the `liner` piece
+  gone, `deck.front` and `deck.rear` new, `interior.*` objects, the cabin's materials and the
+  studio's `cab*` lamps).
+- **Cabin views:** the studio's boxes kept out of the glass's reflections there
+  (`quiet_glass()`), the module's low fill lamp lifted off the console (`fill_higher()`).
+- **Weakest:** the canopy mirrors the pods, the cluster and the cyan lines all over from the
+  driver's seat; the seat covers show facets up close; the cabin is mostly black round the
+  cognac seats, and the console reads pale under the fill lamp.
+
 ## What I would improve
 
 - The drops meet as plain intersections (pod to core, buttress to hip); a poured car wants a fillet there, which needs the bodies built as one cage or a blend pass.

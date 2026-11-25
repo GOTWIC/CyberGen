@@ -69,10 +69,44 @@ the well and the skin above leaves no more room. The side markers behind the rea
 light strips on the skin. Tiny cusps of the canopy's tip still peek past the pebbles at full
 size.
 
+## Cabin (2026-11-24)
+
+![cabin](cabin.jpg)
+
+The schematic cabin (a box tub, block seats, a ring wheel, a strip of screen) is replaced by
+`vehicles/cabin.py`'s full interior, style `orrin`, between the two decks under the glass,
+which stay as they were:
+
+- **Tub:** a lining from the footwells under the nose deck (firewall at x 1.08) to a wall
+  just ahead of the load deck (x -1.07), carpet in deep teal-black; the glass is the roof,
+  so there is no headliner, roof kit, visors or mirror.
+- **Seats:** four lounges in pale stone with deep teal inserts, one quilt bar each, pillow
+  headrests on posts; the rear pair a little more upright.
+- **Dash:** low and soft under the glass's foot, its top meeting the nose deck's rear edge
+  (`cowl` returns that edge: the glass runs on to the nose, so the module's windshield base
+  is not the dash's); a floating screen, a free cluster, slot vents, a mint light line under
+  the brow; the two-spoke round wheel, a console, pedals, mats.
+- **Doors:** cards on the petal doors front and rear (no speaker behind), a lit sill plate
+  reading LUMEN.
+- **Its own:** one hair of mint light round the cabin at the glass's foot, along both sides
+  and across the rear wall, the light ribbons of the body carried inside.
+- **Cabin views:** the studio's boxes are also kept out of the glass's reflections there
+  (`quiet_glass()`, a view hook): seen from the side, the canopy had mirrored the top box as
+  an opaque white panel over the seats.
+- **Triangles:** cabin 4,448 (old) to 45,778; the car 356,713 to 398,043 (budget 400,000),
+  the lining at the module's `detail=0`, the seats' quilting cut to one bar.
+- **Check:** verdict `look`, as before: the tires (front lids, unchanged), symmetry (the
+  cabin's one-sided parts marked meant; `led.cabin` 8.5 mm, as before); `through` ok, panels
+  ok, triangles ok; the log's "through the shell" says nothing.
+- **Exterior:** unchanged (signature: only `interior.*` objects, the cabin's materials and the
+  studio's `cab*` lamps differ).
+- **Weakest:** from the driver's seat, the displays mirror large in the long glass ahead and
+  the nose deck beyond the dash reads as a dark slab; through the glass from outside the
+  seats are the cabin's whole story, and the door cards and dash stay dark.
+
 ## What I would improve
 
 - The glass doors are only hairlines; a real hinge line and a B hoop under the glass would explain the way in better.
-- Seats are bevelled blocks; they deserve shells as soft as the body.
 - Small teeth can still show where a panel's rim meets a slot wall (rims are thinned to 4 mm to hide them).
 - The wheel wells are plain dark cavities with a visible step; a liner would tidy them.
 
