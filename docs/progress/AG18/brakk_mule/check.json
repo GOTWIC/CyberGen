@@ -6,7 +6,7 @@
   2.76
  ],
  "top_z": 2.76,
- "objects": 234,
+ "objects": 293,
  "palette": {
   "paint": [
    0.115,
@@ -152,6 +152,16 @@
     "meant": true
    },
    {
+    "object": "interior.wheel.soft",
+    "off_mm": 254.8,
+    "at": [
+     2.56,
+     0.334,
+     1.786
+    ],
+    "meant": true
+   },
+   {
     "object": "whip",
     "off_mm": 250.2,
     "at": [
@@ -162,12 +172,32 @@
     "meant": true
    },
    {
-    "object": "interior.wheel",
-    "off_mm": 238.6,
+    "object": "interior.wheel.interior",
+    "off_mm": 240.8,
     "at": [
-     2.418,
-     0.37,
-     1.334
+     2.358,
+     0.215,
+     1.59
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.gloss",
+    "off_mm": 233.4,
+    "at": [
+     2.366,
+     0.508,
+     1.589
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.lit",
+    "off_mm": 226.8,
+    "at": [
+     2.376,
+     0.501,
+     1.597
     ],
     "meant": true
    },
@@ -178,6 +208,16 @@
      -1.071,
      -0.737,
      1.94
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.metal",
+    "off_mm": 215.4,
+    "at": [
+     2.406,
+     0.382,
+     1.635
     ],
     "meant": true
    },
@@ -212,12 +252,12 @@
     "meant": true
    },
    {
-    "object": "markings",
-    "off_mm": 162.7,
+    "object": "interior.cluster.soft",
+    "off_mm": 165.2,
     "at": [
-     -0.605,
-     -1.117,
-     1.673
+     2.63,
+     0.22,
+     1.704
     ],
     "meant": true
    },
@@ -232,12 +272,32 @@
     "meant": true
    },
    {
+    "object": "interior.pedals.interior",
+    "off_mm": 156.8,
+    "at": [
+     2.813,
+     0.408,
+     1.138
+    ],
+    "meant": true
+   },
+   {
     "object": "box.plates",
     "off_mm": 155.6,
     "at": [
      0.346,
      -1.116,
      1.374
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.pedals.mat",
+    "off_mm": 154.8,
+    "at": [
+     2.804,
+     0.363,
+     1.139
     ],
     "meant": true
    },
@@ -272,12 +332,52 @@
     "meant": true
    },
    {
+    "object": "markings",
+    "off_mm": 144.9,
+    "at": [
+     -0.801,
+     -1.117,
+     1.692
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.pedals.metal",
+    "off_mm": 134.7,
+    "at": [
+     2.786,
+     0.358,
+     1.117
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.gloss",
+    "off_mm": 122.4,
+    "at": [
+     2.687,
+     0.546,
+     1.657
+    ],
+    "meant": true
+   },
+   {
     "object": "ladder.ribs",
     "off_mm": 118.8,
     "at": [
      -0.332,
      0.92,
      0.819
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.dark",
+    "off_mm": 115.5,
+    "at": [
+     2.681,
+     0.55,
+     1.652
     ],
     "meant": true
    },
@@ -302,12 +402,32 @@
     "meant": true
    },
    {
+    "object": "interior.cluster.white",
+    "off_mm": 88.2,
+    "at": [
+     2.668,
+     0.312,
+     1.626
+    ],
+    "meant": true
+   },
+   {
     "object": "collar.hoses",
     "off_mm": 86.8,
     "at": [
      1.163,
      -0.753,
      1.441
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.lit",
+    "off_mm": 67.6,
+    "at": [
+     2.659,
+     0.4,
+     1.607
     ],
     "meant": true
    },
@@ -322,22 +442,12 @@
     "meant": true
    },
    {
-    "object": "interior.screens",
-    "off_mm": 63.2,
-    "at": [
-     2.709,
-     0.51,
-     1.634
-    ],
-    "meant": true
-   },
-   {
     "object": "cargo.marks",
     "off_mm": 57.6,
     "at": [
      -0.596,
      0.952,
-     1.51
+     1.507
     ],
     "meant": true
    },
@@ -372,6 +482,16 @@
     "meant": true
    },
    {
+    "object": "interior.aft.gloss",
+    "off_mm": 20.0,
+    "at": [
+     1.36,
+     -0.34,
+     1.745
+    ],
+    "meant": true
+   },
+   {
     "object": "cooler.louvres",
     "off_mm": 17.4,
     "at": [
@@ -400,66 +520,6 @@
      2.145
     ],
     "meant": true
-   },
-   {
-    "object": "led.hold",
-    "off_mm": 15.0,
-    "at": [
-     -1.4,
-     0.265,
-     2.305
-    ],
-    "meant": true
-   },
-   {
-    "object": "door.bar",
-    "off_mm": 12.5,
-    "at": [
-     -0.537,
-     1.087,
-     1.9
-    ],
-    "meant": true
-   },
-   {
-    "object": "wiper.blades",
-    "off_mm": 9.7,
-    "at": [
-     2.976,
-     -0.399,
-     1.604
-    ],
-    "meant": true
-   },
-   {
-    "object": "box.ribs",
-    "off_mm": 6.0,
-    "at": [
-     0.533,
-     -1.1,
-     2.276
-    ],
-    "meant": true
-   },
-   {
-    "object": "door.sill",
-    "off_mm": 6.0,
-    "at": [
-     0.444,
-     1.044,
-     1.166
-    ],
-    "meant": true
-   },
-   {
-    "object": "box.shell",
-    "off_mm": 5.5,
-    "at": [
-     0.62,
-     1.064,
-     2.314
-    ],
-    "meant": true
    }
   ]
  },
@@ -483,20 +543,20 @@
  },
  "triangles": {
   "verdict": "ok",
-  "total": 392506,
+  "total": 399697,
   "budget": 400000,
   "top": [
    [
     "markings",
-    14947
-   ],
-   [
-    "lettering",
-    13509
+    11629
    ],
    [
     "bolts",
     11232
+   ],
+   [
+    "lettering",
+    10801
    ],
    [
     "hub.fl",
@@ -530,7 +590,7 @@
    ],
    [
     "tiretext",
-    31128
+    33912
    ],
    [
     "tire",
@@ -545,12 +605,12 @@
     15810
    ],
    [
-    "markings",
-    14947
-   ],
-   [
     "fender",
     13592
+   ],
+   [
+    "pylon",
+    13568
    ]
   ]
  },

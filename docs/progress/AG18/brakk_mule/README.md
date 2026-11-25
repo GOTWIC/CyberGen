@@ -81,10 +81,23 @@ are of this build.
 - Left: the sensor band's and the brow's layered glow (step C), the camera pods' small lit
   strips.
 
+## Cabin
+
+![cabin](cabin.jpg)
+
+The full cab from `vehicles/cabin.py` (`style="brakk"`), in place of the box seats and slab dash: `cab_fwd`, `cab_side`, `cab_back` and `cab_in` above, 128 samples. Only the cab is fitted out; the box keeps its lit hold.
+
+- **What it has.** A working van's cab-over cab lined from the windshield's base to a wall inside the cab's back, a black rubber floor high over the front wheels with ribbed mats, a pale headliner and back wall, hard dark trim under the door glass's sill; two upright buckets in brown vinyl with post headrests and belts on the pillars; a long flat dash under the windshield with an olive band, slat vents, the gauge hood (a bar display, not lettered gauges) and a small route screen; a four-spoke wheel on a bus's flat 46 degree column, pedals with a dead pedal; a console box between the seats with the toggle selector and a scanner standing in its dock; door cards with bar pulls and bolted steel kick plates, MULE lit on the sills; grab bars up both door pillars; the windshield's sides and header and both quarter windows in plain steel frames; a dome light and an inside mirror; on the back wall a clipboard of manifests and a fire extinguisher in its bracket.
+- **The budget.** The Mule was already at 386,867 triangles without a cabin on this machine (the tire lettering counts more under Windows' font than under the Mac's DIN), so the cab has 12,830: the lining on a 75 mm grid (`cab.step`, coarser than detail 0), the seats at detail 0 with their upholstery left unsubdivided (smooth shading rounds it off; 1,786 each against 5,956 subdivided), the door cards' panels sampled every 12 cm (`cab.pad` wrapped for `door()`), no visors, no overhead console (it also filled the driver's view), the cluster's bars in place of its lettered gauges, the extinguisher on 12 sides without its lettering, frames without bolt heads. The exterior gave nothing.
+- **The lining.** The firewall plane just behind the windshield's base (2.97), the spine on to 20 cm of each end (`cap=0.20`), the vertices under the cowl pressed 30 mm inside the shell, the firewall's fill cut off at the cowl's height (1.43; ahead of the glass's base it stood in the open air), the reveals in the dark trim. The frames hide what stayed ragged at the grazing windshield and quarter glass.
+- **Triangles.** Interior 2,888 before (the schematic tub), 12,830 now (lining 2,099, each seat 1,786, the door cards 1,708, the wheel 952); the whole van 389,755 before, 399,697 now (of 400,000).
+- **Check.** `--check` says `ok` on every check: tires, ground, symmetry (the cab's one-sided parts told as meant), panels, through (0 cabin parts in the open), triangles. The log's "through the shell" says nothing.
+- **Exterior.** Signed before and after: only `interior.*` objects, cabin materials and the studio's `cab*` lamps differ.
+- **Weakest from the seat.** The seats are faceted where the light rakes across them, and the cabin's lower half is dark; the headliner is a plain pale surface with nothing on it; the windshield's corner facets show the lining's fold behind the frames from the passenger's side.
+
 ## What I would improve
 
 - The walking beam shows only between the tires and from behind; a cutaway fender or a higher view of the bogie would explain it better.
-- The windshield is dark from the front; a brighter cabin (lit dash, door cards, belts) would read through it.
 - A tail lift folded under the frame, chains on the barn doors, a second roller door on the right, and a real hinge line in the bellows.
 - The side tile takes a 64 mm lens at this length, so its perspective is stronger than the other cars' side views.
 

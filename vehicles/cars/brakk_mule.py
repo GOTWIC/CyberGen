@@ -25,6 +25,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import carkit as K                                                  # noqa: E402
+import cabin as C                                                   # noqa: E402
 from functools import partial                                       # noqa: E402
 from brands import brakk                                            # noqa: E402
 from brands.brakk import (bolt, chevrons, coil, lamp_pylon, on_plane, on_side,  # noqa: E402
@@ -976,40 +977,239 @@ def build_lettering():
 # ---------------------------------------------------------------------------------------
 # interior
 # ---------------------------------------------------------------------------------------
+CFLOOR = 0.98                       # the cab floor's top, high over the front wheels
+CAB_X0, CAB_X1 = 1.34, 2.97         # a wall inside the cab's back, the firewall just behind
+#                                     the windshield's base (3.02)
+
+
+def cab_zone(label, p, n):
+    """The lining's material: rubber up the footwells and over the nose under the windshield's
+    base, the cowl in the dash's hard trim, the walls changing from trim to headliner over
+    the door glass's sill (1.50), behind the door cards."""
+    if label == "fill":
+        return "interior.carpet"
+    if p is None or n is None or label in ("floor", "fire", "rear", "well"):
+        return None
+    if p.x > 2.60 and p.z < 1.22:
+        return "interior.carpet"
+    if p.x > 2.80 and p.z < 1.54:
+        return "interior"
+    return "interior.head" if p.z > 1.53 else "interior"
+
+
+def wall_bar(P, cab, a, b, off=0.045, r=0.014, mat="interior.metal", inset=0.035):
+    """A grab bar standing off the lining's left wall from (x, z) a to b, on two posts."""
+    pa, na = cab.wall(a[0], a[1], 1)
+    pb, nb = cab.wall(b[0], b[1], 1)
+    qa, qb = pa + na * off, pb + nb * off
+    P[mat].tube(qa, qb, r, 10)
+    for p, n, q in ((pa, na, qa.lerp(qb, inset / (qb - qa).length)),
+                    (pb, nb, qb.lerp(qa, inset / (qb - qa).length))):
+        foot = p + (q - p - n * (q - p).dot(n))
+        P[mat].tube(foot - n * 0.004, q, r * 0.75, 8)
+        P["interior.gloss"].cyl(foot - n * 0.004, 0.008, r * 1.6, 10, axis=tuple(n))
+
+
+def wall_bolts(g, cab, pts, lift, r=0.0065, h=0.0035):
+    """Bolt heads on the lining's left wall at (x, z) points, lift off it."""
+    for x, z in pts:
+        p, n = cab.wall(x, z, 1)
+        bolt(g, p + n * lift, n, r, h)
+
+
+def glass_trim(g, cab, outline, center, w=(-0.015, 0.03, 0.08), lift=0.006, n=60, anchors=None):
+    """A moulding round a window's edge from inside: a band laid on the lining and the glass
+    along a polyline of the glass panel's outline (outline), reaching from w[0] outside it to
+    w[-1] in toward center (the frame's width and a little of the glass), so the reveal's
+    rays never show ragged at a grazing pane. anchors: laid on the lining only at that many
+    stations, straight between them (a header over a lumpy lining)."""
+    pts = [V3(p) for p in outline]
+    L = [0.0]
+    for a, b in zip(pts, pts[1:]):
+        L.append(L[-1] + (b - a).length)
+    rows = []
+    for k in range(n + 1):
+        s = L[-1] * k / n
+        i = max(0, min(len(pts) - 2, next((j for j in range(len(L) - 1) if L[j + 1] >= s), 0)))
+        q = pts[i].lerp(pts[i + 1], (s - L[i]) / max(L[i + 1] - L[i], 1e-9))
+        inw = (V3(center) - q).normalized()
+        row = []
+        for t in w:
+            p = q + inw * t
+            o = cab._from(p)
+            hit, nrm = cab.at(o, p - o)
+            if hit is None:
+                hit, nrm = p, (o - p).normalized()
+            row.append(hit + nrm * (lift if t not in (w[0], w[-1]) else lift * 0.3))
+        rows.append(row)
+    if anchors:
+        ks = [round(n * a / (anchors - 1)) for a in range(anchors)]
+        for a, b in zip(ks, ks[1:]):
+            for k in range(a + 1, b):
+                t = (k - a) / (b - a)
+                rows[k] = [p.lerp(q, t) for p, q in zip(rows[a], rows[b])]
+    m = len(w)
+    g.add([p for r in rows for p in r],
+          [(i * m + j, i * m + j + 1, (i + 1) * m + j + 1, (i + 1) * m + j)
+           for i in range(n) for j in range(m - 1)])
+
+
+def extinguisher(P, c, h=0.40, r=0.055, n=12):
+    """A fire extinguisher standing at c (its foot) in a strapped bracket (n sides: few,
+    for the Mule's budget)."""
+    c = V3(c)
+    P["seat.red"].lathe([(0.0, 0.001), (0.0, r - 0.006), (0.006, r), (h - 0.07, r),
+                         (h - 0.04, r * 0.7), (h - 0.03, 0.016), (h - 0.03, 0.001)], n,
+                        axis='z', at=tuple(c))
+    P["interior.gloss"].cyl(c + V3((0, 0, h - 0.035)), 0.05, 0.018, 8)
+    P["interior.metal"].box(c + V3((0.012, 0, h + 0.022)), (0.07, 0.012, 0.008),
+                            rot=Matrix.Rotation(rad(-12), 3, 'Y'))
+    P["interior.gloss"].pipe([c + V3((-0.012, 0, h + 0.01)), c + V3((-0.05, 0, h - 0.02)),
+                              c + V3((-0.062, 0, h - 0.18))], 0.006, 6, up=(0, 1, 0))
+    for z in (0.10, h - 0.12):
+        P["interior.metal"].ring(c + V3((0, 0, z)), 'z', r + 0.004, sec=(0.022, 0.004), n=n)
+
+
+def glass_frame(P, path, ns, mid, closed=False, depth=0.05, flange=0.05, back=0.02,
+                lip=0.004):
+    """A steel frame round a window from inside, the Bastion's slit frames lean (no bolts:
+    the Mule's budget): along path (points on the glass's visible edge, ns each one's
+    normal into the cabin) a sleeve square into the cabin to depth, a flange of flange
+    round it, its outer face back to back inside the glass's plane (sunk into the
+    lining); mid a point inside the glass, which the flange turns away from; lip how far
+    inside the glass the sleeve stops."""
+    path = [V3(p) for p in path]
+    ns = [V3(n).normalized() for n in ns]
+    m = len(path)
+    segs = [(i, (i + 1) % m) for i in range(m if closed else m - 1)]
+    outs = []
+    for i, j in segs:
+        t = (path[j] - path[i]).normalized()
+        o = t.cross((ns[i] + ns[j]).normalized())
+        if o.dot((path[i] + path[j]) / 2 - V3(mid)) < 0:
+            o = -o
+        outs.append(o.normalized())
+    offs = []
+    for k in range(m):
+        before = [o for (i, j), o in zip(segs, outs) if j == k]
+        after = [o for (i, j), o in zip(segs, outs) if i == k]
+        if before and after:                        # mitred
+            s_ = before[0] + after[0]
+            offs.append(s_ * (2.0 / s_.length_squared))
+        else:
+            offs.append((before or after)[0])
+    sec = [(0.0, lip), (0.0, depth), (flange, depth), (flange, back), (0.006, lip)]
+    q = len(sec)
+    vs = [p + o * a + n * d for p, o, n in zip(path, offs, ns) for a, d in sec]
+    fs = [(i * q + c, i * q + (c + 1) % q, j * q + (c + 1) % q, j * q + c)
+          for i, j in segs for c in range(q)]
+    if not closed:
+        fs.append(tuple(reversed(range(q))))
+        fs.append(tuple((m - 1) * q + c for c in range(q)))
+    P["interior"].add(vs, fs)
+
+
 def build_interior():
-    g = Geo()
-    g.box((2.12, 0, 0.94), (1.70, 1.14, 0.04))
-    g.box((1.36, 0, 1.52), (0.04, 1.40, 1.20))
-    g.prism([(3.00, -0.62, 1.10), (3.00, -0.62, 1.46), (2.80, -0.62, 1.49), (2.66, -0.62, 1.40),
-             (2.70, -0.62, 1.10)], (0, 1.24, 0))           # the dash, inside the hull's sides
-    g.box((2.05, 0, 1.06), (0.9, 0.16, 0.24))
-    g.obj("interior.tub", "interior", bevel=0.006)
-    g = Geo()
-    tf = Matrix.Rotation(rad(-10), 3, 'Y')
-    for y in (0.37, -0.37):
-        xs = 1.98
-        g.box((xs, y, 1.14), (0.48, 0.48, 0.14))
-        g.box((xs - 0.30, y, 1.50), (0.12, 0.46, 0.66), rot=tf)
-        g.box((xs - 0.37, y, 1.91), (0.08, 0.26, 0.17), rot=tf)
-        for s in (-1, 1):
-            g.box((xs, y + s * 0.245, 1.17), (0.44, 0.05, 0.16))
-        g.box((xs, y, 1.01), (0.20, 0.20, 0.12))
-    g.obj("interior.seats", "seat", bevel=0.014, segs=3)
-    g = Geo()
-    wheel = (Matrix.Translation((2.50, 0.37, 1.50)) @ Matrix.Rotation(rad(-68), 4, 'Y')
-             @ Matrix.Rotation(pi / 2, 4, 'X'))
-    g.lathe([(-0.014, 0.185), (0.0, 0.20), (0.014, 0.185), (0.0, 0.17)], 8, xf=wheel)
-    g.box((2.60, 0.37, 1.45), (0.24, 0.06, 0.06), rot=Matrix.Rotation(rad(-22), 3, 'Y'))
-    for a in (30, 150, 270):
-        tube(g, wheel @ V3((0, -0.02, 0)), wheel @ V3((0.18 * cos(rad(a)), 0, 0.18 * sin(rad(a)))),
-             0.012, 6)
-    g.obj("interior.wheel", "interior", sharp=40)
-    g = Geo()
-    scr = Matrix.Rotation(rad(-24), 3, 'Y')
-    g.box((2.69, 0.0, 1.53), (0.008, 0.44, 0.17), rot=scr)
-    g.box((2.72, 0.37, 1.60), (0.008, 0.28, 0.07), rot=scr)
-    g.box((2.69, -0.37, 1.53), (0.008, 0.24, 0.13), rot=scr)
-    g.obj("interior.screens", "screen")
+    """The cab (vehicles/cabin.py), a cargo van's, lean on triangles (the Mule stands near the
+    kit's budget: the lining coarser than detail 0, the seats at detail 0 and left
+    unsubdivided, the door cards' panels sampled every 12 cm, no visors or overhead
+    console): a rubber floor high over the front wheels, two upright seats in brown vinyl,
+    a long flat dash under the windshield with the gauge hood (bars, not lettered gauges)
+    and a small route screen, a four-spoke wheel on a bus's flat column, a console box
+    between the seats with a scanner in its dock, door cards with bolted kick plates and
+    bar pulls, grab bars up the door pillars, the windshield and quarter windows in steel
+    frames, a fire extinguisher and a clipboard of manifests on the back wall; the
+    interior views cab_*."""
+    C.materials(carpet=(0.030, 0.031, 0.034), head=(0.26, 0.265, 0.25), soft=(0.06, 0.062, 0.066),
+                trim=(0.115, 0.135, 0.040), trim_metal=0.0, trim_rough=0.45,
+                metal=(0.46, 0.47, 0.48), accent=(0.05, 0.03, 0.015),
+                piping=(0.95, 0.36, 0.01), mat=(0.016, 0.016, 0.018),
+                ambient=(0.30, 0.85, 0.75), ambient_strength=3.0)
+    sb = next(n for n in K.MAT["seat"].node_tree.nodes if n.type == 'BSDF_PRINCIPLED')
+    sb.inputs["Roughness"].default_value = 0.72             # a work vinyl, not a gloss
+    sb.inputs["Specular IOR Level"].default_value = 0.3
+    # the spine on to 20 cm of each end (the Hauler's finding); the lining at detail 0
+    cab = C.Cabin(CAB_X0, CAB_X1, CFLOOR, style="brakk", cap=0.20, detail=0)
+    cab.step = 0.075                    # coarser than detail 0's 55 mm: the Mule's budget
+    lin = cab.lining(smooth=4, zone=cab_zone, wall="interior.head", belt=SILL,
+                     reveal="interior")
+    for v in lin.data.vertices:         # held under the cowl, which the windshield's base meets
+        if v.co.x > 2.80 and v.co.z > 1.38:
+            v.co = cab.keep(v.co, margin=0.03, wells=False)
+    import bmesh                        # the firewall's fill over the cowl's height (ahead of
+    bm = bmesh.new()                    # the glass's base it stood in the open air, which
+    bm.from_mesh(lin.data)              # room() misses): cut off at the cowl
+    zc = 1.43
+    fs = [f for f in bm.faces if f.calc_center_median().x > CAB_X1 - 0.04]
+    geom = list({v for f in fs for v in f.verts}) + list({e for f in fs for e in f.edges}) + fs
+    bmesh.ops.bisect_plane(bm, geom=geom, plane_co=(0, 0, zc), plane_no=(0, 0, 1), dist=1e-6)
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.calc_center_median().x > CAB_X1 - 0.04
+                               and f.calc_center_median().z > zc], context='FACES')
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
+    bm.to_mesh(lin.data)
+    bm.free()
+    for y in (0.40, -0.40):
+        cab.seat((1.95, y, CFLOOR + 0.40), driver=y > 0, rake=15, back=0.60, bolster=0.45,
+                 headrest="post", width=0.50)
+    for ob in cab.objects:              # the upholstery left unsubdivided (the budget): its
+        if ob.name.startswith("interior.seat") and ob.name.endswith((".seat", ".cover")):
+            for md in [m for m in ob.modifiers if m.type == 'SUBSURF']:   # smooth shading
+                ob.modifiers.remove(md)                                    # rounds it off
+    d = cab.dash(depth=0.40, fascia=0.12, knee=0.08, glovebox=False, defrost=False)
+    cab.cluster(graphics="bars")      # bars: lighter than the gauges' lettering
+    cab.screen(graphics="map")
+    cab.wheel(at=(2.42, 0.40, CFLOOR + 0.66), tilt=46, r=0.20)
+    cab.pedals()
+    con = cab.console(x0=1.62, w=0.30, h=0.34, cups=0, switches=0, selector="toggle")
+    pad = cab.pad                       # the door cards' panels on a coarser sampling
+    cab.pad = lambda g, proj, c, w, h, **kw: pad(g, proj, c, w, h, **dict(kw, step=0.12, n=2))
+    cab.door(1.58, 2.44, tag="door", sill_text="MULE", pull="bar", speaker=False,
+             pocket=False, strip=False)
+    cab.pad = pad
+    cab.roof_kit(grabs=None, visors=False)
+    cab.mats(rear=False, ribs=4)
+    P = C._Parts()
+    # bolted kick plates on the doors, grab bars up the door pillars
+    xa, xb = 1.58, 2.44
+    xm = (xa + xb) / 2
+    cab.pad(P["interior.metal"], 'y', (xm, CFLOOR + 0.11), xb - xa - 0.12, 0.12, r=0.01,
+            lift=0.026, n=1, rings=(), step=0.12)
+    wall_bolts(P["interior.gloss"], cab, [(xm + s * (xb - xa - 0.18) / 2, CFLOOR + 0.11)
+                                          for s in (-1, 1)], 0.027)
+    wall_bar(P, cab, (2.56, 1.20), (2.56, 1.85), off=0.05)
+    # the windshield's sides and header and the quarter windows in steel frames (the
+    # lining's reveals at their grazing glass, ragged, inside them)
+    nc = V3((-0.889, 0, -0.458))                    # the windshield's middle, into the cab
+    nk = V3((-0.852, -0.225, -0.473))               # its corner facet
+    glass_frame(P, [(3.01, 0.629, 1.534), (2.664, 0.663, 2.002), (2.705, 0.55, 2.11),
+                    (2.705, 0.0, 2.111)], [nk, nk, nk + nc, nc], (2.85, 0.0, 1.83))
+    A, B, Cq = V3((3.02, 0.68, 1.47)), V3((2.62, 0.72, 2.04)), V3((2.62, 0.80, 1.50))
+    a, b, c = (B - Cq).length, (A - Cq).length, (A - B).length
+    inc = (A * a + B * b + Cq * c) / (a + b + c)    # the triangle's incenter: scaled about it,
+    r = (B - A).cross(Cq - A).length / (a + b + c)  # its edges move in evenly (the frame's
+    k = (r - 0.045) / r                             # 45 mm in the glass)
+    glass_frame(P, [inc.lerp(p, k) for p in (A, B, Cq)], [V3((-0.285, -0.950, -0.127))] * 3,
+                inc, closed=True, depth=0.045, flange=0.03, back=0.03, lip=0.015)
+    cab._emit("hardware", P, mirror=True)
+    P = C._Parts()
+    # the scanner in its dock on the console's top, a clipboard and the extinguisher on the
+    # back wall
+    zt = con["top"]
+    xs = con["x0"] + 0.10
+    P["interior.gloss"].box((xs, 0.0, zt + 0.03), (0.10, 0.12, 0.06))
+    P["interior"].box((xs - 0.005, 0.0, zt + 0.10), (0.05, 0.07, 0.16),
+                      rot=Matrix.Rotation(rad(-10), 3, 'Y'))
+    P["screen.lit"].box((xs + 0.009, 0.0, zt + 0.15), (0.002, 0.05, 0.04),
+                        rot=Matrix.Rotation(rad(-10), 3, 'Y'))
+    p, n = cab.on('X', -0.30, 1.62)
+    P["interior.metal"].box(p + n * 0.006, (0.012, 0.23, 0.32))
+    P["interior.head"].box(p + n * 0.0135 + V3((0, 0, -0.02)), (0.002, 0.21, 0.27))
+    P["interior.gloss"].box(p + n * 0.016 + V3((0, 0, 0.14)), (0.008, 0.08, 0.03))
+    extinguisher(P, (CAB_X0 + 0.07, 0.0, CFLOOR + 0.002), h=0.38, r=0.052)
+    cab._emit("aft", P, one_sided=True)
+    cab.views(exposure=0.6, outside=3.0, daylight=12.0)
+    cab.report()
+    K.meant("symmetry", *cab.one_sided, "interior.roof.*")
 
 
 # ---------------------------------------------------------------------------------------
@@ -1073,7 +1273,7 @@ def main():
     K.meant("symmetry", "cargo.*", "hold.*", "led.hold", "door.*", "box.shell", "box.ribs",
             "bolts.left", "ladder", "ladder.ribs", "underrun", "box.plates", "box.platebolts",
             "markings", "chevrons", "placard.ink", "collar.hoses", "whip", "roof.hatch",
-            "interior.wheel", "interior.screens", "wipers", "wiper.blades", "cooler.louvres",
+            "wipers", "wiper.blades", "cooler.louvres",
             "cooler.blades")
     K.shoot(extra=dict(view="rear", size=(840, 400), corner="tl"))
 

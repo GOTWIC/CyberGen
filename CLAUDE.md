@@ -2540,8 +2540,8 @@ waits for Swagnik's review.
   wheel or yoke, pedals, console, door cards, roof kit, mats, styles per brand, the interior
   views `cab_fwd`, `cab_side`, `cab_back`, `cab_dash`, `cab_in`); `vehicles/README.md`,
   "Cabins". Every car in the cities and the four new ones have one (each folder's
-  `cabin.jpg`) except the Brakk Bastion and Mule, whose unfinished cabins are in a local
-  git stash on the PC (the Mule near the 400,000 triangle budget). The roll-out's car
+  `cabin.jpg`; the Brakk Mule's a lean one, 399,697 triangles in all on Windows, whose
+  tire lettering in Windows' font costs about 2,800 more than the Mac's DIN). The roll-out's car
   scripts carry workarounds for gaps of the module (their reports list them: spine ends
   and `cap`, a windshield split on the centerline, lining through the skin at folds, well
   rims, load floors, glossy studio reflections in the cabin views, cheap seats and door
