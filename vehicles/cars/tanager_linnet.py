@@ -28,11 +28,12 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import bmesh                                                        # noqa: E402
 import carkit as K                                                  # noqa: E402
+import cabin as C                                                   # noqa: E402
 from functools import partial                                       # noqa: E402
 from brands import tanager                                          # noqa: E402
 from brands.tanager import (GD, GLYPH, badge, banner, bar_on, dots, grain, pad,   # noqa: E402
                             rect, rrect, sheet, text_proj)
-from carkit import Geo, Matrix, V3, cos, hypot, pi, rad, sin, stud    # noqa: E402
+from carkit import Geo, Matrix, V3, cos, hypot, rad, stud              # noqa: E402
 
 # ---------------------------------------------------------------------------------------
 # dimensions
@@ -774,77 +775,78 @@ def build_roof():
 # ---------------------------------------------------------------------------------------
 # interior
 # ---------------------------------------------------------------------------------------
+def zone(label, p, n):
+    """The lining's material where the module's rule (head over the belt, trim under it,
+    face by face) would make a saw: the belt (1.02) runs across the cowl under the raked
+    windshield and along the door glass's sills, where the 40 mm faces lean, and the two
+    colors alternated face by face in spikes. So the footwells are carpet up over the wheel
+    wells (as their covers are), the cowl and the pillars' feet the dash's dark trim, and
+    the walls change from trim to headliner 0.9 m up, behind the door cards' upper pads."""
+    if label == "fill":         # behind a wheel well (the module's default there is trim,
+        return "interior.carpet"    # and its faces peeked round the covers in grey)
+    if p is None or n is None or label in ("floor", "fire", "well"):
+        return None
+    if p.x > 0.80 and p.z < 0.82:
+        return "interior.carpet"
+    if p.x > 0.86 and p.z < 1.16:
+        return "interior"
+    return "interior.head" if p.z > 0.90 else "interior"
+
+
 def build_interior():
-    """The cabin tub, kept inside the hull and out of the wheel wells (the wells' walls
-    at WELL_Y, their arches up to 0.73 m): beside the wells only its middle reaches down."""
+    """The cabin (vehicles/cabin.py): a lined box from the firewall to the hatch (the rear
+    wheel wells come up beside the boot, covered), two front seats, a rear bench for three,
+    a parcel shelf over the boot, a plain dash in dark grey with a marigold inlay (the
+    paint's), charcoal seat inserts with marigold piping, a two-spoke wheel, door cards
+    front and rear with LINNET on the sills, the roof's kit; the interior views cab_*."""
+    C.materials(head=(0.30, 0.30, 0.29), soft=(0.12, 0.12, 0.125),
+                trim=(0.80, 0.37, 0.0), carpet=(0.025, 0.025, 0.028),
+                accent=(0.055, 0.055, 0.06), piping=(0.85, 0.42, 0.02),
+                ambient=(1.0, 0.58, 0.18))
+    # the firewall at the cowl, just ahead of the windshield's base (behind it, the plane cut
+    # the glass's reveal into spikes); the spine runs on to 4 cm from it: with the module's
+    # 0.45 m the windshield's base, the A-pillars' feet and the footwells all lay in the
+    # front pole's fan, 9 degrees a ray, and came out torn
+    cab = C.Cabin(-2.0, 1.21, 0.25, rear="body", style="tanager", shell=("visor.back.*",),
+                  cap=0.04)
+    cab.step = 0.03         # the lining's grid at detail 2's 30 mm (seats stay at detail 1):
+    #                         the narrow pillar between the quarter light and the door glass
+    cab.lining(smooth=5, zone=zone)
+    cab.seat((0.12, 0.37, 0.60), driver=True)
+    cab.seat((0.12, -0.37, 0.60))
+    cab.seat((-0.74, 0.0, 0.60), places=3, width=1.30)
+    cab.dash(tuck=0.0)                  # the top pad meets the raked glass, no strip of cowl
+    cab.cluster()
+    cab.screen()
+    cab.wheel(tilt=30)
+    cab.pedals(x=0.92)
+    cab.console(h=0.14)
+    cab.door(-0.10, 0.90, tag="door_f", sill_text="LINNET")
+    cab.door(-0.86, -0.14, tag="door_r", sill=False)
+    cab.shelf(-1.95, -1.12, 0.94)
+    cab.roof_kit()
+    cab.mats()
+    # a trim over the narrow pillar between the quarter light and the door glass (the
+    # lining there is a sliver between two reveals, with gaps)
     g = Geo()
-    yi = WELL_Y - 0.012
-    g.box((-0.43, 0, 0.235), (2.84, 2 * yi, 0.03))                  # floor, its middle
-    g.box((0.02, 0, 0.235), (1.84, 1.56, 0.03))                     # floor between the wells
-    g.prism([(x, -0.78, z) for x, z in ((0.99, 0.25), (0.99, 0.80), (0.78, 0.80), (0.80, 0.25))],
-            (0, 1.56, 0))                                           # firewall
-    dash = [(1.17, 0.78), (1.17, 0.995), (0.90, 1.005), (0.76, 0.95), (0.80, 0.78)]
-    g.prism([(x, -0.75, z) for x, z in dash], (0, 1.50, 0))        # dash
-    for sg in (1, -1):
-        g.box((0.02, sg * 0.795, 0.60), (1.84, 0.02, 0.68))         # door cards
-        g.box((-1.385, sg * 0.785, 0.86), (0.95, 0.02, 0.16))       # quarter cards
-        g.box((-1.385, sg * (yi + 0.785) / 2, 0.775), (0.95, 0.785 - yi, 0.02))    # well tops
-    g.box((-1.50, 0, 0.935), (0.72, 1.50, 0.02))                    # parcel shelf
-    g.box((-1.86, 0, 0.60), (0.03, 2 * yi, 0.68))                   # the boot's back
-    g.box((-1.14, 0, 0.60), (0.03, 2 * yi, 0.66))                   # the boot's wall
-    g.box((0.30, 0, 0.36), (0.62, 0.17, 0.20))                      # a low console
-    g.obj("interior.tub", "interior", bevel=0.006)
-    g = Geo()
-    tf, tr = Matrix.Rotation(rad(-16), 3, 'Y'), Matrix.Rotation(rad(-14), 3, 'Y')
-    for y in (0.39, -0.39):
-        g.box((0.27, y, 0.47), (0.50, 0.50, 0.13))
-        g.box((-0.02, y, 0.83), (0.11, 0.48, 0.62), rot=tf)
-        g.box((-0.125, y, 1.215), (0.075, 0.25, 0.16), rot=tf)
-    g.box((-0.715, 0, 0.47), (0.43, 1.38, 0.13))                    # the bench, in front of
-    g.box((-0.976, 0, 0.645), (0.11, 0.96, 0.25), rot=tr)           # the wells; its back
-    g.box((-1.05, 0, 0.94), (0.11, 1.38, 0.37), rot=tr)             # narrow between them
-    for y in (0.46, 0.0, -0.46):
-        g.box((-1.105, y, 1.185), (0.07, 0.24, 0.14), rot=tr)
-    g.obj("interior.seats", "seat", bevel=0.022, segs=3)
-    g = Geo()
-    wheel = (Matrix.Translation((0.66, 0.39, 0.985)) @ Matrix.Rotation(rad(-62), 4, 'Y')
-             @ Matrix.Rotation(pi / 2, 4, 'X'))
-    g.lathe([(-0.012, 0.170), (0.0, 0.183), (0.012, 0.170), (0.0, 0.157)], 28, xf=wheel)
-    for a in (0, 180, 270):
-        g.tube(wheel @ V3((0, -0.02, 0)), wheel @ V3((0.165 * cos(rad(a)), 0, 0.165 * sin(rad(a)))),
-               0.011, 6)
-    g.box((0.76, 0.39, 0.94), (0.20, 0.05, 0.05), rot=Matrix.Rotation(rad(-28), 3, 'Y'))
-    g.obj("interior.wheel", "interior", sharp=40)
-    g = Geo()
-    scr = Matrix.Rotation(rad(-16), 3, 'Y')
-    g.box((0.77, 0.10, 1.045), (0.004, 0.34, 0.088), rot=scr)
-    g.box((0.80, 0.39, 1.035), (0.004, 0.20, 0.052), rot=scr)
-    g.obj("interior.screens", "screen")
-    g = Geo()                                   # their bezels, the map's blocks and a route
-    g.box((0.774, 0.10, 1.045), (0.012, 0.37, 0.112), rot=scr)
-    g.box((0.804, 0.39, 1.035), (0.012, 0.225, 0.07), rot=scr)
-    for y, z, a, b in ((0.21, 1.058, 0.07, 0.03), (0.215, 1.022, 0.06, 0.018),
-                       (0.105, 1.065, 0.09, 0.02), (0.02, 1.03, 0.11, 0.03),
-                       (-0.035, 1.07, 0.05, 0.02), (0.44, 1.04, 0.05, 0.022),
-                       (0.345, 1.03, 0.07, 0.03)):
-        g.box((0.7672 + (0.03 if y > 0.3 else 0.0) - (z - 1.045) * 0.287, y, z), (0.002, a, b),
-              rot=scr)
-    g.obj("interior.bezels", "interior", bevel=0.002)
-    g = Geo()                                   # ceiling lights, so the cabin reads
-    for x in (0.20, -0.80):
-        g.box((x, 0, 1.459), (0.30, 0.16, 0.008))
-    g.obj("interior.dome", "dome")
-    # the headliner, and trims inside the pillars and along the rails over and under the
-    # windows (the glass leans in 11 degrees: so do they)
-    g = Geo()
-    g.box((-0.37, 0, 1.469), (1.84, 1.12, 0.012))
-    for sg in (1, -1):
-        lean = Matrix.Rotation(sg * rad(11.4), 3, 'X')
-        for x, w in ((-0.12, 0.13), (-0.88, 0.13)):
-            g.box((x, sg * 0.7385, 1.20), (w, 0.016, 0.47), rot=lean)
-        g.box((-0.335, sg * 0.697, 1.41), (1.77, 0.016, 0.05), rot=lean)
-        g.box((-0.04, sg * 0.784, 0.968), (1.88, 0.016, 0.045), rot=lean)
-    g.obj("interior.trim", "headliner", bevel=0.004)
+    a, b = V3((0.872, 0, 0.985)), V3((0.636, 0, 1.40))
+    ax = (b - a).normalized()
+    ac = V3((ax.z, 0, -ax.x))
+    rows = []
+    for k in range(9):
+        c = a.lerp(b, k / 8)
+        row = []
+        for t in (-0.026, -0.018, 0.018, 0.026):
+            q = c + ac * t
+            p, n = cab.wall(q.x, q.z, 1)
+            row.append(p + n * (0.004 if abs(t) > 0.02 else 0.009))
+        rows.append(row)
+    g.add([p for r in rows for p in r], [(i * 4 + j, i * 4 + j + 1, i * 4 + j + 5, i * 4 + j + 4)
+                                        for i in range(8) for j in range(3)])
+    cab._obj(g, "pillar_trim", "interior.head", mirror=True)
+    cab.views(exposure=-0.4, outside=2.0, daylight=8.0)
+    cab.report()
+    K.meant("symmetry", *cab.one_sided, "interior.seat2.*")     # a bench for three: its belts
     # the parking permit behind the windshield, on the right
     w = W_FRONT
     c = w.at(-0.43, 1.15, -GD - 0.012)
@@ -882,7 +884,7 @@ def main():
                 paint2=(0.80, 0.78, 0.72), paint2_finish="gloss",
                 dust_amount=0.3, glass=(0.42, 0.47, 0.50),
                 led_front=(1.0, 0.90, 0.72), led_accent=(1.0, 0.42, 0.03),
-                caliper=(0.95, 0.62, 0.03), seat=(0.40, 0.385, 0.35),
+                caliper=(0.95, 0.62, 0.03), seat=(0.30, 0.29, 0.265),
                 interior=(0.05, 0.05, 0.055), decal=(0.045, 0.045, 0.05),
                 screen=(0.30, 0.95, 0.70))
     grain("plastic", (0.040, 0.042, 0.046))
@@ -892,15 +894,13 @@ def main():
     K.pbr("mark", (0.03, 0.032, 0.036), 0.0, 0.5)
     K.pbr("visor", (0.006, 0.006, 0.008), 0.0, 0.12)        # gloss black with no coat
     K.pbr("panel", (0.018, 0.026, 0.034), 0.0, 0.28)
-    K.pbr("headliner", (0.46, 0.45, 0.42), 0.0, 0.85)
     K.pbr("roofglass", (0.010, 0.012, 0.016), 0.0, 0.04, **{"Coat Weight": 1.0})
     K.pbr("reflector", (0.55, 0.01, 0.008), 0.0, 0.15, **{"Coat Weight": 1.0})
-    K.emit("dome", (1.0, 0.93, 0.82), 50.0)
     K.emit("pixel", (0.30, 1.0, 0.72), 36.0)
     K.emit("pixel_r", (1.0, 0.50, 0.08), 36.0)
     K.need("lamp_housing", "chrome", "lens_clear", "lens_smoke", "lens_red", "lens_amber",
            "optic", "frit", "mirror")
-    K.meant("symmetry", "interior.wheel", "interior.screens", "interior.bezels", "tow.*", "wipers*",
+    K.meant("symmetry", "tow.*", "wipers*",
             "permit*", "display*", "pixels*", "charge.*", "body.fender", "roof.number",
             "lettering.*", "roundel.number", "plate.glyphs.*", "badge.t.*", "hatch.camera")
     build_hull()

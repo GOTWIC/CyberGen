@@ -6,7 +6,7 @@
   2.697
  ],
  "top_z": 2.69,
- "objects": 210,
+ "objects": 270,
  "palette": {
   "paint": [
    0.07,
@@ -26,16 +26,16 @@
   "wheels": [
    {
     "tag": "fl",
-    "clearance_mm": 0.0,
-    "nearest": "interior.tub",
+    "clearance_mm": 53.0,
+    "nearest": "body.well",
     "at": [
-     2.035,
-     0.87,
-     0.399
+     2.1,
+     0.772,
+     0.342
     ],
     "foot_mm": -7.0,
-    "steer_hits": "interior.tub",
-    "steer_deg": 0,
+    "steer_hits": "body.well",
+    "steer_deg": 15,
     "verdict": "fail"
    },
    {
@@ -52,16 +52,16 @@
    },
    {
     "tag": "fr",
-    "clearance_mm": 0.0,
-    "nearest": "interior.tub",
+    "clearance_mm": 53.0,
+    "nearest": "body.well",
     "at": [
-     2.035,
-     -0.87,
-     0.399
+     2.1,
+     -0.824,
+     0.342
     ],
     "foot_mm": -7.0,
-    "steer_hits": "interior.tub",
-    "steer_deg": 0,
+    "steer_hits": "body.well",
+    "steer_deg": 15,
     "verdict": "fail"
    },
    {
@@ -87,29 +87,51 @@
  "symmetry": {
   "verdict": "look",
   "center_off_mm": 23.9,
-  "objects": 87,
+  "objects": 77,
   "asymmetric": [
    {
-    "object": "interior.seats",
+    "object": "interior.seat0.cover",
     "off_mm": 500.0,
     "at": [
-     0.774,
-     -0.339,
-     1.368
-    ]
+     0.732,
+     -0.352,
+     0.981
+    ],
+    "meant": true
    },
    {
-    "object": "interior.belts",
-    "off_mm": 386.7,
+    "object": "interior.door.soft.r",
+    "off_mm": 374.7,
     "at": [
-     0.745,
-     -0.63,
-     1.342
-    ]
+     0.75,
+     -0.904,
+     0.882
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat0.metal",
+    "off_mm": 371.4,
+    "at": [
+     0.763,
+     -0.631,
+     1.026
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.door.ambient.r",
+    "off_mm": 366.8,
+    "at": [
+     0.75,
+     -0.876,
+     0.876
+    ],
+    "meant": true
    },
    {
     "object": "seal.door.r",
-    "off_mm": 356.7,
+    "off_mm": 364.0,
     "at": [
      0.771,
      -0.93,
@@ -118,16 +140,16 @@
    },
    {
     "object": "roundel.r",
-    "off_mm": 356.6,
+    "off_mm": 363.2,
     "at": [
-     0.772,
+     0.773,
      -0.932,
-     0.774
+     0.786
     ]
    },
    {
     "object": "body.slider",
-    "off_mm": 355.3,
+    "off_mm": 362.4,
     "at": [
      0.771,
      -0.926,
@@ -135,8 +157,28 @@
     ]
    },
    {
+    "object": "interior.door.interior.r",
+    "off_mm": 362.0,
+    "at": [
+     0.758,
+     -0.887,
+     0.866
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat0.seat",
+    "off_mm": 361.9,
+    "at": [
+     0.563,
+     -0.408,
+     1.451
+    ],
+    "meant": true
+   },
+   {
     "object": "glass.door.r",
-    "off_mm": 354.1,
+    "off_mm": 361.1,
     "at": [
      0.771,
      -0.922,
@@ -144,17 +186,58 @@
     ]
    },
    {
-    "object": "interior.wheel",
-    "off_mm": 350.9,
+    "object": "interior.lining",
+    "off_mm": 356.9,
     "at": [
-     1.608,
-     -0.251,
-     1.12
-    ]
+     0.767,
+     -0.9,
+     0.804
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.door.metal.r",
+    "off_mm": 354.4,
+    "at": [
+     0.734,
+     -0.887,
+     0.878
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat0.belt",
+    "off_mm": 353.8,
+    "at": [
+     0.781,
+     -0.632,
+     0.975
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat0.interior",
+    "off_mm": 352.0,
+    "at": [
+     0.813,
+     -0.187,
+     0.796
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat0.red",
+    "off_mm": 348.1,
+    "at": [
+     0.789,
+     -0.183,
+     0.792
+    ],
+    "meant": true
    },
    {
     "object": "locker.hatch.open",
-    "off_mm": 332.5,
+    "off_mm": 333.9,
     "at": [
      -1.584,
      1.243,
@@ -162,17 +245,18 @@
     ]
    },
    {
-    "object": "lettering.door.r",
-    "off_mm": 312.9,
+    "object": "interior.door.gloss.r",
+    "off_mm": 329.3,
     "at": [
-     0.72,
-     -0.931,
-     0.618
-    ]
+     0.788,
+     -0.872,
+     0.852
+    ],
+    "meant": true
    },
    {
     "object": "locker.hatch.liner",
-    "off_mm": 306.3,
+    "off_mm": 306.7,
     "at": [
      -1.588,
      1.217,
@@ -181,21 +265,91 @@
    },
    {
     "object": "roundel.number.r",
-    "off_mm": 294.2,
+    "off_mm": 306.4,
     "at": [
-     0.84,
+     0.837,
      -0.934,
-     0.759
+     0.764
     ]
    },
    {
-    "object": "body.sclad",
-    "off_mm": 254.0,
+    "object": "interior.wheel.soft",
+    "off_mm": 300.9,
     "at": [
-     0.717,
+     1.376,
+     -0.281,
+     1.212
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat1.cover",
+    "off_mm": 294.9,
+    "at": [
+     1.737,
+     0.6,
+     1.343
+    ],
+    "meant": true
+   },
+   {
+    "object": "lettering.door.r",
+    "off_mm": 294.5,
+    "at": [
+     0.651,
      -0.931,
-     0.559
+     0.81
     ]
+   },
+   {
+    "object": "interior.wheel.interior",
+    "off_mm": 270.6,
+    "at": [
+     1.346,
+     -0.272,
+     1.168
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.gloss",
+    "off_mm": 239.2,
+    "at": [
+     1.349,
+     -0.329,
+     1.162
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.lit",
+    "off_mm": 228.7,
+    "at": [
+     1.344,
+     -0.341,
+     1.155
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.door.lit.r",
+    "off_mm": 227.7,
+    "at": [
+     0.891,
+     -0.862,
+     0.858
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.door.grille.r",
+    "off_mm": 227.6,
+    "at": [
+     0.913,
+     -0.908,
+     0.663
+    ],
+    "meant": true
    },
    {
     "object": "parcels.kraft",
@@ -216,30 +370,32 @@
     ]
    },
    {
+    "object": "interior.wheel.metal",
+    "off_mm": 217.2,
+    "at": [
+     1.348,
+     -0.45,
+     1.165
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.mats.mat",
+    "off_mm": 203.0,
+    "at": [
+     1.899,
+     -0.246,
+     0.428
+    ],
+    "meant": true
+   },
+   {
     "object": "parcels.tape",
     "off_mm": 200.0,
     "at": [
      -1.999,
      -0.635,
      2.009
-    ]
-   },
-   {
-    "object": "interior.tub",
-    "off_mm": 195.0,
-    "at": [
-     0.826,
-     -0.654,
-     0.62
-    ]
-   },
-   {
-    "object": "interior.dash.gear",
-    "off_mm": 193.8,
-    "at": [
-     1.641,
-     -0.431,
-     1.071
     ]
    },
    {
@@ -279,6 +435,26 @@
     ]
    },
    {
+    "object": "interior.seat1.belt",
+    "off_mm": 171.0,
+    "at": [
+     1.644,
+     0.732,
+     1.251
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.seat1.metal",
+    "off_mm": 166.4,
+    "at": [
+     1.615,
+     0.731,
+     1.154
+    ],
+    "meant": true
+   },
+   {
     "object": "rack.straps",
     "off_mm": 163.2,
     "at": [
@@ -294,159 +470,6 @@
      -0.97,
      -0.682,
      1.374
-    ]
-   },
-   {
-    "object": "bump.strip.door.r",
-    "off_mm": 142.4,
-    "at": [
-     0.853,
-     -0.947,
-     0.445
-    ]
-   },
-   {
-    "object": "parcels.ink",
-    "off_mm": 138.0,
-    "at": [
-     -0.97,
-     -0.697,
-     1.389
-    ]
-   },
-   {
-    "object": "handtruck.frame",
-    "off_mm": 129.7,
-    "at": [
-     -0.86,
-     -1.048,
-     0.24
-    ]
-   },
-   {
-    "object": "bump.lines.door.r",
-    "off_mm": 128.5,
-    "at": [
-     0.668,
-     -0.952,
-     0.43
-    ]
-   },
-   {
-    "object": "interior.screens",
-    "off_mm": 119.1,
-    "at": [
-     1.995,
-     -0.29,
-     1.199
-    ]
-   },
-   {
-    "object": "handle.pocket.r",
-    "off_mm": 110.2,
-    "at": [
-     1.061,
-     -0.931,
-     0.832
-    ]
-   },
-   {
-    "object": "body.slider.l",
-    "off_mm": 99.0,
-    "at": [
-     0.181,
-     1.022,
-     1.141
-    ]
-   },
-   {
-    "object": "handle.pull.l",
-    "off_mm": 95.0,
-    "at": [
-     0.207,
-     1.025,
-     0.873
-    ]
-   },
-   {
-    "object": "locker.cell",
-    "off_mm": 93.0,
-    "at": [
-     -1.518,
-     0.54,
-     1.177
-    ]
-   },
-   {
-    "object": "track.arm.l",
-    "off_mm": 91.4,
-    "at": [
-     -0.622,
-     1.019,
-     0.974
-    ]
-   },
-   {
-    "object": "locker.parcel.kraft",
-    "off_mm": 91.0,
-    "at": [
-     -1.458,
-     0.607,
-     1.179
-    ]
-   },
-   {
-    "object": "seal.door.l",
-    "off_mm": 88.8,
-    "at": [
-     -0.193,
-     1.015,
-     1.044
-    ]
-   },
-   {
-    "object": "roundel.number.l",
-    "off_mm": 88.6,
-    "at": [
-     -0.014,
-     1.019,
-     0.806
-    ]
-   },
-   {
-    "object": "handle.pull.r",
-    "off_mm": 88.2,
-    "at": [
-     1.084,
-     -0.94,
-     0.8
-    ]
-   },
-   {
-    "object": "handtruck.toe",
-    "off_mm": 88.2,
-    "at": [
-     -0.828,
-     -1.003,
-     0.246
-    ]
-   },
-   {
-    "object": "roundel.l",
-    "off_mm": 87.6,
-    "at": [
-     -0.014,
-     1.017,
-     0.882
-    ]
-   },
-   {
-    "object": "lettering.door.l",
-    "off_mm": 86.2,
-    "at": [
-     -0.394,
-     1.016,
-     0.808
     ]
    }
   ]
@@ -507,6 +530,7 @@
   ],
   "open_mm": 4209,
   "cutter_holes": [],
+  "cut_loops": 0,
   "pieces": {
    "body": {
     "closed": true,
@@ -517,6 +541,17 @@
  "through": {
   "verdict": "look",
   "parts": [
+   {
+    "object": "interior.lining",
+    "out_mm": 121.0,
+    "share": 0.02,
+    "at": [
+     0.627,
+     0.883,
+     0.424
+    ],
+    "meant": true
+   },
    {
     "object": "interior.liner",
     "out_mm": 91.8,
@@ -529,42 +564,42 @@
     "meant": false
    },
    {
-    "object": "interior.tub",
-    "out_mm": 63.6,
-    "share": 0.09,
+    "object": "interior.lining.door",
+    "out_mm": 34.4,
+    "share": 0.12,
     "at": [
-     2.144,
-     -0.898,
-     0.202
+     0.237,
+     0.929,
+     1.877
     ],
-    "meant": false
+    "meant": true
    },
    {
-    "object": "interior.card.l",
-    "out_mm": 35.5,
-    "share": 0.25,
+    "object": "interior.kick.l",
+    "out_mm": 34.0,
+    "share": 0.82,
     "at": [
-     0.274,
-     0.975,
-     0.336
+     -0.517,
+     0.966,
+     0.3
     ],
-    "meant": false
+    "meant": true
    },
    {
-    "object": "interior.rails",
-    "out_mm": 17.6,
-    "share": 0.35,
+    "object": "interior.stepwell.interior",
+    "out_mm": 13.8,
+    "share": 0.17,
     "at": [
-     0.38,
-     0.816,
-     2.0
+     1.158,
+     0.921,
+     0.425
     ],
-    "meant": false
+    "meant": true
    },
    {
     "object": "interior.mat",
     "out_mm": 7.9,
-    "share": 0.25,
+    "share": 0.5,
     "at": [
      -2.61,
      -0.85,
@@ -573,11 +608,11 @@
     "meant": false
    }
   ],
-  "count": 5
+  "count": 2
  },
  "triangles": {
   "verdict": "ok",
-  "total": 314760,
+  "total": 345483,
   "budget": 400000,
   "top": [
    [
@@ -605,30 +640,34 @@
     10904
    ],
    [
-    "locker.hatches",
-    8404
+    "interior.lining",
+    10131
    ],
    [
-    "seal.ends",
-    6960
+    "locker.hatches",
+    8404
    ]
   ],
   "groups": [
    [
     "body",
-    64742
+    64685
    ],
    [
     "tire",
     57536
    ],
    [
+    "interior",
+    37603
+   ],
+   [
     "lettering",
-    21860
+    21955
    ],
    [
     "locker",
-    19264
+    19257
    ],
    [
     "seal",
@@ -641,10 +680,6 @@
    [
     "cover",
     10272
-   ],
-   [
-    "led",
-    10240
    ]
   ]
  },

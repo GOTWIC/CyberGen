@@ -6,7 +6,7 @@
   1.948
  ],
  "top_z": 1.941,
- "objects": 165,
+ "objects": 233,
  "palette": {
   "paint": [
    0.37,
@@ -87,7 +87,7 @@
  "symmetry": {
   "verdict": "look",
   "center_off_mm": 78.0,
-  "objects": 39,
+  "objects": 40,
   "asymmetric": [
    {
     "object": "body.slider",
@@ -126,6 +126,56 @@
     ]
    },
    {
+    "object": "interior.lining",
+    "off_mm": 500.0,
+    "at": [
+     0.062,
+     -0.872,
+     1.038
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.door.interior.r",
+    "off_mm": 500.0,
+    "at": [
+     0.049,
+     -0.882,
+     1.014
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.door.soft.r",
+    "off_mm": 500.0,
+    "at": [
+     0.068,
+     -0.88,
+     0.998
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.door.metal.r",
+    "off_mm": 484.3,
+    "at": [
+     -0.022,
+     -0.857,
+     0.86
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.door.ambient.r",
+    "off_mm": 476.4,
+    "at": [
+     0.01,
+     -0.844,
+     0.856
+    ],
+    "meant": true
+   },
+   {
     "object": "roundel.r",
     "off_mm": 458.2,
     "at": [
@@ -135,21 +185,41 @@
     ]
    },
    {
-    "object": "roundel.number.r",
-    "off_mm": 392.9,
+    "object": "interior.door.gloss.r",
+    "off_mm": 455.7,
     "at": [
-     0.144,
+     0.098,
+     -0.842,
+     0.834
+    ],
+    "meant": true
+   },
+   {
+    "object": "roundel.number.r",
+    "off_mm": 398.4,
+    "at": [
+     0.153,
      -0.904,
-     0.74
+     0.746
     ]
    },
    {
-    "object": "lettering.door.r",
-    "off_mm": 353.0,
+    "object": "interior.door.lit.r",
+    "off_mm": 374.9,
     "at": [
-     -0.228,
+     0.201,
+     -0.832,
+     0.834
+    ],
+    "meant": true
+   },
+   {
+    "object": "lettering.door.r",
+    "off_mm": 355.9,
+    "at": [
+     -0.225,
      -0.901,
-     0.724
+     0.729
     ]
    },
    {
@@ -171,10 +241,20 @@
     ]
    },
    {
+    "object": "interior.door.grille.r",
+    "off_mm": 272.6,
+    "at": [
+     0.326,
+     -0.877,
+     0.628
+    ],
+    "meant": true
+   },
+   {
     "object": "step.ribs",
     "off_mm": 257.8,
     "at": [
-     -0.49,
+     0.51,
      1.129,
      0.176
     ]
@@ -192,34 +272,34 @@
     "object": "checker.molded.door.r",
     "off_mm": 188.9,
     "at": [
-     0.451,
+     -0.209,
      -0.912,
      0.501
     ]
    },
    {
     "object": "handle.pocket.r",
-    "off_mm": 150.2,
+    "off_mm": 149.0,
     "at": [
      0.491,
      -0.901,
-     0.683
+     0.747
     ]
    },
    {
     "object": "handle.pull.r",
-    "off_mm": 128.1,
+    "off_mm": 126.5,
     "at": [
      0.513,
      -0.91,
-     0.781
+     0.715
     ]
    },
    {
     "object": "bump.strip.door.r",
     "off_mm": 123.9,
     "at": [
-     -0.33,
+     -0.09,
      -0.917,
      0.435
     ]
@@ -237,7 +317,7 @@
     "object": "bump.strip.door.l",
     "off_mm": 119.6,
     "at": [
-     -1.2,
+     -1.8,
      1.011,
      0.431
     ]
@@ -253,11 +333,11 @@
    },
    {
     "object": "lettering.door.l",
-    "off_mm": 114.1,
+    "off_mm": 114.4,
     "at": [
      -1.238,
      0.991,
-     0.567
+     0.568
     ]
    },
    {
@@ -273,18 +353,9 @@
     "object": "bump.lines.door.r",
     "off_mm": 110.2,
     "at": [
-     0.488,
+     0.448,
      -0.922,
      0.42
-    ]
-   },
-   {
-    "object": "seal.door.l",
-    "off_mm": 109.7,
-    "at": [
-     -1.753,
-     0.95,
-     1.341
     ]
    },
    {
@@ -294,6 +365,15 @@
      -1.258,
      0.99,
      0.602
+    ]
+   },
+   {
+    "object": "seal.door.l",
+    "off_mm": 105.7,
+    "at": [
+     -1.753,
+     0.95,
+     1.341
     ]
    },
    {
@@ -309,14 +389,14 @@
     "object": "handle.pull.l",
     "off_mm": 100.0,
     "at": [
-     -0.739,
+     -0.748,
      1.0,
-     0.715
+     0.678
     ]
    },
    {
     "object": "glass.door.l",
-    "off_mm": 98.6,
+    "off_mm": 94.6,
     "at": [
      -1.77,
      0.918,
@@ -327,9 +407,9 @@
     "object": "roundel.number.l",
     "off_mm": 93.6,
     "at": [
-     -1.087,
+     -1.096,
      0.994,
-     0.736
+     0.742
     ]
    },
    {
@@ -345,100 +425,39 @@
     "object": "roundel.l",
     "off_mm": 92.6,
     "at": [
-     -1.159,
+     -1.172,
      0.992,
-     0.807
+     0.799
     ]
+   },
+   {
+    "object": "interior.lining.door",
+    "off_mm": 92.0,
+    "at": [
+     -1.767,
+     0.964,
+     0.562
+    ],
+    "meant": true
    },
    {
     "object": "handle.pocket.l",
     "off_mm": 90.8,
     "at": [
-     -0.779,
+     -0.778,
      0.991,
-     0.715
+     0.75
     ]
    },
    {
-    "object": "interior.card.l",
-    "off_mm": 75.5,
+    "object": "interior.door.interior.l",
+    "off_mm": 82.3,
     "at": [
-     -1.864,
-     0.972,
-     0.984
-    ]
-   },
-   {
-    "object": "antenna",
-    "off_mm": 56.6,
-    "at": [
-     -1.788,
-     -0.304,
-     1.825
-    ]
-   },
-   {
-    "object": "track.arm.r",
-    "off_mm": 56.3,
-    "at": [
-     -0.565,
-     -0.9,
-     0.974
-    ]
-   },
-   {
-    "object": "tow.eye",
-    "off_mm": 55.2,
-    "at": [
-     2.25,
-     -0.4,
-     0.249
-    ]
-   },
-   {
-    "object": "interior.tub",
-    "off_mm": 28.8,
-    "at": [
-     0.614,
-     -0.868,
-     0.99
-    ]
-   },
-   {
-    "object": "wipers",
-    "off_mm": 25.8,
-    "at": [
-     -2.177,
-     0.205,
-     1.156
-    ]
-   },
-   {
-    "object": "permit",
-    "off_mm": 14.0,
-    "at": [
-     2.005,
-     -0.455,
-     1.202
-    ]
-   },
-   {
-    "object": "permit.text",
-    "off_mm": 11.2,
-    "at": [
-     2.035,
-     -0.483,
-     1.161
-    ]
-   },
-   {
-    "object": "permit.mark",
-    "off_mm": 11.2,
-    "at": [
-     2.027,
-     -0.462,
-     1.173
-    ]
+     -1.213,
+     0.952,
+     0.551
+    ],
+    "meant": true
    }
   ]
  },
@@ -447,11 +466,11 @@
   "open_edges": [
    {
     "panel": "body.clad",
-    "length_mm": 1759,
+    "length_mm": 1434,
     "at": [
-     0.01,
-     0.907,
-     0.42
+     0.011,
+     0.902,
+     0.312
     ],
     "meant": false
    },
@@ -467,27 +486,28 @@
    },
    {
     "panel": "body.fender",
-    "length_mm": 1110,
+    "length_mm": 67,
     "at": [
      0.641,
-     0.878,
-     1.055
+     0.82,
+     1.618
     ],
     "meant": false
    },
    {
     "panel": "body.quarter",
-    "length_mm": 1110,
+    "length_mm": 67,
     "at": [
      -0.621,
-     0.878,
-     1.055
+     0.82,
+     1.618
     ],
     "meant": false
    }
   ],
-  "open_mm": 5239,
+  "open_mm": 2828,
   "cutter_holes": [],
+  "cut_loops": 0,
   "pieces": {
    "body": {
     "closed": true,
@@ -496,27 +516,53 @@
   }
  },
  "through": {
-  "verdict": "look",
+  "verdict": "ok",
   "parts": [
    {
-    "object": "interior.card.l",
-    "out_mm": 37.0,
-    "share": 0.21,
+    "object": "interior.door.interior.l",
+    "out_mm": 54.4,
+    "share": 0.02,
     "at": [
-     -0.656,
-     0.952,
-     0.326
+     -1.825,
+     0.943,
+     0.354
     ],
-    "meant": false
+    "meant": true
+   },
+   {
+    "object": "interior.lining.door",
+    "out_mm": 45.1,
+    "share": 0.24,
+    "at": [
+     -1.732,
+     0.938,
+     0.321
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.jambs.interior",
+    "out_mm": 17.9,
+    "share": 0.37,
+    "at": [
+     0.64,
+     0.795,
+     1.575
+    ],
+    "meant": true
    }
   ],
-  "count": 1
+  "count": 0
  },
  "triangles": {
   "verdict": "ok",
-  "total": 285996,
+  "total": 347270,
   "budget": 400000,
   "top": [
+   [
+    "interior.lining",
+    22990
+   ],
    [
     "tire.fl",
     14384
@@ -544,13 +590,13 @@
    [
     "checker.molded",
     7560
-   ],
-   [
-    "body.roof",
-    7104
    ]
   ],
   "groups": [
+   [
+    "interior",
+    70381
+   ],
    [
     "tire",
     57536
@@ -561,7 +607,7 @@
    ],
    [
     "lettering",
-    26474
+    23961
    ],
    [
     "checker",
@@ -578,10 +624,6 @@
    [
     "cover",
     10272
-   ],
-   [
-    "led",
-    8332
    ]
   ]
  },

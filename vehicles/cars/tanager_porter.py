@@ -30,6 +30,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import bmesh                                                        # noqa: E402
 import bpy                                                          # noqa: E402
 import carkit as K                                                  # noqa: E402
+import cabin as C                                                   # noqa: E402
 from carkit import (Geo, Matrix, V3, atan2, cos, hypot, on_body, pi, rad, sin,    # noqa: E402
                     stud)
 
@@ -1171,91 +1172,189 @@ def build_drone(cx, z):
 # ---------------------------------------------------------------------------------------
 # inside: a walk-through cab with a low step, the driver on the off side; the hold
 # ---------------------------------------------------------------------------------------
+def split_mirror(ob):
+    """A part the cabin built on the left wall and mirrored, as two objects: the left one
+    (the data as built), which slides with the open door, and the right one (the data
+    mirrored in y). Returns the left one."""
+    left = ob.copy()
+    left.data = ob.data.copy()
+    K.CAR.objects.link(left)
+    left.modifiers.remove(left.modifiers["mirror"])
+    left.name = ob.name + ".l"
+    ob.data.transform(Matrix.Scale(-1.0, 4, (0, 1, 0)))
+    ob.data.flip_normals()
+    ob.modifiers.remove(ob.modifiers["mirror"])
+    ob.name = ob.name + ".r"
+    return left
+
+
+def cut_faces(ob, planes, inside, y0=0.3, name=None):
+    """The lining cut exactly on planes ((point, normal), on its faces past y0 only) and
+    the faces inside() taken out: into an object of their own (name), or deleted."""
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    for co, no in planes:
+        fs = [f for f in bm.faces if f.calc_center_median().y > y0]
+        es = list({e for f in fs for e in f.edges})
+        vs = list({v for f in fs for v in f.verts})
+        bmesh.ops.bisect_plane(bm, geom=vs + es + fs, plane_co=co, plane_no=no, dist=1e-6)
+    new = None
+    if name:
+        new = ob.copy()
+        new.data = ob.data.copy()
+        new.name = name
+        K.CAR.objects.link(new)
+        bm2 = bm.copy()
+        bmesh.ops.delete(bm2, geom=[f for f in bm2.faces if not inside(f.calc_center_median())],
+                         context='FACES')
+        bm2.to_mesh(new.data)
+        bm2.free()
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if inside(f.calc_center_median())],
+                     context='FACES')
+    bm.to_mesh(ob.data)
+    bm.free()
+    return new
+
+
+def zone(label, p, n):
+    """The lining's material: the module's rule (headliner over the belt, trim under it,
+    face by face) saws where the belt crosses leaning faces. The footwells are carpet up
+    over the wheel wells (as the wells' covers are), the cowl the dash's dark trim, and the
+    walls change from trim to headliner 0.95 m up, behind the door cards' upper pads."""
+    if label == "fill":         # behind a wheel well (the module's default there is trim,
+        return "interior.carpet"    # and its faces peeked round the covers in grey)
+    if p is None or n is None or label in ("floor", "fire", "rear", "well"):
+        return None
+    if p.x > 1.25 and p.z < 0.86:
+        return "interior.carpet"
+    if p.x > 2.10 and p.z < 1.30:
+        return "interior"
+    return "interior.head" if p.z > 0.95 else "interior"
+
+
 def build_interior():
+    """The cab (vehicles/cabin.py): lined from the windshield to the bulkhead, a doorway
+    through the bulkhead's middle to the hold up a step (PORTER lit on its riser), the
+    driver's seat on the off side, the mate's jump seat on the near wheel housing facing
+    back, the step well by the near door, a plain dash in dark grey with a green inlay (the
+    paint's), the cluster and screen, a two-spoke wheel on a van's raked column, pedals,
+    door cards, the roof's kit, ribbed mats. The near door's lining, card and kick plate
+    slide with it. The hold is as it was: its liner, floor, shelves and parcels."""
+    C.materials(head=(0.40, 0.40, 0.385), soft=(0.12, 0.125, 0.13),
+                trim=(0.07, 0.56, 0.37), carpet=(0.03, 0.032, 0.034),
+                accent=(0.05, 0.055, 0.06), piping=(0.95, 0.42, 0.04),
+                mat=(0.06, 0.064, 0.07), ambient=(0.30, 0.95, 0.70))
+    # the firewall at the windshield's base; the spine runs on to 15 cm from each end (the
+    # Linnet's finding: with the module's 0.45 m the windshield's base, the pillars' feet
+    # and the footwells lay in the poles' fans and tore; at 4 cm here a ray out through the
+    # arch ahead of the front wheel set the lining 1.2 m outside)
+    cab = C.Cabin(0.16, 2.50, CFLOOR, style="tanager", lhd=False, cap=0.15,
+                  rear_window=(0.33, CFLOOR + 0.20, 1.88))
+    cab.step = 0.035        # the lining's grid finer than detail 1's 40 mm (seats stay)
+    lin = cab.lining(smooth=5, zone=zone, wall="interior")      # the bulkhead in hard trim
+    pane = K.CAR.objects["interior.pane"]           # the bulkhead's opening is a doorway
+    cab.objects.remove(pane)
+    bpy.data.objects.remove(pane)
+    # the step well by the near door: the floor taken out over it, a riser and its ends
+    cut_faces(lin, [((0, 0.605, 0), (0, 1, 0)), ((0.33, 0, 0), (1, 0, 0)),
+                    ((1.17, 0, 0), (1, 0, 0))],
+              lambda c: c.y > 0.605 and 0.33 < c.x < 1.17 and c.z < CFLOOR + 0.002)
+    P = C._Parts()
+    P["interior"].box((0.75, 0.611, CFLOOR - 0.06), (0.84, 0.012, 0.13))
+    for x in (0.336, 1.164):
+        yw = cab.half(x, CFLOOR - 0.06) - 0.004
+        P["interior"].box((x, (0.605 + yw) / 2, CFLOOR - 0.06), (0.012, yw - 0.605, 0.13))
+    cab._emit("stepwell", P)
+    # the driver on the off side, the mate's jump seat facing back over the near wheel
+    drv = cab.seat((0.90, -0.45, CFLOOR + 0.40), driver=True)
+    del drv
+    cab.seat((1.50, 0.60, 1.00), kind="jump", face=-1, belt="seat", rails=False,
+             width=0.42)
+    P = C._Parts()                              # its box over the wheel housing
+    P["interior"].prism([(1.28, y, z) for y, z in ((0.40, CFLOOR - 0.005), (0.585, CFLOOR - 0.005),
+                                                   (0.585, 0.795), (0.86, 0.795), (0.86, 0.87),
+                                                   (0.40, 0.87))], (0.44, 0, 0))
+    C.pill(P["interior.carpet"], (1.50, 0.63, 0.873), (1, 0, 0), (0, 1, 0), 0.42, 0.44, 0.006,
+           r=0.03, soft=0.3)
+    cab._emit("mate_box", P, bevel={"interior": 0.008}, one_sided=True)
+    cab.dash(tuck=0.0)                  # the top pad meets the glass, no strip of cowl
+    cab.cluster()
+    cab.screen()
+    cab.wheel(tilt=40)
+    cab.pedals()
+    cab.door(D_R + 0.03, D_F - 0.03, tag="door", sill=False, pull="bar")
+    cab.roof_kit(mirror=False)
+    # ribbed mats: the driver's footwell, the aisle
+    P = C._Parts()
+    for c, w, h in (((1.62, -0.45), 0.60, 0.42), ((0.75, 0.0), 0.70, 1.10)):
+        C.pill(P["interior.mat"], (c[0], c[1], CFLOOR + 0.004), (1, 0, 0), (0, 1, 0), w, h,
+               0.008, r=0.04, soft=0.3)
+        n = int(h / 0.09)
+        for k in range(n):
+            P["interior.mat"].box((c[0], c[1] - h / 2 + 0.045 + (h - 0.09) * (k + 0.5) / n,
+                                   CFLOOR + 0.0095), (w - 0.08, 0.012, 0.003))
+    cab._emit("mats", P)
+    # the step up to the hold in the bulkhead's doorway, a riser behind it to the hold's
+    # floor, PORTER lit on its face
+    P = C._Parts()
+    P["interior"].box((0.255, 0, CFLOOR + 0.10), (0.19, 0.76, 0.20))
+    P["interior.carpet"].box((0.255, 0, CFLOOR + 0.201), (0.17, 0.72, 0.004))
+    P["interior"].box((0.145, 0, (CFLOOR + 0.20 + HFLOOR) / 2), (0.03, 0.66, HFLOOR - CFLOOR - 0.20))
+    K.text_flat(P["interior.ambient"], "PORTER", 0.034, V3((0.3510, 0, CFLOOR + 0.10)),
+                (0, 1, 0), (0, 0, 1), spacing=1.3)
+    cab._emit("step", P, keep=False)
+    # grab posts each side of the cab's doorways
+    P = C._Parts()
+    for x in (D_F - 0.05, D_R + 0.05):
+        z1 = cab.roof(x, 0.78)[0].z + 0.01
+        P["caliper"].tube((x, 0.78, CFLOOR - 0.005), (x, 0.78, z1), 0.016, 12)
+    cab._emit("posts", P, mirror=True)
+    cab.views(exposure=-0.3, outside=2.0, daylight=8.0)
+    cab.report()
+    K.meant("symmetry", *cab.one_sided)
+    # the near door's lining, card and a kick plate over the step well slide with it
+    DOOR.append(cut_faces(lin, [((D_R, 0, 0), (1, 0, 0)), ((D_F, 0, 0), (1, 0, 0)),
+                                ((0, 0, CFLOOR + 0.004), (0, 0, 1)), ((0, 0, HEAD + 0.02), (0, 0, 1))],
+                          lambda c: c.y > 0.3 and D_R < c.x < D_F and CFLOOR + 0.004 < c.z < HEAD + 0.02,
+                          name="interior.lining.door"))
+    for ob in list(K.CAR.objects):
+        if ob.name.startswith("interior.door.") and "mirror" in ob.modifiers:
+            DOOR.append(split_mirror(ob))
     g = Geo()
-    g.box((1.24, -0.135, CFLOOR - 0.015), (2.12, 1.47, 0.03))       # the cab's floor, less the
-    g.box((1.75, 0.735, CFLOOR - 0.015), (1.10, 0.27, 0.03))        # step well by the door
-    g.box((0.25, 0.735, CFLOOR - 0.015), (0.14, 0.27, 0.03))
-    g.box((0.75, 0.605, 0.355), (0.86, 0.012, 0.13))                # the well's riser, its ends
-    for x in (0.325, 1.175):
-        g.box((x, 0.745, 0.355), (0.012, 0.29, 0.13))
-    for y in (0.735, -0.735):                                       # wheel housings
-        g.box((FA_X, y, 0.50), (0.90, 0.33, 0.60))
-    g.box((2.20, 0, 0.93), (0.42, 1.66, 0.30))                      # the dash
-    g.box((2.27, 0, 0.62), (0.20, 1.20, 0.36))
-    g.box((0.16, 0.60, 1.21), (0.03, 0.54, 1.58))                   # the bulkhead, a doorway
-    g.box((0.16, -0.60, 1.21), (0.03, 0.54, 1.58))                  # through its middle
-    g.box((0.16, 0, 1.94), (0.03, 0.66, 0.12))
-    g.box((0.25, 0, 0.52), (0.20, 0.66, 0.20))                      # a step up to the hold
-    g.box((0.75, -0.90, 0.68), (0.82, 0.02, 0.70))                  # the off side door's card
-    for y in (0.90, -0.90):
-        g.box((1.80, y, 0.90), (1.10, 0.02, 0.20))
-    g.box((1.02, -0.45, 0.52), (0.40, 0.42, 0.20))                  # the seat's pedestal
-    g.obj("interior.tub", "interior", bevel=0.006)
+    yk = cab.half(0.75, CFLOOR + 0.02) - 0.006
+    g.box((0.75, yk, CFLOOR - 0.055), (D_F - D_R - 0.06, 0.012, 0.13))
+    DOOR.append(g.obj("interior.kick.l", "interior", bevel=0.003))
+    K.meant("symmetry", "interior.lining*", "interior.door.*", "interior.kick.l",
+            "interior.stepwell*", "interior.step.ambient", "interior.mats*")
+    # the open doorway: the door's lining, card and kick plate slid back with it, the
+    # lining's and the step well's edges beside it
+    K.meant("through", "interior.lining*", "interior.door.*", "interior.kick.l",
+            "interior.stepwell*")
+
+    # ---- the hold, as it was: its liner, the walk-through's posts, the floor's rubber
     g = Geo()
-    g.box((0.75, 0.90, 0.68), (0.82, 0.02, 0.70))
-    g.box((0.75, 0.894, 0.86), (0.40, 0.03, 0.035))                 # its pull
-    DOOR.append(g.obj("interior.card.l", "interior", bevel=0.006))
-    g = Geo()
-    g.box((1.10, 0, 2.003), (1.86, 1.40, 0.012))
     g.box((-1.33, 0, 2.288), (2.54, 1.44, 0.012))
     for y in (0.845, -0.845):                                       # the hold's walls
         g.box((-1.24, y, 1.50), (2.72, 0.02, 1.46))
     for y in (0.60, -0.60):                                         # its front, behind the brow
         g.box((0.13, y, 1.38), (0.02, 0.50, 1.22))
         g.box((-0.05, y, 2.13), (0.02, 0.50, 0.30))
+    g.box((0.13, 0, 1.94), (0.02, 0.70, 0.12))                      # over the doorway
     g.obj("interior.liner", "liner", bevel=0.004)
-    g = Geo()                                                       # the floors' rubber
-    g.box((1.24, -0.135, CFLOOR + 0.003), (2.08, 1.43, 0.006))
+    g = Geo()                                                       # the floor's rubber
     g.box((-1.24, 0, HFLOOR - 0.012), (2.74, 1.70, 0.03))
     g.obj("interior.mat", "mat")
     g = Geo()
-    for k in range(11):
-        g.box((1.24, -0.82 + 0.13 * k, CFLOOR + 0.0075), (2.0, 0.012, 0.003))
     for k in range(13):
         g.box((-1.30, -0.72 + 0.12 * k, HFLOOR + 0.0045), (2.5, 0.012, 0.003))
     g.obj("interior.mat.ribs", "rubber")
-
-    # ---- seats: the driver's on the off side, a mate's seat facing back over the near
-    #      wheel housing
     g = Geo()
-    tf, tb = Matrix.Rotation(rad(-12), 3, 'Y'), Matrix.Rotation(rad(10), 3, 'Y')
-    g.box((1.04, -0.45, 0.675), (0.48, 0.50, 0.12))
-    g.box((0.795, -0.45, 1.03), (0.11, 0.48, 0.62), rot=tf)
-    g.box((0.725, -0.45, 1.42), (0.075, 0.27, 0.17), rot=tf)
-    g.box((1.60, 0.70, 0.85), (0.42, 0.34, 0.10))
-    g.box((1.855, 0.70, 1.13), (0.09, 0.34, 0.48), rot=tb)
-    g.obj("interior.seats", "seat", bevel=0.024, segs=3)
-    g = Geo()                                                       # belts
-    g.hexa([(0.86, -0.67, 0.75), (0.86, -0.63, 0.75), (0.74, -0.63, 1.34), (0.74, -0.67, 1.34),
-            (0.865, -0.67, 0.752), (0.865, -0.63, 0.752), (0.745, -0.63, 1.342),
-            (0.745, -0.67, 1.342)])
-    g.obj("interior.belts", "mark")
-
-    # ---- the wheel on its column, two screens on the dash
-    g, gs, gw = Geo(), Geo(), Geo()
-    g.tube((2.0, -0.45, 1.0), (1.64, -0.45, 1.075), 0.022, 10)
-    tw = (Matrix.Translation((1.63, -0.45, 1.078)) @ Matrix.Rotation(rad(-12), 4, 'Y')
-          @ Matrix.Rotation(pi / 2, 4, 'Z'))
-    gw.lathe([(-0.013, 0.178), (-0.013, 0.204), (0.013, 0.204), (0.013, 0.178)], 28, xf=tw)
-    gw.lathe([(-0.012, 0.002), (-0.012, 0.045), (0.016, 0.04), (0.016, 0.002)], 14, xf=tw)
-    gw.box((0, 0, 0), (0.016, 0.36, 0.03), xf=tw)
-    g.box((2.03, -0.45, 1.14), (0.04, 0.36, 0.15), rot=Matrix.Rotation(rad(-15), 3, 'Y'))
-    gs.box((2.008, -0.45, 1.143), (0.004, 0.32, 0.115), rot=Matrix.Rotation(rad(-15), 3, 'Y'))
-    g.box((2.03, 0.02, 1.17), (0.03, 0.30, 0.21), rot=Matrix.Rotation(rad(-15), 3, 'Y'))
-    gs.box((2.012, 0.02, 1.173), (0.004, 0.27, 0.18), rot=Matrix.Rotation(rad(-15), 3, 'Y'))
-    g.obj("interior.dash.gear", "interior", bevel=0.006)
-    gw.obj("interior.wheel", "mark", sharp=40)
-    gs.obj("interior.screens", "screen")
-
-    # ---- grab posts each side of each doorway, yellow nosings, the step's tread
-    g, gn, gt, gr, gl = Geo(), Geo(), Geo(), Geo(), Geo()
-    for x in (D_F - 0.05, D_R + 0.05):
-        for y in (0.80, -0.80):
-            g.tube((x, y, CFLOOR), (x, y, 2.0), 0.016, 12)
     for y in (0.36, -0.36):
         g.tube((0.19, y, 0.62), (0.19, y, 1.86), 0.014, 10)
     g.obj("interior.rails", "caliper", sharp=40)
+
+    # ---- yellow nosings, the step's tread
+    gn, gt, gr, gl = Geo(), Geo(), Geo(), Geo()
     gt.box((0.75, 0.765, 0.294), (0.82, 0.31, 0.012))
     gn.box((0.75, 0.915, 0.296), (0.82, 0.024, 0.016))
     gn.box((0.75, 0.596, CFLOOR + 0.004), (0.82, 0.024, 0.014))
@@ -1302,9 +1401,9 @@ def build_interior():
         parcel(*p)
     parcels_out("parcels")
 
-    # ---- light: strips under both ceilings, and real lamps so the cab and the hold read
+    # ---- light: strips under the hold's ceiling, and real lamps so the cab and the hold
+    #      read
     g = Geo()
-    g.box((1.10, 0, 1.995), (0.9, 0.20, 0.006))
     for y in (0.40, -0.40):
         g.box((-1.30, y, 2.28), (2.3, 0.05, 0.006))
     g.obj("interior.dome", "dome")
@@ -1320,6 +1419,7 @@ def build_interior():
         o = bpy.data.objects.new("cabin.light", L)
         K.STUDIO.objects.link(o)
         o.location = (x, 0.0, 1.985 if x > 0 else 2.27)
+        o.visible_camera = False                # as the studio has them: not seen, only lighting
     # the permit behind the windshield, on the near side
     w = W_FRONT
     c = w.at(0.52, 1.25, -GD - 0.012)

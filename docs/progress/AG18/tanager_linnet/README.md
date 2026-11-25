@@ -4,7 +4,7 @@
 
 - **Brand, model, type:** Tanager Linnet, compact five-door hatchback, 5 seats (all names made up). The fourth Tanager: the car most people in the city drive, here as a drive club's unit 24.
 - **Size:** 4.18 m long, 1.78 m wide over the arch trims (2.01 m over the mirrors), 1.55 m to the roof, 1.59 m over the antenna fin, wheelbase 2.74 m, wheels 0.67 m, ground clearance 0.18 m (0.11 m under the mud flaps).
-- **Triangles:** 319,531 in 147 objects (body at subdivision 3).
+- **Triangles:** 391,887 in 216 objects (body at subdivision 3; 319,531 in 147 before the full cabin).
 - **Build:** `vehicles/blender.sh vehicles/cars/tanager_linnet.py --out docs/progress/AG18/tanager_linnet --sheet` (`LINNET_HULL=1` with `--preview` shows the bare hull; `--check --clay --zebra` wrote `check.json`, `clay.jpg` and `zebra.jpg` here).
 
 ## The design
@@ -23,13 +23,26 @@
 - Clay and zebra before the details and at the end (`clay.jpg`, `zebra.jpg`): the stripes run evenly along the flanks and over the roof and bend once at the shoulder. A first shoulder (crease 0.5, a 33 degree fold) broke into patches on the rear door, where the panels' bevel caught the fold on some edges and not on others; it is now a crease of 0.3 over a 28 degree fold, soft enough that the bevel catches none of it (no patches in the clay or the close-ups).
 - Faults found in close-ups and put right: tabs of paint inside the window seals and a spike over a door pull (faces the cuts folded back, taken out on every painted panel), bumper pads dented where a ray fell into the gap between the face's paint and its cladding (the ends are laid on the hull before it is split, and the pads are plates in the face's own plane), the end of the cladding's step on each face, which subdivision drew 3 cm up into a hook beside the bumper plate (creased where it ends now), side glass that went white from behind (the fill light mirrored in it), a roof panel and a hatch glass that mirrored the top box.
 
+## Cabin
+
+![cabin](cabin.jpg)
+
+The full interior from `vehicles/cabin.py` (`style="tanager"`), in place of the box seats and slab dash: `cab_fwd`, `cab_side`, `cab_back` and `cab_in` above (96 samples).
+
+- **What it has.** A lined box from the firewall at the cowl to the hatch (the rear wells covered beside the boot), two comfort seats and a bench for three with charcoal inserts and marigold piping, a dark dash with a marigold inlay (the paint's) and round vents, a free-standing cluster, a landscape screen, a two-spoke wheel at 30 degrees, pedals, a console with a dial, door cards front and rear (LINNET lit on the front sills), a parcel shelf over the boot, dome light, visors, grab loops, mirror, mats; a trim over the narrow pillar between the quarter light and the door glass. The parking permit stays behind the windshield.
+- **The lining's tears.** A first cabin showed spikes at the windshield's base and torn edges in the footwells and at the A-pillars' feet. Two causes: the module's spine stopped 0.45 m short of the firewall, so the cab-forward car's whole front (the raked glass's base, the pillars' feet, the footwells) lay in the front pole's fan, a ray every 9 degrees; and the belt (1.02 m, the side windows' sills) ran across the cowl, so headliner and trim alternated face by face in saw teeth. Now the spine runs to 4 cm from each end (`cap=0.04`), the lining's grid is 30 mm (`cab.step`, the seats stay at detail 1), the firewall stands at the cowl just ahead of the glass's base, the dash's top pad meets the glass (`tuck=0`), and the car's own `zone()` makes the footwells carpet up over the wheel wells, the cowl and the pillars' feet dark trim and the walls change color 0.9 m up, behind the door cards; the faces the module fills in behind the wells (label `fill`, trim by default) are carpet too, where they peeked round the well covers in grey.
+- **Triangles.** Cabin 6,068 before, 78,424 now (lining 27,886, bench 18,228, front seats 7,588 each); the whole car 319,531 before, 391,887 now, under the kit's 400,000.
+- **Check.** `--check` all `ok` (`check.json`): tires, ground, symmetry (the wheel, pedals, cluster, screen and the bench's belts for three told as meant), panels, through, triangles. The log's "through the shell" names only six faces of the front well covers at the arch's lip (28 mm, behind the fender and the tire, unseen: the module's known case).
+- **Exterior.** Signed before and after: only `interior.*` objects, cabin materials and the studio's `cab*` lamps differ (and the light links' lists, by the interior objects in them).
+- **Weakest from the driver's seat.** The quarter light frames the dark mirror foot outside; the A-pillar has small steps where its lining meets the glass; the seats read pale under the cabin lights.
+
 ## What I would improve
 
 - The hood is still the plainest surface of the car: its raised middle is faint, and a cut service flap would want a finer hull there (the Mino's finding).
 - The side glass reads dark in the pure side view even with a lamp in the cabin; the seats show from the three-quarter views.
 - The mirrors' feet and arms are simple blocks, and the mirrors stand a little small from straight ahead.
 - The nose and tail faces are flat planes; a little crown across them would make the ends less of a shield, but the visors' pads and the flat shading of the cut faces rely on the plane.
-- The wheel wells are plain cavities; no belts, no pedals, no door cards' detail.
+- The wheel wells are plain cavities.
 
 ## Kit wishes
 
