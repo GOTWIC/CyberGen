@@ -80,6 +80,43 @@ Left: the pods' tip lamps are flat faces of the pod (as on the Dart); the emitte
 glow is step C's; the styling groove shows a thin line of the door cards through it from
 close by (a cut line is a hole through the skin); the windshield's grey sheen is as before.
 
+## Cabin (2026-11-24)
+
+![cabin](cabin.jpg)
+
+The schematic cabin (box seats, a slab tub, a box yoke, flat screen slabs, a warm strip
+under each rail) is replaced by the shared module's (`vehicles/cabin.py`, `style="kestrel"`),
+styled as a flight deck. The exterior is unchanged: its fingerprint differs only in
+`interior.*`, the cabin's materials and the studio's `cab*` lamps, and the old `led.cabin`
+strip went with the old cabin. The power cell under the rear glass is kept as it was.
+
+- **What it has:** a lined tub from a firewall just ahead of the windshield's base (x 1.56,
+  the spine's cap 0.10 so the raked glass's base and the footwells are sampled finely) to a
+  wall behind the rear seats (x -1.42), floor 0.51 m up over the belly; a parcel shelf over
+  the boot under the rear glass, the power cell on it. Four tan seats (two front, two rear
+  with an armrest and cupholders between them), each with a five-point harness (two
+  shoulder straps over the back, lap straps, a crotch strap, a round quick-release buckle
+  ringed in cyan) in place of the module's three-point belt. A graphite dash with slot vents
+  and a titanium inlay, a free cluster, a wide glass display across the fascia, a yoke
+  (no pedals: the yoke flies it, the throttle is on the console; ribbed footrests in the
+  footwells instead), a throttle quadrant of two levers in a lit gate on the console.
+- **Overhead console:** a faceted spine on the centerline under the glass roof, from the
+  windshield's header to the solid roof: rows of guarded toggles, an annunciator strip,
+  two rotary selectors and a small camera display (the car's mirrors are camera blades, so
+  no inside mirror), "KA 4-404" stencilled on its cheeks. A trim bar with a reading strip
+  across the rear glass's header. No dome light or visors (the roof over the front seats is
+  glass); grab loops over the doors.
+- **Lettering:** "KM-404" on the dash before the passenger, "NO STEP" on the glovebox, a lit
+  "KESTREL AERODYNE" on the front sill plates.
+- **Fit:** the lining is held 35 mm inside the lower hull where it folds in under the chine,
+  and 30 mm inside under the windshield's base; the cabin's tree of the lining is made again
+  after (the door cards are laid on it). Left through the shell: 4 faces of the lining,
+  4 mm, in the fold between the visor and the windshield's base, under the dash's top.
+- **Triangles:** the cabin about 6,900 to 66,334; the car 121,401 to 180,799 (of 400,000).
+- **Check:** `look`, as before: the pod's low panel, the stern's name and the fin code are
+  3 to 11 mm off their mirror images (as before the cabin); tires, ground, panels, `through`
+  and triangles `ok`; the cabin's one-sided parts are marked meant.
+
 ## What I would improve
 
 - The step bays read as plain dark panels in the side view; a real recess with the hinge

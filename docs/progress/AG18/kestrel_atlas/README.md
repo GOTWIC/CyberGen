@@ -87,6 +87,46 @@ emitters' layered glow is step C's; the red lens over the rear chine channel sho
 skin's facets in its reflections from close by; the side glass's wavy reflections are as
 before (the panes follow the flowing flank).
 
+## Cabin (2026-11-24)
+
+![cabin](cabin.jpg)
+
+The schematic cabin (box seats, a slab tub and dash, a box yoke, flat screen slabs, a warm
+strip under each roof edge) is replaced by the shared module's (`vehicles/cabin.py`,
+`style="kestrel"`), styled as a work flight deck. The exterior is unchanged: its
+fingerprint differs only in `interior.*`, the cabin's materials and the studio's `cab*`
+lamps, and the old `led.cabin` strips went with the old cabin.
+
+- **What it has:** a lined tub from a firewall at the windshield's base (x 2.30) to a wall
+  just inside the cab's back (x 0.80), floor 0.61 m up; the back wall has a window under the
+  back glass (a smoked pane in a frame), trims down its corners from the belt to the roof,
+  a fire extinguisher in its bracket, a first aid case and the placards "MAX PAYLOAD 1400
+  KG" and "SECURE LOAD BEFORE LIFT". Two khaki seats, tall and upright (hip 0.36 m over
+  the floor, 15 degrees of rake, so the headrests clear the back wall), each with a
+  five-point harness (two shoulder straps over the back, lap straps, a crotch strap, a
+  round quick-release buckle ringed in cyan) in place of the module's three-point belt. A
+  graphite dash with slot vents and a titanium inlay, a free cluster, a wide glass display
+  across the fascia, a yoke; no pedals (the yoke flies it, the throttle is on the console):
+  ribbed footrests in the footwells; a throttle quadrant of two levers in a lit gate on the
+  console; door cards with bar pulls and a lit "KESTREL AERODYNE" sill plate; sun visors.
+- **Overhead console:** a faceted spine on the centerline under the solid roof, from the
+  windshield's header back over the seats: rows of guarded toggles, an annunciator strip,
+  two rotary selectors and a small camera display (no inside mirror: the car's mirrors are
+  camera blades), "KA 2-626" stencilled on its cheeks. The module's dome lamp, which hung
+  inside it, is moved under it for the cabin views. "KH-626" on the dash before the
+  passenger.
+- **Fit:** the cab's front is raked so far that the module's default spine (at half the
+  cabin's height) put its front pole over the windshield, outside the car: the rays from it
+  laid lining 45 cm outside the hull and the car measured 31 cm wider. The spine is set at
+  1.12 m with a cap of 0.12, the firewall at the windshield's base. The lining is held
+  35 mm inside the lower hull under the chine and 30 mm inside under the windshield's base;
+  nothing of the cabin comes through the shell.
+- **Triangles:** the cabin about 4,000 to 42,925; the car 172,776 to 211,717 (of 400,000).
+- **Check:** `look`, as before: the pods' panels, the drum's stencil, the light band, the
+  stern's name and the fin code are 3 to 11 mm off their mirror images (the same findings
+  as before the cabin); tires, ground, panels, `through` and triangles `ok`; the cabin's
+  one-sided parts are marked meant.
+
 ## What I would improve
 
 - The stern mouth and its thrusters sit in the shadow of the tailgate; a hinged gate drawn

@@ -21,8 +21,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from functools import partial                                       # noqa: E402
 
 import carkit as K                                                  # noqa: E402
+import cabin as C                                                   # noqa: E402
 from brands import kestrel                                          # noqa: E402
 from brands.kestrel import chine, plate, rib                        # noqa: E402
+from math import exp                                                # noqa: E402
 from carkit import (Geo, Matrix, V3, band_point, cos, on_body, pi, rad,    # noqa: E402
                     ribbon, sin, stud, text_flat, text_on_body)
 
@@ -820,57 +822,363 @@ def build_surface_details():
 
 
 # ---------------------------------------------------------------------------------------
-# interior: two seats, a yoke, a screen across the dash
+# interior (vehicles/cabin.py): a two-seat work flight deck in the cab
 # ---------------------------------------------------------------------------------------
-def build_interior():
-    # the tub follows the hull's flare: narrow at the floor, as wide as the cab at the
-    # shoulder (step A found the dash and the floor's front corners out under the prow)
-    g = Geo()
-    g.prism([(0.70, -0.60, 0.59), (1.60, -0.60, 0.59), (1.84, -0.56, 0.59), (2.12, -0.40, 0.59),
-             (2.12, 0.40, 0.59), (1.84, 0.56, 0.59), (1.60, 0.60, 0.59), (0.70, 0.60, 0.59)],
-            (0, 0, 0.02))
+FLOOR = 0.61                        # the cab floor's top, over the belly
+X0, X1 = 0.80, 2.30                 # the cab's back wall (inside its skin; the bed behind),
+                                    # the firewall just ahead of the windshield's base
+HIP = (1.20, 0.40, FLOOR + 0.36)    # the pilot's hip point (left): a tall, upright seat
+REAR_WINDOW = (0.44, 1.60, 1.90)    # the window in the back wall: half width, foot, head
 
-    def dash_w(z):                                      # the hull's half width less 3 cm
-        return min(0.72, 0.50 + (z - 0.61) * 0.95)
-    dash = [(2.14, 0.61), (2.14, 1.12), (1.96, 1.17), (1.78, 1.10), (1.84, 0.84), (1.84, 0.61)]
-    n = len(dash)
-    g.add([(x, -dash_w(z), z) for x, z in dash] + [(x, dash_w(z), z) for x, z in dash],
-          [tuple(range(n)), tuple(range(n, 2 * n))]
-          + [(i, (i + 1) % n, n + (i + 1) % n, n + i) for i in range(n)])
-    g.box((1.30, 0, 0.71), (1.00, 0.17, 0.22))
-    g.prism([(0.775, -0.58, 0.59), (0.775, 0.58, 0.59), (0.775, 0.87, 0.90),
-             (0.775, 0.84, 1.45), (0.775, -0.84, 1.45), (0.775, -0.87, 0.90)],
-            (0.05, 0, 0))                               # the cab's back wall, inside
-    for sy in (1, -1):                                  # door cards under the glass
-        g.prism([(1.84, sy * 0.55, 0.61), (1.84, sy * 0.59, 0.61), (1.84, sy * 0.80, 0.80),
-                 (1.84, sy * 0.82, 1.26), (1.84, sy * 0.75, 1.26), (1.84, sy * 0.70, 0.86)],
-                (-1.04, 0, 0))
-    g.obj("interior.tub", "interior", bevel=0.006)
-    g = Geo()
-    tilt = Matrix.Rotation(rad(-14), 3, 'Y')
-    for y in (0.40, -0.40):
-        g.box((1.24, y, 0.80), (0.52, 0.46, 0.20))
-        g.box((0.94, y, 1.20), (0.11, 0.44, 0.66), rot=tilt)
-        g.box((0.86, y, 1.60), (0.07, 0.24, 0.16), rot=tilt)
-        for s in (-1, 1):
-            g.box((1.24, y + s * 0.23, 0.87), (0.48, 0.05, 0.16))
-            g.box((0.955, y + s * 0.225, 1.17), (0.14, 0.05, 0.52), rot=tilt)
-    g.obj("interior.seats", "seat", bevel=0.012, segs=3)
-    g = Geo()                                           # a yoke, not a wheel
-    yk = Matrix.Translation((1.66, 0.40, 1.16)) @ Matrix.Rotation(rad(-62), 4, 'Y')
-    g.box((0, 0, 0), (0.03, 0.30, 0.035), xf=yk)
-    for s in (-1, 1):
-        g.box((0, s * 0.15, 0.045), (0.035, 0.035, 0.12), xf=yk)
-    g.box((1.76, 0.40, 1.13), (0.20, 0.05, 0.05))
-    g.obj("interior.yoke", "interior", bevel=0.004)
-    g = Geo()
-    scr = Matrix.Rotation(rad(-24), 3, 'Y')
-    g.box((1.845, 0.0, 1.17), (0.008, 1.16, 0.09), rot=scr)
-    g.box((1.30, 0.0, 0.823), (0.34, 0.11, 0.006))
-    g.obj("interior.screens", "screen")
-    g = Geo()
-    g.box((1.08, 0.57, 1.955), (0.60, 0.014, 0.008))
-    g.obj("led.cabin", "cabin_led", mirror=True)
+
+def quiet_glass():
+    """In the cabin views the studio's boxes stay out of the glass's reflections too (the
+    module hides them from the camera and through the glass, not in it: the coated roof and
+    windshield mirrored the top box as a white slab over the seats), and the module's low
+    fill lamp, which hangs over the console, goes up toward the brow."""
+    keep = {}
+
+    def hook(name, before):
+        if not K.VIEWS.get(name, {}).get("cabin"):
+            return
+        for o in K.STUDIO.objects:
+            if o.type != 'LIGHT' or o.name.startswith("cab"):
+                continue
+            if before:
+                keep[o.name] = o.visible_glossy
+                o.visible_glossy = False
+            elif o.name in keep:
+                o.visible_glossy = keep.pop(o.name)
+    K.on_view(hook)
+
+    def fill_higher():
+        o = K.STUDIO.objects.get("cab1")
+        if o is not None:
+            o.location = (o.location.x + 0.10, o.location.y, o.location.z + 0.22)
+    K.after_studio(fill_higher)
+
+
+def relined(cab, lin):
+    """The cabin's tree of the lining made again once its vertices moved (the door cards,
+    the belts and the roof's kit are laid on it)."""
+    from mathutils.bvhtree import BVHTree
+    lin.data.update()
+    vs = [lin.matrix_world @ v.co for v in lin.data.vertices]
+    cab.lin = BVHTree.FromPolygons(vs, [tuple(q.vertices) for q in lin.data.polygons])
+
+
+def seat_frame(rec, rake, drop=0.075, tilt=9.0):
+    """A seat's own frame as cabin.seat() draws it: cpt(x, y, z) on the cushion (z over
+    the hip; ctop(x) the cushion's top at its middle), bpt(s, y, f) on the back (s up it,
+    f out of its face)."""
+    H = V3(rec["hip"])
+    face = rec["face"]
+    X, Y, Z = V3((face, 0, 0)), V3((0, face, 0)), V3((0, 0, 1))
+    r = rad(rake)
+    A = X * -sin(r) + Z * cos(r)
+    N = X * cos(r) + Z * sin(r)
+    Pf = H + X * -0.115
+    tt = sin(rad(tilt)) / cos(rad(tilt))
+
+    def cpt(x, y, z):
+        return H + X * x + Y * y + Z * z
+
+    def ctop(x):
+        return -drop + tt * x
+
+    def bpt(s, y, f):
+        return Pf + A * s + Y * y + N * f
+    return cpt, ctop, bpt, N, A
+
+
+def harness(cab, rec, rake, back, tag):
+    """A five-point harness on a seat in place of the module's three-point belt: two
+    shoulder straps over the back's top, a lap strap each side, a crotch strap, and a round
+    quick-release buckle where they meet, its turn plate ringed in light."""
+    cpt, ctop, bpt, N, A = seat_frame(rec, rake)
+    p = C._Parts()
+    gb, gm, ga = p["seat.belt"], p["interior.metal"], p["interior.ambient"]
+    strap = [(-0.022, -0.0012), (0.022, -0.0012), (0.022, 0.0012), (-0.022, 0.0012)]
+    xb = 0.07
+    buckle = cpt(xb, 0.0, ctop(xb) + 0.022)
+
+    def lump(s):                                    # the back's lumbar roll under a strap
+        return 0.012 * exp(-((s - 0.16) / 0.13) ** 2) + 0.007
+    for sy in (-1, 1):
+        y = sy * 0.095
+        path = [bpt(back - 0.07, y, -0.075), bpt(back + 0.012, y, -0.03),
+                bpt(back - 0.03, y, lump(back - 0.03)),
+                bpt(back * 0.6, y * 0.92, lump(back * 0.6)),
+                bpt(0.20, y * 0.78, lump(0.20)), bpt(0.06, y * 0.6, lump(0.06) + 0.006),
+                cpt(-0.06, y * 0.42, ctop(-0.06) + 0.012), cpt(0.02, y * 0.2, ctop(0.02) + 0.018),
+                buckle + V3((0, 0, -0.004))]
+        gb.sweep(K.chaikin(path, 2), strap, up=tuple(N))
+        # the lap strap: from its anchor beside the cushion over the hips to the buckle
+        lap = [cpt(-0.11, sy * 0.275, -0.15), cpt(-0.07, sy * 0.262, ctop(-0.07) + 0.03),
+               cpt(-0.02, sy * 0.19, ctop(-0.02) + 0.02), cpt(0.04, sy * 0.08, ctop(0.04) + 0.02),
+               buckle + V3((0, 0, -0.004))]
+        gb.sweep(K.chaikin(lap, 2), strap, up=(0, 0, 1))
+        gm.box(cpt(-0.11, sy * 0.275, -0.15), (0.05, 0.012, 0.03))
+        s = back * 0.62                             # an adjuster on each shoulder strap
+        gm.box(bpt(s, y * 0.92, lump(s) + 0.006), (0.006, 0.05, 0.03),
+               rot=Matrix((N, V3((0, 1, 0)), A)).transposed())
+    crotch = [cpt(0.22, 0.0, ctop(0.22) - 0.02), cpt(0.17, 0.0, ctop(0.17) + 0.008),
+              cpt(0.11, 0.0, ctop(0.11) + 0.014), buckle + V3((0, 0, -0.004))]
+    gb.sweep(K.chaikin(crotch, 2), strap, up=(0, 0, 1))
+    gm.cyl(buckle - V3((0, 0, 0.006)), 0.012, 0.042, n=24)
+    p["interior.gloss"].cyl(buckle + V3((0, 0, 0.006)), 0.003, 0.03, n=6)
+    ga.ring(buckle + V3((0, 0, 0.0075)), 'z', 0.034, sec=(0.003, 0.0015), n=24)
+    cab._emit(tag + ".harness", p, one_sided=True)
+
+
+def stencil(cab, tag, items):
+    """Aircraft lettering inside: (text, size, origin, right, up) each, in light grey."""
+    p = C._Parts()
+    for txt, size, o, right, up in items:
+        K.text_flat(p["interior.stencil"], txt, size, V3(o), V3(right), V3(up), spacing=1.18)
+    cab._emit(tag, p, one_sided=True, keep=False)
+
+
+def overhead(cab, xa, xb, w=0.17, h=0.07, reg="KA 4-404"):
+    """The overhead console: a faceted spine hung under the glass roof on the centerline
+    from the windshield's header back to the roof, folded like the hull (a flat underside,
+    chamfered cheeks), its underside a switch panel: rows of guarded toggles, two rotary
+    selectors, a strip of annunciators, a small camera display in place of a mirror, and
+    the registration stencilled on its cheeks."""
+    p = C._Parts()
+    secs, zb = [], []
+    n = max(6, int(round((xa - xb) / 0.05)))
+    for k in range(n + 1):
+        x = xa + (xb - xa) * k / n
+        zt = min(cab.roof(x, 0.0)[0].z, cab.roof(x, w * 0.5)[0].z) - 0.002
+        end = min(k, n - k)
+        hh = h * (0.55 if end == 0 else 0.85 if end == 1 else 1.0)
+        zb.append(zt - hh)
+        secs.append([V3((x, a * w / 2, zt + b * hh)) for a, b in
+                     ((1.0, 0.0), (0.92, -0.55), (0.62, -1.0), (-0.62, -1.0), (-0.92, -0.55),
+                      (-1.0, 0.0))])
+    C.loft(p["interior"], secs)
+    gg, gm, gw = p["interior.gloss"], p["interior.metal"], p["screen.white"]
+    gl, gwn = p["screen.lit"], p["screen.warn"]
+
+    def under(x):
+        t = max(0.0, min(1.0, (xa - x) / (xa - xb)))
+        k = min(n - 1, int(t * n))
+        f = t * n - k
+        return zb[k] + (zb[k + 1] - zb[k]) * f
+    ys = (-0.042, -0.014, 0.014, 0.042)
+    for i in range(7):                              # rows of guarded toggles
+        x = xa - 0.17 - 0.06 * i
+        if x < xb + 0.16:
+            break
+        z = under(x) - 0.001
+        gg.box((x, 0.0, z - 0.002), (0.046, 0.11, 0.004))
+        gm.box((x + 0.016, 0.0, z - 0.007), (0.004, 0.104, 0.007))     # the guard rail
+        for y in ys:
+            gm.box((x + 0.002, y, z - 0.009), (0.005, 0.005, 0.011))     # the bat
+            (gwn if (i, y) in ((0, -0.042), (3, 0.042)) else gw).box(
+                (x - 0.014, y, z - 0.0045), (0.004, 0.014, 0.001))
+    for x in (xb + 0.12, xb + 0.065):               # two rotary selectors
+        z = under(x)
+        for y in (-0.035, 0.035):
+            gm.cyl((x, y, z - 0.012), 0.008, 0.014, n=16)
+            gl.box((x + 0.008, y, z - 0.0125), (0.006, 0.003, 0.001))
+    # the annunciator strip, and the camera display (no inside mirror: the car's mirrors
+    # are camera blades)
+    x = xa - 0.12
+    z = under(x)
+    gg.box((x, 0.0, z - 0.003), (0.04, 0.15, 0.006))
+    for k in range(6):
+        g_ = gwn if k == 2 else gl if k % 2 else gw
+        g_.box((x, -0.0625 + 0.025 * k, z - 0.0062), (0.012, 0.018, 0.001))
+    c = V3((xa - 0.045, 0.0, under(xa - 0.045) - 0.03))
+    cab._display(p, c, (0, -1, 0), (0.42, 0, 0.91), 0.15, 0.04, "bars", bezel=0.006)
+    cab._emit("overhead", p)
+    # the registration on each cheek
+    xm = (xa + xb) / 2
+    zc = under(xm) + h * 0.55
+    items = []
+    for sg in (1, -1):
+        items.append((reg, 0.020, (xm, sg * (w / 2 * 0.955 + 0.003), zc),
+                      (-sg, 0, 0), (0, sg * 0.40, 0.92)))
+    stencil(cab, "overhead_text", items)
+
+
+def header_bar(cab, xa, xb, hw, tag="header_r", h=0.03):
+    """A trim bar across the headliner between xa and xb (a glass's header: it covers the
+    lining's ragged edge there, where the rays fan out round the spine's end), hw its half
+    width, a reading light strip along its lower edge."""
+    p = C._Parts()
+    secs, strip = [], []
+    n = 12
+    for k in range(n + 1):
+        y = -hw + 2 * hw * k / n
+        ra = cab.roof(xa, y)[0].z - 0.003
+        rb = cab.roof(xb, y)[0].z - 0.003
+        z = min(ra, rb)
+        secs.append([V3((xa, y, z)), V3((xb, y, z)), V3((xb + 0.01, y, z - h)),
+                     V3((xa - 0.01, y, z - h * 0.8))])
+        strip.append(V3(((xa + xb) / 2, y * 0.9, z - h - 0.0015)))
+    g = p["interior"]
+    m = 4
+    g.add([q for s_ in secs for q in s_],
+          [(i * m + j, i * m + (j + 1) % m, (i + 1) * m + (j + 1) % m, (i + 1) * m + j)
+           for i in range(n) for j in range(m)] + [tuple(range(m)),
+                                                   tuple(n * m + j for j in range(m))])
+    p["interior.ambient"].pipe(strip, 0.003, n=4, up=(0, 0, 1))
+    cab._emit(tag, p)
+
+
+def throttle(cab, x, top, y=0.0):
+    """A throttle quadrant on the console: two levers with grips in a slotted gate, a
+    detent scale beside each slot, lit."""
+    p = C._Parts()
+    gg, gm, gs = p["interior.gloss"], p["interior.metal"], p["interior.soft"]
+    C.pill(gg, (x, y, top + 0.012), (1, 0, 0), (0, 1, 0), 0.16, 0.10, 0.02, r=0.012, soft=0.3)
+    for sy in (-0.022, 0.022):
+        p["screen.dark"].box((x, y + sy, top + 0.0225), (0.13, 0.006, 0.001))
+        for k in range(5):
+            (p["screen.warn"] if k == 4 else p["screen.white"]).box(
+                (x - 0.05 + 0.025 * k, y + sy * 1.75, top + 0.0225), (0.002, 0.008, 0.001))
+        a = rad(18 if sy > 0 else 8)
+        b0 = V3((x + 0.01, y + sy, top + 0.02))
+        b1 = b0 + V3((-sin(a), 0, cos(a))) * 0.085
+        gm.tube(b0, b1, 0.0045, 8)
+        C.pill(gs, b1 + V3((0, 0, 0.008)), (0, 1, 0), (1, 0, 0), 0.046, 0.022, 0.018, r=0.008,
+               soft=0.8)
+    cab._emit("throttle", p, one_sided=True)
+
+
+def footrests(cab, x):
+    """No pedals (the yoke flies it: pitch and roll in the grips, the throttle on the
+    console): a ribbed footrest across each front footwell."""
+    p = C._Parts()
+    gm, gr = p["interior.metal"], p["interior.mat"]
+    a = rad(50)
+    up, nr = V3((cos(a), 0, sin(a))), V3((-sin(a), 0, cos(a)))
+    R3 = Matrix((V3((0, 1, 0)), up, nr)).transposed()
+    y = abs(cab.driver["hip"].y)
+    c = V3((x, y, cab.floor + 0.11))
+    gm.box(c, (0.28, 0.16, 0.01), rot=R3)
+    for k in range(5):
+        gr.box(c + nr * 0.006 + up * (0.16 * (k - 2) * 0.2), (0.25, 0.008, 0.004), rot=R3)
+    gm.box(V3((x + 0.05, y, cab.floor + 0.012)), (0.10, 0.22, 0.024))
+    cab._emit("footrest", p, mirror=True)
+
+
+def wall_kit(cab):
+    """On the back wall between the seats: a fire extinguisher in its bracket, a first aid
+    case, a hook strip, and a load placard under the window."""
+    p = C._Parts()
+    x = X0 + 0.004
+    gr, gm, gi = p["interior.red"], p["interior.metal"], p["interior"]
+    zb = FLOOR + 0.30
+    gr.cyl((x + 0.065, 0.0, zb), 0.36, 0.055, n=20)                 # the bottle
+    gm.cyl((x + 0.065, 0.0, zb + 0.36), 0.05, 0.022, n=12)           # its valve
+    gi.tube(V3((x + 0.065, 0.0, zb + 0.40)), V3((x + 0.11, 0.0, zb + 0.43)), 0.006, 6)
+    for z in (zb + 0.08, zb + 0.28):                                 # the bracket's bands
+        gm.ring((x + 0.065, 0.0, z), 'z', 0.058, sec=(0.004, 0.012), n=20)
+        gm.box((x + 0.004, 0.0, z), (0.008, 0.05, 0.03))
+    zc = zb + 0.52                                                   # the first aid case
+    C.pill(gi, (x + 0.045, 0.0, zc), (0, 1, 0), (0, 0, 1), 0.22, 0.13, 0.08, r=0.02,
+           soft=0.4)
+    gr.box((x + 0.087, 0.0, zc), (0.004, 0.07, 0.02))
+    gr.box((x + 0.087, 0.0, zc), (0.004, 0.02, 0.07))
+    cab._emit("wall_kit", p)
+    right, up = (0, 1, 0), (0, 0, 1)                # read from the seats, looking back
+    z = REAR_WINDOW[1] - 0.055
+    stencil(cab, "wall_text", [
+        ("MAX PAYLOAD 1400 KG", 0.022, (x + 0.002, 0.0, z), right, up),
+        ("SECURE LOAD BEFORE LIFT", 0.014, (x + 0.002, 0.0, z - 0.03), right, up),
+        ("FIRE", 0.018, (x + 0.002, 0.115, zb + 0.20), right, up)])
+
+
+def corner_trims(cab, w=0.16, t=0.02):
+    """A trim down each of the back wall's corners from the belt to the roof: the wall is
+    filled flat only under the belt and over the side windows, and the corner between
+    showed the back panel's paint behind the side glass's end."""
+    p = C._Parts()
+    x = X0 + 0.004
+    z0, z1 = cab.belt - 0.04, cab.roof(X0 + 0.05, 0.6)[0].z + 0.01
+    for sg in (1, -1):
+        rows = []
+        n = 10
+        for k in range(n + 1):
+            z = z0 + (z1 - z0) * k / n
+            yo = cab.half(x + 0.012, z) + 0.012
+            rows.append([V3((x, sg * yo, z)), V3((x, sg * (yo - w), z)),
+                         V3((x + t, sg * (yo - w), z)), V3((x + t, sg * yo, z))])
+        C.loft(p["interior.head"], rows)
+    cab._emit("corner_trim", p)
+
+
+def dome_lower():
+    """The module's dome lamp hangs 5 cm under the roof on the centerline, inside the
+    overhead console here, which it lit from within: it goes under it."""
+    def lower():
+        o = K.STUDIO.objects.get("cab0")
+        if o is not None:
+            o.location = (o.location.x, o.location.y, o.location.z - 0.08)
+    K.after_studio(lower)
+
+
+def build_cabin():
+    """The cabin (vehicles/cabin.py): a two-seat work flight deck in the cab. Graphite
+    lining and dash, khaki seats upright with five-point harnesses, a yoke, a free cluster
+    and a wide glass display, an overhead console on the roof between the seats, a throttle
+    quadrant on the console, footrests in place of pedals, door cards, the back wall with its
+    window, an extinguisher and a first aid case, stencilled registrations and placards."""
+    C.materials(carpet=(0.014, 0.015, 0.017), head=(0.050, 0.053, 0.058),
+                soft=(0.026, 0.028, 0.032), trim=(0.36, 0.38, 0.40), trim_metal=1.0,
+                trim_rough=0.32, accent=(0.10, 0.085, 0.05), piping=(1.0, 0.42, 0.04),
+                metal=(0.50, 0.52, 0.55), mat=(0.010, 0.010, 0.011),
+                ambient=(0.12, 0.75, 0.9), ambient_strength=10.0)
+    K.pbr("interior.stencil", (0.62, 0.66, 0.70), 0.0, 0.55)
+    K.pbr("interior.red", (0.55, 0.035, 0.02), 0.0, 0.35)
+    sb = next(n for n in K.MAT["seat"].node_tree.nodes if n.type == 'BSDF_PRINCIPLED')
+    sb.inputs["Base Color"].default_value = (0.22, 0.18, 0.11, 1.0)   # khaki, deeper inside
+    sb.inputs["Roughness"].default_value = 0.7
+    sb.inputs["Specular IOR Level"].default_value = 0.25
+    # the spine low enough that its front pole stands under the windshield (by default
+    # it stood at half the cabin's height, over the glass at the cab's raked front)
+    cab = C.Cabin(X0, X1, FLOOR, style="kestrel", cap=0.12, zs=1.12, rear_window=REAR_WINDOW)
+    lin = cab.lining()
+    for v in lin.data.vertices:         # held inside the lower hull, which folds in under
+        if v.co.z < 0.95 and abs(v.co.y) > 0.45:    # the chine, and under the windshield's
+            v.co = cab.keep(v.co, margin=0.035, wells=False)    # base, where it meets the
+        elif v.co.x > 2.05 and v.co.z > 1.0:                    # visor in a fold
+            v.co = cab.keep(v.co, margin=0.03, wells=False)
+    relined(cab, lin)
+    hx, hy, hz = HIP
+    for y, drv in ((hy, True), (-hy, False)):
+        rec = cab.seat((hx, y, hz), driver=drv, belt=None, back=0.58, rake=15)
+        harness(cab, rec, 15, 0.58, rec["tag"])
+    d = cab.dash(depth=0.50)
+    cab.cluster()
+    cab.screen(kind="wide", w=0.86, h=0.12, y=0.0, t=0.45)
+    cab.wheel(kind="yoke", tilt=30, column=0.36)
+    footrests(cab, hx + 0.86)
+    con = cab.console(selector=None, switches=4)
+    L = con["x1"] - con["x0"]
+    throttle(cab, con["x0"] + L * 0.47, con["top"])
+    cab.door(0.84, 1.86, tag="door", arm=hz + 0.18, sill_text="KESTREL AERODYNE")
+    cab.roof_kit(dome=False, mirror=False)
+    overhead(cab, cab.header(0.0).x - 0.04, 0.92, reg="KA 2-626")
+    cab.mats(rear=False)
+    wall_kit(cab)
+    corner_trims(cab)
+    t = d["top"](-0.42, 0.55)
+    items = [("KH-626", 0.034, t + V3((0, 0, 0.004)), (0, -1, 0), (1, 0, 0))]
+    stencil(cab, "stencils", items)
+    cab.views(exposure=0.3, outside=3.0, daylight=8.0)
+    quiet_glass()
+    dome_lower()
+    cab.report()
+    K.meant("symmetry", *cab.one_sided)
+
+
+def build_interior():
+    build_cabin()
 
 
 # ---------------------------------------------------------------------------------------

@@ -84,6 +84,42 @@ without the uncut-hull cutters); the emitters' layered glow is step C's; the ste
 thin where the band narrows past the mouth's middle (an even band would widen it, a change
 to the stern's look).
 
+## Cabin (2026-11-24)
+
+![cabin](cabin.jpg)
+
+The schematic cabin (box seats, a slab tub, a box yoke, flat screen slabs) is replaced by
+the shared module's (`vehicles/cabin.py`, `style="kestrel"`), styled as a two-seat flight
+deck. The exterior is unchanged: its fingerprint differs only in `interior.*`, the cabin's
+materials and the studio's `cab*` lamps. The power cell and its shelf under the rear glass
+are kept as they were.
+
+- **What it has:** a lined tub from a firewall at the windshield's base (x 1.17, the
+  spine's cap 0.08) to a bulkhead behind the seats (x -0.96), floor 0.50 m up; the
+  bulkhead is open over the side windows' band, so the power cell shows through the rear
+  glass from the seats, and a trim bar with a cyan reading strip runs across its head. Two
+  oxblood seats laid back 28 degrees, low (hip 0.13 m over the floor), with post headrests
+  under the low roof and five-point harnesses (two shoulder straps over the back, lap
+  straps, a crotch strap, a round quick-release buckle ringed in cyan) in place of the
+  module's three-point belt. A graphite dash 0.60 m deep under the raked glass with slot
+  vents and a titanium inlay, a free cluster, a wide glass display, a yoke; no pedals (the
+  yoke flies it, the throttle is on the console): ribbed footrests in the footwells; a
+  throttle quadrant of two levers in a lit gate on the console; door cards with bar pulls
+  and a lit "KESTREL AERODYNE" sill plate.
+- **Overhead console:** a faceted spine on the centerline under the glass roof, from the
+  windshield's header to the solid roof behind the heads: rows of guarded toggles, an
+  annunciator strip, two rotary selectors and a small camera display (no inside mirror:
+  the car's mirrors are camera blades), "KA 2-217" stencilled on its cheeks. The module's
+  dome lamp, which hung inside it, is moved under it for the cabin views. "KD-217" on the
+  dash before the passenger.
+- **Fit:** the lining is held 35 mm inside the lower hull where it folds in under the
+  chine, 20 mm inside under the windshield's base and 15 mm along the A pillar's crease;
+  nothing of the cabin comes through the shell.
+- **Triangles:** the cabin about 3,900 to 37,596; the car 113,032 to 146,740 (of 400,000).
+- **Check:** `look` only for the fin code, 3.3 mm off its mirror image, as before (the old
+  tub's 4.5 mm `through` finding is gone); tires, ground, panels, `through` and triangles
+  `ok`; the cabin's one-sided parts are marked meant.
+
 ## What I would improve
 
 - The flat windshield mirrors the fins and the studio's top light at the hero's angle; a

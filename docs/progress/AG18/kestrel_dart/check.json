@@ -6,7 +6,7 @@
   1.194
  ],
  "top_z": 1.519,
- "objects": 108,
+ "objects": 179,
  "palette": {
   "paint": [
    0.64,
@@ -36,33 +36,185 @@
  "symmetry": {
   "verdict": "look",
   "center_off_mm": 0.0,
-  "objects": 3,
+  "objects": 1,
   "asymmetric": [
    {
-    "object": "interior.yoke",
-    "off_mm": 278.2,
+    "object": "interior.wheel.interior",
+    "off_mm": 337.4,
     "at": [
-     0.201,
-     0.167,
-     0.934
-    ]
+     0.115,
+     0.385,
+     0.886
+    ],
+    "meant": true
    },
    {
-    "object": "interior.screens",
-    "off_mm": 83.7,
+    "object": "interior.wheel.metal",
+    "off_mm": 324.4,
     "at": [
-     0.558,
-     0.45,
-     0.977
-    ]
+     0.11,
+     0.313,
+     0.923
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.soft",
+    "off_mm": 319.5,
+    "at": [
+     0.096,
+     0.365,
+     0.865
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.gloss",
+    "off_mm": 292.5,
+    "at": [
+     0.118,
+     0.424,
+     0.912
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.lit",
+    "off_mm": 278.8,
+    "at": [
+     0.117,
+     0.437,
+     0.919
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.lit",
+    "off_mm": 99.9,
+    "at": [
+     0.58,
+     0.263,
+     1.017
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.warn",
+    "off_mm": 98.2,
+    "at": [
+     0.58,
+     0.206,
+     1.015
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.gloss",
+    "off_mm": 90.0,
+    "at": [
+     0.584,
+     0.174,
+     1.03
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.dark",
+    "off_mm": 86.0,
+    "at": [
+     0.584,
+     0.18,
+     1.034
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.white",
+    "off_mm": 85.3,
+    "at": [
+     0.578,
+     0.378,
+     1.003
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.interior",
+    "off_mm": 17.8,
+    "at": [
+     0.587,
+     0.28,
+     0.899
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.throttle.soft",
+    "off_mm": 14.8,
+    "at": [
+     -0.07,
+     -0.037,
+     0.814
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.throttle.metal",
+    "off_mm": 13.2,
+    "at": [
+     -0.1,
+     0.022,
+     0.799
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.dash.metal",
+    "off_mm": 8.6,
+    "at": [
+     0.563,
+     -0.285,
+     0.688
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.stencils.stencil",
+    "off_mm": 5.3,
+    "at": [
+     0.816,
+     -0.399,
+     0.914
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.overhead_text.stencil",
+    "off_mm": 5.2,
+    "at": [
+     -0.353,
+     0.086,
+     1.341
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.dash.gloss",
+    "off_mm": 4.1,
+    "at": [
+     0.597,
+     -0.531,
+     0.608
+    ],
+    "meant": true
    },
    {
     "object": "fin.code",
-    "off_mm": 3.2,
+    "off_mm": 3.3,
     "at": [
-     -1.692,
-     -0.746,
-     1.223
+     -1.682,
+     -0.748,
+     1.228
     ]
    }
   ]
@@ -89,30 +241,22 @@
   }
  },
  "through": {
-  "verdict": "look",
-  "parts": [
-   {
-    "object": "interior.tub",
-    "out_mm": 4.5,
-    "share": 0.02,
-    "at": [
-     0.799,
-     -0.394,
-     0.475
-    ],
-    "meant": false
-   }
-  ],
-  "count": 1
+  "verdict": "ok",
+  "parts": [],
+  "count": 0
  },
  "triangles": {
   "verdict": "ok",
-  "total": 112558,
+  "total": 146740,
   "budget": 400000,
   "top": [
    [
     "body.door",
     7576
+   ],
+   [
+    "interior.lining",
+    6850
    ],
    [
     "body.fender",
@@ -123,34 +267,34 @@
     6104
    ],
    [
+    "interior.seat0.cover",
+    6072
+   ],
+   [
+    "interior.seat1.cover",
+    6072
+   ],
+   [
     "body.quarter",
-    5339
+    5346
    ],
    [
     "pod.ribs",
     4560
-   ],
-   [
-    "body.lower",
-    4500
-   ],
-   [
-    "body.lightband",
-    3372
-   ],
-   [
-    "lamp.chine_f.lit",
-    2808
    ]
   ],
   "groups": [
    [
     "body",
-    49628
+    49636
+   ],
+   [
+    "interior",
+    37596
    ],
    [
     "pod",
-    31542
+    31622
    ],
    [
     "lamp",
@@ -161,16 +305,12 @@
     6104
    ],
    [
-    "interior",
-    3888
-   ],
-   [
     "thrusters",
     1984
    ],
    [
     "fin",
-    1808
+    1822
    ],
    [
     "deck",

@@ -6,7 +6,7 @@
   1.383
  ],
  "top_z": 1.718,
- "objects": 129,
+ "objects": 230,
  "palette": {
   "paint": [
    0.006,
@@ -39,6 +39,56 @@
   "objects": 3,
   "asymmetric": [
    {
+    "object": "interior.wheel.soft",
+    "off_mm": 363.1,
+    "at": [
+     0.603,
+     0.189,
+     1.132
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.interior",
+    "off_mm": 354.2,
+    "at": [
+     0.603,
+     0.193,
+     1.118
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.gloss",
+    "off_mm": 352.6,
+    "at": [
+     0.61,
+     0.246,
+     1.122
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.metal",
+    "off_mm": 349.7,
+    "at": [
+     0.61,
+     0.353,
+     1.134
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.wheel.lit",
+    "off_mm": 348.4,
+    "at": [
+     0.615,
+     0.257,
+     1.13
+    ],
+    "meant": true
+   },
+   {
     "object": "led.step",
     "off_mm": 236.8,
     "at": [
@@ -55,16 +105,6 @@
      0.656,
      1.034,
      0.499
-    ],
-    "meant": true
-   },
-   {
-    "object": "interior.yoke",
-    "off_mm": 219.6,
-    "at": [
-     0.601,
-     0.197,
-     1.057
     ],
     "meant": true
    },
@@ -89,12 +129,102 @@
     "meant": true
    },
    {
+    "object": "interior.cluster.warn",
+    "off_mm": 101.8,
+    "at": [
+     1.034,
+     0.241,
+     1.21
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.lit",
+    "off_mm": 101.4,
+    "at": [
+     1.033,
+     0.297,
+     1.205
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.gloss",
+    "off_mm": 97.2,
+    "at": [
+     1.037,
+     0.214,
+     1.216
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.white",
+    "off_mm": 96.8,
+    "at": [
+     1.032,
+     0.429,
+     1.199
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.dark",
+    "off_mm": 93.1,
+    "at": [
+     1.037,
+     0.22,
+     1.22
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.cluster.interior",
+    "off_mm": 18.0,
+    "at": [
+     1.034,
+     0.32,
+     1.085
+    ],
+    "meant": true
+   },
+   {
     "object": "step.bay",
     "off_mm": 16.1,
     "at": [
      -0.83,
      0.933,
      0.772
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.throttle.soft",
+    "off_mm": 14.8,
+    "at": [
+     0.437,
+     -0.037,
+     0.824
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.dash.metal",
+    "off_mm": 13.6,
+    "at": [
+     1.014,
+     -0.325,
+     0.861
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.throttle.metal",
+    "off_mm": 13.2,
+    "at": [
+     0.407,
+     0.022,
+     0.809
     ],
     "meant": true
    },
@@ -108,21 +238,51 @@
     ]
    },
    {
-    "object": "led.name",
-    "off_mm": 5.2,
+    "object": "interior.stencils.stencil",
+    "off_mm": 6.3,
     "at": [
-     -2.502,
-     0.065,
-     1.149
+     1.224,
+     -0.443,
+     1.092
+    ],
+    "meant": true
+   },
+   {
+    "object": "interior.overhead_text.stencil",
+    "off_mm": 6.2,
+    "at": [
+     0.12,
+     0.087,
+     1.596
+    ],
+    "meant": true
+   },
+   {
+    "object": "led.name",
+    "off_mm": 3.8,
+    "at": [
+     -2.501,
+     0.066,
+     1.143
     ]
    },
    {
-    "object": "fin.code",
-    "off_mm": 3.3,
+    "object": "interior.dash.gloss",
+    "off_mm": 3.5,
     "at": [
-     -2.388,
-     -0.762,
-     1.362
+     1.055,
+     -0.571,
+     0.794
+    ],
+    "meant": true
+   },
+   {
+    "object": "fin.code",
+    "off_mm": 3.4,
+    "at": [
+     -2.395,
+     -0.764,
+     1.367
     ]
    }
   ]
@@ -155,16 +315,32 @@
  },
  "triangles": {
   "verdict": "ok",
-  "total": 119902,
+  "total": 180799,
   "budget": 400000,
   "top": [
+   [
+    "interior.lining",
+    11861
+   ],
    [
     "hull.ribs",
     7448
    ],
    [
-    "interior.seats",
-    5264
+    "interior.seat0.cover",
+    6800
+   ],
+   [
+    "interior.seat1.cover",
+    6800
+   ],
+   [
+    "interior.seat2.cover",
+    6528
+   ],
+   [
+    "interior.seat3.cover",
+    6528
    ],
    [
     "body.lightband",
@@ -173,32 +349,20 @@
    [
     "step.links",
     3904
-   ],
-   [
-    "body.door_r",
-    3756
-   ],
-   [
-    "body.door_f",
-    3708
-   ],
-   [
-    "body.quarter",
-    3644
-   ],
-   [
-    "body.trim",
-    3360
    ]
   ],
   "groups": [
+   [
+    "interior",
+    66334
+   ],
    [
     "body",
     42756
    ],
    [
     "pod",
-    30804
+    30884
    ],
    [
     "lamp",
@@ -207,10 +371,6 @@
    [
     "hull",
     7448
-   ],
-   [
-    "interior",
-    6912
    ],
    [
     "step",
@@ -222,7 +382,7 @@
    ],
    [
     "led",
-    1730
+    2570
    ]
   ]
  },
