@@ -66,12 +66,25 @@ zebra and check above are of this build.
 - Left: the sensor band's layered glow (step C), the fender markers as lit strips, the nose
   ribs' small gap at LOD3 (main's LOD2 had a dent there).
 
+## Cabin
+
+![cabin](cabin.jpg)
+
+The full citadel from `vehicles/cabin.py` (`style="brakk"`), in place of the box seats and slab dash: `cab_fwd`, `cab_side`, `cab_back` and `cab_in` above, 128 samples.
+
+- **What it has.** An armored car's interior lined from the windshield's base to a wall inside the tail plate, a grey spall liner over the slit windows' sills and hard dark trim under them, a black rubber floor with ribbed mats; four upright buckets in brown work vinyl with post headrests and belts on the pillars; a hard black dash with a cobalt band, slat vents, the gauge hood, a small map screen and BASTION on a bolted steel plate; a four-spoke wheel on a 34 degree column, pedals with a dead pedal, a louvred kick panel in each footwell; the console with the lever and a row of switches; steel door cards with bolted edges and bar pulls, BASTION lit on the front sills; every window in a thick bolted steel frame (the slit windows a box frame each, sleeve, flange and bolt heads; the windshield the same section up its sides and across its header); grab bars up the A pillars and on the B pillars and over the doors; an overhead switch and radio console over the front seats' backs ("NET 4"); a round roof hatch with its handwheel and red latches over the rear seats (under the drone pad); behind the rear seats the bay under the glass hatch: an equipment rack of cases on the left, a comms rack of radios on the right, tie-down rails, a power panel on the rear wall and a fire extinguisher.
+- **The lining.** The firewall plane just behind the windshield's base (1.24), the spine on to 20 cm of each end (`cap=0.20`), a 30 mm grid, the vertices under the cowl pressed 30 mm inside the shell, the reveals in the dark trim (`reveal=`), and the car's `zone()`. The lining's faces standing in the footwells (a sliver of the cowl, as a spike) are deleted; the fender plates' inner flange that stands 6 cm through the hull's side by the footwells is hidden by the kick panels. The steel frames replace the earlier mouldings laid on the lining, which stayed ragged round the slit windows and the header.
+- **Triangles.** Interior about 4,500 before (the schematic tub), 78,630 now (lining 22,836, the buckets 7,316 to 7,788 each, the hardware 6,258); the whole vehicle 300,634 before, 374,764 now (of 400,000).
+- **Check.** `--check` says `ok` on every check: tires, ground, symmetry (the cabin's one-sided parts told as meant), panels, through (0 cabin parts in the open), triangles. The log's "through the shell" says nothing.
+- **Exterior.** Signed before and after: only `interior.*` objects, cabin materials and the studio's `cab*` lamps differ.
+- **Weakest from the seat.** The seats' backs show the cabin lamps' hard shadow edges (as on the Hauler); the bay's racks sit behind the rear seats and are hard to see from the front; the corner facets of the windshield show the hood's bright chamfer through the glass; the frames' inner sleeves leave a few grey slivers of lining at their corners.
+
 ## What I would improve
 
 - The raked windshield mirrors the studio's top light from the front quarter; the hero stands lower and more to the side to keep most of it clear. A slight crown in the glass would fix it for every view.
 - The spare hides the hatch's lower half and the unit plate; a spare offset to one side on a longer arm would show more of the tail.
 - The steps are drawn down only; a folded one beside a lowered one would explain them. The drone's rotors could fold, and the pad could sit in a recess with doors.
-- A fuller cabin (door cards, belts, a rear cargo deck) and a second sensor band across the brow of the windshield.
+- A second sensor band across the brow of the windshield.
 
 ## Kit wishes
 
