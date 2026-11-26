@@ -227,7 +227,7 @@ Smart projection per slot (66 degrees; the islands that end up covering texels a
 island covers, over 0.1% of the atlas, as a lip curling under its frame does, are projected
 again at 34 degrees, those still lying over themselves once more at 20, then at 11, then at 6; what still does, layers that face one way and meet at a vertex, is laid flat face by face, each an island of its own), each island scaled to one texel density times its class's
 weight (exterior 1, cabin 0.4, 0.7 on a car with a `cabin.py` cabin, which is seen from
-the seat (at 0.4 it read soft, 170 to 200 px/m), underside 0.35, a lamp or a large face seen only in gaps 0.35, a rim face
+the seat (at 0.4 it read soft, 170 to 200 px/m; where it takes the exterior's 5th percentile under its class's floor and 3% more, the weight comes down by what gives those texels back, never under 0.4, and the body is unwrapped again: the Brakk Mule's 20.7 m2 of cabin), underside 0.35, a lamp or a large face seen only in gaps 0.35, a rim face
 0.5; on a vehicle with no wheels, which floats and sets down when parked, a face under 0.5 m
 that only rays going down leave is underside: no eye gets under it, and its belly's texels
 go to what is seen), then a skyline packer at the largest
@@ -251,13 +251,15 @@ it. Measured density (px/m, area weighted median and 5th percentile, per class) 
 
 ## Size class
 
-A vehicle whose body has 55 m2 of exterior or more (faces of class exterior after the
+A vehicle whose body has 50 m2 of exterior or more (faces of class exterior after the
 unseen ones are removed: trucks, vans, the hauler class) is **large**, else **standard**.
 The class sets the LOD budgets (LOD3 8,000 triangles large, 5,000 standard) and the texel
 floor of `texel_density` (large: 240 px/m, standard: 300 px/m; set so that the Mule, the
 largest, passes with a few percent to spare, and never under 220 px/m). The lower floor is
 what the check asks only: the unwrap's detail boost keeps the standard floor's margin in
-every class. `pack.json`'s `size_class` records the class, the exterior it was measured
+every class. The line was 55 m2 until the cabins: a cabin hides faces seen through the
+glass that had counted as exterior, and the Brakk Bastion fell from 57.1 to 54.9 m2; at 50
+the nearest cars stay clear of it (the Aurel Regent 48.5, the Bastion 54.9). `pack.json`'s `size_class` records the class, the exterior it was measured
 on, the rule, the budgets and the floor; the report and the proof's footer repeat them.
 
 ## LODs

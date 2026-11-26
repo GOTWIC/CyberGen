@@ -160,7 +160,8 @@ vehicles/blender.sh vehicles/game.py --car vanta_r --test           # 1024 / 512
   LOD is measured against LOD0 (normals, textures) and fails when crumpled. `--keep-work`
   then `--lods-only` remakes only the LODs in seconds.
 - **Cabins** (`cabin.py`'s `interior.*` objects). Faces seen only through the glass are the
-  cabin class (texels at 0.7 of the exterior's on a car with a cabin, 0.4 otherwise); the
+  cabin class (texels at 0.7 of the exterior's on a car with a cabin, less where the exterior would fall
+  under its floor, 0.4 otherwise); the
   cabin is in LOD0 and LOD1 and left out from LOD2, where the glass turns dark and opaque.
   It has a triangle budget of its own over the exterior's: 50,000 at LOD0, 10,000 at LOD1,
   measured apart (`pack.json`'s `lods[k].exterior` and `.cabin`). A cabin face no ray from outside
@@ -176,7 +177,7 @@ vehicles/blender.sh vehicles/game.py --car vanta_r --test           # 1024 / 512
   relief for it; within it, it is not collapsed
   at LOD0, and at LOD1 it is collapsed apart from the exterior. `--views cab_fwd,cab_in,cab_back` compares the pack from inside, in
   the cabin views' own light; `proof/lod1_<view>.jpg` shows LOD1 from there.
-- **Size class.** Large vehicles (55 m2 of body exterior or more: trucks, vans) get an
+- **Size class.** Large vehicles (50 m2 of body exterior or more: trucks, vans) get an
   8,000 triangle LOD3 (5,000 otherwise) and a lower texel floor.
 - **Shared wheels.** A wheel that is another one moved or mirrored shares its texels
   (never mirrored when lettering is baked onto it).

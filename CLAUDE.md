@@ -2468,7 +2468,7 @@ waits for Swagnik's review.
   GitHub release of this repo (`vehicles/packs.py`: `fetch` on a machine without them, every
   file checked against the committed `vehicles/packs.json`; `publish` after rebuilding
   packs, committing `packs.json` in the same PR; `status`). Size classes standard
-  and large (55 m2 of exterior or more: LOD3 8,000 triangles, texel floor 240 px/m against
+  and large (50 m2 of exterior or more: LOD3 8,000 triangles, texel floor 240 px/m against
   5,000 and 300). Built for 18 vehicles, every check passing (the faults of the first run
   fixed in `game.py` and nine packs rebuilt, 2026-11-12; the other nine are as first built).
   A pack is the car parked and shut (`CYBERGEN_SHUT`, `SHUT_ENV` in `game.py`).

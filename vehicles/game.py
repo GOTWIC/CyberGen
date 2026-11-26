@@ -53,7 +53,7 @@ T0 = time.time()
 LOD_TRIS = (150000, 60000, 20000, 5000)
 # the size class: a vehicle whose body has this much exterior (m2, after the unseen faces
 # are removed: trucks, vans, the hauler class) is large: a larger far LOD, a lower floor
-LARGE_EXTERIOR_M2 = 55.0
+LARGE_EXTERIOR_M2 = 50.0   # 55 until the cabins: the Bastion's fell to 54.9 m2 (57.1 before)
 LOD_TRIS_LARGE = (150000, 60000, 20000, 8000)
 # a cabin.py cabin's own allowance over those (the budgets above are the exterior's, wheels
 # and glass: measured without the cabin), LOD0 and LOD1; the cabin is left out from LOD2.
@@ -79,6 +79,8 @@ CLASS_NAMES = {0: "exterior", 1: "underside", 2: "cabin", 3: "lamp_in_gaps",  # 
                4: "rim_face"}                 # the far LODs' rim faces (rim_disc)
 CABIN_WEIGHT = 0.7              # the cabin class's weight on a car with a cabin.py cabin (seen
                                 # from the seat: at 0.4 it read soft, 170 to 200 px/m)
+CABIN_WEIGHT_MIN = 0.4          # ... lowered toward this where the exterior falls under its
+CABIN_REWEIGH = 3               # floor (unwrapped again up to this many times)
 CAGE_M, REACH_M = 0.015, 0.035  # baking the detail: cage out, ray reach under the surface
 TEXEL_FLOOR = {"body": 300.0, "wheels": 300.0}  # px/m on exterior faces at 4096 / 2048
 TEXEL_FLOOR_LARGE = {"body": 240.0, "wheels": 240.0}  # ... for the large class (never under 220)
@@ -2455,6 +2457,8 @@ LOD_WELD_FROM = 3                           # pieces welded where their vertices
 LOD_WELD_M = 0.0015
 LOD_LATHE_SEGS = 20
 LOD_WRECK_FROM = 3                          # wrecked pieces put right (stand_ins)
+LOD_OVER_TOL = 1.1                          # a far LOD over its budget by more (the check's
+LOD_SQUEEZE = 2                             # tolerance) made again at a lower target, this often
 LOD_WRECK_M = 0.01                          # ... off their shape by more than this
 LOD_WRECK_SHARE = 0.12                      # ... or this share of their size
 LOD_STANDIN_M = 0.6                         # ... a hull or gone up to this size
@@ -3688,6 +3692,7 @@ def make_lods(parts_final, budgets, coll, work=None, cabin=None):
                 k, {nm: len(v) for nm, v in unseen.items()}, time.time() - t1))
         hid = unseen or {}
         SMALL_SCALE[0] = 1.0
+        squeeze = 0
         while True:
             prep = {nm: lod_prep(o, k, nm in coarse, nm.startswith("wheel_"),
                                  unseen=hid.get(nm))
@@ -3828,6 +3833,19 @@ def make_lods(parts_final, budgets, coll, work=None, cabin=None):
                 log("  LOD%d starved (ratio %.3f): made again with the small parts left "
                     "out up to %g times the size" % (k, ratio, nxt))
                 SMALL_SCALE[0] = nxt
+                for o in objs_k:
+                    me = o.data
+                    bpy.data.objects.remove(o)
+                    bpy.data.meshes.remove(me)
+                continue
+            if k >= LOD_WRECK_FROM and cab is None and got > LOD_OVER_TOL * budget_k and                     squeeze < LOD_SQUEEZE:
+                # the wrecked pieces' stand-ins and the held box left the LOD over its
+                # budget: made again at a target lowered by the overshoot
+                squeeze += 1
+                nt = int(target * budget_k / got * 0.97)
+                log("  LOD%d over its budget (%d of %d): made again at target %d" % (
+                    k, got, budget_k, nt))
+                target = nt
                 for o in objs_k:
                     me = o.data
                     bpy.data.objects.remove(o)
@@ -4219,6 +4237,29 @@ def main_build(A):
             1000 * DETAIL_FINE_PX / floor_px, sorted({p.ob.name for p in fine})))
         uvinfo["body"] = unwrap(body, A.body_size, boost=marked, floor=floor_px,
                                 fine=detail_faces(body, fine))
+        # a cabin seen from the seat (CABIN_WEIGHT) takes texels from the exterior: where
+        # that leaves the exterior's 5th percentile under the class's floor (with
+        # DETAIL_MARGIN), the cabin's weight comes down by what gives them back (the
+        # weights' squares times the areas are the atlas's share), never under the
+        # weight of the cars before cabins, and the body is unwrapped again (the Brakk
+        # Mule: 20.7 m2 of cabin at 0.7 took its exterior from 243.8 to 236.6 px/m)
+        want = floors["body"] * A.body_size / 4096 * DETAIL_MARGIN
+        for _ in range(CABIN_REWEIGH):
+            st = texel_stats(body, A.body_size)
+            p5 = st.get("exterior", {}).get("p5")
+            cab_a = st.get("cabin", {}).get("area_m2", 0.0)
+            w = WEIGHT[2]
+            if not cabin_idx or not p5 or p5 >= want or cab_a <= 0 or w <= CABIN_WEIGHT_MIN:
+                break
+            S = sum(r["area_m2"] * WEIGHT.get(k, 1.0) ** 2 for k, r in (
+                (next((c for c, nm in CLASS_NAMES.items() if nm == name), None), r)
+                for name, r in st.items()) if k is not None)
+            w2 = w * w - S * (1 - (p5 / want) ** 2) / cab_a
+            WEIGHT[2] = max(CABIN_WEIGHT_MIN, sqrt(max(0.0, w2)) * 0.97)
+            log("the exterior at %.1f px/m is under %.1f with the cabin at %.2f: the cabin's "
+                "weight %.2f, unwrapped again" % (p5, want, w, WEIGHT[2]))
+            uvinfo["body"] = unwrap(body, A.body_size, boost=marked, floor=floor_px,
+                                    fine=detail_faces(body, fine))
         # (the detail boost keeps the standard floor's margin in every class: the large
         # class's lower floor is what the check asks, not room to spend on detail)
     if glass is not None:
@@ -5262,7 +5303,7 @@ def check(pack_dir, docs, seconds, stage_seconds):
         if g is None:
             continue
         n = sum(len(pr["idx"]) for nd in g.values() for pr in nd["prims"])
-        tol = 1.0 if r["lod"] == 0 else 1.1
+        tol = 1.0 if r["lod"] == 0 else LOD_OVER_TOL
         row = dict(lod=r["lod"], triangles=n, budget=r["budget"], ok=n <= r["budget"] * tol)
         if "cabin" in r:
             # a cabin.py cabin: the exterior (body, glass, wheels) and the cabin each
