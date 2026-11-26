@@ -3,15 +3,15 @@
  "title": "Halcyon Sable",
  "ok": true,
  "triangles": {
-  "original": 280675,
+  "original": 340253,
   "lods": [
-   148918,
-   59987,
-   20187,
-   5132
+   193407,
+   69970,
+   20175,
+   5119
   ],
   "lod0_parts": {
-   "body": 95742,
+   "body": 140231,
    "glass": 5440,
    "wheel_fl": 11986,
    "wheel_fr": 11986,
@@ -24,12 +24,12 @@
   }
  },
  "objects": {
-  "original": 106,
+  "original": 183,
   "parts": 10
  },
  "size_class": {
   "name": "standard",
-  "exterior_m2": 41.81,
+  "exterior_m2": 37.1,
   "rule": "large when the body's exterior is 55 m2 or more",
   "lod_budgets": [
    150000,
@@ -40,51 +40,92 @@
   "texel_floor_px_per_m": {
    "body": 300.0,
    "wheels": 300.0
-  }
+  },
+  "cabin_budgets": [
+   50000,
+   10000,
+   0,
+   0
+  ],
+  "budgets_rule": "lod_budgets the exterior's (body, glass, wheels, without the cabin); cabin_budgets the cabin.py cabin's allowance over them"
  },
  "textures": {
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 34312095,
- "seconds": 998.2,
+ "pack_bytes": 41958848,
+ "seconds": 2069.8,
  "stage_seconds": {
-  "build": 1.5,
-  "render_original": 231.0,
-  "parts": 21.6,
+  "build": 2.8,
+  "render_original": 80.1,
+  "parts": 219.0,
   "nodes": 0.0,
-  "uv": 32.5,
-  "bake": 248.1,
-  "lods_export": 17.2,
-  "textures": 8.709830045700073,
-  "proof": 436.92349100112915
+  "uv": 249.7,
+  "bake": 1153.2,
+  "lods_export": 60.3,
+  "textures": 20.665648221969604,
+  "proof": 282.6552724838257
  },
  "baked_down": {
-  "relief": {
-   "pieces": 13,
-   "triangles": 7957,
-   "names": [
-    "arch.bolts",
-    "badge",
-    "decals",
-    "lamp.front.chrome",
-    "lamp.front.housing",
-    "lamp.rear.chrome",
-    "led.marker",
-    "led.name",
-    "mirror.lens",
-    "plate.glyphs",
-    "sensors",
-    "spine.bolts",
-    "wiper.blade"
-   ]
-  },
   "card_src": {
    "pieces": 2,
    "triangles": 40032,
    "names": [
     "mouth.mesh",
     "tail.mesh"
+   ]
+  },
+  "relief": {
+   "pieces": 23,
+   "triangles": 5172,
+   "names": [
+    "decals",
+    "interior.cluster.dark",
+    "interior.cluster.gloss",
+    "interior.console.gloss",
+    "interior.dash.interior",
+    "interior.dash.trim",
+    "interior.door_f.grille",
+    "interior.door_r.gloss",
+    "interior.door_r.grille",
+    "interior.mats.mat",
+    "interior.pedals.mat",
+    "interior.screen.dark",
+    "interior.seat0.red",
+    "interior.seat1.red",
+    "interior.seat2.red",
+    "interior.seat3.red",
+    "interior.wheel.gloss",
+    "interior.wheel.metal",
+    "led.marker",
+    "led.name",
+    "plate.glyphs",
+    "sensors",
+    "spine.bolts"
+   ]
+  },
+  "planar": {
+   "pieces": 5,
+   "triangles": 9747,
+   "names": [
+    "interior.dash.gloss",
+    "interior.lining",
+    "interior.wells"
+   ]
+  },
+  "collapse": {
+   "pieces": 17,
+   "triangles": 45360,
+   "names": [
+    "interior.door_f.interior",
+    "interior.door_f.soft",
+    "interior.door_r.interior",
+    "interior.door_r.soft",
+    "interior.seat0.cover",
+    "interior.seat1.cover",
+    "interior.seat2.cover",
+    "interior.seat3.cover",
+    "interior.wheel.soft"
    ]
   },
   "lathe": {
@@ -101,53 +142,53 @@
  "texel_px_per_m": {
   "body": {
    "exterior": {
-    "area_m2": 41.811,
-    "p5": 346.0,
-    "median": 356.5
+    "area_m2": 37.1,
+    "p5": 324.0,
+    "median": 337.1
    },
    "cabin": {
-    "area_m2": 16.872,
-    "p5": 141.3,
-    "median": 142.7
+    "area_m2": 31.014,
+    "p5": 230.4,
+    "median": 235.5
    },
    "underside": {
-    "area_m2": 0.235,
-    "p5": 314.6,
-    "median": 360.1
+    "area_m2": 0.197,
+    "p5": 316.6,
+    "median": 338.6
    },
    "lamp_in_gaps": {
-    "area_m2": 1.278,
-    "p5": 124.5,
-    "median": 124.6
+    "area_m2": 0.518,
+    "p5": 117.7,
+    "median": 336.7
    }
   },
   "wheels": {
    "exterior": {
     "area_m2": 5.42,
-    "p5": 374.8,
-    "median": 411.5
+    "p5": 374.4,
+    "median": 411.0
    },
    "underside": {
     "area_m2": 0.021,
-    "p5": 143.5,
-    "median": 403.0
+    "p5": 143.3,
+    "median": 402.6
    },
    "lamp_in_gaps": {
     "area_m2": 0.052,
-    "p5": 144.0,
-    "median": 144.0
+    "p5": 143.9,
+    "median": 143.9
    }
   }
  },
- "lights": 45,
+ "lights": 68,
  "collision_hulls": 9,
  "source": {
   "script": "vehicles/cars/halcyon_sable.py",
-  "script_sha256": "94965d05f60383c0ac66583f712999809e7872a6230f12eb2dcbda3472d8a8b7",
+  "script_sha256": "c8a50b8bceaf70bf469828dfb0043bf06e3e5c6e146bc6a6e208699eb3c6edfd",
   "carkit_sha256": "4a1b9a9a1c4472c37227e0b9171ff94263a6d3d320dd4d13ad55783936af1832",
-  "game_sha256": "32271c5b2195e75c93509022799b7dd770add377d59cc906b924e040e27ff1db",
-  "original_triangles": 280675,
-  "original_objects": 106
+  "game_sha256": "8640355211eff1ad8e8800b9a8116a3a72550090cdf34c828e5604422b183fc4",
+  "original_triangles": 340253,
+  "original_objects": 183
  },
  "test": false,
  "checks": [
@@ -166,27 +207,63 @@
    "detail": [
     {
      "lod": 0,
-     "triangles": 148918,
-     "budget": 150000,
-     "ok": true
+     "triangles": 193407,
+     "budget": 200000,
+     "ok": true,
+     "exterior": {
+      "triangles": 144703,
+      "budget": 150000,
+      "ok": true
+     },
+     "cabin": {
+      "triangles": 48704,
+      "budget": 50000,
+      "ok": true
+     }
     },
     {
      "lod": 1,
-     "triangles": 59987,
-     "budget": 60000,
-     "ok": true
+     "triangles": 69970,
+     "budget": 70000,
+     "ok": true,
+     "exterior": {
+      "triangles": 59973,
+      "budget": 60000,
+      "ok": true
+     },
+     "cabin": {
+      "triangles": 9997,
+      "budget": 10000,
+      "ok": true
+     }
     },
     {
      "lod": 2,
-     "triangles": 20187,
+     "triangles": 20175,
      "budget": 20000,
-     "ok": true
+     "ok": true,
+     "exterior": {
+      "triangles": 19545,
+      "budget": 20000
+     },
+     "cabin": {
+      "triangles": 630,
+      "budget": 0
+     }
     },
     {
      "lod": 3,
-     "triangles": 5132,
+     "triangles": 5119,
      "budget": 5000,
-     "ok": true
+     "ok": true,
+     "exterior": {
+      "triangles": 4951,
+      "budget": 5000
+     },
+     "cabin": {
+      "triangles": 168,
+      "budget": 0
+     }
     }
    ]
   },
@@ -197,13 +274,13 @@
     "limit": 0.005,
     "slots": {
      "body": {
-      "overlap": 0.00061,
-      "coverage": 0.4423,
+      "overlap": 0.00083,
+      "coverage": 0.4316,
       "outside_unit": 0.0
      },
      "wheels": {
       "overlap": 0.0,
-      "coverage": 0.2205,
+      "coverage": 0.22,
       "outside_unit": 0.0
      }
     }
@@ -214,14 +291,14 @@
    "ok": true,
    "detail": {
     "body": {
-     "p5": 346.0,
-     "median": 356.5,
+     "p5": 324.0,
+     "median": 337.1,
      "floor": 300.0,
      "ok": true
     },
     "wheels": {
-     "p5": 374.8,
-     "median": 411.5,
+     "p5": 374.4,
+     "median": 411.0,
      "floor": 300.0,
      "ok": true
     }
@@ -370,10 +447,10 @@
    "ok": true,
    "detail": [
     {
-     "normal_p95_deg": 2.0,
-     "bent_share": 0.004,
-     "texture_share": 0.0001,
-     "miss_share": 0.0009,
+     "normal_p95_deg": 2.11,
+     "bent_share": 0.0046,
+     "texture_share": 0.0,
+     "miss_share": 0.001,
      "lod": 1,
      "limits": {
       "p95": 12.0,
@@ -383,10 +460,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 14.66,
-     "bent_share": 0.0166,
-     "texture_share": 0.0008,
-     "miss_share": 0.002,
+     "normal_p95_deg": 15.46,
+     "bent_share": 0.0188,
+     "texture_share": 0.0024,
+     "miss_share": 0.0026,
      "lod": 2,
      "limits": {
       "p95": 25.0,
@@ -396,10 +473,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 32.64,
-     "bent_share": 0.0768,
-     "texture_share": 0.0074,
-     "miss_share": 0.0377,
+     "normal_p95_deg": 28.12,
+     "bent_share": 0.0606,
+     "texture_share": 0.0154,
+     "miss_share": 0.0404,
      "lod": 3,
      "limits": {
       "p95": 40.0,
@@ -416,15 +493,15 @@
    "detail": {
     "hulls": 9,
     "vertices": [
-     304,
-     138,
-     236,
-     160,
-     194,
-     172,
-     197,
+     316,
+     134,
+     284,
+     168,
+     228,
      152,
-     356
+     182,
+     164,
+     364
     ]
    }
   }
