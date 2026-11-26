@@ -160,17 +160,21 @@ vehicles/blender.sh vehicles/game.py --car vanta_r --test           # 1024 / 512
   LOD is measured against LOD0 (normals, textures) and fails when crumpled. `--keep-work`
   then `--lods-only` remakes only the LODs in seconds.
 - **Cabins** (`cabin.py`'s `interior.*` objects). Faces seen only through the glass are the
-  cabin class (texels at 0.4 of the exterior's); the cabin is in LOD0 and LOD1 and left out
-  from LOD2, where the glass turns dark and opaque. A cabin face no ray from outside
+  cabin class (texels at 0.7 of the exterior's on a car with a cabin, 0.4 otherwise); the
+  cabin is in LOD0 and LOD1 and left out from LOD2, where the glass turns dark and opaque.
+  It has a triangle budget of its own over the exterior's: 50,000 at LOD0, 10,000 at LOD1,
+  measured apart (`pack.json`'s `lods[k].exterior` and `.cabin`). A cabin face no ray from outside
   reaches is still kept when it is open to the cabin (seen from a seat). A cabin face keeps
   its side when its back is also seen from outside (a door lining through the slot under a side window), and
   its lit displays and sill letters stay geometry (baked, they were specks); a closed solid
   wound inward (the seat covers) is turned outward for the low parts and the bakes alike
   (a collapsed seat baked dark and mottled from its inward originals), and its baked-down
   detail comes from the cabin's own objects only (the body's paint, a few centimeters behind
-  the lining, came through on the headliner and door cards). Over budget
-  the cabin is shed alike with the exterior (relief, then a collapse of every part of 600
-  triangles or more). `--views cab_fwd,cab_in,cab_back` compares the pack from inside, in
+  the lining, came through on the headliner and door cards). Over its
+  allowance the cabin alone is shed (its flat faces merged, then its relief, then a
+  collapse of its parts of 600 triangles or more but the lining), never the exterior's
+  relief for it; within it, it is not collapsed
+  at LOD0, and at LOD1 it is collapsed apart from the exterior. `--views cab_fwd,cab_in,cab_back` compares the pack from inside, in
   the cabin views' own light; `proof/lod1_<view>.jpg` shows LOD1 from there.
 - **Size class.** Large vehicles (55 m2 of body exterior or more: trucks, vans) get an
   8,000 triangle LOD3 (5,000 otherwise) and a lower texel floor.
@@ -183,7 +187,9 @@ vehicles/blender.sh vehicles/game.py --car vanta_r --test           # 1024 / 512
 - **Checks.** Budgets, UV overlap, texel density, files, wheel pivots, LOD bounds, LOD
   fidelity, hull count (`game_report.json`); the run fails when one fails.
 - **Time.** About 8 to 14 minutes a car at full size, up to 27 for the largest (most of it
-  the bakes, the LOD fits and the proof); `--lods` alone 1 to 4 minutes. Packs are 20 to
+  the bakes, the LOD fits and the proof); a car with a full cabin 35 to 45 minutes on the PC
+  with `--views cab_fwd,cab_in` (the Vanta-R, the Mino: its larger atlas unwrap and bake,
+  the cabin views rendered three times); `--lods` alone 1 to 4 minutes. Packs are 20 to
   51 MB and never go in git.
 - **On another machine.** The built packs are a GitHub release of this repo:
   `python vehicles/packs.py fetch` downloads the 15 (about 550 MB) into the packs' cache and

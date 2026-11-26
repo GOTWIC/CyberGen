@@ -13,7 +13,7 @@ vehicles/blender.sh vehicles/game.py --car vanta_r --test          # 1024 / 512,
 | `--car NAME` | a car of `vehicles/cars/` (file name without `.py`) |
 | `--out DIR` | the pack's folder (default `~/.cache/cybergen/vehicles/game/<car>/`; never in git) |
 | `--body-size N`, `--wheel-size N` | atlas sizes (4096, 2048) |
-| `--lods A B C D` | triangle budgets (default by the size class: 150000 60000 20000 5000, large 150000 60000 20000 8000) |
+| `--lods A B C D` | triangle budgets of the exterior, glass and wheels (default by the size class: 150000 60000 20000 5000, large 150000 60000 20000 8000); a `cabin.py` cabin has its own allowance over them (below) |
 | `--samples K` | scales every bake and render sample count (1) |
 | `--test` | 1024 / 512 textures, a quarter of the samples, half-size renders |
 | `--docs` | also writes `docs/progress/AG18/<car>/game.jpg` and `game_report.json` |
@@ -129,6 +129,21 @@ weave are listed in `micro_detail` for the engine's detail maps.
 
 So that LOD0 is near 150,000 triangles without decimating the silhouette:
 
+- **The cabin's own budget.** The budgets are the exterior's (body, glass, wheels: every
+  face but a cabin's), measured without the cabin. A `cabin.py` cabin (its `interior.*`
+  objects) has an allowance of its own over them, measured apart: 50,000 triangles at LOD0
+  (`CABIN_LOD0`), 10,000 at LOD1 (`CABIN_LOD1`), none from LOD2, which leaves it out. Over
+  the exterior's budget the exterior is shed as below; over the cabin's allowance the cabin
+  alone: first its flat faces within 0.5 degrees of coplanar merged (never a face shaded
+  curved; nothing moves, `planar` in `baked_down`: the Mino's cabin 13% lighter), then its
+  relief up to 12.5 mm, then its parts of 600 triangles or more collapsed as the exterior's,
+  but never the lining (its edges lap onto the body's frame, and a collapse tore them off
+  it). The exterior's relief never pays for the cabin, and a cabin within its allowance is
+  not collapsed at all. Shared, the Vanta-R's and the Mino's exterior bodies
+  lost 18,000 and 35,000 triangles to their cabins and their bumpers, guards, lamp chromes
+  and plates were baked flat; collapsed, the Mino's headrests, headliner and tailgate trim
+  showed folds and tears.
+
 - **Always**: relief no taller than 3.2 mm over another object's surface (a lamp only
   when 70% of it lies on one other piece: a band between flutes would bake in patches) (lettering,
   ribbons, decals, glyphs, studs) is removed and baked onto the surface under it (color,
@@ -182,12 +197,13 @@ So that LOD0 is near 150,000 triangles without decimating the silhouette:
 
 `baked_down` in `pack.json` lists every piece and what became of it.
 
-**Fine relief stays at LOD0.** When LOD0 is under its budget with nothing shed, relief
+**Fine relief stays at LOD0.** When LOD0 is under its budget with nothing shed (the exterior
+and a cabin each within its own), relief
 whose loose parts are under 4 texels wide at the texel floor (flutes and slots 13 mm wide or
 less, small lettering: no atlas draws them as lines and letters, they come out as a beat
 pattern or as dots) is also kept as it is in LOD0, over its baked image (`kept_at_lod0` in
 `baked_down`), the smallest pieces first while that fits the budget and takes no more than
-20% of it; lamps never. Its faces are left out from LOD1 on, where the baked image alone
+20% of it (a cabin's within its allowance); lamps never. Its faces are left out from LOD1 on, where the baked image alone
 draws it. Relief too small for any image (every part of it under 8 texels long: letters
 12 mm tall, screw heads) is kept at LOD0 the same way with nothing baked under it
 (`lod0_only`): its image was dots, and showed round the letters. A piece with one larger
@@ -210,7 +226,8 @@ door; a script written before the convention by its own variable, `SHUT_ENV` in 
 Smart projection per slot (66 degrees; the islands that end up covering texels another
 island covers, over 0.1% of the atlas, as a lip curling under its frame does, are projected
 again at 34 degrees, those still lying over themselves once more at 20, then at 11, then at 6; what still does, layers that face one way and meet at a vertex, is laid flat face by face, each an island of its own), each island scaled to one texel density times its class's
-weight (exterior 1, cabin 0.4, underside 0.35, a lamp or a large face seen only in gaps 0.35, a rim face
+weight (exterior 1, cabin 0.4, 0.7 on a car with a `cabin.py` cabin, which is seen from
+the seat (at 0.4 it read soft, 170 to 200 px/m), underside 0.35, a lamp or a large face seen only in gaps 0.35, a rim face
 0.5; on a vehicle with no wheels, which floats and sets down when parked, a face under 0.5 m
 that only rays going down leave is underside: no eye gets under it, and its belly's texels
 go to what is seen), then a skyline packer at the largest
@@ -247,7 +264,10 @@ on, the rule, the budgets and the floor; the report and the proof's footer repea
 
 LOD0 the parts as above. LOD1 to LOD3 are made from LOD0 to their budgets (60,000, 20,000,
 5,000, or 8,000 for a large vehicle), each at most 60% of the LOD before it (a car under
-budget still steps down), and share LOD0's textures. Per part, in this order:
+budget still steps down), and share LOD0's textures. A `cabin.py` cabin is in LOD1 too,
+collapsed apart from the exterior at a ratio of its own to its allowance (10,000 triangles,
+at most 60% of LOD0's cabin), the exterior to its budget as any car's; from LOD2 it is left
+out. Per part, in this order:
 
 1. **Left out.** From LOD2 the cabin's faces; from LOD2 every piece no larger than 5 cm
    in any direction (bolts, sensors, small vents; lamps never); at LOD3 the faces seen only
@@ -342,7 +362,10 @@ body then draws nearer LOD0.
 Each LOD is measured against LOD0 (`lods[k].fidelity` in `pack.json`, check
 `lod_fidelity`): at points spread over the body's exterior (one per 40 cm2 at least), LOD0's
 surface nearest along the normal line (within 3 cm) that faces the same way (not a thin
-plate's far side), the angle between the two shading
+plate's far side, nor a `cabin.py` cabin's face, whose own faces are not measured either:
+the Mino's far tailgate, moved a little in by the collapse, found the lining a few
+centimeters inside it and counted a torn texture),
+the angle between the two shading
 normals and, through the two UVs, the bake's base color and paint weights (at 1024 px):
 the area weighted 95th percentile angle (`normal_p95_deg`), the share over 25 degrees
 (`bent_share`), the share with a channel off by 0.25 (`texture_share`, a torn or smeared
@@ -365,7 +388,7 @@ corners (the farthest points along 128 directions). `collision.glb`, nodes
 | `kind` | `wheeled` or `hover` |
 | `dimensions` | length, width, height, min and max (LOD0, wheels included) |
 | `wheelbase`, `track`, `ride_height` | axle to axle; per axle (0 the front) left to right; the body's lowest point |
-| `lods` | per LOD: file, triangles, budget, triangles per part; from LOD1 `fidelity` (see LODs) |
+| `lods` | per LOD: file, triangles, budget, triangles per part; from LOD1 `fidelity` (see LODs). With a `cabin.py` cabin also `exterior` and `cabin` (triangles and budget each; the budget their sum; from LOD2 the cabin's allowance is 0 and what is left of it, faces seen from outside, counts in the LOD's budget) |
 | `parts` | per node: name, kind (`body`, `glass`, `wheel`, `brake`), material, pivot; wheels and brakes also radius, width, side, axle, `steers`, `spins`, `follows`, `uv_shared_with` |
 | `materials` | per slot: textures (file, size, color space, channels) and params |
 | `colors`, `tinted_materials` | show colors per channel; the materials that follow them |
@@ -375,14 +398,16 @@ corners (the farthest points along 128 directions). `collision.glb`, nodes
 | `collision` | file and hulls |
 | `views`, `cameras` | the hero view, the studio as the car's script set it up (`views.studio`: per light its energy and color, and `unlit`, the parts a light was linked off), and the cameras of the proof renders |
 | `baked_down` | what was removed or replaced, and how |
-| `size_class` | `name` (`standard` or `large`), `exterior_m2`, `rule`, `lod_budgets`, `texel_floor_px_per_m` |
+| `size_class` | `name` (`standard` or `large`), `exterior_m2`, `rule`, `lod_budgets` (the exterior's), `texel_floor_px_per_m`; with a `cabin.py` cabin `cabin_budgets` (its allowance per LOD) and `budgets_rule` |
 | `uv` | islands, measured texel density, its floor, the density factor of the islands under baked-down detail (`detail_boost`) |
 | `build` | test or full, samples, seconds per stage |
 
 ## Checks (`game_report.json`; the run fails when one fails)
 
 - `files`: every file present and readable, textures at their sizes.
-- `budgets`: LOD0 within its budget, the others within 10% of theirs.
+- `budgets`: LOD0 within its budget, the others within 10% of theirs; with a `cabin.py`
+  cabin, at LOD0 and LOD1 the exterior and the cabin each within its own (`exterior`,
+  `cabin` in each row).
 - `uv_overlap`: at most 0.5% of the covered texels covered twice (LOD0, a shared pair once),
   nothing outside the unit square.
 - `texel_density`: the exterior's 5th percentile at least the size class's floor (300 px/m,

@@ -55,6 +55,16 @@ LOD_TRIS = (150000, 60000, 20000, 5000)
 # are removed: trucks, vans, the hauler class) is large: a larger far LOD, a lower floor
 LARGE_EXTERIOR_M2 = 55.0
 LOD_TRIS_LARGE = (150000, 60000, 20000, 8000)
+# a cabin.py cabin's own allowance over those (the budgets above are the exterior's, wheels
+# and glass: measured without the cabin), LOD0 and LOD1; the cabin is left out from LOD2.
+# Over the exterior's budget the exterior is shed, over the cabin's the cabin alone: the
+# exterior's relief never pays for the cabin, and a cabin within its allowance is not
+# collapsed at LOD0 at all
+CABIN_LOD0 = 50000
+CABIN_LOD1 = 10000
+CABIN_LODS = (CABIN_LOD0, CABIN_LOD1, 0, 0)
+CABIN_PLANAR_DEG = 0.5          # over its allowance, first: a cabin's flat faces this close to
+                                # coplanar merged (the Mino's cabin 13% fewer, nothing moved)
 FLAT_RELIEF_M = 0.0032          # relief this low is always baked onto the surface under it
 RELIEF_ONE_SURFACE = 0.7       # a lamp is relief on one piece: this share of its points
 TALL_RELIEF_M = 0.0125          # relief up to this tall is baked down when over the budget
@@ -67,6 +77,8 @@ TIRE_SEGMENTS = 64
 WEIGHT = {0: 1.0, 1: 0.35, 2: 0.4, 3: 0.35, 4: 0.5}  # texel density by face class: exterior,
 CLASS_NAMES = {0: "exterior", 1: "underside", 2: "cabin", 3: "lamp_in_gaps",  # ... (below),
                4: "rim_face"}                 # the far LODs' rim faces (rim_disc)
+CABIN_WEIGHT = 0.7              # the cabin class's weight on a car with a cabin.py cabin (seen
+                                # from the seat: at 0.4 it read soft, 170 to 200 px/m)
 CAGE_M, REACH_M = 0.015, 0.035  # baking the detail: cage out, ray reach under the surface
 TEXEL_FLOOR = {"body": 300.0, "wheels": 300.0}  # px/m on exterior faces at 4096 / 2048
 TEXEL_FLOOR_LARGE = {"body": 240.0, "wheels": 240.0}  # ... for the large class (never under 220)
@@ -541,7 +553,7 @@ class Piece:
         self.me = me                    # bpy mesh in world space, attributes cg_obj, cg_n
         self.tris = sum(len(p.vertices) - 2 for p in me.polygons)
         self.part = "body"
-        self.op = "keep"                # keep, relief, card, lathe, collapse
+        self.op = "keep"                # keep, relief, card, lathe, collapse, planar
         self.over = False               # relief also kept as it is at LOD0 (fine_over)
         self.relief = None              # height over the surface under it, m
         self.panel = any(md.type == 'SOLIDIFY' for md in ob.modifiers)
@@ -1168,6 +1180,32 @@ def collapse_mesh(p, ratio):
     return out
 
 
+def planar_mesh(p, deg):
+    """The piece's mesh with its flat faces within deg of coplanar merged and triangulated
+    again (nothing moves: a face shaded curved, its corner normals off its plane, is never
+    merged, and the boundaries stay); None when that saves nothing."""
+    bm = bmesh.new()
+    bm.from_mesh(p.me)
+    bm.normal_update()
+    ln = bm.loops.layers.float_vector.get("cg_n")
+    flat = 1.0 - cos(max(deg, 1.0) * pi / 180)
+    for f in bm.faces:
+        f.tag = ln is not None and any(1.0 - V3(l[ln]).dot(f.normal) > flat for l in f.loops)
+    for e in bm.edges:
+        lf = e.link_faces
+        e.seam = len(lf) == 2 and (lf[0].tag or lf[1].tag)
+    bmesh.ops.dissolve_limit(bm, angle_limit=deg * pi / 180, use_dissolve_boundaries=False,
+                             verts=bm.verts[:], edges=bm.edges[:], delimit={'SEAM'})
+    bmesh.ops.triangulate(bm, faces=bm.faces[:], quad_method='BEAUTY', ngon_method='BEAUTY')
+    if len(bm.faces) >= p.tris:
+        bm.free()
+        return None
+    me = p.me.copy()
+    bm.to_mesh(me)
+    bm.free()
+    return me
+
+
 # ---------------------------------------------------------------------------------------
 # parts: meshes joined, hidden faces removed
 # ---------------------------------------------------------------------------------------
@@ -1229,11 +1267,11 @@ def part_meshes(pieces, cards):
             continue
         if p.op == "lathe":
             me = p.lathe
-        elif p.op == "collapse":
+        elif p.op in ("collapse", "planar"):
             me = p.low
         else:
             me = p.me.copy()
-        if p.op in ("lathe", "collapse"):
+        if p.op in ("lathe", "collapse", "planar"):
             me = me.copy()
         tag_mesh(me, p.idx)
         if p.over:
@@ -2531,6 +2569,10 @@ class Surface:
             self.trees[k] = BVHTree.FromPolygons(vs, fs)
             self.tris[k] = tri
         self.all_isl = [isl[lt.polygon_index] for lt in lts]
+        # (a cabin.py cabin's faces, which the fidelity measure does not take for LOD0's
+        # exterior; None without a cabin)
+        ca = me.attributes.get("cg_cabin")
+        self.all_cabin = [ca.data[lt.polygon_index].value for lt in lts] if ca else None
         self.all = BVHTree.FromPolygons(co, [tuple(lt.vertices) for lt in lts])
         self.all_tris = [(tuple(lt.loops), tuple(co[v] for v in lt.vertices)) for lt in lts]
 
@@ -3293,18 +3335,30 @@ def stand_ins(prep, out, coll, budget):
 
 
 def lod_part(ob, prep, ratio, name, coll, surf, symmetric=False, floor=None, far=None,
-             clamp=False, more=None):
-    """A part of a LOD: its prepared mesh collapsed to ratio of its triangles; a piece the
-    collapse took under its floor (LOD_FLOOR: a few triangles and so many a square meter
-    of its area, never more than it has) collapsed again alone to that floor, so no panel
-    vanishes; a piece in more ({piece: factor}) collapsed again alone to that many times
-    the triangles the common ratio left it; UVs and shading normals laid on again from
-    LOD0's surface."""
+             clamp=False, more=None, cab=None):
+    """A part of a LOD: its prepared mesh collapsed to ratio of its triangles (a cabin.py
+    cabin's faces, cg_cabin, to cab of theirs when cab is given: the cabin's own budget); a
+    piece the collapse took under its floor (LOD_FLOOR: a few triangles and so many a
+    square meter of its area, never more than it has) collapsed again alone to that floor,
+    so no panel vanishes; a piece in more ({piece: factor}) collapsed again alone to that
+    many times the triangles the common ratio left it; UVs and shading normals laid on
+    again from LOD0's surface."""
     if prep.get("cg_whole"):
         ratio = 1.0
-    me = prep.copy()
-    out = _collapse(me, ratio, coll, symmetric)
-    bpy.data.meshes.remove(me)
+    if cab is not None and "cg_cabin" in prep.attributes:
+        # the exterior and the cabin each at its own ratio
+        halves = []
+        for keep, r in (({0}, ratio), ({1}, cab)):
+            m = _only(prep, keep, key="cg_cabin")
+            halves.append(_collapse(m, r, coll, symmetric))
+            bpy.data.meshes.remove(m)
+        jo = join_meshes("tmp_cabin", halves, coll)
+        out = jo.data
+        bpy.data.objects.remove(jo)
+    else:
+        me = prep.copy()
+        out = _collapse(me, ratio, coll, symmetric)
+        bpy.data.meshes.remove(me)
     fl = floor
     if (fl is not None or more) and ratio < 0.999 and "cg_piece" in prep.attributes:
         have, got = _piece_tris(prep), _piece_tris(out)
@@ -3363,11 +3417,12 @@ def lod_part(ob, prep, ratio, name, coll, surf, symmetric=False, floor=None, far
 
 
 def hold_bounds(parts_final, objs_k, ratio, target, k, coll, prep, surf, floor=None,
-                hb=None, more=None):
+                hb=None, more=None, cab=None):
     """A LOD whose box falls short of LOD0's by more than the check allows (lod_bounds: 2 cm
     or 1.5% of the size; a glass dome's crown collapsed away): the parts that reach LOD0's
     box on that side are collapsed again at twice their ratio, the others a little more to
-    keep the budget, up to three times. Returns (objects, triangles)."""
+    keep the budget, up to three times. cab: the cabin's own ratio (lod_part), its
+    triangles then kept out of target and of the count. Returns (objects, triangles)."""
     lo0, hi0 = world_box([o for _, o in parts_final])
     tol = [max(0.02, 0.015 * (hi0[i] - lo0[i])) for i in range(3)]
     rat = {nm: ratio for nm, _ in parts_final}
@@ -3394,7 +3449,8 @@ def hold_bounds(parts_final, objs_k, ratio, target, k, coll, prep, surf, floor=N
             break
         for nm in bump:
             rat[nm] = min(1.0, rat[nm] * 2)
-        tri0 = {nm: mesh_tris(prep[nm]) for nm, o in parts_final}
+        tri0 = {nm: mesh_tris(prep[nm]) - (cabin_tris(prep[nm]) if cab is not None else 0)
+                for nm, o in parts_final}
         fixed = sum(tri0[nm] * rat[nm] for nm in bump)
         rest = sum(tri0[nm] for nm in tri0 if nm not in bump)
         if rest > 0:
@@ -3412,9 +3468,19 @@ def hold_bounds(parts_final, objs_k, ratio, target, k, coll, prep, surf, floor=N
                            "LOD%d_%s" % (k, nm), coll, surf[nm],
                            symmetric=(nm in ("body", "glass")), floor=floor,
                            far=hb if nm == "body" else None, clamp=k >= LOD_WRECK_FROM,
-                           more=more if nm == "body" else None)
+                           more=more if nm == "body" else None,
+                           cab=cab if nm == "body" else None)
                   for nm, o in parts_final]
-    return objs_k, sum(mesh_tris(o.data) for o in objs_k)
+    return objs_k, sum(mesh_tris(o.data) - (cabin_tris(o.data) if cab is not None else 0)
+                       for o in objs_k)
+
+
+def cabin_tris(me):
+    """The triangles of a mesh's cabin.py cabin faces (cg_cabin), 0 without them."""
+    a = me.attributes.get("cg_cabin")
+    if a is None:
+        return 0
+    return sum(len(p.vertices) - 2 for p, x in zip(me.polygons, a.data) if x.value)
 
 
 def fid_textures(work, slot="body"):
@@ -3450,13 +3516,17 @@ def fidelity(ob, surf, tex, off=None):
     cls = [x.value for x in a.data] if a else [0] * len(me.polygons)
     pa = me.attributes.get("cg_piece")
     pcs = [x.value for x in pa.data] if pa else [0] * len(me.polygons)
+    ca = me.attributes.get("cg_cabin")
+    cab = [x.value for x in ca.data] if ca else [0] * len(me.polygons)
     uvl = me.uv_layers.active.data if me.uv_layers else None
     cn = [V3(x.vector) for x in me.corner_normals]
     co = [v.co for v in me.vertices]
     rows, miss, tot = [], 0.0, 0.0
     R = FID_RES
     for lt in _loop_tris(me):
-        if cls[lt.polygon_index] != 0 or lt.area < 1e-10:
+        # (the exterior: a cabin.py cabin's faces seen from outside are not measured,
+        # as LOD0's are not taken for it below)
+        if cls[lt.polygon_index] != 0 or cab[lt.polygon_index] or lt.area < 1e-10:
             continue
         A = lt.area
         tot += A
@@ -3475,14 +3545,16 @@ def fidelity(ob, surf, tex, off=None):
             # the LOD0 surface nearest the point along the normal line, facing its way
             # (every surface the line meets within reach, not only the outermost: a trim
             # over a panel would stand in for the panel; the far side of a thin plate is
-            # not it)
+            # not it; nor a cabin.py cabin's face: a far LOD's tailgate, the collapse
+            # moving it a little in, took the lining a few centimeters inside it for
+            # LOD0, and its texture for a torn one)
             hit, o_, left = (None,), p + fn * FID_REACH_M, 2 * FID_REACH_M
             for _ in range(6):
                 h = surf.all.ray_cast(o_, -fn, left)
                 if h[0] is None:
                     break
-                if h[1].dot(fn) > 0 and (hit[0] is None or
-                                         (h[0] - p).length < (hit[0] - p).length):
+                if h[1].dot(fn) > 0 and not (surf.all_cabin and surf.all_cabin[h[2]]) and (
+                        hit[0] is None or (h[0] - p).length < (hit[0] - p).length):
                     hit = h
                 step = (h[0] - o_).length + 1e-5
                 o_, left = o_ - fn * step, left - step
@@ -3569,11 +3641,14 @@ def opaque_unseen(parts_final):
     return out
 
 
-def make_lods(parts_final, budgets, coll, work=None):
+def make_lods(parts_final, budgets, coll, work=None, cabin=None):
     """LOD1 to LOD3 from LOD0's parts: each lod_prep'ed, then collapsed (body and glass
     symmetric in y) at one ratio for every part to the budget (at most 60% of the LOD
     before it), UVs and normals laid on from LOD0 (Surface), the box held (hold_bounds);
-    each measured against LOD0 (fidelity). Returns [dict(lod, objs, fidelity)]."""
+    each measured against LOD0 (fidelity). cabin: a cabin.py cabin's allowance per LOD
+    (CABIN_LODS): where it is not 0 the budget is the exterior's and the cabin's faces
+    (cg_cabin) are collapsed apart to the allowance (at most 60% of the cabin before).
+    Returns [dict(lod, objs, fidelity)]."""
     for nm, o in parts_final:
         mark_islands(o)
     surf = {nm: Surface(o) for nm, o in parts_final}
@@ -3593,10 +3668,19 @@ def make_lods(parts_final, budgets, coll, work=None):
     log("LODs: glass kept whole (coarse, shaded by its normals): %s" % sorted(coarse))
     lods = [dict(lod=0, objs=[o for _, o in parts_final], fidelity=None)]
     prev = sum(mesh_tris(o.data) for _, o in parts_final)
+    if body0 is None or "cg_cabin" not in body0.data.attributes:
+        cabin = None
+    prev_cab = cabin_tris(body0.data) if cabin else 0
     unseen = None
     for k, budget_k in enumerate(budgets[1:], 1):
         t = time.time()
-        target = min(budget_k, int(0.6 * prev))     # a car under budget still steps down
+        allow = cabin[k] if cabin and k < len(cabin) else 0
+        if allow:
+            # the exterior and the cabin each to its own budget
+            target = min(budget_k, int(0.6 * (prev - prev_cab)))
+            t_cab = min(allow, int(0.6 * prev_cab))
+        else:
+            target = min(budget_k, int(0.6 * prev))     # a car under budget still steps down
         if k >= LOD_OPAQUE_FROM and unseen is None:
             t1 = time.time()
             unseen = opaque_unseen(parts_final)
@@ -3648,6 +3732,12 @@ def make_lods(parts_final, budgets, coll, work=None):
                     prep["glass"]["cg_whole"] = True
             base = sum(mesh_tris(m) for m in prep.values())
             fixed = sum(mesh_tris(m) for m in prep.values() if m.get("cg_whole"))
+            cab = None
+            if allow and "body" in prep:
+                c_in = cabin_tris(prep["body"])
+                if c_in:
+                    cab = min(1.0, t_cab / c_in)
+                    base -= c_in
             ratio = min(1.0, max(0.003, target - fixed) / max(base - fixed, 1))
             # the floors take half the budget left at most
             floor = None
@@ -3672,9 +3762,11 @@ def make_lods(parts_final, budgets, coll, work=None):
                                        symmetric=(nm in ("body", "glass")), floor=floor,
                                        far=hb if nm == "body" else None,
                                        clamp=k >= LOD_WRECK_FROM,
-                                       more=more if nm == "body" else None)
+                                       more=more if nm == "body" else None,
+                                       cab=cab if nm == "body" else None)
                               for nm, o in parts_final]
-                    got = sum(mesh_tris(o.data) for o in objs_k)
+                    got = sum(mesh_tris(o.data) - (cabin_tris(o.data) if cab is not None
+                                                   else 0) for o in objs_k)
                     if got <= target * 1.03 or ratio >= 0.999:
                         break
                     if hb and ratio < 0.03:
@@ -3685,7 +3777,7 @@ def make_lods(parts_final, budgets, coll, work=None):
                         floor = (floor[0], floor[1] * s, floor[2] * s)
                     ratio *= max(1, target - fixed) / max(1, got - fixed) * 0.98
                 objs_k, got = hold_bounds(parts_final, objs_k, ratio, target, k, coll, prep, surf,
-                                          floor, hb, more)
+                                          floor, hb, more, cab)
                 fid, bent = None, {}
                 if body0 is not None:
                     lim = FID_LIMITS.get(k)
@@ -3743,6 +3835,12 @@ def make_lods(parts_final, budgets, coll, work=None):
                 continue
             break
         SMALL_SCALE[0] = 1.0
+        if cab is not None:
+            # (got, base and target the exterior's)
+            c_got = sum(cabin_tris(o.data) for o in objs_k)
+            log("LOD%d: cabin %d triangles (target %d, ratio %.3f)" % (k, c_got, t_cab, cab))
+            got += c_got
+            prev_cab = c_got
         log("LOD%d: %d triangles (prepared %d, target %d, ratio %.3f), %.1f s; fidelity %s" % (
             k, got, base, target, ratio, time.time() - t, fid))
         prev = got
@@ -3776,16 +3874,28 @@ def save_lod_input(work, parts_final):
                              {o for _, o in parts_final}, fake_user=True)
 
 
-def export_lods(out, lods, names, budgets):
+def export_lods(out, lods, names, budgets, cabin=CABIN_LODS):
+    """The LOD files and their rows for pack.json. A LOD with a cabin.py cabin (cg_cabin)
+    also gets its exterior's and its cabin's triangles against their budgets (cabin: the
+    cabin's allowance per LOD), and its budget is their sum."""
     rows = []
     for L in lods:
+        k = L["lod"]
+        has_cab = any("cg_cabin" in o.data.attributes for o in L["objs"])
+        cab = sum(cabin_tris(o.data) for o in L["objs"])
         for o in L["objs"]:
             strip_attrs(o.data)
-        path = os.path.join(out, "lod%d.glb" % L["lod"])
+        path = os.path.join(out, "lod%d.glb" % k)
         export_glb(path, L["objs"], names)
         tri = {nm: mesh_tris(o.data) for nm, o in zip(names, L["objs"])}
-        row = dict(lod=L["lod"], file="lod%d.glb" % L["lod"], triangles=sum(tri.values()),
-                   budget=budgets[L["lod"]], parts=tri)
+        allow = cabin[k] if has_cab and k < len(cabin) else 0
+        row = dict(lod=k, file="lod%d.glb" % k, triangles=sum(tri.values()),
+                   budget=budgets[k] + allow, parts=tri)
+        if has_cab:
+            # (where the cabin has no allowance, from LOD2, what is left of it counts in
+            # the LOD's budget)
+            row["exterior"] = dict(triangles=sum(tri.values()) - cab, budget=budgets[k])
+            row["cabin"] = dict(triangles=cab, budget=allow)
         if L.get("fidelity") is not None:
             row["fidelity"] = L["fidelity"]
         rows.append(row)
@@ -3828,7 +3938,7 @@ def main_lods(A):
         A.lods = list(sc["lod_budgets"])
         pack["size_class"] = dict(sc, lod_budgets=list(A.lods))
     t = time.time()
-    lods = make_lods(parts_final, A.lods, coll, work)
+    lods = make_lods(parts_final, A.lods, coll, work, CABIN_LODS)
     rows = export_lods(A.out, lods[1:], [nm for nm, _ in parts_final], A.lods)
     pack["lods"] = pack["lods"][:1] + rows
     pack["source"]["game_sha256"] = sha256(os.path.abspath(__file__))
@@ -3908,10 +4018,21 @@ def main_build(A):
     # over the budget, in this order: taller relief; then every part of 600 triangles or
     # more alike, panels too, at most halved a round (a round that crushed the small dense
     # parts alone turned turbine wheels and light strips into polygons), four rounds; the
-    # glass never (a collapsed canopy shows its facets in every reflection)
-    steps = ["tall", "collapse", "collapse", "collapse", "collapse"]
-    over_tried = False
+    # glass never (a collapsed canopy shows its facets in every reflection). A cabin.py
+    # cabin is measured apart against its own allowance (CABIN_LOD0) and shed alone the same
+    # way: the exterior's budget (wheels and glass with it) never pays for the cabin
     cabin_idx = {p.idx for p in pieces if p.ob.name.split(".", 1)[0] == CABIN_PREFIX}
+    groups = [("exterior", budget, ["tall", "collapse", "collapse", "collapse", "collapse"])]
+    if cabin_idx:
+        # (first its flat faces merged, which moves nothing; then its relief; then a
+        # collapse of its parts but the lining, whose edges lap onto the body's frame: a
+        # collapse tore them off it and drew its headliner in zigzags)
+        groups.append(("cabin", CABIN_LOD0, ["planar", "tall", "collapse", "collapse",
+                                             "collapse", "collapse"]))
+
+    def in_group(p, g):
+        return (p.idx in cabin_idx) == (g == "cabin")
+    over_tried = False
     while True:
         parts = part_meshes(pieces, cards)
         objs = {part: join_meshes("tmp_" + part, [m for m, _ in lst], low_coll)
@@ -3932,47 +4053,6 @@ def main_build(A):
                                     {mi.name for mi in infos.values() if mi.emissive},
                                     floats=not wheels, cabin=cabin_idx)
         total = sum(mesh_tris(objs[twins.get(k, k)].data) for k in objs)
-        log("low: %d triangles (%s); removed (coincident, hidden) %s; twins %s" % (
-            total, ", ".join("%s %d" % (k, mesh_tris(o.data)) for k, o in sorted(objs.items())),
-            culled, twins))
-        if total <= budget and len(steps) == 5 and not over_tried:
-            # under the budget with nothing shed: fine relief (flutes, slots, small
-            # lettering: parts under DETAIL_FINE_PX texels wide at the floor, which no
-            # atlas draws as lines and letters) is also kept as it is at LOD0, over its
-            # baked image, smallest first while there is room; from LOD1 the image alone
-            over_tried = True
-            floor_px = TEXEL_FLOOR["body"] * A.body_size / 4096
-            lit_ = {mi.name for mi in infos.values() if mi.emissive}
-            cand = [p for p in fine_relief([p for p in pieces if p.op == "relief" and
-                                            p.part == "body" and p.mat not in lit_],
-                                           floor_px)]
-            room = min(budget * 0.97 - total, OVER_SHARE * budget)
-            for p in sorted(cand, key=lambda p: (p.tris, p.name)):
-                if p.tris <= room:
-                    p.over = True
-                    room -= p.tris
-                    if part_sizes(p)[1] * floor_px < OVER_ONLY_PX:
-                        # every part of it too small for any image (letters a few
-                        # texels tall, screw heads): at LOD0 as it is, and nothing baked
-                        # under it (its image was dots, and showed round the letters). A
-                        # piece with one larger part keeps its image: a hull number among
-                        # small print must still be there from LOD1 on
-                        p.op = "keep"
-            kept = [p for p in cand if p.over]
-            if kept:
-                log("  fine relief kept at LOD0 over its baked image: %d pieces, %d "
-                    "triangles (%s); of them at LOD0 only, with no image: %s" % (
-                        len(kept), sum(p.tris for p in kept),
-                        ", ".join(sorted(p.name for p in kept))[:300],
-                        ", ".join(sorted(p.name for p in kept if p.op == "keep"))[:300]))
-                for ob in list(objs.values()):
-                    me = ob.data
-                    bpy.data.objects.remove(ob)
-                    bpy.data.meshes.remove(me)
-                continue
-        if total <= budget or not steps:
-            break
-        step = steps.pop(0)
         per_piece = {}
         for part, ob in objs.items():
             a = ob.data.attributes.get("cg_piece")
@@ -3981,40 +4061,111 @@ def main_build(A):
             k = 1 + sum(1 for v in twins.values() if v == part)
             for poly, x in zip(ob.data.polygons, a.data):
                 per_piece[x.value] = per_piece.get(x.value, 0) + k * (len(poly.vertices) - 2)
+        cab = sum(per_piece.get(i, 0) for i in cabin_idx)
+        have = {"exterior": total - cab, "cabin": cab}
+        log("low: %d triangles (%s); removed (coincident, hidden) %s; twins %s%s" % (
+            total, ", ".join("%s %d" % (k, mesh_tris(o.data)) for k, o in sorted(objs.items())),
+            culled, twins, "; exterior %d of %d, cabin %d of %d" % (
+                have["exterior"], budget, cab, CABIN_LOD0) if cabin_idx else ""))
+        kept_any = False
+        if not over_tried:
+            # within its budget with nothing shed: fine relief (flutes, slots, small
+            # lettering: parts under DETAIL_FINE_PX texels wide at the floor, which no
+            # atlas draws as lines and letters) is also kept as it is at LOD0, over its
+            # baked image, smallest first while there is room; from LOD1 the image alone
+            over_tried = True
+            floor_px = TEXEL_FLOOR["body"] * A.body_size / 4096
+            lit_ = {mi.name for mi in infos.values() if mi.emissive}
+            for g, bud, _ in groups:
+                if have[g] > bud:
+                    continue
+                cand = [p for p in fine_relief([p for p in pieces if p.op == "relief" and
+                                                p.part == "body" and p.mat not in lit_ and
+                                                in_group(p, g)],
+                                               floor_px)]
+                room = min(bud * 0.97 - have[g], OVER_SHARE * bud)
+                for p in sorted(cand, key=lambda p: (p.tris, p.name)):
+                    if p.tris <= room:
+                        p.over = True
+                        room -= p.tris
+                        if part_sizes(p)[1] * floor_px < OVER_ONLY_PX:
+                            # every part of it too small for any image (letters a few
+                            # texels tall, screw heads): at LOD0 as it is, and nothing
+                            # baked under it (its image was dots, and showed round the
+                            # letters). A piece with one larger part keeps its image: a
+                            # hull number among small print must still be there from LOD1
+                            p.op = "keep"
+                kept = [p for p in cand if p.over]
+                if kept:
+                    kept_any = True
+                    log("  fine relief kept at LOD0 over its baked image%s: %d pieces, %d "
+                        "triangles (%s); of them at LOD0 only, with no image: %s" % (
+                            " (cabin)" if g == "cabin" else "",
+                            len(kept), sum(p.tris for p in kept),
+                            ", ".join(sorted(p.name for p in kept))[:300],
+                            ", ".join(sorted(p.name for p in kept if p.op == "keep"))[:300]))
+        over = [(g, bud, steps) for g, bud, steps in groups if have[g] > bud and steps]
+        if not over and not kept_any:
+            break
         for ob in list(objs.values()):
             me = ob.data
             bpy.data.objects.remove(ob)
             bpy.data.meshes.remove(me)
-        excess = total - budget * 0.97
-        if step == "tall":
-            cand = [p for p in pieces if p.op == "keep" and p.relief is not None and
-                    p.relief <= TALL_RELIEF_M and not (infos.get(p.mat) and
-                                                       infos[p.mat].emissive)]
-            cand.sort(key=lambda p: -per_piece.get(p.idx, 0))
-            for p in cand:
-                if excess <= 0:
-                    break
-                p.op = "relief"
-                excess -= per_piece.get(p.idx, 0)
-                log("  over budget: relief %s (%.1f mm) baked down" % (p.name, p.relief * 1000))
-        else:
-            # lamps never (a thin light strip collapsed breaks into dashes), wheels never
-            # (seen close and turning; a collapsed wheel unwraps folded, its UVs overlapping)
-            cand = [p for p in pieces if p.op in ("keep", "collapse") and
-                    per_piece.get(p.idx, 0) >= 600 and
-                    p.part != "glass" and
-                    p.part.split(":")[0] not in ("wheel", "brake") and
-                    not (infos.get(p.mat) and infos[p.mat].emissive)]
-            pool = sum(per_piece.get(p.idx, 0) for p in cand)
-            if pool <= 0:
-                continue
-            r = max(0.5, 1 - excess / pool)
-            for p in cand:
-                cur = mesh_tris(p.low) / p.tris if p.op == "collapse" else 1.0
-                p.low = collapse_mesh(p, r * cur)
-                p.op = "collapse"
-            log("  over budget (%s): %d pieces collapsed to %.0f%%" % (step, len(cand),
-                                                                     r * 100))
+        for g, bud, steps in over:
+            step = steps.pop(0)
+            excess = have[g] - bud * 0.97
+            what = "over budget" if g == "exterior" else "cabin over its allowance"
+            if step == "planar":
+                n0 = n1 = 0
+                for p in pieces:
+                    if p.op != "keep" or not in_group(p, g) or (
+                            infos.get(p.mat) and infos[p.mat].emissive):
+                        continue
+                    low = planar_mesh(p, CABIN_PLANAR_DEG)
+                    if low is not None:
+                        p.low, p.op = low, "planar"
+                        n0 += p.tris
+                        n1 += mesh_tris(low)
+                log("  %s: flat faces merged (%g degrees), %d to %d triangles" % (
+                    what, CABIN_PLANAR_DEG, n0, n1))
+            elif step == "tall":
+                cand = [p for p in pieces if p.op == "keep" and p.relief is not None and
+                        p.relief <= TALL_RELIEF_M and in_group(p, g) and
+                        not (infos.get(p.mat) and infos[p.mat].emissive)]
+                cand.sort(key=lambda p: -per_piece.get(p.idx, 0))
+                for p in cand:
+                    if excess <= 0:
+                        break
+                    p.op = "relief"
+                    excess -= per_piece.get(p.idx, 0)
+                    log("  %s: relief %s (%.1f mm) baked down" % (what, p.name,
+                                                                p.relief * 1000))
+            else:
+                # lamps never (a thin light strip collapsed breaks into dashes), wheels never
+                # (seen close and turning; a collapsed wheel unwraps folded, its UVs
+                # overlapping)
+                cand = [p for p in pieces if p.op in ("keep", "collapse", "planar") and
+                        per_piece.get(p.idx, 0) >= 600 and
+                        p.part != "glass" and in_group(p, g) and
+                        not p.ob.name.startswith(CABIN_PREFIX + ".lining") and
+                        p.part.split(":")[0] not in ("wheel", "brake") and
+                        not (infos.get(p.mat) and infos[p.mat].emissive)]
+                pool = sum(per_piece.get(p.idx, 0) for p in cand)
+                if pool <= 0:
+                    continue
+                r = max(0.5, 1 - excess / pool)
+                for p in cand:
+                    cur = mesh_tris(p.low) / p.tris if p.op in ("collapse", "planar") else 1.0
+                    p.low = collapse_mesh(p, r * cur)
+                    p.op = "collapse"
+                log("  %s (%s): %d pieces collapsed to %.0f%%" % (what, step, len(cand),
+                                                                  r * 100))
+    if cabin_idx and "body" in objs:
+        # the cabin's faces, for its own budget through the LODs (make_lods, export_lods)
+        me = objs["body"].data
+        pa = me.attributes["cg_piece"]
+        ca = me.attributes.new("cg_cabin", 'INT', 'FACE')
+        ca.data.foreach_set("value", [1 if x.value in cabin_idx else 0 for x in pa.data])
     times["parts"] = time.time() - t
 
     # 4. the parts as nodes: body, glass, wheels and brakes about their axles
@@ -4053,6 +4204,8 @@ def main_build(A):
 
     # 5. normals, UVs
     t = time.time()
+    if cabin_idx:               # a cabin.py cabin, seen from the seat: more texels
+        WEIGHT[2] = CABIN_WEIGHT
     for ob in [body, glass] + list(nodes.values()):
         if ob is not None:
             set_normals(ob.data)
@@ -4137,7 +4290,7 @@ def main_build(A):
     replaced = {"body": set(), "wheels": set()}
     relief = {"body": [], "wheels": []}
     for p in pieces:
-        if p.op == "keep" or p.part == "glass":
+        if p.op in ("keep", "planar") or p.part == "glass":
             continue
         slot = "body" if p.part == "body" else "wheels"
         if p.ob not in sources[slot]:
@@ -4234,7 +4387,7 @@ def main_build(A):
         parts_final.append(("%s_%s" % (kind, tag), nodes[key]))
     if A.keep_work:
         save_lod_input(work, parts_final)
-    lods = make_lods(parts_final, A.lods, low_coll, work)
+    lods = make_lods(parts_final, A.lods, low_coll, work, CABIN_LODS)
     hulls = collision([o for nm, o in parts_final if nm in ("body", "glass")])
     hull_obs = []
     for i, me in enumerate(hulls):
@@ -4298,7 +4451,8 @@ def main_build(A):
             baked_down.append(dict(piece=p.name, op=p.op, triangles=p.tris,
                                    relief_mm=round(p.relief * 1000, 1) if p.relief else None,
                                    into="card" if p.op == "card_src" else
-                                   ("surface under it" if p.op == "relief" else p.op),
+                                   ("surface under it" if p.op == "relief" else
+                                    "its flat faces merged" if p.op == "planar" else p.op),
                                    **({"kept_at_lod0": True} if p.over else {})))
     # the glass's own material: the one most of the glass area wears (a car may tune its
     # own, a dome's lower IOR), else the kit's
@@ -4348,7 +4502,11 @@ def main_build(A):
             for o in hull_obs]),
         views=dict(hero=hero_view, studio=studio), cameras=cams,
         baked_down=baked_down,
-        size_class=dict(size_cls, lod_budgets=list(A.lods)),
+        size_class=dict(size_cls, lod_budgets=list(A.lods),
+                        **({"cabin_budgets": list(CABIN_LODS),
+                            "budgets_rule": "lod_budgets the exterior's (body, glass, "
+                            "wheels, without the cabin); cabin_budgets the cabin.py "
+                            "cabin's allowance over them"} if cabin_idx else {})),
         uv=dict(islands=uvinfo, texel_px_per_m=texel,
                 detail_boost=round(body.get("cg_detail_boost", 1.0), 3) if body else None,
                 texel_floor_px_per_m={k: round(v * (A.body_size if k == "body"
@@ -5105,8 +5263,19 @@ def check(pack_dir, docs, seconds, stage_seconds):
             continue
         n = sum(len(pr["idx"]) for nd in g.values() for pr in nd["prims"])
         tol = 1.0 if r["lod"] == 0 else 1.1
-        rows.append(dict(lod=r["lod"], triangles=n, budget=r["budget"],
-                         ok=n <= r["budget"] * tol))
+        row = dict(lod=r["lod"], triangles=n, budget=r["budget"], ok=n <= r["budget"] * tol)
+        if "cabin" in r:
+            # a cabin.py cabin: the exterior (body, glass, wheels) and the cabin each
+            # against its own budget where the cabin has an allowance (LOD0, LOD1); from
+            # LOD2 what is left of the cabin counts in the LOD's budget
+            c = r["cabin"]["triangles"]
+            row["exterior"] = dict(triangles=n - c, budget=r["exterior"]["budget"])
+            row["cabin"] = dict(triangles=c, budget=r["cabin"]["budget"])
+            if r["cabin"]["budget"]:
+                for key in ("exterior", "cabin"):
+                    row[key]["ok"] = row[key]["triangles"] <= row[key]["budget"] * tol
+                row["ok"] = row["exterior"]["ok"] and row["cabin"]["ok"]
+        rows.append(row)
     ok("budgets", all(x["ok"] for x in rows), rows)
 
     # UV overlap per slot (LOD0; a node sharing another's UVs counted once)
@@ -5303,7 +5472,10 @@ def compose_proof(pack_dir, pack, report):
     row2.append(tw_)
     q = (W // 4, W * 9 // 64)
     row3 = [tile(os.path.join(proof, "lod%d_hero.jpg" % r["lod"]), q,
-                 "LOD%d  %s triangles" % (r["lod"], format(r["triangles"], ",")))
+                 "LOD%d  %s triangles%s" % (
+                     r["lod"], format(r["triangles"], ","),
+                     " (cabin %s)" % format(r["cabin"]["triangles"], ",")
+                     if r.get("cabin", {}).get("budget") else ""))
             for r in lods]
     gap = 4
     H = half[1] * 2 + q[1] + 2 * gap + 70
