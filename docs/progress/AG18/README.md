@@ -5,7 +5,7 @@ kit (`vehicles/carkit.py`). Seven made-up brands, three models each and a fourth
 (2026-11-24); a brand is a design
 language in geometry and texture, never in color (`vehicles/BRANDS.md`). Scope and the plan
 for what comes next: `docs/assetgen_scope.md`, 14.19. Each folder holds one 4K multi-view
-sheet and the car's notes, and, for the 18 cars with a game pack (the four newest have none yet), its proof (`game.jpg`) and
+sheet and the car's notes, and, for the 22 cars with a game pack, its proof (`game.jpg`) and
 report (`game_report.json`); the pack itself is built by `vehicles/game.py` outside git
 (format: `vehicles/GAME.md`).
 
@@ -18,18 +18,18 @@ The whole roster at one scale (`vehicles/blender.sh vehicles/lineup.py`).
 | Halcyon | Vanta-R | mid-engined supercar | 2 | 4.69 m | [vanta_r](vanta_r/sheet.jpg) | [proof](vanta_r/game.jpg) |
 | Halcyon | Sable | four-door fastback grand tourer | 4 | 5.11 m | [halcyon_sable](halcyon_sable/sheet.jpg) | [proof](halcyon_sable/game.jpg) |
 | Halcyon | Ridge | performance crossover | 4 | 4.75 m | [halcyon_ridge](halcyon_ridge/sheet.jpg) | [proof](halcyon_ridge/game.jpg) |
-| Halcyon | Kite | hot hatch, three doors | 2 + 2 | 4.05 m | [halcyon_kite](halcyon_kite/sheet.jpg) | none yet |
+| Halcyon | Kite | hot hatch, three doors | 2 + 2 | 4.05 m | [halcyon_kite](halcyon_kite/sheet.jpg) | [proof](halcyon_kite/game.jpg) |
 | Kestrel Aerodyne | Dart | hover coupe | 2 | 4.66 m | [kestrel_dart](kestrel_dart/sheet.jpg) | [proof](kestrel_dart/game.jpg) |
 | Kestrel Aerodyne | Meridian | hover sedan | 4 | 5.32 m | [kestrel_meridian](kestrel_meridian/sheet.jpg) | [proof](kestrel_meridian/game.jpg) |
 | Kestrel Aerodyne | Atlas | hover hauler with a load bed | 2 | 5.91 m | [kestrel_atlas](kestrel_atlas/sheet.jpg) | [proof](kestrel_atlas/game.jpg) |
 | Orrin | Lumen | sedan under one leaf of glass | 4 | 5.03 m | [orrin_lumen](orrin_lumen/sheet.jpg) | [proof](orrin_lumen/game.jpg) |
 | Orrin | Pebble | city pod, the dome lifts as the door | 2 | 2.82 m | [orrin_pebble](orrin_pebble/sheet.jpg) | [proof](orrin_pebble/game.jpg) |
 | Orrin | Aria | hypercar with channels through the body | 2 | 4.74 m | [orrin_aria](orrin_aria/sheet.jpg) | [proof](orrin_aria/game.jpg) |
-| Orrin | Tide | crossover estate under one canopy | 5 | 4.80 m | [orrin_tide](orrin_tide/sheet.jpg) | none yet |
+| Orrin | Tide | crossover estate under one canopy | 5 | 4.80 m | [orrin_tide](orrin_tide/sheet.jpg) | [proof](orrin_tide/game.jpg) |
 | Brakk Industrial | Hauler | crew cab pickup, exposed wheels | 4 | 5.69 m | [brakk_hauler](brakk_hauler/sheet.jpg) | [proof](brakk_hauler/game.jpg) |
 | Brakk Industrial | Bastion | armored utility vehicle | 4 | 5.11 m | [brakk_bastion](brakk_bastion/sheet.jpg) | [proof](brakk_bastion/game.jpg) |
 | Brakk Industrial | Mule | six-wheel cargo van | 2 | 6.65 m | [brakk_mule](brakk_mule/sheet.jpg) | [proof](brakk_mule/game.jpg) |
-| Brakk Industrial | Burro | compact two-door 4x4 | 2 | 4.02 m | [brakk_burro](brakk_burro/sheet.jpg) | none yet |
+| Brakk Industrial | Burro | compact two-door 4x4 | 2 | 4.02 m | [brakk_burro](brakk_burro/sheet.jpg) | [proof](brakk_burro/game.jpg) |
 | Aurel | Prelate | formal coupe | 2 + 2 | 5.19 m | [aurel_prelate](aurel_prelate/sheet.jpg) | out of the cities until redesigned ([proof](aurel_prelate/game.jpg)) |
 | Aurel | Regent | limousine | 4 | 5.92 m | [aurel_regent](aurel_regent/sheet.jpg) | out of the cities until redesigned ([proof](aurel_regent/game.jpg)) |
 | Aurel | Zenith | hover grand tourer on a skirt of light | 4 | 5.42 m | [aurel_zenith](aurel_zenith/sheet.jpg) | out of the cities until redesigned ([proof](aurel_zenith/game.jpg)) |
@@ -39,7 +39,7 @@ The whole roster at one scale (`vehicles/blender.sh vehicles/lineup.py`).
 | Tanager | Mino | city car | 4 | 3.43 m | [tanager_mino](tanager_mino/sheet.jpg) | [proof](tanager_mino/game.jpg) |
 | Tanager | Cab | driverless taxi with a sliding door | 4 | 4.55 m | [tanager_cab](tanager_cab/sheet.jpg) | [proof](tanager_cab/game.jpg) |
 | Tanager | Porter | parcel-locker delivery van | 2 | 5.30 m | [tanager_porter](tanager_porter/sheet.jpg) | [proof](tanager_porter/game.jpg) |
-| Tanager | Linnet | compact five-door | 5 | 4.18 m | [tanager_linnet](tanager_linnet/sheet.jpg) | none yet |
+| Tanager | Linnet | compact five-door | 5 | 4.18 m | [tanager_linnet](tanager_linnet/sheet.jpg) | [proof](tanager_linnet/game.jpg) |
 
 ## Trains
 
@@ -57,6 +57,14 @@ trains there are still the stand-ins.
 |---|---|---|---|---|---|---|
 | Caldera Transit Works | Strand | elevated rail and metro | 20.0 x 3.0 m, floor 1.15 m over the rail, three 1.4 m doors a side | 41 (49 in the middle car) | [caldera_strand](caldera_strand/sheet.jpg) | [inside](caldera_strand/interior.jpg) |
 | Caldera Transit Works | Quill | sky tube pod | 9.0 x 2.4 x 2.7 m, one 1.4 m door a side, 209 mm clear of the 7 m tube | 16 (17 in the middle pod) | [caldera_quill](caldera_quill/sheet.jpg) | [inside](caldera_quill/interior.jpg) |
+
+**Packs with cabins** (2026-11-25 to 27): every pack of a car in the cities rebuilt with its
+cabin, and the Kite, Linnet, Tide and Burro packed for the first time, every check passing
+(`vehicles/game.py`: a cabin's own triangle budget at LOD0 and LOD1, far LODs made again when
+over budget). These packs are not yet published as a release, so the cities still park the
+earlier cabinless ones; the Aurels' proofs are from 2026-11-12. Seen in the proofs and left
+open: LOD3 fronts torn or folded (the Lumen worst, then the Cab, Porter, Meridian, Kite,
+Linnet, Burro), the Linnet's front bumper baked in body color.
 
 **In the cities** (step H): `assetgen vehicles BUILD` (also part of `assetgen build`) parks
 the packs in a generated city in place of AG8's parked car variants: a model by its

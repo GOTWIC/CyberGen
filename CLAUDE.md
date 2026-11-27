@@ -2545,8 +2545,17 @@ waits for Swagnik's review.
   scripts carry workarounds for gaps of the module (their reports list them: spine ends
   and `cap`, a windshield split on the centerline, lining through the skin at folds, well
   rims, load floors, glossy studio reflections in the cabin views, cheap seats and door
-  cards, fill faces, rear wall fills) that are yet to be folded into `cabin.py`. Every car
-  given a cabin has an out-of-date game pack until the packs are rebuilt.
+  cards, fill faces, rear wall fills) that are yet to be folded into `cabin.py`.
+- **Packs with cabins** (2026-11-25 to 27): `game.py` packs a car's cabin (`interior.*`)
+  within budgets of its own (LOD0 150,000 exterior plus 50,000 cabin, LOD1 60,000 plus
+  10,000; none past LOD1), retries a far LOD over its budget by more than 10% at a lower
+  target, and brings a cabin's texel weight (0.7) down to 0.4 where it starves the exterior.
+  Rebuilt on Windows for the 15 cars in the cities and built for the first time for the Kite,
+  Linnet, Tide and Burro, every check passing (proofs and reports in each car's folder). The
+  rebuilt packs are not published yet (`packs.json` is the cabinless release), so the cities
+  still park the old ones, and the four new cars are not in the parked table. Open: LOD3
+  fronts torn or folded on several cars (worst the Lumen), the Linnet's bumper baked in body
+  color.
 - The other phases (improvements, AG8's parked vehicles and
   stage 4's fleet drawing on them) are listed in the scope with their plan.
 

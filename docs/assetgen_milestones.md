@@ -3431,6 +3431,26 @@ Results: [`docs/progress/AG18/delta_at3/`](progress/AG18/delta_at3/README.md).
   fails (side traces hit 76 of 114: its hulls leave the open cab uncovered at middle height, the
   same in 12 and 12b).
 
+### Game packs with cabins (2026-11-25 to 2026-11-27)
+
+- **`vehicles/game.py`**: a car's cabin (`interior.*`) packed with budgets of its own (LOD0
+  150,000 exterior and 50,000 cabin, LOD1 60,000 and 10,000; dropped from LOD2), piloted on
+  the Vanta-R and Mino; then (1f813f4c) a far LOD more than 10% over budget made again at a
+  target scaled by its overshoot, the large class from 50 m2 of exterior (55: a cabin hides
+  faces once counted as exterior; the Bastion fell to 54.9 m2), a cabin's texel weight 0.7
+  brought down to 0.4 at most where the exterior's 5th percentile falls under its floor.
+- **Rebuilt on Windows** (Blender 5.2, one car at a time): the 15 cars in the cities, and
+  first packs of the Halcyon Kite, Tanager Linnet, Orrin Tide and Brakk Burro, every check
+  passing; LOD0 105,255 (Dart) to 195,138 (Bastion) triangles, LOD1 52,638 to 69,995, 25 to
+  220 minutes a car. Proofs and reports in each car's folder. Not published: `packs.json`
+  stays the cabinless release until the next `packs.py publish`, and the four new cars wait
+  for the parked table.
+- **Open, from the proofs**: LOD3 fronts torn or folded (Lumen's hood folded, with a dark
+  hood patch at LOD1; the Cab's nose and a bright patch on its door window; the Porter's
+  A-pillar; the Meridian's hood; the Kite's pale windshield; the Linnet's door; the Burro's
+  grille a dark block; the Pebble's small side tear); the Linnet's front bumper baked in body
+  color at every LOD.
+
 ## Order
 
 ```
