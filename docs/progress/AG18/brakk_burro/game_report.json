@@ -1,0 +1,470 @@
+{
+ "car": "brakk_burro",
+ "title": "Brakk Burro",
+ "ok": true,
+ "triangles": {
+  "original": 306750,
+  "lods": [
+   184652,
+   69994,
+   20078,
+   5140
+  ],
+  "lod0_parts": {
+   "body": 143256,
+   "glass": 460,
+   "wheel_fl": 10234,
+   "wheel_fr": 10234,
+   "wheel_rl": 10234,
+   "wheel_rr": 10234
+  }
+ },
+ "objects": {
+  "original": 250,
+  "parts": 6
+ },
+ "size_class": {
+  "name": "standard",
+  "exterior_m2": 42.55,
+  "rule": "large when the body's exterior is 50 m2 or more",
+  "lod_budgets": [
+   150000,
+   60000,
+   20000,
+   5000
+  ],
+  "texel_floor_px_per_m": {
+   "body": 300.0,
+   "wheels": 300.0
+  },
+  "cabin_budgets": [
+   50000,
+   10000,
+   0,
+   0
+  ],
+  "budgets_rule": "lod_budgets the exterior's (body, glass, wheels, without the cabin); cabin_budgets the cabin.py cabin's allowance over them"
+ },
+ "textures": {
+  "body": 4096,
+  "wheels": 2048
+ },
+ "pack_bytes": 48818748,
+ "seconds": 3401.8,
+ "stage_seconds": {
+  "build": 3.1,
+  "render_original": 81.4,
+  "parts": 123.2,
+  "nodes": 0.0,
+  "uv": 2230.9,
+  "bake": 553.3,
+  "lods_export": 108.1,
+  "textures": 19.105913400650024,
+  "proof": 281.1959297657013
+ },
+ "baked_down": {
+  "relief": {
+   "pieces": 17,
+   "triangles": 24698,
+   "names": [
+    "chevrons",
+    "interior.cluster.dark",
+    "interior.roof.mirror",
+    "interior.screen.dark",
+    "lamp.marker.chrome",
+    "lamp.pylon_f_turn.chrome",
+    "lamp.pylon_r_turn.chrome",
+    "lettering",
+    "markings",
+    "pylon.f.bolts",
+    "pylon.r.bolts",
+    "tiretext.fl",
+    "tiretext.fr",
+    "tiretext.rl",
+    "tiretext.rr",
+    "tiretext.spare",
+    "winch.slot"
+   ]
+  },
+  "card_src": {
+   "pieces": 1,
+   "triangles": 4236,
+   "names": [
+    "lamp.roofbar.chrome"
+   ]
+  },
+  "lod0_only": {
+   "pieces": 1,
+   "triangles": 961,
+   "names": [
+    "interior.plate.gloss"
+   ]
+  }
+ },
+ "texel_px_per_m": {
+  "body": {
+   "exterior": {
+    "area_m2": 42.553,
+    "p5": 339.2,
+    "median": 356.0
+   },
+   "underside": {
+    "area_m2": 1.446,
+    "p5": 124.3,
+    "median": 355.6
+   },
+   "cabin": {
+    "area_m2": 19.167,
+    "p5": 231.5,
+    "median": 248.9
+   },
+   "lamp_in_gaps": {
+    "area_m2": 2.04,
+    "p5": 124.3,
+    "median": 133.0
+   }
+  },
+  "wheels": {
+   "exterior": {
+    "area_m2": 6.22,
+    "p5": 541.5,
+    "median": 589.3
+   },
+   "lamp_in_gaps": {
+    "area_m2": 1.656,
+    "p5": 206.3,
+    "median": 206.3
+   },
+   "underside": {
+    "area_m2": 0.115,
+    "p5": 206.3,
+    "median": 551.5
+   }
+  }
+ },
+ "lights": 57,
+ "collision_hulls": 8,
+ "source": {
+  "script": "vehicles/cars/brakk_burro.py",
+  "script_sha256": "de58f53d5ff968e0dca601df8773d828d13a50dd73c976dccc4d2226b2e3d6b5",
+  "carkit_sha256": "4a1b9a9a1c4472c37227e0b9171ff94263a6d3d320dd4d13ad55783936af1832",
+  "game_sha256": "0ad8b492606e0f635834e714c0236f556a0ec776a6db7c3a071987b42777c7d3",
+  "original_triangles": 306750,
+  "original_objects": 250
+ },
+ "test": false,
+ "checks": [
+  {
+   "check": "files",
+   "ok": true,
+   "detail": {
+    "files": 15,
+    "missing": [],
+    "unreadable": []
+   }
+  },
+  {
+   "check": "budgets",
+   "ok": true,
+   "detail": [
+    {
+     "lod": 0,
+     "triangles": 184652,
+     "budget": 200000,
+     "ok": true,
+     "exterior": {
+      "triangles": 147642,
+      "budget": 150000,
+      "ok": true
+     },
+     "cabin": {
+      "triangles": 37010,
+      "budget": 50000,
+      "ok": true
+     }
+    },
+    {
+     "lod": 1,
+     "triangles": 69994,
+     "budget": 70000,
+     "ok": true,
+     "exterior": {
+      "triangles": 59995,
+      "budget": 60000,
+      "ok": true
+     },
+     "cabin": {
+      "triangles": 9999,
+      "budget": 10000,
+      "ok": true
+     }
+    },
+    {
+     "lod": 2,
+     "triangles": 20078,
+     "budget": 20000,
+     "ok": true,
+     "exterior": {
+      "triangles": 19853,
+      "budget": 20000
+     },
+     "cabin": {
+      "triangles": 225,
+      "budget": 0
+     }
+    },
+    {
+     "lod": 3,
+     "triangles": 5140,
+     "budget": 5000,
+     "ok": true,
+     "exterior": {
+      "triangles": 5058,
+      "budget": 5000
+     },
+     "cabin": {
+      "triangles": 82,
+      "budget": 0
+     }
+    }
+   ]
+  },
+  {
+   "check": "uv_overlap",
+   "ok": true,
+   "detail": {
+    "limit": 0.005,
+    "slots": {
+     "body": {
+      "overlap": 0.00104,
+      "coverage": 0.4994,
+      "outside_unit": 0.0
+     },
+     "wheels": {
+      "overlap": 0.0,
+      "coverage": 0.5615,
+      "outside_unit": 0.0
+     }
+    }
+   }
+  },
+  {
+   "check": "texel_density",
+   "ok": true,
+   "detail": {
+    "body": {
+     "p5": 339.2,
+     "median": 356.0,
+     "floor": 300.0,
+     "ok": true
+    },
+    "wheels": {
+     "p5": 541.5,
+     "median": 589.3,
+     "floor": 300.0,
+     "ok": true
+    }
+   }
+  },
+  {
+   "check": "wheel_pivots",
+   "ok": true,
+   "detail": [
+    {
+     "part": "wheel_fl",
+     "pivot": [
+      1.27,
+      0.81,
+      0.43
+     ],
+     "center_offset_mm": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "radius": 0.43,
+     "radius_pack": 0.43,
+     "json_pivot": [
+      1.27,
+      0.81,
+      0.43
+     ],
+     "ok": true
+    },
+    {
+     "part": "wheel_fr",
+     "pivot": [
+      1.27,
+      -0.81,
+      0.43
+     ],
+     "center_offset_mm": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "radius": 0.43,
+     "radius_pack": 0.43,
+     "json_pivot": [
+      1.27,
+      -0.81,
+      0.43
+     ],
+     "ok": true
+    },
+    {
+     "part": "wheel_rl",
+     "pivot": [
+      -1.23,
+      0.81,
+      0.43
+     ],
+     "center_offset_mm": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "radius": 0.43,
+     "radius_pack": 0.43,
+     "json_pivot": [
+      -1.23,
+      0.81,
+      0.43
+     ],
+     "ok": true
+    },
+    {
+     "part": "wheel_rr",
+     "pivot": [
+      -1.23,
+      -0.81,
+      0.43
+     ],
+     "center_offset_mm": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "radius": 0.43,
+     "radius_pack": 0.43,
+     "json_pivot": [
+      -1.23,
+      -0.81,
+      0.43
+     ],
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "lod_bounds",
+   "ok": true,
+   "detail": [
+    {
+     "lod": 1,
+     "deviation_m": [
+      0.0004,
+      0.0,
+      0.0001
+     ],
+     "tolerance_m": [
+      0.0603,
+      0.0293,
+      0.0294
+     ],
+     "ok": true
+    },
+    {
+     "lod": 2,
+     "deviation_m": [
+      0.0026,
+      0.0012,
+      0.0121
+     ],
+     "tolerance_m": [
+      0.0603,
+      0.0293,
+      0.0294
+     ],
+     "ok": true
+    },
+    {
+     "lod": 3,
+     "deviation_m": [
+      0.0082,
+      0.001,
+      0.0009
+     ],
+     "tolerance_m": [
+      0.0603,
+      0.0293,
+      0.0294
+     ],
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "lod_fidelity",
+   "ok": true,
+   "detail": [
+    {
+     "normal_p95_deg": 11.85,
+     "bent_share": 0.0071,
+     "texture_share": 0.0021,
+     "miss_share": 0.0013,
+     "lod": 1,
+     "limits": {
+      "p95": 12.0,
+      "bent": 0.02,
+      "tex": 0.01
+     },
+     "ok": true
+    },
+    {
+     "normal_p95_deg": 21.27,
+     "bent_share": 0.0341,
+     "texture_share": 0.0087,
+     "miss_share": 0.0018,
+     "lod": 2,
+     "limits": {
+      "p95": 25.0,
+      "bent": 0.05,
+      "tex": 0.025
+     },
+     "ok": true
+    },
+    {
+     "normal_p95_deg": 26.85,
+     "bent_share": 0.0549,
+     "texture_share": 0.0108,
+     "miss_share": 0.034,
+     "lod": 3,
+     "limits": {
+      "p95": 40.0,
+      "bent": 0.1,
+      "tex": 0.04
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "collision",
+   "ok": true,
+   "detail": {
+    "hulls": 8,
+    "vertices": [
+     426,
+     294,
+     196,
+     320,
+     292,
+     208,
+     354,
+     164
+    ]
+   }
+  }
+ ]
+}
