@@ -1,0 +1,492 @@
+{
+ "car": "halcyon_kite",
+ "title": "Halcyon Kite",
+ "ok": true,
+ "triangles": {
+  "original": 328529,
+  "lods": [
+   186786,
+   69985,
+   19976,
+   5107
+  ],
+  "lod0_parts": {
+   "body": 135818,
+   "glass": 3648,
+   "wheel_fl": 11626,
+   "wheel_fr": 11626,
+   "wheel_rl": 11626,
+   "wheel_rr": 11626,
+   "brake_fl": 204,
+   "brake_fr": 204,
+   "brake_rl": 204,
+   "brake_rr": 204
+  }
+ },
+ "objects": {
+  "original": 191,
+  "parts": 10
+ },
+ "size_class": {
+  "name": "standard",
+  "exterior_m2": 31.74,
+  "rule": "large when the body's exterior is 50 m2 or more",
+  "lod_budgets": [
+   150000,
+   60000,
+   20000,
+   5000
+  ],
+  "texel_floor_px_per_m": {
+   "body": 300.0,
+   "wheels": 300.0
+  },
+  "cabin_budgets": [
+   50000,
+   10000,
+   0,
+   0
+  ],
+  "budgets_rule": "lod_budgets the exterior's (body, glass, wheels, without the cabin); cabin_budgets the cabin.py cabin's allowance over them"
+ },
+ "textures": {
+  "body": 4096,
+  "wheels": 2048
+ },
+ "pack_bytes": 43424340,
+ "seconds": 2791.5,
+ "stage_seconds": {
+  "build": 2.4,
+  "render_original": 83.4,
+  "parts": 118.2,
+  "nodes": 0.0,
+  "uv": 1707.0,
+  "bake": 494.6,
+  "lods_export": 81.0,
+  "textures": 17.515084743499756,
+  "proof": 285.90526485443115
+ },
+ "baked_down": {
+  "card_src": {
+   "pieces": 3,
+   "triangles": 45840,
+   "names": [
+    "mouth.mesh",
+    "scoop.mesh",
+    "tail.mesh"
+   ]
+  },
+  "relief": {
+   "pieces": 11,
+   "triangles": 3935,
+   "names": [
+    "decals",
+    "interior.cluster.dark",
+    "interior.pedals.mat",
+    "interior.roof.mirror",
+    "interior.screen.dark",
+    "led.marker",
+    "led.name",
+    "lettering",
+    "plate.glyphs",
+    "sensors",
+    "spine.bolts"
+   ]
+  },
+  "planar": {
+   "pieces": 20,
+   "triangles": 43874,
+   "names": [
+    "interior.dash.gloss",
+    "interior.door.interior",
+    "interior.door.soft",
+    "interior.lining",
+    "interior.load.carpet",
+    "interior.quarter.interior",
+    "interior.quarter.soft",
+    "interior.seat0.belt",
+    "interior.seat0.cover",
+    "interior.seat1.belt",
+    "interior.seat1.cover",
+    "interior.seat2.cover",
+    "interior.seat3.cover",
+    "interior.wells"
+   ]
+  },
+  "lathe": {
+   "pieces": 4,
+   "triangles": 57536,
+   "names": [
+    "tire.fl",
+    "tire.fr",
+    "tire.rl",
+    "tire.rr"
+   ]
+  }
+ },
+ "texel_px_per_m": {
+  "body": {
+   "exterior": {
+    "area_m2": 31.735,
+    "p5": 335.1,
+    "median": 362.3
+   },
+   "underside": {
+    "area_m2": 0.187,
+    "p5": 174.3,
+    "median": 362.5
+   },
+   "cabin": {
+    "area_m2": 29.837,
+    "p5": 250.8,
+    "median": 253.0
+   },
+   "lamp_in_gaps": {
+    "area_m2": 0.403,
+    "p5": 126.5,
+    "median": 361.5
+   }
+  },
+  "wheels": {
+   "exterior": {
+    "area_m2": 2.231,
+    "p5": 590.7,
+    "median": 644.7
+   },
+   "underside": {
+    "area_m2": 0.022,
+    "p5": 570.1,
+    "median": 644.7
+   },
+   "lamp_in_gaps": {
+    "area_m2": 0.021,
+    "p5": 225.6,
+    "median": 225.6
+   }
+  }
+ },
+ "lights": 67,
+ "collision_hulls": 7,
+ "source": {
+  "script": "vehicles/cars/halcyon_kite.py",
+  "script_sha256": "b3f59b6525b6268a2a36ab0ec6cb69c555afb993b3aed58d1ca0761e716c12ca",
+  "carkit_sha256": "4a1b9a9a1c4472c37227e0b9171ff94263a6d3d320dd4d13ad55783936af1832",
+  "game_sha256": "0ad8b492606e0f635834e714c0236f556a0ec776a6db7c3a071987b42777c7d3",
+  "original_triangles": 328529,
+  "original_objects": 191
+ },
+ "test": false,
+ "checks": [
+  {
+   "check": "files",
+   "ok": true,
+   "detail": {
+    "files": 15,
+    "missing": [],
+    "unreadable": []
+   }
+  },
+  {
+   "check": "budgets",
+   "ok": true,
+   "detail": [
+    {
+     "lod": 0,
+     "triangles": 186786,
+     "budget": 200000,
+     "ok": true,
+     "exterior": {
+      "triangles": 137335,
+      "budget": 150000,
+      "ok": true
+     },
+     "cabin": {
+      "triangles": 49451,
+      "budget": 50000,
+      "ok": true
+     }
+    },
+    {
+     "lod": 1,
+     "triangles": 69985,
+     "budget": 70000,
+     "ok": true,
+     "exterior": {
+      "triangles": 59985,
+      "budget": 60000,
+      "ok": true
+     },
+     "cabin": {
+      "triangles": 10000,
+      "budget": 10000,
+      "ok": true
+     }
+    },
+    {
+     "lod": 2,
+     "triangles": 19976,
+     "budget": 20000,
+     "ok": true,
+     "exterior": {
+      "triangles": 19548,
+      "budget": 20000
+     },
+     "cabin": {
+      "triangles": 428,
+      "budget": 0
+     }
+    },
+    {
+     "lod": 3,
+     "triangles": 5107,
+     "budget": 5000,
+     "ok": true,
+     "exterior": {
+      "triangles": 4921,
+      "budget": 5000
+     },
+     "cabin": {
+      "triangles": 186,
+      "budget": 0
+     }
+    }
+   ]
+  },
+  {
+   "check": "uv_overlap",
+   "ok": true,
+   "detail": {
+    "limit": 0.005,
+    "slots": {
+     "body": {
+      "overlap": 0.00086,
+      "coverage": 0.4583,
+      "outside_unit": 0.0
+     },
+     "wheels": {
+      "overlap": 0.0,
+      "coverage": 0.224,
+      "outside_unit": 0.0
+     }
+    }
+   }
+  },
+  {
+   "check": "texel_density",
+   "ok": true,
+   "detail": {
+    "body": {
+     "p5": 335.1,
+     "median": 362.3,
+     "floor": 300.0,
+     "ok": true
+    },
+    "wheels": {
+     "p5": 590.7,
+     "median": 644.7,
+     "floor": 300.0,
+     "ok": true
+    }
+   }
+  },
+  {
+   "check": "wheel_pivots",
+   "ok": true,
+   "detail": [
+    {
+     "part": "wheel_fl",
+     "pivot": [
+      1.31,
+      0.7825,
+      0.345
+     ],
+     "center_offset_mm": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "radius": 0.345,
+     "radius_pack": 0.345,
+     "json_pivot": [
+      1.31,
+      0.7825,
+      0.345
+     ],
+     "ok": true
+    },
+    {
+     "part": "wheel_fr",
+     "pivot": [
+      1.31,
+      -0.7825,
+      0.345
+     ],
+     "center_offset_mm": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "radius": 0.345,
+     "radius_pack": 0.345,
+     "json_pivot": [
+      1.31,
+      -0.7825,
+      0.345
+     ],
+     "ok": true
+    },
+    {
+     "part": "wheel_rl",
+     "pivot": [
+      -1.33,
+      0.7825,
+      0.345
+     ],
+     "center_offset_mm": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "radius": 0.345,
+     "radius_pack": 0.345,
+     "json_pivot": [
+      -1.33,
+      0.7825,
+      0.345
+     ],
+     "ok": true
+    },
+    {
+     "part": "wheel_rr",
+     "pivot": [
+      -1.33,
+      -0.7825,
+      0.345
+     ],
+     "center_offset_mm": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "radius": 0.345,
+     "radius_pack": 0.345,
+     "json_pivot": [
+      -1.33,
+      -0.7825,
+      0.345
+     ],
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "lod_bounds",
+   "ok": true,
+   "detail": [
+    {
+     "lod": 1,
+     "deviation_m": [
+      0.0,
+      0.0,
+      0.0002
+     ],
+     "tolerance_m": [
+      0.0616,
+      0.0294,
+      0.0202
+     ],
+     "ok": true
+    },
+    {
+     "lod": 2,
+     "deviation_m": [
+      0.0005,
+      0.0006,
+      0.0014
+     ],
+     "tolerance_m": [
+      0.0616,
+      0.0294,
+      0.0202
+     ],
+     "ok": true
+    },
+    {
+     "lod": 3,
+     "deviation_m": [
+      0.006,
+      0.0006,
+      0.0
+     ],
+     "tolerance_m": [
+      0.0616,
+      0.0294,
+      0.0202
+     ],
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "lod_fidelity",
+   "ok": true,
+   "detail": [
+    {
+     "normal_p95_deg": 1.64,
+     "bent_share": 0.0036,
+     "texture_share": 0.0,
+     "miss_share": 0.0005,
+     "lod": 1,
+     "limits": {
+      "p95": 12.0,
+      "bent": 0.02,
+      "tex": 0.01
+     },
+     "ok": true
+    },
+    {
+     "normal_p95_deg": 15.86,
+     "bent_share": 0.0221,
+     "texture_share": 0.0026,
+     "miss_share": 0.0018,
+     "lod": 2,
+     "limits": {
+      "p95": 25.0,
+      "bent": 0.05,
+      "tex": 0.025
+     },
+     "ok": true
+    },
+    {
+     "normal_p95_deg": 30.35,
+     "bent_share": 0.0686,
+     "texture_share": 0.016,
+     "miss_share": 0.0591,
+     "lod": 3,
+     "limits": {
+      "p95": 40.0,
+      "bent": 0.1,
+      "tex": 0.04
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "check": "collision",
+   "ok": true,
+   "detail": {
+    "hulls": 7,
+    "vertices": [
+     398,
+     224,
+     276,
+     126,
+     334,
+     138,
+     346
+    ]
+   }
+  }
+ ]
+}
