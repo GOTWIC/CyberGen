@@ -8,7 +8,7 @@
    186786,
    69985,
    19976,
-   5107
+   5127
   ],
   "lod0_parts": {
    "body": 135818,
@@ -53,18 +53,18 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 43424340,
- "seconds": 2791.5,
+ "pack_bytes": 43543291,
+ "seconds": 2911.8,
  "stage_seconds": {
-  "build": 2.4,
-  "render_original": 83.4,
-  "parts": 118.2,
+  "build": 2.8,
+  "render_original": 121.0,
+  "parts": 145.7,
   "nodes": 0.0,
-  "uv": 1707.0,
-  "bake": 494.6,
-  "lods_export": 81.0,
-  "textures": 17.515084743499756,
-  "proof": 285.90526485443115
+  "uv": 1548.4,
+  "bake": 731.3,
+  "lods_export": 69.5,
+  "textures": 17.08027458190918,
+  "proof": 274.8042051792145
  },
  "baked_down": {
   "card_src": {
@@ -171,7 +171,7 @@
   "script": "vehicles/cars/halcyon_kite.py",
   "script_sha256": "b3f59b6525b6268a2a36ab0ec6cb69c555afb993b3aed58d1ca0761e716c12ca",
   "carkit_sha256": "4a1b9a9a1c4472c37227e0b9171ff94263a6d3d320dd4d13ad55783936af1832",
-  "game_sha256": "0ad8b492606e0f635834e714c0236f556a0ec776a6db7c3a071987b42777c7d3",
+  "game_sha256": "1b52432947a42b2976adc1e33a4930f639dbee535955f60f09aa69d1b2036a2d",
   "original_triangles": 328529,
   "original_objects": 191
  },
@@ -238,15 +238,15 @@
     },
     {
      "lod": 3,
-     "triangles": 5107,
+     "triangles": 5127,
      "budget": 5000,
      "ok": true,
      "exterior": {
-      "triangles": 4921,
+      "triangles": 5046,
       "budget": 5000
      },
      "cabin": {
-      "triangles": 186,
+      "triangles": 81,
       "budget": 0
      }
     }
@@ -414,9 +414,9 @@
     {
      "lod": 3,
      "deviation_m": [
-      0.006,
       0.0006,
-      0.0
+      0.0042,
+      0.0007
      ],
      "tolerance_m": [
       0.0616,
@@ -458,10 +458,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 30.35,
-     "bent_share": 0.0686,
-     "texture_share": 0.016,
-     "miss_share": 0.0591,
+     "normal_p95_deg": 28.73,
+     "bent_share": 0.062,
+     "texture_share": 0.0112,
+     "miss_share": 0.0076,
      "lod": 3,
      "limits": {
       "p95": 40.0,

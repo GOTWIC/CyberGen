@@ -126,21 +126,21 @@
   },
   "halcyon_kite": {
    "asset": "halcyon_kite.zip",
-   "sha256": "c8cc4aa14d53b1e20db9c47e1b9cf6c421dcd215d17d28fbe6615dfbad973de1",
-   "bytes": 27938851,
+   "sha256": "e06d43e75a1b8bddf3405cdaefd02efeefe0cf0822d4a94eaccaf6ff31944ef9",
+   "bytes": 28055455,
    "files": {
-    "body_base_color.png": "3ba3bd7e47dfcb64959ce765a3c9ab167a7811fc8aa24d4db59d0f8a71235c2e",
-    "body_emissive.png": "c2c0dfa89b189567c6b10f4fee127fe963a1f6081d86489f1797ce69246b0e9d",
-    "body_mask.png": "b7908dc9f656c2f155062eb614c5e9afc2e14f08333d5c0634ad9f85cc6da877",
-    "body_normal.png": "104dfae6cba2efb13103bf1f2f361f465b915af94df66b7e820a6b7d0f02fd27",
-    "body_orm.png": "fff18b2079c6d753c201326c7cce6b15e555d54d86131f6abb0a84b26c292296",
+    "body_base_color.png": "31bb8170326826e4d55e02ae3a6ccf890bbcf12c1e186313d59ec751725db51b",
+    "body_emissive.png": "f6a5808a356aa71d3b1341128751bffe2f6bc45379b752cc7470e550086df07a",
+    "body_mask.png": "c1011a72aa5984855b97882b708c0727b166161d42cc070a61bdf11b8c504306",
+    "body_normal.png": "02aeb289bd1cbb96deeea939723ee419fd0c7a0a91704636f9f2b264b99b8de5",
+    "body_orm.png": "ad2f8b153056a22021bda6a3e8e89cf1655c45a24702fcd49c4d2b9b90b30360",
     "collision.glb": "3236474415a9c05eeff1255582aa1c70ef1de824c367501bda01fffbf39fdd24",
-    "game_report.json": "68b4fc818463b1211a60c969ee87f764241dc4d640b4d0f34578f2a7544cc954",
-    "lod0.glb": "831ad54a64f40a9dd3400b5ae593f818b72fcf5740fdf1282faad614592dcad5",
+    "game_report.json": "0e5e93b362d3cfaa10007aa3582658cce63d474891c52568f76849ed162ee547",
+    "lod0.glb": "c1814e4a8c8794524f4a189129091ecfe382e48875b3b323b54e1ae35eaa489b",
     "lod1.glb": "b2ac49c398e88abf955f7d8b4d1df36c203db4daff839eaccef8a4f3e2022657",
     "lod2.glb": "1532db8b48775cd85648a33b5d03811c1073d5955f4f36c5692baa5a32083494",
-    "lod3.glb": "8a8f03bf553a56d9115c7b6b62d6e83164dea54bc88468033d4b96d8147d38e7",
-    "pack.json": "10a04943d0a9e5b44a16d9e01feef197b01e0d94ad6a29182d804cbc5ce9ff2f",
+    "lod3.glb": "e498c4df3babf705132f66e0a0fc7f12f155e96fba9ff2235c937b76cc1b94ad",
+    "pack.json": "7033a6e65b42fbf581715f13c13979dcf63efac5c252d425af866ef7185d3f1c",
     "wheels_base_color.png": "f02783d631067a14cf1ac1f067265d0e75b0333c25d792410f9ac70b8a7de816",
     "wheels_emissive.png": "cab3d03422f7a6df26859bf099800e4f780a34b33f9b0c323b184963bb043461",
     "wheels_mask.png": "eaa47b7c043ebbf78d7778487651c46f960a2ef9b02a800b3c0b58eaff449b6f",
@@ -151,7 +151,7 @@
     "script": "vehicles/cars/halcyon_kite.py",
     "script_sha256": "b3f59b6525b6268a2a36ab0ec6cb69c555afb993b3aed58d1ca0761e716c12ca",
     "carkit_sha256": "4a1b9a9a1c4472c37227e0b9171ff94263a6d3d320dd4d13ad55783936af1832",
-    "game_sha256": "0ad8b492606e0f635834e714c0236f556a0ec776a6db7c3a071987b42777c7d3"
+    "game_sha256": "1b52432947a42b2976adc1e33a4930f639dbee535955f60f09aa69d1b2036a2d"
    }
   },
   "halcyon_ridge": {
