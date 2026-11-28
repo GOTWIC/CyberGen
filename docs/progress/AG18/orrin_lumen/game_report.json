@@ -8,7 +8,7 @@
    187602,
    69979,
    20409,
-   4249
+   4927
   ],
   "lod0_parts": {
    "body": 77954,
@@ -49,18 +49,18 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 38836586,
- "seconds": 1969.0,
+ "pack_bytes": 39028556,
+ "seconds": 3427.0,
  "stage_seconds": {
-  "build": 4.2,
-  "render_original": 86.2,
-  "parts": 255.9,
+  "build": 6.8,
+  "render_original": 569.8,
+  "parts": 414.2,
   "nodes": 0.0,
-  "uv": 487.1,
-  "bake": 707.5,
-  "lods_export": 124.0,
-  "textures": 25.37964630126953,
-  "proof": 277.3602044582367
+  "uv": 562.0,
+  "bake": 1529.3,
+  "lods_export": 48.7,
+  "textures": 22.849230766296387,
+  "proof": 271.3070938587189
  },
  "baked_down": {
   "collapse": {
@@ -156,7 +156,7 @@
   "script": "vehicles/cars/orrin_lumen.py",
   "script_sha256": "231c6ec5026ac62c4daf01d244e6389de87054a3940c678cc269e02b9a0daac8",
   "carkit_sha256": "4a1b9a9a1c4472c37227e0b9171ff94263a6d3d320dd4d13ad55783936af1832",
-  "game_sha256": "0ad8b492606e0f635834e714c0236f556a0ec776a6db7c3a071987b42777c7d3",
+  "game_sha256": "1b52432947a42b2976adc1e33a4930f639dbee535955f60f09aa69d1b2036a2d",
   "original_triangles": 398043,
   "original_objects": 123
  },
@@ -223,15 +223,15 @@
     },
     {
      "lod": 3,
-     "triangles": 4249,
+     "triangles": 4927,
      "budget": 5000,
      "ok": true,
      "exterior": {
-      "triangles": 4077,
+      "triangles": 4822,
       "budget": 5000
      },
      "cabin": {
-      "triangles": 172,
+      "triangles": 105,
       "budget": 0
      }
     }
@@ -400,8 +400,8 @@
      "lod": 3,
      "deviation_m": [
       0.0,
-      0.0029,
-      0.0002
+      0.0017,
+      0.0005
      ],
      "tolerance_m": [
       0.0755,
@@ -443,10 +443,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 13.24,
-     "bent_share": 0.0146,
-     "texture_share": 0.0168,
-     "miss_share": 0.0472,
+     "normal_p95_deg": 13.63,
+     "bent_share": 0.0143,
+     "texture_share": 0.0121,
+     "miss_share": 0.0298,
      "lod": 3,
      "limits": {
       "p95": 40.0,
