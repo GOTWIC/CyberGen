@@ -36,32 +36,32 @@
   },
   "brakk_burro": {
    "asset": "brakk_burro.zip",
-   "sha256": "d73644b3937db6d1a8f5b30d95c2ff79249240f19cf91e22dac07bef64c5f6d5",
-   "bytes": 33407961,
+   "sha256": "777dc70f45406b38044b6abb16b7b5b2fb6a9f9de640342efa18e75d23249449",
+   "bytes": 34433208,
    "files": {
-    "body_base_color.png": "4185cf2179fa6896aa59552a16e5d3aef7bc1ab6ad0bf8cca1ee6c3993fe72a3",
-    "body_emissive.png": "b7bb68f39f77e6b15f52407cccc088ea8c0a53dc5a1a7df0e542acfbecf009cd",
-    "body_mask.png": "1059d20d454bdbfbd908a62fd1acbabc5d9f5856cbb9f2cbd1b648c73314c37b",
-    "body_normal.png": "d9d504e57c1213124da0cd2ef9e6415cb3374cca0759380a0e234f2a77deda54",
-    "body_orm.png": "93ef087e068d6bebd533c4f1bd73743d58a6ec6d6eda6c17e7ae9b0b94db3970",
+    "body_base_color.png": "6c7d77a880c175d432a037a6a93a2424eb1f5aa284a7c65cebf5e4cf746b1c01",
+    "body_emissive.png": "31a92fc5cf57ad2e099d4fc1de2534d87e80bde42f44623be23441c6fcee486a",
+    "body_mask.png": "fc34be450413c5f6d959899f43f75ce9e3f113f2527208741f265b5cefad9591",
+    "body_normal.png": "3ec7d556bd323f97b2806033fa533a976635c512ec389a70427654b990a35041",
+    "body_orm.png": "2580589a49698c80fc1b5c002ec6ba155bdd816b50d273946c39e528b7360d71",
     "collision.glb": "cdff08a3309c6479e379da68acb6dff1a66d30b06ba90943d0e6640a8ad578e6",
-    "game_report.json": "34b458ea16ce28a4d139610fc8c1b59e1e27973069600b676c886364c21f3d37",
-    "lod0.glb": "6e4394f853815984e2a626b514556ef956092fc1c2587c1a73a25c90436e4341",
+    "game_report.json": "6a35bc92eb2210e50b1415cb4cca9c2690ea9eac2d5b9c83c8a59747d2743428",
+    "lod0.glb": "11f58a8c6757c5673d091fa922b24d829c6066f7dd8499b9fc6eb7d8f81f29cd",
     "lod1.glb": "41145775af38e6cbb33a8f735aeb4d6099bc0c9b278987fc2c296142373aa429",
     "lod2.glb": "8f2abb64f0b1d7e3cb9b7efb9ebafc26fdf089ee19a02aa448513e7f9f2c079e",
-    "lod3.glb": "13460a8e5d3331f8acf1c8a708c5d9cde4c0d005a9a65191c91ee1748fa855bb",
-    "pack.json": "fa7518108931044d3c4fa05921abea80c39e5248756b2ee1e073e188c4774e57",
-    "wheels_base_color.png": "832808d5829900898af473cd0eb99fa7cd92bfef089ac359580afbb25178c2bb",
-    "wheels_emissive.png": "af12194f6ad03615a4a2fb6beb1813ad15a2714da49f35101c3e281ba95fc736",
-    "wheels_mask.png": "47b5c66f69c7ae0b8bba0e1b9343970efcdff8ca78e6f3507f5a57d41c349244",
-    "wheels_normal.png": "76ee2c78daaa29fe7a465aa62dfe7fae5ba6efd593dfaee0396842846a69e2d9",
-    "wheels_orm.png": "a730871f535daa2cda489dd8eb3e83ef54a72cd0375603566ec7cd1ed2f54ceb"
+    "lod3.glb": "8ff462a8a855204fec2e6cb0f553f0b28e025f4081870524e2a50f055cd8e43c",
+    "pack.json": "81e9e7bfaaca8c083b21fd55e45734222430da9a72e9136e586cd7c84ab2c86e",
+    "wheels_base_color.png": "a0e8134ca1bb98ca0bb44ed120c8debc74a0436424561ee695a38f2e4926e4ba",
+    "wheels_emissive.png": "0bb4977012ed377b92d3995ed9d736871813c0608bce018d58717366c23a767a",
+    "wheels_mask.png": "2402f8c115fb221fee6bb082d292690f7a22c39caa88d39a5fccdeb35a51e0a2",
+    "wheels_normal.png": "57c3bd743a6f729ee8507ef90987f783109599912911638a1f353b71c082b6ff",
+    "wheels_orm.png": "1cc258e44fe491138625433e0e35b9174039faa904dbd9eb4c992882141006d6"
    },
    "source": {
     "script": "vehicles/cars/brakk_burro.py",
     "script_sha256": "de58f53d5ff968e0dca601df8773d828d13a50dd73c976dccc4d2226b2e3d6b5",
     "carkit_sha256": "4a1b9a9a1c4472c37227e0b9171ff94263a6d3d320dd4d13ad55783936af1832",
-    "game_sha256": "0ad8b492606e0f635834e714c0236f556a0ec776a6db7c3a071987b42777c7d3"
+    "game_sha256": "1b52432947a42b2976adc1e33a4930f639dbee535955f60f09aa69d1b2036a2d"
    }
   },
   "brakk_hauler": {

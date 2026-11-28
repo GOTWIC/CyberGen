@@ -8,7 +8,7 @@
    184652,
    69994,
    20078,
-   5140
+   5124
   ],
   "lod0_parts": {
    "body": 143256,
@@ -49,18 +49,18 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 48818748,
- "seconds": 3401.8,
+ "pack_bytes": 49830471,
+ "seconds": 3759.5,
  "stage_seconds": {
-  "build": 3.1,
-  "render_original": 81.4,
-  "parts": 123.2,
+  "build": 2.9,
+  "render_original": 80.0,
+  "parts": 116.8,
   "nodes": 0.0,
-  "uv": 2230.9,
-  "bake": 553.3,
-  "lods_export": 108.1,
-  "textures": 19.105913400650024,
-  "proof": 281.1959297657013
+  "uv": 2176.8,
+  "bake": 1027.9,
+  "lods_export": 67.1,
+  "textures": 18.55635929107666,
+  "proof": 268.1960361003876
  },
  "baked_down": {
   "relief": {
@@ -148,7 +148,7 @@
   "script": "vehicles/cars/brakk_burro.py",
   "script_sha256": "de58f53d5ff968e0dca601df8773d828d13a50dd73c976dccc4d2226b2e3d6b5",
   "carkit_sha256": "4a1b9a9a1c4472c37227e0b9171ff94263a6d3d320dd4d13ad55783936af1832",
-  "game_sha256": "0ad8b492606e0f635834e714c0236f556a0ec776a6db7c3a071987b42777c7d3",
+  "game_sha256": "1b52432947a42b2976adc1e33a4930f639dbee535955f60f09aa69d1b2036a2d",
   "original_triangles": 306750,
   "original_objects": 250
  },
@@ -215,15 +215,15 @@
     },
     {
      "lod": 3,
-     "triangles": 5140,
+     "triangles": 5124,
      "budget": 5000,
      "ok": true,
      "exterior": {
-      "triangles": 5058,
+      "triangles": 5092,
       "budget": 5000
      },
      "cabin": {
-      "triangles": 82,
+      "triangles": 32,
       "budget": 0
      }
     }
@@ -391,9 +391,9 @@
     {
      "lod": 3,
      "deviation_m": [
-      0.0082,
+      0.0026,
       0.001,
-      0.0009
+      0.0011
      ],
      "tolerance_m": [
       0.0603,
@@ -435,10 +435,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 26.85,
-     "bent_share": 0.0549,
-     "texture_share": 0.0108,
-     "miss_share": 0.034,
+     "normal_p95_deg": 25.8,
+     "bent_share": 0.0533,
+     "texture_share": 0.0103,
+     "miss_share": 0.0021,
      "lod": 3,
      "limits": {
       "p95": 40.0,
