@@ -269,7 +269,9 @@ LOD0 the parts as above. LOD1 to LOD3 are made from LOD0 to their budgets (60,00
 budget still steps down), and share LOD0's textures. A `cabin.py` cabin is in LOD1 too,
 collapsed apart from the exterior at a ratio of its own to its allowance (10,000 triangles,
 at most 60% of LOD0's cabin), the exterior to its budget as any car's; from LOD2 it is left
-out. Per part, in this order:
+out. LOD3's body is made from LOD2's (its UVs and normals still laid on from LOD0's
+surface, its fidelity measured against LOD0): collapsed from LOD0 straight to a few percent,
+its panels crumpled and tore at the nose and wheel arches. Per part, in this order:
 
 1. **Left out.** From LOD2 the cabin's faces; from LOD2 every piece no larger than 5 cm
    in any direction (bolts, sensors, small vents; lamps never); at LOD3 the faces seen only

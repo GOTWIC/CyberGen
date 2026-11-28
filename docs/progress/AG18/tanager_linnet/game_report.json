@@ -8,7 +8,7 @@
    194764,
    69977,
    20334,
-   4978
+   5138
   ],
   "lod0_parts": {
    "body": 160092,
@@ -49,18 +49,18 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 45541199,
- "seconds": 3654.4,
+ "pack_bytes": 45948202,
+ "seconds": 13777.5,
  "stage_seconds": {
-  "build": 3.4,
-  "render_original": 84.0,
-  "parts": 255.5,
+  "build": 5.3,
+  "render_original": 569.6,
+  "parts": 414.0,
   "nodes": 0.0,
-  "uv": 634.9,
-  "bake": 2263.3,
-  "lods_export": 109.4,
-  "textures": 23.955503702163696,
-  "proof": 278.44299483299255
+  "uv": 769.0,
+  "bake": 10010.2,
+  "lods_export": 100.6,
+  "textures": 35.84057021141052,
+  "proof": 1870.3301086425781
  },
  "baked_down": {
   "relief": {
@@ -245,7 +245,7 @@
   "script": "vehicles/cars/tanager_linnet.py",
   "script_sha256": "a525d5d98b024e570b1b7c9b13de74a18ed095e8d8e18984959799a7fe1f5869",
   "carkit_sha256": "4a1b9a9a1c4472c37227e0b9171ff94263a6d3d320dd4d13ad55783936af1832",
-  "game_sha256": "0ad8b492606e0f635834e714c0236f556a0ec776a6db7c3a071987b42777c7d3",
+  "game_sha256": "1b52432947a42b2976adc1e33a4930f639dbee535955f60f09aa69d1b2036a2d",
   "original_triangles": 391887,
   "original_objects": 216
  },
@@ -312,15 +312,15 @@
     },
     {
      "lod": 3,
-     "triangles": 4978,
+     "triangles": 5138,
      "budget": 5000,
      "ok": true,
      "exterior": {
-      "triangles": 4857,
+      "triangles": 5076,
       "budget": 5000
      },
      "cabin": {
-      "triangles": 121,
+      "triangles": 62,
       "budget": 0
      }
     }
@@ -490,7 +490,7 @@
      "deviation_m": [
       0.0,
       0.0008,
-      0.0
+      0.0001
      ],
      "tolerance_m": [
       0.0627,
@@ -532,10 +532,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 22.43,
-     "bent_share": 0.0431,
-     "texture_share": 0.0321,
-     "miss_share": 0.1493,
+     "normal_p95_deg": 14.65,
+     "bent_share": 0.0215,
+     "texture_share": 0.0178,
+     "miss_share": 0.0143,
      "lod": 3,
      "limits": {
       "p95": 40.0,

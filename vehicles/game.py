@@ -2457,6 +2457,7 @@ LOD_WELD_FROM = 3                           # pieces welded where their vertices
 LOD_WELD_M = 0.0015
 LOD_LATHE_SEGS = 20
 LOD_WRECK_FROM = 3                          # wrecked pieces put right (stand_ins)
+LOD_FROM_PREV = 3                           # a far LOD's body from the LOD before it
 LOD_OVER_TOL = 1.1                          # a far LOD over its budget by more (the check's
 LOD_SQUEEZE = 2                             # tolerance) made again at a lower target, this often
 LOD_WRECK_M = 0.01                          # ... off their shape by more than this
@@ -3646,7 +3647,8 @@ def opaque_unseen(parts_final):
 
 
 def make_lods(parts_final, budgets, coll, work=None, cabin=None):
-    """LOD1 to LOD3 from LOD0's parts: each lod_prep'ed, then collapsed (body and glass
+    """LOD1 to LOD3 from LOD0's parts (from LOD_FROM_PREV the body from the LOD before it,
+    LOD3's from LOD2's): each lod_prep'ed, then collapsed (body and glass
     symmetric in y) at one ratio for every part to the budget (at most 60% of the LOD
     before it), UVs and normals laid on from LOD0 (Surface), the box held (hold_bounds);
     each measured against LOD0 (fidelity). cabin: a cabin.py cabin's allowance per LOD
@@ -3691,10 +3693,20 @@ def make_lods(parts_final, budgets, coll, work=None, cabin=None):
             log("LOD%d: faces not seen with the glass opaque %s (%.1f s)" % (
                 k, {nm: len(v) for nm, v in unseen.items()}, time.time() - t1))
         hid = unseen or {}
+        src = dict(parts_final)
+        if k >= LOD_FROM_PREV and lods[-1]["lod"] == k - 1 and "body" in src:
+            # the far LOD's body from the LOD before it (a clean mesh a few times its size),
+            # not from LOD0 (a collapse to a few percent crumples its panels); its faces not
+            # seen with the glass opaque found again on it
+            names = [nm for nm, _ in parts_final]
+            src["body"] = lods[-1]["objs"][names.index("body")]
+            if k >= LOD_OPAQUE_FROM:
+                hid = dict(hid)
+                hid["body"] = opaque_unseen([(nm, src[nm]) for nm in names])["body"]
         SMALL_SCALE[0] = 1.0
         squeeze = 0
         while True:
-            prep = {nm: lod_prep(o, k, nm in coarse, nm.startswith("wheel_"),
+            prep = {nm: lod_prep(src[nm], k, nm in coarse, nm.startswith("wheel_"),
                                  unseen=hid.get(nm))
                     for nm, o in parts_final}
             for nm in coarse:       # too much to keep whole: unsubdivided, else collapsed
@@ -4378,7 +4390,22 @@ def main_build(A):
         if target is None:
             continue
         rec = receiver_of(target, replaced[slot], sources[slot], relief[slot], low_coll)
-        srcs = sources[slot]
+        srcs = list(sources[slot])
+        if rec is not None and "cg_piece" in rec.data.attributes:
+            # a kept piece under baked-down detail is a source too: the rays from its faces
+            # start on it, and without it they passed through it to the next surface behind
+            # (the Linnet's bumper, a plastic plate under its plate and sensors, took the
+            # paint of the nose 12 mm behind it)
+            under = {x.value for x in rec.data.attributes["cg_piece"].data}
+            for p in pieces:
+                if p.idx in under and p.op in ("keep", "planar") and p.part != "glass" and \
+                        ("body" if p.part == "body" else "wheels") == slot and \
+                        p.ob not in srcs:
+                    srcs.append(p.ob)
+                    for m in p.ob.data.materials:
+                        if m is not None and m.name not in src_chans:
+                            src_chans[m.name] = Channels(infos.get(m.name) or MatInfo(m),
+                                                         infos, emax, True, False)
         sc = [src_chans[m.name] for o in srcs for m in o.data.materials if m is not None]
         sc = list({id(c): c for c in sc}.values())
         log("baking %s: %d faces, %d of them under baked-down detail, %d source objects" % (
