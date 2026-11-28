@@ -3442,14 +3442,23 @@ Results: [`docs/progress/AG18/delta_at3/`](progress/AG18/delta_at3/README.md).
 - **Rebuilt on Windows** (Blender 5.2, one car at a time): the 15 cars in the cities, and
   first packs of the Halcyon Kite, Tanager Linnet, Orrin Tide and Brakk Burro, every check
   passing; LOD0 105,255 (Dart) to 195,138 (Bastion) triangles, LOD1 52,638 to 69,995, 25 to
-  220 minutes a car. Proofs and reports in each car's folder. Not published: `packs.json`
-  stays the cabinless release until the next `packs.py publish`, and the four new cars wait
-  for the parked table.
-- **Open, from the proofs**: LOD3 fronts torn or folded (Lumen's hood folded, with a dark
+  220 minutes a car. Proofs and reports in each car's folder. Released as
+  `vehicle-packs-2026-11-27` (19 packs, 546 MB, `packs.json`); the four new cars wait for the
+  parked table.
+- **Seen in the proofs**: LOD3 fronts torn or folded (Lumen's hood folded, with a dark
   hood patch at LOD1; the Cab's nose and a bright patch on its door window; the Porter's
   A-pillar; the Meridian's hood; the Kite's pale windshield; the Linnet's door; the Burro's
   grille a dark block; the Pebble's small side tear); the Linnet's front bumper baked in body
   color at every LOD.
+- **Fixed** (9722afa6): LOD3's body made from LOD2's (`LOD_FROM_PREV` 3), its UVs, normals
+  and fidelity still from LOD0: collapsed from LOD0 straight to a few percent, the panels
+  crumpled and tore at the nose and arches. A kept piece under baked-down detail is a bake
+  source, so the rays no longer pass through it to the surface behind (the Linnet's bumper
+  took the nose's paint). Rebuilt with both and republished into the release: the Lumen,
+  Linnet, Cab, Porter, Meridian, Kite, Burro and Tide (LOD3 4,927 to 8,202 triangles, 56 to
+  233 minutes a car), each LOD3 whole at the front, faceted. The Pebble's rebuild was not
+  published: from LOD2 its LOD3 carried LOD2's tear along the rear window and folded at the
+  front quarter, so its released LOD3, from LOD0, stays.
 
 ## Order
 

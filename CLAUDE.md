@@ -2551,11 +2551,13 @@ waits for Swagnik's review.
   10,000; none past LOD1), retries a far LOD over its budget by more than 10% at a lower
   target, and brings a cabin's texel weight (0.7) down to 0.4 where it starves the exterior.
   Rebuilt on Windows for the 15 cars in the cities and built for the first time for the Kite,
-  Linnet, Tide and Burro, every check passing (proofs and reports in each car's folder). The
-  rebuilt packs are not published yet (`packs.json` is the cabinless release), so the cities
-  still park the old ones, and the four new cars are not in the parked table. Open: LOD3
-  fronts torn or folded on several cars (worst the Lumen), the Linnet's bumper baked in body
-  color.
+  Linnet, Tide and Burro, every check passing (proofs and reports in each car's folder),
+  released as `vehicle-packs-2026-11-27` (`packs.json`); the four new cars are not in the
+  parked table yet. LOD3's body is made from LOD2's (`LOD_FROM_PREV`; from LOD0 its panels
+  tore at the nose and arches), and a kept piece under baked detail is a bake source (the
+  Linnet's bumper took the nose's paint): the Lumen, Linnet, Cab, Porter, Meridian, Kite,
+  Burro and Tide rebuilt with both. The Pebble keeps its LOD3 from LOD0 (from LOD2 it
+  carried LOD2's tear and folded its front).
 - The other phases (improvements, AG8's parked vehicles and
   stage 4's fleet drawing on them) are listed in the scope with their plan.
 

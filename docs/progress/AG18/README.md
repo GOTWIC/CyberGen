@@ -61,10 +61,10 @@ trains there are still the stand-ins.
 **Packs with cabins** (2026-11-25 to 27): every pack of a car in the cities rebuilt with its
 cabin, and the Kite, Linnet, Tide and Burro packed for the first time, every check passing
 (`vehicles/game.py`: a cabin's own triangle budget at LOD0 and LOD1, far LODs made again when
-over budget). These packs are not yet published as a release, so the cities still park the
-earlier cabinless ones; the Aurels' proofs are from 2026-11-12. Seen in the proofs and left
-open: LOD3 fronts torn or folded (the Lumen worst, then the Cab, Porter, Meridian, Kite,
-Linnet, Burro), the Linnet's front bumper baked in body color.
+over budget), released as `vehicle-packs-2026-11-27`; the Aurels' proofs are from
+2026-11-12. The far LOD's torn and folded fronts are fixed by making LOD3 from LOD2 (the
+Lumen, Linnet, Cab, Porter, Meridian, Kite, Burro and Tide rebuilt; the Pebble keeps its
+LOD3 from LOD0, which came out cleaner), and the Linnet's front bumper keeps its own color.
 
 **In the cities** (step H): `assetgen vehicles BUILD` (also part of `assetgen build`) parks
 the packs in a generated city in place of AG8's parked car variants: a model by its
