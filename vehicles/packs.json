@@ -266,27 +266,27 @@
   },
   "kestrel_meridian": {
    "asset": "kestrel_meridian.zip",
-   "sha256": "ab283dbd68d48aa404716dda05e88f3439e5f96a115ac9ff449129264caefaa4",
-   "bytes": 25945535,
+   "sha256": "0f1e1c97ba0622e9950bf789fbd14e0858854ffcfa36c9ac75c9c92c76ebc0d6",
+   "bytes": 26448072,
    "files": {
-    "body_base_color.png": "bfe0c8b91f95a0aec80a89173c916329e0c8ed47f2af2ec9153569394bd59c13",
-    "body_emissive.png": "ac22626708eb0020fd24398955fbf9a7a6de377f87ea49486bb9562a878dcd56",
-    "body_mask.png": "3a7b95aaee25d6a41ea3733b5691144d84e7e9dcde03611d73846e5c7ec402b7",
-    "body_normal.png": "17aef33fffba0eb35488281da7ad4f44951eab17218318a80dcc2019a696ecbb",
-    "body_orm.png": "edeafd4c75e9d7f9a986dcb87c5f1a4683ef8e009d0a22903dae9f58501a614e",
+    "body_base_color.png": "6f01bd524dd8195396696f1dedbd446d0ebdae61d62b50e87e16eef2448a935c",
+    "body_emissive.png": "f1bdefa37c35ec32a37d00d6822dcc1fb49fc116d35eef716c1876872592a526",
+    "body_mask.png": "e91c6ee8904332726bdb1bed7bee21b7c46f68ddfdc75820639e8f3991fb34fa",
+    "body_normal.png": "1a1f7131b24353c5d6bb83c240109ff3d1bdef0c9ff9574289609765bd6de025",
+    "body_orm.png": "9ecf91b5ff34e9340e808dc538d72b9b36e7d3c7bfbb517cd9f2b36dbe2738a9",
     "collision.glb": "fb0994a5331ccd766e19da30a08250e07460578dea2639203d785ecc539f05e3",
-    "game_report.json": "34cded7feeb415d268769629f27cde14f511c94c764a3b0a1e8a7f7c91981d86",
-    "lod0.glb": "52c05db39102742990cc90ffc614b2216373f23ee3fc4d03d38fd853edbc06cc",
+    "game_report.json": "e7bb634c1515aa40d0c243c2f11cedb7d245e5fab834d425849e3cdefa7bf913",
+    "lod0.glb": "5fe1e57ae07797d9f5452d692267a55db2b5b8477314cbcaaccebf79b4d67971",
     "lod1.glb": "6d711075fee7a341a44b082d42c2cf0144870d48e13944b1d5f6d297005c1299",
     "lod2.glb": "de272e2abb5f3af9b6ea9f88cd913f06631b2550f73aadb68f14d59a6a9cf6bb",
-    "lod3.glb": "b1848794b81ec23c66a5c7d59746337a1ddcd8e06cd6170538a5ca9e62b923a2",
-    "pack.json": "01e14f76cabd6f2f954773af32489a628554fa7682dd1235a5ccbbe62e03193c"
+    "lod3.glb": "855d1cc142700db29345d5e8b4848f322999802b3f2b3f5feedaf86f5d3189ef",
+    "pack.json": "7973b40a4e3273c10ebf03eb57f56b08d6a4c22d1eedf1abe6a098f3e26b3bb7"
    },
    "source": {
     "script": "vehicles/cars/kestrel_meridian.py",
     "script_sha256": "5595be2b8d405ac397ca4feec59bc13a1162e36bea5b68a53121738c193fcaf8",
     "carkit_sha256": "4a1b9a9a1c4472c37227e0b9171ff94263a6d3d320dd4d13ad55783936af1832",
-    "game_sha256": "0ad8b492606e0f635834e714c0236f556a0ec776a6db7c3a071987b42777c7d3"
+    "game_sha256": "1b52432947a42b2976adc1e33a4930f639dbee535955f60f09aa69d1b2036a2d"
    }
   },
   "orrin_aria": {

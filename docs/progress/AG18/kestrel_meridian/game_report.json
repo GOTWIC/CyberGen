@@ -8,7 +8,7 @@
    124808,
    55872,
    20560,
-   4992
+   5126
   ],
   "lod0_parts": {
    "body": 123544,
@@ -44,18 +44,18 @@
  "textures": {
   "body": 4096
  },
- "pack_bytes": 38903647,
- "seconds": 3212.4,
+ "pack_bytes": 39404901,
+ "seconds": 5465.1,
  "stage_seconds": {
-  "build": 2.2,
-  "render_original": 81.9,
-  "parts": 255.2,
+  "build": 3.3,
+  "render_original": 124.7,
+  "parts": 367.3,
   "nodes": 0.0,
-  "uv": 1209.1,
-  "bake": 1159.5,
-  "lods_export": 226.4,
-  "textures": 15.250823736190796,
-  "proof": 261.8368151187897
+  "uv": 1528.6,
+  "bake": 2939.6,
+  "lods_export": 81.9,
+  "textures": 22.9994535446167,
+  "proof": 395.1556718349457
  },
  "baked_down": {
   "relief": {
@@ -154,7 +154,7 @@
   "script": "vehicles/cars/kestrel_meridian.py",
   "script_sha256": "5595be2b8d405ac397ca4feec59bc13a1162e36bea5b68a53121738c193fcaf8",
   "carkit_sha256": "4a1b9a9a1c4472c37227e0b9171ff94263a6d3d320dd4d13ad55783936af1832",
-  "game_sha256": "0ad8b492606e0f635834e714c0236f556a0ec776a6db7c3a071987b42777c7d3",
+  "game_sha256": "1b52432947a42b2976adc1e33a4930f639dbee535955f60f09aa69d1b2036a2d",
   "original_triangles": 180799,
   "original_objects": 230
  },
@@ -221,15 +221,15 @@
     },
     {
      "lod": 3,
-     "triangles": 4992,
+     "triangles": 5126,
      "budget": 5000,
      "ok": true,
      "exterior": {
-      "triangles": 4675,
+      "triangles": 4881,
       "budget": 5000
      },
      "cabin": {
-      "triangles": 317,
+      "triangles": 245,
       "budget": 0
      }
     }
@@ -301,9 +301,9 @@
     {
      "lod": 3,
      "deviation_m": [
-      0.0028,
+      0.0055,
       0.0,
-      0.0
+      0.0005
      ],
      "tolerance_m": [
       0.0797,
@@ -345,10 +345,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 24.04,
-     "bent_share": 0.0471,
-     "texture_share": 0.018,
-     "miss_share": 0.0281,
+     "normal_p95_deg": 32.38,
+     "bent_share": 0.0765,
+     "texture_share": 0.0312,
+     "miss_share": 0.0426,
      "lod": 3,
      "limits": {
       "p95": 40.0,
