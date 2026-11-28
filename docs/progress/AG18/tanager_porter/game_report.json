@@ -8,7 +8,7 @@
    183230,
    69993,
    20292,
-   8053
+   8202
   ],
   "lod0_parts": {
    "body": 151290,
@@ -26,7 +26,7 @@
  "size_class": {
   "name": "large",
   "exterior_m2": 85.49,
-  "rule": "large when the body's exterior is 55 m2 or more",
+  "rule": "large when the body's exterior is 50 m2 or more",
   "lod_budgets": [
    150000,
    60000,
@@ -49,18 +49,18 @@
   "body": 4096,
   "wheels": 2048
  },
- "pack_bytes": 40062098,
- "seconds": 3334.4,
+ "pack_bytes": 40948818,
+ "seconds": 3945.7,
  "stage_seconds": {
   "build": 1.8,
-  "render_original": 84.2,
-  "parts": 79.3,
+  "render_original": 84.5,
+  "parts": 79.4,
   "nodes": 0.0,
-  "uv": 1012.9,
-  "bake": 1454.2,
-  "lods_export": 411.3,
-  "textures": 17.90681290626526,
-  "proof": 271.3449544906616
+  "uv": 1037.6,
+  "bake": 2373.2,
+  "lods_export": 87.1,
+  "textures": 17.803311347961426,
+  "proof": 262.88787031173706
  },
  "baked_down": {
   "card_src": {
@@ -203,7 +203,7 @@
   "script": "vehicles/cars/tanager_porter.py",
   "script_sha256": "d1fcd512ed87531c30620bed0bb3a22f88514825b217f9d30b106b6c44e2b731",
   "carkit_sha256": "4a1b9a9a1c4472c37227e0b9171ff94263a6d3d320dd4d13ad55783936af1832",
-  "game_sha256": "8640355211eff1ad8e8800b9a8116a3a72550090cdf34c828e5604422b183fc4",
+  "game_sha256": "1b52432947a42b2976adc1e33a4930f639dbee535955f60f09aa69d1b2036a2d",
   "original_triangles": 345483,
   "original_objects": 270
  },
@@ -270,15 +270,15 @@
     },
     {
      "lod": 3,
-     "triangles": 8053,
+     "triangles": 8202,
      "budget": 8000,
      "ok": true,
      "exterior": {
-      "triangles": 6696,
+      "triangles": 6523,
       "budget": 8000
      },
      "cabin": {
-      "triangles": 1357,
+      "triangles": 1679,
       "budget": 0
      }
     }
@@ -446,8 +446,8 @@
     {
      "lod": 3,
      "deviation_m": [
-      0.0002,
-      0.0065,
+      0.002,
+      0.0058,
       0.0011
      ],
      "tolerance_m": [
@@ -490,10 +490,10 @@
      "ok": true
     },
     {
-     "normal_p95_deg": 13.92,
-     "bent_share": 0.0227,
-     "texture_share": 0.0235,
-     "miss_share": 0.0853,
+     "normal_p95_deg": 18.31,
+     "bent_share": 0.0283,
+     "texture_share": 0.0191,
+     "miss_share": 0.0063,
      "lod": 3,
      "limits": {
       "p95": 40.0,
