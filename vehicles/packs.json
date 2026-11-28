@@ -381,21 +381,21 @@
   },
   "orrin_tide": {
    "asset": "orrin_tide.zip",
-   "sha256": "b970c2fa6bb14e5f599a9c4e2dea0bb4c58c7b8da90b1151e564a33b69292b73",
-   "bytes": 24364034,
+   "sha256": "009e827762a894dc022b0b178cb7ea14203a11531f00aa8562e7347a4bdd4517",
+   "bytes": 24379646,
    "files": {
-    "body_base_color.png": "6c410ea2186b32224d21e6bca5967b529ba93d7da6ffef21a42ab15039f8ca08",
-    "body_emissive.png": "7806ba8719cc6c83d5308363ab230afa7ae343ad5d5100a0298148c8d552abdb",
-    "body_mask.png": "31a70654342accf144fdf4edc4c662ce1e9f6e8288427a7e1fc08dce6a57847e",
-    "body_normal.png": "6f99f951119e6b311bad21977226cce2aea6b44a97dc74689a59260283947b6f",
-    "body_orm.png": "ec4c96ac422b2b8adff4843639a4208ab61a5b3ccbde166dfef2373372bd29f5",
+    "body_base_color.png": "2817caad542ce6801d801648c0ac62f6fccec47c8307d3be809c2f601064c91f",
+    "body_emissive.png": "0fb44801f3eb6aa90be6dbbec8fdfb6be6a6ad69f49a2e797be379121260664b",
+    "body_mask.png": "eb6e533600c31b4c82844652d2841cc8bb3224291984b0faa8b730f8fd29d595",
+    "body_normal.png": "ac41783385db452a2ec0477ece9317dce98c89c3580f25d70cfc3c50459e6e99",
+    "body_orm.png": "25ba10c6ab65e774952c086d61e548bf994e987ebdfa86d4be9a400963d445b0",
     "collision.glb": "71b2882473c8b92d226da570a96c39bc76a20a2c8b890e96acd28ee90bbb5b89",
-    "game_report.json": "12fb4efd50ae71f275d074f789d66e8d6e1f6db254bac076ad0722144fad81ff",
-    "lod0.glb": "9d3883792443682b4ec66dc1184938d97ed779d9f1497a2eca354b85ccfbbc6f",
+    "game_report.json": "dc738919645f3ad06ec6b9138c37396c4317abdb430df154db289d51cfcd017a",
+    "lod0.glb": "7122d11eebb919bbc1ff6e4bf673cc19a4d7ff7af5d35433f795606c12511bae",
     "lod1.glb": "1121d27bc8e2807c22ecd590a774da23db8e39ecc3d24a84927f911a62c725f3",
     "lod2.glb": "85a0e3708408491a55438af2ba852a3cc3236f65f69eafe30137a39bcf0ab2d1",
-    "lod3.glb": "243721ee25e1ecc4a88a8d22f083277206f41aaa4c99f840b03644f7830d9262",
-    "pack.json": "52e5adc4d63b753503e62abe018a2f57ccffc63f5a91ac414a06100a7998d38a",
+    "lod3.glb": "d9edafb7504519e0db2fdbe8d7048ee2e43e77121ec6a3b168a6f94de2911807",
+    "pack.json": "3556b05f67099ef1a36d8ac17ef9e1e9f85246af732eaac5d9583082ca761675",
     "wheels_base_color.png": "06765b55767419aadfe93a8eb3389f53b6d983a2c8f3e2ac54821ab04c8bd403",
     "wheels_emissive.png": "d4f4f7b5ed7577bf62b032fe082135cb39db1544eeaca996cc48c13bd5a1089f",
     "wheels_mask.png": "8fc6a1ac4e2066ef3a79c424784c9b996fec3cba749d6693f142756a9e4e60a8",
@@ -406,7 +406,7 @@
     "script": "vehicles/cars/orrin_tide.py",
     "script_sha256": "503acf7e2bb34a03302352b8dd2c48133525aee0ff788925cdeacc6ea25ce977",
     "carkit_sha256": "4a1b9a9a1c4472c37227e0b9171ff94263a6d3d320dd4d13ad55783936af1832",
-    "game_sha256": "0ad8b492606e0f635834e714c0236f556a0ec776a6db7c3a071987b42777c7d3"
+    "game_sha256": "1b52432947a42b2976adc1e33a4930f639dbee535955f60f09aa69d1b2036a2d"
    }
   },
   "tanager_cab": {
