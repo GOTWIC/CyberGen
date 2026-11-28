@@ -411,32 +411,32 @@
   },
   "tanager_cab": {
    "asset": "tanager_cab.zip",
-   "sha256": "08215656c54d4f93845d58d0eb1ab31e47ed508290ec289a2d579ac1683e48f1",
-   "bytes": 27260130,
+   "sha256": "ce761f2a0611c0436b8efba927a447c41ceda3193e7b5a7e057baab8da05b143",
+   "bytes": 28056242,
    "files": {
-    "body_base_color.png": "915ac72e37e8313a8c823e98b3b8dbfe19aab86abbc2dcd9e3bb7487d7fdeaab",
-    "body_emissive.png": "915e9860375d5a3aa9ea3b003c040c5248d2c91f400d5899490d8cdc62f34302",
-    "body_mask.png": "6408546dc4616d09a7ed347280745ff42f99afced109324d2d9494441b74ba50",
-    "body_normal.png": "dd7ce2ee7713cde6dfbfe6bc42037fdc9d443eeb832ee5b2c4aa218f62f034b9",
-    "body_orm.png": "3fc18e2053007be1ba461337166ed5ced89332cca8cc5d7fc3daf4976d4d0c2e",
+    "body_base_color.png": "fb5dec9062acbf9edbc1aaf6358734503d782544be256bc09223a3d55042377a",
+    "body_emissive.png": "fd7bd9d200566024e2ae120a430bf33ae4c5bc31bb04e77b63568ca676adb655",
+    "body_mask.png": "f9c4328e95b12e2b181a671d03fe83e2cf25acb3dcd1eec209ee60ff2a501cad",
+    "body_normal.png": "06cef9cdea657e4613e886290efabcd4f45b07b8b5814e297fa0361c98dc94cb",
+    "body_orm.png": "f3377518753f0401b00e67018c3581b007ccb6eb4adf98f944ef4d5242bc30b2",
     "collision.glb": "8dc6e9d27424b83228623facfad6c6d5a7e37db9d964e623007fb1e432989120",
-    "game_report.json": "285b7c6cc06b1e96eca03df71233aab1d88b760a9bf98a5290b4aa7b2de15a09",
-    "lod0.glb": "c3997e9d10d06f081cbbd99a264546978c0d2b5a6631e84e62280b99b47936c2",
+    "game_report.json": "1063b33d414cdea6e7b5ec385b192c14381a6d96f91a0d9a4e6bf62ccc1c234b",
+    "lod0.glb": "5a07601007ee057f799001d547e0b53016892255f8a875392bdead1da55f53a1",
     "lod1.glb": "a07ce580a71eb07e73cbaa47c092e5e541e353fc2135e4a8cc12e03a313418f4",
     "lod2.glb": "c6807ed5eb7707b9748c8337cdde82e0289bee07686c080cc4595c27374adf8a",
-    "lod3.glb": "b5faa2746d72b9bbfbe61334abdcbdbdc8dece6bb868e587e3893017cebd6474",
-    "pack.json": "9fdc55dba90a886e1a6dd08d72f0345d3ca151249df11058c0046e3881a7c058",
-    "wheels_base_color.png": "7349dfacccdd65f087971b356271a1e0bb1debf435f3442102cd8fd3311349dd",
-    "wheels_emissive.png": "8273489817544e37cef270f354a1df8b221b76cff76118a760965f32bb19daa7",
-    "wheels_mask.png": "c43d1d2b78808c707e3dcad6f49c9ee45d7be591ccc61e96401d02d1e3ae12b4",
-    "wheels_normal.png": "82f7462d91c4055b31d60d863507768a39d140fb065162050a482bd2f39580b1",
-    "wheels_orm.png": "a2b48ece062539f3e404c32aeb9f68d6101120ffb72de85eed28242a294a9ebc"
+    "lod3.glb": "297e21ef1795d41d14feaebe492e089a8027aadba388f21ec3e17f5e85547e33",
+    "pack.json": "59918ad050cbffa797c8545998c20032af306e3dfaf8638fcfebb65ec8cabdb5",
+    "wheels_base_color.png": "21b1ccadde8cf78ffa84d07759ea2e196280b3dd8917930c5b46e02e288e075e",
+    "wheels_emissive.png": "f048a6d8066dec47522707513dc6d5770549d0c5c95454f6c74a2662c37d0e9b",
+    "wheels_mask.png": "25613b2891872e0239cf47f54daccae26151c2aeb0ae89d66f2879084d041ac6",
+    "wheels_normal.png": "bc6176a56a9a838658bd0a497b1a922c17c1f72a039223ec83a624621a447e58",
+    "wheels_orm.png": "7f533bd9b5df659e716e7ac4394cc88eb339691abbb7c600ef636f7b26ae8890"
    },
    "source": {
     "script": "vehicles/cars/tanager_cab.py",
     "script_sha256": "d67bf985ad4cde1283d93061dee1f20934864858fa1e723dd5b62c8ff92b0d0b",
     "carkit_sha256": "4a1b9a9a1c4472c37227e0b9171ff94263a6d3d320dd4d13ad55783936af1832",
-    "game_sha256": "8640355211eff1ad8e8800b9a8116a3a72550090cdf34c828e5604422b183fc4"
+    "game_sha256": "1b52432947a42b2976adc1e33a4930f639dbee535955f60f09aa69d1b2036a2d"
    }
   },
   "tanager_linnet": {
